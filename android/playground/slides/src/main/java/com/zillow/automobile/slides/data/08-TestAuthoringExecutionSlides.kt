@@ -3,28 +3,26 @@ package com.zillow.automobile.slides.data
 import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.SlideContent
 
-/**
- * Slides for Introduction to AutoMobile?
- */
-fun getTestAuthoringExecutionSlides(): List<SlideContent> = listOf(
-// - Test Authoring & Execution
-//      - yaml plan because
-//        - I want to support iOS in the same tool
-//        - easy to record/replay
-//      - JUnitRunner Android library
-//        - Live demo of running a test to run through the AutoMobile Playground app and resume the slideshow
-//	    - User credentials & Experiments
-//	    - Code example of test with credentials
-//	    - Live demo of login in AutoMobile Playground
-//	    - Code example of experiment and treatment with credentials
-//	    - Live demo of control vs party mode in AutoMobile Playground
-  SlideContent.LargeText(
-    title = "Test Authoring & Execution"
-  ),
-
-  SlideContent.CodeSample(
-    title = "YAML Plan Sample",
-    code = """
+/** Slides for Introduction to AutoMobile? */
+fun getTestAuthoringExecutionSlides(): List<SlideContent> =
+    listOf(
+        // - Test Authoring & Execution
+        //      - yaml plan because
+        //        - I want to support iOS in the same tool
+        //        - easy to record/replay
+        //      - JUnitRunner Android library
+        //        - Live demo of running a test to run through the AutoMobile Playground app and
+        // resume the slideshow
+        //	    - User credentials & Experiments
+        //	    - Code example of test with credentials
+        //	    - Live demo of login in AutoMobile Playground
+        //	    - Code example of experiment and treatment with credentials
+        //	    - Live demo of control vs party mode in AutoMobile Playground
+        SlideContent.LargeText(title = "Test Authoring & Execution"),
+        SlideContent.CodeSample(
+            title = "YAML Plan Sample",
+            code =
+                """
 ---
 name: set-alarm-6-30am-demo-mode
 description: Create 6:30 AM alarm in Clock app
@@ -49,30 +47,32 @@ steps:
   - tool: tapOn
     text: "OK"
 
-    """.trimIndent(),
-    language = "yaml"
-  ),
-  SlideContent.BulletPoints(
-    title = "AutoMobile JUnitRunner",
-    points = listOf(
-      BulletPoint(text = "Android library"),
-      BulletPoint(text = "JUnit4 prioritized with JUnit5 compatibility"),
-      BulletPoint(text = "Runs AutoMobile in CLI mode until failure, STDERR captured for debugging"),
-      // TODO: Uncomment when koog support lands
-      //  BulletPoint(text = "koog integration for optional self-healing")
-    )
-  ),
-  SlideContent.BulletPoints(
-    title = "Test Authoring Capabilities",
-    points = listOf(
-      BulletPoint(text = "Secure user credential handling"),
-      BulletPoint(text = "Experiment + Treatment support"),
-      BulletPoint(text = "Basic Kotlin DSL, high flexibility")
-    )
-  ),
-  SlideContent.CodeSample(
-    title = "Environment Credentials Example",
-    code = """
+    """
+                    .trimIndent(),
+            language = "yaml"),
+        SlideContent.BulletPoints(
+            title = "AutoMobile JUnitRunner",
+            points =
+                listOf(
+                    BulletPoint(text = "Android library"),
+                    BulletPoint(text = "JUnit4 prioritized with JUnit5 compatibility"),
+                    BulletPoint(
+                        text =
+                            "Runs AutoMobile in CLI mode until failure, STDERR captured for debugging"),
+                    // TODO: Uncomment when koog support lands
+                    //  BulletPoint(text = "koog integration for optional self-healing")
+                )),
+        SlideContent.BulletPoints(
+            title = "Test Authoring Capabilities",
+            points =
+                listOf(
+                    BulletPoint(text = "Secure user credential handling"),
+                    BulletPoint(text = "Experiment + Treatment support"),
+                    BulletPoint(text = "Basic Kotlin DSL, high flexibility"))),
+        SlideContent.CodeSample(
+            title = "Environment Credentials Example",
+            code =
+                """
       @Test
       fun `given valid credentials, login should succeed`() {
           val result = AutoMobilePlan("test-plans/login.yaml", {
@@ -80,13 +80,13 @@ steps:
           }).execute()
           assertThat(result.status).isEqualTo(SUCCESS)
       }
-    """.trimIndent(),
-    language = "kotlin"
-  ),
-
-  SlideContent.CodeSample(
-    title = "Experiment Configuration Example",
-    code = """
+    """
+                    .trimIndent(),
+            language = "kotlin"),
+        SlideContent.CodeSample(
+            title = "Experiment Configuration Example",
+            code =
+                """
   @Test
   fun `given an excited audience, start the party`() {
     val result =
@@ -99,14 +99,13 @@ steps:
 
     assertTrue("Party mode is active", result.success)
   }
-    """.trimIndent(),
-    language = "kotlin"
-  ),
-
-
-  SlideContent.CodeSample(
-    title = "Experiment Configuration Example",
-    code = """
+    """
+                    .trimIndent(),
+            language = "kotlin"),
+        SlideContent.CodeSample(
+            title = "Experiment Configuration Example",
+            code =
+                """
   @Test
   fun `given an excited audience, start the party`() {
     val result =
@@ -117,20 +116,20 @@ steps:
 
     assertTrue("Party mode is active", result.success)
   }
-    """.trimIndent(),
-    language = "kotlin"
-  ),
+    """
+                    .trimIndent(),
+            language = "kotlin"),
 
-//  ---
-//name: complete-onboarding
-//description: Complete fake onboarding flow with experiment-specific behavior
-//parameters:
-//  experiment: ${experiment}
-//  environment: ${environment}
-//  user_email: ${user_email}
-//  skip_intro: ${skip_intro}
-//
-//steps:
-//  - tool: observe
-//    label: "Observe initial app state with ${experiment}"
-)
+        //  ---
+        // name: complete-onboarding
+        // description: Complete fake onboarding flow with experiment-specific behavior
+        // parameters:
+        //  experiment: ${experiment}
+        //  environment: ${environment}
+        //  user_email: ${user_email}
+        //  skip_intro: ${skip_intro}
+        //
+        // steps:
+        //  - tool: observe
+        //    label: "Observe initial app state with ${experiment}"
+    )

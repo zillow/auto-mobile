@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.startup.Initializer
 
 /**
- * Initializer for Coil image loading library using AndroidX Startup.
- * Ensures Coil is ready for use in the application.
- * The actual Coil configuration is handled by the library's auto-initialization.
+ * Initializer for Coil image loading library using AndroidX Startup. Ensures Coil is ready for use
+ * in the application. The actual Coil configuration is handled by the library's
+ * auto-initialization.
  */
 class CoilInitializer : Initializer<Unit> {
 

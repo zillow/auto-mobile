@@ -22,9 +22,7 @@ class SlidesNavigationTest {
     assertEquals("automobile://playground/slides/0", SlidesDestination.createDeepLink(0))
     assertEquals("automobile://playground/slides/3", SlidesDestination.createDeepLink(3))
     assertEquals(
-      "automobile://playground/slides/0",
-      SlidesDestination.createDeepLink()
-    ) // Default value
+        "automobile://playground/slides/0", SlidesDestination.createDeepLink()) // Default value
   }
 
   @Test
@@ -51,9 +49,7 @@ class SlidesNavigationTest {
     assertEquals("slides/0", DeepLinkManager.parseDeepLink(slideUri0))
     assertEquals("slides/5", DeepLinkManager.parseDeepLink(slideUri5))
     assertEquals(
-      "slides/0",
-      DeepLinkManager.parseDeepLink(slideUriInvalid)
-    ) // Invalid index defaults to 0
+        "slides/0", DeepLinkManager.parseDeepLink(slideUriInvalid)) // Invalid index defaults to 0
   }
 
   @Test
@@ -65,9 +61,7 @@ class SlidesNavigationTest {
 
     assertTrue("Valid slide URI should be valid", DeepLinkManager.isValidDeepLink(validSlideUri))
     assertTrue(
-      "Invalid scheme should be invalid",
-      !DeepLinkManager.isValidDeepLink(invalidSchemeUri)
-    )
+        "Invalid scheme should be invalid", !DeepLinkManager.isValidDeepLink(invalidSchemeUri))
     assertTrue("Invalid host should be invalid", !DeepLinkManager.isValidDeepLink(invalidHostUri))
     assertTrue("Invalid path should be invalid", !DeepLinkManager.isValidDeepLink(invalidPathUri))
   }

@@ -46,55 +46,41 @@ data class OnboardingPage(val title: String, val description: String, val emoji:
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
   val pages =
-    listOf(
-      OnboardingPage(
-        title = stringResource(id = R.string.onboarding_welcome_title),
-        description =  stringResource(id = R.string.onboarding_welcome_description),
-        emoji = stringResource(id = R.string.onboarding_welcome_emoji)
-      ),
-      OnboardingPage(
-        title = stringResource(id = R.string.onboarding_source_intelligence_title),
-        description =
-          stringResource(id = R.string.onboarding_source_intelligence_description),
-        emoji = stringResource(id = R.string.onboarding_source_intelligence_emoji)
-      ),
-      OnboardingPage(
-        title = stringResource(id = R.string.onboarding_gestures_title),
-        description =
-          stringResource(id = R.string.onboarding_gestures_description),
-        emoji = stringResource(id = R.string.onboarding_gestures_emoji)
-      ),
-      OnboardingPage(
-        title = stringResource(id = R.string.onboarding_automation_title),
-        description =
-          stringResource(id = R.string.onboarding_automation_description),
-        emoji = stringResource(id = R.string.onboarding_automation_emoji)
-      ),
-      OnboardingPage(
-        title = stringResource(id = R.string.onboarding_opensource_title),
-        description =
-          stringResource(id = R.string.onboarding_opensource_description),
-        emoji = stringResource(id = R.string.onboarding_opensource_emoji)
-      )
-    )
+      listOf(
+          OnboardingPage(
+              title = stringResource(id = R.string.onboarding_welcome_title),
+              description = stringResource(id = R.string.onboarding_welcome_description),
+              emoji = stringResource(id = R.string.onboarding_welcome_emoji)),
+          OnboardingPage(
+              title = stringResource(id = R.string.onboarding_source_intelligence_title),
+              description =
+                  stringResource(id = R.string.onboarding_source_intelligence_description),
+              emoji = stringResource(id = R.string.onboarding_source_intelligence_emoji)),
+          OnboardingPage(
+              title = stringResource(id = R.string.onboarding_gestures_title),
+              description = stringResource(id = R.string.onboarding_gestures_description),
+              emoji = stringResource(id = R.string.onboarding_gestures_emoji)),
+          OnboardingPage(
+              title = stringResource(id = R.string.onboarding_automation_title),
+              description = stringResource(id = R.string.onboarding_automation_description),
+              emoji = stringResource(id = R.string.onboarding_automation_emoji)),
+          OnboardingPage(
+              title = stringResource(id = R.string.onboarding_opensource_title),
+              description = stringResource(id = R.string.onboarding_opensource_description),
+              emoji = stringResource(id = R.string.onboarding_opensource_emoji)))
 
   val pagerState = rememberPagerState(pageCount = { pages.size })
   val coroutineScope = rememberCoroutineScope()
 
-  Column(modifier = Modifier
-    .fillMaxSize()
-    .background(MaterialTheme.colorScheme.background)) {
+  Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     // Skip button
     Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(16.dp),
-      horizontalArrangement = Arrangement.End
-    ) {
-      if (pagerState.currentPage < pages.size - 1) {
-        TextButton(onClick = onFinish) { Text(stringResource(id = R.string.onboarding_skip)) }
-      }
-    }
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        horizontalArrangement = Arrangement.End) {
+          if (pagerState.currentPage < pages.size - 1) {
+            TextButton(onClick = onFinish) { Text(stringResource(id = R.string.onboarding_skip)) }
+          }
+        }
 
     // Pager content
     HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
@@ -105,51 +91,48 @@ fun OnboardingScreen(onFinish: () -> Unit) {
     Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
       // Page indicators
       PageIndicators(
-        pageCount = pages.size,
-        currentPage = pagerState.currentPage,
-        modifier = Modifier.padding(bottom = 24.dp)
-      )
+          pageCount = pages.size,
+          currentPage = pagerState.currentPage,
+          modifier = Modifier.padding(bottom = 24.dp))
 
       // Navigation buttons
       Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        // Back button
-        if (pagerState.currentPage > 0) {
-          OutlinedButton(
-            onClick = {
-              coroutineScope.launch {
-                pagerState.animateScrollToPage(pagerState.currentPage - 1)
-              }
-            }) {
-            Text(stringResource(id = R.string.onboarding_back))
-          }
-        } else {
-          Spacer(modifier = Modifier.width(80.dp))
-        }
-
-        // Next/Finish button
-        Button(
-          onClick = {
-            if (pagerState.currentPage < pages.size - 1) {
-              coroutineScope.launch {
-                pagerState.animateScrollToPage(pagerState.currentPage + 1)
-              }
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically) {
+            // Back button
+            if (pagerState.currentPage > 0) {
+              OutlinedButton(
+                  onClick = {
+                    coroutineScope.launch {
+                      pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                    }
+                  }) {
+                    Text(stringResource(id = R.string.onboarding_back))
+                  }
             } else {
-              onFinish()
+              Spacer(modifier = Modifier.width(80.dp))
             }
-          },
-          modifier = Modifier.widthIn(min = 100.dp)
-        ) {
-          Text(
-            text = if (pagerState.currentPage < pages.size - 1) stringResource(id = R.string.onboarding_next) else stringResource(
-              id = R.string.onboarding_get_started
-            )
-          )
-        }
-      }
+
+            // Next/Finish button
+            Button(
+                onClick = {
+                  if (pagerState.currentPage < pages.size - 1) {
+                    coroutineScope.launch {
+                      pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                    }
+                  } else {
+                    onFinish()
+                  }
+                },
+                modifier = Modifier.widthIn(min = 100.dp)) {
+                  Text(
+                      text =
+                          if (pagerState.currentPage < pages.size - 1)
+                              stringResource(id = R.string.onboarding_next)
+                          else stringResource(id = R.string.onboarding_get_started))
+                }
+          }
     }
   }
 }
@@ -161,61 +144,54 @@ fun OnboardingPageContent(page: OnboardingPage, modifier: Modifier = Modifier) {
   val context = LocalContext.current
 
   Column(
-    modifier = modifier.padding(horizontal = 32.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.Center
-  ) {
-    // Emoji/Icon
-    Text(text = page.emoji, fontSize = 80.sp, modifier = Modifier.padding(bottom = 32.dp))
+      modifier = modifier.padding(horizontal = 32.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center) {
+        // Emoji/Icon
+        Text(text = page.emoji, fontSize = 80.sp, modifier = Modifier.padding(bottom = 32.dp))
 
-    // Title
-    Text(
-      text = page.title,
-      fontSize = 28.sp,
-      fontWeight = FontWeight.Bold,
-      textAlign = TextAlign.Center,
-      color = MaterialTheme.colorScheme.onBackground,
-      modifier = Modifier.padding(bottom = 16.dp)
-    )
+        // Title
+        Text(
+            text = page.title,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 16.dp))
 
-    // Description
-    if (page.title == stringResource(id = R.string.onboarding_opensource_title)) {
-      val githubUrl = stringResource(id = R.string.github_url)
-      val annotatedString = buildAnnotatedString {
-        append(stringResource(id = R.string.onboarding_opensource_description_part1))
-        withStyle(
-          style = SpanStyle(
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline
-          )
-        ) {
-          pushStringAnnotation("url", githubUrl)
-          append(stringResource(id = R.string.onboarding_opensource_description_part2))
-          pop()
+        // Description
+        if (page.title == stringResource(id = R.string.onboarding_opensource_title)) {
+          val githubUrl = stringResource(id = R.string.github_url)
+          val annotatedString = buildAnnotatedString {
+            append(stringResource(id = R.string.onboarding_opensource_description_part1))
+            withStyle(
+                style =
+                    SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline)) {
+                  pushStringAnnotation("url", githubUrl)
+                  append(stringResource(id = R.string.onboarding_opensource_description_part2))
+                  pop()
+                }
+            append(stringResource(id = R.string.onboarding_opensource_description_part3))
+          }
+
+          Text(
+              text = annotatedString,
+              fontSize = 16.sp,
+              textAlign = TextAlign.Center,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              lineHeight = 24.sp,
+              modifier = Modifier.clickable { uriHandler.openUri(githubUrl) })
+        } else {
+          Text(
+              text = page.description,
+              fontSize = 16.sp,
+              textAlign = TextAlign.Center,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              lineHeight = 24.sp)
         }
-        append(stringResource(id = R.string.onboarding_opensource_description_part3))
       }
-
-      Text(
-        text = annotatedString,
-        fontSize = 16.sp,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        lineHeight = 24.sp,
-        modifier = Modifier.clickable {
-          uriHandler.openUri(githubUrl)
-        }
-      )
-    } else {
-      Text(
-        text = page.description,
-        fontSize = 16.sp,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        lineHeight = 24.sp
-      )
-    }
-  }
 }
 
 /** Page indicator dots. */
@@ -224,18 +200,15 @@ fun PageIndicators(pageCount: Int, currentPage: Int, modifier: Modifier = Modifi
   Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     repeat(pageCount) { index ->
       Box(
-        modifier =
-          Modifier
-            .size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
-            .clip(RoundedCornerShape(4.dp))
-            .background(
-              if (index == currentPage) {
-                MaterialTheme.colorScheme.primary
-              } else {
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-              }
-            )
-      )
+          modifier =
+              Modifier.size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
+                  .clip(RoundedCornerShape(4.dp))
+                  .background(
+                      if (index == currentPage) {
+                        MaterialTheme.colorScheme.primary
+                      } else {
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                      }))
     }
   }
 }

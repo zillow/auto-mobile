@@ -46,13 +46,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import androidx.core.net.toUri
+import kotlinx.coroutines.delay
 
 /** Main media player screen with image and video components. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,69 +61,50 @@ fun MediaPlayerScreen() {
   var selectedMediaType by remember { mutableStateOf(MediaType.IMAGE) }
 
   Scaffold(
-    topBar = {
-      TopAppBar(
-        title = {
-          Text(
-            text = "Media Player",
-            fontWeight = FontWeight.Bold
-          )
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-          containerColor = MaterialTheme.colorScheme.primaryContainer,
-          titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-      )
-    }
-  ) { paddingValues ->
-    LazyColumn(
-      modifier =
-        Modifier
-          .fillMaxSize()
-          .padding(paddingValues)
-          .padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-      // Media type selection cards
-      items(MediaType.entries) { mediaType ->
-        MediaTypeCard(
-          mediaType = mediaType,
-          isSelected = selectedMediaType == mediaType,
-          onClick = { selectedMediaType = mediaType }
-        )
+      topBar = {
+        TopAppBar(
+            title = { Text(text = "Media Player", fontWeight = FontWeight.Bold) },
+            colors =
+                TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer))
+      }) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+              // Media type selection cards
+              items(MediaType.entries) { mediaType ->
+                MediaTypeCard(
+                    mediaType = mediaType,
+                    isSelected = selectedMediaType == mediaType,
+                    onClick = { selectedMediaType = mediaType })
+              }
+
+              // Selected media player
+              item {
+                when (selectedMediaType) {
+                  MediaType.IMAGE -> {
+                    ImageGalleryComponent(
+                        imageUrls = getSampleImageUrls(), modifier = Modifier.fillMaxWidth())
+                  }
+
+                  MediaType.VIDEO -> {
+                    // VideoPlayerComponent was merged into VideoPlayerScreen
+                    Text(
+                        text = "Video player functionality moved to VideoPlayerScreen",
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium)
+                  }
+
+                  MediaType.AUDIO -> {
+                    AudioPlayerComponent(
+                        audioResource = VideoResource.UriVideo(getSampleAudioUrl().toUri()),
+                        modifier = Modifier.fillMaxWidth())
+                  }
+                }
+              }
+            }
       }
-
-      // Selected media player
-      item {
-        when (selectedMediaType) {
-          MediaType.IMAGE -> {
-            ImageGalleryComponent(
-              imageUrls = getSampleImageUrls(),
-              modifier = Modifier.fillMaxWidth()
-            )
-          }
-
-          MediaType.VIDEO -> {
-            // VideoPlayerComponent was merged into VideoPlayerScreen
-            Text(
-              text = "Video player functionality moved to VideoPlayerScreen",
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-              style = MaterialTheme.typography.bodyMedium
-            )
-          }
-
-          MediaType.AUDIO -> {
-            AudioPlayerComponent(
-              audioResource = VideoResource.UriVideo(getSampleAudioUrl().toUri()),
-              modifier = Modifier.fillMaxWidth()
-            )
-          }
-        }
-      }
-    }
-  }
 }
 
 /** Fullscreen media player with auto-hiding controls. */
@@ -156,139 +136,116 @@ fun FullscreenMediaPlayer() {
   }
 
   Box(
-    modifier =
-      Modifier
-        .fillMaxSize()
-        .background(Color.Black)
-        .clickable(
-          interactionSource = remember { MutableInteractionSource() }, indication = null
-        ) {
-          showControls = !showControls
-        }) {
+      modifier =
+          Modifier.fillMaxSize().background(Color.Black).clickable(
+              interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                showControls = !showControls
+              }) {
 
+        // Media controls overlay
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)) {
+              MediaControlsOverlay(
+                  isPlaying = isPlaying,
+                  currentTime = currentTime,
+                  volume = volume,
+                  onPlayPause = {
+                    isPlaying = !isPlaying
+                    showControls = true
+                  },
+                  onSeek = { newTime ->
+                    currentTime = newTime
+                    showControls = true
+                  },
+                  onVolumeChange = { newVolume ->
+                    volume = newVolume
+                    showControls = true
+                  })
+            }
 
-    // Media controls overlay
-    AnimatedVisibility(
-      visible = showControls,
-      enter = fadeIn(),
-      exit = fadeOut(),
-      modifier = Modifier.align(Alignment.BottomCenter)
-    ) {
-      MediaControlsOverlay(
-        isPlaying = isPlaying,
-        currentTime = currentTime,
-        volume = volume,
-        onPlayPause = {
-          isPlaying = !isPlaying
-          showControls = true
-        },
-        onSeek = { newTime ->
-          currentTime = newTime
-          showControls = true
-        },
-        onVolumeChange = { newVolume ->
-          volume = newVolume
-          showControls = true
-        })
-    }
-
-    // Progress indicator when playing
-    if (isPlaying) {
-      LinearProgressIndicator(
-        progress = { currentTime / 100f },
-        modifier = Modifier
-          .fillMaxWidth()
-          .align(Alignment.TopCenter),
-        color = MaterialTheme.colorScheme.primary,
-        trackColor = Color.Transparent
-      )
-    }
-  }
+        // Progress indicator when playing
+        if (isPlaying) {
+          LinearProgressIndicator(
+              progress = { currentTime / 100f },
+              modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
+              color = MaterialTheme.colorScheme.primary,
+              trackColor = Color.Transparent)
+        }
+      }
 }
 
 /** Media controls overlay with play/pause, seek, and volume controls. */
 @Composable
 fun MediaControlsOverlay(
-  isPlaying: Boolean,
-  currentTime: Float,
-  volume: Float,
-  onPlayPause: () -> Unit,
-  onSeek: (Float) -> Unit,
-  onVolumeChange: (Float) -> Unit
+    isPlaying: Boolean,
+    currentTime: Float,
+    volume: Float,
+    onPlayPause: () -> Unit,
+    onSeek: (Float) -> Unit,
+    onVolumeChange: (Float) -> Unit
 ) {
   Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .background(Color.Black.copy(alpha = 0.7f))
-      .padding(16.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.spacedBy(16.dp)
-  ) {
-    // Progress slider
-    Column {
-      Text(
-        text = "${formatTime(currentTime)} / ${formatTime(100f)}",
-        color = Color.White,
-        fontSize = 14.sp
-      )
-      Slider(
-        value = currentTime,
-        onValueChange = onSeek,
-        valueRange = 0f..100f,
-        modifier = Modifier.fillMaxWidth(),
-        colors =
-          SliderDefaults.colors(
-            thumbColor = MaterialTheme.colorScheme.primary,
-            activeTrackColor = MaterialTheme.colorScheme.primary,
-            inactiveTrackColor = Color.Gray
-          )
-      )
-    }
+      modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.7f)).padding(16.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Progress slider
+        Column {
+          Text(
+              text = "${formatTime(currentTime)} / ${formatTime(100f)}",
+              color = Color.White,
+              fontSize = 14.sp)
+          Slider(
+              value = currentTime,
+              onValueChange = onSeek,
+              valueRange = 0f..100f,
+              modifier = Modifier.fillMaxWidth(),
+              colors =
+                  SliderDefaults.colors(
+                      thumbColor = MaterialTheme.colorScheme.primary,
+                      activeTrackColor = MaterialTheme.colorScheme.primary,
+                      inactiveTrackColor = Color.Gray))
+        }
 
-    // Control buttons
-    Row(
-      horizontalArrangement = Arrangement.spacedBy(24.dp),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      // Volume control
-      Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-          imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-          contentDescription = "Volume Up",
-          tint = Color.White
-        )
-        Slider(
-          value = volume,
-          onValueChange = onVolumeChange,
-          valueRange = 0f..1f,
-          modifier = Modifier.width(120.dp),
-          colors =
-            SliderDefaults.colors(
-              thumbColor = MaterialTheme.colorScheme.primary,
-              activeTrackColor = MaterialTheme.colorScheme.primary,
-              inactiveTrackColor = Color.Gray
-            )
-        )
+        // Control buttons
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+              // Volume control
+              Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = "Volume Up",
+                    tint = Color.White)
+                Slider(
+                    value = volume,
+                    onValueChange = onVolumeChange,
+                    valueRange = 0f..1f,
+                    modifier = Modifier.width(120.dp),
+                    colors =
+                        SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = Color.Gray))
+              }
+
+              // Play/Pause button
+              Button(
+                  onClick = onPlayPause,
+                  modifier = Modifier.size(64.dp),
+                  colors =
+                      ButtonDefaults.buttonColors(
+                          containerColor = MaterialTheme.colorScheme.primary)) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = Color.White,
+                    )
+                  }
+            }
       }
-
-      // Play/Pause button
-      Button(
-        onClick = onPlayPause,
-        modifier = Modifier.size(64.dp),
-        colors =
-          ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary
-          )
-      ) {
-        Icon(
-          imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-          contentDescription = if (isPlaying) "Pause" else "Play",
-          tint = Color.White,
-
-          )
-      }
-    }
-  }
 }
 
 /** Format time in seconds to MM:SS format. */
@@ -301,83 +258,70 @@ private fun formatTime(seconds: Float): String {
 /** Media type selection card. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MediaTypeCard(
-  mediaType: MediaType,
-  isSelected: Boolean,
-  onClick: () -> Unit
-) {
+fun MediaTypeCard(mediaType: MediaType, isSelected: Boolean, onClick: () -> Unit) {
   Card(
-    onClick = onClick,
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-      } else {
-        MaterialTheme.colorScheme.surface
+      onClick = onClick,
+      modifier = Modifier.fillMaxWidth(),
+      colors =
+          CardDefaults.cardColors(
+              containerColor =
+                  if (isSelected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                  } else {
+                    MaterialTheme.colorScheme.surface
+                  }),
+      elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
+          Text(
+              text = "${mediaType.icon} ${mediaType.displayName}",
+              fontSize = 18.sp,
+              fontWeight = FontWeight.Medium,
+              color =
+                  if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                  } else {
+                    MaterialTheme.colorScheme.onSurface
+                  })
+          Text(
+              text = mediaType.description,
+              fontSize = 14.sp,
+              color =
+                  if (isSelected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                  } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                  })
+        }
       }
-    ),
-    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-  ) {
-    Column(
-      modifier = Modifier.padding(16.dp)
-    ) {
-      Text(
-        text = "${mediaType.icon} ${mediaType.displayName}",
-        fontSize = 18.sp,
-        fontWeight = FontWeight.Medium,
-        color = if (isSelected) {
-          MaterialTheme.colorScheme.onPrimaryContainer
-        } else {
-          MaterialTheme.colorScheme.onSurface
-        }
-      )
-      Text(
-        text = mediaType.description,
-        fontSize = 14.sp,
-        color = if (isSelected) {
-          MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-        } else {
-          MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-        }
-      )
-    }
-  }
 }
 
 /** Enum for different media types. */
-enum class MediaType(
-  val displayName: String,
-  val description: String,
-  val icon: String
-) {
+enum class MediaType(val displayName: String, val description: String, val icon: String) {
   IMAGE("Image Gallery", "View images with Coil loading", "🖼️"),
   VIDEO("Video Player", "Play videos with ExoPlayer", "🎬"),
   AUDIO("Audio Player", "Play audio with ExoPlayer", "🎵")
 }
 
 /** Sample image URLs for testing. */
-private fun getSampleImageUrls(): List<String> = listOf(
-  "https://picsum.photos/800/600?random=1",
-  "https://picsum.photos/800/600?random=2",
-  "https://picsum.photos/800/600?random=3",
-  "https://picsum.photos/800/600?random=4"
-)
+private fun getSampleImageUrls(): List<String> =
+    listOf(
+        "https://picsum.photos/800/600?random=1",
+        "https://picsum.photos/800/600?random=2",
+        "https://picsum.photos/800/600?random=3",
+        "https://picsum.photos/800/600?random=4")
 
 /** Sample video URL for testing. */
 private fun getSampleVideoUrl(): String =
-  "android.resource://com.zillow.automobile.mediaplayer/raw/automobile"
+    "android.resource://com.zillow.automobile.mediaplayer/raw/automobile"
 
 /** Sample audio URL for testing. */
-private fun getSampleAudioUrl(): String =
-  "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav"
+private fun getSampleAudioUrl(): String = "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav"
 
 /** Preview for the media player screen. */
 @Preview(showBackground = true)
 @Composable
 fun MediaPlayerScreenPreview() {
-  MaterialTheme {
-    MediaPlayerScreen()
-  }
+  MaterialTheme { MediaPlayerScreen() }
 }
 
 /** Preview for the fullscreen media player. */

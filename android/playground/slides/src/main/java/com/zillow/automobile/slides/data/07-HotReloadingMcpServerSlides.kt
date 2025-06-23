@@ -3,31 +3,29 @@ package com.zillow.automobile.slides.data
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
-fun getHotReloadingSlides(): List<SlideContent> = listOf(
-  SlideContent.LargeText(
-    title = "MCP Dev Workflow"
-  ),
-
-  SlideContent.MermaidDiagram(
-    title = "Challenges and Goals",
-    code = """
+fun getHotReloadingSlides(): List<SlideContent> =
+    listOf(
+        SlideContent.LargeText(title = "MCP Dev Workflow"),
+        SlideContent.MermaidDiagram(
+            title = "Challenges and Goals",
+            code =
+                """
       flowchart LR
         A[Make Code Change] --> B[Rebuild MCP Server]
         B --> C[npm install -g]
         C --> D[Restart MCP Server]
         D --> E[Tail MCP server logs]
         E --> F[Tail Firebender MCP client logs]
-      """.trimIndent()
-  ),
-
-  SlideContent.Emoji(
-    emoji = PresentationEmoji.BROKEN_CHAIN,
-    caption = "Decoupling Architecture",
-  ),
-
-  SlideContent.CodeSample(
-    title = "Node TypeScript Hot Reloading package.json",
-    code = """
+      """
+                    .trimIndent()),
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.BROKEN_CHAIN,
+            caption = "Decoupling Architecture",
+        ),
+        SlideContent.CodeSample(
+            title = "Node TypeScript Hot Reloading package.json",
+            code =
+                """
 {
   "name": "auto-mobile",
   "version": "0.0.1",
@@ -39,29 +37,30 @@ fun getHotReloadingSlides(): List<SlideContent> = listOf(
     ...
   },
   ...
-      """.trimIndent(),
-    language = "json"
-  ),
-
-  SlideContent.MermaidDiagram(
-    title = "Hot Reloading STDIO via mcp-remote",
-    code = """
+      """
+                    .trimIndent(),
+            language = "json"),
+        SlideContent.MermaidDiagram(
+            title = "Hot Reloading STDIO via mcp-remote",
+            code =
+                """
       flowchart LR
         MCP_Client --> PID
         PID --> StreamingTransport
         StreamingTransport --> MCP_Server
         MCP_Server --> MCP_Client
-      """.trimIndent()
-  ),
+      """
+                    .trimIndent()),
 
-//  SlideContent.Screenshot(
-//    caption = "Android Studio + Firebender Integration",
-//    imageUrl = "TODO: Insert actual image URL here"
-//  ),
+        //  SlideContent.Screenshot(
+        //    caption = "Android Studio + Firebender Integration",
+        //    imageUrl = "TODO: Insert actual image URL here"
+        //  ),
 
-  SlideContent.CodeSample(
-    title = "MCP Server Config",
-    code = """
+        SlideContent.CodeSample(
+            title = "MCP Server Config",
+            code =
+                """
       {
         "mcpServers": {
           "AutoMobile": {
@@ -70,7 +69,6 @@ fun getHotReloadingSlides(): List<SlideContent> = listOf(
           }
         }
       }
-    """.trimIndent(),
-    language = "json"
-  )
-)
+    """
+                    .trimIndent(),
+            language = "json"))

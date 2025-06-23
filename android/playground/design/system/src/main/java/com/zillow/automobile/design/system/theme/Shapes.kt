@@ -5,13 +5,14 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 // AutoMobile Design System Shapes
-val AutoMobileShapes = Shapes(
-  extraSmall = RoundedCornerShape(4.dp),
-  small = RoundedCornerShape(8.dp),
-  medium = RoundedCornerShape(12.dp),
-  large = RoundedCornerShape(16.dp),
-  extraLarge = RoundedCornerShape(28.dp),
-)
+val AutoMobileShapes =
+    Shapes(
+        extraSmall = RoundedCornerShape(4.dp),
+        small = RoundedCornerShape(8.dp),
+        medium = RoundedCornerShape(12.dp),
+        large = RoundedCornerShape(16.dp),
+        extraLarge = RoundedCornerShape(28.dp),
+    )
 
 // Additional custom shapes for specific use cases
 object AutoMobileCustomShapes {

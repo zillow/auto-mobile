@@ -4,19 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 
-data class LoggedInUserRecord(
-  val userId: String,
-  val displayName: String
-)
+data class LoggedInUserRecord(val userId: String, val displayName: String)
 
-data class LoginResult<T>(
-  val success: T? = null,
-  val error: Int? = null
-)
+data class LoginResult<T>(val success: T? = null, val error: Int? = null)
 
 class AuthRepository(context: Context) {
   private val sharedPreferences: SharedPreferences =
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   var user: LoggedInUserRecord? = null
     private set
@@ -41,10 +35,9 @@ class AuthRepository(context: Context) {
     return try {
       // Simulate login validation - in real app this would call API
       if (username.isNotEmpty() && password.isNotEmpty()) {
-        val loggedInUser = LoggedInUserRecord(
-          userId = username,
-          displayName = username.replaceFirstChar { it.uppercase() }
-        )
+        val loggedInUser =
+            LoggedInUserRecord(
+                userId = username, displayName = username.replaceFirstChar { it.uppercase() })
         setLoggedInUser(loggedInUser)
         LoginResult(success = loggedInUser)
       } else {

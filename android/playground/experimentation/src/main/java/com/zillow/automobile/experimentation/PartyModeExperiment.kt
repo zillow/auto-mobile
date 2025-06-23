@@ -1,9 +1,10 @@
 package com.zillow.automobile.experimentation
 
-class PartyModeExperiment(
-  private val experimentRepository: ExperimentRepository
-) {
-  enum class Treatment { CONTROL, PARTY }
+class PartyModeExperiment(private val experimentRepository: ExperimentRepository) {
+  enum class Treatment {
+    CONTROL,
+    PARTY
+  }
 
   companion object {
     const val EXPERIMENT_NAME = "Mood"

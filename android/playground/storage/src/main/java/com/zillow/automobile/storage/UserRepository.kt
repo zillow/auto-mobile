@@ -5,15 +5,15 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 
 data class UserProfile(
-  val name: String,
-  val email: String,
-  val profileImageUrl: String? = null,
-  val createdAt: Long = System.currentTimeMillis()
+    val name: String,
+    val email: String,
+    val profileImageUrl: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 class UserRepository(context: Context) {
   private val sharedPreferences: SharedPreferences =
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
   private val authRepository = AuthRepository(context)
 
   var onGuestModeProfileModificationAttempt: (() -> Unit)? = null
@@ -21,11 +21,10 @@ class UserRepository(context: Context) {
   fun getUserProfile(): UserProfile? {
     return if (authRepository.isGuestMode) {
       UserProfile(
-        name = "Anon Ymous",
-        email = "you@somewhere.net",
-        profileImageUrl = null,
-        createdAt = System.currentTimeMillis()
-      )
+          name = "Anon Ymous",
+          email = "you@somewhere.net",
+          profileImageUrl = null,
+          createdAt = System.currentTimeMillis())
     } else {
       val name = sharedPreferences.getString(KEY_NAME, null)
       val email = sharedPreferences.getString(KEY_EMAIL, null)
@@ -60,9 +59,7 @@ class UserRepository(context: Context) {
       return
     }
 
-    sharedPreferences.edit {
-      putString(KEY_NAME, name)
-    }
+    sharedPreferences.edit { putString(KEY_NAME, name) }
   }
 
   fun updateEmail(email: String) {
@@ -71,9 +68,7 @@ class UserRepository(context: Context) {
       return
     }
 
-    sharedPreferences.edit {
-      putString(KEY_EMAIL, email)
-    }
+    sharedPreferences.edit { putString(KEY_EMAIL, email) }
   }
 
   fun updateProfileImage(imageUrl: String?) {

@@ -5,14 +5,14 @@ import androidx.compose.ui.graphics.Color
 // Design System Color Palette
 val AutoMobileBlack = Color(0xFF000000)
 val AutoMobileRed =
-  Color(0xFFFF0000) // Only for standalone "AutoMobile" word/wordmark, not in sentences
+    Color(0xFFFF0000) // Only for standalone "AutoMobile" word/wordmark, not in sentences
 val AutoMobileEggshell = Color(0xFFF8F8FF)
 val AutoMobileWhite = Color(0xFFFFFFFF)
 
 // Promo video colors
 val PromoOrange = Color(0xFFFF3300) // Primary flow elements in presentations and Mermaid diagrams
 val PromoBlue =
-  Color(0xFF525FE1) // Secondary elements and connections in presentations and Mermaid diagrams
+    Color(0xFF525FE1) // Secondary elements and connections in presentations and Mermaid diagrams
 
 // Additional semantic colors
 val AutoMobileGray100 = Color(0xFFF5F5F5)

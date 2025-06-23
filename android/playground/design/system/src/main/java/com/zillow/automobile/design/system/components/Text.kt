@@ -13,107 +13,102 @@ import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun AutoMobileText(
-  text: String,
-  modifier: Modifier = Modifier,
-  color: Color = Color.Unspecified,
-  style: TextStyle = LocalTextStyle.current,
-  textAlign: TextAlign? = null,
-  overflow: TextOverflow = TextOverflow.Clip,
-  softWrap: Boolean = true,
-  maxLines: Int = Int.MAX_VALUE,
-  minLines: Int = 1
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    style: TextStyle = LocalTextStyle.current,
+    textAlign: TextAlign? = null,
+    overflow: TextOverflow = TextOverflow.Clip,
+    softWrap: Boolean = true,
+    maxLines: Int = Int.MAX_VALUE,
+    minLines: Int = 1
 ) {
   Text(
-    text = text,
-    modifier = modifier,
-    color = color,
-    style = style,
-    textAlign = textAlign,
-    overflow = overflow,
-    softWrap = softWrap,
-    maxLines = maxLines,
-    minLines = minLines
-  )
+      text = text,
+      modifier = modifier,
+      color = color,
+      style = style,
+      textAlign = textAlign,
+      overflow = overflow,
+      softWrap = softWrap,
+      maxLines = maxLines,
+      minLines = minLines)
 }
 
 @Composable
 fun AutoMobileHeadline(
-  text: String,
-  modifier: Modifier = Modifier,
-  color: Color = MaterialTheme.colorScheme.onSurface,
-  textAlign: TextAlign? = null,
-  overflow: TextOverflow = TextOverflow.Ellipsis,
-  maxLines: Int = 2
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    textAlign: TextAlign? = null,
+    overflow: TextOverflow = TextOverflow.Ellipsis,
+    maxLines: Int = 2
 ) {
   AutoMobileText(
-    text = text,
-    modifier = modifier,
-    color = color,
-    style = MaterialTheme.typography.headlineMedium,
-    textAlign = textAlign,
-    overflow = overflow,
-    maxLines = maxLines
-  )
+      text = text,
+      modifier = modifier,
+      color = color,
+      style = MaterialTheme.typography.headlineMedium,
+      textAlign = textAlign,
+      overflow = overflow,
+      maxLines = maxLines)
 }
 
 @Composable
 fun AutoMobileTitle(
-  text: String,
-  modifier: Modifier = Modifier,
-  color: Color = MaterialTheme.colorScheme.onSurface,
-  textAlign: TextAlign? = null,
-  overflow: TextOverflow = TextOverflow.Ellipsis,
-  maxLines: Int = 1
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    textAlign: TextAlign? = null,
+    overflow: TextOverflow = TextOverflow.Ellipsis,
+    maxLines: Int = 1
 ) {
   AutoMobileText(
-    text = text,
-    modifier = modifier,
-    color = color,
-    style = MaterialTheme.typography.titleLarge,
-    textAlign = textAlign,
-    overflow = overflow,
-    maxLines = maxLines
-  )
+      text = text,
+      modifier = modifier,
+      color = color,
+      style = MaterialTheme.typography.titleLarge,
+      textAlign = textAlign,
+      overflow = overflow,
+      maxLines = maxLines)
 }
 
 @Composable
 fun AutoMobileBodyText(
-  text: String,
-  modifier: Modifier = Modifier,
-  color: Color = MaterialTheme.colorScheme.onSurface,
-  textAlign: TextAlign? = null,
-  overflow: TextOverflow = TextOverflow.Clip,
-  maxLines: Int = Int.MAX_VALUE
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    textAlign: TextAlign? = null,
+    overflow: TextOverflow = TextOverflow.Clip,
+    maxLines: Int = Int.MAX_VALUE
 ) {
   AutoMobileText(
-    text = text,
-    modifier = modifier,
-    color = color,
-    style = MaterialTheme.typography.bodyMedium,
-    textAlign = textAlign,
-    overflow = overflow,
-    maxLines = maxLines
-  )
+      text = text,
+      modifier = modifier,
+      color = color,
+      style = MaterialTheme.typography.bodyMedium,
+      textAlign = textAlign,
+      overflow = overflow,
+      maxLines = maxLines)
 }
 
 @Composable
 fun AutoMobileLabel(
-  text: String,
-  modifier: Modifier = Modifier,
-  color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-  textAlign: TextAlign? = null,
-  overflow: TextOverflow = TextOverflow.Ellipsis,
-  maxLines: Int = 1
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    textAlign: TextAlign? = null,
+    overflow: TextOverflow = TextOverflow.Ellipsis,
+    maxLines: Int = 1
 ) {
   AutoMobileText(
-    text = text,
-    modifier = modifier,
-    color = color,
-    style = MaterialTheme.typography.labelMedium,
-    textAlign = textAlign,
-    overflow = overflow,
-    maxLines = maxLines
-  )
+      text = text,
+      modifier = modifier,
+      color = color,
+      style = MaterialTheme.typography.labelMedium,
+      textAlign = textAlign,
+      overflow = overflow,
+      maxLines = maxLines)
 }
 
 @Preview(showBackground = true)

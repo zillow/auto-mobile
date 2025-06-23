@@ -31,19 +31,33 @@ plugins {
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":kotlin-test-author")
+
 include(":junit-runner")
+
 include(":playground:app")
+
 include(":playground:login")
+
 include(":playground:onboarding")
+
 include(":playground:mediaplayer")
+
 include(":playground:home")
+
 include(":playground:discover")
+
 include(":playground:settings")
+
 include(":playground:slides")
+
 include(":playground:storage")
+
 include(":playground:design:assets")
+
 include(":playground:design:system")
 
 rootProject.name = "auto-mobile-android"
+
 include(":playground:experimentation")
+
 include(":playground:analytics")

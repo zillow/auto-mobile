@@ -1,102 +1,85 @@
 package com.zillow.automobile.slides.model
 
 /**
- * Sealed class representing different types of slide content.
- * Each slide type has its own data requirements and rendering approach.
+ * Sealed class representing different types of slide content. Each slide type has its own data
+ * requirements and rendering approach.
  */
 sealed class SlideContent {
   /**
-   * Large text slide with optional subtitle.
-   * Auto-resizes text to fill available space effectively.
+   * Large text slide with optional subtitle. Auto-resizes text to fill available space effectively.
    */
-  data class LargeText(
-    val title: String,
-    val subtitle: String? = null
-  ) : SlideContent()
+  data class LargeText(val title: String, val subtitle: String? = null) : SlideContent()
 
   /**
-   * Bulleted list slide with hierarchical support.
-   * Each bullet point can contain nested sub-points.
+   * Bulleted list slide with hierarchical support. Each bullet point can contain nested sub-points.
    */
-  data class BulletPoints(
-    val title: String? = null,
-    val points: List<BulletPoint>
-  ) : SlideContent()
+  data class BulletPoints(val title: String? = null, val points: List<BulletPoint>) :
+      SlideContent()
 
   /**
-   * Emoji slide with large emoji display and optional caption.
-   * Uses predefined emoji set for consistency.
+   * Emoji slide with large emoji display and optional caption. Uses predefined emoji set for
+   * consistency.
    */
-  data class Emoji(
-    val emoji: PresentationEmoji,
-    val caption: String? = null
-  ) : SlideContent()
+  data class Emoji(val emoji: PresentationEmoji, val caption: String? = null) : SlideContent()
 
   /**
-   * Code sample slide with syntax highlighting.
-   * Supports multiple programming languages and copy functionality.
+   * Code sample slide with syntax highlighting. Supports multiple programming languages and copy
+   * functionality.
    */
   data class CodeSample(
-    val code: String,
-    val language: String,
-    val title: String? = null,
-    val highlight: String? = null
+      val code: String,
+      val language: String,
+      val title: String? = null,
+      val highlight: String? = null
   ) : SlideContent()
 
   /**
-   * Image/visualization slide with optional caption.
-   * Supports both local and remote images with loading states.
+   * Image/visualization slide with optional caption. Supports both local and remote images with
+   * loading states.
    */
   data class Visualization(
-    val imageUrl: String,
-    val caption: String? = null,
-    val contentDescription: String? = null
+      val imageUrl: String,
+      val caption: String? = null,
+      val contentDescription: String? = null
   ) : SlideContent()
 
   /**
-   * Video player slide with controls and caption.
-   * Auto-pauses when navigating away from the slide.
+   * Video player slide with controls and caption. Auto-pauses when navigating away from the slide.
    */
   data class Video(
-    val videoUrl: String,
-    val caption: String? = null,
-    val contentDescription: String? = null
+      val videoUrl: String,
+      val caption: String? = null,
+      val contentDescription: String? = null
   ) : SlideContent()
 
   /**
-   * Mermaid diagram slide with interactive diagrams.
-   * Renders Mermaid syntax into SVG diagrams with theming support.
+   * Mermaid diagram slide with interactive diagrams. Renders Mermaid syntax into SVG diagrams with
+   * theming support.
    */
   data class MermaidDiagram(
-    val code: String,
-    val title: String? = null,
-    val caption: String? = null
+      val code: String,
+      val title: String? = null,
+      val caption: String? = null
   ) : SlideContent()
 
   /**
-   * Screenshot slide with day/night theme support.
-   * Automatically selects appropriate screenshot based on current theme.
+   * Screenshot slide with day/night theme support. Automatically selects appropriate screenshot
+   * based on current theme.
    */
   data class Screenshot(
-    val lightScreenshot: Int? = null,
-    val darkScreenshot: Int? = null,
-    val title: String? = null,
-    val caption: String? = null,
-    val contentDescription: String? = null
+      val lightScreenshot: Int? = null,
+      val darkScreenshot: Int? = null,
+      val title: String? = null,
+      val caption: String? = null,
+      val contentDescription: String? = null
   ) : SlideContent()
 }
 
-/**
- * Represents a bullet point that can have nested sub-points.
- */
-data class BulletPoint(
-  val text: String,
-  val subPoints: List<String> = emptyList()
-)
+/** Represents a bullet point that can have nested sub-points. */
+data class BulletPoint(val text: String, val subPoints: List<String> = emptyList())
 
 /**
- * Predefined emojis commonly used in presentations.
- * Ensures consistency and provides type safety.
+ * Predefined emojis commonly used in presentations. Ensures consistency and provides type safety.
  */
 enum class PresentationEmoji(val unicode: String, val description: String) {
   CONSTRUCTION("🚧", "Under Construction"),

@@ -19,60 +19,42 @@ import com.zillow.automobile.design.system.theme.AutoMobileTheme
 
 @Composable
 fun AutoMobileCard(
-  modifier: Modifier = Modifier,
-  shape: Shape = MaterialTheme.shapes.medium,
-  containerColor: Color = MaterialTheme.colorScheme.surface,
-  contentColor: Color = MaterialTheme.colorScheme.onSurface,
-  elevation: Dp = AutoMobileDimensions.elevationSmall,
-  content: @Composable ColumnScope.() -> Unit
+    modifier: Modifier = Modifier,
+    shape: Shape = MaterialTheme.shapes.medium,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    elevation: Dp = AutoMobileDimensions.elevationSmall,
+    content: @Composable ColumnScope.() -> Unit
 ) {
   Card(
-    modifier = modifier,
-    shape = shape,
-    colors = CardDefaults.cardColors(
-      containerColor = containerColor,
-      contentColor = contentColor
-    ),
-    elevation = CardDefaults.cardElevation(
-      defaultElevation = elevation
-    )
-  ) {
-    Column(
-      modifier = Modifier.padding(AutoMobileDimensions.spacing4)
-    ) {
-      content()
-    }
-  }
+      modifier = modifier,
+      shape = shape,
+      colors =
+          CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
+      elevation = CardDefaults.cardElevation(defaultElevation = elevation)) {
+        Column(modifier = Modifier.padding(AutoMobileDimensions.spacing4)) { content() }
+      }
 }
 
 @Composable
 fun AutoMobileOutlinedCard(
-  modifier: Modifier = Modifier,
-  shape: Shape = MaterialTheme.shapes.medium,
-  containerColor: Color = MaterialTheme.colorScheme.surface,
-  contentColor: Color = MaterialTheme.colorScheme.onSurface,
-  borderColor: Color = MaterialTheme.colorScheme.outline,
-  borderWidth: Dp = AutoMobileDimensions.borderThin,
-  content: @Composable ColumnScope.() -> Unit
+    modifier: Modifier = Modifier,
+    shape: Shape = MaterialTheme.shapes.medium,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    borderColor: Color = MaterialTheme.colorScheme.outline,
+    borderWidth: Dp = AutoMobileDimensions.borderThin,
+    content: @Composable ColumnScope.() -> Unit
 ) {
   OutlinedCard(
-    modifier = modifier,
-    shape = shape,
-    colors = CardDefaults.outlinedCardColors(
-      containerColor = containerColor,
-      contentColor = contentColor
-    ),
-    border = BorderStroke(
-      width = borderWidth,
-      color = borderColor
-    )
-  ) {
-    Column(
-      modifier = Modifier.padding(AutoMobileDimensions.spacing4)
-    ) {
-      content()
-    }
-  }
+      modifier = modifier,
+      shape = shape,
+      colors =
+          CardDefaults.outlinedCardColors(
+              containerColor = containerColor, contentColor = contentColor),
+      border = BorderStroke(width = borderWidth, color = borderColor)) {
+        Column(modifier = Modifier.padding(AutoMobileDimensions.spacing4)) { content() }
+      }
 }
 
 @Preview(showBackground = true)
@@ -80,10 +62,7 @@ fun AutoMobileOutlinedCard(
 private fun AutoMobileCardPreview() {
   AutoMobileTheme {
     AutoMobileCard {
-      AutoMobileText(
-        text = "Card Content",
-        style = MaterialTheme.typography.bodyMedium
-      )
+      AutoMobileText(text = "Card Content", style = MaterialTheme.typography.bodyMedium)
     }
   }
 }

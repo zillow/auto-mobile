@@ -5,14 +5,14 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 
 data class OnboardingRecord(
-  val hasCompletedOnboarding: Boolean,
-  val completedSteps: List<String>,
-  val lastStepCompleted: String?
+    val hasCompletedOnboarding: Boolean,
+    val completedSteps: List<String>,
+    val lastStepCompleted: String?
 )
 
 class OnboardingRepository(context: Context) {
   private val sharedPreferences: SharedPreferences =
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   var hasCompletedOnboarding: Boolean
     get() = sharedPreferences.getBoolean(KEY_ONBOARDING_COMPLETED, false)
@@ -20,20 +20,19 @@ class OnboardingRepository(context: Context) {
 
   fun getOnboardingRecord(): OnboardingRecord {
     val completedSteps =
-      sharedPreferences.getStringSet(KEY_COMPLETED_STEPS, emptySet())?.toList() ?: emptyList()
+        sharedPreferences.getStringSet(KEY_COMPLETED_STEPS, emptySet())?.toList() ?: emptyList()
     val lastStep = sharedPreferences.getString(KEY_LAST_STEP, null)
 
     return OnboardingRecord(
-      hasCompletedOnboarding = hasCompletedOnboarding,
-      completedSteps = completedSteps,
-      lastStepCompleted = lastStep
-    )
+        hasCompletedOnboarding = hasCompletedOnboarding,
+        completedSteps = completedSteps,
+        lastStepCompleted = lastStep)
   }
 
   fun markStepCompleted(stepName: String) {
     val completedSteps =
-      sharedPreferences.getStringSet(KEY_COMPLETED_STEPS, emptySet())?.toMutableSet()
-        ?: mutableSetOf()
+        sharedPreferences.getStringSet(KEY_COMPLETED_STEPS, emptySet())?.toMutableSet()
+            ?: mutableSetOf()
     completedSteps.add(stepName)
 
     sharedPreferences.edit {

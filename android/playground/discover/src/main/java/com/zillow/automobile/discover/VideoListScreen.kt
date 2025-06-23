@@ -32,125 +32,95 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.zillow.automobile.mediaplayer.VideoData
 
-
-/**
- * MEDIA screen content displaying a scrollable list of videos
- */
+/** MEDIA screen content displaying a scrollable list of videos */
 @Composable
 fun VideoListScreen(onNavigateToVideoPlayer: (String) -> Unit) {
   LazyColumn(
-    modifier = Modifier.fillMaxSize(),
-    contentPadding = PaddingValues(16.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
-  ) {
-    items(VideoData.entries) { video ->
-      VideoCard(
-        video = video,
-        onClick = { onNavigateToVideoPlayer(video.id) }
-      )
-    }
-  }
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(16.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        items(VideoData.entries) { video ->
+          VideoCard(video = video, onClick = { onNavigateToVideoPlayer(video.id) })
+        }
+      }
 }
 
 @Composable
-fun VideoCard(
-  video: VideoData,
-  onClick: () -> Unit
-) {
+fun VideoCard(video: VideoData, onClick: () -> Unit) {
   Card(
-    onClick = onClick,
-    modifier = Modifier.fillMaxWidth(),
-    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-    shape = RoundedCornerShape(12.dp)
-  ) {
-    Column {
-      Box {
-        AsyncImage(
-          model = video.thumbnailUrl,
-          contentDescription = video.title,
-          modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-          contentScale = ContentScale.Crop
-        )
+      onClick = onClick,
+      modifier = Modifier.fillMaxWidth(),
+      elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+      shape = RoundedCornerShape(12.dp)) {
+        Column {
+          Box {
+            AsyncImage(
+                model = video.thumbnailUrl,
+                contentDescription = video.title,
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                contentScale = ContentScale.Crop)
 
-        // Play button overlay
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(8.dp),
-          contentAlignment = Alignment.BottomEnd
-        ) {
-          Card(
-            colors = CardDefaults.cardColors(
-              containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-            ),
-            shape = RoundedCornerShape(4.dp)
-          ) {
+            // Play button overlay
+            Box(
+                modifier = Modifier.fillMaxSize().padding(8.dp),
+                contentAlignment = Alignment.BottomEnd) {
+                  Card(
+                      colors =
+                          CardDefaults.cardColors(
+                              containerColor =
+                                  MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)),
+                      shape = RoundedCornerShape(4.dp)) {
+                        Text(
+                            text = video.duration,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface)
+                      }
+                }
+
+            // Play icon centered
+            Icon(
+                imageVector = Icons.Filled.PlayArrow,
+                contentDescription = "Play",
+                modifier = Modifier.align(Alignment.Center).size(48.dp),
+                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
+          }
+
+          Column(modifier = Modifier.padding(12.dp)) {
             Text(
-              text = video.duration,
-              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-              fontSize = 12.sp,
-              color = MaterialTheme.colorScheme.onSurface
-            )
+                text = video.title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface)
+
+            Text(
+                text = video.description,
+                fontSize = 14.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp))
           }
         }
-
-        // Play icon centered
-        Icon(
-          imageVector = Icons.Filled.PlayArrow,
-          contentDescription = "Play",
-          modifier = Modifier
-            .align(Alignment.Center)
-            .size(48.dp),
-          tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
-        )
       }
-
-      Column(
-        modifier = Modifier.padding(12.dp)
-      ) {
-        Text(
-          text = video.title,
-          fontSize = 16.sp,
-          fontWeight = FontWeight.Bold,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-          color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Text(
-          text = video.description,
-          fontSize = 14.sp,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.padding(top = 4.dp)
-        )
-      }
-    }
-  }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PreviewVideoListScreen() {
-  MaterialTheme {
-    VideoListScreen(onNavigateToVideoPlayer = {})
-  }
+  MaterialTheme { VideoListScreen(onNavigateToVideoPlayer = {}) }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PreviewVideoCard() {
   val sampleVideo = VideoData.AUTO_MOBILE
-  MaterialTheme {
-    VideoCard(
-      video = sampleVideo,
-      onClick = {}
-    )
-  }
+  MaterialTheme { VideoCard(video = sampleVideo, onClick = {}) }
 }
 
 @Preview(showBackground = true, name = "Video Card in List")
@@ -158,15 +128,8 @@ fun PreviewVideoCard() {
 fun PreviewVideoCardList() {
   MaterialTheme {
     LazyColumn(
-      contentPadding = PaddingValues(16.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-      items(VideoData.entries) { video ->
-        VideoCard(
-          video = video,
-          onClick = {}
-        )
-      }
-    }
+        contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+          items(VideoData.entries) { video -> VideoCard(video = video, onClick = {}) }
+        }
   }
 }

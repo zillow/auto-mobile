@@ -1,9 +1,9 @@
 package com.zillow.automobile.slides
 
-import com.zillow.automobile.slides.old.getAllSlides
 import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
+import com.zillow.automobile.slides.old.getAllSlides
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,14 +45,9 @@ class SlidesScreenTest {
     val testFlowSlide = mermaidSlides.find { it.title == "AutoMobile Test Flow" }
     assertTrue("Should contain the AutoMobile Test Flow diagram", testFlowSlide != null)
     testFlowSlide?.let { slide ->
+      assertTrue("Should contain flowchart syntax", slide.code.contains("flowchart TD"))
       assertTrue(
-        "Should contain flowchart syntax",
-        slide.code.contains("flowchart TD")
-      )
-      assertTrue(
-        "Should contain AutoMobile-specific content",
-        slide.code.contains("observe Screen")
-      )
+          "Should contain AutoMobile-specific content", slide.code.contains("observe Screen"))
     }
   }
 
@@ -91,13 +86,12 @@ class SlidesScreenTest {
       assertTrue("Language should not be empty", slide.language.isNotEmpty())
       // Updated to be more flexible for mermaid diagrams and other content
       assertTrue(
-        "Code should contain meaningful content",
-        slide.code.contains("@Test") ||
-          slide.code.contains("fun ") ||
-          slide.code.contains("flowchart") ||
-          slide.code.contains("sequenceDiagram") ||
-          slide.code.length > 20
-      )
+          "Code should contain meaningful content",
+          slide.code.contains("@Test") ||
+              slide.code.contains("fun ") ||
+              slide.code.contains("flowchart") ||
+              slide.code.contains("sequenceDiagram") ||
+              slide.code.length > 20)
     }
   }
 }
@@ -134,18 +128,15 @@ class SlideContentTestHelper {
     assertEquals("Should be the same slide", slide, slides[0])
   }
 
-  private fun createTestSlides(): List<SlideContent> = listOf(
-    SlideContent.LargeText("Test Title", "Test Subtitle"),
-    SlideContent.Emoji(PresentationEmoji.ROCKET, "Test Caption"),
-    SlideContent.BulletPoints(
-      "Test Features", listOf(
-        BulletPoint("Feature 1", listOf("Sub 1", "Sub 2")),
-        BulletPoint("Feature 2")
-      )
-    ),
-    SlideContent.CodeSample("fun test() {}", "kotlin", "Test Code"),
-    SlideContent.Visualization("test-image.png", "Test Image")
-  )
+  private fun createTestSlides(): List<SlideContent> =
+      listOf(
+          SlideContent.LargeText("Test Title", "Test Subtitle"),
+          SlideContent.Emoji(PresentationEmoji.ROCKET, "Test Caption"),
+          SlideContent.BulletPoints(
+              "Test Features",
+              listOf(BulletPoint("Feature 1", listOf("Sub 1", "Sub 2")), BulletPoint("Feature 2"))),
+          SlideContent.CodeSample("fun test() {}", "kotlin", "Test Code"),
+          SlideContent.Visualization("test-image.png", "Test Image"))
 
   private fun createEmptySlideList(): List<SlideContent> = emptyList()
 
@@ -156,11 +147,11 @@ class SlideNavigationTest {
 
   @Test
   fun `slide index should be coerced within valid range`() {
-    val slides = listOf(
-      SlideContent.LargeText("Slide 1"),
-      SlideContent.LargeText("Slide 2"),
-      SlideContent.LargeText("Slide 3")
-    )
+    val slides =
+        listOf(
+            SlideContent.LargeText("Slide 1"),
+            SlideContent.LargeText("Slide 2"),
+            SlideContent.LargeText("Slide 3"))
 
     // Test negative index
     val negativeIndex = -5
@@ -180,10 +171,7 @@ class SlideNavigationTest {
 
   @Test
   fun `slide validation should work correctly`() {
-    val slides = listOf(
-      SlideContent.LargeText("Slide 1"),
-      SlideContent.LargeText("Slide 2")
-    )
+    val slides = listOf(SlideContent.LargeText("Slide 1"), SlideContent.LargeText("Slide 2"))
 
     assertTrue("Index 0 should be valid", 0 in slides.indices)
     assertTrue("Index 1 should be valid", 1 in slides.indices)
@@ -199,11 +187,11 @@ class SlideNavigationTest {
     val singleSlide = listOf(SlideContent.LargeText("Single"))
     assertEquals("Single slide should have count 1", 1, singleSlide.size)
 
-    val multipleSlides = listOf(
-      SlideContent.LargeText("First"),
-      SlideContent.Emoji(PresentationEmoji.ROCKET),
-      SlideContent.BulletPoints("Third", emptyList())
-    )
+    val multipleSlides =
+        listOf(
+            SlideContent.LargeText("First"),
+            SlideContent.Emoji(PresentationEmoji.ROCKET),
+            SlideContent.BulletPoints("Third", emptyList()))
     assertEquals("Multiple slides should have correct count", 3, multipleSlides.size)
   }
 }

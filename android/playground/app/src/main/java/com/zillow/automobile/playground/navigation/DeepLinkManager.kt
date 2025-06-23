@@ -5,8 +5,8 @@ import android.content.Intent
 import android.net.Uri
 
 /**
- * Utility class for managing deep link URLs within the AutoMobile Playground app.
- * Provides methods for generating and parsing deep link URLs for navigation.
+ * Utility class for managing deep link URLs within the AutoMobile Playground app. Provides methods
+ * for generating and parsing deep link URLs for navigation.
  */
 object DeepLinkManager {
 
@@ -21,44 +21,32 @@ object DeepLinkManager {
   private const val PATH_SLIDES = "/slides"
   private const val PATH_VIDEO_PLAYER = "/video_player"
 
-  /**
-   * Generate deep link URL for onboarding screen
-   */
+  /** Generate deep link URL for onboarding screen */
   fun generateOnboardingUrl(): String {
     return buildUri(PATH_ONBOARDING)
   }
 
-  /**
-   * Generate deep link URL for login screen
-   */
+  /** Generate deep link URL for login screen */
   fun generateLoginUrl(): String {
     return buildUri(PATH_LOGIN)
   }
 
-  /**
-   * Generate deep link URL for home screen
-   */
+  /** Generate deep link URL for home screen */
   fun generateHomeUrl(): String {
     return buildUri(PATH_HOME)
   }
 
-  /**
-   * Generate deep link URL for slides screen
-   */
+  /** Generate deep link URL for slides screen */
   fun generateSlidesUrl(slideIndex: Int = 0): String {
     return buildUri("$PATH_SLIDES/$slideIndex")
   }
 
-  /**
-   * Generate deep link URL for video player screen
-   */
+  /** Generate deep link URL for video player screen */
   fun generateVideoPlayerUrl(videoId: String): String {
     return buildUri("$PATH_VIDEO_PLAYER/$videoId")
   }
 
-  /**
-   * Parse deep link URL and return the corresponding navigation route
-   */
+  /** Parse deep link URL and return the corresponding navigation route */
   fun parseDeepLink(uri: Uri): String? {
     if (uri.scheme != SCHEME || uri.host != HOST) {
       return null
@@ -87,18 +75,12 @@ object DeepLinkManager {
     }
   }
 
-  /**
-   * Validate if a URI is a valid deep link for this app
-   */
+  /** Validate if a URI is a valid deep link for this app */
   fun isValidDeepLink(uri: Uri): Boolean {
-    return uri.scheme == SCHEME &&
-      uri.host == HOST &&
-      parseDeepLink(uri) != null
+    return uri.scheme == SCHEME && uri.host == HOST && parseDeepLink(uri) != null
   }
 
-  /**
-   * Get the destination name from a deep link URI
-   */
+  /** Get the destination name from a deep link URI */
   fun getDestinationName(uri: Uri): String? {
     if (!isValidDeepLink(uri)) return null
 
@@ -116,72 +98,53 @@ object DeepLinkManager {
 
   // AutoMobile test integration methods
 
-  /**
-   * Navigate to onboarding screen via deep link for AutoMobile tests
-   */
+  /** Navigate to onboarding screen via deep link for AutoMobile tests */
   fun navigateToOnboardingForTest(context: Context) {
     launchDeepLink(context, generateOnboardingUrl())
   }
 
-  /**
-   * Navigate to login screen via deep link for AutoMobile tests
-   */
+  /** Navigate to login screen via deep link for AutoMobile tests */
   fun navigateToLoginForTest(context: Context) {
     launchDeepLink(context, generateLoginUrl())
   }
 
-  /**
-   * Navigate to home screen via deep link for AutoMobile tests
-   */
+  /** Navigate to home screen via deep link for AutoMobile tests */
   fun navigateToHomeForTest(context: Context) {
     launchDeepLink(context, generateHomeUrl())
   }
 
-  /**
-   * Navigate to slides screen via deep link for AutoMobile tests
-   */
+  /** Navigate to slides screen via deep link for AutoMobile tests */
   fun navigateToSlidesForTest(context: Context, slideIndex: Int = 0) {
     launchDeepLink(context, generateSlidesUrl(slideIndex))
   }
 
-  /**
-   * Navigate to video player screen via deep link for AutoMobile tests
-   */
+  /** Navigate to video player screen via deep link for AutoMobile tests */
   fun navigateToVideoPlayerForTest(context: Context, videoId: String) {
     launchDeepLink(context, generateVideoPlayerUrl(videoId))
   }
 
-  /**
-   * Generic method to launch a deep link intent for testing
-   */
+  /** Generic method to launch a deep link intent for testing */
   fun launchDeepLink(context: Context, deepLinkUrl: String) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLinkUrl)).apply {
-      setPackage(context.packageName)
-      flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-    }
+    val intent =
+        Intent(Intent.ACTION_VIEW, Uri.parse(deepLinkUrl)).apply {
+          setPackage(context.packageName)
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
     context.startActivity(intent)
   }
 
-  /**
-   * Get all available deep link URLs for testing purposes
-   */
+  /** Get all available deep link URLs for testing purposes */
   fun getAllDeepLinks(): List<Pair<String, String>> {
     return listOf(
-      "Onboarding" to generateOnboardingUrl(),
-      "Login" to generateLoginUrl(),
-      "Home" to generateHomeUrl(),
-      "Slides (slide 0)" to generateSlidesUrl(0),
-      "Slides (slide 3)" to generateSlidesUrl(3),
-      "Video Player (sample)" to generateVideoPlayerUrl("sample123")
-    )
+        "Onboarding" to generateOnboardingUrl(),
+        "Login" to generateLoginUrl(),
+        "Home" to generateHomeUrl(),
+        "Slides (slide 0)" to generateSlidesUrl(0),
+        "Slides (slide 3)" to generateSlidesUrl(3),
+        "Video Player (sample)" to generateVideoPlayerUrl("sample123"))
   }
 
   private fun buildUri(path: String): String {
-    return Uri.Builder()
-      .scheme(SCHEME)
-      .authority(HOST)
-      .path(path)
-      .build()
-      .toString()
+    return Uri.Builder().scheme(SCHEME).authority(HOST).path(path).build().toString()
   }
 }

@@ -3,59 +3,59 @@ package com.zillow.automobile.storage
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 data class UserStats(
-  val taps: Int = 0,
-  val swipes: Int = 0,
-  val screensNavigated: Int = 0,
-  val lastUpdated: Long = System.currentTimeMillis(),
-  val sessionStartTime: Long = System.currentTimeMillis(),
-  val totalSessions: Int = 1,
-  val averageSessionDuration: Long = 0,
-  val tapBreakdown: Map<String, Int> = emptyMap(),
-  val swipeBreakdown: Map<String, Int> = emptyMap(),
-  val screenBreakdown: Map<String, Int> = emptyMap(),
-  val todayStats: DailyStats = DailyStats(),
-  val weeklyStats: List<DailyStats> = emptyList()
+    val taps: Int = 0,
+    val swipes: Int = 0,
+    val screensNavigated: Int = 0,
+    val lastUpdated: Long = System.currentTimeMillis(),
+    val sessionStartTime: Long = System.currentTimeMillis(),
+    val totalSessions: Int = 1,
+    val averageSessionDuration: Long = 0,
+    val tapBreakdown: Map<String, Int> = emptyMap(),
+    val swipeBreakdown: Map<String, Int> = emptyMap(),
+    val screenBreakdown: Map<String, Int> = emptyMap(),
+    val todayStats: DailyStats = DailyStats(),
+    val weeklyStats: List<DailyStats> = emptyList()
 )
 
 data class DailyStats(
-  val date: String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
-  val taps: Int = 0,
-  val swipes: Int = 0,
-  val screens: Int = 0,
-  val sessionCount: Int = 0,
-  val totalDuration: Long = 0
+    val date: String = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+    val taps: Int = 0,
+    val swipes: Int = 0,
+    val screens: Int = 0,
+    val sessionCount: Int = 0,
+    val totalDuration: Long = 0
 )
 
 data class AnalyticsEvent(
-  val eventName: String,
-  val timestamp: Long,
-  val properties: Map<String, Any> = emptyMap(),
-  val elementId: String? = null,
-  val elementType: String? = null,
-  val screenName: String? = null,
-  val coordinates: Pair<Float, Float>? = null
+    val eventName: String,
+    val timestamp: Long,
+    val properties: Map<String, Any> = emptyMap(),
+    val elementId: String? = null,
+    val elementType: String? = null,
+    val screenName: String? = null,
+    val coordinates: Pair<Float, Float>? = null
 )
 
 data class DetailedEventStats(
-  val totalEvents: Int,
-  val recentEvents: List<AnalyticsEvent>,
-  val topElements: Map<String, Int>,
-  val topScreens: Map<String, Int>,
-  val hourlyDistribution: Map<Int, Int>
+    val totalEvents: Int,
+    val recentEvents: List<AnalyticsEvent>,
+    val topElements: Map<String, Int>,
+    val topScreens: Map<String, Int>,
+    val hourlyDistribution: Map<Int, Int>
 )
 
 class AnalyticsRepository(context: Context) {
   private val sharedPreferences: SharedPreferences =
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   private val _currentScreen = MutableStateFlow<String?>(null)
   val currentScreen: StateFlow<String?> = _currentScreen.asStateFlow()
@@ -103,19 +103,18 @@ class AnalyticsRepository(context: Context) {
     val avgSessionDuration = sharedPreferences.getLong(KEY_AVG_SESSION_DURATION, 0)
 
     return UserStats(
-      taps = taps,
-      swipes = swipes,
-      screensNavigated = screensNavigated,
-      lastUpdated = lastUpdated,
-      sessionStartTime = sessionStartTime,
-      totalSessions = totalSessions,
-      averageSessionDuration = avgSessionDuration,
-      tapBreakdown = getTapBreakdown(),
-      swipeBreakdown = getSwipeBreakdown(),
-      screenBreakdown = getScreenBreakdown(),
-      todayStats = getTodayStats(),
-      weeklyStats = getWeeklyStats()
-    )
+        taps = taps,
+        swipes = swipes,
+        screensNavigated = screensNavigated,
+        lastUpdated = lastUpdated,
+        sessionStartTime = sessionStartTime,
+        totalSessions = totalSessions,
+        averageSessionDuration = avgSessionDuration,
+        tapBreakdown = getTapBreakdown(),
+        swipeBreakdown = getSwipeBreakdown(),
+        screenBreakdown = getScreenBreakdown(),
+        todayStats = getTodayStats(),
+        weeklyStats = getWeeklyStats())
   }
 
   private fun getTapBreakdown(): Map<String, Int> {
@@ -135,13 +134,14 @@ class AnalyticsRepository(context: Context) {
 
   private fun parseBreakdownJson(json: String): Map<String, Int> {
     return try {
-      json.removeSurrounding("{", "}")
-        .split(",")
-        .filter { it.isNotBlank() }
-        .associate { entry ->
-          val (key, value) = entry.split(":")
-          key.trim().removeSurrounding("\"") to value.trim().toInt()
-        }
+      json
+          .removeSurrounding("{", "}")
+          .split(",")
+          .filter { it.isNotBlank() }
+          .associate { entry ->
+            val (key, value) = entry.split(":")
+            key.trim().removeSurrounding("\"") to value.trim().toInt()
+          }
     } catch (e: Exception) {
       emptyMap()
     }
@@ -155,26 +155,28 @@ class AnalyticsRepository(context: Context) {
   fun trackEvent(eventName: String, properties: Map<String, Any> = emptyMap()) {
     if (!isTrackingEnabled) return
 
-    @Suppress("UNCHECKED_CAST")
-    val coordinates = properties["coordinates"] as? Pair<Float, Float>
+    @Suppress("UNCHECKED_CAST") val coordinates = properties["coordinates"] as? Pair<Float, Float>
 
     when (eventName) {
-      "tap", "button_click", "card_tap" -> incrementTaps(
-        elementType = properties["elementType"] as? String,
-        elementId = properties["elementId"] as? String,
-        coordinates = coordinates
-      )
+      "tap",
+      "button_click",
+      "card_tap" ->
+          incrementTaps(
+              elementType = properties["elementType"] as? String,
+              elementId = properties["elementId"] as? String,
+              coordinates = coordinates)
 
-      "swipe", "scroll", "gesture" -> incrementSwipes(
-        elementType = properties["elementType"] as? String,
-        elementId = properties["elementId"] as? String,
-        direction = properties["direction"] as? String,
-        coordinates = coordinates
-      )
+      "swipe",
+      "scroll",
+      "gesture" ->
+          incrementSwipes(
+              elementType = properties["elementType"] as? String,
+              elementId = properties["elementId"] as? String,
+              direction = properties["direction"] as? String,
+              coordinates = coordinates)
 
-      "navigation", "screen_view" -> incrementScreensNavigated(
-        screenName = properties["screenName"] as? String
-      )
+      "navigation",
+      "screen_view" -> incrementScreensNavigated(screenName = properties["screenName"] as? String)
     }
   }
 
@@ -187,13 +189,12 @@ class AnalyticsRepository(context: Context) {
     val todayDuration = sharedPreferences.getLong("${KEY_TODAY_DURATION}_$today", 0)
 
     return DailyStats(
-      date = today,
-      taps = todayTaps,
-      swipes = todaySwipes,
-      screens = todayScreens,
-      sessionCount = todaySessions,
-      totalDuration = todayDuration
-    )
+        date = today,
+        taps = todayTaps,
+        swipes = todaySwipes,
+        screens = todayScreens,
+        sessionCount = todaySessions,
+        totalDuration = todayDuration)
   }
 
   private fun getWeeklyStats(): List<DailyStats> {
@@ -216,10 +217,10 @@ class AnalyticsRepository(context: Context) {
   }
 
   fun incrementTaps(
-    count: Int = 1,
-    elementId: String? = null,
-    elementType: String? = null,
-    coordinates: Pair<Float, Float>? = null
+      count: Int = 1,
+      elementId: String? = null,
+      elementType: String? = null,
+      coordinates: Pair<Float, Float>? = null
   ) {
     if (!isTrackingEnabled) return
 
@@ -252,11 +253,11 @@ class AnalyticsRepository(context: Context) {
   }
 
   fun incrementSwipes(
-    count: Int = 1,
-    elementId: String? = null,
-    elementType: String? = null,
-    direction: String? = null,
-    coordinates: Pair<Float, Float>? = null
+      count: Int = 1,
+      elementId: String? = null,
+      elementType: String? = null,
+      direction: String? = null,
+      coordinates: Pair<Float, Float>? = null
   ) {
     if (!isTrackingEnabled) return
 
@@ -269,12 +270,13 @@ class AnalyticsRepository(context: Context) {
     }
 
     // Update breakdowns
-    val breakdownKey = when {
-      elementType != null && direction != null -> "$elementType-$direction"
-      elementType != null -> elementType
-      direction != null -> direction
-      else -> "unknown"
-    }
+    val breakdownKey =
+        when {
+          elementType != null && direction != null -> "$elementType-$direction"
+          elementType != null -> elementType
+          direction != null -> direction
+          else -> "unknown"
+        }
 
     val breakdown = getSwipeBreakdown().toMutableMap()
     breakdown[breakdownKey] = (breakdown[breakdownKey] ?: 0) + count
@@ -285,12 +287,11 @@ class AnalyticsRepository(context: Context) {
 
     // Track detailed event
     trackDetailedEvent(
-      "swipe",
-      elementId,
-      elementType,
-      coordinates,
-      mapOf("direction" to (direction ?: "unknown"))
-    )
+        "swipe",
+        elementId,
+        elementType,
+        coordinates,
+        mapOf("direction" to (direction ?: "unknown")))
 
     // Performance monitoring
     monitorPerformance("swipe")
@@ -353,21 +354,21 @@ class AnalyticsRepository(context: Context) {
   }
 
   private fun trackDetailedEvent(
-    eventType: String,
-    elementId: String? = null,
-    elementType: String? = null,
-    coordinates: Pair<Float, Float>? = null,
-    additionalProperties: Map<String, Any> = emptyMap()
+      eventType: String,
+      elementId: String? = null,
+      elementType: String? = null,
+      coordinates: Pair<Float, Float>? = null,
+      additionalProperties: Map<String, Any> = emptyMap()
   ) {
-    val event = AnalyticsEvent(
-      eventName = eventType,
-      timestamp = System.currentTimeMillis(),
-      properties = additionalProperties,
-      elementId = elementId,
-      elementType = elementType,
-      screenName = _currentScreen.value,
-      coordinates = coordinates
-    )
+    val event =
+        AnalyticsEvent(
+            eventName = eventType,
+            timestamp = System.currentTimeMillis(),
+            properties = additionalProperties,
+            elementId = elementId,
+            elementType = elementType,
+            screenName = _currentScreen.value,
+            coordinates = coordinates)
 
     // Keep only last 1000 events to prevent memory issues
     if (eventHistory.size >= 1000) {
@@ -394,37 +395,39 @@ class AnalyticsRepository(context: Context) {
 
   fun getDetailedEventStats(eventType: String): DetailedEventStats {
     val filteredEvents = eventHistory.filter { it.eventName == eventType }
-    val topElements = filteredEvents
-      .mapNotNull { it.elementType }
-      .groupingBy { it }
-      .eachCount()
-      .entries
-      .sortedByDescending { it.value }
-      .take(10)
-      .associate { it.key to it.value }
+    val topElements =
+        filteredEvents
+            .mapNotNull { it.elementType }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(10)
+            .associate { it.key to it.value }
 
-    val topScreens = filteredEvents
-      .mapNotNull { it.screenName }
-      .groupingBy { it }
-      .eachCount()
-      .entries
-      .sortedByDescending { it.value }
-      .take(10)
-      .associate { it.key to it.value }
+    val topScreens =
+        filteredEvents
+            .mapNotNull { it.screenName }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(10)
+            .associate { it.key to it.value }
 
-    val hourlyDistribution = filteredEvents
-      .groupBy {
-        Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.HOUR_OF_DAY)
-      }
-      .mapValues { it.value.size }
+    val hourlyDistribution =
+        filteredEvents
+            .groupBy {
+              Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.HOUR_OF_DAY)
+            }
+            .mapValues { it.value.size }
 
     return DetailedEventStats(
-      totalEvents = filteredEvents.size,
-      recentEvents = filteredEvents.takeLast(50),
-      topElements = topElements,
-      topScreens = topScreens,
-      hourlyDistribution = hourlyDistribution
-    )
+        totalEvents = filteredEvents.size,
+        recentEvents = filteredEvents.takeLast(50),
+        topElements = topElements,
+        topScreens = topScreens,
+        hourlyDistribution = hourlyDistribution)
   }
 
   fun getPerformanceMetrics(): Map<String, Map<String, Double>> {
@@ -433,21 +436,19 @@ class AnalyticsRepository(context: Context) {
         mapOf("avg" to 0.0, "min" to 0.0, "max" to 0.0)
       } else {
         mapOf(
-          "avg" to times.average(),
-          "min" to (times.minOrNull()?.toDouble() ?: 0.0),
-          "max" to (times.maxOrNull()?.toDouble() ?: 0.0)
-        )
+            "avg" to times.average(),
+            "min" to (times.minOrNull()?.toDouble() ?: 0.0),
+            "max" to (times.maxOrNull()?.toDouble() ?: 0.0))
       }
     }
   }
 
   fun exportData(): Map<String, Any> {
     return mapOf(
-      "userStats" to getUserStats(),
-      "eventHistory" to eventHistory.takeLast(500), // Export last 500 events
-      "performanceMetrics" to getPerformanceMetrics(),
-      "exportTimestamp" to System.currentTimeMillis()
-    )
+        "userStats" to getUserStats(),
+        "eventHistory" to eventHistory.takeLast(500), // Export last 500 events
+        "performanceMetrics" to getPerformanceMetrics(),
+        "exportTimestamp" to System.currentTimeMillis())
   }
 
   fun updateUserStats(stats: UserStats) {
@@ -491,7 +492,7 @@ class AnalyticsRepository(context: Context) {
     val totalSessions = sharedPreferences.getInt(KEY_TOTAL_SESSIONS, 1)
     val currentAvgDuration = sharedPreferences.getLong(KEY_AVG_SESSION_DURATION, 0)
     val newAvgDuration =
-      ((currentAvgDuration * (totalSessions - 1)) + sessionDuration) / totalSessions
+        ((currentAvgDuration * (totalSessions - 1)) + sessionDuration) / totalSessions
 
     val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 

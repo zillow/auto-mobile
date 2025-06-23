@@ -4,35 +4,27 @@ import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
-fun getSourceMappingSlides(): List<SlideContent> = listOf(
-// - Source mapping
-//      - Mention the inspiration
-//      - Find the activity
-//      - Find the fragment
-//      - Find the composable
-//      - WebView / ReactNative support is possible, after
-//      - Configurable by looking at
-//        - root common module of plurality of composables (default)
-//        - the plurality of composables
-//        - ignore composables and just goto activity/fragment
-//        - application module
-  SlideContent.LargeText(
-    title = "Source Mapping"
-  ),
-
-  SlideContent.Emoji(
-    emoji = PresentationEmoji.LIGHTBULB,
-    caption = "React Dev Tools inspired"
-  ),
-
-  SlideContent.Emoji(
-    emoji = PresentationEmoji.WINDOWS,
-    caption = "adb shell dumpsys window windows"
-  ),
-
-
-  SlideContent.CodeSample(
-    code = """
+fun getSourceMappingSlides(): List<SlideContent> =
+    listOf(
+        // - Source mapping
+        //      - Mention the inspiration
+        //      - Find the activity
+        //      - Find the fragment
+        //      - Find the composable
+        //      - WebView / ReactNative support is possible, after
+        //      - Configurable by looking at
+        //        - root common module of plurality of composables (default)
+        //        - the plurality of composables
+        //        - ignore composables and just goto activity/fragment
+        //        - application module
+        SlideContent.LargeText(title = "Source Mapping"),
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.LIGHTBULB, caption = "React Dev Tools inspired"),
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.WINDOWS, caption = "adb shell dumpsys window windows"),
+        SlideContent.CodeSample(
+            code =
+                """
     keepClearAreas: restricted=[], unrestricted=[]
     mPrepareSyncSeqId=0
 
@@ -48,28 +40,19 @@ fun getSourceMappingSlides(): List<SlideContent> = listOf(
  mHighResSnapshotScale=0.8
  mSnapshotEnabled=true
  SnapshotCache Task
- """.trimIndent(),
-    language = "shell"
-  ),
-
-  SlideContent.LargeText(
-    title = "Find the activity with exact package"
-  ),
-  SlideContent.LargeText(
-    title = "Find the fragment, approximate package"
-  ),
-  // TODO: Check this actually works today in view hierarchy somewhere
-  SlideContent.LargeText(
-    title = "Find the Composables"
-  ),
-
-  SlideContent.BulletPoints(
-    title = "Configurable by looking at",
-    points = listOf(
-      BulletPoint(text = "Root common module of plurality of Composable (default)"),
-      BulletPoint(text = "Plurality of @Composable"),
-      BulletPoint(text = "Ignore @Composable and just goto Activity/Fragment"),
-      BulletPoint(text = "Application module")
+ """
+                    .trimIndent(),
+            language = "shell"),
+        SlideContent.LargeText(title = "Find the activity with exact package"),
+        SlideContent.LargeText(title = "Find the fragment, approximate package"),
+        // TODO: Check this actually works today in view hierarchy somewhere
+        SlideContent.LargeText(title = "Find the Composables"),
+        SlideContent.BulletPoints(
+            title = "Configurable by looking at",
+            points =
+                listOf(
+                    BulletPoint(text = "Root common module of plurality of Composable (default)"),
+                    BulletPoint(text = "Plurality of @Composable"),
+                    BulletPoint(text = "Ignore @Composable and just goto Activity/Fragment"),
+                    BulletPoint(text = "Application module"))),
     )
-  ),
-)

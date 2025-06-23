@@ -14,9 +14,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class SettingsViewModel(
-  private val experimentRepository: ExperimentRepository,
-  private val userRepository: UserRepository,
-  private val analyticsRepository: AnalyticsRepository
+    private val experimentRepository: ExperimentRepository,
+    private val userRepository: UserRepository,
+    private val analyticsRepository: AnalyticsRepository
 ) : ViewModel() {
 
   private val _experiments = MutableStateFlow<List<Experiment>>(emptyList())
@@ -50,9 +50,7 @@ class SettingsViewModel(
   }
 
   private fun setupGuestModeCallback() {
-    userRepository.onGuestModeProfileModificationAttempt = {
-      _shouldNavigateToLogin.value = true
-    }
+    userRepository.onGuestModeProfileModificationAttempt = { _shouldNavigateToLogin.value = true }
   }
 
   fun onNavigatedToLogin() {
@@ -107,9 +105,7 @@ class SettingsViewModel(
   }
 
   fun updateExperiments(experiments: List<Experiment>) {
-    experiments.forEach { experiment ->
-      experimentRepository.saveExperiment(experiment)
-    }
+    experiments.forEach { experiment -> experimentRepository.saveExperiment(experiment) }
     _experiments.value = experiments
   }
 
@@ -152,10 +148,8 @@ class SettingsViewModelFactory(private val context: Context) : ViewModelProvider
     if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
       @Suppress("UNCHECKED_CAST")
       return SettingsViewModel(
-        ExperimentRepository(context),
-        UserRepository(context),
-        AnalyticsRepository(context)
-      ) as T
+          ExperimentRepository(context), UserRepository(context), AnalyticsRepository(context))
+          as T
     }
     throw IllegalArgumentException("Unknown ViewModel class")
   }

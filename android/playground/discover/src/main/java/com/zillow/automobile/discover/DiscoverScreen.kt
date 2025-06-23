@@ -23,69 +23,42 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiscoverVideoScreen(
-  onNavigateToVideoPlayer: (String) -> Unit
-) {
+fun DiscoverVideoScreen(onNavigateToVideoPlayer: (String) -> Unit) {
   val pagerState = rememberPagerState(pageCount = { 5 })
   val coroutineScope = rememberCoroutineScope()
 
   val tabTitles = listOf("Tap", "Swipe", "Media", "Text", "Chat")
 
   Scaffold(
-    topBar = {
-      TopAppBar(
-        title = {
-          Text(
-            text = "Discover",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold
-          )
-        }
-      )
-    }
-  ) { paddingValues ->
-    Column(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(paddingValues)
-    ) {
-      TabRow(
-        selectedTabIndex = pagerState.currentPage,
-        modifier = Modifier.fillMaxWidth()
-      ) {
-        tabTitles.forEachIndexed { index, title ->
-          Tab(
-            selected = pagerState.currentPage == index,
-            onClick = {
-              coroutineScope.launch {
-                pagerState.animateScrollToPage(index)
-              }
-            },
-            text = { Text(title) }
-          )
-        }
-      }
+      topBar = {
+        TopAppBar(
+            title = { Text(text = "Discover", fontSize = 24.sp, fontWeight = FontWeight.Bold) })
+      }) { paddingValues ->
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+          TabRow(selectedTabIndex = pagerState.currentPage, modifier = Modifier.fillMaxWidth()) {
+            tabTitles.forEachIndexed { index, title ->
+              Tab(
+                  selected = pagerState.currentPage == index,
+                  onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+                  text = { Text(title) })
+            }
+          }
 
-      HorizontalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxSize()
-      ) { page ->
-        when (page) {
-          0 -> TapScreen()
-          1 -> SwipeScreen()
-          2 -> VideoListScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)
-          3 -> InputTextScreen()
-          4 -> ChatScreen()
+          HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            when (page) {
+              0 -> TapScreen()
+              1 -> SwipeScreen()
+              2 -> VideoListScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)
+              3 -> InputTextScreen()
+              4 -> ChatScreen()
+            }
+          }
         }
       }
-    }
-  }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PreviewDiscoverVideoScreen() {
-  MaterialTheme {
-    DiscoverVideoScreen(onNavigateToVideoPlayer = {})
-  }
+  MaterialTheme { DiscoverVideoScreen(onNavigateToVideoPlayer = {}) }
 }

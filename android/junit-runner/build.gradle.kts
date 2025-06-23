@@ -104,8 +104,10 @@ publishing {
       name = "Central"
       url = uri("https://central.sonatype.com/api/v1/publisher/upload")
       credentials {
-        username = findProperty("sonatype.username") as String? ?: System.getenv("SONATYPE_USERNAME")
-        password = findProperty("sonatype.password") as String? ?: System.getenv("SONATYPE_PASSWORD")
+        username =
+            findProperty("sonatype.username") as String? ?: System.getenv("SONATYPE_USERNAME")
+        password =
+            findProperty("sonatype.password") as String? ?: System.getenv("SONATYPE_PASSWORD")
       }
     }
   }

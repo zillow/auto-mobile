@@ -3,22 +3,16 @@ package com.zillow.automobile.slides.data
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
-fun getViewHierarchyCacheSlides(): List<SlideContent> = listOf(
+fun getViewHierarchyCacheSlides(): List<SlideContent> =
+    listOf(
+        SlideContent.Emoji(emoji = PresentationEmoji.SLOW, caption = "adb View Hierarchy is slow"),
+        SlideContent.Emoji(emoji = PresentationEmoji.PICTURE, caption = "pHash + fuzzy matching"),
 
-  SlideContent.Emoji(
-      emoji = PresentationEmoji.SLOW,
-      caption = "adb View Hierarchy is slow"
-    ),
-
-    SlideContent.Emoji(
-      emoji = PresentationEmoji.PICTURE,
-      caption = "pHash + fuzzy matching"
-    ),
-
-    // TODO: fill in
-    SlideContent.MermaidDiagram(
-      title = "View Hierarchy Cache System",
-      code = """
+        // TODO: fill in
+        SlideContent.MermaidDiagram(
+            title = "View Hierarchy Cache System",
+            code =
+                """
 flowchart LR
     A["observe() call"] --> B["Take Screenshot &<br/>Calculate dHash"];
     B --> C{"Compare to<br/>cached hashes"};
@@ -35,11 +29,7 @@ flowchart LR
     class A,G,I result;
     class B,D,E,H logic;
     class C,F decision;
-        """.trimIndent()
-    ),
-
-    SlideContent.Emoji(
-      emoji = PresentationEmoji.ROCKET,
-      caption = "85% faster observations"
-    ),
-  )
+        """
+                    .trimIndent()),
+        SlideContent.Emoji(emoji = PresentationEmoji.ROCKET, caption = "85% faster observations"),
+    )

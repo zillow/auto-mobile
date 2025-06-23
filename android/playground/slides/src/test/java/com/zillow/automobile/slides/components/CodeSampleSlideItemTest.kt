@@ -3,14 +3,13 @@ package com.zillow.automobile.slides.components
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * Tests for CodeSampleSlideItem highlighting functionality.
- */
+/** Tests for CodeSampleSlideItem highlighting functionality. */
 class CodeSampleSlideItemTest {
 
   @Test
   fun `processCodeWithHighlighting should highlight matching lines`() {
-    val code = """
+    val code =
+        """
       keepClearAreas: restricted=[], unrestricted=[]
       mPrepareSyncSeqId=0
 
@@ -18,20 +17,22 @@ class CodeSampleSlideItemTest {
       imeInputTarget in display# 0 Window{ea58714 u0 com.zillow.automobile.playground/com.zillow.automobile.playground.MainActivity}
       imeControlTarget in display# 0 Window{ea58714 u0 com.zillow.automobile.playground/com.zillow.automobile.playground.MainActivity}
       Minimum task size of display#0 220  mBlurEnabled=true
-    """.trimIndent()
+    """
+            .trimIndent()
 
-    val highlight = """
+    val highlight =
+        """
       imeLayeringTarget in display# 0 Window{ea58714 u0 com.zillow.automobile.playground/com.zillow.automobile.playground.MainActivity}
       imeInputTarget in display# 0 Window{ea58714 u0 com.zillow.automobile.playground/com.zillow.automobile.playground.MainActivity}
       imeControlTarget in display# 0 Window{ea58714 u0 com.zillow.automobile.playground/com.zillow.automobile.playground.MainActivity}
-    """.trimIndent()
+    """
+            .trimIndent()
 
     val result = processCodeWithHighlighting(code, highlight, true)
 
     // Verify that highlighted lines contain the highlighted-line class
     assertTrue("Result should contain highlighted-line spans", result.contains("highlighted-line"))
     assertTrue("Result should contain dimmed-line spans", result.contains("dimmed-line"))
-
   }
 
   @Test

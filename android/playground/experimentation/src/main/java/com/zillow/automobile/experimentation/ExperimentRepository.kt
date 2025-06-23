@@ -6,27 +6,26 @@ import androidx.core.content.edit
 
 class ExperimentRepository(context: Context) {
   private val sharedPreferences: SharedPreferences =
-    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   fun getExperiments(): List<Experiment> {
     val experimentNames =
-      sharedPreferences.getStringSet(KEY_EXPERIMENT_NAMES, emptySet()) ?: emptySet()
+        sharedPreferences.getStringSet(KEY_EXPERIMENT_NAMES, emptySet()) ?: emptySet()
     return experimentNames.map { name ->
       val treatments =
-        sharedPreferences.getStringSet("${KEY_TREATMENTS_PREFIX}$name", emptySet())?.toList()
-          ?: emptyList()
-      val currentTreatment = sharedPreferences.getString(
-        "${KEY_CURRENT_TREATMENT_PREFIX}$name",
-        treatments.firstOrNull()
-      ) ?: ""
+          sharedPreferences.getStringSet("${KEY_TREATMENTS_PREFIX}$name", emptySet())?.toList()
+              ?: emptyList()
+      val currentTreatment =
+          sharedPreferences.getString(
+              "${KEY_CURRENT_TREATMENT_PREFIX}$name", treatments.firstOrNull()) ?: ""
       Experiment(name, treatments, currentTreatment)
     }
   }
 
   fun saveExperiment(experiment: Experiment) {
     val experimentNames =
-      sharedPreferences.getStringSet(KEY_EXPERIMENT_NAMES, emptySet())?.toMutableSet()
-        ?: mutableSetOf()
+        sharedPreferences.getStringSet(KEY_EXPERIMENT_NAMES, emptySet())?.toMutableSet()
+            ?: mutableSetOf()
     experimentNames.add(experiment.name)
 
     sharedPreferences.edit {
@@ -44,8 +43,8 @@ class ExperimentRepository(context: Context) {
 
   fun deleteExperiment(experimentName: String) {
     val experimentNames =
-      sharedPreferences.getStringSet(KEY_EXPERIMENT_NAMES, emptySet())?.toMutableSet()
-        ?: mutableSetOf()
+        sharedPreferences.getStringSet(KEY_EXPERIMENT_NAMES, emptySet())?.toMutableSet()
+            ?: mutableSetOf()
     experimentNames.remove(experimentName)
 
     sharedPreferences.edit {

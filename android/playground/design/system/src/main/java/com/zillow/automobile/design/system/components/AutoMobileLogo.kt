@@ -26,51 +26,47 @@ enum class LogoSize(val size: Dp) {
 
 @Composable
 fun AutoMobileLogo(
-  experimentResolver: ExperimentResolver,
-  modifier: Modifier = Modifier,
-  size: LogoSize = LogoSize.Medium
+    experimentResolver: ExperimentResolver,
+    modifier: Modifier = Modifier,
+    size: LogoSize = LogoSize.Medium
 ) {
   val partyModeEnabled = experimentResolver.isPartyModeEnabled()
 
   if (partyModeEnabled) {
     // Use holographic version for party mode
     AsyncImage(
-      model = R.drawable.auto_mobile_holo,
-      contentDescription = "AutoMobile Party Logo",
-      modifier = modifier.size(size.size),
-      fallback = painterResource(R.drawable.automobile_logo)
-    )
+        model = R.drawable.auto_mobile_holo,
+        contentDescription = "AutoMobile Party Logo",
+        modifier = modifier.size(size.size),
+        fallback = painterResource(R.drawable.automobile_logo))
   } else {
     // Use standard logo for control
     Image(
-      painter = painterResource(R.drawable.automobile_logo),
-      contentDescription = "AutoMobile Logo",
-      modifier = modifier.size(size.size)
-    )
+        painter = painterResource(R.drawable.automobile_logo),
+        contentDescription = "AutoMobile Logo",
+        modifier = modifier.size(size.size))
   }
 }
 
 @Composable
 fun AutoMobileLogo(
-  modifier: Modifier = Modifier,
-  size: LogoSize = LogoSize.Medium,
-  forcePartyMode: Boolean = false
+    modifier: Modifier = Modifier,
+    size: LogoSize = LogoSize.Medium,
+    forcePartyMode: Boolean = false
 ) {
   if (forcePartyMode) {
     // Use holographic version for party mode
     AsyncImage(
-      model = R.drawable.auto_mobile_holo,
-      contentDescription = "AutoMobile Party Logo",
-      modifier = modifier.size(size.size),
-      fallback = painterResource(R.drawable.automobile_logo)
-    )
+        model = R.drawable.auto_mobile_holo,
+        contentDescription = "AutoMobile Party Logo",
+        modifier = modifier.size(size.size),
+        fallback = painterResource(R.drawable.automobile_logo))
   } else {
     // Use standard logo for control
     Image(
-      painter = painterResource(R.drawable.automobile_logo),
-      contentDescription = "AutoMobile Logo",
-      modifier = modifier.size(size.size)
-    )
+        painter = painterResource(R.drawable.automobile_logo),
+        contentDescription = "AutoMobile Logo",
+        modifier = modifier.size(size.size))
   }
 }
 
@@ -79,16 +75,15 @@ fun AutoMobileLogo(
 private fun AutoMobileLogoPreview() {
   AutoMobileTheme {
     Column(
-      verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4),
-      horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-      AutoMobileLogo(size = LogoSize.Small)
-      AutoMobileLogo(size = LogoSize.Medium)
-      AutoMobileLogo(size = LogoSize.Large)
-      AutoMobileLogo(size = LogoSize.ExtraLarge)
+        verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+          AutoMobileLogo(size = LogoSize.Small)
+          AutoMobileLogo(size = LogoSize.Medium)
+          AutoMobileLogo(size = LogoSize.Large)
+          AutoMobileLogo(size = LogoSize.ExtraLarge)
 
-      // Party mode previews
-      AutoMobileLogo(size = LogoSize.Medium, forcePartyMode = true)
-    }
+          // Party mode previews
+          AutoMobileLogo(size = LogoSize.Medium, forcePartyMode = true)
+        }
   }
 }

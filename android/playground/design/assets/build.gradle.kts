@@ -1,6 +1,4 @@
-plugins {
-  alias(libs.plugins.android.library)
-}
+plugins { alias(libs.plugins.android.library) }
 
 android {
   namespace = "com.zillow.automobile.design.assets"

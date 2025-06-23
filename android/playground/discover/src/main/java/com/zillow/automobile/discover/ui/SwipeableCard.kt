@@ -35,123 +35,99 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 data class SwipeCard(
-  val id: String,
-  val title: String,
-  val description: String,
-  val imageUrl: String,
-  val color: Color
+    val id: String,
+    val title: String,
+    val description: String,
+    val imageUrl: String,
+    val color: Color
 )
 
 @Composable
-fun SwipeableCard(
-  card: SwipeCard,
-  onSwipeAway: () -> Unit
-) {
+fun SwipeableCard(card: SwipeCard, onSwipeAway: () -> Unit) {
   val offsetX = remember { Animatable(0f) }
   val scale = remember { Animatable(1f) }
   val coroutineScope = rememberCoroutineScope()
 
   Card(
-    modifier = Modifier
-      .fillMaxWidth()
-      .height(200.dp)
-      .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-      .scale(scale.value)
-      .pointerInput(Unit) {
-        detectHorizontalDragGestures(
-          onDragEnd = {
-            if (abs(offsetX.value) > 300) {
-              // Swipe away animation
-              coroutineScope.launch {
-                offsetX.animateTo(
-                  targetValue = if (offsetX.value > 0) 1000f else -1000f,
-                  animationSpec = tween(300)
-                )
-                onSwipeAway()
+      modifier =
+          Modifier.fillMaxWidth()
+              .height(200.dp)
+              .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+              .scale(scale.value)
+              .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                      if (abs(offsetX.value) > 300) {
+                        // Swipe away animation
+                        coroutineScope.launch {
+                          offsetX.animateTo(
+                              targetValue = if (offsetX.value > 0) 1000f else -1000f,
+                              animationSpec = tween(300))
+                          onSwipeAway()
+                        }
+                      } else {
+                        // Snap back animation
+                        coroutineScope.launch {
+                          offsetX.snapTo(0f)
+                          scale.snapTo(1f)
+                        }
+                      }
+                    }) { change, dragAmount ->
+                      change.consume()
+                      coroutineScope.launch {
+                        offsetX.snapTo(offsetX.value + dragAmount)
+                        val progress = abs(offsetX.value) / 300f
+                        scale.snapTo(1f - (progress * 0.1f).coerceAtMost(0.1f))
+                      }
+                    }
+              },
+      elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+      colors = CardDefaults.cardColors(containerColor = card.color.copy(alpha = 0.1f))) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+              AsyncImage(
+                  model = card.imageUrl,
+                  contentDescription = card.title,
+                  modifier = Modifier.size(120.dp).clip(RoundedCornerShape(8.dp)),
+                  contentScale = ContentScale.Crop)
+
+              Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
+                Text(
+                    text = card.title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    text = card.description,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp))
               }
-            } else {
-              // Snap back animation
-              coroutineScope.launch {
-                offsetX.snapTo(0f)
-                scale.snapTo(1f)
-              }
+
+              Icon(
+                  imageVector = Icons.Filled.DragHandle,
+                  contentDescription = "Swipe indicator",
+                  tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-          }
-        ) { change, dragAmount ->
-          change.consume()
-          coroutineScope.launch {
-            offsetX.snapTo(offsetX.value + dragAmount)
-            val progress = abs(offsetX.value) / 300f
-            scale.snapTo(1f - (progress * 0.1f).coerceAtMost(0.1f))
-          }
-        }
-      },
-    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-    colors = CardDefaults.cardColors(containerColor = card.color.copy(alpha = 0.1f))
-  ) {
-    Row(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(16.dp),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      AsyncImage(
-        model = card.imageUrl,
-        contentDescription = card.title,
-        modifier = Modifier
-          .size(120.dp)
-          .clip(RoundedCornerShape(8.dp)),
-        contentScale = ContentScale.Crop
-      )
-
-      Column(
-        modifier = Modifier
-          .weight(1f)
-          .padding(start = 16.dp)
-      ) {
-        Text(
-          text = card.title,
-          fontSize = 18.sp,
-          fontWeight = FontWeight.Bold,
-          color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-          text = card.description,
-          fontSize = 14.sp,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.padding(top = 8.dp)
-        )
       }
-
-      Icon(
-        imageVector = Icons.Filled.DragHandle,
-        contentDescription = "Swipe indicator",
-        tint = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-    }
-  }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PreviewSwipeableCard() {
-  val sampleCard = SwipeCard(
-    id = "1",
-    title = "Preview Card",
-    description = "This is a preview of the swipeable card component",
-    imageUrl = "https://picsum.photos/300/200?random=1",
-    color = Color(0xFF6200EE)
-  )
+  val sampleCard =
+      SwipeCard(
+          id = "1",
+          title = "Preview Card",
+          description = "This is a preview of the swipeable card component",
+          imageUrl = "https://picsum.photos/300/200?random=1",
+          color = Color(0xFF6200EE))
 
-  MaterialTheme {
-    SwipeableCard(
-      card = sampleCard,
-      onSwipeAway = {}
-    )
-  }
+  MaterialTheme { SwipeableCard(card = sampleCard, onSwipeAway = {}) }
 }

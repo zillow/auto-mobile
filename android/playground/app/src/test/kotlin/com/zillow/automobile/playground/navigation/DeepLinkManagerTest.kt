@@ -97,27 +97,27 @@ class DeepLinkManagerTest {
     val validUri = Uri.parse("automobile://playground/home")
     assertTrue(DeepLinkManager.isValidDeepLink(validUri))
 
-      val invalidUri = Uri.parse("https://google.com")
-      assertFalse(DeepLinkManager.isValidDeepLink(invalidUri))
-    }
+    val invalidUri = Uri.parse("https://google.com")
+    assertFalse(DeepLinkManager.isValidDeepLink(invalidUri))
+  }
 
   @Test
   fun testGetDestinationName() {
     val onboardingUri = Uri.parse("automobile://playground/onboarding")
     assertEquals("Onboarding", DeepLinkManager.getDestinationName(onboardingUri))
 
-      val loginUri = Uri.parse("automobile://playground/login")
-      assertEquals("Login", DeepLinkManager.getDestinationName(loginUri))
+    val loginUri = Uri.parse("automobile://playground/login")
+    assertEquals("Login", DeepLinkManager.getDestinationName(loginUri))
 
-      val homeUri = Uri.parse("automobile://playground/home")
-      assertEquals("Home", DeepLinkManager.getDestinationName(homeUri))
+    val homeUri = Uri.parse("automobile://playground/home")
+    assertEquals("Home", DeepLinkManager.getDestinationName(homeUri))
 
-      val videoPlayerUri = Uri.parse("automobile://playground/video_player/test123")
-      assertEquals("Video Player", DeepLinkManager.getDestinationName(videoPlayerUri))
+    val videoPlayerUri = Uri.parse("automobile://playground/video_player/test123")
+    assertEquals("Video Player", DeepLinkManager.getDestinationName(videoPlayerUri))
 
-      val invalidUri = Uri.parse("https://google.com")
-      assertNull(DeepLinkManager.getDestinationName(invalidUri))
-    }
+    val invalidUri = Uri.parse("https://google.com")
+    assertNull(DeepLinkManager.getDestinationName(invalidUri))
+  }
 
   @Test
   fun testGetAllDeepLinks() {

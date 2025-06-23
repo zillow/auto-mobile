@@ -26,11 +26,7 @@ class MainActivity : ComponentActivity() {
     analyticsTracker.trackScreenView("MainActivity")
 
     enableEdgeToEdge()
-    setContent {
-      AutoMobileTheme {
-        AppNavigation()
-      }
-    }
+    setContent { AutoMobileTheme { AppNavigation() } }
 
     // Handle deep links
     handleDeepLink(intent)

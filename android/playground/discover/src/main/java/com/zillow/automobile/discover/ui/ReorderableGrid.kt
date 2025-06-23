@@ -45,17 +45,10 @@ import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import kotlin.math.roundToInt
 
-data class GridImage(
-  val id: String,
-  val imageUrl: String,
-  val description: String
-)
+data class GridImage(val id: String, val imageUrl: String, val description: String)
 
 @Composable
-fun ReorderableGrid(
-  images: List<GridImage>,
-  onReorder: (Int, Int) -> Unit
-) {
+fun ReorderableGrid(images: List<GridImage>, onReorder: (Int, Int) -> Unit) {
   var draggedIndex by remember { mutableIntStateOf(-1) }
   var draggedOverIndex by remember { mutableIntStateOf(-1) }
   var tempReorderedImages by remember { mutableStateOf<List<GridImage>?>(null) }
@@ -72,91 +65,92 @@ fun ReorderableGrid(
   }
 
   LazyVerticalGrid(
-    columns = GridCells.Fixed(3),
-    contentPadding = PaddingValues(8.dp),
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalArrangement = Arrangement.spacedBy(8.dp),
-    modifier = Modifier.height(280.dp)
-  ) {
-    itemsIndexed(displayImages, key = { _, image -> image.id }) { index, image ->
-      val isBeingDragged = draggedIndex != -1 && images[draggedIndex].id == image.id
-      val isDropTarget = draggedOverIndex == index && !isBeingDragged
+      columns = GridCells.Fixed(3),
+      contentPadding = PaddingValues(8.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+      modifier = Modifier.height(280.dp)) {
+        itemsIndexed(displayImages, key = { _, image -> image.id }) { index, image ->
+          val isBeingDragged = draggedIndex != -1 && images[draggedIndex].id == image.id
+          val isDropTarget = draggedOverIndex == index && !isBeingDragged
 
-      GridImageItem(
-        image = image,
-        isDragged = isBeingDragged,
-        isDropTarget = isDropTarget,
-        onDragStart = {
-          val originalIndex = images.indexOfFirst { it.id == image.id }
-          draggedIndex = originalIndex
-          tempReorderedImages = images.toList()
-        },
-        onDragEnd = {
-          if (draggedIndex != -1 && tempReorderedImages != null) {
-            val finalIndex = tempReorderedImages!!.indexOfFirst { it.id == images[draggedIndex].id }
-            if (finalIndex != draggedIndex) {
-              onReorder(draggedIndex, finalIndex)
-            }
-          }
-          draggedIndex = -1
-          draggedOverIndex = -1
-          tempReorderedImages = null
-        },
-        onDragMove = { offset ->
-          if (draggedIndex != -1 && tempReorderedImages != null) {
-            // Calculate grid position based on drag offset
-            val itemSize = with(density) { 88.dp.toPx() } // Approximate item size including spacing
-            val cols = 3
-            val currentRow = index / cols
-            val currentCol = index % cols
+          GridImageItem(
+              image = image,
+              isDragged = isBeingDragged,
+              isDropTarget = isDropTarget,
+              onDragStart = {
+                val originalIndex = images.indexOfFirst { it.id == image.id }
+                draggedIndex = originalIndex
+                tempReorderedImages = images.toList()
+              },
+              onDragEnd = {
+                if (draggedIndex != -1 && tempReorderedImages != null) {
+                  val finalIndex =
+                      tempReorderedImages!!.indexOfFirst { it.id == images[draggedIndex].id }
+                  if (finalIndex != draggedIndex) {
+                    onReorder(draggedIndex, finalIndex)
+                  }
+                }
+                draggedIndex = -1
+                draggedOverIndex = -1
+                tempReorderedImages = null
+              },
+              onDragMove = { offset ->
+                if (draggedIndex != -1 && tempReorderedImages != null) {
+                  // Calculate grid position based on drag offset
+                  val itemSize =
+                      with(density) { 88.dp.toPx() } // Approximate item size including spacing
+                  val cols = 3
+                  val currentRow = index / cols
+                  val currentCol = index % cols
 
-            val newCol =
-              ((currentCol * itemSize + offset.x) / itemSize).roundToInt().coerceIn(0, cols - 1)
-            val newRow = ((currentRow * itemSize + offset.y) / itemSize).roundToInt()
-              .coerceIn(0, 1) // 2 rows max
-            val newIndex = (newRow * cols + newCol).coerceIn(0, displayImages.size - 1)
+                  val newCol =
+                      ((currentCol * itemSize + offset.x) / itemSize)
+                          .roundToInt()
+                          .coerceIn(0, cols - 1)
+                  val newRow =
+                      ((currentRow * itemSize + offset.y) / itemSize)
+                          .roundToInt()
+                          .coerceIn(0, 1) // 2 rows max
+                  val newIndex = (newRow * cols + newCol).coerceIn(0, displayImages.size - 1)
 
-            if (newIndex != draggedOverIndex && newIndex != index && newIndex < displayImages.size) {
-              draggedOverIndex = newIndex
+                  if (newIndex != draggedOverIndex &&
+                      newIndex != index &&
+                      newIndex < displayImages.size) {
+                    draggedOverIndex = newIndex
 
-              // Create new reordered list by moving the dragged item to the hovered position
-              val currentList = tempReorderedImages!!.toMutableList()
-              val draggedImage = images[draggedIndex]
-              val currentDraggedIndex = currentList.indexOfFirst { it.id == draggedImage.id }
+                    // Create new reordered list by moving the dragged item to the hovered position
+                    val currentList = tempReorderedImages!!.toMutableList()
+                    val draggedImage = images[draggedIndex]
+                    val currentDraggedIndex = currentList.indexOfFirst { it.id == draggedImage.id }
 
-              if (currentDraggedIndex != -1) {
-                currentList.removeAt(currentDraggedIndex)
-                currentList.add(newIndex, draggedImage)
-                tempReorderedImages = currentList
-              }
-            }
-          }
-        },
-        modifier = Modifier.animateItem(
-          fadeInSpec = null,
-          fadeOutSpec = null
-        )
-      )
-    }
-  }
+                    if (currentDraggedIndex != -1) {
+                      currentList.removeAt(currentDraggedIndex)
+                      currentList.add(newIndex, draggedImage)
+                      tempReorderedImages = currentList
+                    }
+                  }
+                }
+              },
+              modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
+        }
+      }
 }
 
 @Composable
 fun GridImageItem(
-  image: GridImage,
-  isDragged: Boolean,
-  isDropTarget: Boolean,
-  onDragStart: () -> Unit,
-  onDragEnd: () -> Unit,
-  onDragMove: (Offset) -> Unit,
-  modifier: Modifier = Modifier
+    image: GridImage,
+    isDragged: Boolean,
+    isDropTarget: Boolean,
+    onDragStart: () -> Unit,
+    onDragEnd: () -> Unit,
+    onDragMove: (Offset) -> Unit,
+    modifier: Modifier = Modifier
 ) {
   var dragOffset by remember { mutableStateOf(Offset.Zero) }
   val scale = remember { Animatable(1f) }
 
-  LaunchedEffect(isDragged) {
-    scale.animateTo(if (isDragged) 1.15f else 1f)
-  }
+  LaunchedEffect(isDragged) { scale.animateTo(if (isDragged) 1.15f else 1f) }
 
   LaunchedEffect(isDropTarget, isDragged) {
     if (!isDragged) {
@@ -165,97 +159,87 @@ fun GridImageItem(
   }
 
   Card(
-    modifier = modifier
-      .aspectRatio(1f)
-      .offset {
-        if (isDragged) IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt())
-        else IntOffset.Zero
-      }
-      .scale(scale.value)
-      .zIndex(if (isDragged) 1f else 0f)
-      .shadow(if (isDragged) 16.dp else 4.dp, RoundedCornerShape(8.dp))
-      .pointerInput(Unit) {
-        detectDragGestures(
-          onDragStart = { offset ->
-            // Start drag immediately on touch
-            onDragStart()
-            dragOffset = Offset.Zero
-          },
-          onDragEnd = {
-            onDragEnd()
-            dragOffset = Offset.Zero
+      modifier =
+          modifier
+              .aspectRatio(1f)
+              .offset {
+                if (isDragged) IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt())
+                else IntOffset.Zero
+              }
+              .scale(scale.value)
+              .zIndex(if (isDragged) 1f else 0f)
+              .shadow(if (isDragged) 16.dp else 4.dp, RoundedCornerShape(8.dp))
+              .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                      // Start drag immediately on touch
+                      onDragStart()
+                      dragOffset = Offset.Zero
+                    },
+                    onDragEnd = {
+                      onDragEnd()
+                      dragOffset = Offset.Zero
+                    }) { change, dragAmount ->
+                      dragOffset += dragAmount
+                      onDragMove(dragOffset)
+                    }
+              },
+      elevation = CardDefaults.cardElevation(defaultElevation = if (isDragged) 16.dp else 4.dp),
+      colors =
+          CardDefaults.cardColors(
+              containerColor =
+                  when {
+                    isDragged -> MaterialTheme.colorScheme.primaryContainer
+                    isDropTarget -> MaterialTheme.colorScheme.secondaryContainer
+                    else -> MaterialTheme.colorScheme.surface
+                  })) {
+        Box(modifier = Modifier.fillMaxSize()) {
+          AsyncImage(
+              model = image.imageUrl,
+              contentDescription = image.description,
+              modifier = Modifier.fillMaxSize(),
+              contentScale = ContentScale.Crop)
+
+          if (isDragged) {
+            Box(
+                modifier =
+                    Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
           }
-        ) { change, dragAmount ->
-          dragOffset += dragAmount
-          onDragMove(dragOffset)
+
+          if (isDropTarget && !isDragged) {
+            Box(
+                modifier =
+                    Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)))
+          }
+
+          Icon(
+              imageVector = Icons.Filled.Star,
+              contentDescription = "Drag handle",
+              modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp),
+              tint = Color.White)
         }
-      },
-    elevation = CardDefaults.cardElevation(
-      defaultElevation = if (isDragged) 16.dp else 4.dp
-    ),
-    colors = CardDefaults.cardColors(
-      containerColor = when {
-        isDragged -> MaterialTheme.colorScheme.primaryContainer
-        isDropTarget -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surface
       }
-    )
-  ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-      AsyncImage(
-        model = image.imageUrl,
-        contentDescription = image.description,
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.Crop
-      )
-
-      if (isDragged) {
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-        )
-      }
-
-      if (isDropTarget && !isDragged) {
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
-        )
-      }
-
-      Icon(
-        imageVector = Icons.Filled.Star,
-        contentDescription = "Drag handle",
-        modifier = Modifier
-          .align(Alignment.TopEnd)
-          .padding(4.dp)
-          .size(16.dp),
-        tint = Color.White
-      )
-    }
-  }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun ReorderableGridPreview() {
-  val sampleImages = listOf(
-    GridImage("1", "https://picsum.photos/200/200?random=1", "Sample image 1"),
-    GridImage("2", "https://picsum.photos/200/200?random=2", "Sample image 2"),
-    GridImage("3", "https://picsum.photos/200/200?random=3", "Sample image 3"),
-    GridImage("4", "https://picsum.photos/200/200?random=4", "Sample image 4"),
-    GridImage("5", "https://picsum.photos/200/200?random=5", "Sample image 5"),
-    GridImage("6", "https://picsum.photos/200/200?random=6", "Sample image 6")
-  )
+  val sampleImages =
+      listOf(
+          GridImage("1", "https://picsum.photos/200/200?random=1", "Sample image 1"),
+          GridImage("2", "https://picsum.photos/200/200?random=2", "Sample image 2"),
+          GridImage("3", "https://picsum.photos/200/200?random=3", "Sample image 3"),
+          GridImage("4", "https://picsum.photos/200/200?random=4", "Sample image 4"),
+          GridImage("5", "https://picsum.photos/200/200?random=5", "Sample image 5"),
+          GridImage("6", "https://picsum.photos/200/200?random=6", "Sample image 6"))
 
   MaterialTheme {
     ReorderableGrid(
-      images = sampleImages,
-      onReorder = { fromIndex, toIndex ->
-        // Preview doesn't handle reordering
-      }
-    )
+        images = sampleImages,
+        onReorder = { fromIndex, toIndex ->
+          // Preview doesn't handle reordering
+        })
   }
 }

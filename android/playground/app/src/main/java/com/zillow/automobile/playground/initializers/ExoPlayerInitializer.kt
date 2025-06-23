@@ -4,10 +4,9 @@ import android.content.Context
 import androidx.startup.Initializer
 
 /**
- * Initializer for ExoPlayer using AndroidX Startup.
- * Sets up any global configurations for ExoPlayer if needed.
- * Currently, ExoPlayer doesn't require complex global initialization,
- * so this serves as a placeholder for future configuration needs.
+ * Initializer for ExoPlayer using AndroidX Startup. Sets up any global configurations for ExoPlayer
+ * if needed. Currently, ExoPlayer doesn't require complex global initialization, so this serves as
+ * a placeholder for future configuration needs.
  */
 class ExoPlayerInitializer : Initializer<Unit> {
 

@@ -34,20 +34,20 @@ data class BottomNavItem(val label: String, val icon: ImageVector, val route: St
 
 @Composable
 fun HomeScreen(
-  onNavigateToVideoPlayer: (String) -> Unit = {},
-  onNavigateToSlides: (Int) -> Unit = {},
-  onLogout: () -> Unit = {},
-  onGuestModeNavigateToLogin: () -> Unit = {}
+    onNavigateToVideoPlayer: (String) -> Unit = {},
+    onNavigateToSlides: (Int) -> Unit = {},
+    onLogout: () -> Unit = {},
+    onGuestModeNavigateToLogin: () -> Unit = {}
 ) {
   var selectedTab by remember { mutableIntStateOf(0) }
   val context = LocalContext.current
   val analyticsTracker = remember { AnalyticsTracker.getInstance().apply { initialize(context) } }
 
-  val navItems = listOf(
-    BottomNavItem("Discover", Icons.Filled.Search, "discover"),
-    BottomNavItem("Slides", Icons.Filled.Slideshow, "slides"),
-    BottomNavItem("Settings", Icons.Filled.Settings, "settings")
-  )
+  val navItems =
+      listOf(
+          BottomNavItem("Discover", Icons.Filled.Search, "discover"),
+          BottomNavItem("Slides", Icons.Filled.Slideshow, "slides"),
+          BottomNavItem("Settings", Icons.Filled.Settings, "settings"))
 
   // Track screen view when tab changes
   LaunchedEffect(selectedTab) {
@@ -58,46 +58,37 @@ fun HomeScreen(
   }
 
   Scaffold(
-    contentWindowInsets = WindowInsets.systemBars,
-    bottomBar = {
-      NavigationBar(
-        windowInsets = WindowInsets.navigationBars
-      ) {
-        navItems.forEachIndexed { index, item ->
-          NavigationBarItem(
-            selected = selectedTab == index,
-            onClick = {
-              if (item.route == "slides") {
-                onNavigateToSlides(0) // Navigate to first slide
-              } else {
-                selectedTab = index
-              }
-            },
-            icon = { Icon(item.icon, contentDescription = item.label) },
-            label = { Text(item.label) }
-          )
+      contentWindowInsets = WindowInsets.systemBars,
+      bottomBar = {
+        NavigationBar(windowInsets = WindowInsets.navigationBars) {
+          navItems.forEachIndexed { index, item ->
+            NavigationBarItem(
+                selected = selectedTab == index,
+                onClick = {
+                  if (item.route == "slides") {
+                    onNavigateToSlides(0) // Navigate to first slide
+                  } else {
+                    selectedTab = index
+                  }
+                },
+                icon = { Icon(item.icon, contentDescription = item.label) },
+                label = { Text(item.label) })
+          }
+        }
+      }) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+          when (selectedTab) {
+            0 -> DiscoverVideoScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)
+            1 -> {
+              // Slides handled by navigation - this case shouldn't be reached
+              // since we navigate away when slides is selected
+            }
+            2 ->
+                SettingsScreen(
+                    onLogout = onLogout, onGuestModeNavigateToLogin = onGuestModeNavigateToLogin)
+          }
         }
       }
-    }
-  ) { paddingValues ->
-    Box(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(paddingValues)
-    ) {
-      when (selectedTab) {
-        0 -> DiscoverVideoScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)
-        1 -> {
-          // Slides handled by navigation - this case shouldn't be reached
-          // since we navigate away when slides is selected
-        }
-        2 -> SettingsScreen(
-          onLogout = onLogout,
-          onGuestModeNavigateToLogin = onGuestModeNavigateToLogin
-        )
-      }
-    }
-  }
 }
 
 /** Preview for the home screen with bottom navigation. */

@@ -25,18 +25,14 @@ fun AutoMobileFloatingActionButton(
     icon: ImageVector,
     contentDescription: String? = null
 ) {
-    FloatingActionButton(
-        onClick = onClick,
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.secondary,
-        contentColor = MaterialTheme.colorScheme.onSecondary,
-        elevation = FloatingActionButtonDefaults.elevation()
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription
-        )
-    }
+  FloatingActionButton(
+      onClick = onClick,
+      modifier = modifier,
+      containerColor = MaterialTheme.colorScheme.secondary,
+      contentColor = MaterialTheme.colorScheme.onSecondary,
+      elevation = FloatingActionButtonDefaults.elevation()) {
+        Icon(imageVector = icon, contentDescription = contentDescription)
+      }
 }
 
 @Composable
@@ -46,18 +42,14 @@ fun AutoMobileSmallFloatingActionButton(
     icon: ImageVector,
     contentDescription: String? = null
 ) {
-    SmallFloatingActionButton(
-        onClick = onClick,
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.secondary,
-        contentColor = MaterialTheme.colorScheme.onSecondary,
-        elevation = FloatingActionButtonDefaults.elevation()
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = contentDescription
-        )
-    }
+  SmallFloatingActionButton(
+      onClick = onClick,
+      modifier = modifier,
+      containerColor = MaterialTheme.colorScheme.secondary,
+      contentColor = MaterialTheme.colorScheme.onSecondary,
+      elevation = FloatingActionButtonDefaults.elevation()) {
+        Icon(imageVector = icon, contentDescription = contentDescription)
+      }
 }
 
 @Composable
@@ -68,48 +60,32 @@ fun AutoMobileExtendedFloatingActionButton(
     icon: ImageVector? = null,
     contentDescription: String? = null
 ) {
-    ExtendedFloatingActionButton(
-        onClick = onClick,
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.secondary,
-        contentColor = MaterialTheme.colorScheme.onSecondary,
-        elevation = FloatingActionButtonDefaults.elevation()
-    ) {
-      if (icon != null) {
-        Icon(
-          imageVector = icon,
-          contentDescription = contentDescription
-        )
+  ExtendedFloatingActionButton(
+      onClick = onClick,
+      modifier = modifier,
+      containerColor = MaterialTheme.colorScheme.secondary,
+      contentColor = MaterialTheme.colorScheme.onSecondary,
+      elevation = FloatingActionButtonDefaults.elevation()) {
+        if (icon != null) {
+          Icon(imageVector = icon, contentDescription = contentDescription)
+        }
+        Text(text = text)
       }
-      Text(text = text)
-    }
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun AutoMobileFloatingActionButtonPreview() {
-    AutoMobileTheme {
-      Column(
-        verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4)
-        ) {
-            AutoMobileFloatingActionButton(
-                onClick = { },
-                icon = Icons.Default.Add,
-                contentDescription = "Add"
-            )
+  AutoMobileTheme {
+    Column(verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4)) {
+      AutoMobileFloatingActionButton(
+          onClick = {}, icon = Icons.Default.Add, contentDescription = "Add")
 
-            AutoMobileSmallFloatingActionButton(
-                onClick = { },
-                icon = Icons.Default.Add,
-                contentDescription = "Add"
-            )
+      AutoMobileSmallFloatingActionButton(
+          onClick = {}, icon = Icons.Default.Add, contentDescription = "Add")
 
-            AutoMobileExtendedFloatingActionButton(
-                text = "Add Item",
-                onClick = { },
-                icon = Icons.Default.Add,
-                contentDescription = "Add"
-            )
-        }
+      AutoMobileExtendedFloatingActionButton(
+          text = "Add Item", onClick = {}, icon = Icons.Default.Add, contentDescription = "Add")
     }
+  }
 }
