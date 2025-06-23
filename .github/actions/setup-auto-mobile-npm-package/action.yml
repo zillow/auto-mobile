@@ -1,0 +1,24 @@
+#file: noinspection YAMLSchemaValidation
+name: "gradle-task-run"
+description: ""
+inputs:
+  shell:
+    description: "The shell to use for any steps that use shells"
+    default: "bash"
+    required: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Setup Node.js"
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+        cache: "npm"
+
+    - name: "Build and Install NPM Package"
+      shell: ${{ inputs.shell }}
+      run: |
+        npm ci --prefer-offline
+        npm run build
+        npm install -g .

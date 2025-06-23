@@ -1,0 +1,175 @@
+# Version catalog is a central place for you to declare and version dependencies
+# https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
+# https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
+
+[versions]
+# Build tool versions
+build-android-buildTools = "35.0.0"        # Used in playground Android modules
+build-android-compileSdk = "36"            # Used in playground Android modules
+build-android-minSdk = "27"                # Used in playground Android modules
+build-android-targetSdk = "35"             # Used in playground Android modules
+build-android-agp = "8.9.2"
+
+# Kotlin versions
+build-kotlin = "2.1.21"
+build-kotlin-language = "2.0"              # Used in all Kotlin modules
+build-kotlin-coroutines = "1.10.2"
+build-kotlin-datetime = "0.6.2"
+
+# Java versions
+build-java-target = "22"                   # Used in root build.gradle.kts and playground
+
+# Gradle plugin versions (currently unused but available for future use)
+build-gradle-doctor = "0.10.0"
+build-gradle-sortDependencies = "0.14"
+
+# AndroidX versions
+androidx-core = "1.16.0"
+androidx-activity-compose = "1.10.1"
+androidx-compose-bom = "2025.05.00"
+androidx-lifecycle = "2.9.1"
+androidx-startup = "1.2.0"
+
+# Media library versions
+coil = "3.2.0"
+coreSplashscreen = "1.2.0-beta02"
+kotlinxCoroutinesTest = "1.10.2"
+media3 = "1.7.1"
+
+# Library versions
+clikt = "5.0.3"
+junitJupiterApi = "5.11.4"
+junitVintageEngine = "5.11.4"
+koogAgents = "0.2.1"
+mockk = "1.13.17"
+snakeyaml = "2.3"
+test-junit = "4.13.2"
+test-androidx-junit = "1.2.1"
+test-androidx-espresso = "3.6.1"
+
+# Navigation versions
+navigation3 = "1.0.0-alpha04"              # Used in playground app
+
+# Kotlin ecosystem
+kotlinxSerializationJSON = "1.7.3"
+kotlinPoet = "2.2.0"
+appcompat = "1.7.1"
+material = "1.12.0"
+constraintlayout = "2.2.1"
+navigationFragmentKtx = "2.9.0"
+navigationUiKtx = "2.9.0"
+annotation = "1.9.1"
+preference = "1.2.0"
+
+[plugins]
+sortDependencies = { id = "com.squareup.sort-dependencies", version.ref = "build-gradle-sortDependencies" }
+doctor = { id = "com.osacky.doctor", version.ref = "build-gradle-doctor" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "build-kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "build-kotlin" }
+android-library = { id = "com.android.library", version.ref = "build-android-agp" }
+android-application = { id = "com.android.application", version.ref = "build-android-agp" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "build-kotlin" }
+
+[libraries]
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
+clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junitJupiterApi" }
+junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiterApi" }
+junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junitJupiterApi" }
+junit-vintage-engine = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junitVintageEngine" }
+kgp = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "build-kotlin" }
+agp = { module = "com.android.tools.build:gradle", version.ref = "build-android-agp" }
+
+koog-agents = { module = "ai.koog:koog-agents", version.ref = "koogAgents" }
+kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "build-kotlin" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
+kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "build-kotlin-coroutines" }
+kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "build-kotlin-datetime" }
+kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
+kotlinPoet = { module = "com.squareup:kotlinpoet", version.ref = "kotlinPoet" }
+
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
+navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
+
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
+
+androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+androidx-startup = { module = "androidx.startup:startup-runtime", version.ref = "androidx-startup" }
+
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "androidx-compose-bom" }
+compose-ui-core = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-util = { group = "androidx.compose.ui", name = "ui-util" }
+compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+compose-ui-junit = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+compose-material = { group = "androidx.compose.material3", name = "material3" }
+compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+junit = { module = "junit:junit", version.ref = "test-junit" }
+androidx-junit = { module = "androidx.test.ext:junit", version.ref = "test-androidx-junit" }
+androidx-espresso = { module = "androidx.test.espresso:espresso-core", version.ref = "test-androidx-espresso" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+androidx-lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+androidx-navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigationFragmentKtx" }
+androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtx" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
+androidx-preference = { group = "androidx.preference", name = "preference", version.ref = "preference" }
+
+# Media libraries
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
+media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
+media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref = "media3" }
+media3-database = { module = "androidx.media3:media3-database", version.ref = "media3" }
+media3-datasource = { module = "androidx.media3:media3-datasource", version.ref = "media3" }
+
+# Libraries can be bundled together for easier import
+[bundles]
+kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutines"]
+kotlin = [
+  "kotlin-stdlib-jdk8",
+  "kotlinxCoroutines",
+  "kotlinxDatetime"
+]
+compose-ui = [
+  "androidx-activity-compose",
+  "compose-ui-core",
+  "compose-ui-util",
+  "compose-ui-graphics",
+  "compose-ui-tooling",
+  "compose-ui-tooling-preview",
+  "compose-material",
+  "compose-material-icons-extended"
+]
+compose-ui-espresso-test = [
+  "androidx-junit",
+  "compose-ui-junit",
+  "androidx-espresso"
+]
+compose-ui-debug = [
+  "compose-ui-tooling",
+  "compose-ui-test-manifest"
+]
+unit-test = [
+  "junit"
+]
+media-libraries = [
+  "coil-compose",
+  "coil-network-okhttp",
+  "media3-exoplayer",
+  "media3-ui",
+  "media3-ui-compose",
+  "media3-database",
+  "media3-datasource"
+]

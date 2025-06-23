@@ -1,0 +1,206 @@
+#file: noinspection YAMLSchemaValidation
+name: "gradle-task-run"
+description: ""
+inputs:
+  gradle-flags:
+    description: "Set of options we will pass to ./gradlew"
+    example: '["--continue", "--stacktrace"]'
+    required: "true"
+    default: "[]"
+  gradle-tasks:
+    description: "Set of tasks to be executed by ./gradlew"
+    example: '["assembleDebug", "check"]'
+    required: "true"
+  gradle-version:
+    description: "Version of Gradle to run build and cache results with"
+    required: "true"
+    default: ""
+  gradle-encryption-key:
+    description: "Encryption key used for this project"
+    required: "true"
+  gradle-home-directory:
+    description: "The directory to use for Gradle User Home"
+    required: "true"
+    default: "~/.gradle"
+  gradle-project-directory:
+    description: "The directory in which the Gradle project exists"
+    required: "true"
+    default: "."
+  reuse-configuration-cache:
+    description: "Whether to allow Configuration Cache reuse"
+    required: "true"
+  reuse-build-cache:
+    description: "Whether to allow Gradle Build Cache reuse"
+    required: "false"
+    default: true
+  malloc-replacement:
+    description: "Which implementation to replace malloc with"
+    required: "true"
+    default: "jemalloc"
+  debug:
+    description: "Whether to show debug logging"
+    required: "true"
+    default: false
+  shell:
+    description: "The shell to use for any steps that use shells"
+    default: "bash"
+    required: "true"
+  optional-suffix:
+    description: "Optional suffix to add to file names"
+    required: "true"
+    default: ""
+
+outputs:
+  gradle-home-project-cache-hit:
+    value: ${{ steps.gradle-home-project.outputs.cache-hit }}
+  cache-gradle-home-cache-hit:
+    value: ${{ steps.cache-gradle-home.outputs.cache-hit }}
+  cache-gradle-build-cache-hit:
+    value: ${{ steps.cache-gradle-build.outputs.cache-hit }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Install JDK"
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '23'
+
+    - name: "Set up jemalloc"
+      if: ${{ inputs.malloc-replacement == 'jemalloc' }}
+      uses: kaeawc/setup-jemalloc@v0.0.3
+
+    - name: "Set up tcmalloc"
+      if: ${{ inputs.malloc-replacement == 'tcmalloc' }}
+      uses: kaeawc/setup-tcmalloc@v0.0.1
+
+    - name: "Print Java Flags & version"
+      if: ${{ inputs.debug == 'true' }}
+      shell: ${{ inputs.shell }}
+      run: |
+        java -XX:+UseParallelGC -XX:+UnlockExperimentalVMOptions -XX:+PrintFlagsFinal -version
+
+    - name: "Evaluate Gradle version & flags"
+      id: eval_gradle
+      shell: ${{ inputs.shell }}
+      working-directory: ${{ inputs.gradle-project-directory }}
+      run: |
+        if [ "${{ inputs.gradle-version }}" == "" ]; then
+          echo "Reading Gradle version from Gradle wrapper properties file."
+          grep "distributionUrl" gradle/wrapper/gradle-wrapper.properties | sed -E 's/.*gradle-([0-9.]+)-(all|bin).zip/\1/' > /tmp/gradle_version.txt
+          echo 'export version="$(cat /tmp/gradle_version.txt)' >> $GITHUB_OUTPUT
+        else
+          echo "Reading custom Gradle version provided to action."
+          echo 'export version="${{ inputs.gradle-version }}"' >> $GITHUB_OUTPUT
+        fi
+
+        # Note that we do not attempt to visually align JVM args - spaces included in kotlin.daemon.jvmargs causes the Kotlin compiler daemon to not run and fallback to Gradle in-process
+        export GRADLE_FLAGS="
+          --continue
+          --stacktrace
+          $(if [ "${{ inputs.reuse-configuration-cache }}" == "true" ]; then echo ""; else echo "--no-configuration-cache -Dorg.gradle.unsafe.isolated-projects=false"; fi;)
+          $(if [ "${{ inputs.reuse-build-cache }}" == "true" ]; then echo ""; else echo "--no-build-cache --rerun-tasks"; fi;)
+          $(echo "${{ inputs.gradle-flags }}" | jq ".[]" -M -r)
+          -Dorg.gradle.configuration-cache.internal.report-link-as-warning=true
+          "
+
+        # Remove any newlines or tabs from GRADLE_FLAGS
+        export GRADLE_FLAGS="${GRADLE_FLAGS//[$'\t\r\n']}"
+
+        # Write temporary file for checksum
+        echo "$GRADLE_FLAGS" > /tmp/gradle_flags.txt
+
+        echo "Printing evaluated Gradle flags"
+        echo "GRADLE_FLAGS: $GRADLE_FLAGS"
+
+    - name: "Hash Gradle Tasks"
+      uses: pplanel/hash-calculator-action@v1.3.2
+      id: gradle-task-hash
+      with:
+        input: ${{ inputs.gradle-tasks }}
+        method: MD5
+
+    - name: "Debug cache key inputs"
+      shell: ${{ inputs.shell }}
+      run: |
+        echo "reuse-build-cache: ${{ inputs.reuse-build-cache }}"
+        echo "Task hash is ${{ steps.gradle-task-hash.outputs.digest }}"
+        echo "gradle-flags: ${{ inputs.gradle-flags }}"
+        echo "gradle-tasks: ${{ inputs.gradle-tasks }}"
+        echo "gradle-version: ${{ steps.eval_gradle.outputs.version }}"
+        echo "gradle-home-directory: ${{ inputs.gradle-home-directory }}"
+        echo "gradle-project-directory: ${{ inputs.gradle-project-directory }}"
+        echo "reuse-configuration-cache: ${{ inputs.reuse-configuration-cache }}"
+        echo "reuse-build-cache: ${{ inputs.reuse-build-cache }}"
+        echo "debug: ${{ inputs.debug }}"
+        echo "shell: ${{ inputs.shell }}"
+        echo "ANDROID_HOME: $ANDROID_HOME"
+
+    - name: "Setup Gradle"
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: ${{ steps.eval_gradle.outputs.version }}
+        cache-encryption-key: ${{ inputs.gradle-encryption-key }}
+        cache-cleanup: "on-success"
+        build-scan-publish: true
+        cache-disabled: ${{ inputs.reuse-build-cache == 'false' }}
+        build-scan-terms-of-use-url: 'https://gradle.com/help/legal-terms-of-use'
+        build-scan-terms-of-use-agree: 'yes'
+        validate-wrappers: true
+
+    - name: "Restore Android SDK Platform Tools"
+      id: cache-android-platform-tools
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          /usr/local/lib/android/sdk/platform-tools
+          /home/runner/.config/.android/cache
+        key: v2-${{ runner.os }}-android-platform-tools
+
+    - name: "Setup Android SDK"
+      if: steps.cache-android-platform-tools.outputs.cache-hit != 'true'
+      uses: android-actions/setup-android@v3.2.2
+
+    - name: "Save Android SDK Platform Tools"
+      uses: actions/cache/save@v4
+      if: steps.cache-android-platform-tools.outputs.cache-hit != 'true'
+      with:
+        path: |
+          /usr/local/lib/android/sdk/platform-tools
+          /home/runner/.config/.android/cache
+        key: v2-${{ runner.os }}-android-platform-tools
+
+    - name: "Run Tasks via Gradle"
+      shell: ${{ inputs.shell }}
+      working-directory: ${{ inputs.gradle-project-directory }}
+      run: |
+        export GRADLE_FLAGS=$(cat /tmp/gradle_flags.txt)
+        ./gradlew ${{ inputs.gradle-tasks }} $GRADLE_FLAGS
+
+    - name: "Check if any JUnit tests reports were created"
+      id: junit-reports-exist
+      if: always() # always run even if the previous step fails
+      uses: andstor/file-existence-action@v3
+      with:
+        files: "**/build/test-results/testDebugUnitTest/TEST-*.xml"
+
+    - name: "Publish Test Report"
+      uses: mikepenz/action-junit-report@v4
+      if: steps.junit-reports-exist.outputs.files_exists == 'true'
+      with:
+        report_paths: '**/build/test-results/testDebugUnitTest/TEST-*.xml'
+
+    - name: "Rename Configuration Cache HTML Report"
+      shell: ${{ inputs.shell }}
+      working-directory: ${{ inputs.gradle-project-directory }}
+      if: success() || failure()
+      run: |
+        mkdir -p build/reports/configuration-cache
+        html_file=$(find build/reports/configuration-cache -type f -name "*.html" | head -n 1)
+        if [[ -n "$html_file" ]]; then
+          echo "Found Config Cache HTML Report"
+          mv "$html_file" build/reports/config-cache-report.html
+        else
+          touch build/reports/config-cache-report.html
+        fi

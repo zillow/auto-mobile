@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools">
+
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <application
+    android:name=".App"
+    android:allowBackup="true"
+    android:icon="@mipmap/ic_launcher"
+    android:label="@string/app_name"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.Android">
+
+  <activity
+      android:name=".MainActivity"
+      android:exported="true"
+      android:launchMode="singleTop"
+    android:theme="@style/Theme.AutoMobile.SplashScreen">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+
+      <!-- Deep link intent filters for AutoMobile Playground -->
+      <intent-filter android:autoVerify="false">
+          <action android:name="android.intent.action.VIEW" />
+
+          <category android:name="android.intent.category.DEFAULT" />
+          <category android:name="android.intent.category.BROWSABLE" />
+
+          <data
+              android:scheme="automobile"
+              android:host="playground" />
+      </intent-filter>
+    </activity>
+
+    <!-- AndroidX Startup configuration -->
+    <provider
+      android:name="androidx.startup.InitializationProvider"
+      android:authorities="${applicationId}.androidx-startup"
+      android:exported="false"
+      tools:node="merge">
+
+      <!-- Coil Initializer -->
+      <meta-data
+        android:name="com.zillow.automobile.playground.initializers.CoilInitializer"
+        android:value="androidx.startup" />
+
+      <!-- ExoPlayer Initializer -->
+      <meta-data
+        android:name="com.zillow.automobile.playground.initializers.ExoPlayerInitializer"
+        android:value="androidx.startup" />
+    </provider>
+
+  </application>
+
+</manifest>

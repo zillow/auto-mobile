@@ -1,0 +1,136 @@
+name: "auto-generated-playground-2025-06-21T17-57"
+description: "Automatically generated test plan for com.zillow.automobile.playground"
+generated: "2025-06-21T17:57:57.358Z"
+appId: "com.zillow.automobile.playground"
+metadata:
+  sessionId: "3fcc09b7-66ee-47dd-a8e5-9f84a4278cb9"
+  toolCallCount: 35
+  duration: 3437027
+steps:
+  - tool: "listAvds"
+    params:
+    description: "listAvds executed at 2025-06-21T17:57:57.512Z"
+  - tool: "listAvds"
+    params:
+    description: "listAvds executed at 2025-06-21T17:58:33.332Z"
+  - tool: "listAvds"
+    params:
+    description: "listAvds executed at 2025-06-21T17:59:15.832Z"
+  - tool: "startEmulator"
+    params:
+      avdName: "Pixel_9_Pro"
+      timeoutMs: 120000
+      maxTimeLimit: "1h"
+    description: "startEmulator executed at 2025-06-21T17:59:38.263Z"
+  - tool: "startEmulator"
+    params:
+      avdName: "Pixel_9_Pro"
+      timeoutMs: 120000
+      maxTimeLimit: "1h"
+    description: "startEmulator executed at 2025-06-21T17:59:38.322Z"
+  - tool: "tapOn"
+    params:
+      text: "Discover"
+    description: "tapOn executed at 2025-06-21T18:35:19.616Z"
+  - tool: "tapOn"
+    params:
+      text: "Button"
+    description: "tapOn executed at 2025-06-21T18:35:33.185Z"
+  - tool: "tapOn"
+    params:
+      text: "Swipe"
+    description: "tapOn executed at 2025-06-21T18:35:41.852Z"
+  - tool: "swipeOnElement"
+    params:
+      elementId: "Swipe Left/Right"
+      direction: "left"
+      duration: 500
+    description: "swipeOnElement executed at 2025-06-21T18:35:48.175Z"
+  - tool: "swipeOnScreen"
+    params:
+      direction: "left"
+      includeSystemInsets: false
+      duration: 500
+    description: "swipeOnScreen executed at 2025-06-21T18:35:59.175Z"
+  - tool: "tapOn"
+    params:
+      text: "Slides"
+    description: "tapOn executed at 2025-06-21T18:36:09.087Z"
+  - tool: "pressButton"
+    params:
+      button: "back"
+    description: "pressButton executed at 2025-06-21T18:36:17.844Z"
+  - tool: "tapOn"
+    params:
+      text: "Media"
+    description: "tapOn executed at 2025-06-21T18:36:24.426Z"
+  - tool: "tapOn"
+    params:
+      text: "AutoMobile Promo"
+    description: "tapOn executed at 2025-06-21T18:36:32.238Z"
+  - tool: "tapOn"
+    params:
+      text: "Back"
+    description: "tapOn executed at 2025-06-21T18:36:45.911Z"
+  - tool: "pressButton"
+    params:
+      button: "back"
+    description: "pressButton executed at 2025-06-21T18:36:53.282Z"
+  - tool: "tapOn"
+    params:
+      text: "Text"
+    description: "tapOn executed at 2025-06-21T18:37:02.272Z"
+  - tool: "tapOn"
+    params:
+      text: "Basic Text Field"
+    description: "tapOn executed at 2025-06-21T18:37:11.167Z"
+  - tool: "inputText"
+    params:
+      text: "Testing AutoMobile"
+    description: "inputText executed at 2025-06-21T18:37:20.321Z"
+  - tool: "tapOn"
+    params:
+      text: "Chat"
+    description: "tapOn executed at 2025-06-21T18:37:28.308Z"
+  - tool: "tapOn"
+    params:
+      text: "What do you want to say?"
+    description: "tapOn executed at 2025-06-21T18:37:40.056Z"
+  - tool: "inputText"
+    params:
+      text: "Hello from AutoMobile testing!"
+    description: "inputText executed at 2025-06-21T18:37:47.097Z"
+  - tool: "tapOn"
+    params:
+      text: "Send message"
+    description: "tapOn executed at 2025-06-21T18:37:55.304Z"
+  - tool: "launchApp"
+    params:
+      appId: "com.zillow.automobile.playground"
+    description: "launchApp executed at 2025-06-21T18:41:21.290Z"
+  - tool: "tapOn"
+    params:
+      text: "Media"
+    description: "tapOn executed at 2025-06-21T18:41:29.577Z"
+  - tool: "swipeOnScreen"
+    params:
+      direction: "left"
+      includeSystemInsets: false
+      duration: 500
+    description: "swipeOnScreen executed at 2025-06-21T18:41:40.001Z"
+  - tool: "tapOn"
+    params:
+      text: "Media"
+    description: "tapOn executed at 2025-06-21T18:41:46.231Z"
+  - tool: "tapOn"
+    params:
+      text: "AutoMobile Promo"
+    description: "tapOn executed at 2025-06-21T18:41:55.420Z"
+  - tool: "pressButton"
+    params:
+      button: "back"
+    description: "pressButton executed at 2025-06-21T18:42:05.700Z"
+  - tool: "tapOn"
+    params:
+      text: "Slides"
+    description: "tapOn executed at 2025-06-21T18:42:14.798Z"

@@ -1,0 +1,15 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+  <style name="Theme.Android" parent="android:Theme.Material.Light.NoActionBar" />
+
+  <!-- Splash Screen Theme -->
+  <style name="Theme.AutoMobile.SplashScreen" parent="Theme.SplashScreen">
+    <!-- Set the splash screen background, animated icon, and animation duration. -->
+    <item name="windowSplashScreenBackground">@color/white</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/automobile_logo</item>
+    <item name="windowSplashScreenAnimationDuration">500</item>
+
+    <!-- Set the theme of the Activity that directly follows your splash screen. -->
+    <item name="postSplashScreenTheme">@style/Theme.Android</item>
+  </style>
+</resources>

@@ -1,43 +1,106 @@
 {
-  "name": "mcp-adb-firebender",
-  "version": "1.0.0",
-  "description": "MCP server for automated UI interactions via ADB",
-  "main": "src/index.ts",
-  "type": "module",
+  "name": "auto-mobile",
+  "version": "0.0.1",
+  "description": "Mobile device interaction automation with first class MCP support",
   "scripts": {
-    "test": "mocha",
-    "start": "node --loader ts-node/esm src/index.ts",
-    "build": "tsc",
-    "dev": "ts-node --esm src/index.ts"
+    "test": "mocha --require ts-node/register test/*.ts",
+    "test:coverage": "nyc mocha --require ts-node/register test/*.ts",
+    "lint": "eslint . --fix",
+    "watch": "tsc --watch",
+    "build": "tsc && chmod +x dist/src/index.js",
+    "clean": "rm -rf dist",
+    "start": "npx tsx src/index.ts --transport streamable",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",
+    "dev:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port",
+    "dev:stdio": "npx tsx src/index.ts",
+    "dev:sse": "ts-node-dev --respawn --transpile-only src/index.ts --transport sse",
+    "dev:streamable": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",
+    "dev:streamable:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "keywords": [
     "adb",
+    "android",
     "automation",
+    "mobile",
+    "interaction",
+    "devex",
+    "debug-bridge",
     "ui-testing",
     "mcp"
   ],
-  "author": "",
-  "license": "ISC",
+  "files": [
+    "dist"
+  ],
+  "main": "dist/src/index.js",
+  "bin": {
+    "auto-mobile": "dist/src/index.js"
+  },
+  "author": "Jason Pearson",
+  "license": "Apache-2.0",
+  "contributors": [
+    {
+      "name": "Jason Pearson",
+      "email": "jasonpe@zillowgroup.com"
+    }
+  ],
+  "homepage": "https://github.com/zillow/auto-mobile",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0",
-    "express": "^4.18.2",
-    "jimp": "^0.22.10",
-    "xml2js": "^0.6.2",
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "@types/js-yaml": "^4.0.9",
     "fs-extra": "^11.1.1",
-    "zod": "^3.22.4"
+    "glob": "^11.0.3",
+    "jimp": "^0.22.10",
+    "js-yaml": "^4.1.0",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "sharp": "^0.34.2",
+    "xml2js": "^0.6.2",
+    "zod": "^3.22.4",
+    "zod-to-json-schema": "^3.24.5"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.19.0",
+    "@faker-js/faker": "^9.8.0",
+    "@stylistic/eslint-plugin": "^3.0.1",
     "@types/chai": "^4.3.12",
+    "@types/chai-as-promised": "^8.0.2",
     "@types/express": "^4.17.21",
     "@types/fs-extra": "^11.0.4",
     "@types/mocha": "^10.0.6",
     "@types/node": "^20.10.5",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.5",
+    "@types/proxyquire": "^1.3.31",
     "@types/sinon": "^17.0.2",
+    "@types/sinon-chai": "^4.0.0",
     "@types/xml2js": "^0.4.14",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
+    "@typescript-eslint/parser": "^8.26.1",
+    "@typescript-eslint/utils": "^8.26.1",
     "chai": "^4.3.8",
-    "mocha": "^10.2.0",
+    "chai-as-promised": "^8.0.1",
+    "esbuild": "^0.25.4",
+    "esbuild-register": "^3.6.0",
+    "eslint": "^9.19.0",
+    "eslint-plugin": "^1.0.1",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-notice": "^1.0.0",
+    "lerna": "^8.2.2",
+    "mocha": "^11.1.0",
+    "nyc": "^17.1.0",
+    "proxyquire": "^2.1.3",
     "sinon": "^16.0.0",
+    "sinon-chai": "^3.7.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.2"
   }
 }

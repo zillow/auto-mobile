@@ -1,0 +1,10 @@
+---
+name: launch-clock-app
+description: Very simple test to launch Clock app
+steps:
+  - tool: launchApp
+    appId: com.google.android.deskclock
+    label: Launch Clock application
+
+  - tool: stopApp
+    appId: com.google.android.deskclock

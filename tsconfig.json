@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "target": "ESNext",
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "outDir": "./dist",
     "rootDir": ".",
     "strict": true,
@@ -10,12 +10,11 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": false,
+    "allowSyntheticDefaultImports": true
   },
   "include": [
-    "src/**/*",
-    "test/**/*"
+    "src"
   ],
   "exclude": [
     "node_modules",

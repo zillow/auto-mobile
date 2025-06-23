@@ -1,47 +1,23 @@
 {
   "rules": [
-    "This is a Node Typescript MCP server",
-    "It uses https://github.com/modelcontextprotocol/typescript-sdk to serve tool calls",
-    "It uses Mocha for running tests. Running all tests can be done via npm test",
-    "Functionality of the project:",
-
-    "Internal Utilities:",
-    "* Get screen size and resolution",
-    "* Collect view hierarchy of what is displayed on screen, either XML or Compose.",
-    "* Takes screenshots",
-    "* Run `adb getevent` as a background data stream to establish what touch events are being fired",
-    "* Use `adb sendevent` to send touches, swipes, gestures, pinch to zoom with 2 fingers, etc",
-    "* Change orientation",
-    "* List installed apps",
-    "* Launch app (app package specified)",
-    "* Terminate app (app package specified)",
-    "* Clear app data (app package specified)",
-    "* Send keys (simulating keyboard input, adb shell input keyevent)",
-    "* Install app (apk specified)",
-
-    "Tool calls:",
-    "* Observe (combination of getting screen size, insets of system overlay, view hierarchy and screenshot)",
-    "* Tap at Coordinates (use sendevent, await adb getevent to idle for 100ms, run Observe)",
-    "* Tap on Text (run Observe without Screenshot, determine best View or Span to tap on with fuzzy search, run Tap at Coordinates)",
-    "* Scroll List to Index (use swiping with Observe to count 0 for start, -1 for the end, handle index out of bounds, run Observe)",
-    "* Scroll List to Text (loop until text appears or view hierarchy response stops changing: (run Observe without Screenshot, check for text, Fling List with slow speed), run Observe)",
-    "* Fling List (speed as input, await adb getevent to idle for 100ms, run Observe)",
-    "* Select Random Element in List (Fling List with random speed, select random element within list in view hierarchy)",
-    "* Swipe on Element (use adb sendevent to send a stream of single touch events with coordinates within a specified bounds, direction, and whether to simulate an instant or delayed release, await adb getevent to idle for 100ms, then run Observe)",
-    "* Pull to Refresh (Swipe on Element direction down, await adb getevent to idle for 100ms, then run Observe)",
-    "* Exit Dialog (Observe for element with 'Close', 'X', 'Exit', 'Cancel', 'Not Now', 'Later', Tap on Text, await adb getevent to idle for 100ms, then run Observe)",
-    "* List installed apps (await adb getevent to idle for 100ms, then run Observe)",
-    "* Launch app (app package specified, await adb getevent to idle for 100ms, then run Observe)",
-    "* Clear app data (app package specified, await adb getevent to idle for 100ms, then run Observe)",
-    "* Terminate app (app package specified, await adb getevent to idle for 100ms, then run Observe)",
-    "* Open URL (await adb getevent to idle for 100ms, then run Observe)",
-    "* Send Keys (Send keys to the device, simulating keyboard input with random 1-5ms delay between keystrokes, run Observe)",
-    "* Press Button (Press a button on the device, simulating a physical button press.)",
-    "* Change Orientation (await adb getevent to idle for 100ms, then run Observe)"
+    "This is a Node TypeScript MCP server that uses https://github.com/modelcontextprotocol/typescript-sdk to serve tool calls.",
+    "The goal of the project is to provide Android Debug Bridge (ADB) capabilities through MCP tool calls for Android device automation.,",
+    "Whenever terminal output isn't showing, write output to a file in the scratch directory",
+    {
+      "filePathMatches": "*",
+      "rulesPaths": [
+        "README.md",
+        "docs/ai/validation.md",
+        "roadmap/README.md",
+        "roadmap/features/README.md",
+        "roadmap/features/TEMPLATE.md"
+      ]
+    }
   ],
   "ignore": [
-    "node_modules",
-    "dist",
-    ".view_hierarchy_cache"
+    "node_modules/",
+    "dist/",
+    ".view_hierarchy_cache/",
+    "*.js"
   ]
 }

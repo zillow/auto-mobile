@@ -1,0 +1,133 @@
+---
+name: explore-seattle-homes-comprehensive
+description: Comprehensive test to explore homes in Seattle, WA including searching, viewing multiple properties, browsing photos, exploring details, and looking for floor plans and 3D features
+
+steps:
+  # Launch Zillow app
+  - tool: launchApp
+    appId: com.zillow.android.zillowmap
+    label: Launch Zillow application
+
+  - tool: observe
+    withViewHierarchy: true
+    label: Observe initial Zillow app state
+
+  # Search for Seattle, WA homes
+  - tool: tapOn
+    text: "Search field, Home features, school, location"
+    label: Tap on search field to enter location
+
+  - tool: tapOn
+    text: "Seattle, WA"
+    label: Select Seattle, WA from search suggestions
+
+  - tool: observe
+    withViewHierarchy: true
+    label: Observe Seattle homes search results on map
+
+  # Browse through property list at bottom
+  - tool: swipeOnScreen
+    direction: up
+    duration: 800
+    includeSystemInsets: false
+    label: Swipe up to see property list
+
+  # View first luxury property (waterfront estate)
+  - tool: tapOn
+    x: 540
+    y: 1600
+    label: Tap on luxury waterfront property card
+
+  - tool: observe
+    withViewHierarchy: true
+    label: Observe luxury property details page
+
+  # Browse through photos of luxury property
+  - tool: swipeOnScreen
+    direction: left
+    duration: 1000
+    includeSystemInsets: false
+    label: Swipe left to enter photo gallery mode
+
+  - tool: swipeOnScreen
+    direction: left
+    duration: 800
+    includeSystemInsets: false
+    label: Swipe to next photo in gallery
+
+  - tool: swipeOnScreen
+    direction: left
+    duration: 800
+    includeSystemInsets: false
+    label: Swipe to another photo in gallery
+
+  # Return to property details
+  - tool: pressButton
+    button: back
+    label: Go back to property details from photo gallery
+
+  # Expand property details
+  - tool: tapOn
+    text: "Top of home details. Select to expand."
+    label: Expand property details to see full information
+
+  - tool: swipeOnScreen
+    direction: up
+    duration: 1000
+    includeSystemInsets: false
+    label: Scroll through expanded property details
+
+  # Go back to map view
+  - tool: tapOn
+    text: "Return to previous page"
+    label: Return to map view from property details
+
+  # Explore second property with different features
+  - tool: swipeOnScreen
+    direction: up
+    duration: 800
+    includeSystemInsets: false
+    label: Swipe to see more properties in list
+
+  - tool: tapOn
+    text: "property card 3 of 75"
+    label: Tap on second property with price cut
+
+  - tool: observe
+    withViewHierarchy: true
+    label: Observe second property details
+
+  # Browse photos of second property
+  - tool: swipeOnScreen
+    direction: left
+    duration: 1000
+    includeSystemInsets: false
+    label: Enter photo gallery for second property
+
+  - tool: swipeOnScreen
+    direction: left
+    duration: 800
+    includeSystemInsets: false
+    label: View next photo in gallery
+
+  # Return and expand details for second property
+  - tool: pressButton
+    button: back
+    label: Return to property details
+
+  - tool: tapOn
+    text: "Top of home details. Select to expand."
+    label: Expand details for second property
+
+  - tool: observe
+    withViewHierarchy: true
+    label: Observe expanded details with facts and features
+
+  # Stop the application
+  - tool: stopApp
+    appId: com.zillow.android.zillowmap
+    label: Stop Zillow application
+
+  - tool: observe
+    withViewHierarchy: true
+    label: Verify app is closed and returned to home screen

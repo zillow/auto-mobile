@@ -1,0 +1,17 @@
+{
+  "rules": [
+    "This is a JUnitRunner for the AutoMobile CLI.",
+    "Overall the purpose is to run Android UI tests as a full replacement for Espresso and other frameworks.",
+    "Junit4 is prioritized, but should also maintain JUnit5 compatibility",
+    "Speed is one of the highest priorities of this project",
+    "Whenever terminal output isn't showing, write output to a file in the scratch directory",
+    {
+      "filePathMatches": "*",
+      "rulesPaths": [
+        "README.md",
+        "docs/ai/validation.md",
+        "roadmap/README.md"
+      ]
+    }
+  ]
+}

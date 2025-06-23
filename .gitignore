@@ -1,5 +1,23 @@
-.idea/
-node_modules/
-dist/
+.auto-mobile-config.json
+.idea
+node_modules
+/coverage
+/dist
+/venv
+/test_screenshots
 .view_hierarchy_cache/
-test_screenshots/
+screenshots/
+**/.DS_Store
+.nyc_output/
+npm-debug.log*
+/.gitlab-ci-local
+*.tgz
+
+# Places to locally write while thinking or planning
+/scratch
+/roadmap
+/blog
+/presentation
+
+# Generated MkDocs for GitHub Pages
+/site

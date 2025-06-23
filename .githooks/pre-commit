@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# Check if any shell scripts were changed
+if ! scripts/shellcheck/validate_shell_scripts.sh; then
+    echo "Shell script validation failed. Please fix the issues before committing."
+    exit 1
+fi
+
+# Check if any Kotlin files were changed
+if ! scripts/ktfmt/apply_ktfmt.sh; then
+    echo "Kotlin formatting validation failed. Please fix the issues before committing."
+    exit 1
+fi
+
+exit 0

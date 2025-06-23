@@ -1,0 +1,190 @@
+name: "On Merge"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  checks: write
+  security-events: write
+  pull-requests: write
+  contents: read
+  packages: write
+
+jobs:
+# TODO: Fix Node tests on view hierachy sample dumps
+#  validate-xml:
+#    name: "Validate XML"
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: "Git Checkout"
+#        uses: actions/checkout@v4
+#
+#      - name: "Run XMLStarlet"
+#        shell: "bash"
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install xmlstarlet
+#          scripts/xml/validate_xml.sh
+
+  ktfmt:
+    name: "ktfmt"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Run ktfmt"
+        shell: "bash"
+        run: |
+          INSTALL_KTFMT_WHEN_MISSING=true ONLY_TOUCHED_FILES=false scripts/ktfmt/validate_ktfmt.sh
+
+  validate-shell-scripts:
+    name: "Validate Shell Scripts"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Run ShellCheck"
+        shell: "bash"
+        run: |
+          scripts/shellcheck/validate_shell_scripts.sh
+
+  mcp-build-and-test:
+    name: "Node TypeScript Build and Test"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Run Lint"
+        run: npm run lint
+
+      - name: "Run Tests"
+        run: npm run test
+
+  build-junit-runner-library:
+    name: "Build JUnitRunner Library"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":junitRunner:assemble"
+          gradle-project-directory: "android"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Store AAR"
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: aar
+          path: core/build/outputs/aar/core-debug.aar
+
+  build-kotlin-test-author-clikt-app:
+    name: "Build Kotlin Test Author Clikt App"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":kotlinTestAuthor:assembleDist"
+          gradle-project-directory: "android"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Store AAR"
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: aar
+          path: core/build/outputs/aar/core-debug.aar
+
+  build-playground-app:
+    name: "Build Playground App"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":playground:app:assembleDebug"
+          gradle-project-directory: "android"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Store Sample APK"
+        uses: actions/upload-artifact@v4.4.0
+        if: success()  # Only upload if build succeeded
+        with:
+          name: playground-app-apk
+          path: android/playground/app/build/outputs/apk/debug/playground-app-debug.apk
+
+  deploy-docs:
+    name: "Deploy Documentation"
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for git-revision-date-localized plugin
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Setup Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: "Install MkDocs and dependencies"
+        working-directory: scripts/github
+        run: uv sync
+
+      - name: "Build documentation"
+        run: scripts/github/deploy_pages.py build
+
+      - name: "Setup Pages"
+        uses: actions/configure-pages@v5
+
+      - name: "Upload artifact"
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './site'
+
+      - name: "Deploy to GitHub Pages"
+        id: deployment
+        uses: actions/deploy-pages@v4

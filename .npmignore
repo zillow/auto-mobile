@@ -1,0 +1,54 @@
+# Source files (already built to dist/)
+src/
+test/
+*.ts
+!*.d.ts
+
+# Development files
+.eslint*
+tsconfig.json
+.nyc_output/
+coverage/
+*.tsbuildinfo
+.github/
+.githooks/
+.claude/
+.event_monitor_cache/
+
+# Documentation that's not essential
+blog/
+presentation/
+roadmap/
+scratch/
+screenshots/
+test_screenshots/
+docs/ai/
+
+# Android project files
+android/
+
+# Build artifacts
+*.tgz
+logs/
+venv/
+
+# IDE and system files
+.idea/
+.DS_Store
+.view_hierarchy_cache/
+
+# Config files
+.auto-mobile-config.json
+.gitlab-ci-local
+lerna.json
+mkdocs.yml
+firebender.json
+
+# Development scripts
+scripts/
+
+# Example files
+examples/
+
+# Temp files
+npm-debug.log*

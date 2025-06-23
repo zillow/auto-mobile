@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Onboarding Screen -->
+  <string name="onboarding_skip">Skip</string>
+  <string name="onboarding_back">Back</string>
+  <string name="onboarding_next">Next</string>
+  <string name="onboarding_get_started">Get Started</string>
+
+  <!-- Onboarding Pages -->
+  <string name="onboarding_welcome_title">Welcome to AutoMobile</string>
+  <string name="onboarding_welcome_description">Experience the future of Android UI automation with intelligent source mapping and self-healing tests.</string>
+  <string name="onboarding_welcome_emoji">🚗</string>
+
+  <string name="onboarding_source_intelligence_title">Source Code Intelligence</string>
+  <string name="onboarding_source_intelligence_description">Inspect your project source code directly through the view hierarchy using advanced code heuristics and source mapping.</string>
+  <string name="onboarding_source_intelligence_emoji">🔍</string>
+
+  <string name="onboarding_gestures_title">Smart Gestures &amp; Input</string>
+  <string name="onboarding_gestures_description">Precise gestures with window inset awareness and Unicode text input via virtual keyboards for comprehensive testing.</string>
+  <string name="onboarding_gestures_emoji">✋</string>
+
+  <string name="onboarding_automation_title">Automated Test Generation</string>
+  <string name="onboarding_automation_description">Automatically write tests with configurable credentials and experiment settings. Get highly actionable errors and self-healing capabilities.</string>
+  <string name="onboarding_automation_emoji">🤖</string>
+
+  <string name="onboarding_opensource_title">Open Source &amp; Ready</string>
+  <string name="onboarding_opensource_description">Built by Zillow and hosted on GitHub. Join our community and start automating your Android tests today!</string>
+  <string name="onboarding_opensource_description_part1">Built by Zillow and hosted on </string>
+  <string name="onboarding_opensource_description_part2">GitHub</string>
+  <string name="onboarding_opensource_description_part3">. Join our community and start automating your Android tests today!</string>
+  <string name="onboarding_opensource_emoji">🎯</string>
+
+  <!-- GitHub URL -->
+  <string name="github_url">https://github.com/ZillowGroup/Automobile</string>
+</resources>

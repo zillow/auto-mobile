@@ -1,0 +1,229 @@
+---
+name: zillow-home-exploration-with-tour-booking
+description: Comprehensive test exploring Zillow buyability setup, Seattle home search with 3D features, photo exploration, and tour booking for June 17th at 3:30pm
+steps:
+  # Set up demo mode with 1pm time and 4G connectivity
+  - tool: enableDemoMode
+    time: "1300"
+    mobileDataType: "4g"
+    mobileSignalLevel: 4
+    wifiLevel: 0
+    batteryLevel: 85
+    batteryPlugged: false
+    label: Enable demo mode with 1pm time and 4G connectivity
+
+  # Launch Zillow app
+  - tool: launchApp
+    appId: com.zillow.android.zillowmap
+    label: Launch Zillow application
+
+  # Navigate to Home Loans section
+  - tool: tapOn
+    text: "Home Loans"
+    label: Navigate to Home Loans section
+
+  # Access BuyAbility feature
+  - tool: tapOn
+    text: "Get your BuyAbility"
+    label: Access Get your BuyAbility feature
+
+  # Set location to Arizona
+  - tool: tapOn
+    text: "State"
+    label: Open state selection
+
+  - tool: tapOn
+    text: "Arizona"
+    label: Select Arizona as location
+
+  # Set credit score to good (720 & above)
+  - tool: tapOn
+    x: 800
+    y: 1168
+    label: Open credit score selection
+
+  - tool: tapOn
+    text: "720 & above"
+    label: Select good credit score (720 & above)
+
+  # Enter annual income
+  - tool: tapOn
+    x: 540
+    y: 1232
+    label: Focus on annual income field
+
+  - tool: inputText
+    text: "80000"
+    label: Enter annual income of $80,000
+
+  - tool: pressButton
+    button: "back"
+    label: Confirm income entry
+
+  # Enter down payment
+  - tool: tapOn
+    x: 280
+    y: 1770
+    label: Focus on down payment field
+
+  - tool: inputText
+    text: "15000"
+    label: Enter down payment of $15,000
+
+  # Enter monthly debt
+  - tool: tapOn
+    x: 800
+    y: 1349
+    label: Focus on monthly debt field
+
+  - tool: inputText
+    text: "500"
+    label: Enter monthly debt of $500
+
+  # Get BuyAbility results
+  - tool: tapOn
+    text: "Get your BuyAbility℠"
+    label: Submit BuyAbility form
+
+  # Navigate back to search
+  - tool: pressButton
+    button: "back"
+    label: Go back to main app
+
+  - tool: pressButton
+    button: "back"
+    label: Return to search area
+
+  - tool: tapOn
+    text: "Search"
+    label: Navigate to search section
+
+  # Search for Seattle, WA homes
+  - tool: tapOn
+    x: 442
+    y: 219
+    label: Open search field
+
+  - tool: tapOn
+    id: "com.zillow.android.zillowmap:id/search_close_btn"
+    label: Clear current search
+
+  - tool: tapOn
+    text: "Seattle, WA"
+    label: Select Seattle, WA from search history
+
+  # Look for homes with 3D features
+  - tool: tapOn
+    text: "3D Tour, $1399000"
+    label: Explore property with 3D tour feature
+
+  # Pull up property listings
+  - tool: swipeOnElement
+    elementId: "com.zillow.android.zillowmap:id/homes_map_drawer_bottom_sheet"
+    direction: "up"
+    duration: 1000
+    label: Expand property listings
+
+  # Select affordable home for exploration
+  - tool: tapOn
+    x: 540
+    y: 1665
+    label: Select $689,000 home for detailed exploration
+
+  # Explore home photos - simulate finding different rooms
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 1000
+    includeSystemInsets: false
+    label: Enter full-screen photo viewing mode
+
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 1000
+    includeSystemInsets: false
+    label: View second photo
+
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 1000
+    includeSystemInsets: false
+    label: View third photo (exploring kitchen area)
+
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 500
+    includeSystemInsets: false
+    label: View fourth photo (exploring living area)
+
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 300
+    includeSystemInsets: false
+    label: View fifth photo (exploring dining room)
+
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 300
+    includeSystemInsets: false
+    label: View sixth photo (exploring bedroom)
+
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 300
+    includeSystemInsets: false
+    label: View seventh photo (exploring bathroom)
+
+  - tool: swipeOnScreen
+    direction: "left"
+    duration: 200
+    includeSystemInsets: false
+    label: View eighth photo (additional room exploration)
+
+  # Book a tour for June 17th at 3:30pm
+  - tool: tapOn
+    text: "Request a tour"
+    label: Initiate tour booking process
+
+  # Select tour date and time
+  - tool: tapOn
+    text: "Select a time (optional)"
+    label: Open date and time selection
+
+  # Navigate to June 17th
+  - tool: tapOn
+    text: "Jun 16"
+    label: Navigate to see more dates
+
+  - tool: tapOn
+    text: "Jun 17"
+    label: Select June 17th for tour
+
+  # Select 3:30 PM time slot
+  - tool: tapOn
+    text: "3:30 PM"
+    label: Select 3:30 PM time slot
+
+  # Confirm time selection
+  - tool: tapOn
+    text: "Select time"
+    label: Confirm date and time selection
+
+  # Proceed to contact form
+  - tool: tapOn
+    text: "Next"
+    label: Proceed to contact information form
+
+  # Cancel tour request (demo purposes)
+  - tool: pressButton
+    button: "back"
+    label: Cancel tour request for demo
+
+  - tool: tapOn
+    x: 75
+    y: 221
+    label: Exit tour booking flow
+
+  # Final observation
+  - tool: observe
+    withViewHierarchy: true
+    label: Final observation of home photo gallery
