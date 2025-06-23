@@ -243,7 +243,7 @@ fun MermaidDiagramSlideItem(
                                                                       .toInt()
                                                                 } else {
                                                                   0 // Content fits in view, no
-                                                                    // horizontal scroll needed
+                                                                  // horizontal scroll needed
                                                                 }
 
                                                             val scrollY = 0 // Top of the content
@@ -295,7 +295,7 @@ fun MermaidDiagramSlideItem(
                                                       }
                                                 },
                                                 200) // Small delay after zoom to ensure it's
-                                                     // applied
+                                            // applied
 
                                             Log.i(
                                                 TAG,
