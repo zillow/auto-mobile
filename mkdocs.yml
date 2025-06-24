@@ -74,3 +74,5 @@ nav:
   - 'GitHub Discussions': https://github.com/zillow/auto-mobile/discussions
   - 'Contributing': contributing.md
   - 'Change Log': changelog.md
+  - 'Security': security.md
+

@@ -14,14 +14,14 @@ fun getViewHierarchyCacheSlides(): List<SlideContent> =
             code =
                 """
 flowchart LR
-    A["observe() call"] --> B["Take Screenshot &<br/>Calculate dHash"];
-    B --> C{"Compare to<br/>cached hashes"};
-    C -->|"✅ Candidates"| D["pixelmatch comparison"];
-    C -->|"❌ No Candidates"| E["`uiautomator dump`"];
-    D --> F{>99.8% similar?};
-    F -->|"✅ Yes"| G["Return Cached Hierarchy"];
-    F -->|"❌ No"| E;
-    E --> H["Cache Screenshot & Hierarchy"];
+    A["Observe()"] --> B["Screenshot<br/>+dHash"];
+    B --> C{"hash<br/>match?"};
+    C -->|"✅"| D["pixelmatch"];
+    C -->|"❌"| E["`uiautomator dump`"];
+    D --> F{>99.8%?};
+    F -->|"✅"| G["Return"];
+    F -->|"❌"| E;
+    E --> H["Cache"];
     H --> I["Return New Hierarchy"];
     classDef decision fill:#b8860b,stroke-width:0px;
     classDef logic fill:#004baa,stroke-width:0px,color:white;

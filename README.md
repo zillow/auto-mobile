@@ -21,12 +21,13 @@ compatible with multiple foundation model providers. The first platform supporte
 - [CLI Reference](docs/cli.md) - Complete command-line interface documentation
 - [Batteries Included](docs/batteries-included.md) - Built-in features and automation
 - [Local Development](docs/local-development.md)
+- [Change Log](CHANGELOG.md) - coming soon
 
 ## Contributing
 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [SECURITY](SECURITY.md) - Responsible disclosure & use
-- [CONTRIBUTING](CONTRIBUTING.md) - coming soon
+- [CONTRIBUTING](.github/CONTRIBUTING.md) - coming soon
 
 # Acknowledgement 
 

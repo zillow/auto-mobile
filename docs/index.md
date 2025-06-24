@@ -24,6 +24,11 @@ have been available and open sourced for years.
 ## Additional Resources
 
 - [FAQ](faq.md) - Frequently asked questions
+- [Security](security.md) - Responsible vulnerability disclosure & use
+
+# Acknowledgement
+
+By continuing to use AutoMobile, you acknowledge and agree to the warnings and responsible use requirements above.
 
 # License
 

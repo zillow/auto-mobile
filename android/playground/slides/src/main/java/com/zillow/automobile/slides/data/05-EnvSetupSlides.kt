@@ -18,12 +18,19 @@ fun getEnvSetupSlides(): List<SlideContent> =
             code =
                 """
       flowchart LR
-        Start([Start]) --> FindSession{Find Session}
-        FindSession -->|No Session| FindActiveDevice{Find Active Device}
-        FindSession -->|Has Session| End([End])
-        FindActiveDevice -->|No Active Device| FindAvd{Find AVD}
-        FindActiveDevice -->|Has Active Device| End
-        FindAvd -->|No AVD| CreateAvd([Create AVD])
+        A([Tool]) --> B{Find Session}
+        B -->|No Session| C{Find Active Device}
+        B -->|Has Session| D([End])
+        C -->|No Active Device| E{Find AVD}
+        C -->|Has Active Device| D
+        E -->|No AVD| F([Create AVD])
+
+        classDef decision fill:#b8860b,stroke-width:0px;
+        classDef logic fill:#004baa,stroke-width:0px,color:white;
+        classDef result fill:#1a1a1a,stroke-width:0px;
+        class A,G,I result;
+        class B,D,E,H logic;
+        class C,F decision;
       """
                     .trimIndent()),
         SlideContent.Emoji(

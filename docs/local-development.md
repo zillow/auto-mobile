@@ -1,19 +1,24 @@
 # Running from Source
 
-## Hot Reload (Recommended)
+Whether you want to contribute to AutoMobile or just want to run the MCP directly from source, this guide will set you
+up for the development environment maintainers use.
 
-AutoMobile supports multiple transport modes for development:
+## Hot Reload
 
-### Transport Options
+AutoMobile supports multiple transport modes but the only supported use case right now is streamable transport over the
+`mcp-remote` npm package. This allows decoupling of the MCP server process from the STDIO interface to continually
+recompile code as changes are made. 
+
+### Options
 
 **Streamable HTTP (Recommended)** - Modern MCP transport with full streaming support:
 ```shell
-# Start with hot reloading (ts-node-dev)
+# Start with hot reloading (ts-node-dev), streamable is the default
 npm run dev
 npm run dev:streamable
 
 # Custom port
-npm run dev:streamable:port 8080
+npm run dev:port 8080
 ```
 
 Configuration for your favorite MCP client:
