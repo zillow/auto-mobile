@@ -86,7 +86,6 @@ fun SwipeableCard(card: SwipeCard, onSwipeAway: () -> Unit) {
                       }
                     }
               },
-      elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
       colors = CardDefaults.cardColors(containerColor = card.color.copy(alpha = 0.1f))) {
         Row(
             modifier = Modifier.fillMaxSize().padding(16.dp),
