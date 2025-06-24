@@ -12,7 +12,8 @@ val AutoMobileWhite = Color(0xFFFFFFFF)
 
 // Promo video colors
 val PromoOrange = Color(0xFFFF3300) // Primary flow elements in presentations and Mermaid diagrams
-val PromoBlue = Color(0xFF525FE1) // Secondary elements and connections in presentations and Mermaid diagrams
+val PromoBlue =
+    Color(0xFF525FE1) // Secondary elements and connections in presentations and Mermaid diagrams
 
 val AutoMobileLightGrey = Color(0xFFBDBDBD)
 val AutoMobileDarkGrey = Color(0xFF424242)

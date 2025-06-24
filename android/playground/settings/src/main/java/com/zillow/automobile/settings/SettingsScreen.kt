@@ -114,8 +114,7 @@ fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit 
                       val originalExp = experiments.find { it.name == updatedExp.name }
                       if (originalExp != null &&
                           originalExp.currentTreatment != updatedExp.currentTreatment) {
-                        viewModel.updateExperimentTreatment(
-                            updatedExp, updatedExp.currentTreatment)
+                        viewModel.updateExperimentTreatment(updatedExp, updatedExp.currentTreatment)
                       }
                     }
                   })

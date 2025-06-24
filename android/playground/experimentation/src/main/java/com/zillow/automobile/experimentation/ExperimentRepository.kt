@@ -16,7 +16,9 @@ class ExperimentRepository(context: Context) {
       when (experiment) {
         ActiveExperiments.Mood -> {
           val currentTreatmentId = getExperimentCurrentTreatmentId(experiment.experimentName)
-          val currentTreatment = MoodExperiment.treatments.find { it.id == currentTreatmentId } ?: MoodTreatment.CONTROL
+          val currentTreatment =
+              MoodExperiment.treatments.find { it.id == currentTreatmentId }
+                  ?: MoodTreatment.CONTROL
           MoodExperiment(currentTreatment)
         }
         else -> {
@@ -27,15 +29,15 @@ class ExperimentRepository(context: Context) {
   }
 
   internal fun getExperimentCurrentTreatmentId(experimentName: String): String {
-    return sharedPreferences.getString(
-      "${KEY_CURRENT_TREATMENT_PREFIX}$experimentName", CONTROL) ?: CONTROL
+    return sharedPreferences.getString("${KEY_CURRENT_TREATMENT_PREFIX}$experimentName", CONTROL)
+        ?: CONTROL
   }
 
   fun getActiveExperiments(): Set<ActiveExperiments> {
     return ActiveExperiments.entries.toSet()
   }
 
-  fun <T: Treatment> saveExperiment(experiment: Experiment<T>) {
+  fun <T : Treatment> saveExperiment(experiment: Experiment<T>) {
     val experimentNames =
         sharedPreferences.getStringSet(KEY_EXPERIMENT_NAMES, emptySet())?.toMutableSet()
             ?: mutableSetOf()
@@ -47,7 +49,7 @@ class ExperimentRepository(context: Context) {
     }
   }
 
-  fun <T: Treatment> updateExperimentTreatment(experiment: Experiment<T>, treatment: Treatment) {
+  fun <T : Treatment> updateExperimentTreatment(experiment: Experiment<T>, treatment: Treatment) {
     sharedPreferences.edit {
       putString("${KEY_CURRENT_TREATMENT_PREFIX}${experiment.name}", treatment.id)
     }

@@ -14,10 +14,7 @@ import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.experimentation.experiments.MoodTreatment
 
 @Composable
-fun AutoMobileLogo(
-    modifier: Modifier = Modifier,
-    treatment: MoodTreatment = MoodTreatment.PARTY
-) {
+fun AutoMobileLogo(modifier: Modifier = Modifier, treatment: MoodTreatment = MoodTreatment.PARTY) {
 
   if (treatment == MoodTreatment.PARTY) {
     // Use holographic version for party mode

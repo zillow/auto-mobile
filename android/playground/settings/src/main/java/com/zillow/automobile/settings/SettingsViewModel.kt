@@ -80,7 +80,7 @@ class SettingsViewModel(
     _trackingEnabled.value = analyticsRepository.isTrackingEnabled
   }
 
-  fun <T: Treatment> updateExperimentTreatment(experiment: Experiment<T>, treatment: Treatment) {
+  fun <T : Treatment> updateExperimentTreatment(experiment: Experiment<T>, treatment: Treatment) {
     experimentRepository.updateExperimentTreatment(experiment, treatment)
     loadExperiments() // Refresh the state
   }

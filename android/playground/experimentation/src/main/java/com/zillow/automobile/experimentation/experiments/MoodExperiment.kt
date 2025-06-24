@@ -27,6 +27,7 @@ class MoodExperiment(override val currentTreatment: MoodTreatment) : Experiment<
 
   override val name: String = EXPERIMENT_NAME
   override val treatments: Set<MoodTreatment> = MoodTreatment.getIdSet()
+
   override fun copy(treatment: Treatment): Experiment<MoodTreatment> {
     return when (treatment) {
       is MoodTreatment -> return MoodExperiment(treatment)

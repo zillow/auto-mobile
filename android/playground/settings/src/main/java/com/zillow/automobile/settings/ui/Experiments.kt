@@ -37,7 +37,10 @@ import com.zillow.automobile.experimentation.experiments.MoodExperiment
 import com.zillow.automobile.experimentation.experiments.MoodTreatment
 
 @Composable
-fun <T: Treatment> ExperimentBottomSheetContent(experiment: Experiment<T>, onTreatmentSelected: (T) -> Unit) {
+fun <T : Treatment> ExperimentBottomSheetContent(
+    experiment: Experiment<T>,
+    onTreatmentSelected: (T) -> Unit
+) {
   Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
     Text(
         text = "Select Treatment for ${experiment.name}",
@@ -64,7 +67,10 @@ fun <T: Treatment> ExperimentBottomSheetContent(experiment: Experiment<T>, onTre
 }
 
 @Composable
-fun ExperimentsCard(experiments: List<Experiment<*>>, onExperimentClicked: (Experiment<*>) -> Unit) {
+fun ExperimentsCard(
+    experiments: List<Experiment<*>>,
+    onExperimentClicked: (Experiment<*>) -> Unit
+) {
   Card(
       modifier = Modifier.fillMaxWidth(),
       elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -146,8 +152,7 @@ fun ExperimentsSection(
 fun ExperimentBottomSheetPreview() {
   MaterialTheme {
     ExperimentBottomSheetContent(
-        experiment =
-            MoodExperiment(currentTreatment = MoodTreatment.PARTY),
+        experiment = MoodExperiment(currentTreatment = MoodTreatment.PARTY),
         onTreatmentSelected = { /* Preview treatment selection */ })
   }
 }

@@ -43,8 +43,14 @@ import com.zillow.automobile.design.system.components.AutoMobileLogo
 import kotlinx.coroutines.launch
 
 sealed class OnboardingPage {
-  data class Emoji(val title: String, val description: String, val emoji: String) : OnboardingPage()
-  data class Drawable(val title: String, val description: String, @DrawableRes val drawableResId: Int) : OnboardingPage()
+  data class Emoji(val title: String, val description: String, val emoji: String) :
+      OnboardingPage()
+
+  data class Drawable(
+      val title: String,
+      val description: String,
+      @DrawableRes val drawableResId: Int
+  ) : OnboardingPage()
 }
 
 /** Main onboarding screen with pager and navigation controls. */
@@ -77,14 +83,10 @@ fun OnboardingScreen(onFinish: () -> Unit) {
   val pagerState = rememberPagerState(pageCount = { pages.size })
   val coroutineScope = rememberCoroutineScope()
 
-  Column(modifier = Modifier
-    .fillMaxSize()
-    .background(MaterialTheme.colorScheme.background)) {
+  Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
     // Skip button
     Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
         horizontalArrangement = Arrangement.End) {
           if (pagerState.currentPage < pages.size - 1) {
             TextButton(onClick = onFinish) { Text(stringResource(id = R.string.onboarding_skip)) }
@@ -146,8 +148,6 @@ fun OnboardingScreen(onFinish: () -> Unit) {
   }
 }
 
-
-
 /** Individual onboarding page content. */
 @Composable
 fun OnboardingPageContent(page: OnboardingPage, modifier: Modifier = Modifier) {
@@ -157,8 +157,6 @@ fun OnboardingPageContent(page: OnboardingPage, modifier: Modifier = Modifier) {
   }
 }
 
-
-
 /** Individual onboarding page content. */
 @Composable
 fun DrawablePageContent(page: OnboardingPage.Drawable, modifier: Modifier = Modifier) {
@@ -166,53 +164,53 @@ fun DrawablePageContent(page: OnboardingPage.Drawable, modifier: Modifier = Modi
   val context = LocalContext.current
 
   Column(
-    modifier = modifier.padding(horizontal = 32.dp),
-    horizontalAlignment = Alignment.CenterHorizontally,
-    verticalArrangement = Arrangement.Center) {
-    // Logo/Icon
-    AutoMobileLogo()
+      modifier = modifier.padding(horizontal = 32.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center) {
+        // Logo/Icon
+        AutoMobileLogo()
 
-    // Title
-    Text(
-      text = page.title,
-      fontSize = 28.sp,
-      fontWeight = FontWeight.Bold,
-      textAlign = TextAlign.Center,
-      color = MaterialTheme.colorScheme.onBackground,
-      modifier = Modifier.padding(bottom = 16.dp))
+        // Title
+        Text(
+            text = page.title,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 16.dp))
 
-    // Description
-    if (page.title == stringResource(id = R.string.onboarding_opensource_title)) {
-      val githubUrl = stringResource(id = R.string.github_url)
-      val annotatedString = buildAnnotatedString {
-        append(stringResource(id = R.string.onboarding_opensource_description_part1))
-        withStyle(
-          style =
-            SpanStyle(
-              color = MaterialTheme.colorScheme.primary,
-              textDecoration = TextDecoration.Underline)) {
-          pushStringAnnotation("url", githubUrl)
-          append(stringResource(id = R.string.onboarding_opensource_description_part2))
-          pop()
+        // Description
+        if (page.title == stringResource(id = R.string.onboarding_opensource_title)) {
+          val githubUrl = stringResource(id = R.string.github_url)
+          val annotatedString = buildAnnotatedString {
+            append(stringResource(id = R.string.onboarding_opensource_description_part1))
+            withStyle(
+                style =
+                    SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        textDecoration = TextDecoration.Underline)) {
+                  pushStringAnnotation("url", githubUrl)
+                  append(stringResource(id = R.string.onboarding_opensource_description_part2))
+                  pop()
+                }
+          }
+
+          Text(
+              text = annotatedString,
+              fontSize = 16.sp,
+              textAlign = TextAlign.Center,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              lineHeight = 24.sp,
+              modifier = Modifier.clickable { uriHandler.openUri(githubUrl) })
+        } else {
+          Text(
+              text = page.description,
+              fontSize = 16.sp,
+              textAlign = TextAlign.Center,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              lineHeight = 24.sp)
         }
       }
-
-      Text(
-        text = annotatedString,
-        fontSize = 16.sp,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        lineHeight = 24.sp,
-        modifier = Modifier.clickable { uriHandler.openUri(githubUrl) })
-    } else {
-      Text(
-        text = page.description,
-        fontSize = 16.sp,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        lineHeight = 24.sp)
-    }
-  }
 }
 
 @Composable
@@ -277,16 +275,14 @@ fun PageIndicators(pageCount: Int, currentPage: Int, modifier: Modifier = Modifi
     repeat(pageCount) { index ->
       Box(
           modifier =
-              Modifier
-                .size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(
-                  if (index == currentPage) {
-                    MaterialTheme.colorScheme.primary
-                  } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                  }
-                ))
+              Modifier.size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
+                  .clip(RoundedCornerShape(4.dp))
+                  .background(
+                      if (index == currentPage) {
+                        MaterialTheme.colorScheme.primary
+                      } else {
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                      }))
     }
   }
 }
