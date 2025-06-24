@@ -14,7 +14,7 @@ compatible with multiple foundation model providers. The first platform supporte
 - **Device Management**: Multi-device support with emulator control and app lifecycle management.
 - **Progress Notifications**: Real-time progress updates for long-running operations like emulator startup.
 
-## Documenation
+## Documentation
 
 - [Installation](docs/installation.md)
 - [AutoMobile Origin](docs/index.md) - Origin story
