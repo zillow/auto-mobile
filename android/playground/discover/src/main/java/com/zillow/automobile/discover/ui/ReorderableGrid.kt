@@ -49,7 +49,7 @@ data class GridImage(val id: String, val imageUrl: String, val description: Stri
 
 @Composable
 fun ReorderableGrid(images: List<GridImage>, onReorder: (Int, Int) -> Unit) {
-  var draggedIndex by remember { mutableIntStateOf(-1) }
+  var draggedItemId by remember { mutableStateOf<String?>(null) }
   var draggedOverIndex by remember { mutableIntStateOf(-1) }
   val density = LocalDensity.current
 
@@ -59,40 +59,44 @@ fun ReorderableGrid(images: List<GridImage>, onReorder: (Int, Int) -> Unit) {
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
       modifier = Modifier.height(280.dp)) {
-    itemsIndexed(images, key = { _, image -> image.id }) { index, image ->
-      val isBeingDragged = draggedIndex == index
+        itemsIndexed(images, key = { _, image -> image.id }) { index, image ->
+          val isBeingDragged = draggedItemId == image.id
           val isDropTarget = draggedOverIndex == index && !isBeingDragged
 
           GridImageItem(
               image = image,
               isDragged = isBeingDragged,
               isDropTarget = isDropTarget,
-              onDragStart = {
-                draggedIndex = index
-              },
+              onDragStart = { draggedItemId = image.id },
               onDragEnd = {
-                if (draggedIndex != -1 && draggedOverIndex != -1 && draggedIndex != draggedOverIndex) {
-                  onReorder(draggedIndex, draggedOverIndex)
+                if (draggedItemId != null && draggedOverIndex != -1) {
+                  val draggedIndex = images.indexOfFirst { it.id == draggedItemId }
+                  if (draggedIndex != -1 && draggedIndex != draggedOverIndex) {
+                    onReorder(draggedIndex, draggedOverIndex)
+                  }
                 }
-                draggedIndex = -1
+                draggedItemId = null
                 draggedOverIndex = -1
               },
               onDragMove = { offset ->
-                if (draggedIndex != -1) {
+                if (draggedItemId != null) {
                   // Calculate which grid cell we're hovering over
                   val itemSize = with(density) { 96.dp.toPx() } // Item size + spacing
                   val cols = 3
                   val currentRow = index / cols
                   val currentCol = index % cols
 
-                  val newCol = ((currentCol * itemSize + offset.x) / itemSize)
-                    .roundToInt()
-                    .coerceIn(0, cols - 1)
-                  val newRow = ((currentRow * itemSize + offset.y) / itemSize)
-                    .roundToInt()
-                    .coerceIn(0, 1) // 2 rows max in our 280dp height
+                  val newCol =
+                      ((currentCol * itemSize + offset.x) / itemSize)
+                          .roundToInt()
+                          .coerceIn(0, cols - 1)
+                  val newRow =
+                      ((currentRow * itemSize + offset.y) / itemSize)
+                          .roundToInt()
+                          .coerceIn(0, 1) // 2 rows max in our 280dp height
                   val newIndex = (newRow * cols + newCol).coerceIn(0, images.size - 1)
 
+                  val draggedIndex = images.indexOfFirst { it.id == draggedItemId }
                   if (newIndex != draggedOverIndex && newIndex != draggedIndex) {
                     draggedOverIndex = newIndex
                   }
@@ -127,29 +131,29 @@ fun GridImageItem(
   Card(
       modifier =
           modifier
-            .aspectRatio(1f)
-            .offset {
-              if (isDragged) IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt())
-              else IntOffset.Zero
-            }
-            .scale(scale.value)
-            .zIndex(if (isDragged) 1f else 0f)
-            .shadow(if (isDragged) 16.dp else 4.dp, RoundedCornerShape(8.dp))
-            .pointerInput(Unit) {
-              detectDragGestures(
-                onDragStart = { offset ->
-                  // Start drag immediately on touch
-                  onDragStart()
-                  dragOffset = Offset.Zero
-                },
-                onDragEnd = {
-                  onDragEnd()
-                  dragOffset = Offset.Zero
-                }) { change, dragAmount ->
-                dragOffset += dragAmount
-                onDragMove(dragOffset)
+              .aspectRatio(1f)
+              .offset {
+                if (isDragged) IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt())
+                else IntOffset.Zero
               }
-            },
+              .scale(scale.value)
+              .zIndex(if (isDragged) 1f else 0f)
+              .shadow(if (isDragged) 16.dp else 4.dp, RoundedCornerShape(8.dp))
+              .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { offset ->
+                      // Start drag immediately on touch
+                      onDragStart()
+                      dragOffset = Offset.Zero
+                    },
+                    onDragEnd = {
+                      onDragEnd()
+                      dragOffset = Offset.Zero
+                    }) { change, dragAmount ->
+                      dragOffset += dragAmount
+                      onDragMove(dragOffset)
+                    }
+              },
       elevation = CardDefaults.cardElevation(defaultElevation = if (isDragged) 16.dp else 4.dp),
       colors =
           CardDefaults.cardColors(
@@ -169,26 +173,21 @@ fun GridImageItem(
           if (isDragged) {
             Box(
                 modifier =
-                    Modifier
-                      .fillMaxSize()
-                      .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
+                    Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
           }
 
           if (isDropTarget && !isDragged) {
             Box(
                 modifier =
-                    Modifier
-                      .fillMaxSize()
-                      .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)))
+                    Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)))
           }
 
           Icon(
               imageVector = Icons.Filled.Star,
               contentDescription = "Drag handle",
-              modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(4.dp)
-                .size(16.dp),
+              modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp),
               tint = Color.White)
         }
       }
