@@ -1,22 +1,16 @@
-# MCP Client Configuration
+# Firebender MCP Config
 
 This will run AutoMobile in STDIO
-
-## Firebender / Cursor / Claude Desktop
 
 ```json
 {
   "mcpServers": {
     "AutoMobile": {
       "command": "npx",
-      "args": ["-y", "auto-mobile"]
+      "args": ["-y", "auto-mobile@latest"]
     }
   }
 }
 ```
 
 ![firebender-mcp-server-setup-prod.png](../img/firebender-mcp-server-setup-prod.png)
-
-## Goose
-
-TBD

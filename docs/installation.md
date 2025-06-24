@@ -56,7 +56,7 @@ Once its published on NPM you'll be able to just pull the built package as a sin
 
 For full integration:
 
-1. Follow [MCP client config](mcp/client-config.md) guide.
+1. Follow [MCP client config](mcp/overview.md) guide.
 2. Add [AutoMobile JUnitRunner dependency](junitrunner/setup.md)
 3. Begin interacting with your device through AI commands. Ask to export a plan when you want to write a test with it.
 4. Point your agent at an existing test (Espresso/Maestro/Zephyr) and ask it to rewrite it with AutoMobile.
