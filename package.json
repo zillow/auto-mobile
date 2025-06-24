@@ -1,7 +1,7 @@
 {
   "name": "auto-mobile",
   "version": "0.0.1",
-  "description": "Mobile device interaction automation with first class MCP support",
+  "description": "Mobile device interaction automation via MCP",
   "scripts": {
     "test": "mocha --require ts-node/register test/*.ts",
     "test:coverage": "nyc mocha --require ts-node/register test/*.ts",
@@ -15,7 +15,9 @@
     "dev:stdio": "npx tsx src/index.ts",
     "dev:sse": "ts-node-dev --respawn --transpile-only src/index.ts --transport sse",
     "dev:streamable": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",
-    "dev:streamable:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port"
+    "dev:streamable:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port",
+    "prepublishOnly": "cp README.md README.md.backup && node scripts/transform-readme.js",
+    "postpublish": "mv README.md.backup README.md || true"
   },
   "engines": {
     "node": ">=18"
@@ -23,13 +25,13 @@
   "keywords": [
     "adb",
     "android",
+    "auto-mobile",
     "automation",
+    "bridge",
+    "debug",
+    "mcp",
     "mobile",
-    "interaction",
-    "devex",
-    "debug-bridge",
-    "ui-testing",
-    "mcp"
+    "ui-testing"
   ],
   "files": [
     "dist"
@@ -46,7 +48,7 @@
       "email": "jasonpe@zillowgroup.com"
     }
   ],
-  "homepage": "https://github.com/zillow/auto-mobile",
+  "homepage": "https://zillow.github.io/auto-mobile/",
   "publishConfig": {
     "access": "public"
   },

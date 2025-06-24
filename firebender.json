@@ -7,10 +7,7 @@
       "filePathMatches": "*",
       "rulesPaths": [
         "README.md",
-        "docs/ai/validation.md",
-        "roadmap/README.md",
-        "roadmap/features/README.md",
-        "roadmap/features/TEMPLATE.md"
+        "docs/ai/validation.md"
       ]
     }
   ],
