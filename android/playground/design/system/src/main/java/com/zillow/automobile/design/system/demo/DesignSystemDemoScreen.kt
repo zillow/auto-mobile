@@ -46,9 +46,9 @@ import com.zillow.automobile.design.system.components.AutoMobileTextField
 import com.zillow.automobile.design.system.components.AutoMobileTitle
 import com.zillow.automobile.design.system.components.AutoMobileTopAppBar
 import com.zillow.automobile.design.system.components.BottomNavItem
-import com.zillow.automobile.design.system.components.LogoSize
 import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
+import com.zillow.automobile.experimentation.experiments.MoodTreatment
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -166,10 +166,10 @@ fun DesignSystemDemoScreen(onBackClick: () -> Unit = {}) {
                         Row(
                             horizontalArrangement =
                                 Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                              AutoMobileLogo(size = LogoSize.Small)
-                              AutoMobileLogo(size = LogoSize.Medium)
-                              AutoMobileLogo(size = LogoSize.Large)
-                              AutoMobileLogo(size = LogoSize.ExtraLarge)
+                              AutoMobileLogo()
+                              AutoMobileLogo()
+                              AutoMobileLogo()
+                              AutoMobileLogo()
                             }
 
                         Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
@@ -177,10 +177,10 @@ fun DesignSystemDemoScreen(onBackClick: () -> Unit = {}) {
                         Row(
                             horizontalArrangement =
                                 Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                              AutoMobileLogo(size = LogoSize.Small, forcePartyMode = true)
-                              AutoMobileLogo(size = LogoSize.Medium, forcePartyMode = true)
-                              AutoMobileLogo(size = LogoSize.Large, forcePartyMode = true)
-                              AutoMobileLogo(size = LogoSize.ExtraLarge, forcePartyMode = true)
+                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
+                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
+                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
+                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
                             }
                       }
                 }

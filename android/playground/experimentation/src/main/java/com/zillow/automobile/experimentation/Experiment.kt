@@ -1,3 +1,9 @@
 package com.zillow.automobile.experimentation
 
-data class Experiment(val name: String, val treatments: List<String>, val currentTreatment: String)
+interface Experiment<T: Treatment> {
+    val name: String
+    val treatments: Set<T>
+    val currentTreatment: T
+
+    fun copy(treatment: Treatment): Experiment<T>
+}

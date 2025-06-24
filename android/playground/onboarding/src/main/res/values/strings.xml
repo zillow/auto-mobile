@@ -23,13 +23,12 @@
   <string name="onboarding_automation_description">Automatically write tests with configurable credentials and experiment settings. Get highly actionable errors and self-healing capabilities.</string>
   <string name="onboarding_automation_emoji">🤖</string>
 
-  <string name="onboarding_opensource_title">Open Source &amp; Ready</string>
+  <string name="onboarding_opensource_title">Open Source</string>
   <string name="onboarding_opensource_description">Built by Zillow and hosted on GitHub. Join our community and start automating your Android tests today!</string>
   <string name="onboarding_opensource_description_part1">Built by Zillow and hosted on </string>
   <string name="onboarding_opensource_description_part2">GitHub</string>
-  <string name="onboarding_opensource_description_part3">. Join our community and start automating your Android tests today!</string>
-  <string name="onboarding_opensource_emoji">🎯</string>
+  <string name="onboarding_opensource_emoji">❤️</string>
 
   <!-- GitHub URL -->
-  <string name="github_url">https://github.com/ZillowGroup/Automobile</string>
+  <string name="github_url">https://github.com/Zillow/auto-mobile</string>
 </resources>

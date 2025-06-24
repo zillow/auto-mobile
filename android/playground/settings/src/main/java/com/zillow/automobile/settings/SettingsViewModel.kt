@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.zillow.automobile.experimentation.Experiment
 import com.zillow.automobile.experimentation.ExperimentRepository
+import com.zillow.automobile.experimentation.Treatment
 import com.zillow.automobile.storage.AnalyticsRepository
 import com.zillow.automobile.storage.UserProfile
 import com.zillow.automobile.storage.UserRepository
@@ -19,8 +20,8 @@ class SettingsViewModel(
     private val analyticsRepository: AnalyticsRepository
 ) : ViewModel() {
 
-  private val _experiments = MutableStateFlow<List<Experiment>>(emptyList())
-  val experiments: StateFlow<List<Experiment>> = _experiments.asStateFlow()
+  private val _experiments = MutableStateFlow<List<Experiment<*>>>(emptyList())
+  val experiments: StateFlow<List<Experiment<*>>> = _experiments.asStateFlow()
 
   val userStats: StateFlow<UserStats> = analyticsRepository.userStats
 
@@ -58,16 +59,7 @@ class SettingsViewModel(
   }
 
   private fun loadExperiments() {
-    val experiments = experimentRepository.getExperiments()
-
-    // If no experiments exist, create default ones
-    if (experiments.isEmpty()) {
-      val defaultExperiment = Experiment("Mood", listOf("Control", "Party"), "Control")
-      experimentRepository.saveExperiment(defaultExperiment)
-      _experiments.value = listOf(defaultExperiment)
-    } else {
-      _experiments.value = experiments
-    }
+    _experiments.value = experimentRepository.getExperiments()
   }
 
   private fun loadUserData() {
@@ -88,25 +80,9 @@ class SettingsViewModel(
     _trackingEnabled.value = analyticsRepository.isTrackingEnabled
   }
 
-  fun updateExperimentTreatment(experimentName: String, treatment: String) {
-    experimentRepository.updateExperimentTreatment(experimentName, treatment)
+  fun <T: Treatment> updateExperimentTreatment(experiment: Experiment<T>, treatment: Treatment) {
+    experimentRepository.updateExperimentTreatment(experiment, treatment)
     loadExperiments() // Refresh the state
-  }
-
-  fun addExperiment(name: String, treatments: List<String>, currentTreatment: String) {
-    val experiment = Experiment(name, treatments, currentTreatment)
-    experimentRepository.saveExperiment(experiment)
-    loadExperiments()
-  }
-
-  fun deleteExperiment(experimentName: String) {
-    experimentRepository.deleteExperiment(experimentName)
-    loadExperiments()
-  }
-
-  fun updateExperiments(experiments: List<Experiment>) {
-    experiments.forEach { experiment -> experimentRepository.saveExperiment(experiment) }
-    _experiments.value = experiments
   }
 
   fun updateTrackingEnabled(enabled: Boolean) {

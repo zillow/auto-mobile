@@ -58,8 +58,7 @@ sealed class SlideContent {
    */
   data class MermaidDiagram(
       val code: String,
-      val title: String? = null,
-      val caption: String? = null
+      val title: String,
   ) : SlideContent()
 
   /**

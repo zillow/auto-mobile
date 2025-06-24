@@ -32,6 +32,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.zillow.automobile.design.system.theme.AutoMobileBlack
+import com.zillow.automobile.design.system.theme.AutoMobileRed
+import com.zillow.automobile.design.system.theme.AutoMobileWhite
 import com.zillow.automobile.design.system.theme.PromoBlue
 import com.zillow.automobile.design.system.theme.PromoOrange
 import kotlinx.coroutines.delay
@@ -42,11 +45,10 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun MermaidDiagramSlideItem(
+    modifier: Modifier = Modifier,
     mermaidCode: String,
     title: String? = null,
-    caption: String? = null,
-    isDarkMode: Boolean = false,
-    modifier: Modifier = Modifier
+    isDarkMode: Boolean = false
 ) {
 
   val TAG = "MermaidDiagramSlideItem"
@@ -55,8 +57,8 @@ fun MermaidDiagramSlideItem(
   var zoomLevel by remember { mutableFloatStateOf(1f) }
   var contentWidth by remember { mutableFloatStateOf(0f) }
 
-  val backgroundColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
-  val textColor = if (isDarkMode) Color(0xFFF8F8F2) else Color.Black
+  val backgroundColor = if (isDarkMode) AutoMobileBlack else AutoMobileWhite
+  val textColor = if (isDarkMode) AutoMobileWhite else AutoMobileBlack
 
   // Calculate opacity based on zoom level - fade out when zooming in
   val contentOpacity by
@@ -452,15 +454,6 @@ fun MermaidDiagramSlideItem(
             }
           }
         }
-
-        // Optional caption
-        caption?.let {
-          Text(
-              text = it,
-              style = MaterialTheme.typography.bodyMedium,
-              color = textColor,
-              modifier = Modifier.padding(top = 16.dp).alpha(contentOpacity))
-        }
       }
 }
 
@@ -475,6 +468,7 @@ private fun createMermaidDiagramHtml(
   val textColorHex = String.format("#%06X", 0xFFFFFF and textColor.toArgb())
 
   // Design system colors
+  val autoMobileRedHex = String.format("#%06X", 0xFFFFFF and AutoMobileRed.toArgb())
   val orangeHex = String.format("#%06X", 0xFFFFFF and PromoOrange.toArgb())
   val blueHex = String.format("#%06X", 0xFFFFFF and PromoBlue.toArgb())
 
@@ -519,17 +513,17 @@ private fun createMermaidDiagramHtml(
                     startOnLoad: true,
                     theme: '$theme',
                     themeVariables: {
-                        primaryColor: '$orangeHex',
+                        primaryColor: '$bgColorHex',
                         primaryTextColor: '$textColorHex',
-                        primaryBorderColor: '$orangeHex',
+                        primaryBorderColor: '$textColorHex',
                         lineColor: '$textColorHex',
                         secondaryColor: '$blueHex',
                         tertiaryColor: '$bgColorHex',
                         background: '$bgColorHex',
-                        mainBkg: '$orangeHex',
+                        mainBkg: '$bgColorHex',
                         secondaryBkg: '$blueHex',
                         tertiaryBkg: '${if (isDarkMode) "#3c3c3c" else "#fafafa"}',
-                        cScale0: '$orangeHex',
+                        cScale0: '$bgColorHex',
                         cScale1: '$blueHex',
                         cScale2: '${if (isDarkMode) "#cf6679" else "#e1bee7"}'
                     },
@@ -569,7 +563,6 @@ fun MermaidDiagramSlideItemFlowchartPreview() {
             G --> H[Report Failure]
       """
                 .trimIndent(),
-        caption = "Automated test execution workflow",
         isDarkMode = false)
   }
 }
@@ -598,7 +591,6 @@ fun MermaidDiagramSlideItemSequencePreview() {
             U-->>T: Verification Result
       """
                 .trimIndent(),
-        caption = "How AutoMobile interacts with app components",
         isDarkMode = true)
   }
 }

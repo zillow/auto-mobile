@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zillow.automobile.design.system.components.AutoMobileButton
 import com.zillow.automobile.design.system.components.AutoMobileCard
 import com.zillow.automobile.design.system.components.AutoMobileHeadline
+import com.zillow.automobile.design.system.components.AutoMobileLogo
 import com.zillow.automobile.design.system.components.AutoMobileOutlinedTextField
 import com.zillow.automobile.design.system.components.AutoMobileText
 import com.zillow.automobile.design.system.theme.AutoMobileDimensions
@@ -119,7 +120,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
         // AutoMobile Logo
-        AutoMobileText(text = "🚗", style = MaterialTheme.typography.displayLarge)
+        AutoMobileLogo()
 
         AutoMobileHeadline(text = "AutoMobile", color = MaterialTheme.colorScheme.primary)
 

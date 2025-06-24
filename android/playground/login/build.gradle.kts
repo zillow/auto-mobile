@@ -50,6 +50,7 @@ dependencies {
   implementation(libs.navigation3.runtime)
 
   // Playground module dependencies
+  implementation(projects.playground.experimentation)
   implementation(projects.playground.design.system)
   implementation(projects.playground.storage)
 

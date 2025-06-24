@@ -1,5 +1,6 @@
 package com.zillow.automobile.onboarding
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,33 +39,37 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zillow.automobile.design.system.components.AutoMobileLogo
 import kotlinx.coroutines.launch
 
-data class OnboardingPage(val title: String, val description: String, val emoji: String)
+sealed class OnboardingPage {
+  data class Emoji(val title: String, val description: String, val emoji: String) : OnboardingPage()
+  data class Drawable(val title: String, val description: String, @DrawableRes val drawableResId: Int) : OnboardingPage()
+}
 
 /** Main onboarding screen with pager and navigation controls. */
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
-  val pages =
+  val pages: List<OnboardingPage> =
       listOf(
-          OnboardingPage(
+          OnboardingPage.Drawable(
               title = stringResource(id = R.string.onboarding_welcome_title),
               description = stringResource(id = R.string.onboarding_welcome_description),
-              emoji = stringResource(id = R.string.onboarding_welcome_emoji)),
-          OnboardingPage(
+              drawableResId = com.zillow.automobile.design.assets.R.drawable.automobile_logo),
+          OnboardingPage.Emoji(
               title = stringResource(id = R.string.onboarding_source_intelligence_title),
               description =
                   stringResource(id = R.string.onboarding_source_intelligence_description),
               emoji = stringResource(id = R.string.onboarding_source_intelligence_emoji)),
-          OnboardingPage(
+          OnboardingPage.Emoji(
               title = stringResource(id = R.string.onboarding_gestures_title),
               description = stringResource(id = R.string.onboarding_gestures_description),
               emoji = stringResource(id = R.string.onboarding_gestures_emoji)),
-          OnboardingPage(
+          OnboardingPage.Emoji(
               title = stringResource(id = R.string.onboarding_automation_title),
               description = stringResource(id = R.string.onboarding_automation_description),
               emoji = stringResource(id = R.string.onboarding_automation_emoji)),
-          OnboardingPage(
+          OnboardingPage.Emoji(
               title = stringResource(id = R.string.onboarding_opensource_title),
               description = stringResource(id = R.string.onboarding_opensource_description),
               emoji = stringResource(id = R.string.onboarding_opensource_emoji)))
@@ -72,10 +77,14 @@ fun OnboardingScreen(onFinish: () -> Unit) {
   val pagerState = rememberPagerState(pageCount = { pages.size })
   val coroutineScope = rememberCoroutineScope()
 
-  Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+  Column(modifier = Modifier
+    .fillMaxSize()
+    .background(MaterialTheme.colorScheme.background)) {
     // Skip button
     Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(16.dp),
         horizontalArrangement = Arrangement.End) {
           if (pagerState.currentPage < pages.size - 1) {
             TextButton(onClick = onFinish) { Text(stringResource(id = R.string.onboarding_skip)) }
@@ -137,9 +146,77 @@ fun OnboardingScreen(onFinish: () -> Unit) {
   }
 }
 
+
+
 /** Individual onboarding page content. */
 @Composable
 fun OnboardingPageContent(page: OnboardingPage, modifier: Modifier = Modifier) {
+  when (page) {
+    is OnboardingPage.Drawable -> DrawablePageContent(page, modifier)
+    is OnboardingPage.Emoji -> EmojiPageContent(page, modifier)
+  }
+}
+
+
+
+/** Individual onboarding page content. */
+@Composable
+fun DrawablePageContent(page: OnboardingPage.Drawable, modifier: Modifier = Modifier) {
+  val uriHandler = LocalUriHandler.current
+  val context = LocalContext.current
+
+  Column(
+    modifier = modifier.padding(horizontal = 32.dp),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.Center) {
+    // Logo/Icon
+    AutoMobileLogo()
+
+    // Title
+    Text(
+      text = page.title,
+      fontSize = 28.sp,
+      fontWeight = FontWeight.Bold,
+      textAlign = TextAlign.Center,
+      color = MaterialTheme.colorScheme.onBackground,
+      modifier = Modifier.padding(bottom = 16.dp))
+
+    // Description
+    if (page.title == stringResource(id = R.string.onboarding_opensource_title)) {
+      val githubUrl = stringResource(id = R.string.github_url)
+      val annotatedString = buildAnnotatedString {
+        append(stringResource(id = R.string.onboarding_opensource_description_part1))
+        withStyle(
+          style =
+            SpanStyle(
+              color = MaterialTheme.colorScheme.primary,
+              textDecoration = TextDecoration.Underline)) {
+          pushStringAnnotation("url", githubUrl)
+          append(stringResource(id = R.string.onboarding_opensource_description_part2))
+          pop()
+        }
+      }
+
+      Text(
+        text = annotatedString,
+        fontSize = 16.sp,
+        textAlign = TextAlign.Center,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        lineHeight = 24.sp,
+        modifier = Modifier.clickable { uriHandler.openUri(githubUrl) })
+    } else {
+      Text(
+        text = page.description,
+        fontSize = 16.sp,
+        textAlign = TextAlign.Center,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        lineHeight = 24.sp)
+    }
+  }
+}
+
+@Composable
+fun EmojiPageContent(page: OnboardingPage.Emoji, modifier: Modifier = Modifier) {
   val uriHandler = LocalUriHandler.current
   val context = LocalContext.current
 
@@ -164,6 +241,7 @@ fun OnboardingPageContent(page: OnboardingPage, modifier: Modifier = Modifier) {
           val githubUrl = stringResource(id = R.string.github_url)
           val annotatedString = buildAnnotatedString {
             append(stringResource(id = R.string.onboarding_opensource_description_part1))
+            append(" ")
             withStyle(
                 style =
                     SpanStyle(
@@ -173,7 +251,6 @@ fun OnboardingPageContent(page: OnboardingPage, modifier: Modifier = Modifier) {
                   append(stringResource(id = R.string.onboarding_opensource_description_part2))
                   pop()
                 }
-            append(stringResource(id = R.string.onboarding_opensource_description_part3))
           }
 
           Text(
@@ -194,21 +271,22 @@ fun OnboardingPageContent(page: OnboardingPage, modifier: Modifier = Modifier) {
       }
 }
 
-/** Page indicator dots. */
 @Composable
 fun PageIndicators(pageCount: Int, currentPage: Int, modifier: Modifier = Modifier) {
   Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     repeat(pageCount) { index ->
       Box(
           modifier =
-              Modifier.size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
-                  .clip(RoundedCornerShape(4.dp))
-                  .background(
-                      if (index == currentPage) {
-                        MaterialTheme.colorScheme.primary
-                      } else {
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                      }))
+              Modifier
+                .size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(
+                  if (index == currentPage) {
+                    MaterialTheme.colorScheme.primary
+                  } else {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                  }
+                ))
     }
   }
 }

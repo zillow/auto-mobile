@@ -37,8 +37,17 @@ dependencies {
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
 
+  // Image loading
+  implementation(libs.coil.compose)
+  implementation(libs.coil.network.okhttp)
+
   // Storage module
   implementation(projects.playground.storage)
+  implementation(projects.playground.experimentation)
+
+  // Design system module
+  implementation(projects.playground.design.assets)
+  implementation(projects.playground.design.system)
 
   // Compose dependencies
   implementation(platform(libs.compose.bom))

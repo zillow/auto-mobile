@@ -245,7 +245,6 @@ private fun SlideItem(
       MermaidDiagramSlideItem(
           mermaidCode = slideContent.code,
           title = slideContent.title,
-          caption = slideContent.caption,
           isDarkMode = isDarkMode,
           modifier = modifier)
     }

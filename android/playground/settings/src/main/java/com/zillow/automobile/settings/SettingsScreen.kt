@@ -115,7 +115,7 @@ fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit 
                       if (originalExp != null &&
                           originalExp.currentTreatment != updatedExp.currentTreatment) {
                         viewModel.updateExperimentTreatment(
-                            updatedExp.name, updatedExp.currentTreatment)
+                            updatedExp, updatedExp.currentTreatment)
                       }
                     }
                   })
