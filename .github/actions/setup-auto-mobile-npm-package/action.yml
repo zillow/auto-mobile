@@ -1,5 +1,5 @@
 #file: noinspection YAMLSchemaValidation
-name: "gradle-task-run"
+name: "npm-task-run"
 description: ""
 inputs:
   shell:
@@ -16,9 +16,17 @@ runs:
         node-version: "22"
         cache: "npm"
 
-    - name: "Build and Install NPM Package"
+    - name: "Cache NPM Dependencies"
       shell: ${{ inputs.shell }}
       run: |
-        npm ci --prefer-offline
+        npm ci --cache .npm --prefer-offline
+
+    - name: "Build AutoMobile"
+      shell: ${{ inputs.shell }}
+      run: |
         npm run build
+
+    - name: "Globally Install AutoMobile"
+      shell: ${{ inputs.shell }}
+      run: |
         npm install -g .
