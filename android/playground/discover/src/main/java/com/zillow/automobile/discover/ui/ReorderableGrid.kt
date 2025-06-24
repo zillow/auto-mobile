@@ -51,18 +51,7 @@ data class GridImage(val id: String, val imageUrl: String, val description: Stri
 fun ReorderableGrid(images: List<GridImage>, onReorder: (Int, Int) -> Unit) {
   var draggedIndex by remember { mutableIntStateOf(-1) }
   var draggedOverIndex by remember { mutableIntStateOf(-1) }
-  var tempReorderedImages by remember { mutableStateOf<List<GridImage>?>(null) }
   val density = LocalDensity.current
-
-  // Use either the temporary reordered list or the original list
-  val displayImages = tempReorderedImages ?: images
-
-  // Reset temp list when images change from outside
-  LaunchedEffect(images) {
-    if (draggedIndex == -1) {
-      tempReorderedImages = null
-    }
-  }
 
   LazyVerticalGrid(
       columns = GridCells.Fixed(3),
@@ -70,8 +59,8 @@ fun ReorderableGrid(images: List<GridImage>, onReorder: (Int, Int) -> Unit) {
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
       modifier = Modifier.height(280.dp)) {
-        itemsIndexed(displayImages, key = { _, image -> image.id }) { index, image ->
-          val isBeingDragged = draggedIndex != -1 && images[draggedIndex].id == image.id
+    itemsIndexed(images, key = { _, image -> image.id }) { index, image ->
+      val isBeingDragged = draggedIndex == index
           val isDropTarget = draggedOverIndex == index && !isBeingDragged
 
           GridImageItem(
@@ -79,56 +68,33 @@ fun ReorderableGrid(images: List<GridImage>, onReorder: (Int, Int) -> Unit) {
               isDragged = isBeingDragged,
               isDropTarget = isDropTarget,
               onDragStart = {
-                val originalIndex = images.indexOfFirst { it.id == image.id }
-                draggedIndex = originalIndex
-                tempReorderedImages = images.toList()
+                draggedIndex = index
               },
               onDragEnd = {
-                if (draggedIndex != -1 && tempReorderedImages != null) {
-                  val finalIndex =
-                      tempReorderedImages!!.indexOfFirst { it.id == images[draggedIndex].id }
-                  if (finalIndex != draggedIndex) {
-                    onReorder(draggedIndex, finalIndex)
-                  }
+                if (draggedIndex != -1 && draggedOverIndex != -1 && draggedIndex != draggedOverIndex) {
+                  onReorder(draggedIndex, draggedOverIndex)
                 }
                 draggedIndex = -1
                 draggedOverIndex = -1
-                tempReorderedImages = null
               },
               onDragMove = { offset ->
-                if (draggedIndex != -1 && tempReorderedImages != null) {
-                  // Calculate grid position based on drag offset
-                  val itemSize =
-                      with(density) { 88.dp.toPx() } // Approximate item size including spacing
+                if (draggedIndex != -1) {
+                  // Calculate which grid cell we're hovering over
+                  val itemSize = with(density) { 96.dp.toPx() } // Item size + spacing
                   val cols = 3
                   val currentRow = index / cols
                   val currentCol = index % cols
 
-                  val newCol =
-                      ((currentCol * itemSize + offset.x) / itemSize)
-                          .roundToInt()
-                          .coerceIn(0, cols - 1)
-                  val newRow =
-                      ((currentRow * itemSize + offset.y) / itemSize)
-                          .roundToInt()
-                          .coerceIn(0, 1) // 2 rows max
-                  val newIndex = (newRow * cols + newCol).coerceIn(0, displayImages.size - 1)
+                  val newCol = ((currentCol * itemSize + offset.x) / itemSize)
+                    .roundToInt()
+                    .coerceIn(0, cols - 1)
+                  val newRow = ((currentRow * itemSize + offset.y) / itemSize)
+                    .roundToInt()
+                    .coerceIn(0, 1) // 2 rows max in our 280dp height
+                  val newIndex = (newRow * cols + newCol).coerceIn(0, images.size - 1)
 
-                  if (newIndex != draggedOverIndex &&
-                      newIndex != index &&
-                      newIndex < displayImages.size) {
+                  if (newIndex != draggedOverIndex && newIndex != draggedIndex) {
                     draggedOverIndex = newIndex
-
-                    // Create new reordered list by moving the dragged item to the hovered position
-                    val currentList = tempReorderedImages!!.toMutableList()
-                    val draggedImage = images[draggedIndex]
-                    val currentDraggedIndex = currentList.indexOfFirst { it.id == draggedImage.id }
-
-                    if (currentDraggedIndex != -1) {
-                      currentList.removeAt(currentDraggedIndex)
-                      currentList.add(newIndex, draggedImage)
-                      tempReorderedImages = currentList
-                    }
                   }
                 }
               },
@@ -161,29 +127,29 @@ fun GridImageItem(
   Card(
       modifier =
           modifier
-              .aspectRatio(1f)
-              .offset {
-                if (isDragged) IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt())
-                else IntOffset.Zero
+            .aspectRatio(1f)
+            .offset {
+              if (isDragged) IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt())
+              else IntOffset.Zero
+            }
+            .scale(scale.value)
+            .zIndex(if (isDragged) 1f else 0f)
+            .shadow(if (isDragged) 16.dp else 4.dp, RoundedCornerShape(8.dp))
+            .pointerInput(Unit) {
+              detectDragGestures(
+                onDragStart = { offset ->
+                  // Start drag immediately on touch
+                  onDragStart()
+                  dragOffset = Offset.Zero
+                },
+                onDragEnd = {
+                  onDragEnd()
+                  dragOffset = Offset.Zero
+                }) { change, dragAmount ->
+                dragOffset += dragAmount
+                onDragMove(dragOffset)
               }
-              .scale(scale.value)
-              .zIndex(if (isDragged) 1f else 0f)
-              .shadow(if (isDragged) 16.dp else 4.dp, RoundedCornerShape(8.dp))
-              .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { offset ->
-                      // Start drag immediately on touch
-                      onDragStart()
-                      dragOffset = Offset.Zero
-                    },
-                    onDragEnd = {
-                      onDragEnd()
-                      dragOffset = Offset.Zero
-                    }) { change, dragAmount ->
-                      dragOffset += dragAmount
-                      onDragMove(dragOffset)
-                    }
-              },
+            },
       elevation = CardDefaults.cardElevation(defaultElevation = if (isDragged) 16.dp else 4.dp),
       colors =
           CardDefaults.cardColors(
@@ -203,21 +169,26 @@ fun GridImageItem(
           if (isDragged) {
             Box(
                 modifier =
-                    Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
+                    Modifier
+                      .fillMaxSize()
+                      .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
           }
 
           if (isDropTarget && !isDragged) {
             Box(
                 modifier =
-                    Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)))
+                    Modifier
+                      .fillMaxSize()
+                      .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)))
           }
 
           Icon(
               imageVector = Icons.Filled.Star,
               contentDescription = "Drag handle",
-              modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp),
+              modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(16.dp),
               tint = Color.White)
         }
       }
