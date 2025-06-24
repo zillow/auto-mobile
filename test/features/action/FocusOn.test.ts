@@ -3,7 +3,7 @@ import { FocusOn } from "../../../src/features/action/FocusOn";
 import { AdbUtils } from "../../../src/utils/adb";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { SingleTap } from "../../../src/features/action/SingleTap";
-import { ExecResult, ObserveResult, FocusOnResult } from "../../../src/models";
+import { ObserveResult } from "../../../src/models";
 import sinon from "sinon";
 
 describe("FocusOn", () => {
@@ -30,15 +30,6 @@ describe("FocusOn", () => {
     sinon.restore();
   });
 
-  // Helper function to create mock ExecResult
-  const createMockExecResult = (stdout: string = ""): ExecResult => ({
-    stdout,
-    stderr: "",
-    toString: () => stdout,
-    trim: () => stdout.trim(),
-    includes: (searchString: string) => stdout.includes(searchString)
-  });
-
   // Helper function to create mock ObserveResult
   const createMockObserveResult = (focused: boolean = false): ObserveResult => ({
     timestamp: Date.now(),
@@ -56,14 +47,6 @@ describe("FocusOn", () => {
         }
       }
     }
-  });
-
-  // Helper function to create mock element with focus state
-  const createMockElement = (focused: boolean = false) => ({
-    "bounds": { left: 100, top: 200, right: 500, bottom: 300 },
-    "resource-id": "com.example.app:id/test_input",
-    "focused": focused.toString(),
-    "clickable": "true"
   });
 
   describe("execute", () => {

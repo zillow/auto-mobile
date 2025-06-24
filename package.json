@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "description": "Mobile device interaction automation via MCP",
   "scripts": {
-    "test": "mocha --require ts-node/register test/*.ts",
-    "test:coverage": "nyc mocha --require ts-node/register test/*.ts",
+    "test": "mocha --require esbuild-register test/**/*.ts",
+    "test:coverage": "nyc mocha --require esbuild-register test/**/*.ts",
     "lint": "eslint . --fix",
     "watch": "tsc --watch",
     "build": "tsc && chmod +x dist/src/index.js",
