@@ -19,7 +19,7 @@ runs:
     - name: "Cache NPM Dependencies"
       shell: ${{ inputs.shell }}
       run: |
-        npm ci --cache .npm --prefer-offline
+        npm ci
 
     - name: "Build AutoMobile"
       shell: ${{ inputs.shell }}
