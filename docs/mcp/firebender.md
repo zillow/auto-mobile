@@ -1,7 +1,5 @@
 # Firebender MCP Config
 
-This will run AutoMobile in STDIO
-
 ```json
 {
   "mcpServers": {

@@ -1,6 +1,7 @@
 # Firebender MCP Config
 
-This will run AutoMobile in STDIO
+This is a simple sample of how to get AutoMobile running with Cursor, for other options see the
+[overview](overview.md).
 
 ```json
 {

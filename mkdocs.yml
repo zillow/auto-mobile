@@ -71,6 +71,11 @@ nav:
       - 'Plan Authoring & Execution': plan-authoring-execution.md
       - 'CLI': cli.md
       - 'CI': ci.md
+  - 'MCP Client Config':
+      - 'Overview': mcp/overview.md
+      - 'Firebender': mcp/firebender.md
+      - 'Cursor': mcp/cursor.md
+      - 'Goose': mcp/goose.md
   - 'GitHub Discussions': https://github.com/zillow/auto-mobile/discussions
   - 'Contributing': contributing.md
   - 'Change Log': changelog.md
