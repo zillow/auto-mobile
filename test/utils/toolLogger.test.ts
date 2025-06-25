@@ -101,8 +101,8 @@ describe("Tool Logger", () => {
     fsExtraWriteFileStub.callsArgWith(2, null);
 
     const toolName = "testTool";
-    const toolParams = {param1: "value1"};
-    const result = {success: true};
+    const toolParams = { param1: "value1" };
+    const result = { success: true };
 
     const logFile = await toolLogger.logToolCall(toolName, toolParams, result);
 
