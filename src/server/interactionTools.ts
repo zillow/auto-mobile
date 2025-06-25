@@ -769,7 +769,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
       }
 
       const direction = args.direction;
-      const maxTime = args.lookFor.maxTime ?? 10000;
+      const maxTime = 120000; // args.lookFor.maxTime ?? 120000;
       const startTime = Date.now();
       let foundElement = null;
 
@@ -806,7 +806,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
         const result = await swipe.execute(
           containerElement,
           elementUtils.getSwipeDirectionForScroll(direction),
-          { duration: 300 },
+          { duration: 600 },
           progress
         );
 
