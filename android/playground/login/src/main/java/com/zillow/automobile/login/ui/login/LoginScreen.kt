@@ -51,101 +51,88 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Header section of the login screen containing logo and title.
- */
+/** Header section of the login screen containing logo and title. */
 @Composable
 private fun LoginHeader() {
   AutoMobileLogo()
   AutoMobileHeadline(text = "AutoMobile", color = MaterialTheme.colorScheme.primary)
 }
 
-/**
- * Form section containing username and password input fields.
- */
+/** Form section containing username and password input fields. */
 @Composable
 private fun LoginForm(
-  username: String,
-  password: String,
-  onUsernameChange: (String) -> Unit,
-  onPasswordChange: (String) -> Unit,
-  loginFormState: LoginFormState,
-  usernameHadContent: Boolean,
-  passwordHadContent: Boolean,
-  usernameBlurred: Boolean,
-  passwordBlurred: Boolean,
-  onPasswordDone: () -> Unit,
-  modifier: Modifier = Modifier
+    username: String,
+    password: String,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    loginFormState: LoginFormState,
+    usernameHadContent: Boolean,
+    passwordHadContent: Boolean,
+    usernameBlurred: Boolean,
+    passwordBlurred: Boolean,
+    onPasswordDone: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
   Column(modifier = modifier) {
     AutoMobileOutlinedTextField(
-      value = username,
-      onValueChange = onUsernameChange,
-      label = { Text(stringResource(R.string.prompt_email)) },
-      keyboardOptions =
-        KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-      isError =
-        (usernameHadContent && username.length < 5) ||
-          (usernameBlurred && loginFormState.usernameError != null),
-      supportingText = {
-        if ((usernameHadContent && username.length < 5) ||
-          (usernameBlurred && loginFormState.usernameError != null)
-        ) {
-          loginFormState.usernameError?.let {
-            Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
+        value = username,
+        onValueChange = onUsernameChange,
+        label = { Text(stringResource(R.string.prompt_email)) },
+        keyboardOptions =
+            KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+        isError =
+            (usernameHadContent && username.length < 5) ||
+                (usernameBlurred && loginFormState.usernameError != null),
+        supportingText = {
+          if ((usernameHadContent && username.length < 5) ||
+              (usernameBlurred && loginFormState.usernameError != null)) {
+            loginFormState.usernameError?.let {
+              Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
+            }
           }
-        }
-      },
-      modifier = Modifier.fillMaxWidth()
-    )
+        },
+        modifier = Modifier.fillMaxWidth())
 
     Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
 
     AutoMobileOutlinedTextField(
-      value = password,
-      onValueChange = onPasswordChange,
-      label = { Text(stringResource(R.string.prompt_password)) },
-      visualTransformation = PasswordVisualTransformation(),
-      keyboardOptions =
-        KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-      keyboardActions = KeyboardActions(onDone = { onPasswordDone() }),
-      isError =
-        (passwordHadContent && password.length < 5) ||
-          (passwordBlurred && loginFormState.passwordError != null),
-      supportingText = {
-        if ((passwordHadContent && password.length < 5) ||
-          (passwordBlurred && loginFormState.passwordError != null)
-        ) {
-          loginFormState.passwordError?.let {
-            Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
+        value = password,
+        onValueChange = onPasswordChange,
+        label = { Text(stringResource(R.string.prompt_password)) },
+        visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions =
+            KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onPasswordDone() }),
+        isError =
+            (passwordHadContent && password.length < 5) ||
+                (passwordBlurred && loginFormState.passwordError != null),
+        supportingText = {
+          if ((passwordHadContent && password.length < 5) ||
+              (passwordBlurred && loginFormState.passwordError != null)) {
+            loginFormState.passwordError?.let {
+              Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
+            }
           }
-        }
-      },
-      modifier = Modifier.fillMaxWidth()
-    )
+        },
+        modifier = Modifier.fillMaxWidth())
   }
 }
 
-/**
- * Action buttons section containing sign in button, loading indicator, and guest mode button.
- */
+/** Action buttons section containing sign in button, loading indicator, and guest mode button. */
 @Composable
 private fun LoginActions(
-  isFormValid: Boolean,
-  isLoading: Boolean,
-  onSignInClick: () -> Unit,
-  onGuestModeClick: () -> Unit,
-  modifier: Modifier = Modifier
+    isFormValid: Boolean,
+    isLoading: Boolean,
+    onSignInClick: () -> Unit,
+    onGuestModeClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
   Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-    AnimatedVisibility(
-      visible = isFormValid && !isLoading, enter = fadeIn(), exit = fadeOut()
-    ) {
+    AnimatedVisibility(visible = isFormValid && !isLoading, enter = fadeIn(), exit = fadeOut()) {
       AutoMobileButton(
-        text = stringResource(R.string.action_sign_in),
-        onClick = onSignInClick,
-        modifier = Modifier.wrapContentWidth()
-      )
+          text = stringResource(R.string.action_sign_in),
+          onClick = onSignInClick,
+          modifier = Modifier.wrapContentWidth())
     }
 
     if (isLoading) {
@@ -156,10 +143,9 @@ private fun LoginActions(
     Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
 
     AutoMobileButton(
-      text = "Continue as Guest",
-      onClick = onGuestModeClick,
-      modifier = Modifier.wrapContentWidth()
-    )
+        text = "Continue as Guest",
+        onClick = onGuestModeClick,
+        modifier = Modifier.wrapContentWidth())
   }
 }
 
@@ -227,52 +213,49 @@ fun LoginScreen(
 
   Column(
       modifier =
-          Modifier
-            .fillMaxSize()
-            .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
-            .padding(16.dp),
-    horizontalAlignment = Alignment.CenterHorizontally
-  ) {
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
+          Modifier.fillMaxSize()
+              .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
+              .padding(16.dp),
+      horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
-    LoginHeader()
+        LoginHeader()
 
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
+        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
-    LoginForm(
-      username = username,
-      password = password,
-      onUsernameChange = { username = it },
-      onPasswordChange = { password = it },
-      loginFormState = loginFormState,
-      usernameHadContent = usernameHadContent,
-      passwordHadContent = passwordHadContent,
-      usernameBlurred = usernameBlurred,
-      passwordBlurred = passwordBlurred,
-      onPasswordDone = {
-        passwordBlurred = true
-        if (isFormValid) {
-          isLoading = true
-          viewModel.login(username, password)
-        }
-      })
+        LoginForm(
+            username = username,
+            password = password,
+            onUsernameChange = { username = it },
+            onPasswordChange = { password = it },
+            loginFormState = loginFormState,
+            usernameHadContent = usernameHadContent,
+            passwordHadContent = passwordHadContent,
+            usernameBlurred = usernameBlurred,
+            passwordBlurred = passwordBlurred,
+            onPasswordDone = {
+              passwordBlurred = true
+              if (isFormValid) {
+                isLoading = true
+                viewModel.login(username, password)
+              }
+            })
 
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
+        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
 
-    LoginActions(
-      isFormValid = isFormValid,
-      isLoading = isLoading,
-      onSignInClick = {
-        usernameBlurred = true
-        passwordBlurred = true
-        isLoading = true
-        viewModel.login(username, password)
-      },
-      onGuestModeClick = onGuestMode
-    )
+        LoginActions(
+            isFormValid = isFormValid,
+            isLoading = isLoading,
+            onSignInClick = {
+              usernameBlurred = true
+              passwordBlurred = true
+              isLoading = true
+              viewModel.login(username, password)
+            },
+            onGuestModeClick = onGuestMode)
 
-    Spacer(modifier = Modifier.weight(1f))
-  }
+        Spacer(modifier = Modifier.weight(1f))
+      }
 }
 
 /**
@@ -334,9 +317,7 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
     }
 
     Box(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
         contentAlignment = Alignment.BottomCenter) {
           AutoMobileCard {
             AutoMobileText(text = loginError!!, color = MaterialTheme.colorScheme.error)
@@ -346,23 +327,17 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
 }
 
 /** Preview for the LoginScreen composable with mock data. */
-@Preview(name = "Login Screen - Light", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-  name = "Login Screen - Dark",
-  showBackground = true,
-  uiMode = Configuration.UI_MODE_NIGHT_YES
-)
+    name = "Login Screen - Light", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Login Screen - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun LoginScreenPreview() {
   // Create a simple mock ViewModel using a local class
   class MockLoginViewModel : ViewModel() {
-    val loginFormState = MutableStateFlow(
-      LoginFormState(
-        isDataValid = true,
-        usernameError = null,
-        passwordError = null
-      )
-    )
+    val loginFormState =
+        MutableStateFlow(
+            LoginFormState(isDataValid = true, usernameError = null, passwordError = null))
     val loginResult = MutableStateFlow<LoginResult?>(null)
 
     fun login(username: String, password: String) {
@@ -381,9 +356,11 @@ fun LoginScreenPreview() {
     object {
       val loginFormState = mockViewModel.loginFormState.asStateFlow()
       val loginResult = mockViewModel.loginResult.asStateFlow()
+
       fun login(username: String, password: String) = mockViewModel.login(username, password)
+
       fun loginDataChanged(username: String, password: String) =
-        mockViewModel.loginDataChanged(username, password)
+          mockViewModel.loginDataChanged(username, password)
     }
   }
 
@@ -396,72 +373,47 @@ fun LoginScreenPreview() {
   val configuration = LocalConfiguration.current
   val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
   val scrollState = rememberScrollState()
-
-
 }
 
 @Preview(name = "Login Header", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-  name = "Login Header - Dark",
-  showBackground = true,
-  uiMode = Configuration.UI_MODE_NIGHT_YES
-)
+    name = "Login Header - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun LoginHeaderPreview() {
-  Column(horizontalAlignment = Alignment.CenterHorizontally) {
-    LoginHeader()
-  }
+  Column(horizontalAlignment = Alignment.CenterHorizontally) { LoginHeader() }
 }
 
 @Preview(name = "Login Form", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-  name = "Login Form - Dark",
-  showBackground = true,
-  uiMode = Configuration.UI_MODE_NIGHT_YES
-)
+    name = "Login Form - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun LoginFormPreview() {
   LoginForm(
-    username = "user@example.com",
-    password = "password123",
-    onUsernameChange = {},
-    onPasswordChange = {},
-    loginFormState = LoginFormState(isDataValid = true),
-    usernameHadContent = true,
-    passwordHadContent = true,
-    usernameBlurred = false,
-    passwordBlurred = false,
-    onPasswordDone = {}
-  )
+      username = "user@example.com",
+      password = "password123",
+      onUsernameChange = {},
+      onPasswordChange = {},
+      loginFormState = LoginFormState(isDataValid = true),
+      usernameHadContent = true,
+      passwordHadContent = true,
+      usernameBlurred = false,
+      passwordBlurred = false,
+      onPasswordDone = {})
 }
 
 @Preview(name = "Login Actions", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-  name = "Login Actions - Dark",
-  showBackground = true,
-  uiMode = Configuration.UI_MODE_NIGHT_YES
-)
+    name = "Login Actions - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun LoginActionsPreview() {
-  LoginActions(
-    isFormValid = true,
-    isLoading = false,
-    onSignInClick = {},
-    onGuestModeClick = {}
-  )
+  LoginActions(isFormValid = true, isLoading = false, onSignInClick = {}, onGuestModeClick = {})
 }
 
 @Preview(
-  name = "Login Actions - Loading",
-  showBackground = true,
-  uiMode = Configuration.UI_MODE_NIGHT_NO
-)
+    name = "Login Actions - Loading",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Composable
 fun LoginActionsLoadingPreview() {
-  LoginActions(
-    isFormValid = true,
-    isLoading = true,
-    onSignInClick = {},
-    onGuestModeClick = {}
-  )
+  LoginActions(isFormValid = true, isLoading = true, onSignInClick = {}, onGuestModeClick = {})
 }
