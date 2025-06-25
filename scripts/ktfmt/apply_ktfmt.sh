@@ -182,6 +182,12 @@ if [[ -n "$errors" ]]; then
     exit 1
 fi
 
+# Stage the formatted files
+if [[ ${#files_to_process[@]} -gt 0 ]]; then
+    echo -e "${YELLOW}Staging formatted files...${NC}"
+    printf '%s\n' "${files_to_process[@]}" | xargs git add
+fi
+
 echo -e "${GREEN}Kotlin source files have been formatted successfully.${NC}"
 echo "Total time elapsed: $total_elapsed ms."
 exit 0
