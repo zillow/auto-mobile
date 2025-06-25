@@ -57,4 +57,5 @@ dependencies {
   implementation(libs.bundles.media.libraries)
 
   testImplementation(libs.junit)
+  testImplementation(projects.junitRunner)
 }

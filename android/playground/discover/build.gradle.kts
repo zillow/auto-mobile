@@ -63,4 +63,5 @@ dependencies {
   testImplementation(libs.junit)
   testImplementation(libs.kotlinxCoroutines)
   testImplementation(libs.kotlinx.coroutines.test)
+  testImplementation(projects.junitRunner)
 }

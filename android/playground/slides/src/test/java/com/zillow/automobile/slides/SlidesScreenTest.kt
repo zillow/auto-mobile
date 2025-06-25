@@ -1,9 +1,9 @@
 package com.zillow.automobile.slides
 
+import com.zillow.automobile.slides.data.getAllSlides
 import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
-import com.zillow.automobile.slides.old.getAllSlides
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

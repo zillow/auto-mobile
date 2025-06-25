@@ -1,0 +1,96 @@
+---
+name: zillow-3d-home-exploration
+description: Automated exploration of Zillow app 3D home tours, including bypassing login, searching for 3D tour homes in NYC, and navigating through different rooms using navigation buttons
+steps:
+  # Launch Zillow app
+  - tool: launchApp
+    appId: com.zillow.android.zillowmap
+    label: Launch Zillow application
+
+  # Bypass login screen by pressing back
+  - tool: pressButton
+    button: back
+    label: Bypass login screen to reach main app
+
+  # Open search interface
+  - tool: tapOn
+    id: com.zillow.android.zillowmap:id/non_pill_search_bar
+    label: Open search interface
+
+  # Tap on search input field
+  - tool: tapOn
+    id: com.zillow.android.zillowmap:id/search_src_text
+    label: Focus on search input field
+
+  # Search for 3D tour homes in NYC
+  - tool: inputText
+    text: "3D tour homes in New York City NY"
+    label: Enter search query for 3D tour homes in NYC
+
+  # Execute search by tapping suggestion
+  - tool: tapOn
+    text: "3D tour homes in New York City NY"
+    label: Execute search from suggestion dropdown
+
+  # Expand search results to full screen
+  - tool: swipeOnElement
+    elementId: com.zillow.android.zillowmap:id/homes_map_drawer_bottom_sheet
+    direction: up
+    duration: 1000
+    label: Swipe up to make search results full screen
+
+  # Dismiss tip dialog
+  - tool: tapOn
+    text: "Got it"
+    label: Dismiss tip dialog about map view
+
+  - tool: scroll
+    direction: down
+    containerElementId: com.zillow.android.zillowmap:id/homes_map_drawer_bottom_sheet
+    lookingFor:
+      text: "2532 E 26th St, Brooklyn, NY"
+
+  - tool: tapOn
+    text: "3D Home"
+    label: Enter the home with a 3d tour
+
+  - tool: tapOn
+    text: "3D Home"
+    label: Enter 3D Home tour mode
+
+  # Navigate around the home using swipe gestures
+  - tool: swipeOnScreen
+    direction: right
+    includeSystemInsets: false
+    duration: 1000
+    label: Navigate in 3D view using swipe gesture
+
+  - tool: tapOn
+    text: "1st Fl Living Room"
+
+  - tool: swipeOnScreen
+    direction: right
+    includeSystemInsets: false
+    duration: 300
+
+  - tool: tapOn
+    text: "1st Fl Bedroom"
+
+  - tool: tapOn
+    text: "1st Fl Living Room"
+
+  - tool: tapOn
+    text: "1st Fl Kitchen"
+
+  - tool: swipeOnScreen
+    direction: right
+    includeSystemInsets: false
+    duration: 300
+
+  - tool: tapOn
+    text: "1st Fl Bathroom"
+
+  # Terminate the app
+  - tool: terminateApp
+    appId: com.zillow.android.zillowmap
+    label: Stop Zillow app

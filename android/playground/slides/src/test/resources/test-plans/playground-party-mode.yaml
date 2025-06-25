@@ -1,0 +1,12 @@
+---
+name: playground-party-mode
+description: Complete fake onboarding flow with experiment-specific behavior
+parameters:
+  experiment: ${experiment}
+  environment: ${environment}
+  user_email: ${user_email}
+  skip_intro: ${skip_intro}
+
+steps:
+  - tool: observe
+    label: "Observe initial app state with ${experiment}"
