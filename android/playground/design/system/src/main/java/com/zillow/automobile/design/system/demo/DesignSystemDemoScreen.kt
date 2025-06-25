@@ -177,10 +177,7 @@ fun DesignSystemDemoScreen(onBackClick: () -> Unit = {}) {
                         Row(
                             horizontalArrangement =
                                 Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
-                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
-                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
-                              AutoMobileLogo(treatment = MoodTreatment.PARTY)
+                              AutoMobileLogo()
                             }
                       }
                 }

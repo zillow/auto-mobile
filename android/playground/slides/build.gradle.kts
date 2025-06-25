@@ -37,8 +37,8 @@ dependencies {
   implementation(libs.androidx.appcompat)
   implementation(libs.material)
 
-  // Design system dependency
-  implementation(project(":playground:design:system"))
+  implementation(projects.playground.design.system)
+  implementation(projects.playground.experimentation)
 
   // Compose dependencies
   implementation(platform(libs.compose.bom))

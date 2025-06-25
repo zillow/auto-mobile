@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
+import com.zillow.automobile.experimentation.ExperimentRepository
 import com.zillow.automobile.playground.navigation.AppNavigation
 import com.zillow.automobile.playground.navigation.DeepLinkManager
 import com.zillow.automobile.storage.AnalyticsTracker
@@ -25,8 +26,15 @@ class MainActivity : ComponentActivity() {
     // Track screen view for MainActivity
     analyticsTracker.trackScreenView("MainActivity")
 
+    // Initialize experiment repository
+    val experimentRepository = ExperimentRepository(this)
+
     enableEdgeToEdge()
-    setContent { AutoMobileTheme { AppNavigation() } }
+    setContent {
+      AutoMobileTheme(experimentRepository = experimentRepository) {
+        AppNavigation()
+      }
+    }
 
     // Handle deep links
     handleDeepLink(intent)

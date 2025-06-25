@@ -161,19 +161,70 @@ fun MyComponent() {
 }
 ```
 
+### Accessing Experiments
+
+The AutoMobileTheme now supports automatic experiment integration via `CompositionLocal`. This
+allows any composable within the theme to access active experiments without manually passing them
+down.
+
+#### Get a specific experiment:
+
+```kotlin
+@Composable
+fun MyComposable() {
+  val moodExperiment = getExperiment<MoodExperiment>(MoodExperiment.EXPERIMENT_NAME)
+  
+  // Use experiment data
+  val currentTreatment = moodExperiment?.currentTreatment
+}
+```
+
+#### Check if a treatment is active:
+
+```kotlin
+@Composable
+fun MyComposable() {
+  val isPartyMode = isExperimentTreatmentActive(MoodExperiment.EXPERIMENT_NAME, "Party")
+  
+  val content = if (isPartyMode) "🎉 Party Mode!" else "Normal Mode"
+}
+```
+
+#### Access all experiments:
+
+```kotlin
+@Composable
+fun MyComposable() {
+  val allExperiments = LocalExperiments.current
+  
+  // Process all active experiments
+}
+```
+
+### Initializing the Theme with Experiments
+
+Initialize your theme with an `ExperimentRepository`:
+
+```kotlin
+class MainActivity : ComponentActivity() {
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    
+    val experimentRepository = ExperimentRepository(this)
+    
+    setContent { 
+      AutoMobileTheme(experimentRepository = experimentRepository) { 
+        // Your app content
+      } 
+    }
+  }
+}
+```
+
 ## Demo Screen
 
 A comprehensive demo screen is available at `demo/DesignSystemDemoScreen.kt` that showcases all
 components and demonstrates proper usage patterns.
-
-## Migration from Old Theme
-
-The design system replaces the old `AutomobileandroidTheme`. To migrate:
-
-1. Replace `AutomobileandroidTheme` with `AutoMobileTheme`
-2. Add design system dependency to your module
-3. Update imports to use design system components
-4. Replace custom color/typography definitions with design system tokens
 
 ## Best Practices
 
@@ -192,3 +243,4 @@ When adding new components:
 3. Include `@Preview` composables for development and testing
 4. Document usage patterns and any special considerations
 5. Ensure components follow Material3 guidelines and design specifications
+

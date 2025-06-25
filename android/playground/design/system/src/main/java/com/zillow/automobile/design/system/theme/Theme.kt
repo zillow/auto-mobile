@@ -8,8 +8,24 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.zillow.automobile.experimentation.Experiment
+import com.zillow.automobile.experimentation.ExperimentRepository
+
+// CompositionLocal for providing experiments to composables
+val LocalExperiments = staticCompositionLocalOf<List<Experiment<*>>> { emptyList() }
+
+/**
+ * Helper function to get a specific experiment by name from the current context
+ */
+@Composable
+inline fun <reified T : Experiment<*>> getExperiment(experimentName: String): T? {
+  val experiments = LocalExperiments.current
+  return experiments.find { it.name == experimentName } as? T
+}
 
 // AutoMobile Light Color Scheme
 private val AutoMobileLightColorScheme =
@@ -93,12 +109,15 @@ private val AutoMobileDarkColorScheme =
 fun AutoMobileTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false, // Disabled by default to use design system colors
+    experimentRepository: ExperimentRepository? = null,
     content: @Composable () -> Unit
 ) {
+  val context = LocalContext.current
+  val experiments = experimentRepository?.getExperiments() ?: emptyList()
+
   val colorScheme =
       when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-          val context = LocalContext.current
           if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
@@ -106,9 +125,12 @@ fun AutoMobileTheme(
         else -> AutoMobileLightColorScheme
       }
 
-  MaterialTheme(
+  CompositionLocalProvider(LocalExperiments provides experiments) {
+    MaterialTheme(
       colorScheme = colorScheme,
       typography = AutoMobileTypography,
       shapes = AutoMobileShapes,
-      content = content)
+      content = content
+    )
+  }
 }

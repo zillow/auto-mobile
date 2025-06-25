@@ -1,9 +1,6 @@
 package com.zillow.automobile.login.ui
 
 import android.content.res.Configuration
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -11,14 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,123 +21,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.zillow.automobile.design.system.components.AutoMobileButton
 import com.zillow.automobile.design.system.components.AutoMobileCard
-import com.zillow.automobile.design.system.components.AutoMobileHeadline
-import com.zillow.automobile.design.system.components.AutoMobileLogo
-import com.zillow.automobile.design.system.components.AutoMobileOutlinedTextField
 import com.zillow.automobile.design.system.components.AutoMobileText
 import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.login.R
 import com.zillow.automobile.login.data.LoginRepository
 import kotlinx.coroutines.delay
-
-/** Header section of the login screen containing logo and title. */
-@Composable
-private fun LoginHeader() {
-  AutoMobileLogo()
-  AutoMobileHeadline(text = "AutoMobile", color = MaterialTheme.colorScheme.primary)
-}
-
-/** Form section containing username and password input fields. */
-@Composable
-private fun LoginForm(
-    username: String,
-    password: String,
-    onUsernameChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-    loginFormState: LoginFormState,
-    usernameHadContent: Boolean,
-    passwordHadContent: Boolean,
-    usernameBlurred: Boolean,
-    passwordBlurred: Boolean,
-    onPasswordDone: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-  Column(modifier = modifier) {
-    AutoMobileOutlinedTextField(
-        value = username,
-        onValueChange = onUsernameChange,
-        label = { Text(stringResource(R.string.prompt_email)) },
-        keyboardOptions =
-            KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-        isError =
-            (usernameHadContent && username.length < 5) ||
-                (usernameBlurred && loginFormState.usernameError != null),
-        supportingText = {
-          if ((usernameHadContent && username.length < 5) ||
-              (usernameBlurred && loginFormState.usernameError != null)) {
-            loginFormState.usernameError?.let {
-              Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
-            }
-          }
-        },
-        modifier = Modifier.fillMaxWidth())
-
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-
-    AutoMobileOutlinedTextField(
-        value = password,
-        onValueChange = onPasswordChange,
-        label = { Text(stringResource(R.string.prompt_password)) },
-        visualTransformation = PasswordVisualTransformation(),
-        keyboardOptions =
-            KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onPasswordDone() }),
-        isError =
-            (passwordHadContent && password.length < 5) ||
-                (passwordBlurred && loginFormState.passwordError != null),
-        supportingText = {
-          if ((passwordHadContent && password.length < 5) ||
-              (passwordBlurred && loginFormState.passwordError != null)) {
-            loginFormState.passwordError?.let {
-              Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
-            }
-          }
-        },
-        modifier = Modifier.fillMaxWidth())
-  }
-}
-
-/** Action buttons section containing sign in button, loading indicator, and guest mode button. */
-@Composable
-private fun LoginActions(
-    isFormValid: Boolean,
-    isLoading: Boolean,
-    onSignInClick: () -> Unit,
-    onGuestModeClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-  Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-    AnimatedVisibility(visible = isFormValid && !isLoading, enter = fadeIn(), exit = fadeOut()) {
-      AutoMobileButton(
-          text = stringResource(R.string.action_sign_in),
-          onClick = onSignInClick,
-          modifier = Modifier.wrapContentWidth())
-    }
-
-    if (isLoading) {
-      Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-      CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-    }
-
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-
-    AutoMobileButton(
-        text = "Continue as Guest",
-        onClick = onGuestModeClick,
-        modifier = Modifier.wrapContentWidth())
-  }
-}
 
 /**
  * Login screen composable that handles user authentication.
@@ -412,54 +298,5 @@ fun LoginScreenPreview() {
         onLoginSuccess = { /* Preview login success */ },
         onLoginError = { /* Preview login error */ },
         onGuestMode = { /* Preview guest mode */ })
-  }
-}
-
-@Preview(name = "Login Header", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
-@Preview(
-    name = "Login Header - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun LoginHeaderPreview() {
-  AutoMobileTheme { Column(horizontalAlignment = Alignment.CenterHorizontally) { LoginHeader() } }
-}
-
-@Preview(name = "Login Form", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
-@Preview(
-    name = "Login Form - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun LoginFormPreview() {
-  AutoMobileTheme {
-    LoginForm(
-        username = "user@example.com",
-        password = "password123",
-        onUsernameChange = {},
-        onPasswordChange = {},
-        loginFormState = LoginFormState(isDataValid = true),
-        usernameHadContent = true,
-        passwordHadContent = true,
-        usernameBlurred = false,
-        passwordBlurred = false,
-        onPasswordDone = {})
-  }
-}
-
-@Preview(name = "Login Actions", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
-@Preview(
-    name = "Login Actions - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
-@Composable
-fun LoginActionsPreview() {
-  AutoMobileTheme {
-    LoginActions(isFormValid = true, isLoading = false, onSignInClick = {}, onGuestModeClick = {})
-  }
-}
-
-@Preview(
-    name = "Login Actions - Loading",
-    showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_NO)
-@Composable
-fun LoginActionsLoadingPreview() {
-  AutoMobileTheme {
-    LoginActions(isFormValid = true, isLoading = true, onSignInClick = {}, onGuestModeClick = {})
   }
 }

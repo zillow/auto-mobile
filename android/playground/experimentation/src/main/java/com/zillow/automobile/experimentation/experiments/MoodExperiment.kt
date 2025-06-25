@@ -23,6 +23,7 @@ class MoodExperiment(override val currentTreatment: MoodTreatment) : Experiment<
   companion object {
     const val EXPERIMENT_NAME = "Mood"
     val treatments: Set<MoodTreatment> = MoodTreatment.getIdSet()
+    val control: MoodExperiment = MoodExperiment(MoodTreatment.CONTROL)
   }
 
   override val name: String = EXPERIMENT_NAME

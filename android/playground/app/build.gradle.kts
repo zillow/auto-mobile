@@ -74,6 +74,7 @@ dependencies {
   implementation(projects.playground.onboarding)
   implementation(projects.playground.slides)
   implementation(projects.playground.storage)
+  implementation(projects.playground.experimentation)
 
   // Test dependencies
   testImplementation(libs.bundles.unit.test)

@@ -11,23 +11,31 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.zillow.automobile.design.assets.R
 import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
+import com.zillow.automobile.design.system.theme.getExperiment
+import com.zillow.automobile.experimentation.experiments.MoodExperiment
 import com.zillow.automobile.experimentation.experiments.MoodTreatment
 
 @Composable
-fun AutoMobileLogo(modifier: Modifier = Modifier, treatment: MoodTreatment = MoodTreatment.PARTY) {
-
-  if (treatment == MoodTreatment.PARTY) {
-    // Use holographic version for party mode
-    Image(
+fun AutoMobileLogo(modifier: Modifier = Modifier) {
+  val mood = getExperiment<MoodExperiment>(MoodExperiment.EXPERIMENT_NAME)
+  when (mood?.currentTreatment) {
+    MoodTreatment.PARTY -> {
+      // Use holographic version for party mode
+      Image(
         painter = painterResource(R.drawable.auto_mobile_holo),
         contentDescription = "AutoMobile Party Logo",
-        modifier = modifier)
-  } else {
-    // Use standard logo for control
-    Image(
+        modifier = modifier
+      )
+    }
+
+    else -> {
+      // Use standard logo for control
+      Image(
         painter = painterResource(R.drawable.automobile_logo),
         contentDescription = "AutoMobile Logo",
-        modifier = modifier)
+        modifier = modifier
+      )
+    }
   }
 }
 
@@ -35,15 +43,6 @@ fun AutoMobileLogo(modifier: Modifier = Modifier, treatment: MoodTreatment = Moo
 @Composable
 private fun AutoMobileLogoPreview() {
   AutoMobileTheme {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4),
-        horizontalAlignment = Alignment.CenterHorizontally) {
-          AutoMobileLogo()
-          AutoMobileLogo()
-          AutoMobileLogo()
-          AutoMobileLogo()
-
-          AutoMobileLogo(treatment = MoodTreatment.PARTY)
-        }
+    AutoMobileLogo()
   }
 }
