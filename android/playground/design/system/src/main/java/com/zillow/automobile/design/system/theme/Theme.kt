@@ -18,9 +18,7 @@ import com.zillow.automobile.experimentation.ExperimentRepository
 // CompositionLocal for providing experiments to composables
 val LocalExperiments = staticCompositionLocalOf<List<Experiment<*>>> { emptyList() }
 
-/**
- * Helper function to get a specific experiment by name from the current context
- */
+/** Helper function to get a specific experiment by name from the current context */
 @Composable
 inline fun <reified T : Experiment<*>> getExperiment(experimentName: String): T? {
   val experiments = LocalExperiments.current
@@ -127,10 +125,9 @@ fun AutoMobileTheme(
 
   CompositionLocalProvider(LocalExperiments provides experiments) {
     MaterialTheme(
-      colorScheme = colorScheme,
-      typography = AutoMobileTypography,
-      shapes = AutoMobileShapes,
-      content = content
-    )
+        colorScheme = colorScheme,
+        typography = AutoMobileTypography,
+        shapes = AutoMobileShapes,
+        content = content)
   }
 }

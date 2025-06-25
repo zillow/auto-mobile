@@ -48,7 +48,6 @@ import com.zillow.automobile.design.system.components.AutoMobileTopAppBar
 import com.zillow.automobile.design.system.components.BottomNavItem
 import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
-import com.zillow.automobile.experimentation.experiments.MoodTreatment
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -20,7 +20,6 @@ import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.login.R
 
-
 /** Action buttons section containing sign in button, loading indicator, and guest mode button. */
 @Composable
 internal fun LoginActions(

@@ -30,11 +30,7 @@ class MainActivity : ComponentActivity() {
     val experimentRepository = ExperimentRepository(this)
 
     enableEdgeToEdge()
-    setContent {
-      AutoMobileTheme(experimentRepository = experimentRepository) {
-        AppNavigation()
-      }
-    }
+    setContent { AutoMobileTheme(experimentRepository = experimentRepository) { AppNavigation() } }
 
     // Handle deep links
     handleDeepLink(intent)
