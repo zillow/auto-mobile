@@ -2,24 +2,26 @@ import { expect } from "chai";
 import sinon from "sinon";
 import sinonChai from "sinon-chai";
 import { use } from "chai";
-import * as avdmanager from "../../../src/utils/android-cmdline-tools/avdmanager";
-import * as detection from "../../../src/utils/android-cmdline-tools/detection";
-import * as install from "../../../src/utils/android-cmdline-tools/install";
-import { logger } from "../../../src/utils/logger";
+import { AvdManagerDependencies } from "../../../src/utils/android-cmdline-tools/avdmanager";
 
 use(sinonChai);
 
-describe("AVDManager", () => {
+describe("AVDManager", function() {
+  this.timeout(15000);
   let sandbox: sinon.SinonSandbox;
-  let mockLocation: detection.AndroidToolsLocation;
+  let mockLocation: any;
+  let avdmanager: any;
 
   beforeEach(() => {
     sandbox = sinon.createSandbox();
 
-    // Mock logger to suppress output during tests
-    sandbox.stub(logger, "info");
-    sandbox.stub(logger, "warn");
-    sandbox.stub(logger, "error");
+    // Clear module cache first
+    delete require.cache[require.resolve("../../../src/utils/android-cmdline-tools/avdmanager")];
+    delete require.cache[require.resolve("../../../src/utils/android-cmdline-tools/detection")];
+    delete require.cache[require.resolve("../../../src/utils/android-cmdline-tools/install")];
+
+    // Now require the modules
+    avdmanager = require("../../../src/utils/android-cmdline-tools/avdmanager");
 
     // Mock location
     mockLocation = {
@@ -34,19 +36,39 @@ describe("AVDManager", () => {
     sandbox.restore();
   });
 
+  // Helper function to create mock dependencies
+  function createMockDependencies(overrides: Partial<AvdManagerDependencies> = {}): AvdManagerDependencies {
+    return {
+      spawn: sandbox.stub(),
+      existsSync: sandbox.stub(),
+      logger: {
+        info: sandbox.stub(),
+        warn: sandbox.stub(),
+        error: sandbox.stub(),
+        debug: sandbox.stub(),
+        setLogLevel: sandbox.stub(),
+        getLogLevel: sandbox.stub(),
+        enableStdoutLogging: sandbox.stub(),
+        disableStdoutLogging: sandbox.stub(),
+        close: sandbox.stub()
+      },
+      detectAndroidCommandLineTools: sandbox.stub().resolves([mockLocation]),
+      getBestAndroidToolsLocation: sandbox.stub().returns(mockLocation),
+      validateRequiredTools: sandbox.stub().returns({ valid: true, missing: [] }),
+      installAndroidTools: sandbox.stub().resolves({
+        success: true,
+        installed_tools: ["avdmanager", "sdkmanager"],
+        failed_tools: [],
+        installation_path: "/mock/path",
+        installation_method: "manual",
+        message: "Success"
+      }),
+      ...overrides
+    };
+  }
+
   describe("acceptLicenses", () => {
     it("should accept licenses successfully", async () => {
-      // Mock dependencies
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      // Mock file system
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      // Mock spawn
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -54,30 +76,22 @@ describe("AVDManager", () => {
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
-
-      // Simulate successful execution
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
       mockChild.on.withArgs("close").callsArgWith(1, 0);
 
-      const result = await avdmanager.acceptLicenses();
+      const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.true;
       expect(result.message).to.equal("Android SDK licenses accepted");
-      expect(spawnStub).to.have.been.calledWith(
+      expect(mockDeps.spawn).to.have.been.calledWith(
         "/mock/sdk/cmdline-tools/latest/bin/sdkmanager",
         ["--licenses"]
       );
     });
 
     it("should handle license acceptance failure", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -85,9 +99,10 @@ describe("AVDManager", () => {
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
 
-      // Simulate stderr output and failure
       let stderrCallback: (data: Buffer) => void;
       mockChild.stderr.on.withArgs("data").callsFake((event, callback) => {
         stderrCallback = callback;
@@ -99,46 +114,13 @@ describe("AVDManager", () => {
         callback(1);
       });
 
-      const result = await avdmanager.acceptLicenses();
+      const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.false;
       expect(result.message).to.include("License acceptance failed");
     });
 
     it("should install tools if not available", async () => {
-      // Reset any existing stubs for these methods since they might be used in other tests
-      sandbox.restore();
-      sandbox = sinon.createSandbox();
-
-      // Mock logger again after restore
-      sandbox.stub(logger, "info");
-      sandbox.stub(logger, "warn");
-      sandbox.stub(logger, "error");
-
-      const detectStub = sandbox.stub(detection, "detectAndroidCommandLineTools");
-      const bestLocationStub = sandbox.stub(detection, "getBestAndroidToolsLocation");
-
-      // First calls - no tools found
-      detectStub.onFirstCall().resolves([]);
-      bestLocationStub.onFirstCall().returns(null);
-
-      // Second calls - tools found after installation
-      detectStub.onSecondCall().resolves([mockLocation]);
-      bestLocationStub.onSecondCall().returns(mockLocation);
-
-      const installStub = sandbox.stub(install, "installAndroidTools").resolves({
-        success: true,
-        installed_tools: ["avdmanager", "sdkmanager"],
-        failed_tools: [],
-        installation_path: "/mock/sdk/cmdline-tools/latest",
-        installation_method: "manual",
-        message: "Success"
-      });
-
-      sandbox.stub(require("fs"), "existsSync")
-        .withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -146,12 +128,23 @@ describe("AVDManager", () => {
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
+
+      // First call - no tools found
+      mockDeps.detectAndroidCommandLineTools.onFirstCall().resolves([]);
+      mockDeps.getBestAndroidToolsLocation.onFirstCall().returns(null);
+
+      // Second call - tools found after installation
+      mockDeps.detectAndroidCommandLineTools.onSecondCall().resolves([mockLocation]);
+      mockDeps.getBestAndroidToolsLocation.onSecondCall().returns(mockLocation);
+
       mockChild.on.withArgs("close").callsArgWith(1, 0);
 
-      const result = await avdmanager.acceptLicenses();
+      const result = await avdmanager.acceptLicenses(mockDeps);
 
-      expect(installStub).to.have.been.calledWith({
+      expect(mockDeps.installAndroidTools).to.have.been.calledWith({
         tools: ["avdmanager", "sdkmanager"],
         force: false
       });
@@ -161,14 +154,6 @@ describe("AVDManager", () => {
 
   describe("listSystemImages", () => {
     it("should list system images successfully", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -176,9 +161,10 @@ describe("AVDManager", () => {
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
 
-      // Mock stdout data
       let stdoutCallback: (data: Buffer) => void;
       mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
         stdoutCallback = callback;
@@ -196,7 +182,7 @@ Available Packages:
         callback(0);
       });
 
-      const result = await avdmanager.listSystemImages();
+      const result = await avdmanager.listSystemImages(undefined, mockDeps);
 
       expect(result).to.have.lengthOf(2);
       expect(result[0]).to.deep.include({
@@ -214,14 +200,6 @@ Available Packages:
     });
 
     it("should filter system images by criteria", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -229,7 +207,9 @@ Available Packages:
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
 
       let stdoutCallback: (data: Buffer) => void;
       mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
@@ -252,7 +232,7 @@ Available Packages:
       const result = await avdmanager.listSystemImages({
         apiLevel: 33,
         tag: "google_apis"
-      });
+      }, mockDeps);
 
       expect(result).to.have.lengthOf(1);
       expect(result[0].apiLevel).to.equal(33);
@@ -262,14 +242,6 @@ Available Packages:
 
   describe("createAvd", () => {
     it("should create AVD successfully", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -277,7 +249,9 @@ Available Packages:
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
       mockChild.on.withArgs("close").callsArgWith(1, 0);
 
       const params = {
@@ -287,11 +261,11 @@ Available Packages:
         force: true
       };
 
-      const result = await avdmanager.createAvd(params);
+      const result = await avdmanager.createAvd(params, mockDeps);
 
       expect(result.success).to.be.true;
       expect(result.avdName).to.equal("test_avd");
-      expect(spawnStub).to.have.been.calledWith(
+      expect(mockDeps.spawn).to.have.been.calledWith(
         "/mock/sdk/cmdline-tools/latest/bin/avdmanager",
         [
           "create", "avd",
@@ -304,14 +278,6 @@ Available Packages:
     });
 
     it("should include all optional parameters", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -319,7 +285,9 @@ Available Packages:
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
       mockChild.on.withArgs("close").callsArgWith(1, 0);
 
       const params = {
@@ -332,10 +300,10 @@ Available Packages:
         abi: "arm64-v8a"
       };
 
-      const result = await avdmanager.createAvd(params);
+      const result = await avdmanager.createAvd(params, mockDeps);
 
       expect(result.success).to.be.true;
-      expect(spawnStub).to.have.been.calledWith(
+      expect(mockDeps.spawn).to.have.been.calledWith(
         "/mock/sdk/cmdline-tools/latest/bin/avdmanager",
         [
           "create", "avd",
@@ -351,14 +319,6 @@ Available Packages:
     });
 
     it("should handle AVD creation failure", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -366,7 +326,9 @@ Available Packages:
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
 
       let stderrCallback: (data: Buffer) => void;
       mockChild.stderr.on.withArgs("data").callsFake((event, callback) => {
@@ -385,7 +347,7 @@ Available Packages:
         package: "system-images;android-33;google_apis;arm64-v8a"
       };
 
-      const result = await avdmanager.createAvd(params);
+      const result = await avdmanager.createAvd(params, mockDeps);
 
       expect(result.success).to.be.false;
       expect(result.message).to.include("AVD creation failed");
@@ -394,14 +356,6 @@ Available Packages:
 
   describe("deleteAvd", () => {
     it("should delete AVD successfully", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -409,14 +363,16 @@ Available Packages:
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
       mockChild.on.withArgs("close").callsArgWith(1, 0);
 
-      const result = await avdmanager.deleteAvd("test_avd");
+      const result = await avdmanager.deleteAvd("test_avd", mockDeps);
 
       expect(result.success).to.be.true;
       expect(result.message).to.include("deleted successfully");
-      expect(spawnStub).to.have.been.calledWith(
+      expect(mockDeps.spawn).to.have.been.calledWith(
         "/mock/sdk/cmdline-tools/latest/bin/avdmanager",
         ["delete", "avd", "-n", "test_avd"]
       );
@@ -425,14 +381,6 @@ Available Packages:
 
   describe("listAvds", () => {
     it("should parse AVD list correctly", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -440,7 +388,9 @@ Available Packages:
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
 
       let stdoutCallback: (data: Buffer) => void;
       mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
@@ -473,7 +423,7 @@ Available Android Virtual Devices:
         callback(0);
       });
 
-      const result = await avdmanager.listAvds();
+      const result = await avdmanager.listAvds(mockDeps);
 
       expect(result).to.have.lengthOf(3);
 
@@ -501,14 +451,6 @@ Available Android Virtual Devices:
 
   describe("listDevices", () => {
     it("should parse device list correctly", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -516,7 +458,9 @@ Available Android Virtual Devices:
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
 
       let stdoutCallback: (data: Buffer) => void;
       mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
@@ -544,7 +488,7 @@ id: pixel_4
         callback(0);
       });
 
-      const result = await avdmanager.listDevices();
+      const result = await avdmanager.listDevices(mockDeps);
 
       expect(result).to.have.lengthOf(3);
 
@@ -570,14 +514,6 @@ id: pixel_4
 
   describe("installSystemImage", () => {
     it("should install system image successfully", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -585,29 +521,23 @@ id: pixel_4
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
       mockChild.on.withArgs("close").callsArgWith(1, 0);
 
       const packageName = "system-images;android-33;google_apis;arm64-v8a";
-      const result = await avdmanager.installSystemImage(packageName);
+      const result = await avdmanager.installSystemImage(packageName, true, mockDeps);
 
       expect(result.success).to.be.true;
       expect(result.message).to.include("installed successfully");
-      expect(spawnStub).to.have.been.calledWith(
+      expect(mockDeps.spawn).to.have.been.calledWith(
         "/mock/sdk/cmdline-tools/latest/bin/sdkmanager",
         [packageName]
       );
     });
 
     it("should install without accepting license when specified", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -615,11 +545,13 @@ id: pixel_4
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
       mockChild.on.withArgs("close").callsArgWith(1, 0);
 
       const packageName = "system-images;android-33;google_apis;arm64-v8a";
-      const result = await avdmanager.installSystemImage(packageName, false);
+      const result = await avdmanager.installSystemImage(packageName, false, mockDeps);
 
       expect(result.success).to.be.true;
       expect(mockChild.stdin.write).to.not.have.been.called;
@@ -642,10 +574,11 @@ id: pixel_4
 
   describe("Error Handling", () => {
     it("should handle tools installation failure", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(null);
+      const mockDeps = createMockDependencies();
 
-      sandbox.stub(install, "installAndroidTools").resolves({
+      mockDeps.detectAndroidCommandLineTools.resolves([]);
+      mockDeps.getBestAndroidToolsLocation.returns(null);
+      mockDeps.installAndroidTools.resolves({
         success: false,
         installed_tools: [],
         failed_tools: ["avdmanager", "sdkmanager"],
@@ -654,22 +587,18 @@ id: pixel_4
         message: "Installation failed"
       });
 
-      const result = await avdmanager.acceptLicenses();
+      const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.false;
       expect(result.message).to.include("Failed to install required tools");
     });
 
     it("should handle missing tools after installation", async () => {
-      const detectStub = sandbox.stub(detection, "detectAndroidCommandLineTools");
-      const bestLocationStub = sandbox.stub(detection, "getBestAndroidToolsLocation");
+      const mockDeps = createMockDependencies();
 
-      detectStub.onFirstCall().resolves([]);
-      detectStub.onSecondCall().resolves([]);
-      bestLocationStub.onFirstCall().returns(null);
-      bestLocationStub.onSecondCall().returns(null);
-
-      sandbox.stub(install, "installAndroidTools").resolves({
+      mockDeps.detectAndroidCommandLineTools.resolves([]);
+      mockDeps.getBestAndroidToolsLocation.returns(null);
+      mockDeps.installAndroidTools.resolves({
         success: true,
         installed_tools: ["avdmanager", "sdkmanager"],
         failed_tools: [],
@@ -678,35 +607,24 @@ id: pixel_4
         message: "Success"
       });
 
-      const result = await avdmanager.acceptLicenses();
+      const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.false;
       expect(result.message).to.include("Tools installation completed but tools not detected");
     });
 
     it("should handle missing executable files", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
+      const mockDeps = createMockDependencies();
 
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.returns(false); // No executable files exist
+      mockDeps.existsSync.returns(false); // No executable files exist
 
-      const result = await avdmanager.acceptLicenses();
+      const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.false;
       expect(result.message).to.include("SDK manager not found");
     });
 
     it("should handle command spawn errors", async () => {
-      sandbox.stub(detection, "detectAndroidCommandLineTools").resolves([mockLocation]);
-      sandbox.stub(detection, "getBestAndroidToolsLocation").returns(mockLocation);
-      sandbox.stub(detection, "validateRequiredTools").returns({ valid: true, missing: [] });
-
-      const existsSyncStub = sandbox.stub(require("fs"), "existsSync");
-      existsSyncStub.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      const spawnStub = sandbox.stub(require("child_process"), "spawn");
       const mockChild = {
         stdout: { on: sandbox.stub() },
         stderr: { on: sandbox.stub() },
@@ -714,12 +632,14 @@ id: pixel_4
         on: sandbox.stub()
       };
 
-      spawnStub.returns(mockChild);
+      const mockDeps = createMockDependencies();
+      mockDeps.spawn.returns(mockChild);
+      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
 
       // Simulate spawn error
       mockChild.on.withArgs("error").callsArgWith(1, new Error("Spawn failed"));
 
-      const result = await avdmanager.acceptLicenses();
+      const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.false;
       expect(result.message).to.include("Failed to spawn command");

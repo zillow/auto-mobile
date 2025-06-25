@@ -10,6 +10,28 @@ import {
 } from "./detection";
 import { installAndroidTools } from "./install";
 
+// Dependencies interface for dependency injection
+export interface AvdManagerDependencies {
+  spawn: typeof spawn;
+  existsSync: typeof existsSync;
+  logger: typeof logger;
+  detectAndroidCommandLineTools: typeof detectAndroidCommandLineTools;
+  getBestAndroidToolsLocation: typeof getBestAndroidToolsLocation;
+  validateRequiredTools: typeof validateRequiredTools;
+  installAndroidTools: typeof installAndroidTools;
+}
+
+// Create default dependencies
+const createDefaultDependencies = (): AvdManagerDependencies => ({
+  spawn,
+  existsSync,
+  logger,
+  detectAndroidCommandLineTools,
+  getBestAndroidToolsLocation,
+  validateRequiredTools,
+  installAndroidTools
+});
+
 /**
  * Execute a command using spawn with proper error handling and logging
  */
@@ -17,15 +39,15 @@ async function spawnCommand(command: string, args: string[], options: {
   cwd?: string;
   input?: string;
   timeout?: number;
-} = {}): Promise<{
+} = {}, dependencies = createDefaultDependencies()): Promise<{
   stdout: string;
   stderr: string;
   exitCode: number;
 }> {
   return new Promise((resolve, reject) => {
-    logger.info(`Executing: ${command} ${args.join(" ")}`);
+    dependencies.logger.info(`Executing: ${command} ${args.join(" ")}`);
 
-    const child = spawn(command, args, {
+    const child = dependencies.spawn(command, args, {
       cwd: options.cwd,
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -46,7 +68,7 @@ async function spawnCommand(command: string, args: string[], options: {
       const output = data.toString();
       stdout += output;
       if (output.trim()) {
-        logger.info(`[${command}] ${output.trim()}`);
+        dependencies.logger.info(`[${command}] ${output.trim()}`);
       }
     });
 
@@ -54,7 +76,7 @@ async function spawnCommand(command: string, args: string[], options: {
       const output = data.toString();
       stderr += output;
       if (output.trim()) {
-        logger.warn(`[${command}] ${output.trim()}`);
+        dependencies.logger.warn(`[${command}] ${output.trim()}`);
       }
     });
 
@@ -83,13 +105,13 @@ async function spawnCommand(command: string, args: string[], options: {
 /**
  * Ensure required Android tools are available, installing if necessary
  */
-async function ensureToolsAvailable(): Promise<AndroidToolsLocation> {
-  const locations = await detectAndroidCommandLineTools();
-  const bestLocation = getBestAndroidToolsLocation(locations);
+async function ensureToolsAvailable(dependencies = createDefaultDependencies()): Promise<AndroidToolsLocation> {
+  const locations = await dependencies.detectAndroidCommandLineTools();
+  const bestLocation = dependencies.getBestAndroidToolsLocation(locations);
 
   if (!bestLocation) {
-    logger.info("Android command line tools not found, installing...");
-    const installResult = await installAndroidTools({
+    dependencies.logger.info("Android command line tools not found, installing...");
+    const installResult = await dependencies.installAndroidTools({
       tools: ["avdmanager", "sdkmanager"],
       force: false
     });
@@ -99,8 +121,8 @@ async function ensureToolsAvailable(): Promise<AndroidToolsLocation> {
     }
 
     // Re-detect after installation
-    const updatedLocations = await detectAndroidCommandLineTools();
-    const newBestLocation = getBestAndroidToolsLocation(updatedLocations);
+    const updatedLocations = await dependencies.detectAndroidCommandLineTools();
+    const newBestLocation = dependencies.getBestAndroidToolsLocation(updatedLocations);
 
     if (!newBestLocation) {
       throw new Error("Tools installation completed but tools not detected");
@@ -110,10 +132,10 @@ async function ensureToolsAvailable(): Promise<AndroidToolsLocation> {
   }
 
   // Validate that required tools are available
-  const validation = validateRequiredTools(bestLocation, ["avdmanager", "sdkmanager"]);
+  const validation = dependencies.validateRequiredTools(bestLocation, ["avdmanager", "sdkmanager"]);
   if (!validation.valid) {
-    logger.info(`Missing required tools: ${validation.missing.join(", ")}, installing...`);
-    const installResult = await installAndroidTools({
+    dependencies.logger.info(`Missing required tools: ${validation.missing.join(", ")}, installing...`);
+    const installResult = await dependencies.installAndroidTools({
       tools: validation.missing,
       force: false
     });
@@ -129,13 +151,13 @@ async function ensureToolsAvailable(): Promise<AndroidToolsLocation> {
 /**
  * Get the avdmanager executable path
  */
-function getAvdManagerPath(location: AndroidToolsLocation): string {
+function getAvdManagerPath(location: AndroidToolsLocation, dependencies = createDefaultDependencies()): string {
   const avdmanagerPath = join(location.path, "bin", "avdmanager");
   const avdmanagerBatPath = join(location.path, "bin", "avdmanager.bat");
 
-  if (existsSync(avdmanagerPath)) {
+  if (dependencies.existsSync(avdmanagerPath)) {
     return avdmanagerPath;
-  } else if (existsSync(avdmanagerBatPath)) {
+  } else if (dependencies.existsSync(avdmanagerBatPath)) {
     return avdmanagerBatPath;
   }
 
@@ -145,13 +167,13 @@ function getAvdManagerPath(location: AndroidToolsLocation): string {
 /**
  * Get the sdkmanager executable path
  */
-function getSdkManagerPath(location: AndroidToolsLocation): string {
+function getSdkManagerPath(location: AndroidToolsLocation, dependencies = createDefaultDependencies()): string {
   const sdkmanagerPath = join(location.path, "bin", "sdkmanager");
   const sdkmanagerBatPath = join(location.path, "bin", "sdkmanager.bat");
 
-  if (existsSync(sdkmanagerPath)) {
+  if (dependencies.existsSync(sdkmanagerPath)) {
     return sdkmanagerPath;
-  } else if (existsSync(sdkmanagerBatPath)) {
+  } else if (dependencies.existsSync(sdkmanagerBatPath)) {
     return sdkmanagerBatPath;
   }
 
@@ -161,29 +183,32 @@ function getSdkManagerPath(location: AndroidToolsLocation): string {
 /**
  * Accept Android SDK licenses
  */
-export async function acceptLicenses(): Promise<{ success: boolean; message: string }> {
+export async function acceptLicenses(dependencies = createDefaultDependencies()): Promise<{
+  success: boolean;
+  message: string
+}> {
   try {
-    const location = await ensureToolsAvailable();
-    const sdkmanagerPath = getSdkManagerPath(location);
+    const location = await ensureToolsAvailable(dependencies);
+    const sdkmanagerPath = getSdkManagerPath(location, dependencies);
 
-    logger.info("Accepting Android SDK licenses...");
+    dependencies.logger.info("Accepting Android SDK licenses...");
 
     // Provide "y" responses to all license prompts
     const licenseInput = "y\n".repeat(20);
     const result = await spawnCommand(sdkmanagerPath, ["--licenses"], {
       input: licenseInput,
       timeout: 60000 // 60 second timeout
-    });
+    }, dependencies);
 
     if (result.exitCode === 0) {
-      logger.info("Successfully accepted Android SDK licenses");
+      dependencies.logger.info("Successfully accepted Android SDK licenses");
       return { success: true, message: "Android SDK licenses accepted" };
     } else {
       return { success: false, message: `License acceptance failed: ${result.stderr}` };
     }
   } catch (error) {
     const message = `Failed to accept licenses: ${(error as Error).message}`;
-    logger.error(message);
+    dependencies.logger.error(message);
     return { success: false, message };
   }
 }
@@ -191,12 +216,12 @@ export async function acceptLicenses(): Promise<{ success: boolean; message: str
 /**
  * List available system images
  */
-export async function listSystemImages(filter?: SystemImageFilter): Promise<SystemImage[]> {
+export async function listSystemImages(filter?: SystemImageFilter, dependencies = createDefaultDependencies()): Promise<SystemImage[]> {
   try {
-    const location = await ensureToolsAvailable();
-    const sdkmanagerPath = getSdkManagerPath(location);
+    const location = await ensureToolsAvailable(dependencies);
+    const sdkmanagerPath = getSdkManagerPath(location, dependencies);
 
-    const result = await spawnCommand(sdkmanagerPath, ["--list"]);
+    const result = await spawnCommand(sdkmanagerPath, ["--list"], {}, dependencies);
 
     if (result.exitCode !== 0) {
       throw new Error(`Failed to list system images: ${result.stderr}`);
@@ -204,7 +229,7 @@ export async function listSystemImages(filter?: SystemImageFilter): Promise<Syst
 
     return parseSystemImages(result.stdout, filter);
   } catch (error) {
-    logger.error(`Failed to list system images: ${(error as Error).message}`);
+    dependencies.logger.error(`Failed to list system images: ${(error as Error).message}`);
     throw error;
   }
 }
@@ -212,32 +237,32 @@ export async function listSystemImages(filter?: SystemImageFilter): Promise<Syst
 /**
  * Download and install a system image
  */
-export async function installSystemImage(packageName: string, acceptLicense = true): Promise<{
+export async function installSystemImage(packageName: string, acceptLicense = true, dependencies = createDefaultDependencies()): Promise<{
   success: boolean;
   message: string;
 }> {
   try {
-    const location = await ensureToolsAvailable();
-    const sdkmanagerPath = getSdkManagerPath(location);
+    const location = await ensureToolsAvailable(dependencies);
+    const sdkmanagerPath = getSdkManagerPath(location, dependencies);
 
-    logger.info(`Installing system image: ${packageName}`);
+    dependencies.logger.info(`Installing system image: ${packageName}`);
 
     // Accept license and install
     const input = acceptLicense ? "y\n".repeat(10) : undefined;
     const result = await spawnCommand(sdkmanagerPath, [packageName], {
       input,
       timeout: 600000 // 10 minute timeout for downloads
-    });
+    }, dependencies);
 
     if (result.exitCode === 0) {
-      logger.info(`Successfully installed system image: ${packageName}`);
+      dependencies.logger.info(`Successfully installed system image: ${packageName}`);
       return { success: true, message: `System image ${packageName} installed successfully` };
     } else {
       return { success: false, message: `Installation failed: ${result.stderr}` };
     }
   } catch (error) {
     const message = `Failed to install system image ${packageName}: ${(error as Error).message}`;
-    logger.error(message);
+    dependencies.logger.error(message);
     return { success: false, message };
   }
 }
@@ -245,12 +270,12 @@ export async function installSystemImage(packageName: string, acceptLicense = tr
 /**
  * List available AVDs
  */
-export async function listAvds(): Promise<AvdInfo[]> {
+export async function listAvds(dependencies = createDefaultDependencies()): Promise<AvdInfo[]> {
   try {
-    const location = await ensureToolsAvailable();
-    const avdmanagerPath = getAvdManagerPath(location);
+    const location = await ensureToolsAvailable(dependencies);
+    const avdmanagerPath = getAvdManagerPath(location, dependencies);
 
-    const result = await spawnCommand(avdmanagerPath, ["list", "avd"]);
+    const result = await spawnCommand(avdmanagerPath, ["list", "avd"], {}, dependencies);
 
     if (result.exitCode !== 0) {
       throw new Error(`Failed to list AVDs: ${result.stderr}`);
@@ -258,7 +283,7 @@ export async function listAvds(): Promise<AvdInfo[]> {
 
     return parseAvdList(result.stdout);
   } catch (error) {
-    logger.error(`Failed to list AVDs: ${(error as Error).message}`);
+    dependencies.logger.error(`Failed to list AVDs: ${(error as Error).message}`);
     throw error;
   }
 }
@@ -266,14 +291,14 @@ export async function listAvds(): Promise<AvdInfo[]> {
 /**
  * Create a new AVD
  */
-export async function createAvd(params: CreateAvdParams): Promise<{
+export async function createAvd(params: CreateAvdParams, dependencies = createDefaultDependencies()): Promise<{
   success: boolean;
   message: string;
   avdName?: string;
 }> {
   try {
-    const location = await ensureToolsAvailable();
-    const avdmanagerPath = getAvdManagerPath(location);
+    const location = await ensureToolsAvailable(dependencies);
+    const avdmanagerPath = getAvdManagerPath(location, dependencies);
 
     const {
       name,
@@ -285,7 +310,7 @@ export async function createAvd(params: CreateAvdParams): Promise<{
       abi
     } = params;
 
-    logger.info(`Creating AVD: ${name} with package ${packageName}`);
+    dependencies.logger.info(`Creating AVD: ${name} with package ${packageName}`);
 
     const args = ["create", "avd", "-n", name, "-k", packageName];
 
@@ -312,10 +337,10 @@ export async function createAvd(params: CreateAvdParams): Promise<{
     const result = await spawnCommand(avdmanagerPath, args, {
       input: "\n", // Default response to any prompts
       timeout: 300000 // 5 minute timeout
-    });
+    }, dependencies);
 
     if (result.exitCode === 0) {
-      logger.info(`Successfully created AVD: ${name}`);
+      dependencies.logger.info(`Successfully created AVD: ${name}`);
       return {
         success: true,
         message: `AVD ${name} created successfully`,
@@ -329,7 +354,7 @@ export async function createAvd(params: CreateAvdParams): Promise<{
     }
   } catch (error) {
     const message = `Failed to create AVD ${params.name}: ${(error as Error).message}`;
-    logger.error(message);
+    dependencies.logger.error(message);
     return { success: false, message };
   }
 }
@@ -337,27 +362,27 @@ export async function createAvd(params: CreateAvdParams): Promise<{
 /**
  * Delete an AVD
  */
-export async function deleteAvd(name: string): Promise<{
+export async function deleteAvd(name: string, dependencies = createDefaultDependencies()): Promise<{
   success: boolean;
   message: string;
 }> {
   try {
-    const location = await ensureToolsAvailable();
-    const avdmanagerPath = getAvdManagerPath(location);
+    const location = await ensureToolsAvailable(dependencies);
+    const avdmanagerPath = getAvdManagerPath(location, dependencies);
 
-    logger.info(`Deleting AVD: ${name}`);
+    dependencies.logger.info(`Deleting AVD: ${name}`);
 
-    const result = await spawnCommand(avdmanagerPath, ["delete", "avd", "-n", name]);
+    const result = await spawnCommand(avdmanagerPath, ["delete", "avd", "-n", name], {}, dependencies);
 
     if (result.exitCode === 0) {
-      logger.info(`Successfully deleted AVD: ${name}`);
+      dependencies.logger.info(`Successfully deleted AVD: ${name}`);
       return { success: true, message: `AVD ${name} deleted successfully` };
     } else {
       return { success: false, message: `AVD deletion failed: ${result.stderr}` };
     }
   } catch (error) {
     const message = `Failed to delete AVD ${name}: ${(error as Error).message}`;
-    logger.error(message);
+    dependencies.logger.error(message);
     return { success: false, message };
   }
 }
@@ -365,12 +390,12 @@ export async function deleteAvd(name: string): Promise<{
 /**
  * List available device profiles
  */
-export async function listDevices(): Promise<DeviceProfile[]> {
+export async function listDevices(dependencies = createDefaultDependencies()): Promise<DeviceProfile[]> {
   try {
-    const location = await ensureToolsAvailable();
-    const avdmanagerPath = getAvdManagerPath(location);
+    const location = await ensureToolsAvailable(dependencies);
+    const avdmanagerPath = getAvdManagerPath(location, dependencies);
 
-    const result = await spawnCommand(avdmanagerPath, ["list", "device"]);
+    const result = await spawnCommand(avdmanagerPath, ["list", "device"], {}, dependencies);
 
     if (result.exitCode !== 0) {
       throw new Error(`Failed to list devices: ${result.stderr}`);
@@ -378,7 +403,7 @@ export async function listDevices(): Promise<DeviceProfile[]> {
 
     return parseDeviceList(result.stdout);
   } catch (error) {
-    logger.error(`Failed to list devices: ${(error as Error).message}`);
+    dependencies.logger.error(`Failed to list devices: ${(error as Error).message}`);
     throw error;
   }
 }

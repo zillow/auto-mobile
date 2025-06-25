@@ -20,7 +20,7 @@
     "postpublish": "mv README.md.backup README.md || true"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "keywords": [
     "adb",
