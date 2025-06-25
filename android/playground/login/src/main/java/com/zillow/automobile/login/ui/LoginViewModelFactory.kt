@@ -1,4 +1,4 @@
-package com.zillow.automobile.login.ui.login
+package com.zillow.automobile.login.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider

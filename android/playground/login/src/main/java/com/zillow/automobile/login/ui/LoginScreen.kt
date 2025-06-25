@@ -1,4 +1,4 @@
-package com.zillow.automobile.login.ui.login
+package com.zillow.automobile.login.ui
 
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
@@ -59,17 +59,17 @@ private fun LoginHeader() {
 /** Form section containing username and password input fields. */
 @Composable
 private fun LoginForm(
-    username: String,
-    password: String,
-    onUsernameChange: (String) -> Unit,
-    onPasswordChange: (String) -> Unit,
-    loginFormState: LoginFormState,
-    usernameHadContent: Boolean,
-    passwordHadContent: Boolean,
-    usernameBlurred: Boolean,
-    passwordBlurred: Boolean,
-    onPasswordDone: () -> Unit,
-    modifier: Modifier = Modifier
+  username: String,
+  password: String,
+  onUsernameChange: (String) -> Unit,
+  onPasswordChange: (String) -> Unit,
+  loginFormState: LoginFormState,
+  usernameHadContent: Boolean,
+  passwordHadContent: Boolean,
+  usernameBlurred: Boolean,
+  passwordBlurred: Boolean,
+  onPasswordDone: () -> Unit,
+  modifier: Modifier = Modifier
 ) {
   Column(modifier = modifier) {
     AutoMobileOutlinedTextField(
@@ -157,10 +157,10 @@ private fun LoginActions(
  */
 @Composable
 fun LoginScreen(
-    viewModel: LoginViewModel,
-    onLoginSuccess: (LoggedInUserView) -> Unit,
-    onLoginError: (Int) -> Unit,
-    onGuestMode: () -> Unit = {}
+  viewModel: LoginViewModel,
+  onLoginSuccess: (LoggedInUserView) -> Unit,
+  onLoginError: (Int) -> Unit,
+  onGuestMode: () -> Unit = {}
 ) {
   val loginFormState by viewModel.loginFormState.collectAsStateWithLifecycle()
   val loginResult by viewModel.loginResult.collectAsStateWithLifecycle()
@@ -211,10 +211,9 @@ fun LoginScreen(
 
   Column(
       modifier =
-          Modifier
-            .fillMaxSize()
-            .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
-            .padding(16.dp),
+          Modifier.fillMaxSize()
+              .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
+              .padding(16.dp),
       horizontalAlignment = Alignment.CenterHorizontally) {
         Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
@@ -224,15 +223,15 @@ fun LoginScreen(
 
         LoginForm(
             username = username,
-          password = password,
-          onUsernameChange = {
-            username = it
-            if (it.length >= 5) usernameHadContent = true
+            password = password,
+            onUsernameChange = {
+              username = it
+              if (it.length >= 5) usernameHadContent = true
             },
-          onPasswordChange = {
-            password = it
-            if (it.length >= 5) passwordHadContent = true
-          },
+            onPasswordChange = {
+              password = it
+              if (it.length >= 5) passwordHadContent = true
+            },
             loginFormState = loginFormState,
             usernameHadContent = usernameHadContent,
             passwordHadContent = passwordHadContent,
@@ -322,9 +321,7 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
     }
 
     Box(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(16.dp),
+        modifier = Modifier.fillMaxWidth().padding(16.dp),
         contentAlignment = Alignment.BottomCenter) {
           AutoMobileCard {
             AutoMobileText(text = loginError!!, color = MaterialTheme.colorScheme.error)
@@ -333,14 +330,12 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
   }
 }
 
-/**
- * Preview-friendly version of LoginScreen that doesn't require complex dependencies.
- */
+/** Preview-friendly version of LoginScreen that doesn't require complex dependencies. */
 @Composable
 fun LoginScreen(
-  onLoginSuccess: () -> Unit = {},
-  onLoginError: () -> Unit = {},
-  onGuestMode: () -> Unit = {}
+    onLoginSuccess: () -> Unit = {},
+    onLoginError: () -> Unit = {},
+    onGuestMode: () -> Unit = {}
 ) {
   var username by remember { mutableStateOf("") }
   var password by remember { mutableStateOf("") }
@@ -358,56 +353,54 @@ fun LoginScreen(
   val scrollState = rememberScrollState()
 
   Column(
-    modifier =
-      Modifier
-        .fillMaxSize()
-        .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
-        .padding(16.dp),
+      modifier =
+          Modifier.fillMaxSize()
+              .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
+              .padding(16.dp),
       horizontalAlignment = Alignment.CenterHorizontally) {
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
+        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
-    LoginHeader()
+        LoginHeader()
 
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
+        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
-    LoginForm(
-      username = username,
-      password = password,
-      onUsernameChange = {
-        username = it
-        if (it.length >= 5) usernameHadContent = true
-      },
-      onPasswordChange = {
-        password = it
-        if (it.length >= 5) passwordHadContent = true
-      },
-      loginFormState = mockFormState,
-      usernameHadContent = usernameHadContent,
-      passwordHadContent = passwordHadContent,
-      usernameBlurred = usernameBlurred,
-      passwordBlurred = passwordBlurred,
-      onPasswordDone = {
-        passwordBlurred = true
-        if (isFormValid) {
-          onLoginSuccess()
-        }
-      })
+        LoginForm(
+            username = username,
+            password = password,
+            onUsernameChange = {
+              username = it
+              if (it.length >= 5) usernameHadContent = true
+            },
+            onPasswordChange = {
+              password = it
+              if (it.length >= 5) passwordHadContent = true
+            },
+            loginFormState = mockFormState,
+            usernameHadContent = usernameHadContent,
+            passwordHadContent = passwordHadContent,
+            usernameBlurred = usernameBlurred,
+            passwordBlurred = passwordBlurred,
+            onPasswordDone = {
+              passwordBlurred = true
+              if (isFormValid) {
+                onLoginSuccess()
+              }
+            })
 
-    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
+        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
 
-    LoginActions(
-      isFormValid = isFormValid,
-      isLoading = isLoading,
-      onSignInClick = {
-        usernameBlurred = true
-        passwordBlurred = true
-        onLoginSuccess()
-      },
-      onGuestModeClick = onGuestMode
-    )
+        LoginActions(
+            isFormValid = isFormValid,
+            isLoading = isLoading,
+            onSignInClick = {
+              usernameBlurred = true
+              passwordBlurred = true
+              onLoginSuccess()
+            },
+            onGuestModeClick = onGuestMode)
 
-    Spacer(modifier = Modifier.weight(1f))
-  }
+        Spacer(modifier = Modifier.weight(1f))
+      }
 }
 
 /** Preview for the LoginScreen composable with mock data. */
@@ -416,10 +409,9 @@ fun LoginScreen(
 fun LoginScreenPreview() {
   AutoMobileTheme {
     LoginScreen(
-      onLoginSuccess = { /* Preview login success */ },
-      onLoginError = { /* Preview login error */ },
-      onGuestMode = { /* Preview guest mode */ }
-    )
+        onLoginSuccess = { /* Preview login success */ },
+        onLoginError = { /* Preview login error */ },
+        onGuestMode = { /* Preview guest mode */ })
   }
 }
 
@@ -428,9 +420,7 @@ fun LoginScreenPreview() {
     name = "Login Header - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun LoginHeaderPreview() {
-  AutoMobileTheme {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) { LoginHeader() }
-  }
+  AutoMobileTheme { Column(horizontalAlignment = Alignment.CenterHorizontally) { LoginHeader() } }
 }
 
 @Preview(name = "Login Form", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
@@ -440,16 +430,16 @@ fun LoginHeaderPreview() {
 fun LoginFormPreview() {
   AutoMobileTheme {
     LoginForm(
-      username = "user@example.com",
-      password = "password123",
-      onUsernameChange = {},
-      onPasswordChange = {},
-      loginFormState = LoginFormState(isDataValid = true),
-      usernameHadContent = true,
-      passwordHadContent = true,
-      usernameBlurred = false,
-      passwordBlurred = false,
-      onPasswordDone = {})
+        username = "user@example.com",
+        password = "password123",
+        onUsernameChange = {},
+        onPasswordChange = {},
+        loginFormState = LoginFormState(isDataValid = true),
+        usernameHadContent = true,
+        passwordHadContent = true,
+        usernameBlurred = false,
+        passwordBlurred = false,
+        onPasswordDone = {})
   }
 }
 

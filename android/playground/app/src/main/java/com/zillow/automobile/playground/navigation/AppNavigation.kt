@@ -11,7 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import com.zillow.automobile.home.HomeScreen
-import com.zillow.automobile.login.ui.login.LoginScreen
+import com.zillow.automobile.login.ui.LoginScreen
 import com.zillow.automobile.mediaplayer.VideoPlayerScreen
 import com.zillow.automobile.onboarding.OnboardingScreen
 import com.zillow.automobile.slides.SlidesScreen

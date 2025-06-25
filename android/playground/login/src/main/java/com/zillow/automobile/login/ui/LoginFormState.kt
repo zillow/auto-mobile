@@ -1,4 +1,4 @@
-package com.zillow.automobile.login.ui.login
+package com.zillow.automobile.login.ui
 
 /** Data validation state of the login form. */
 data class LoginFormState(
