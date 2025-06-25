@@ -1,12 +1,17 @@
 import fs from "fs-extra";
 import path from "path";
 import sharp from "sharp";
-import pixelmatch from "pixelmatch";
 import { PNG } from "pngjs";
 import { logger } from "./logger";
 import { readFileAsync, readdirAsync } from "./io";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "./constants";
 import { CryptoUtils } from "./crypto";
+
+// Add dynamic import function for pixelmatch
+async function getPixelmatch() {
+  const { default: pixelmatch } = await import("pixelmatch");
+  return pixelmatch;
+}
 
 export interface ScreenshotComparisonResult {
   similarity: number; // 0-100 percentage
@@ -278,6 +283,7 @@ export class ScreenshotUtils {
 
       // Perform pixel comparison with adjusted threshold for fast mode
       const adjustedThreshold = fastMode ? Math.min(threshold * 1.5, 0.2) : threshold;
+      const pixelmatch = await getPixelmatch();
       const pixelDifference = pixelmatch(
         img1.data,
         img2.data,
