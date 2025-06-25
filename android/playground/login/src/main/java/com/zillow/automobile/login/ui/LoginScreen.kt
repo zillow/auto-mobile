@@ -59,17 +59,17 @@ private fun LoginHeader() {
 /** Form section containing username and password input fields. */
 @Composable
 private fun LoginForm(
-  username: String,
-  password: String,
-  onUsernameChange: (String) -> Unit,
-  onPasswordChange: (String) -> Unit,
-  loginFormState: LoginFormState,
-  usernameHadContent: Boolean,
-  passwordHadContent: Boolean,
-  usernameBlurred: Boolean,
-  passwordBlurred: Boolean,
-  onPasswordDone: () -> Unit,
-  modifier: Modifier = Modifier
+    username: String,
+    password: String,
+    onUsernameChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    loginFormState: LoginFormState,
+    usernameHadContent: Boolean,
+    passwordHadContent: Boolean,
+    usernameBlurred: Boolean,
+    passwordBlurred: Boolean,
+    onPasswordDone: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
   Column(modifier = modifier) {
     AutoMobileOutlinedTextField(
@@ -157,10 +157,10 @@ private fun LoginActions(
  */
 @Composable
 fun LoginScreen(
-  viewModel: LoginViewModel,
-  onLoginSuccess: (LoggedInUserView) -> Unit,
-  onLoginError: (Int) -> Unit,
-  onGuestMode: () -> Unit = {}
+    viewModel: LoginViewModel,
+    onLoginSuccess: (LoggedInUserView) -> Unit,
+    onLoginError: (Int) -> Unit,
+    onGuestMode: () -> Unit = {}
 ) {
   val loginFormState by viewModel.loginFormState.collectAsStateWithLifecycle()
   val loginResult by viewModel.loginResult.collectAsStateWithLifecycle()
