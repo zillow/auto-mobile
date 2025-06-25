@@ -42,8 +42,6 @@ dependencies {
   implementation(libs.bundles.compose.ui)
   implementation(libs.androidx.lifecycle.viewmodel.ktx)
   implementation(libs.androidx.lifecycle.runtime)
-
-  // Lifecycle compose integration
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Navigation Compose

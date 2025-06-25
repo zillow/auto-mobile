@@ -39,8 +39,7 @@ dependencies {
 
   // Storage module
   implementation(projects.playground.storage)
-
-  // Experimentation module for experiments
+  implementation(projects.playground.design.system)
   implementation(projects.playground.experimentation)
 
   // Compose dependencies

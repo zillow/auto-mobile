@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.delay
@@ -19,7 +18,6 @@ import kotlinx.coroutines.launch
  * ViewModel for managing ExoPlayer instances and media playback state. Handles video and audio
  * playback with proper lifecycle management.
  */
-@UnstableApi
 class MediaPlayerViewModel : ViewModel() {
 
   private val _playerState = MutableStateFlow<ExoPlayer?>(null)
@@ -44,7 +42,6 @@ class MediaPlayerViewModel : ViewModel() {
   private var isFirstLoad: Boolean = true
 
   /** Initialize ExoPlayer with the given video resource. Supports both video and audio playback. */
-  @UnstableApi
   fun initializePlayer(context: Context, videoResource: VideoResource) {
     if (_playerState.value == null) {
       viewModelScope.launch {

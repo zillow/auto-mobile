@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.zillow.automobile.design.system.components.AutoMobileButton
@@ -47,6 +48,120 @@ import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.login.R
 import com.zillow.automobile.login.data.LoginRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/**
+ * Header section of the login screen containing logo and title.
+ */
+@Composable
+private fun LoginHeader() {
+  AutoMobileLogo()
+  AutoMobileHeadline(text = "AutoMobile", color = MaterialTheme.colorScheme.primary)
+}
+
+/**
+ * Form section containing username and password input fields.
+ */
+@Composable
+private fun LoginForm(
+  username: String,
+  password: String,
+  onUsernameChange: (String) -> Unit,
+  onPasswordChange: (String) -> Unit,
+  loginFormState: LoginFormState,
+  usernameHadContent: Boolean,
+  passwordHadContent: Boolean,
+  usernameBlurred: Boolean,
+  passwordBlurred: Boolean,
+  onPasswordDone: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  Column(modifier = modifier) {
+    AutoMobileOutlinedTextField(
+      value = username,
+      onValueChange = onUsernameChange,
+      label = { Text(stringResource(R.string.prompt_email)) },
+      keyboardOptions =
+        KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+      isError =
+        (usernameHadContent && username.length < 5) ||
+          (usernameBlurred && loginFormState.usernameError != null),
+      supportingText = {
+        if ((usernameHadContent && username.length < 5) ||
+          (usernameBlurred && loginFormState.usernameError != null)
+        ) {
+          loginFormState.usernameError?.let {
+            Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
+          }
+        }
+      },
+      modifier = Modifier.fillMaxWidth()
+    )
+
+    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
+
+    AutoMobileOutlinedTextField(
+      value = password,
+      onValueChange = onPasswordChange,
+      label = { Text(stringResource(R.string.prompt_password)) },
+      visualTransformation = PasswordVisualTransformation(),
+      keyboardOptions =
+        KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+      keyboardActions = KeyboardActions(onDone = { onPasswordDone() }),
+      isError =
+        (passwordHadContent && password.length < 5) ||
+          (passwordBlurred && loginFormState.passwordError != null),
+      supportingText = {
+        if ((passwordHadContent && password.length < 5) ||
+          (passwordBlurred && loginFormState.passwordError != null)
+        ) {
+          loginFormState.passwordError?.let {
+            Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
+          }
+        }
+      },
+      modifier = Modifier.fillMaxWidth()
+    )
+  }
+}
+
+/**
+ * Action buttons section containing sign in button, loading indicator, and guest mode button.
+ */
+@Composable
+private fun LoginActions(
+  isFormValid: Boolean,
+  isLoading: Boolean,
+  onSignInClick: () -> Unit,
+  onGuestModeClick: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    AnimatedVisibility(
+      visible = isFormValid && !isLoading, enter = fadeIn(), exit = fadeOut()
+    ) {
+      AutoMobileButton(
+        text = stringResource(R.string.action_sign_in),
+        onClick = onSignInClick,
+        modifier = Modifier.wrapContentWidth()
+      )
+    }
+
+    if (isLoading) {
+      Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
+      CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    }
+
+    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
+
+    AutoMobileButton(
+      text = "Continue as Guest",
+      onClick = onGuestModeClick,
+      modifier = Modifier.wrapContentWidth()
+    )
+  }
+}
 
 /**
  * Login screen composable that handles user authentication.
@@ -108,103 +223,56 @@ fun LoginScreen(
   val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
   // Use smaller spacing and make scrollable in landscape
-  val verticalSpacing = if (isLandscape) 24.dp else 48.dp
   val scrollState = rememberScrollState()
 
   Column(
       modifier =
-          Modifier.fillMaxSize()
-              .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
-              .padding(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
+          Modifier
+            .fillMaxSize()
+            .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
+            .padding(16.dp),
+    horizontalAlignment = Alignment.CenterHorizontally
+  ) {
+    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
-        // AutoMobile Logo
-        AutoMobileLogo()
+    LoginHeader()
 
-        AutoMobileHeadline(text = "AutoMobile", color = MaterialTheme.colorScheme.primary)
+    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
 
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
-
-        AutoMobileOutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text(stringResource(R.string.prompt_email)) },
-            keyboardOptions =
-                KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            isError =
-                (usernameHadContent && username.length < 5) ||
-                    (usernameBlurred && loginFormState.usernameError != null),
-            supportingText = {
-              if ((usernameHadContent && username.length < 5) ||
-                  (usernameBlurred && loginFormState.usernameError != null)) {
-                loginFormState.usernameError?.let {
-                  Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
-                }
-              }
-            },
-            modifier = Modifier.fillMaxWidth())
-
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-
-        AutoMobileOutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text(stringResource(R.string.prompt_password)) },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions =
-                KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            keyboardActions =
-                KeyboardActions(
-                    onDone = {
-                      passwordBlurred = true
-                      if (isFormValid) {
-                        isLoading = true
-                        viewModel.login(username, password)
-                      }
-                    }),
-            isError =
-                (passwordHadContent && password.length < 5) ||
-                    (passwordBlurred && loginFormState.passwordError != null),
-            supportingText = {
-              if ((passwordHadContent && password.length < 5) ||
-                  (passwordBlurred && loginFormState.passwordError != null)) {
-                loginFormState.passwordError?.let {
-                  Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
-                }
-              }
-            },
-            modifier = Modifier.fillMaxWidth())
-
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
-
-        AnimatedVisibility(
-            visible = isFormValid && !isLoading, enter = fadeIn(), exit = fadeOut()) {
-              AutoMobileButton(
-                  text = stringResource(R.string.action_sign_in),
-                  onClick = {
-                    usernameBlurred = true
-                    passwordBlurred = true
-                    isLoading = true
-                    viewModel.login(username, password)
-                  },
-                  modifier = Modifier.wrapContentWidth())
-            }
-
-        if (isLoading) {
-          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-          CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    LoginForm(
+      username = username,
+      password = password,
+      onUsernameChange = { username = it },
+      onPasswordChange = { password = it },
+      loginFormState = loginFormState,
+      usernameHadContent = usernameHadContent,
+      passwordHadContent = passwordHadContent,
+      usernameBlurred = usernameBlurred,
+      passwordBlurred = passwordBlurred,
+      onPasswordDone = {
+        passwordBlurred = true
+        if (isFormValid) {
+          isLoading = true
+          viewModel.login(username, password)
         }
+      })
 
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
+    Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
 
-        AutoMobileButton(
-            text = "Continue as Guest",
-            onClick = { onGuestMode() },
-            modifier = Modifier.wrapContentWidth())
+    LoginActions(
+      isFormValid = isFormValid,
+      isLoading = isLoading,
+      onSignInClick = {
+        usernameBlurred = true
+        passwordBlurred = true
+        isLoading = true
+        viewModel.login(username, password)
+      },
+      onGuestModeClick = onGuestMode
+    )
 
-        Spacer(modifier = Modifier.weight(1f))
-      }
+    Spacer(modifier = Modifier.weight(1f))
+  }
 }
 
 /**
@@ -266,7 +334,9 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
     }
 
     Box(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(16.dp),
         contentAlignment = Alignment.BottomCenter) {
           AutoMobileCard {
             AutoMobileText(text = loginError!!, color = MaterialTheme.colorScheme.error)
@@ -276,86 +346,122 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
 }
 
 /** Preview for the LoginScreen composable with mock data. */
-@Preview(showBackground = true)
+@Preview(name = "Login Screen - Light", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+  name = "Login Screen - Dark",
+  showBackground = true,
+  uiMode = Configuration.UI_MODE_NIGHT_YES
+)
 @Composable
 fun LoginScreenPreview() {
-  // Use a mock state instead of constructing a real ViewModel
-  val mockFormState = LoginFormState(isDataValid = true)
+  // Create a simple mock ViewModel using a local class
+  class MockLoginViewModel : ViewModel() {
+    val loginFormState = MutableStateFlow(
+      LoginFormState(
+        isDataValid = true,
+        usernameError = null,
+        passwordError = null
+      )
+    )
+    val loginResult = MutableStateFlow<LoginResult?>(null)
 
+    fun login(username: String, password: String) {
+      // Mock implementation - do nothing for preview
+    }
+
+    fun loginDataChanged(username: String, password: String) {
+      // Mock implementation - do nothing for preview
+    }
+  }
+
+  val mockViewModel = remember { MockLoginViewModel() }
+
+  // Create a wrapper that matches the expected interface
+  val loginViewModel = remember {
+    object {
+      val loginFormState = mockViewModel.loginFormState.asStateFlow()
+      val loginResult = mockViewModel.loginResult.asStateFlow()
+      fun login(username: String, password: String) = mockViewModel.login(username, password)
+      fun loginDataChanged(username: String, password: String) =
+        mockViewModel.loginDataChanged(username, password)
+    }
+  }
+
+  // Use a simpler approach - just show the UI components directly
   var username by remember { mutableStateOf("user@example.com") }
-  var password by remember { mutableStateOf("password") }
+  var password by remember { mutableStateOf("password123") }
   var isLoading by remember { mutableStateOf(false) }
+  val mockFormState = LoginFormState(isDataValid = true)
 
   val configuration = LocalConfiguration.current
   val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-  // Use smaller spacing and make scrollable in landscape
-  val verticalSpacing = if (isLandscape) 24.dp else 48.dp
   val scrollState = rememberScrollState()
 
-  Column(
-      modifier =
-          Modifier.fillMaxSize()
-              .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
-              .padding(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
 
-        // AutoMobile Logo
-        AutoMobileText(text = "🚗", style = MaterialTheme.typography.displayLarge)
+}
 
-        AutoMobileHeadline(text = "AutoMobile", color = MaterialTheme.colorScheme.primary)
+@Preview(name = "Login Header", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+  name = "Login Header - Dark",
+  showBackground = true,
+  uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+fun LoginHeaderPreview() {
+  Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    LoginHeader()
+  }
+}
 
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
+@Preview(name = "Login Form", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+  name = "Login Form - Dark",
+  showBackground = true,
+  uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+fun LoginFormPreview() {
+  LoginForm(
+    username = "user@example.com",
+    password = "password123",
+    onUsernameChange = {},
+    onPasswordChange = {},
+    loginFormState = LoginFormState(isDataValid = true),
+    usernameHadContent = true,
+    passwordHadContent = true,
+    usernameBlurred = false,
+    passwordBlurred = false,
+    onPasswordDone = {}
+  )
+}
 
-        AutoMobileOutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Email") },
-            keyboardOptions =
-                KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth())
+@Preview(name = "Login Actions", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+  name = "Login Actions - Dark",
+  showBackground = true,
+  uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+fun LoginActionsPreview() {
+  LoginActions(
+    isFormValid = true,
+    isLoading = false,
+    onSignInClick = {},
+    onGuestModeClick = {}
+  )
+}
 
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-
-        AutoMobileOutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions =
-                KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-            modifier = Modifier.fillMaxWidth())
-
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
-
-        AnimatedVisibility(
-            visible = username.isNotEmpty() && password.isNotEmpty() && !isLoading,
-            enter = fadeIn(),
-            exit = fadeOut()) {
-              AutoMobileButton(
-                  text = "Sign in or register",
-                  onClick = {
-                    isLoading = true
-                    // Normally this would call viewModel.login
-                  },
-                  modifier = Modifier.wrapContentWidth())
-            }
-
-        if (isLoading) {
-          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-          CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        }
-
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
-
-        AutoMobileButton(
-            text = "Continue as Guest",
-            onClick = {
-              // Normally this would set guest mode and navigate to home
-            },
-            modifier = Modifier.wrapContentWidth())
-
-        Spacer(modifier = Modifier.weight(1f))
-      }
+@Preview(
+  name = "Login Actions - Loading",
+  showBackground = true,
+  uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Composable
+fun LoginActionsLoadingPreview() {
+  LoginActions(
+    isFormValid = true,
+    isLoading = true,
+    onSignInClick = {},
+    onGuestModeClick = {}
+  )
 }

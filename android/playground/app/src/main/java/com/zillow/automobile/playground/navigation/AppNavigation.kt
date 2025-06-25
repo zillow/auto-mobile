@@ -14,10 +14,10 @@ import com.zillow.automobile.home.HomeScreen
 import com.zillow.automobile.login.ui.login.LoginScreen
 import com.zillow.automobile.mediaplayer.VideoPlayerScreen
 import com.zillow.automobile.onboarding.OnboardingScreen
-import com.zillow.automobile.playground.data.UserPreferences
 import com.zillow.automobile.slides.SlidesScreen
 import com.zillow.automobile.storage.AnalyticsTracker
 import com.zillow.automobile.storage.NavigationTracker
+import com.zillow.automobile.storage.UserPreferences
 
 /** Determines the start destination based on user state */
 fun determineStartDestination(hasCompletedOnboarding: Boolean, isAuthenticated: Boolean): String {

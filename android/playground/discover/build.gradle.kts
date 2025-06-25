@@ -28,6 +28,7 @@ android {
   kotlinOptions {
     jvmTarget = libs.versions.build.java.target.get()
     languageVersion = libs.versions.build.kotlin.language.get()
+    freeCompilerArgs += "-opt-in=androidx.media3.common.util.UnstableApi"
   }
   buildFeatures { compose = true }
 }
@@ -41,6 +42,7 @@ dependencies {
   implementation(projects.playground.storage)
   implementation(projects.playground.mediaplayer)
   implementation(projects.playground.design.system)
+  implementation(projects.playground.experimentation)
 
   // Compose dependencies
   implementation(platform(libs.compose.bom))

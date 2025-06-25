@@ -57,7 +57,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 
-@UnstableApi
 sealed class VideoResource {
   data class UriVideo(val uri: Uri) : VideoResource()
 
@@ -69,7 +68,6 @@ sealed class VideoResource {
   data object PlaceholderVideo : VideoResource()
 }
 
-@UnstableApi
 fun VideoResource.toMediaItem(context: Context? = null): MediaItem? {
   return when (this) {
     is VideoResource.UriVideo -> {
@@ -107,7 +105,6 @@ fun VideoResource.toMediaItem(context: Context? = null): MediaItem? {
   }
 }
 
-@UnstableApi
 @Composable
 fun VideoPlayerScreen(
     videoId: String,

@@ -1,8 +1,6 @@
-package com.zillow.automobile.playground.data
+package com.zillow.automobile.storage
 
 import android.content.Context
-import com.zillow.automobile.storage.AuthRepository
-import com.zillow.automobile.storage.OnboardingRepository
 
 class UserPreferences(context: Context) {
   private val authRepository = AuthRepository(context)

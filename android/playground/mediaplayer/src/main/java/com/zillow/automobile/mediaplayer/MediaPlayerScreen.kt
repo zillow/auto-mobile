@@ -51,6 +51,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import kotlinx.coroutines.delay
 
 /** Main media player screen with image and video components. */
@@ -321,12 +322,12 @@ private fun getSampleAudioUrl(): String = "https://www.soundjay.com/misc/sounds/
 @Preview(showBackground = true)
 @Composable
 fun MediaPlayerScreenPreview() {
-  MaterialTheme { MediaPlayerScreen() }
+  AutoMobileTheme { MediaPlayerScreen() }
 }
 
 /** Preview for the fullscreen media player. */
 @Preview(showBackground = true)
 @Composable
 fun FullscreenMediaPlayerPreview() {
-  MaterialTheme { FullscreenMediaPlayer() }
+  AutoMobileTheme { FullscreenMediaPlayer() }
 }

@@ -54,6 +54,7 @@ dependencies {
   implementation(projects.playground.discover)
   implementation(projects.playground.settings)
   implementation(projects.playground.storage)
+  implementation(projects.playground.experimentation)
 
   // Kotlin coroutines
   implementation(libs.kotlinxCoroutines)

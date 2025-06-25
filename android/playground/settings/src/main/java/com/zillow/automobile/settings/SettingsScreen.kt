@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.settings.ui.EmailEditBottomSheet
 import com.zillow.automobile.settings.ui.ExperimentsSection
 import com.zillow.automobile.settings.ui.ProfileTopAppBar
@@ -224,5 +225,5 @@ fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit 
 @Preview(showBackground = true)
 @Composable
 fun SettingsScreenMainPreview() {
-  MaterialTheme { SettingsScreen(onLogout = { /* Preview logout action */ }) }
+  AutoMobileTheme { SettingsScreen(onLogout = { /* Preview logout action */ }) }
 }

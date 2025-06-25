@@ -42,6 +42,8 @@ junitJupiterApi = "5.11.4"
 junitVintageEngine = "5.11.4"
 koogAgents = "0.2.1"
 mockk = "1.13.17"
+navigationCompose = "2.9.0"
+robolectric = "4.14.1"
 snakeyaml = "2.3"
 test-junit = "4.13.2"
 test-androidx-junit = "1.2.1"
@@ -72,6 +74,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 
 [libraries]
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junitJupiterApi" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junitJupiterApi" }
@@ -93,6 +96,7 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
 
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 
 androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
@@ -108,6 +112,7 @@ compose-ui-junit = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+compose-ui-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 compose-material = { group = "androidx.compose.material3", name = "material3" }
 compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 
@@ -147,6 +152,7 @@ compose-ui = [
   "compose-ui-core",
   "compose-ui-util",
   "compose-ui-graphics",
+  "compose-ui-foundation",
   "compose-ui-tooling",
   "compose-ui-tooling-preview",
   "compose-material",

@@ -33,6 +33,7 @@ android {
   kotlinOptions {
     jvmTarget = libs.versions.build.java.target.get()
     languageVersion = libs.versions.build.kotlin.language.get()
+    freeCompilerArgs += "-opt-in=androidx.media3.common.util.UnstableApi"
   }
   buildFeatures { compose = true }
 }
@@ -51,7 +52,7 @@ dependencies {
   implementation(libs.kotlinxCoroutines)
 
   // Navigation Compose
-  implementation("androidx.navigation:navigation-compose:2.8.4")
+  implementation(libs.androidx.navigation.compose)
 
   // Kotlinx Serialization for navigation
   implementation(libs.kotlinxSerialization)
@@ -77,7 +78,7 @@ dependencies {
   // Test dependencies
   testImplementation(libs.bundles.unit.test)
   testImplementation(projects.junitRunner)
-  testImplementation("org.robolectric:robolectric:4.13")
+  testImplementation(libs.robolectric)
 
   // Debug dependencies
   debugImplementation(libs.bundles.compose.ui.debug)
