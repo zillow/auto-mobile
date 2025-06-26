@@ -37,8 +37,23 @@ steps:
   - tool: "tapOn"
     text: "Front yard"
 
-  - tool: "swipeOnScreen"
-    direction: "up"
-    includeSystemInsets: false
-    duration: 1000
+  - tool: "tapOn"
+    text: "Photos"
 
+  - tool: "tapOn"
+    text: "Request a tour"
+
+  - tool: "tapOn"
+    text: "Jun 26"
+
+  - tool: "tapOn"
+    text: "Jun 27"
+
+  - tool: "tapOn"
+    text: "3:30 PM"
+
+  - tool: "tapOn"
+    text: "Select time"
+
+  - tool: "tapOn"
+    text: "Next"
