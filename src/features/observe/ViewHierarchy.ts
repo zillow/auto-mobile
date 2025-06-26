@@ -15,6 +15,7 @@ import { ScreenshotUtils } from "../../utils/screenshot-utils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { SourceMapper } from "../../utils/sourceMapper";
 import { ActivityInfo, FragmentInfo, ViewInfo } from "../../models/SourceIndexing";
+import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 
 /**
  * Interface for activity top data
@@ -63,6 +64,7 @@ export class ViewHierarchy {
   private window: Window;
   private elementUtils: ElementUtils;
   private sourceMapper: SourceMapper;
+  private accessibilityServiceClient: AccessibilityServiceClient;
   private static viewHierarchyCache: Map<string, ViewHierarchyCache> = new Map();
   private static cacheDir: string = path.join("/tmp/auto-mobile", "view_hierarchy");
   private static screenshotCacheDir: string = path.join("/tmp/auto-mobile", "screenshots");
@@ -91,12 +93,14 @@ export class ViewHierarchy {
     adb: AdbUtils | null = null,
     takeScreenshot: TakeScreenshot | null = null,
     window: Window | null = null,
+    accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
     this.adb = adb || new AdbUtils(deviceId);
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(deviceId, this.adb);
     this.window = window || new Window(deviceId, this.adb);
     this.elementUtils = new ElementUtils();
     this.sourceMapper = SourceMapper.getInstance();
+    this.accessibilityServiceClient = accessibilityServiceClient || new AccessibilityServiceClient(deviceId, this.adb);
 
     // Ensure cache directories exist
     if (!fs.existsSync(ViewHierarchy.cacheDir)) {
@@ -517,6 +521,17 @@ export class ViewHierarchy {
   async getViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
+
+    // First try accessibility service if available
+    try {
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy();
+      if (accessibilityHierarchy) {
+        logger.info("[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service");
+        return accessibilityHierarchy;
+      }
+    } catch (err) {
+      logger.warn(`[VIEW_HIERARCHY] Failed to get hierarchy from accessibility service: ${err}`);
+    }
 
     try {
       // Run screenshot capture and fallback activity hash lookup in parallel
