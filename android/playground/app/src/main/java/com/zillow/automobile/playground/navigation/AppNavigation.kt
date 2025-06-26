@@ -1,5 +1,6 @@
 package com.zillow.automobile.playground.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -28,16 +29,37 @@ fun determineStartDestination(hasCompletedOnboarding: Boolean, isAuthenticated: 
   }
 }
 
+/** Determines the start destination when a deep link is present */
+fun determineStartDestinationWithDeepLink(
+    deepLinkUri: Uri?,
+    hasCompletedOnboarding: Boolean,
+    isAuthenticated: Boolean
+): String {
+  return if (deepLinkUri != null) {
+    // For deep links, we need to start from a screen that allows navigation
+    // If user hasn't completed onboarding or isn't authenticated, we should still
+    // allow deep link navigation but may need to handle auth state separately
+    when {
+      !hasCompletedOnboarding -> OnboardingDestination.route
+      !isAuthenticated -> LoginDestination.route
+      else -> HomeDestination.route
+    }
+  } else {
+    determineStartDestination(hasCompletedOnboarding, isAuthenticated)
+  }
+}
+
 @Composable
-fun AppNavigation() {
+fun AppNavigation(deepLinkUri: Uri? = null) {
   val navController = rememberNavController()
   val context = LocalContext.current
   val userPreferences = remember { UserPreferences(context) }
   val analyticsTracker = remember { AnalyticsTracker.getInstance() }
 
-  // Determine the start destination based on user state
+  // Determine the start destination based on user state and deep link presence
   val startDestination =
-      determineStartDestination(
+      determineStartDestinationWithDeepLink(
+          deepLinkUri = deepLinkUri,
           hasCompletedOnboarding = userPreferences.hasCompletedOnboarding,
           isAuthenticated = userPreferences.isAuthenticated)
 

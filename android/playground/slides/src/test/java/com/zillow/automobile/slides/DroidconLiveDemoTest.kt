@@ -10,24 +10,11 @@ class DroidconLiveDemoTest {
 
   @Test
   @AutoMobileTest(plan = "test-plans/clock-set-alarm.yaml")
-  fun `set alarm in clock app using annotation`() {
-    // Traditional annotation-based approach
-    // AI assistance disabled for this test
-  }
+  fun `Given we have a Clock app we should be able to set an alarm`() {}
 
   @Test
   @AutoMobileTest(plan = "test-plans/zillow-testing.yaml")
-  fun `Zillow testing`() {
-    // Traditional annotation-based approach
-    // AI assistance disabled for this test
-  }
-
-  @Test
-  @AutoMobileTest(plan = "test-plans/zillow-buyability.yaml")
-  fun `Zillow buyability form`() {
-    // Traditional annotation-based approach
-    // AI assistance disabled for this test
-  }
+  fun `Given Zillow has 3D homes we should be able to tour them`() {}
 
   @Test
   @AutoMobileTest(plan = "test-plans/zillow-3d-home-exploration.yaml")
@@ -35,4 +22,18 @@ class DroidconLiveDemoTest {
     // Traditional annotation-based approach
     // AI assistance disabled for this test
   }
+
+  @Test
+  @AutoMobileTest(plan = "test-plans/auto-mobile-playground.yaml")
+  fun `AutoMobile playground`() {}
+
+  @Test
+  @AutoMobileTest(plan = "test-plans/system-notification-youtube-music-play.yaml")
+  fun `Victory Lap`() {}
+
+  @Test @AutoMobileTest(plan = "test-plans/bluesky-ready-to-go.yaml") fun `asf Lap`() {}
+
+  @Test
+  @AutoMobileTest(plan = "test-plans/bluesky-announcement.yaml")
+  fun `Announce AutoMobile is OSS on GitHub`() {}
 }

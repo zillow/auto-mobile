@@ -1,0 +1,77 @@
+---
+name: "bluesky-droidcon-post-and-reply"
+description: "Automated test plan for posting about Droidcon talk and replying with location details on Bluesky"
+generated: "2025-06-26T13:06:40.000Z"
+appId: "xyz.blueskyweb.app"
+steps:
+  # Set device orientation to portrait
+  - tool: "rotate"
+    orientation: "portrait"
+
+  # Launch Bluesky app
+  - tool: "tapOn"
+    text: "Bluesky"
+
+  # Create new post
+  - tool: "tapOn"
+    id: "composeFAB"
+
+  # Enter the main post text
+  - tool: "inputText"
+    text: "AutoMobile is OSS on GitHub! Come check it out at https://zillow.github.io/auto-mobile #LiveDemo #AndroidDev #dcnyc25"
+
+  # Publish the post
+  - tool: "tapOn"
+    id: "composerPublishBtn"
+
+  # Navigate to profile to find the post
+  - tool: "tapOn"
+    id: "bottomBarProfileBtn"
+
+  # Reply to the post we just created
+  - tool: "tapOn"
+    id: "replyBtn"
+
+  # Enter the reply text
+  - tool: "inputText"
+    text: "Where are the slides? Well they are committed to the project here "
+
+  # Publish the reply
+  - tool: "tapOn"
+    id: "composerPublishBtn"
+
+  # Add another reply to the original post
+  - tool: "tapOn"
+    id: "replyBtn"
+
+  # Enter the reply text
+  - tool: "inputText"
+    text: "At the moment its still experimental but you can use try it today: npm install auto-mobile@latest"
+
+  # Publish the reply
+  - tool: "tapOn"
+    id: "composerPublishBtn"
+
+  # Add another reply to the original post
+  - tool: "tapOn"
+    id: "replyBtn"
+
+  # Enter the reply text
+  - tool: "inputText"
+    text: "I'll be driving AutoMobile towards at 1.0 release, right now is time for early feedback about the API surface and capabilities."
+
+  # Publish the reply
+  - tool: "tapOn"
+    id: "composerPublishBtn"
+
+  # Add another reply to the original post
+  - tool: "tapOn"
+    id: "replyBtn"
+
+  # Enter the second reply text
+  - tool: "inputText"
+    text: "#dcnyc25 Thanks for watching my talk and I'm looking forward to sharing more soon!"
+
+  # Publish the second reply
+  - tool: "tapOn"
+    id: "composerPublishBtn"

@@ -1,6 +1,7 @@
 package com.zillow.automobile.playground
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +14,9 @@ import com.zillow.automobile.playground.navigation.DeepLinkManager
 import com.zillow.automobile.storage.AnalyticsTracker
 
 class MainActivity : ComponentActivity() {
+  private var pendingDeepLink: Uri? = null
+  private lateinit var experimentRepository: ExperimentRepository
+
   override fun onCreate(savedInstanceState: Bundle?) {
     // Install the splash screen before super.onCreate()
     installSplashScreen()
@@ -27,19 +31,24 @@ class MainActivity : ComponentActivity() {
     analyticsTracker.trackScreenView("MainActivity")
 
     // Initialize experiment repository
-    val experimentRepository = ExperimentRepository(this)
+    experimentRepository = ExperimentRepository(this)
+
+    // Handle deep links before setting content
+    handleDeepLink(intent)
 
     enableEdgeToEdge()
-    setContent { AutoMobileTheme(experimentRepository = experimentRepository) { AppNavigation() } }
-
-    // Handle deep links
-    handleDeepLink(intent)
+    setComposeContent()
   }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
+
+    // Handle deep link for already running app
     handleDeepLink(intent)
+
+    // Recreate the Compose content with the new deep link
+    setComposeContent()
   }
 
   override fun onStop() {
@@ -48,12 +57,28 @@ class MainActivity : ComponentActivity() {
     AnalyticsTracker.getInstance().getAnalyticsRepository()?.endSession()
   }
 
+  private fun setComposeContent() {
+    setContent {
+      AutoMobileTheme(experimentRepository = experimentRepository) {
+        AppNavigation(deepLinkUri = pendingDeepLink)
+      }
+    }
+  }
+
   private fun handleDeepLink(intent: Intent) {
     val data = intent.data
     if (data != null && DeepLinkManager.isValidDeepLink(data)) {
-      // Deep link handling is managed by Navigation Compose
-      // The NavHost will automatically navigate to the correct destination
-      // based on the deep link patterns defined in AppNavigation
+      pendingDeepLink = data
+      // Analytics tracking for deep link usage
+      AnalyticsTracker.getInstance()
+          .trackEvent(
+              "deep_link_opened",
+              mapOf(
+                  "uri" to data.toString(),
+                  "destination" to (DeepLinkManager.getDestinationName(data) ?: "unknown")))
+    } else {
+      // Clear any previous deep link if this isn't a deep link intent
+      pendingDeepLink = null
     }
   }
 }

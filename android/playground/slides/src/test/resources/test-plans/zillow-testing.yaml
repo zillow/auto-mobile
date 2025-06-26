@@ -21,11 +21,6 @@ steps:
     includeSystemInsets: false
     duration: 1000
 
-  - tool: "swipeOnScreen"
-    direction: "left"
-    includeSystemInsets: false
-    duration: 300
-
   - tool: "tapOn"
     text: "Kitchen"
 

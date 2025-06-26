@@ -1,0 +1,20 @@
+---
+name: "youtube-music-final-fantasy-fanfare"
+description: "Test workflow to orient to portrait, open YouTube Music, search for Final Fantasy 7 Victory Fanfare, and play the music"
+generated: "2025-06-26T12:52:30.000Z"
+appId: "com.google.android.apps.youtube.music"
+steps:
+  - tool: "changeOrientation"
+    orientation: "portrait"
+
+  - tool: "tapOn"
+    text: "YT Music"
+
+  - tool: "tapOn"
+    id: "com.google.android.apps.youtube.music:id/action_search_button"
+
+  - tool: "inputText"
+    text: "final fantasy 7 victory fanfare"
+
+  - tool: "tapOn"
+    id: "com.google.android.apps.youtube.music:id/two_column_item_content_parent"

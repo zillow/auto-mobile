@@ -1,0 +1,55 @@
+---
+name: deep-link-slide-navigation
+description: Test deep link navigation to specific slides after screen rotation and app restart
+steps:
+  - tool: openLink
+    url: "automobile://playground/slides/4"
+    label: Open deep link to slide 4 initially
+
+  - tool: rotate
+    orientation: landscape
+    label: Rotate screen to landscape mode
+
+  - tool: pressButton
+    button: back
+    label: Navigate back to discover screen
+
+  - tool: stopApp
+    appId: com.zillow.automobile.playground
+    label: Stop the AutoMobile playground app
+
+  - tool: openLink
+    url: "automobile://playground/slides/4"
+    label: Reopen deep link to slide 4 after app restart
+
+  - tool: assertVisible
+    text: "🤔"
+    label: Verify slide 4 content is displayed
+
+  - tool: assertVisible
+    text: "How?"
+    label: Verify slide 4 title is displayed
+
+  - tool: openLink
+    url: "automobile://playground/slides/20"
+    label: Test navigation to slide 20
+
+  - tool: assertVisible
+    text: "🏠"
+    label: Verify slide 20 content is displayed
+
+  - tool: assertVisible
+    text: "Zillow 3D home navigation demo"
+    label: Verify slide 20 title is displayed
+
+  - tool: openLink
+    url: "automobile://playground/slides/0"
+    label: Test navigation to slide 0
+
+  - tool: rotate
+    orientation: portrait
+    label: Rotate back to portrait mode
+
+  - tool: stopApp
+    appId: com.zillow.automobile.playground
+    label: Clean up by stopping the app

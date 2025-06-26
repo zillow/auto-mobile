@@ -1,0 +1,10 @@
+---
+name: "system-notification-youtube-music-play"
+description: "Test workflow to open the system notification tray, find YouTube Music playback notification, and play the song"
+generated: "2025-06-26T12:57:30.000Z"
+appId: "com.android.systemui"
+steps:
+  - tool: "openSystemTray"
+
+  - tool: "tapOn"
+    id: "com.android.systemui:id/actionPlayPause"

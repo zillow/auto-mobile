@@ -1,0 +1,14 @@
+---
+name: "youtube-music-final-fantasy-6-fanfare-falconsquall"
+description: "Test workflow to open YouTube Music, search for Final Fantasy 6 Victory Fanfare by FalconSquall, and play the music"
+generated: "2025-06-26T12:55:32.000Z"
+appId: "com.google.android.apps.youtube.music"
+steps:
+  - tool: "tapOn"
+    text: "YT Music"
+
+  - tool: "tapOn"
+    id: "com.google.android.apps.youtube.music:id/action_search_button"
+
+  - tool: "tapOn"
+    text: "06 Victory Fanfare - Final Fantasy VI - FFVI OST"

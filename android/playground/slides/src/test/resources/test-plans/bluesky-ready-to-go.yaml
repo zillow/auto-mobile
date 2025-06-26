@@ -1,0 +1,25 @@
+---
+name: "bluesky-droidcon-post-and-reply"
+description: "Automated test plan for posting about Droidcon talk and replying with location details on Bluesky"
+generated: "2025-06-26T13:06:40.000Z"
+appId: "xyz.blueskyweb.app"
+steps:
+  # Set device orientation to portrait
+  - tool: "rotate"
+    orientation: "portrait"
+
+  # Launch Bluesky app
+  - tool: "tapOn"
+    text: "Bluesky"
+
+  # Create new post
+  - tool: "tapOn"
+    id: "composeFAB"
+
+  # Enter the main post text
+  - tool: "inputText"
+    text: "Do you like live demos? AutoMobile talk happening now at Stage 2! #dcnyc25"
+
+  # Publish the post
+  - tool: "tapOn"
+    id: "composerPublishBtn"
