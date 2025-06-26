@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -53,62 +52,32 @@ fun BulletPointSlideItem(
 
         // Bullet points
         Column(
-            modifier = Modifier.fillMaxWidth().wrapContentWidth(Alignment.CenterHorizontally),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            verticalArrangement = Arrangement.spacedBy(24.dp)) {
               points.forEach { bulletPoint ->
-                BulletPointItem(
-                    bulletPoint = bulletPoint,
-                    bulletColor = bulletColor,
-                    subBulletColor = subBulletColor)
+                BulletPointItem(bulletPoint = bulletPoint, bulletColor = bulletColor)
               }
             }
       }
 }
 
-/** Individual bullet point item with support for sub-points. */
+/** Individual bullet point item. */
 @Composable
 private fun BulletPointItem(
     bulletPoint: BulletPoint,
     bulletColor: Color,
-    subBulletColor: Color,
     modifier: Modifier = Modifier
 ) {
-  Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    // Main bullet point
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      Text(
-          text = "•",
-          style = MaterialTheme.typography.headlineMedium,
-          color = bulletColor,
-          modifier = Modifier.padding(top = 2.dp))
-      Text(
-          text = bulletPoint.text,
-          style =
-              MaterialTheme.typography.headlineSmall.copy(color = bulletColor, lineHeight = 28.sp))
-    }
-
-    // Sub-points
-    if (bulletPoint.subPoints.isNotEmpty()) {
-      Column(
-          modifier = Modifier.padding(start = 32.dp),
-          verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            bulletPoint.subPoints.forEach { subPoint ->
-              Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "◦",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = subBulletColor,
-                    modifier = Modifier.padding(top = 2.dp))
-                Text(
-                    text = subPoint,
-                    style =
-                        MaterialTheme.typography.bodyLarge.copy(
-                            color = subBulletColor, lineHeight = 24.sp))
-              }
-            }
-          }
-    }
+  Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    Text(
+        text = "•",
+        style = MaterialTheme.typography.displaySmall,
+        color = bulletColor,
+        modifier = Modifier.padding(top = 4.dp))
+    Text(
+        text = bulletPoint.text,
+        style = MaterialTheme.typography.displaySmall.copy(color = bulletColor, lineHeight = 48.sp))
   }
 }
 

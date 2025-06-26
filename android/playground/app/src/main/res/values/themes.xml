@@ -6,7 +6,7 @@
   <style name="Theme.AutoMobile.SplashScreen" parent="Theme.SplashScreen">
     <!-- Set the splash screen background, animated icon, and animation duration. -->
     <item name="windowSplashScreenBackground">@color/white</item>
-    <item name="windowSplashScreenAnimatedIcon">@drawable/automobile_logo</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/auto_mobile_big</item>
     <item name="windowSplashScreenAnimationDuration">500</item>
 
     <!-- Set the theme of the Activity that directly follows your splash screen. -->

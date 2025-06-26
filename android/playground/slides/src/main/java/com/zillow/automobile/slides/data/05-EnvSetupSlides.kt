@@ -19,15 +19,16 @@ fun getEnvSetupSlides(): List<SlideContent> =
                 """
       flowchart LR
         A([Tool]) --> B{Find Session}
-        B -->|No Session| C{Find Active Device}
-        B -->|Has Session| D([End])
-        C -->|No Active Device| E{Find AVD}
-        C -->|Has Active Device| D
-        E -->|No AVD| F([Create AVD])
+        B -->|"❌"| C{Find Active Device}
+        B -->|"✅"| D([Device Session])
+        C -->|"❌"| E{Find AVD}
+        C -->|"✅"| D
+        E -->|"❌"| F([Create AVD])
+       F --> D
 
-        classDef decision fill:#b8860b,stroke-width:0px;
-        classDef logic fill:#004baa,stroke-width:0px,color:white;
-        classDef result fill:#1a1a1a,stroke-width:0px;
+        classDef decision fill:#FF3300,stroke-width:0px,color:white;
+        classDef logic fill:#525FE1,stroke-width:0px,color:white;
+        classDef result stroke-width:0px;
         class A,G,I result;
         class B,D,E,H logic;
         class C,F decision;

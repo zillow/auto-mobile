@@ -4,9 +4,9 @@ description: "Automated test plan for posting about Droidcon talk and replying w
 generated: "2025-06-26T13:06:40.000Z"
 appId: "xyz.blueskyweb.app"
 steps:
-  # Set device orientation to portrait
-  - tool: "rotate"
-    orientation: "portrait"
+  - tool: rotate
+    orientation: portrait
+    label: Orient device to portrait mode
 
   # Launch Bluesky app
   - tool: "tapOn"
@@ -75,3 +75,14 @@ steps:
   # Publish the second reply
   - tool: "tapOn"
     id: "composerPublishBtn"
+
+  - tool: stopApp
+    appId: com.zillow.automobile.playground
+    label: Stop the AutoMobile playground app
+
+  - tool: openLink
+    url: "automobile://playground/slides/59"
+
+  - tool: rotate
+    orientation: landscape
+    label: Rotate screen to landscape mode

@@ -56,17 +56,16 @@ steps:
                 listOf(
                     BulletPoint(text = "Android library"),
                     BulletPoint(text = "JUnit4 prioritized with JUnit5 compatibility"),
-                    BulletPoint(
-                        text =
-                            "Runs AutoMobile in CLI mode until failure, STDERR captured for debugging"),
-                    // TODO: Uncomment when koog support lands
-                    //  BulletPoint(text = "koog integration for optional self-healing")
+                    BulletPoint(text = "Runs AutoMobile in CLI mode until failure"),
+                    // TODO: Update when koog lands
+                    BulletPoint(text = "koog integration for self healing (untested)"),
                 )),
+        SlideContent.LargeText(title = "Live demo running Playground test"),
         SlideContent.BulletPoints(
             title = "Test Authoring Capabilities",
             points =
                 listOf(
-                    BulletPoint(text = "Secure user credential handling"),
+                    BulletPoint(text = "User credential handling"),
                     BulletPoint(text = "Experiment + Treatment support"),
                     BulletPoint(text = "Basic Kotlin DSL, high flexibility"))),
         SlideContent.CodeSample(
@@ -76,29 +75,11 @@ steps:
       @Test
       fun `given valid credentials, login should succeed`() {
           val result = AutoMobilePlan("test-plans/login.yaml", {
-            envCredentials = ".env.dev.credentials"
+            "username" to "jason@zillow.com"
+            "password" to "hunter2"
           }).execute()
-          assertThat(result.status).isEqualTo(SUCCESS)
+          assertTrue(result.status)
       }
-    """
-                    .trimIndent(),
-            language = "kotlin"),
-        SlideContent.CodeSample(
-            title = "Experiment Configuration Example",
-            code =
-                """
-  @Test
-  fun `given an excited audience, start the party`() {
-    val result =
-        AutoMobilePlan("test-plans/excited-audience.yaml") {
-              "experiments" to listOf({
-                Experiments.Mood.id to Experiments.Mood.Treatments.Party
-              })
-            })
-            .execute()
-
-    assertTrue("Party mode is active", result.success)
-  }
     """
                     .trimIndent(),
             language = "kotlin"),

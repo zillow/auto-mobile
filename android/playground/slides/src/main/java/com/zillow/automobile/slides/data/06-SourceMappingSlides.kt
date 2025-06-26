@@ -1,6 +1,5 @@
 package com.zillow.automobile.slides.data
 
-import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
@@ -47,12 +46,5 @@ fun getSourceMappingSlides(): List<SlideContent> =
         SlideContent.LargeText(title = "Find the fragment, approximate package"),
         // TODO: Check this actually works today in view hierarchy somewhere
         SlideContent.LargeText(title = "Find the Composables"),
-        SlideContent.BulletPoints(
-            title = "Configurable by looking at",
-            points =
-                listOf(
-                    BulletPoint(text = "Root common module of plurality of Composable (default)"),
-                    BulletPoint(text = "Plurality of @Composable"),
-                    BulletPoint(text = "Ignore @Composable and just goto Activity/Fragment"),
-                    BulletPoint(text = "Application module"))),
+        SlideContent.LargeText(title = "Root common module of plurality of Composable (default)"),
     )

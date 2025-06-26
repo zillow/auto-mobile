@@ -1,0 +1,46 @@
+name: "auto-generated-calendar-2025-06-26T17-36"
+description: "Automatically generated test plan for com.google.android.calendar"
+generated: "2025-06-26T17:36:10.504Z"
+appId: "com.google.android.calendar"
+metadata:
+  sessionId: "758e9930-6afb-4b89-8575-2fff9403759b"
+  toolCallCount: 10
+  duration: 930938
+steps:
+  - tool: "homeScreen"
+    params:
+    description: "homeScreen executed at 2025-06-26T17:36:20.825Z"
+  - tool: "pressButton"
+    params:
+      button: "back"
+    description: "pressButton executed at 2025-06-26T17:36:29.778Z"
+  - tool: "listApps"
+    params:
+    description: "listApps executed at 2025-06-26T17:36:36.214Z"
+  - tool: "launchApp"
+    params:
+      appId: "com.google.android.calendar"
+    description: "launchApp executed at 2025-06-26T17:36:48.690Z"
+  - tool: "tapOn"
+    params:
+      text: "Thursday 26 June: 1 item"
+    description: "tapOn executed at 2025-06-26T17:36:59.929Z"
+  - tool: "scroll"
+    params:
+      containerElementId: "com.google.android.calendar:id/drawer_layout"
+      direction: "down"
+    description: "scroll executed at 2025-06-26T17:37:15.364Z"
+  - tool: "tapOn"
+    params:
+      text: "June"
+    description: "tapOn executed at 2025-06-26T17:37:24.026Z"
+  - tool: "tapOn"
+    params:
+      text: "Friday 27 June 2025"
+    description: "tapOn executed at 2025-06-26T17:37:36.864Z"
+  - tool: "swipeOnScreen"
+    params:
+      direction: "down"
+      includeSystemInsets: false
+      duration: 500
+    description: "swipeOnScreen executed at 2025-06-26T17:37:52.681Z"

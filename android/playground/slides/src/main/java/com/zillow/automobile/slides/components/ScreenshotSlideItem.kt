@@ -8,11 +8,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,41 +63,36 @@ fun ScreenshotSlideItem(
             shape = RoundedCornerShape(16.dp),
             colors =
                 CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)) {
-              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (screenshotRes != null) {
-                  AsyncImage(
-                      model = screenshotRes,
-                      contentDescription = contentDescription ?: caption,
-                      modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                      contentScale = ContentScale.Fit,
-                      onState = { state ->
-                        when (state) {
-                          is AsyncImagePainter.State.Loading -> {
-                            // Loading indicator will be shown by the Box below
-                          }
-                          is AsyncImagePainter.State.Error -> {
-                            // Error state handled by placeholder in Box below
-                          }
-                          is AsyncImagePainter.State.Success -> {
-                            // Screenshot loaded successfully
-                          }
-                          else -> {
-                            // Other states
-                          }
-                        }
-                      })
-
-                  // Loading indicator overlay - only show during loading
-                  // Note: This will be automatically hidden when image loads
-                  CircularProgressIndicator(
-                      modifier = Modifier.size(48.dp), color = MaterialTheme.colorScheme.primary)
-                } else {
-                  // No screenshot available
-                  ScreenshotErrorState()
-                }
-              }
+        ) {
+          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (screenshotRes != null) {
+              AsyncImage(
+                  model = screenshotRes,
+                  contentDescription = contentDescription ?: caption,
+                  modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                  contentScale = ContentScale.Fit,
+                  onState = { state ->
+                    when (state) {
+                      is AsyncImagePainter.State.Loading -> {
+                        // Loading indicator will be shown by the Box below
+                      }
+                      is AsyncImagePainter.State.Error -> {
+                        // Error state handled by placeholder in Box below
+                      }
+                      is AsyncImagePainter.State.Success -> {
+                        // Screenshot loaded successfully
+                      }
+                      else -> {
+                        // Other states
+                      }
+                    }
+                  })
+            } else {
+              // No screenshot available
+              ScreenshotErrorState()
             }
+          }
+        }
 
         // Caption
         caption?.let {

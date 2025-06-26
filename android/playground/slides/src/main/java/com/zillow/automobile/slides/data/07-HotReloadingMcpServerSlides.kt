@@ -1,74 +1,41 @@
 package com.zillow.automobile.slides.data
 
+import com.zillow.automobile.slides.R
+import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
 fun getHotReloadingSlides(): List<SlideContent> =
     listOf(
         SlideContent.LargeText(title = "MCP Dev Workflow"),
-        SlideContent.MermaidDiagram(
-            title = "Challenges and Goals",
-            code =
-                """
-      flowchart LR
-        A[Make Code Change] --> B[Rebuild MCP Server]
-        B --> C[npm install -g]
-        C --> D[Restart MCP Server]
-        D --> E[Tail MCP server logs]
-        E --> F[Tail Firebender MCP client logs]
-      """
-                    .trimIndent()),
+        SlideContent.BulletPoints(
+            title = "Reloading is challenging",
+            points =
+                listOf(
+                    BulletPoint(text = "Make Code Change"),
+                    BulletPoint(text = "Rebuild MCP Server"),
+                    BulletPoint(text = "npm install -g"),
+                    BulletPoint(text = "Tail all the logs and hope for the best"),
+                )),
         SlideContent.Emoji(
             emoji = PresentationEmoji.BROKEN_CHAIN,
             caption = "Decoupling Architecture",
         ),
-        SlideContent.CodeSample(
-            title = "Node TypeScript Hot Reloading package.json",
-            code =
-                """
-{
-  "name": "auto-mobile",
-  "version": "0.0.1",
-  "description": "Mobile device interaction automation with first class MCP support",
-  "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",
-    "dev:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port",
-    "dev:stdio": "npx tsx src/index.ts",
-    ...
-  },
-  ...
-      """
-                    .trimIndent(),
-            language = "json"),
         SlideContent.MermaidDiagram(
-            title = "Hot Reloading STDIO via mcp-remote",
+            title = "Decoupling Architecture",
             code =
                 """
-      flowchart LR
-        MCP_Client --> PID
-        PID --> StreamingTransport
-        StreamingTransport --> MCP_Server
-        MCP_Server --> MCP_Client
+      sequenceDiagram
+        Client->>MCP Remote: Communicate via STDIO
+        MCP Remote->>Transport Layer: Establish streaming transport that can reconnect
+        Transport Layer->>Server Tools: Request the same set of tools
+        Server Tools->>Transport: Respond with the same output
+        Transport-->>Client: Relay through mcp-remote
       """
                     .trimIndent()),
-
-        //  SlideContent.Screenshot(
-        //    caption = "Android Studio + Firebender Integration",
-        //    imageUrl = "TODO: Insert actual image URL here"
-        //  ),
-
-        SlideContent.CodeSample(
-            title = "MCP Server Config",
-            code =
-                """
-      {
-        "mcpServers": {
-          "AutoMobile": {
-            "cmd": "npx",
-            "args": ["-y", "mcp-remote", "http://localhost:9000/auto-mobile/streaming"],
-          }
-        }
-      }
-    """
-                    .trimIndent(),
-            language = "json"))
+        SlideContent.LargeText(
+            title = "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable"),
+        SlideContent.Screenshot(
+            darkScreenshot = R.drawable.firebender_auto_mobile_hot_reload,
+        ),
+    )

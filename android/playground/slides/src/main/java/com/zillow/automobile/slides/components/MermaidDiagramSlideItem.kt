@@ -487,6 +487,7 @@ private fun createMermaidDiagramHtml(
                     margin: 0;
                     padding: 20px;
                     background-color: $bgColorHex;
+                    font-color: $textColorHex;
                     color: $textColorHex;
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     display: flex;

@@ -22,14 +22,6 @@ fun getIntroductionSlides(): List<SlideContent> =
         SlideContent.LargeText(
             title =
                 "AutoMobile is a set of tools for automating the authoring and execution of UI testing"),
-        SlideContent.Emoji(emoji = PresentationEmoji.THINKING, caption = "How?"),
-        SlideContent.BulletPoints(
-            points =
-                listOf(
-                    BulletPoint(text = "Directly uses Android platform tools"),
-                    BulletPoint(text = "Runs as a simple JVM test"),
-                    BulletPoint(text = "Understands your source code"),
-                )),
         SlideContent.BulletPoints(
             title = "AutoMobile includes:",
             points =
@@ -37,7 +29,18 @@ fun getIntroductionSlides(): List<SlideContent> =
                     BulletPoint("MCP server that doubles as a CLI tool"),
                     BulletPoint("A Kotlin test authoring Clikt app"),
                     BulletPoint("A custom JUnitRunner"),
+                    BulletPoint("Accessibility service to expose data quickly"),
                     // TODO: Uncomment if koog lands BulletPoint("An agentic loop for intelligently
                     // self-healing tests")
+                )),
+        SlideContent.BulletPoints(
+            title = "How does it work?",
+            points =
+                listOf(
+                    BulletPoint(text = "Works on any Android debug or production build"),
+                    BulletPoint(text = "Directly detects and uses Android platform tools"),
+                    BulletPoint(text = "Runs as a simple JVM test"),
+                    BulletPoint(text = "Indexes and understands your project source code"),
+                    BulletPoint(text = "Can write tests for you"),
                 )),
     )

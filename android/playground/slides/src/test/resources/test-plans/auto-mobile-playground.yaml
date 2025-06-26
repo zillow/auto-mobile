@@ -18,88 +18,12 @@ steps:
     text: "Elevated"
     label: Tap elevated button on Tap screen
 
-  - tool: tapOn
-    text: "Swipe"
-    label: Navigate to Swipe screen
-
-  - tool: swipeOnScreen
-    direction: left
-    duration: 500
-    includeSystemInsets: false
-    label: Perform left swipe gesture
-
-  - tool: tapOn
-    text: "Media"
-    label: Navigate to Media screen
-
-  - tool: tapOn
-    x: 504
-    y: 778
-    label: Play AutoMobile Promo video
-
-  - tool: pressButton
-    button: back
-    label: Return from video player
-
-  - tool: tapOn
-    text: "Text"
-    label: Navigate to Text screen
-
-  - tool: tapOn
-    text: "Basic Text Field"
-    label: Focus on basic text field
-
-  - tool: inputText
-    text: "🤖 AutoMobile testing AutoMobile! 🎉 Robots running tests on robots 🚗✨"
-    label: Enter playful robot message in basic text field
-
-  - tool: tapOn
-    text: "Email"
-    label: Focus on email field
-
-  - tool: inputText
-    text: "robot@example.com"
-
-  - tool: tapOn
-    text: "Comments"
-    label: Focus on multiline comments field
-
-  - tool: inputText
-    text: "🔥✨🚀 Just dancing over here  🎭 🕺🤖"
-    label: Enter enthusiastic robot circus message
-
-  - tool: tapOn
-    text: "Chat"
-    label: Navigate to Chat screen
-
-  - tool: tapOn
-    text: "What do you want to say?"
-    label: Focus on chat input field
-
-  - tool: inputText
-    text: "Hello? Is this thing on?"
-    label: Enter robot circus chat message
-
-  - tool: tapOn
-    x: 909
-    y: 1706
-    label: Send chat message
-
-  - tool: inputText
-    text: "Oh great another robot friend ❤️"
-    label: Enter robot circus chat message with heart emoji
-
-  - tool: tapOn
-    x: 909
-    y: 1706
-    label: Send chat message
-
   - tool: stopApp
     appId: com.zillow.automobile.playground
     label: Stop the AutoMobile playground app
 
   - tool: openLink
-    url: "automobile://playground/slides/25"
+    url: "automobile://playground/slides/59"
 
   - tool: rotate
     orientation: landscape

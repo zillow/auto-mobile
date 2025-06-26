@@ -27,8 +27,7 @@ fun getAutomaticTestAuthoringSlides(): List<SlideContent> =
                     BulletPoint(text = "Suggestions welcome!"),
                 )),
         SlideContent.Emoji(emoji = PresentationEmoji.THINKING, caption = "Why is this important?"),
+        SlideContent.Emoji(emoji = PresentationEmoji.EASY, caption = "Allows for easier adoption"),
         SlideContent.Emoji(
-            emoji = PresentationEmoji.LIGHTBULB,
-            caption =
-                "Allows for parallelization and distribution of UI testing decoupling from custom tooling"),
+            emoji = PresentationEmoji.FAST, caption = "Allows for easier parallelization"),
     )
