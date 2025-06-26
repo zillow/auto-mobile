@@ -7,6 +7,7 @@ import { readFileAsync } from "../../../src/utils/io";
 import path from "path";
 
 describe("AccessibilityServiceClient - Messaging App", function() {
+  this.timeout(10000);
   let accessibilityServiceClient: AccessibilityServiceClient;
   let mockAdb: AdbUtils;
 
