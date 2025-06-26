@@ -197,21 +197,51 @@ export class AccessibilityServiceClient {
     const converted: any = {};
 
     // Copy over all properties
-    if (node.text) {converted.text = node.text;}
-    if (node["content-desc"]) {converted["content-desc"] = node["content-desc"];}
-    if (node["resource-id"]) {converted["resource-id"] = node["resource-id"];}
-    if (node.className) {converted.className = node.className;}
-    if (node.packageName) {converted.packageName = node.packageName;}
-    if (node.clickable) {converted.clickable = node.clickable;}
-    if (node.enabled) {converted.enabled = node.enabled;}
-    if (node.focusable) {converted.focusable = node.focusable;}
-    if (node.focused) {converted.focused = node.focused;}
-    if (node.scrollable) {converted.scrollable = node.scrollable;}
-    if (node.password) {converted.password = node.password;}
-    if (node.checkable) {converted.checkable = node.checkable;}
-    if (node.checked) {converted.checked = node.checked;}
-    if (node.selected) {converted.selected = node.selected;}
-    if (node["long-clickable"]) {converted["long-clickable"] = node["long-clickable"];}
+    if (node.text) {
+      converted.text = node.text;
+    }
+    if (node["content-desc"]) {
+      converted["content-desc"] = node["content-desc"];
+    }
+    if (node["resource-id"]) {
+      converted["resource-id"] = node["resource-id"];
+    }
+    if (node.className) {
+      converted.className = node.className;
+    }
+    if (node.packageName) {
+      converted.packageName = node.packageName;
+    }
+    if (node.clickable && node.clickable !== "false") {
+      converted.clickable = node.clickable;
+    }
+    if (node.enabled && node.enabled !== "false") {
+      converted.enabled = node.enabled;
+    }
+    if (node.focusable && node.focusable !== "false") {
+      converted.focusable = node.focusable;
+    }
+    if (node.focused && node.focused !== "false") {
+      converted.focused = node.focused;
+    }
+    if (node.scrollable && node.scrollable !== "false") {
+      converted.scrollable = node.scrollable;
+    }
+    if (node.password && node.password !== "false") {
+      converted.password = node.password;
+    }
+    if (node.checkable && node.checkable !== "false") {
+      converted.checkable = node.checkable;
+    }
+    if (node.checked && node.checked !== "false") {
+      converted.checked = node.checked;
+    }
+    if (node.selected && node.selected !== "false") {
+      converted.selected = node.selected;
+    }
+    if (node["long-clickable"] && node["long-clickable"] !== "false") {
+      converted["long-clickable"] = node["long-clickable"];
+    }
 
     // Preserve the accessible property if it exists
     if ((node as any).accessible !== undefined) {

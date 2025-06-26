@@ -54,7 +54,7 @@ describe("AccessibilityServiceClient - Messaging App", function() {
 
     // Check that the root hierarchy properties were converted correctly
     expect(result.hierarchy.bounds).to.equal("[0,0][1008,2244]");
-    expect(result.hierarchy.clickable).to.equal("false");
+    expect(result.hierarchy.clickable).to.be.undefined;
     expect(result.hierarchy.enabled).to.equal("true");
 
     logger.info("Messaging app conversion completed successfully");
@@ -401,7 +401,7 @@ describe("AccessibilityServiceClient - Messaging App", function() {
 
     const contactElement = contactNameElements[0];
     expect(contactElement.bounds).to.equal("[243,158][507,212]");
-    expect(contactElement.clickable).to.equal("false");
+    expect(contactElement.clickable).to.be.undefined;
 
     logger.info("Found contact information");
     logger.info(`Contact name: ${contactElement.text}`);

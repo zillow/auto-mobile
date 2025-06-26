@@ -251,7 +251,7 @@ describe("AccessibilityServiceClient", function() {
       expect(result.hierarchy.text).to.equal("6:43 AM");
       expect(result.hierarchy["content-desc"]).to.equal("6:43 AM");
       expect(result.hierarchy.bounds).to.equal("[175,687][692,973]");
-      expect(result.hierarchy.clickable).to.equal("false");
+      expect(result.hierarchy.clickable).to.be.undefined;
       expect(result.hierarchy.enabled).to.equal("true");
 
       // Check child node conversion

@@ -55,7 +55,7 @@ describe("AccessibilityServiceClient - Sample Data", function() {
 
     // Check that root hierarchy properties were converted correctly
     expect(result.hierarchy.bounds).to.equal("[0,0][1008,2244]");
-    expect(result.hierarchy.clickable).to.equal("false");
+    expect(result.hierarchy.clickable).to.be.undefined;
     expect(result.hierarchy.enabled).to.equal("true");
 
     // Check that child nodes were converted correctly
@@ -73,7 +73,7 @@ describe("AccessibilityServiceClient - Sample Data", function() {
       expect(digitalClock["content-desc"]).to.include("6:43");
       expect(digitalClock["content-desc"]).to.include("AM");
       expect(digitalClock.bounds).to.equal("[175,687][692,973]");
-      expect(digitalClock.clickable).to.equal("false");
+      expect(digitalClock.clickable).to.be.undefined;
       expect(digitalClock.enabled).to.equal("true");
 
       // Find the date element
