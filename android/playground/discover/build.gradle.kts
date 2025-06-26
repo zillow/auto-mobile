@@ -2,6 +2,7 @@ plugins {
   alias(libs.plugins.android.library)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.compose.compiler)
+  alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -54,14 +55,14 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   // Image loading
   implementation(libs.coil.compose)
   implementation(libs.coil.network.okhttp)
 
   testImplementation(libs.junit)
-  testImplementation(libs.kotlinxCoroutines)
+  testImplementation(libs.kotlinx.coroutines)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(projects.junitRunner)
 }

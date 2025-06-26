@@ -59,7 +59,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   testImplementation(libs.junit)
   testImplementation(projects.junitRunner)

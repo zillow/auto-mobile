@@ -36,7 +36,7 @@ dependencies {
   implementation(libs.material)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   testImplementation(libs.junit)
 }

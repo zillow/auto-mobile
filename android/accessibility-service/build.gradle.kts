@@ -1,18 +1,22 @@
 plugins {
-  alias(libs.plugins.android.library)
+  alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
-  alias(libs.plugins.compose.compiler)
+  alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-  namespace = "com.zillow.automobile.home"
+  namespace = "com.zillow.automobile.accessibilityservice"
   compileSdk = libs.versions.build.android.compileSdk.get().toInt()
   buildToolsVersion = libs.versions.build.android.buildTools.get()
 
   defaultConfig {
+    applicationId = "com.zillow.automobile.accessibilityservice"
     minSdk = libs.versions.build.android.minSdk.get().toInt()
+    targetSdk = libs.versions.build.android.targetSdk.get().toInt()
+    versionCode = 1
+    versionName = "1.0"
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    consumerProguardFiles("consumer-rules.pro")
   }
 
   buildTypes {
@@ -28,37 +32,21 @@ android {
   kotlinOptions {
     jvmTarget = libs.versions.build.java.target.get()
     languageVersion = libs.versions.build.kotlin.language.get()
+    freeCompilerArgs += "-opt-in=androidx.media3.common.util.UnstableApi"
   }
-  buildFeatures { compose = true }
 }
 
 dependencies {
   implementation(libs.androidx.core)
-  implementation(libs.androidx.appcompat)
-  implementation(libs.material)
-
-  // Compose dependencies
-  implementation(platform(libs.compose.bom))
-  implementation(libs.bundles.compose.ui)
-  implementation(libs.androidx.lifecycle.viewmodel.ktx)
-  implementation(libs.androidx.lifecycle.runtime)
-
-  // Lifecycle compose integration
-  implementation(libs.androidx.lifecycle.viewmodel.compose)
-
-  // Navigation Compose
-  implementation(libs.navigation3.runtime)
-
-  // Playground module dependencies
-  implementation(projects.playground.design.system)
-  implementation(projects.playground.discover)
-  implementation(projects.playground.settings)
-  implementation(projects.playground.storage)
-  implementation(projects.playground.experimentation)
 
   // Kotlin coroutines
   implementation(libs.kotlinx.coroutines)
 
-  testImplementation(libs.junit)
+  // Kotlinx Serialization for navigation
+  implementation(libs.kotlinx.serialization)
+
+  // Test dependencies
+  testImplementation(libs.bundles.unit.test)
   testImplementation(projects.junitRunner)
+  testImplementation(libs.robolectric)
 }

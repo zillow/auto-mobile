@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">View Hierarchy Service</string>
+  <string name="accessibility_service_description">AutoMobile View Hierarchy Service - Extracts UI hierarchy information for automated testing</string>
+</resources>

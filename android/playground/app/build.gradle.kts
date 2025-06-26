@@ -49,13 +49,13 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   // Navigation Compose
   implementation(libs.androidx.navigation.compose)
 
   // Kotlinx Serialization for navigation
-  implementation(libs.kotlinxSerialization)
+  implementation(libs.kotlinx.serialization)
 
   // Media libraries for initializers
   implementation(libs.coil.compose)

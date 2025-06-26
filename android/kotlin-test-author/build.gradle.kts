@@ -20,17 +20,19 @@ java {
   toolchain { languageVersion.set(JavaLanguageVersion.of(libs.versions.build.java.target.get())) }
   // Configure Gradle daemon to use same JDK
   System.setProperty("org.gradle.java.home", System.getProperty("java.home"))
+  withSourcesJar()
+  withJavadocJar()
 }
 
 dependencies {
   implementation(projects.junitRunner)
 
-  implementation(libs.kotlinPoet)
+  implementation(libs.kotlin.poet)
   implementation(libs.clikt)
   implementation(libs.junit)
 
   // Use the kotlinx ecosystem bundle for datetime, coroutines, and serialization
-  implementation(libs.bundles.kotlinxEcosystem)
+  implementation(libs.bundles.kotlinx.ecosystem)
 
   // Test dependencies
   testImplementation(libs.kotlin.test)

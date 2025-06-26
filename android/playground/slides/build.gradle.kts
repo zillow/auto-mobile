@@ -50,7 +50,7 @@ dependencies {
   implementation(libs.androidx.lifecycle.viewmodel.compose)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   // Media libraries for images and video
   implementation(libs.bundles.media.libraries)

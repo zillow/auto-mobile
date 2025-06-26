@@ -57,7 +57,7 @@ dependencies {
   implementation(libs.coil.network.okhttp)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   testImplementation(libs.junit)
 }

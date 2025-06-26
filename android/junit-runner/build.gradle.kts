@@ -32,7 +32,7 @@ dependencies {
   implementation(libs.snakeyaml)
 
   // Kotlin ecosystem (coroutines, datetime, serialization)
-  implementation(libs.bundles.kotlinxEcosystem)
+  implementation(libs.bundles.kotlinx.ecosystem)
 
   // Koog AI agent framework
   implementation(libs.koog.agents)

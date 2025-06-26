@@ -55,7 +55,7 @@ dependencies {
   implementation(libs.navigation3.runtime)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   testImplementation(libs.junit)
   testImplementation(projects.junitRunner)

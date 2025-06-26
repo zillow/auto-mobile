@@ -53,7 +53,7 @@ dependencies {
   implementation(projects.playground.storage)
 
   // Kotlin coroutines
-  implementation(libs.kotlinxCoroutines)
+  implementation(libs.kotlinx.coroutines)
 
   testImplementation(libs.junit)
   testImplementation(projects.junitRunner)
