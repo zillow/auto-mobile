@@ -1,66 +1,44 @@
 ---
-name: zillow-3d-home-exploration
-description: Automated exploration of Zillow app 3D home tours, including bypassing login, searching for 3D tour homes in NYC, and navigating through different rooms using navigation buttons
+name: "auto-generated-zillowmap-2025-06-26T11-48"
+description: "Automatically generated test plan for com.zillow.android.zillowmap"
+generated: "2025-06-26T11:48:02.903Z"
+appId: "com.zillow.android.zillowmap"
 steps:
-  # Expand search results to full screen
-  - tool: swipeOnElement
-    elementId: com.zillow.android.zillowmap:id/homes_map_drawer_bottom_sheet
-    direction: up
-    duration: 1000
-    label: Swipe up to make search results full screen
+  - tool: "launchApp"
+    appId: "com.zillow.android.zillowmap"
 
-  # Dismiss tip dialog
-  - tool: tapOn
-    text: "Got it"
-    label: Dismiss tip dialog about map view
+  - tool: "tapOn"
+    text: "32 Flatlands 9 St UNIT 22A, Brooklyn, NY"
 
-  - tool: scroll
-    direction: down
-    containerElementId: com.zillow.android.zillowmap:id/homes_map_drawer_bottom_sheet
-    lookingFor:
-      text: "2532 E 26th St, Brooklyn, NY"
-
-  - tool: tapOn
+  - tool: "tapOn"
     text: "3D Home"
-    label: Enter the home with a 3d tour
 
-  - tool: tapOn
-    text: "3D Home"
-    label: Enter 3D Home tour mode
+  - tool: "tapOn"
+    text: "Living room"
 
-  # Navigate around the home using swipe gestures
-  - tool: swipeOnScreen
-    direction: right
+  - tool: "swipeOnScreen"
+    direction: "left"
     includeSystemInsets: false
     duration: 1000
-    label: Navigate in 3D view using swipe gesture
 
-  - tool: tapOn
-    text: "1st Fl Living Room"
-
-  - tool: swipeOnScreen
-    direction: right
+  - tool: "swipeOnScreen"
+    direction: "left"
     includeSystemInsets: false
     duration: 300
 
-  - tool: tapOn
-    text: "1st Fl Bedroom"
+  - tool: "tapOn"
+    text: "Kitchen"
 
-  - tool: tapOn
-    text: "1st Fl Living Room"
-
-  - tool: tapOn
-    text: "1st Fl Kitchen"
-
-  - tool: swipeOnScreen
-    direction: right
+  - tool: "swipeOnScreen"
+    direction: "right"
     includeSystemInsets: false
-    duration: 300
+    duration: 1000
 
-  - tool: tapOn
-    text: "1st Fl Bathroom"
+  - tool: "tapOn"
+    text: "Front yard"
 
-  # Terminate the app
-  - tool: terminateApp
-    appId: com.zillow.android.zillowmap
-    label: Stop Zillow app
+  - tool: "swipeOnScreen"
+    direction: "up"
+    includeSystemInsets: false
+    duration: 1000
+
