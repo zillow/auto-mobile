@@ -159,7 +159,7 @@ export default [
 		rules: baseRules,
 	},
 	{
-		files: ["test/**/*.ts"],
+        files: ["test/**/*.ts", "**/scratch/**/*.ts"],
 		plugins,
 		languageOptions,
 		rules: {
