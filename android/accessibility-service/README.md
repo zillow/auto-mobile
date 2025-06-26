@@ -36,7 +36,7 @@ adb shell "am broadcast -a com.zillow.automobile.GET_HIERARCHY_SYNC && sleep 0.5
 
 ```bash
 # Check if the app is installed
-adb shell pm list packages | grep automobile
+adb shell pm list packages | grep com.zillow.automobile.accessibilityservice
 
 # Check if the accessibility service is running
 adb shell settings get secure enabled_accessibility_services
