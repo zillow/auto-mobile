@@ -46,8 +46,8 @@ object DeepLinkManager {
     return buildUri("$PATH_VIDEO_PLAYER/$videoId")
   }
 
-  /** Parse deep link URL and return the corresponding navigation route */
-  fun parseDeepLink(uri: Uri): String? {
+  /** Parse deep link URL and return the corresponding navigation destination */
+  fun parseDeepLink(uri: Uri): AppDestination? {
     if (uri.scheme != SCHEME || uri.host != HOST) {
       return null
     }
@@ -55,18 +55,18 @@ object DeepLinkManager {
     val path = uri.path ?: return null
 
     return when {
-      path == PATH_ONBOARDING -> OnboardingDestination.route
-      path == PATH_LOGIN -> LoginDestination.route
-      path == PATH_HOME -> HomeDestination.route
+      path == PATH_ONBOARDING -> OnboardingDestination
+      path == PATH_LOGIN -> LoginDestination
+      path == PATH_HOME -> HomeDestination
       path.startsWith(PATH_SLIDES) -> {
-        val slideIndex = path.substringAfterLast("/").toIntOrNull() ?: 0
-        SlidesDestination.createRoute(slideIndex)
+        val slideIndex = path.substringAfterLast("/").toIntOrNull()?.takeIf { it >= 0 } ?: 0
+        SlidesDestination(slideIndex)
       }
 
       path.startsWith(PATH_VIDEO_PLAYER) -> {
         val videoId = path.substringAfterLast("/")
         if (videoId.isNotEmpty()) {
-          VideoPlayerDestination.createRoute(videoId)
+          VideoPlayerDestination(videoId)
         } else {
           null
         }

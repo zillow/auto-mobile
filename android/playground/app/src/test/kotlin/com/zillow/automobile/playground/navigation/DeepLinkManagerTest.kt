@@ -39,57 +39,64 @@ class DeepLinkManagerTest {
   @Test
   fun testParseValidOnboardingDeepLink() {
     val uri = Uri.parse("automobile://playground/onboarding")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertEquals(OnboardingDestination.route, route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertEquals(OnboardingDestination, destination)
   }
 
   @Test
   fun testParseValidLoginDeepLink() {
     val uri = Uri.parse("automobile://playground/login")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertEquals(LoginDestination.route, route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertEquals(LoginDestination, destination)
   }
 
   @Test
   fun testParseValidHomeDeepLink() {
     val uri = Uri.parse("automobile://playground/home")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertEquals(HomeDestination.route, route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertEquals(HomeDestination, destination)
   }
 
   @Test
   fun testParseValidVideoPlayerDeepLink() {
     val uri = Uri.parse("automobile://playground/video_player/sample123")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertEquals(VideoPlayerDestination.createRoute("sample123"), route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertEquals(VideoPlayerDestination("sample123"), destination)
+  }
+
+  @Test
+  fun testParseValidSlidesDeepLink() {
+    val uri = Uri.parse("automobile://playground/slides/5")
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertEquals(SlidesDestination(5), destination)
   }
 
   @Test
   fun testParseInvalidScheme() {
     val uri = Uri.parse("https://playground/onboarding")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertNull(route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertNull(destination)
   }
 
   @Test
   fun testParseInvalidHost() {
     val uri = Uri.parse("automobile://wronghost/onboarding")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertNull(route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertNull(destination)
   }
 
   @Test
   fun testParseInvalidPath() {
     val uri = Uri.parse("automobile://playground/unknown")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertNull(route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertNull(destination)
   }
 
   @Test
   fun testParseVideoPlayerWithoutId() {
     val uri = Uri.parse("automobile://playground/video_player/")
-    val route = DeepLinkManager.parseDeepLink(uri)
-    assertNull(route)
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertNull(destination)
   }
 
   @Test

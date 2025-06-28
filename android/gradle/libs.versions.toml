@@ -63,6 +63,7 @@ navigation-fragment-ktx = "2.9.0"
 navigation-ui-ktx = "2.9.0"
 annotation = "1.9.1"
 preference = "1.2.0"
+lifecycleViewmodelNavigation3Android = "1.0.0-alpha02"
 
 [plugins]
 sortDependencies = { id = "com.squareup.sort-dependencies", version.ref = "build-gradle-sortDependencies" }
@@ -140,6 +141,7 @@ media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref = "media3" }
 media3-database = { module = "androidx.media3:media3-database", version.ref = "media3" }
 media3-datasource = { module = "androidx.media3:media3-datasource", version.ref = "media3" }
+androidx-lifecycle-viewmodel-navigation3-android = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-navigation3-android", version.ref = "lifecycleViewmodelNavigation3Android" }
 
 # Libraries can be bundled together for easier import
 [bundles]

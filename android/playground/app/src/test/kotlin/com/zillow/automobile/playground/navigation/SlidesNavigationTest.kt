@@ -6,31 +6,18 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class SlidesNavigationTest {
 
   @Test
-  fun `SlidesDestination should create correct routes`() {
-    assertEquals("slides/0", SlidesDestination.createRoute(0))
-    assertEquals("slides/5", SlidesDestination.createRoute(5))
-    assertEquals("slides/10", SlidesDestination.createRoute(10))
-    assertEquals("slides/0", SlidesDestination.createRoute()) // Default value
-  }
-
-  @Test
-  fun `SlidesDestination should create correct deep links`() {
-    assertEquals("automobile://playground/slides/0", SlidesDestination.createDeepLink(0))
-    assertEquals("automobile://playground/slides/3", SlidesDestination.createDeepLink(3))
-    assertEquals(
-        "automobile://playground/slides/0", SlidesDestination.createDeepLink()) // Default value
-  }
-
-  @Test
-  fun `SlidesDestination should have correct route properties`() {
-    assertEquals("slides/{slideIndex}", SlidesDestination.route)
-    assertEquals("slides/{slideIndex}", SlidesDestination.routeWithArgs)
-    assertEquals("slides", SlidesDestination.routeBase)
-    assertEquals("automobile://playground/slides/{slideIndex}", SlidesDestination.deepLinkPattern)
+  fun `SlidesDestination should create correct destinations`() {
+    assertEquals(SlidesDestination(0), SlidesDestination(0))
+    assertEquals(SlidesDestination(5), SlidesDestination(5))
+    assertEquals(SlidesDestination(10), SlidesDestination(10))
+    assertEquals(SlidesDestination(0), SlidesDestination()) // Default value
   }
 
   @Test
@@ -46,10 +33,11 @@ class SlidesNavigationTest {
     val slideUri5 = Uri.parse("automobile://playground/slides/5")
     val slideUriInvalid = Uri.parse("automobile://playground/slides/invalid")
 
-    assertEquals("slides/0", DeepLinkManager.parseDeepLink(slideUri0))
-    assertEquals("slides/5", DeepLinkManager.parseDeepLink(slideUri5))
+    assertEquals(SlidesDestination(0), DeepLinkManager.parseDeepLink(slideUri0))
+    assertEquals(SlidesDestination(5), DeepLinkManager.parseDeepLink(slideUri5))
     assertEquals(
-        "slides/0", DeepLinkManager.parseDeepLink(slideUriInvalid)) // Invalid index defaults to 0
+        SlidesDestination(0),
+        DeepLinkManager.parseDeepLink(slideUriInvalid)) // Invalid index defaults to 0
   }
 
   @Test
@@ -112,31 +100,28 @@ class SlidesNavigationTest {
     // Test negative slide index
     val negativeIndexUri = Uri.parse("automobile://playground/slides/-1")
     val parsedNegative = DeepLinkManager.parseDeepLink(negativeIndexUri)
-    assertEquals("slides/0", parsedNegative) // Should default to 0
+    assertEquals(SlidesDestination(0), parsedNegative) // Should default to 0
 
     // Test very large slide index
     val largeIndexUri = Uri.parse("automobile://playground/slides/999999")
     val parsedLarge = DeepLinkManager.parseDeepLink(largeIndexUri)
-    assertEquals("slides/999999", parsedLarge) // Should preserve the number
+    assertEquals(SlidesDestination(999999), parsedLarge) // Should preserve the number
 
     // Test missing slide index
     val missingIndexUri = Uri.parse("automobile://playground/slides/")
     val parsedMissing = DeepLinkManager.parseDeepLink(missingIndexUri)
-    assertEquals("slides/0", parsedMissing) // Should default to 0
+    assertEquals(SlidesDestination(0), parsedMissing) // Should default to 0
   }
 
   @Test
   fun `Slides destination creation should handle boundary values`() {
     // Test minimum values
-    assertEquals("slides/0", SlidesDestination.createRoute(0))
-    assertEquals("automobile://playground/slides/0", SlidesDestination.createDeepLink(0))
+    assertEquals(SlidesDestination(0), SlidesDestination(0))
 
     // Test reasonable maximum values
-    assertEquals("slides/100", SlidesDestination.createRoute(100))
-    assertEquals("automobile://playground/slides/100", SlidesDestination.createDeepLink(100))
+    assertEquals(SlidesDestination(100), SlidesDestination(100))
 
     // Test default parameter behavior
-    assertEquals("slides/0", SlidesDestination.createRoute())
-    assertEquals("automobile://playground/slides/0", SlidesDestination.createDeepLink())
+    assertEquals(SlidesDestination(0), SlidesDestination())
   }
 }

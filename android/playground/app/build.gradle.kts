@@ -51,8 +51,9 @@ dependencies {
   // Kotlin coroutines
   implementation(libs.kotlinx.coroutines)
 
-  // Navigation Compose
-  implementation(libs.androidx.navigation.compose)
+  // Navigation 3
+  implementation(libs.navigation3.runtime)
+  implementation(libs.navigation3.ui)
 
   // Kotlinx Serialization for navigation
   implementation(libs.kotlinx.serialization)
@@ -75,6 +76,7 @@ dependencies {
   implementation(projects.playground.slides)
   implementation(projects.playground.storage)
   implementation(projects.playground.experimentation)
+  implementation(libs.androidx.lifecycle.viewmodel.navigation3.android)
 
   // Test dependencies
   testImplementation(libs.bundles.unit.test)
