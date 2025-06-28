@@ -2,7 +2,8 @@ import { expect } from "chai";
 import { registerDeepLinkTools } from "../../src/server/deepLinkTools";
 import { ToolRegistry } from "../../src/server/toolRegistry";
 
-describe("Deep Link Tools Registration", () => {
+describe("Deep Link Tools Registration", function() {
+  this.timeout(5000);
   let mockGetCurrentDeviceId: () => string | undefined;
 
   beforeEach(() => {

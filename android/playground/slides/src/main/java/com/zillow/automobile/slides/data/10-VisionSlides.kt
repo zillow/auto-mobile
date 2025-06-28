@@ -1,5 +1,6 @@
 package com.zillow.automobile.slides.data
 
+import com.zillow.automobile.slides.R
 import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
@@ -27,20 +28,17 @@ fun getVisionSlides(): List<SlideContent> =
                     BulletPoint(text = "API Levels"),
                     BulletPoint(text = "Input devices"),
                 )),
-
-        // TODO: If this lands before talk omit from vision
-        SlideContent.LargeText(title = "Self healing agentic loop coming very soon"),
-
-        // TODO: If this lands before talk omit from vision
-        SlideContent.LargeText(title = "Android MCP SDK which is also OSS"),
+        SlideContent.LargeText(title = "Self healing soon"),
         SlideContent.BulletPoints(
             title = "Android MCP SDK which is also OSS",
             points =
                 listOf(
                     BulletPoint(text = "Tools: View Hierarchy, Storage, Network"),
                     BulletPoint(text = "Resources: App Resources, Filesystem"),
+                    BulletPoint(text = "https://github.com/kaeawc/android-mcp-sdk"),
                 )),
         SlideContent.LargeText(title = "And now so is AutoMobile"),
         SlideContent.Emoji(emoji = PresentationEmoji.ROCKET, caption = "Launching"),
-        SlideContent.Emoji(emoji = PresentationEmoji.MICROPHONE, caption = "Questions?"),
+        SlideContent.Screenshot(
+            lightScreenshot = R.drawable.auto_mobile_qr_code, caption = "Questions?"),
     )

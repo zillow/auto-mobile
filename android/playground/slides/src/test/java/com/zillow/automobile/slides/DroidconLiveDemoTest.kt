@@ -34,16 +34,42 @@ class DroidconLiveDemoTest {
   }
 
   @Test
-  @AutoMobileTest(plan = "test-plans/auto-mobile-playground.yaml")
-  fun `AutoMobile playground`() {}
+  fun `AutoMobile playground`() {
+
+    val result =
+        AutoMobilePlan("test-plans/auto-mobile-playground.yaml", { "slide" to "59" }).execute()
+
+    assertTrue(result.success)
+  }
+
+  @Test
+  fun `AutoMobile restart slide`() {
+
+    val result =
+        AutoMobilePlan("test-plans/auto-mobile-restart-slide.yaml", { "slide" to "83" }).execute()
+
+    assertTrue(result.success)
+  }
 
   @Test @AutoMobileTest(plan = "test-plans/bluesky-ready-to-go.yaml") fun `Ready for the talk`() {}
 
   @Test
-  @AutoMobileTest(plan = "test-plans/bluesky-announcement.yaml")
-  fun `Announce AutoMobile is OSS on GitHub`() {}
+  fun `Announce AutoMobile is OSS on GitHub`() {
+
+    val result =
+        AutoMobilePlan("test-plans/bluesky-announcement.yaml", { "slide" to "83" }).execute()
+
+    assertTrue(result.success)
+  }
 
   @Test
-  @AutoMobileTest(plan = "test-plans/system-notification-youtube-music-play.yaml")
-  fun `Victory Fanfare`() {}
+  fun `Victory Fanfare`() {
+
+    val result =
+        AutoMobilePlan(
+                "test-plans/system-notification-youtube-music-play.yaml", { "slide" to "83" })
+            .execute()
+
+    assertTrue(result.success)
+  }
 }

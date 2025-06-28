@@ -4,7 +4,26 @@ description: "Test workflow to open the system notification tray, find YouTube M
 generated: "2025-06-26T12:57:30.000Z"
 appId: "com.android.systemui"
 steps:
+  - tool: rotate
+    orientation: portrait
+    label: Orient device to portrait mode
+
+  - tool: pressButton
+    button: back
+    label: Use back button to exit slides
+
   - tool: "openSystemTray"
 
   - tool: "tapOn"
     id: "com.android.systemui:id/actionPlayPause"
+
+  - tool: stopApp
+    appId: com.zillow.automobile.playground
+    label: Stop the AutoMobile playground app
+
+  - tool: openLink
+    url: "automobile://playground/slides/${slide}"
+
+  - tool: rotate
+    orientation: landscape
+    label: Rotate screen to landscape mode

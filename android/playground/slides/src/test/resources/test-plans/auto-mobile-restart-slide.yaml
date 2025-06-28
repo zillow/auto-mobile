@@ -1,0 +1,17 @@
+---
+name: automobile-playground-discover-screens
+description: Reboot a slide in emergency
+parameters:
+  slide: ${slide}
+
+steps:
+  - tool: stopApp
+    appId: com.zillow.automobile.playground
+    label: Stop the AutoMobile playground app
+
+  - tool: openLink
+    url: "automobile://playground/slides/${slide}"
+
+  - tool: rotate
+    orientation: landscape
+    label: Rotate screen to landscape mode
