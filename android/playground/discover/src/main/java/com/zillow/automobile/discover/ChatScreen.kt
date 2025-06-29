@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -257,13 +258,13 @@ fun AnimatedChatInput(
 @Preview(showBackground = true)
 @Composable
 fun PreviewChatScreen() {
-  MaterialTheme { ChatScreen() }
+  AutoMobileTheme { ChatScreen() }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun PreviewMessageBubble() {
-  MaterialTheme {
+  AutoMobileTheme {
     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       MessageBubble(
           message =

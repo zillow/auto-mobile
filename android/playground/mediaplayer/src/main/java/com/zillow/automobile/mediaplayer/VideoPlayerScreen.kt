@@ -282,7 +282,6 @@ fun ErrorMessage(error: String, onRetry: () -> Unit, modifier: Modifier = Modifi
       }
 }
 
-@UnstableApi
 enum class VideoData(
     val id: String,
     val title: String,

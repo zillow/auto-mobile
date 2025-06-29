@@ -1,5 +1,6 @@
 package com.zillow.automobile.design.system.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -57,11 +58,24 @@ fun AutoMobileOutlinedCard(
       }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "Card", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "Card - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun AutoMobileCardPreview() {
   AutoMobileTheme {
     AutoMobileCard {
+      AutoMobileText(text = "Card Content", style = MaterialTheme.typography.bodyMedium)
+    }
+  }
+}
+
+@Preview(name = "Outlined Card", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Outlined Card - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun AutoMobileOutlinedCardPreview() {
+  AutoMobileTheme {
+    AutoMobileOutlinedCard {
       AutoMobileText(text = "Card Content", style = MaterialTheme.typography.bodyMedium)
     }
   }

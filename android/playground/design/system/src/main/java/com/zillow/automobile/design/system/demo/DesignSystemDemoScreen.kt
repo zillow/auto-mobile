@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -146,12 +145,8 @@ fun DesignSystemDemoScreen(onBackClick: () -> Unit = {}) {
                   AutoMobileBodyText("Primary: Black (#000000)")
                   AutoMobileBodyText("Secondary: Red (#FF0000)")
                   AutoMobileBodyText("Background: Eggshell (#F8F8FF)")
-                  AutoMobileBodyText(
-                      text = "This text uses the primary color",
-                      color = MaterialTheme.colorScheme.primary)
-                  AutoMobileBodyText(
-                      text = "This text uses the secondary color",
-                      color = MaterialTheme.colorScheme.secondary)
+                  AutoMobileBodyText(text = "This text uses the primary color")
+                  AutoMobileBodyText(text = "This text uses the secondary color")
                 }
 
                 // AutoMobile Logo Section

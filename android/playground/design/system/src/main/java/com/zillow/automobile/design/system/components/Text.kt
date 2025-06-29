@@ -1,15 +1,20 @@
 package com.zillow.automobile.design.system.components
 
+import android.content.res.Configuration
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 
 @Composable
 fun AutoMobileText(
@@ -39,7 +44,6 @@ fun AutoMobileText(
 fun AutoMobileHeadline(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurface,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
     maxLines: Int = 2
@@ -47,7 +51,7 @@ fun AutoMobileHeadline(
   AutoMobileText(
       text = text,
       modifier = modifier,
-      color = color,
+      color = MaterialTheme.colorScheme.onSurface,
       style = MaterialTheme.typography.headlineMedium,
       textAlign = textAlign,
       overflow = overflow,
@@ -58,7 +62,6 @@ fun AutoMobileHeadline(
 fun AutoMobileTitle(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurface,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
     maxLines: Int = 1
@@ -66,8 +69,8 @@ fun AutoMobileTitle(
   AutoMobileText(
       text = text,
       modifier = modifier,
-      color = color,
       style = MaterialTheme.typography.titleLarge,
+      color = MaterialTheme.colorScheme.onSurface,
       textAlign = textAlign,
       overflow = overflow,
       maxLines = maxLines)
@@ -77,7 +80,6 @@ fun AutoMobileTitle(
 fun AutoMobileBodyText(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurface,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Clip,
     maxLines: Int = Int.MAX_VALUE
@@ -85,8 +87,8 @@ fun AutoMobileBodyText(
   AutoMobileText(
       text = text,
       modifier = modifier,
-      color = color,
       style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurface,
       textAlign = textAlign,
       overflow = overflow,
       maxLines = maxLines)
@@ -96,7 +98,6 @@ fun AutoMobileBodyText(
 fun AutoMobileLabel(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
     maxLines: Int = 1
@@ -104,19 +105,26 @@ fun AutoMobileLabel(
   AutoMobileText(
       text = text,
       modifier = modifier,
-      color = color,
       style = MaterialTheme.typography.labelMedium,
+      color = MaterialTheme.colorScheme.onSurface,
       textAlign = textAlign,
       overflow = overflow,
       maxLines = maxLines)
 }
 
-@Preview(showBackground = true)
+@Preview(name = "Text", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "Text - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun AutoMobileTextPreview() {
-  com.zillow.automobile.design.system.theme.AutoMobileTheme {
-    androidx.compose.foundation.layout.Column {
-      AutoMobileHeadline("Headline Text")
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
+      AutoMobileHeadline("AutoMobile")
       AutoMobileTitle("Title Text")
       AutoMobileBodyText("Body text for longer content")
       AutoMobileLabel("Label Text")

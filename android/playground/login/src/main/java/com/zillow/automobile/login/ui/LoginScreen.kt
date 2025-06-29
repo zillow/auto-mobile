@@ -1,6 +1,7 @@
 package com.zillow.automobile.login.ui
 
 import android.content.res.Configuration
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -25,7 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.zillow.automobile.design.system.components.AutoMobileCard
+import com.zillow.automobile.design.system.components.AutoMobileOutlinedCard
 import com.zillow.automobile.design.system.components.AutoMobileText
 import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
@@ -34,7 +35,7 @@ import com.zillow.automobile.login.data.LoginRepository
 import kotlinx.coroutines.delay
 
 /**
- * Login screen composable that handles user authentication.
+ * Core login screen composable that handles user authentication with a provided ViewModel.
  *
  * @param viewModel The LoginViewModel that manages authentication state
  * @param onLoginSuccess Callback invoked when login is successful
@@ -42,7 +43,7 @@ import kotlinx.coroutines.delay
  * @param onGuestMode Callback invoked when guest mode is selected
  */
 @Composable
-fun LoginScreen(
+fun LoginScreenCore(
     viewModel: LoginViewModel,
     onLoginSuccess: (LoggedInUserView) -> Unit,
     onLoginError: (Int) -> Unit,
@@ -98,6 +99,7 @@ fun LoginScreen(
   Column(
       modifier =
           Modifier.fillMaxSize()
+              .background(MaterialTheme.colorScheme.background)
               .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
               .padding(16.dp),
       horizontalAlignment = Alignment.CenterHorizontally) {
@@ -167,7 +169,7 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
   var loginError by remember { mutableStateOf<String?>(null) }
   var showErrorMessage by remember { mutableStateOf(false) }
 
-  LoginScreen(
+  LoginScreenCore(
       viewModel = loginViewModel,
       onLoginSuccess = { user ->
         // Clear any previous errors
@@ -209,94 +211,34 @@ fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode:
     Box(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         contentAlignment = Alignment.BottomCenter) {
-          AutoMobileCard {
-            AutoMobileText(text = loginError!!, color = MaterialTheme.colorScheme.error)
-          }
+          AutoMobileOutlinedCard { AutoMobileText(text = loginError!!) }
         }
   }
 }
 
-/** Preview-friendly version of LoginScreen that doesn't require complex dependencies. */
-@Composable
-fun LoginScreen(
-    onLoginSuccess: () -> Unit = {},
-    onLoginError: () -> Unit = {},
-    onGuestMode: () -> Unit = {}
-) {
-  var username by remember { mutableStateOf("") }
-  var password by remember { mutableStateOf("") }
-  var isLoading by remember { mutableStateOf(false) }
-  var usernameHadContent by remember { mutableStateOf(false) }
-  var passwordHadContent by remember { mutableStateOf(false) }
-  var usernameBlurred by remember { mutableStateOf(false) }
-  var passwordBlurred by remember { mutableStateOf(false) }
-
-  val mockFormState = LoginFormState(isDataValid = username.length >= 5 && password.length >= 5)
-  val isFormValid = mockFormState.isDataValid && username.isNotEmpty() && password.isNotEmpty()
-
-  val configuration = LocalConfiguration.current
-  val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-  val scrollState = rememberScrollState()
-
-  Column(
-      modifier =
-          Modifier.fillMaxSize()
-              .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
-              .padding(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
-
-        LoginHeader()
-
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing12))
-
-        LoginForm(
-            username = username,
-            password = password,
-            onUsernameChange = {
-              username = it
-              if (it.length >= 5) usernameHadContent = true
-            },
-            onPasswordChange = {
-              password = it
-              if (it.length >= 5) passwordHadContent = true
-            },
-            loginFormState = mockFormState,
-            usernameHadContent = usernameHadContent,
-            passwordHadContent = passwordHadContent,
-            usernameBlurred = usernameBlurred,
-            passwordBlurred = passwordBlurred,
-            onPasswordDone = {
-              passwordBlurred = true
-              if (isFormValid) {
-                onLoginSuccess()
-              }
-            })
-
-        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing6))
-
-        LoginActions(
-            isFormValid = isFormValid,
-            isLoading = isLoading,
-            onSignInClick = {
-              usernameBlurred = true
-              passwordBlurred = true
-              onLoginSuccess()
-            },
-            onGuestModeClick = onGuestMode)
-
-        Spacer(modifier = Modifier.weight(1f))
-      }
-}
-
 /** Preview for the LoginScreen composable with mock data. */
-@Preview(showBackground = true)
+@Preview(name = "Login", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "Login - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-fun LoginScreenPreview() {
-  AutoMobileTheme {
-    LoginScreen(
-        onLoginSuccess = { /* Preview login success */ },
-        onLoginError = { /* Preview login error */ },
-        onGuestMode = { /* Preview guest mode */ })
+fun LoginScreenPreviewComposable() {
+
+  val context = LocalContext.current
+  val mockRepository = LoginRepository(context)
+  val mockViewModel = remember { LoginViewModel(mockRepository) }
+
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
+      LoginScreenCore(
+          viewModel = mockViewModel,
+          onLoginSuccess = { /* Preview login success */ },
+          onLoginError = { /* Preview login error */ },
+          onGuestMode = { /* Preview guest mode */ })
+    }
   }
 }

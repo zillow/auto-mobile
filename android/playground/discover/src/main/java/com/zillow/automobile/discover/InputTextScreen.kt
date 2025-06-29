@@ -46,6 +46,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 
 @Composable
 fun InputTextScreen() {
@@ -397,5 +398,5 @@ fun InputTextScreen() {
 @Preview(showBackground = true)
 @Composable
 fun PreviewInputTextScreen() {
-  MaterialTheme { InputTextScreen() }
+  AutoMobileTheme { InputTextScreen() }
 }

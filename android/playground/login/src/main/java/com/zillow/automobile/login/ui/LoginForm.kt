@@ -1,6 +1,7 @@
 package com.zillow.automobile.login.ui
 
 import android.content.res.Configuration
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,7 +18,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
-import com.zillow.automobile.design.system.components.AutoMobileOutlinedTextField
 import com.zillow.automobile.design.system.theme.AutoMobileDimensions
 import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.login.R
@@ -37,7 +38,7 @@ internal fun LoginForm(
     modifier: Modifier = Modifier
 ) {
   Column(modifier = modifier) {
-    AutoMobileOutlinedTextField(
+    OutlinedTextField(
         value = username,
         onValueChange = onUsernameChange,
         label = { Text(stringResource(R.string.prompt_email)) },
@@ -58,7 +59,7 @@ internal fun LoginForm(
 
     Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
 
-    AutoMobileOutlinedTextField(
+    OutlinedTextField(
         value = password,
         onValueChange = onPasswordChange,
         label = { Text(stringResource(R.string.prompt_password)) },
@@ -87,16 +88,18 @@ internal fun LoginForm(
 @Composable
 fun LoginFormPreview() {
   AutoMobileTheme {
-    LoginForm(
-        username = "user@example.com",
-        password = "password123",
-        onUsernameChange = {},
-        onPasswordChange = {},
-        loginFormState = LoginFormState(isDataValid = true),
-        usernameHadContent = true,
-        passwordHadContent = true,
-        usernameBlurred = false,
-        passwordBlurred = false,
-        onPasswordDone = {})
+    Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+      LoginForm(
+          username = "user@example.com",
+          password = "password123",
+          onUsernameChange = {},
+          onPasswordChange = {},
+          loginFormState = LoginFormState(isDataValid = true),
+          usernameHadContent = true,
+          passwordHadContent = true,
+          usernameBlurred = false,
+          passwordBlurred = false,
+          onPasswordDone = {})
+    }
   }
 }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -19,15 +18,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverVideoScreen(onNavigateToVideoPlayer: (String) -> Unit) {
-  val pagerState = rememberPagerState(pageCount = { 5 })
+  val tabs: Map<String, @Composable () -> Unit> =
+      mapOf(
+          "Tap" to { TapScreen() },
+          "Swipe" to { SwipeScreen() },
+          "Media" to { VideoListScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer) },
+          "Text" to { InputTextScreen() },
+          "Chat" to { ChatScreen() },
+      )
+  val tabPageMap: Map<Int, @Composable () -> Unit> =
+      tabs.map { it.value }.mapIndexed { index, entry -> index to entry }.toMap()
+  val tabTitles = tabs.keys
+  val pagerState = rememberPagerState(pageCount = { tabTitles.size })
   val coroutineScope = rememberCoroutineScope()
-
-  val tabTitles = listOf("Tap", "Swipe", "Media", "Text", "Chat")
 
   Scaffold(
       topBar = {
@@ -45,13 +54,7 @@ fun DiscoverVideoScreen(onNavigateToVideoPlayer: (String) -> Unit) {
           }
 
           HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            when (page) {
-              0 -> TapScreen()
-              1 -> SwipeScreen()
-              2 -> VideoListScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)
-              3 -> InputTextScreen()
-              4 -> ChatScreen()
-            }
+            tabPageMap.getOrDefault(page, defaultValue = {})()
           }
         }
       }
@@ -60,5 +63,5 @@ fun DiscoverVideoScreen(onNavigateToVideoPlayer: (String) -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun PreviewDiscoverVideoScreen() {
-  MaterialTheme { DiscoverVideoScreen(onNavigateToVideoPlayer = {}) }
+  AutoMobileTheme { DiscoverVideoScreen(onNavigateToVideoPlayer = {}) }
 }

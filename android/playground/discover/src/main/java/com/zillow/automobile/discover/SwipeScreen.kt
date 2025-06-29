@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.discover.ui.GridImage
 import com.zillow.automobile.discover.ui.ReorderableGrid
 import com.zillow.automobile.discover.ui.SwipeCard
@@ -118,5 +118,5 @@ fun SwipeScreen(viewModel: SwipeScreenViewModel = viewModel()) {
 @Preview(showBackground = true)
 @Composable
 fun PreviewSwipeScreen() {
-  MaterialTheme { SwipeScreen() }
+  AutoMobileTheme { SwipeScreen() }
 }

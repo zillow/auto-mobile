@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.storage.AnalyticsRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -331,5 +332,5 @@ fun TapScreen() {
 @Preview(showBackground = true)
 @Composable
 fun PreviewTapScreen() {
-  MaterialTheme { TapScreen() }
+  AutoMobileTheme { TapScreen() }
 }

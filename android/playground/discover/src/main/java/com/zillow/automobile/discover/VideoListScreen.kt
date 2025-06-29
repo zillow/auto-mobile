@@ -1,5 +1,7 @@
 package com.zillow.automobile.discover
 
+import android.content.res.Configuration
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,12 +26,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.mediaplayer.VideoData
 
 /** MEDIA screen content displaying a scrollable list of videos */
@@ -110,25 +114,60 @@ fun VideoCard(video: VideoData, onClick: () -> Unit) {
       }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "VideoList", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "VideoList - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun PreviewVideoListScreen() {
-  MaterialTheme { VideoListScreen(onNavigateToVideoPlayer = {}) }
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+      VideoListScreen(onNavigateToVideoPlayer = {})
+    }
+  }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "VideCard", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "VideCard - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun PreviewVideoCard() {
   val sampleVideo = VideoData.AUTO_MOBILE
-  MaterialTheme { VideoCard(video = sampleVideo, onClick = {}) }
+
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    Column(Modifier.background(MaterialTheme.colorScheme.background)) {
+      VideoCard(video = sampleVideo, onClick = {})
+    }
+  }
 }
 
-@Preview(showBackground = true, name = "Video Card in List")
+@Preview(name = "VideoCard in List", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "VideoCard in List - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun PreviewVideoCardList() {
-  MaterialTheme {
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
     LazyColumn(
-        contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        modifier = Modifier.background(MaterialTheme.colorScheme.background),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
           items(VideoData.entries) { video -> VideoCard(video = video, onClick = {}) }
         }
   }
