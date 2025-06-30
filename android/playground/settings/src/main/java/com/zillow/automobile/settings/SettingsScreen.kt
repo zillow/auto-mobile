@@ -1,5 +1,6 @@
 package com.zillow.automobile.settings
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -222,8 +224,23 @@ fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit 
   }
 }
 
-@Preview(showBackground = true)
+@Preview(
+    name = "Discover Screen - Keyboard Open",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Discover Screen - Keyboard Open - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun SettingsScreenMainPreview() {
-  AutoMobileTheme { SettingsScreen(onLogout = { /* Preview logout action */ }) }
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    SettingsScreen(onLogout = { /* Preview logout action */ })
+  }
 }

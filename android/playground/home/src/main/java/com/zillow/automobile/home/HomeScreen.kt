@@ -1,5 +1,6 @@
 package com.zillow.automobile.home
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +12,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Slideshow
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -24,8 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
+import com.zillow.automobile.design.system.theme.AutoMobileTheme
 import com.zillow.automobile.discover.DiscoverVideoScreen
 import com.zillow.automobile.settings.SettingsScreen
 import com.zillow.automobile.storage.AnalyticsTracker
@@ -39,7 +41,26 @@ fun HomeScreen(
     onLogout: () -> Unit = {},
     onGuestModeNavigateToLogin: () -> Unit = {}
 ) {
-  var selectedTab by remember { mutableIntStateOf(0) }
+  var bottomNavSelection by remember { mutableIntStateOf(0) }
+  HomeScreenCore(
+      bottomNavSelected = bottomNavSelection,
+      setBottomNavSelection = { bottomNavSelection = it },
+      onNavigateToVideoPlayer = onNavigateToVideoPlayer,
+      onNavigateToSlides = onNavigateToSlides,
+      onLogout = onLogout,
+      onGuestModeNavigateToLogin = onGuestModeNavigateToLogin,
+  )
+}
+
+@Composable
+fun HomeScreenCore(
+    bottomNavSelected: Int,
+    setBottomNavSelection: (Int) -> Unit = {},
+    onNavigateToVideoPlayer: (String) -> Unit = {},
+    onNavigateToSlides: (Int) -> Unit = {},
+    onLogout: () -> Unit = {},
+    onGuestModeNavigateToLogin: () -> Unit = {}
+) {
   val context = LocalContext.current
   val analyticsTracker = remember { AnalyticsTracker.getInstance().apply { initialize(context) } }
 
@@ -50,8 +71,8 @@ fun HomeScreen(
           BottomNavItem("Settings", Icons.Filled.Settings, "settings"))
 
   // Track screen view when tab changes
-  LaunchedEffect(selectedTab) {
-    when (selectedTab) {
+  LaunchedEffect(bottomNavSelected) {
+    when (bottomNavSelected) {
       0 -> analyticsTracker.trackScreenView("DiscoverScreen")
       2 -> analyticsTracker.trackScreenView("SettingsScreen")
     }
@@ -63,12 +84,12 @@ fun HomeScreen(
         NavigationBar(windowInsets = WindowInsets.navigationBars) {
           navItems.forEachIndexed { index, item ->
             NavigationBarItem(
-                selected = selectedTab == index,
+                selected = bottomNavSelected == index,
                 onClick = {
                   if (item.route == "slides") {
                     onNavigateToSlides(0) // Navigate to first slide
                   } else {
-                    selectedTab = index
+                    setBottomNavSelection(index)
                   }
                 },
                 icon = { Icon(item.icon, contentDescription = item.label) },
@@ -77,7 +98,7 @@ fun HomeScreen(
         }
       }) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-          when (selectedTab) {
+          when (bottomNavSelected) {
             0 -> DiscoverVideoScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)
             1 -> {
               // Slides handled by navigation - this case shouldn't be reached
@@ -91,9 +112,42 @@ fun HomeScreen(
       }
 }
 
-/** Preview for the home screen with bottom navigation. */
-@Preview(showBackground = true)
+@Preview(
+    name = "Home - Tap - Keyboard Open",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Home - Tap - Keyboard Open - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-fun HomeScreenPreview() {
-  MaterialTheme { HomeScreen() }
+fun HomeScreenTapPreview() {
+
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) { HomeScreenCore(bottomNavSelected = 0) }
+}
+
+@Preview(
+    name = "Home - Settings - Keyboard Open",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Home - Settings - Keyboard Open - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun HomeScreenSettingsPreview() {
+
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) { HomeScreenCore(bottomNavSelected = 2) }
 }

@@ -1,5 +1,6 @@
 package com.zillow.automobile.discover
 
+import android.content.res.Configuration
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -8,15 +9,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -47,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -69,7 +68,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     }
   }
 
-  Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.ime)) {
+  Column(modifier = Modifier.fillMaxSize()) {
     // Chat Header
     TopAppBar(
         title = {
@@ -107,7 +106,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     // Messages List
     LazyColumn(
         state = listState,
-        modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = Modifier.weight(1f).fillMaxSize().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
           item { Spacer(modifier = Modifier.height(8.dp)) }
 
@@ -229,7 +228,7 @@ fun AnimatedChatInput(
           animationSpec = tween(200),
           label = "send_button_alpha")
 
-  Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface, shadowElevation = 8.dp) {
+  Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalAlignment = Alignment.Bottom,
@@ -255,27 +254,84 @@ fun AnimatedChatInput(
   }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "Chat Screen", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Chat Screen - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun PreviewChatScreen() {
-  AutoMobileTheme { ChatScreen() }
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) { ChatScreen() }
+  }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "Message Bubble", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Message Bubble - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun PreviewMessageBubble() {
-  AutoMobileTheme {
-    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      MessageBubble(
-          message =
-              ChatMessage(
-                  id = "1",
-                  text =
-                      "Hello! This is a message from the bot. It can be quite long to show how the bubble adapts to different text lengths.",
-                  isFromUser = false))
-      MessageBubble(
-          message =
-              ChatMessage(id = "2", text = "This is my response as a user!", isFromUser = true))
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    Column(
+        modifier = Modifier.background(MaterialTheme.colorScheme.background).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          MessageBubble(
+              message =
+                  ChatMessage(
+                      id = "1",
+                      text =
+                          "Hello! This is a message from the bot. It can be quite long to show how the bubble adapts to different text lengths.",
+                      isFromUser = false))
+          MessageBubble(
+              message =
+                  ChatMessage(id = "2", text = "This is my response as a user!", isFromUser = true))
+        }
+  }
+}
+
+@Preview(
+    name = "Chat Screen - Keyboard Open",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Chat Screen - Keyboard Open - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun PreviewChatScreenKeyboardOpen() {
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+      ChatScreen()
+
+      // Simulate keyboard overlay
+      Box(
+          modifier =
+              Modifier.fillMaxWidth()
+                  .height(240.dp)
+                  .align(Alignment.BottomCenter)
+                  .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f))) {
+            Text(
+                text = "Keyboard Area",
+                modifier = Modifier.align(Alignment.Center),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp)
+          }
     }
   }
 }

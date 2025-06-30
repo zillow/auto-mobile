@@ -1,5 +1,6 @@
 package com.zillow.automobile.discover
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
@@ -60,8 +62,22 @@ fun DiscoverVideoScreen(onNavigateToVideoPlayer: (String) -> Unit) {
       }
 }
 
-@Preview(showBackground = true)
+@Preview(
+    name = "Discover Screen - Keyboard Open",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(
+    name = "Discover Screen - Keyboard Open - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun PreviewDiscoverVideoScreen() {
-  AutoMobileTheme { DiscoverVideoScreen(onNavigateToVideoPlayer = {}) }
+
+  val isDarkMode =
+      when (LocalConfiguration.current.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+        Configuration.UI_MODE_NIGHT_YES -> true
+        else -> false
+      }
+
+  AutoMobileTheme(darkTheme = isDarkMode) { DiscoverVideoScreen(onNavigateToVideoPlayer = {}) }
 }
