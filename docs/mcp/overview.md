@@ -6,9 +6,9 @@ AutoMobile MCP is designed to be run in STDIO mode in production settings like w
 npx -y auto-mobile@latest
 ```
 
-If you have a private NPM registry you can instead do the following
+If you have a private npm registry you can instead do the following
 
-```kotlin
+```shell
 npx --registry https://your.awesome.private.registry.net/path/to/npm/proxy -y auto-mobile@latest
 ```
 
