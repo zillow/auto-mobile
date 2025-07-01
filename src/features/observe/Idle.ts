@@ -414,8 +414,6 @@ export class Idle {
       // For system packages, use a simpler approach
       if (this.isSystemLauncher(packageName)) {
         logger.info(`[AwaitIdle] ${packageName} is a system package, using simplified stability check`);
-        // Just wait a bit and assume stable for system UI
-        await new Promise(resolve => setTimeout(resolve, 100));
         return {
           isStable: true,
           shouldUpdateLastNonIdleTime: false,

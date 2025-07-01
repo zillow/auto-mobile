@@ -2,12 +2,10 @@ import { AdbUtils } from "../../utils/adb";
 import { AwaitIdle } from "../observe/AwaitIdle";
 import { ObserveScreen } from "../observe/ObserveScreen";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
-import { ViewHierarchyResult } from "../../models/ViewHierarchyResult";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ActiveWindowInfo } from "../../models";
-import { assert } from "chai";
+import { ActiveWindowInfo, ViewHierarchyResult } from "../../models";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -75,15 +73,7 @@ export class BaseVisualChange {
       }
     }
 
-    if (progress) {
-      await progress(20, 100, "Executing action...");
-    }
-
     const blockResult = await block();
-
-    if (progress) {
-      await progress(40, 100, "Action completed, waiting for UI to stabilize...");
-    }
 
     // Get package name for UI stability waiting
     let packageName = options.packageName;
@@ -96,7 +86,7 @@ export class BaseVisualChange {
     if (!packageName) {
       if (cachedPackageName) {
         packageName = cachedPackageName;
-        logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: $packageName`);
+        logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: ${packageName}`);
         // Start the initialization in the background
         promises.push(this.awaitIdle.initializeUiStabilityTracking(
           packageName,
@@ -124,16 +114,8 @@ export class BaseVisualChange {
       }
     }
 
-    if (progress) {
-      await progress(50, 100, "Waiting for UI to stabilize...");
-    }
-
     const results = await Promise.all(promises);
     const resultsSize = results.length;
-
-    results.forEach((result, index) => {
-      assert.isTrue(result.success, `Call ${index} should succeed`);
-    });
 
     // Get results from promises and cast to correct types
     let initState: any = null;
@@ -161,27 +143,15 @@ export class BaseVisualChange {
       } else {
         await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState);
       }
-
-      if (progress) {
-        await progress(70, 100, `UI stability achieved for ${packageName}`);
-      }
     }
 
     // Wait for both operations to complete
     await Promise.all(promises);
 
-    if (progress) {
-      await progress(80, 100, "Taking final observation...");
-    }
-
     const result = await this.takeObservation(blockResult, previousViewHierarchy, {
       changeExpected: options.changeExpected,
       tolerancePercent: options.tolerancePercent ?? DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT
     });
-
-    if (progress) {
-      await progress(100, 100, "Action and observation completed");
-    }
 
     return result;
   }
