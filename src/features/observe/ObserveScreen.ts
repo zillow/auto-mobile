@@ -78,18 +78,6 @@ export class ObserveScreen {
   }
 
   /**
-   * Set cached active window from external source (e.g., UI stability waiting)
-   * This now delegates to the Window class
-   */
-  public setCachedActiveWindow(activeWindow: ActiveWindowInfo): void {
-    this.window.setCachedActiveWindow(activeWindow);
-  }
-
-  public getCachedActiveWindow(): ActiveWindowInfo | null {
-    return this.window.getCachedActiveWindow();
-  }
-
-  /**
    * Collect screen size and handle errors
    * @param result - ObserveResult to update
    */

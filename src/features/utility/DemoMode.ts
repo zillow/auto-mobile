@@ -39,7 +39,7 @@ export class DemoMode extends BaseVisualChange {
       async () => {
         try {
           // Get current package name from active window
-          const activeWindow = await this.window.getActive();
+          const activeWindow = await this.window.getActive(true);
           logger.info("Setting up Android demo mode for current app:", activeWindow.appId);
 
           // Allow demo mode
@@ -105,7 +105,7 @@ export class DemoMode extends BaseVisualChange {
       async () => {
         try {
           // Get current package name from active window
-          const activeWindow = await this.window.getActive();
+          const activeWindow = await this.window.getActive(true);
           logger.info("Exiting Android demo mode for current app:", activeWindow.appId);
 
           await this.adb.executeCommand("shell am broadcast -a com.android.systemui.demo -e command exit");

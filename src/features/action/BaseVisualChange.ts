@@ -80,9 +80,9 @@ export class BaseVisualChange {
 
     // Dynamic parallel promises
     const promises: Promise<any>[] = [];
-    const cachedPackageName = this.observeScreen.getCachedActiveWindow()?.appId;
+    const cachedPackageName = (await this.window.getCachedActiveWindow())?.appId;
 
-    // If no package name provided and we have a cached one, start optimistic initialization
+    // Start optimistic initialization with full active window fetch
     if (!packageName) {
       if (cachedPackageName) {
         packageName = cachedPackageName;
@@ -102,7 +102,7 @@ export class BaseVisualChange {
       logger.info("[BaseVisualChange] No package name provided, attempting to get active window package name...");
       try {
         promises.push(
-          this.window.getActive()
+          this.window.getActive(true)
             .catch(error => {
               // If we can't get the active window package name, we'll just wait for touch events
               packageName = undefined;
@@ -132,7 +132,6 @@ export class BaseVisualChange {
     // Update package name from active window result if needed
     if (activeWindowResult && activeWindowResult.appId) {
       packageName = activeWindowResult.appId;
-      this.observeScreen.setCachedActiveWindow(activeWindowResult);
       logger.info(`[BaseVisualChange] Updated package name from active window: ${packageName}`);
     }
 

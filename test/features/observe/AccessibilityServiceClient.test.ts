@@ -13,7 +13,8 @@ describe("AccessibilityServiceClient", function() {
       executeCommand: async () => ({ stdout: "", stderr: "" })
     } as unknown as AdbUtils;
 
-    accessibilityServiceClient = new AccessibilityServiceClient(null, mockAdb);
+    accessibilityServiceClient = new AccessibilityServiceClient("test-device", mockAdb);
+    AccessibilityServiceClient.clearAvailabilityCache();
   });
 
   describe("isInstalled", function() {

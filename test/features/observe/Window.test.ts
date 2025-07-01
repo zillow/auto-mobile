@@ -13,7 +13,9 @@ describe("Window", () => {
 
   beforeEach(() => {
     adbStub = sinon.createStubInstance(AdbUtils);
-    window = new Window(null, adbStub as unknown as AdbUtils);
+    window = new Window("test-device", adbStub as unknown as AdbUtils);
+    // Clear cache before each test to prevent stale results
+    window.clearCache();
   });
 
   describe("constructor", () => {
@@ -25,7 +27,7 @@ describe("Window", () => {
     });
 
     it("should create instance with default values when no parameters provided", () => {
-      const windowInstance = new Window();
+      const windowInstance = new Window("default-device");
       expect(windowInstance).to.be.instanceOf(Window);
     });
   });
@@ -45,7 +47,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("com.example.app");
       expect(result.activityName).to.equal("com.example.app.MainActivity");
@@ -68,7 +70,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("com.test.app");
       expect(result.activityName).to.equal("com.test.MainActivity");
@@ -89,7 +91,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("");
       expect(result.activityName).to.equal("");
@@ -110,7 +112,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("com.example.app");
       expect(result.activityName).to.equal("com.example.app.MainActivity");
@@ -134,7 +136,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("com.example.app");
       expect(result.activityName).to.equal("com.example.app.MainActivity");
@@ -144,7 +146,7 @@ describe("Window", () => {
     it("should handle adb command failure gracefully", async () => {
       adbStub.executeCommand.rejects(new Error("ADB command failed"));
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("");
       expect(result.activityName).to.equal("");
@@ -160,7 +162,7 @@ describe("Window", () => {
         includes: (str: string) => false
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("");
       expect(result.activityName).to.equal("");
@@ -182,7 +184,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       // Should extract the package and activity from the mActivityRecord line within the Pop-Up Window block
       expect(result.appId).to.equal("com.zillow.android.zillowmap");
@@ -215,7 +217,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("com.zillow.android.zillowmap");
       expect(result.activityName).to.equal("com.zillow.android.appshell.MainTabActivity");
@@ -247,7 +249,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("com.example.testapp");
       expect(result.activityName).to.equal("com.example.MainActivity");
@@ -277,7 +279,7 @@ describe("Window", () => {
         includes: (str: string) => dumpsysOutput.includes(str)
       } as ExecResult);
 
-      const result = await window.getActive();
+      const result = await window.getActive(true);
 
       expect(result.appId).to.equal("com.example.testapp");
       expect(result.activityName).to.equal("com.example.MainActivity");

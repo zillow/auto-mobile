@@ -102,7 +102,7 @@ export class AccessibilityServiceClient {
      * @returns Promise<boolean> - True if available for use, false otherwise
      */
   async isAvailable(): Promise<boolean> {
-    // const startTime = Date.now();
+    const startTime = Date.now();
 
     // Check cache first
     if (AccessibilityServiceClient.cachedAvailability) {
@@ -118,36 +118,35 @@ export class AccessibilityServiceClient {
       timestamp: Date.now()
     };
 
-    logger.info(`[ACCESSIBILITY_SERVICE] Availability wasn't cached`);
-    return true;
+    logger.debug(`[ACCESSIBILITY_SERVICE] Availability wasn't cached`);
 
-    // try {
-    //   // Check installation and enabled status in parallel for better performance
-    //   const [installed, enabled] = await Promise.all([
-    //     this.isInstalled(),
-    //     this.isEnabled()
-    //   ]);
-    //
-    //   const available = installed && enabled;
-    //   const duration = Date.now() - startTime;
-    //
-    //   // Cache the result
-    //   AccessibilityServiceClient.cachedAvailability = {
-    //     isAvailable: available,
-    //     timestamp: Date.now()
-    //   };
-    //
-    //   logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available}`);
-    //   return available;
-    // } catch (error) {
-    //   const duration = Date.now() - startTime;
-    //   logger.warn(`[ACCESSIBILITY_SERVICE] Availability check failed after ${duration}ms: ${error}`);
-    //
-    //   // Clear cache on error
-    //   AccessibilityServiceClient.cachedAvailability = null;
-    //
-    //   return false;
-    // }
+    try {
+      // Check installation and enabled status in parallel for better performance
+      const [installed, enabled] = await Promise.all([
+        this.isInstalled(),
+        this.isEnabled()
+      ]);
+
+      const available = installed && enabled;
+      const duration = Date.now() - startTime;
+
+      // Cache the result
+      AccessibilityServiceClient.cachedAvailability = {
+        isAvailable: available,
+        timestamp: Date.now()
+      };
+
+      logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available}`);
+      return available;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Availability check failed after ${duration}ms: ${error}`);
+
+      // Clear cache on error
+      AccessibilityServiceClient.cachedAvailability = null;
+
+      return false;
+    }
   }
 
   /**

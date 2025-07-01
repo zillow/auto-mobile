@@ -87,13 +87,6 @@ export class Window {
   }
 
   /**
-   * Get cached active window
-   */
-  public getCachedActiveWindow(): ActiveWindowInfo | null {
-    return this.cachedActiveWindow;
-  }
-
-  /**
    * Clear the cached active window
    */
   public async clearCache(): Promise<void> {
@@ -112,6 +105,19 @@ export class Window {
     }
 
     logger.info("[WINDOW] Cleared cached active window");
+  }
+
+  async getCachedActiveWindow(): Promise<ActiveWindowInfo | null> {
+    if (!this.cachedActiveWindow) {
+      logger.info("[WINDOW] Using disk cached active window");
+      const diskCache = await this.readCacheFromDisk();
+      if (diskCache) {
+        this.cachedActiveWindow = diskCache;
+        logger.info("[WINDOW] Using disk cached active window");
+        return diskCache;
+      }
+    }
+    return this.cachedActiveWindow;
   }
 
   /**

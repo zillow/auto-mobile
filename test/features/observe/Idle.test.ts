@@ -278,7 +278,7 @@ describe("Idle - Unit Tests", function() {
         frameDeadlineMissedDelta: 0
       };
       const percentiles = {
-        percentile50th: 150, // > 100
+        percentile50th: 250, // > 200
         percentile90th: 80,
         percentile95th: 150
       };
@@ -296,7 +296,7 @@ describe("Idle - Unit Tests", function() {
       };
       const percentiles = {
         percentile50th: 50,
-        percentile90th: 150, // > 100
+        percentile90th: 250, // > 200
         percentile95th: 150
       };
 
@@ -314,7 +314,7 @@ describe("Idle - Unit Tests", function() {
       const percentiles = {
         percentile50th: 50,
         percentile90th: 80,
-        percentile95th: 250 // > 200
+        percentile95th: 450 // > 400
       };
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
