@@ -1,18 +1,16 @@
 # AutoMobile
 
-AutoMobile is a comprehensive set of tools that enables AI agents to interact with mobile devices. It provides automated
-testing, performance monitoring, and device interaction via an MCP server, custom test runner, and agentic loop that is
-compatible with multiple foundation model providers. The first platform supported is Android with plans to extend to iOS.
+AutoMobile is a set of tools for mobile device automation. You can use it for UI testing or as a development workflow
+assistant.
 
-# Why build this
+Its component parts:
 
-Mobile engineers have a hard time having high confidence when simple changes can have cascading consequences. The UI 
-tests meant to provide confidence are slow, brittle, and generally expensive to run. Product owners and designers have a
-tough time dogfooding mobile apps on both platforms. Accessibility audits require experts in mobile accessibility - and
-after 15 years we’re still applying WCAG once a quarter.
+- MCP server that doubles as a CLI tool
+- A Kotlin test authoring Clikt app
+- A custom JUnitRunner
+- Accessibility service to expose data quickly
 
-Basically everyone is missing something and it comes down to ease of access. It turns out there are low level tools that
-have been available and open sourced for years.
+The first platform supported is Android with plans to extend to iOS.
 
 # How do I get started?
 
@@ -20,6 +18,10 @@ have been available and open sourced for years.
 - [Authoring your first test](test-authoring-and-execution/first-plan-and-test.md) - Using AutoMobile MCP to automatically author a test
 - [Model Provider Guides](providers/overview.md) - To enable AutoMobile agent test recovery
 - [Running on CI](ci.md) - Automated testing capabilities
+
+# Why build this
+
+- [Origin](origin.md)
 
 ## Additional Resources
 

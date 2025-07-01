@@ -19,8 +19,7 @@ As we're not yet published on npm you need to build it from source, install it, 
 
 ```shell
 # clone the rep
-npm run build
-npm install -g
+npm install -g auto-mobile@latest
 ```
 
 Copy the following into Firebender/Cursor/your favorite MCP client:
@@ -32,21 +31,6 @@ Copy the following into Firebender/Cursor/your favorite MCP client:
       "command": "npx",
       "args": [
         "-y",
-        "auto-mobile"
-      ]
-    }
-  }
-}
-```
-
-Once its published on NPM you'll be able to just pull the built package as a single step:
-
-```json
-{
-  "mcpServers": {
-    "AutoMobile": {
-      "command": "npx",
-      "args": [
         "auto-mobile@latest"
       ]
     }

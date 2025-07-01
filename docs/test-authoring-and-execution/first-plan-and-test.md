@@ -7,25 +7,17 @@ This guide walks through creating your first AutoMobile test using automatic exp
 - AutoMobile MCP server installed and configured
 - Android device or emulator connected and accessible via ADB
 - Target app installed on the device
-- JUnit runner configured in your test project
 
-## Step 1: Enable Source Mapping
+## Step 1: Enable Source Mapping & Test Authoring
 
 This is what will allow AutoMobile to recognize what source code you're testing from the view hierarchy. Add
 environment variables to your AutoMobile MCP configuration like so:
 
 ```json
 {
-  "mcpServers": {
-    "AutoMobile": {
-      "command": "npx",
-      "args": ["-y", "auto-mobile"],
-      "env": {
-        "ANDROID_APP_ID": "com.example.android.app",
-        "ANDROID_SOURCE_PATH": "/Users/test/AndroidStudioProjects/example"
-      }
-    }
-  }
+  "androidProjectPath": "/absolute/path/to/your/android/project/root",
+  "androidAppId": "com.example.app",
+  "mode": "testAuthoring"
 }
 ```
 
@@ -39,34 +31,16 @@ Open the My Example App, complete Login with credentials
 testuser@example.com
 password123
 
-```typescript
-// Example interaction sequence
-await launchApp({ appId: "com.example.myapp" });
-await observe({ withViewHierarchy: true });
-await tapOn({ text: "Login" });
-await inputText({ text: "testuser@example.com" });
-await tapOn({ text: "Password" });
-await inputText({ text: "password123" });
-await tapOn({ text: "Sign In" });
-await assertVisible({ text: "Welcome" });
-```
-
 ## Step 3: Force Close the App
 
 Once you've completed your interaction sequence, force close the app. AutoMobile will then automatically write the plan
-and test in the relevant module of the tested UI.
+and test in the relevant module of the tested UI. You can also tell AutoMobile to close the app as part of its prompt.
 
 ## Step 4: Run the authored test
 
-Right click on the test created in Android Studio and run, or execute it manually via Gradle:
-
-```bash
-./gradlew test --tests LoginFlowTest
-```
+Right-click on the test created in Android Studio and run.
 
 ## Next Steps
-
-
 
 - Explore [plan syntax](syntax.md) for more complex interactions
 - Learn about [execution options](execution.md) for different environments

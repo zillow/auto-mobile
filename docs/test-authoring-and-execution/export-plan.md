@@ -1,49 +1,35 @@
 # Plans - Exporting
 
-Three ways to export AutoMobile plans from logged tool calls:
+Plans are automatically saved as YAML files and can be [replayed](execution.md) along with KotlinPoet-generated test
+files that reference the YAML plans. AutoMobile uses source mapping and heuristics to guide which module tests are
+written to.
 
-Plans are saved as YAML files and can be replayed using `executePlan`.
+## Step 1: Enable Source Mapping & Test Authoring
 
-## Automatic Export
-
-Plans are automatically exported to the specified directory with KotlinPoet-generated test files that reference the YAML
-plans.
-
-### MCP Config
-
-TODO: Create a tool call that allows the runtime configuration of these values. This would allow 
-for AutoMobile to dynamically create plans and tests that are best suited to the screens being tested.
-
-### Environment Variables
+This is what will allow AutoMobile to recognize what source code you're testing from the view hierarchy. Add
+environment variables to your AutoMobile MCP configuration like so:
 
 ```json
 {
-  "mcpServers": {
-    "AutoMobile": {
-      "command": "npx",
-      "args": ["-y", "auto-mobile@latest"],
-      "env": {
-        "AUTO_MOBILE_PLAN_EXPORT_DIR": "/path/to/test-plans",
-        "AUTO_MOBILE_TEST_EXPORT_DIR": "/path/to/test/sourceset/package/",
-        "AUTO_MOBILE_GENERATE_KOTLIN_TESTS": "true",
-        "AUTO_MOBILE_USER_CREDENTIALS": "/path/to/yaml/with/credentials"
-      }
-    }
-  }
+  "androidProjectPath": "/absolute/path/to/your/android/project/root",
+  "androidAppId": "com.example.app",
+  "mode": "testAuthoring"
 }
 ```
 
-## Manual CLI Export
+## Step 2: Explore your app via AutoMobile
 
-```bash
-# Export plan from command line
-auto-mobile --cli exportPlan --planName "login-test"
-```
+Give AutoMobile a goal to perform. It can be simple or complex.
 
-## Manual MCP Agent Export
+Example Prompt:
 
-```yaml
-# Agent calls exportPlan tool
-- tool: exportPlan
-  planName: "shopping-cart-test"
-```
+Open the My Example App, complete Login with credentials
+testuser@example.com
+password123
+
+## Step 3: Force Close the App
+
+Once you've completed your interaction sequence, force close the app. AutoMobile will then automatically write the plan
+and test in the relevant module of the tested UI. You can also tell AutoMobile to close the app as part of its prompt.
+
+If you have a use-case where you'd prefer to trigger exporting plans differently, please file an issue.
