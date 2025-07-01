@@ -46,7 +46,7 @@ describe("ViewHierarchy", function() {
         getActive: async () => ({ packageName: "test.package", activityName: "TestActivity", layoutSeqSum: 123 })
       } as unknown as Window;
 
-      viewHierarchy = new ViewHierarchy(null, mockAdb, mockTakeScreenshot, mockWindow);
+      viewHierarchy = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshot, mockWindow);
       setupReadFileMock();
     });
 
@@ -232,7 +232,7 @@ describe("ViewHierarchy", function() {
         getActive: async () => ({ packageName: "test.package", activityName: "TestActivity", layoutSeqSum: 123 })
       } as unknown as Window;
 
-      viewHierarchy = new ViewHierarchy(null, mockAdb, mockTakeScreenshot, mockWindow);
+      viewHierarchy = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshot, mockWindow);
     });
 
     it("should parse dumpsys activity top output for class overrides", function() {
@@ -400,7 +400,7 @@ describe("ViewHierarchy", function() {
         getActive: async () => ({ packageName: "test.package", activityName: "TestActivity", layoutSeqSum: 123 })
       } as unknown as Window;
 
-      viewHierarchy = new ViewHierarchy(null, mockAdb, mockTakeScreenshot, mockWindow);
+      viewHierarchy = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshot, mockWindow);
     });
 
     it("should return null from checkInMemoryCache when no cache exists", async function() {
@@ -544,7 +544,7 @@ describe("ViewHierarchy", function() {
         getActive: async () => ({ packageName: "test.package", activityName: "TestActivity", layoutSeqSum: 123 })
       } as unknown as Window;
 
-      viewHierarchy = new ViewHierarchy(null, mockAdb, mockTakeScreenshot, mockWindow);
+      viewHierarchy = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshot, mockWindow);
     });
 
     it("should process valid XML data correctly", async function() {
@@ -585,7 +585,7 @@ describe("ViewHierarchy", function() {
         }
       } as unknown as AdbUtils;
 
-      const viewHierarchyWithMock = new ViewHierarchy(null, mockAdbWithOutput, mockTakeScreenshot, mockWindow);
+      const viewHierarchyWithMock = new ViewHierarchy("test-device", mockAdbWithOutput, mockTakeScreenshot, mockWindow);
 
       const result = await viewHierarchyWithMock.executeUiAutomatorDump();
       expect(result).to.equal(xmlContent);
@@ -606,7 +606,7 @@ describe("ViewHierarchy", function() {
         execute: async () => ({ success: false, error: "Screenshot failed" })
       } as unknown as TakeScreenshot;
 
-      const viewHierarchyWithMock = new ViewHierarchy(null, mockAdb, mockTakeScreenshotFail, mockWindow);
+      const viewHierarchyWithMock = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshotFail, mockWindow);
 
       try {
         await viewHierarchyWithMock.getOrCreateScreenshotBuffer(null);
@@ -637,7 +637,7 @@ describe("ViewHierarchy", function() {
         getActive: async () => null // Simulate no active window
       } as unknown as Window;
 
-      viewHierarchy = new ViewHierarchy(null, mockAdb, mockTakeScreenshot, mockWindow);
+      viewHierarchy = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshot, mockWindow);
       setupReadFileMock();
     });
 
@@ -661,7 +661,7 @@ describe("ViewHierarchy", function() {
         execute: async () => ({ success: false, error: "screenshot error" })
       } as unknown as TakeScreenshot;
 
-      const viewHierarchyWithMocks = new ViewHierarchy(null, mockAdb, mockTakeScreenshotError, mockWindowWithActive);
+      const viewHierarchyWithMocks = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshotError, mockWindowWithActive);
 
       const result = await viewHierarchyWithMocks.getViewHierarchy();
 
@@ -676,7 +676,7 @@ describe("ViewHierarchy", function() {
         }
       } as unknown as AdbUtils;
 
-      const viewHierarchyWithError = new ViewHierarchy(null, mockAdbError, mockTakeScreenshot, mockWindow);
+      const viewHierarchyWithError = new ViewHierarchy("test-device", mockAdbError, mockTakeScreenshot, mockWindow);
 
       try {
         await viewHierarchyWithError.executeUiAutomatorDump();
@@ -693,7 +693,7 @@ describe("ViewHierarchy", function() {
         }
       } as unknown as AdbUtils;
 
-      const viewHierarchyWithError = new ViewHierarchy(null, mockAdbLockedError, mockTakeScreenshot, mockWindow);
+      const viewHierarchyWithError = new ViewHierarchy("test-device", mockAdbLockedError, mockTakeScreenshot, mockWindow);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -710,7 +710,7 @@ describe("ViewHierarchy", function() {
         }
       } as unknown as AdbUtils;
 
-      const viewHierarchyWithError = new ViewHierarchy(null, mockAdbCatError, mockTakeScreenshot, mockWindow);
+      const viewHierarchyWithError = new ViewHierarchy("test-device", mockAdbCatError, mockTakeScreenshot, mockWindow);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -727,7 +727,7 @@ describe("ViewHierarchy", function() {
         }
       } as unknown as AdbUtils;
 
-      const viewHierarchyWithError = new ViewHierarchy(null, mockAdbGenericError, mockTakeScreenshot, mockWindow);
+      const viewHierarchyWithError = new ViewHierarchy("test-device", mockAdbGenericError, mockTakeScreenshot, mockWindow);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -757,7 +757,7 @@ describe("ViewHierarchy", function() {
         getActive: async () => ({ packageName: "test.package", activityName: "TestActivity", layoutSeqSum: 123 })
       } as unknown as Window;
 
-      viewHierarchy = new ViewHierarchy(null, mockAdb, mockTakeScreenshot, mockWindow);
+      viewHierarchy = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshot, mockWindow);
     });
 
     it("should handle empty hierarchy", function() {
@@ -816,7 +816,7 @@ describe("ViewHierarchy", function() {
         getActive: async () => ({ packageName: "test.package", activityName: "TestActivity", layoutSeqSum: 123 })
       } as unknown as Window;
 
-      viewHierarchy = new ViewHierarchy(null, mockAdb, mockTakeScreenshot, mockWindow);
+      viewHierarchy = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshot, mockWindow);
     });
 
     it("should handle node with empty children array", function() {
@@ -973,7 +973,7 @@ describe("ViewHierarchy - Integration", function() {
     takeScreenshot = new TakeScreenshot(null, adb);
     window = new Window(null, adb);
     awaitIdle = new AwaitIdle(null, adb);
-    viewHierarchy = new ViewHierarchy(null, adb, takeScreenshot, window);
+    viewHierarchy = new ViewHierarchy("test-device", adb, takeScreenshot, window);
 
     // Check if any devices are connected
     try {
@@ -1381,7 +1381,7 @@ async function traverseHierarchyAsync(hierarchy: any, callback: (node: any) => P
 
 describe("Z-Index Accessibility Analysis", () => {
   it("should add accessible field to clickable elements", async () => {
-    const viewHierarchy = new ViewHierarchy(null, null, null, null);
+    const viewHierarchy = new ViewHierarchy("test-device", null, null, null);
 
     // Mock XML with clickable elements at different Z levels
     const mockXml = `
@@ -1423,7 +1423,7 @@ describe("Z-Index Accessibility Analysis", () => {
   });
 
   it("should calculate accessibility percentage correctly for overlapping elements", async () => {
-    const viewHierarchy = new ViewHierarchy(null, null, null, null);
+    const viewHierarchy = new ViewHierarchy("test-device", null, null, null);
 
     // Mock XML with overlapping clickable elements
     const mockXml = `
@@ -1465,7 +1465,7 @@ describe("Z-Index Accessibility Analysis", () => {
   });
 
   it("should handle elements with no bounds gracefully", async () => {
-    const viewHierarchy = new ViewHierarchy(null, null, null, null);
+    const viewHierarchy = new ViewHierarchy("test-device", null, null, null);
 
     // Mock XML with element without bounds
     const mockXml = `
@@ -1486,7 +1486,7 @@ describe("findFocusedElement", function() {
   let viewHierarchy: ViewHierarchy;
 
   beforeEach(function() {
-    viewHierarchy = new ViewHierarchy(null, null, null, null);
+    viewHierarchy = new ViewHierarchy("test-device", null, null, null);
   });
 
   it("should find focused element in simple hierarchy", function() {

@@ -537,99 +537,98 @@ export class ViewHierarchy {
       }
     }
 
-    throw new Error("Fallback unavailable");
-    // try {
-    //   // Run screenshot capture and fallback activity hash lookup in parallel
-    //   const parallelOperationsStartTime = Date.now();
-    //   const screenshotBufferResult = await this.getOrCreateScreenshotBuffer(screenshotPath);
-    //   const parallelOperationsDuration = Date.now() - parallelOperationsStartTime;
-    //   logger.info(`[VIEW_HIERARCHY] Screenshot + activity hash obtained in parallel in ${parallelOperationsDuration}ms`);
-    //
-    //   const { buffer: screenshotBuffer } = screenshotBufferResult;
-    //   logger.info(`[VIEW_HIERARCHY] Screenshot buffer size: ${screenshotBuffer.length} bytes`);
-    //
-    //   // Scan backwards through up to 200 recent screenshots to find one that actually has cached view hierarchy data
-    //   logger.info("[VIEW_HIERARCHY] Scanning recent screenshots for fuzzy matches with cached view hierarchy");
-    //   const fuzzyStartTime = Date.now();
-    //   const cachedResult = await this.findFuzzyMatchWithCache(screenshotBuffer, 200);
-    //   const fuzzyDuration = Date.now() - fuzzyStartTime;
-    //
-    //   if (cachedResult) {
-    //     const totalDuration = Date.now() - startTime;
-    //     logger.info(`[VIEW_HIERARCHY] *** CACHE HIT: Found cached view hierarchy using fuzzy matching in ${fuzzyDuration}ms, total getViewHierarchy time: ${totalDuration}ms ***`);
-    //
-    //     // Try to augment with source indexing if not already present
-    //     const extendedResult = await this.augmentWithSourceIndexing(cachedResult as ExtendedViewHierarchyResult);
-    //     return extendedResult;
-    //   }
-    //
-    //   logger.info(`[VIEW_HIERARCHY] No fuzzy match found after ${fuzzyDuration}ms`);
-    //
-    //   logger.info("[VIEW_HIERARCHY] *** CACHE MISS: No cached view hierarchy found, fetching new hierarchy ***");
-    //
-    //   // Get fresh view hierarchy
-    //   const freshStartTime = Date.now();
-    //   const viewHierarchy = await this._getViewHierarchyWithoutCache();
-    //   const freshDuration = Date.now() - freshStartTime;
-    //   logger.info(`[VIEW_HIERARCHY] Fresh hierarchy fetched in ${freshDuration}ms`);
-    //
-    //   // Augment with source indexing information
-    //   const sourceStartTime = Date.now();
-    //   const extendedViewHierarchy = await this.augmentWithSourceIndexing(viewHierarchy as ExtendedViewHierarchyResult);
-    //   const sourceDuration = Date.now() - sourceStartTime;
-    //   logger.info(`[VIEW_HIERARCHY] Source indexing augmentation took ${sourceDuration}ms`);
-    //
-    //   // Cache the result using a timestamp
-    //   const cacheStartTime = Date.now();
-    //   const timestamp = Date.now();
-    //   logger.info(`[VIEW_HIERARCHY] Caching view hierarchy with timestamp: ${timestamp}`);
-    //   await this.cacheViewHierarchy(timestamp, extendedViewHierarchy);
-    //   const cacheDuration = Date.now() - cacheStartTime;
-    //   logger.info(`[VIEW_HIERARCHY] Caching completed in ${cacheDuration}ms`);
-    //
-    //   // Save the screenshot with the same timestamp for future fuzzy matching
-    //   const saveScreenshotStartTime = Date.now();
-    //   await this.saveScreenshotForFuzzyMatching(screenshotBuffer, timestamp.toString());
-    //   const saveScreenshotDuration = Date.now() - saveScreenshotStartTime;
-    //   logger.info(`[VIEW_HIERARCHY] Screenshot save for fuzzy matching took ${saveScreenshotDuration}ms`);
-    //
-    //   const totalDuration = Date.now() - startTime;
-    //   logger.info(`[VIEW_HIERARCHY] *** FRESH HIERARCHY: getViewHierarchy completed in ${totalDuration}ms (fresh hierarchy) ***`);
-    //   return viewHierarchy;
-    // } catch (err) {
-    //   const totalDuration = Date.now() - startTime;
-    //   logger.warn(`[VIEW_HIERARCHY] getViewHierarchy failed after ${totalDuration}ms:`, err);
-    //
-    //   // If the error is one of the specific ADB errors, re-call _getViewHierarchyWithoutCache
-    //   // to ensure its specific error message is returned.
-    //   if (err instanceof Error &&
-    //     (err.message.includes("null root node returned by UiTestAutomationBridge") ||
-    //       err.message.includes("cat:") ||
-    //       err.message.includes("No such file or directory"))) {
-    //     logger.info("[VIEW_HIERARCHY] Specific ADB error detected, calling _getViewHierarchyWithoutCache to get its specific error message.");
-    //     return await this._getViewHierarchyWithoutCache();
-    //   }
-    //
-    //   // If screenshot-related error, fall back to getting view hierarchy without cache
-    //   // (this might also lead to one of the specific errors above if _getViewHierarchyWithoutCache fails)
-    //   if (err instanceof Error && err.message.includes("screenshot")) {
-    //     logger.info("[VIEW_HIERARCHY] Screenshot error detected, falling back to view hierarchy without cache");
-    //     const fallbackResult = await this._getViewHierarchyWithoutCache();
-    //     // If the fallback result has a specific error message, preserve it
-    //     if (fallbackResult.hierarchy && (fallbackResult.hierarchy as any).error) {
-    //       return fallbackResult;
-    //     }
-    //     return fallbackResult;
-    //   }
-    //
-    //   // For all other unhandled errors from getViewHierarchy itself, return the generic message.
-    //   logger.info("[VIEW_HIERARCHY] Unhandled error in getViewHierarchy, returning generic error message.");
-    //   return {
-    //     hierarchy: {
-    //       error: "Failed to retrieve view hierarchy"
-    //     }
-    //   } as unknown as ViewHierarchyResult;
-    // }
+    try {
+      // Run screenshot capture and fallback activity hash lookup in parallel
+      const parallelOperationsStartTime = Date.now();
+      const screenshotBufferResult = await this.getOrCreateScreenshotBuffer(screenshotPath);
+      const parallelOperationsDuration = Date.now() - parallelOperationsStartTime;
+      logger.info(`[VIEW_HIERARCHY] Screenshot + activity hash obtained in parallel in ${parallelOperationsDuration}ms`);
+
+      const { buffer: screenshotBuffer } = screenshotBufferResult;
+      logger.info(`[VIEW_HIERARCHY] Screenshot buffer size: ${screenshotBuffer.length} bytes`);
+
+      // Scan backwards through up to 200 recent screenshots to find one that actually has cached view hierarchy data
+      logger.info("[VIEW_HIERARCHY] Scanning recent screenshots for fuzzy matches with cached view hierarchy");
+      const fuzzyStartTime = Date.now();
+      const cachedResult = await this.findFuzzyMatchWithCache(screenshotBuffer, 200);
+      const fuzzyDuration = Date.now() - fuzzyStartTime;
+
+      if (cachedResult) {
+        const totalDuration = Date.now() - startTime;
+        logger.info(`[VIEW_HIERARCHY] *** CACHE HIT: Found cached view hierarchy using fuzzy matching in ${fuzzyDuration}ms, total getViewHierarchy time: ${totalDuration}ms ***`);
+
+        // Try to augment with source indexing if not already present
+        const extendedResult = await this.augmentWithSourceIndexing(cachedResult as ExtendedViewHierarchyResult);
+        return extendedResult;
+      }
+
+      logger.info(`[VIEW_HIERARCHY] No fuzzy match found after ${fuzzyDuration}ms`);
+
+      logger.info("[VIEW_HIERARCHY] *** CACHE MISS: No cached view hierarchy found, fetching new hierarchy ***");
+
+      // Get fresh view hierarchy
+      const freshStartTime = Date.now();
+      const viewHierarchy = await this._getViewHierarchyWithoutCache();
+      const freshDuration = Date.now() - freshStartTime;
+      logger.info(`[VIEW_HIERARCHY] Fresh hierarchy fetched in ${freshDuration}ms`);
+
+      // Augment with source indexing information
+      const sourceStartTime = Date.now();
+      const extendedViewHierarchy = await this.augmentWithSourceIndexing(viewHierarchy as ExtendedViewHierarchyResult);
+      const sourceDuration = Date.now() - sourceStartTime;
+      logger.info(`[VIEW_HIERARCHY] Source indexing augmentation took ${sourceDuration}ms`);
+
+      // Cache the result using a timestamp
+      const cacheStartTime = Date.now();
+      const timestamp = Date.now();
+      logger.info(`[VIEW_HIERARCHY] Caching view hierarchy with timestamp: ${timestamp}`);
+      await this.cacheViewHierarchy(timestamp, extendedViewHierarchy);
+      const cacheDuration = Date.now() - cacheStartTime;
+      logger.info(`[VIEW_HIERARCHY] Caching completed in ${cacheDuration}ms`);
+
+      // Save the screenshot with the same timestamp for future fuzzy matching
+      const saveScreenshotStartTime = Date.now();
+      await this.saveScreenshotForFuzzyMatching(screenshotBuffer, timestamp.toString());
+      const saveScreenshotDuration = Date.now() - saveScreenshotStartTime;
+      logger.info(`[VIEW_HIERARCHY] Screenshot save for fuzzy matching took ${saveScreenshotDuration}ms`);
+
+      const totalDuration = Date.now() - startTime;
+      logger.info(`[VIEW_HIERARCHY] *** FRESH HIERARCHY: getViewHierarchy completed in ${totalDuration}ms (fresh hierarchy) ***`);
+      return viewHierarchy;
+    } catch (err) {
+      const totalDuration = Date.now() - startTime;
+      logger.warn(`[VIEW_HIERARCHY] getViewHierarchy failed after ${totalDuration}ms:`, err);
+
+      // If the error is one of the specific ADB errors, re-call _getViewHierarchyWithoutCache
+      // to ensure its specific error message is returned.
+      if (err instanceof Error &&
+        (err.message.includes("null root node returned by UiTestAutomationBridge") ||
+          err.message.includes("cat:") ||
+          err.message.includes("No such file or directory"))) {
+        logger.info("[VIEW_HIERARCHY] Specific ADB error detected, calling _getViewHierarchyWithoutCache to get its specific error message.");
+        return await this._getViewHierarchyWithoutCache();
+      }
+
+      // If screenshot-related error, fall back to getting view hierarchy without cache
+      // (this might also lead to one of the specific errors above if _getViewHierarchyWithoutCache fails)
+      if (err instanceof Error && err.message.includes("screenshot")) {
+        logger.info("[VIEW_HIERARCHY] Screenshot error detected, falling back to view hierarchy without cache");
+        const fallbackResult = await this._getViewHierarchyWithoutCache();
+        // If the fallback result has a specific error message, preserve it
+        if (fallbackResult.hierarchy && (fallbackResult.hierarchy as any).error) {
+          return fallbackResult;
+        }
+        return fallbackResult;
+      }
+
+      // For all other unhandled errors from getViewHierarchy itself, return the generic message.
+      logger.info("[VIEW_HIERARCHY] Unhandled error in getViewHierarchy, returning generic error message.");
+      return {
+        hierarchy: {
+          error: "Failed to retrieve view hierarchy"
+        }
+      } as unknown as ViewHierarchyResult;
+    }
   }
 
   /**
