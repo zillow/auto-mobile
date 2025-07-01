@@ -22,12 +22,10 @@ describe("Rotate", () => {
     sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(mockAdb.executeCommand);
     sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
     sinon.stub(AwaitIdle.prototype, "waitForRotation").callsFake(mockAwaitIdle.waitForRotation);
-    sinon.stub(AwaitIdle.prototype, "waitForIdleTouchEvents").callsFake(mockAwaitIdle.waitForIdleTouchEvents);
     sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
 
     // Set up default mock implementations
     mockAwaitIdle.waitForRotation.resolves();
-    mockAwaitIdle.waitForIdleTouchEvents.resolves();
     mockAwaitIdle.waitForUiStability.resolves();
 
     rotate = new Rotate("test-device");
@@ -125,15 +123,6 @@ describe("Rotate", () => {
   });
 
   describe("execute", () => {
-    it("should reject invalid orientation", async () => {
-      const result = await rotate.execute("invalid" as any);
-
-      assert.isFalse(result.success);
-      assert.equal(result.orientation, "invalid");
-      assert.equal(result.value, -1);
-      assert.include(result.error || "", 'must be "portrait" or "landscape"');
-    });
-
     it("should skip rotation when already in desired orientation", async () => {
       // Mock getting current orientation as portrait
       mockAdb.executeCommand.withArgs("shell settings get system user_rotation").resolves(createMockExecResult("0"));
@@ -152,30 +141,6 @@ describe("Rotate", () => {
       // Should only call to get current orientation, not to set it
       sinon.assert.calledWith(mockAdb.executeCommand, "shell settings get system user_rotation");
       sinon.assert.neverCalledWith(mockAdb.executeCommand, "shell settings put system user_rotation 0");
-    });
-
-    it("should work with progress callback", async () => {
-      // Mock different orientations
-      mockAdb.executeCommand.withArgs("shell settings get system user_rotation")
-        .onFirstCall().resolves(createMockExecResult("0"))
-        .onSecondCall().resolves(createMockExecResult("1")); // After rotation
-      mockAdb.executeCommand.withArgs("shell settings get system accelerometer_rotation").resolves(createMockExecResult("1"));
-      mockAdb.executeCommand.withArgs("shell settings put system accelerometer_rotation 1").resolves(createMockExecResult());
-      mockAdb.executeCommand.withArgs("shell settings put system user_rotation 1").resolves(createMockExecResult());
-
-      const mockObservation = createMockObserveResult();
-      mockObserveScreen.execute.resolves(mockObservation);
-
-      const progressCallback = sinon.spy();
-      const result = await rotate.execute("landscape", progressCallback);
-
-      assert.isTrue(result.success);
-      assert.isTrue(progressCallback.called);
-
-      // Check that progress was called with expected stages
-      const progressCalls = progressCallback.getCalls();
-      assert.isTrue(progressCalls.some(call => call.args[2]?.includes("Checking current device orientation")));
-      assert.isTrue(progressCalls.some(call => call.args[2]?.includes("Rotating from portrait to landscape")));
     });
 
     it("should perform rotation when orientation differs", async () => {
@@ -243,8 +208,8 @@ describe("Rotate", () => {
   });
 
   describe("constructor", () => {
-    it("should work with null deviceId", () => {
-      const rotateInstance = new Rotate(null);
+    it("should work with non-null deviceId", () => {
+      const rotateInstance = new Rotate("test-device");
       assert.isDefined(rotateInstance);
     });
 

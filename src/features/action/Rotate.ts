@@ -65,20 +65,12 @@ export class Rotate extends BaseVisualChange {
 
     const value = orientation === "portrait" ? 0 : 1;
 
-    if (progress) {
-      await progress(0, 100, "Checking current device orientation...");
-    }
-
     // Get current orientation
     const currentOrientation = await this.getCurrentOrientation();
 
     // Check if we're already in the desired orientation
     if (currentOrientation === orientation) {
       logger.info(`Device is already in ${orientation} orientation, no rotation needed`);
-
-      if (progress) {
-        await progress(100, 100, `Already in ${orientation} orientation`);
-      }
 
       // Still take an observation for consistency
       const observation = await this.observeScreen.execute();
@@ -94,10 +86,6 @@ export class Rotate extends BaseVisualChange {
       };
     }
 
-    if (progress) {
-      await progress(20, 100, "Checking orientation lock status...");
-    }
-
     // Check if orientation is locked
     const isLocked = await this.isOrientationLocked();
     let orientationUnlocked = false;
@@ -105,35 +93,20 @@ export class Rotate extends BaseVisualChange {
     return this.observedChange(
       async () => {
         try {
-          if (progress) {
-            await progress(30, 100, `Rotating from ${currentOrientation} to ${orientation}...`);
-          }
 
           // If orientation is locked, unlock it temporarily
           if (isLocked) {
             logger.info("Orientation is locked, temporarily unlocking for rotation");
             await this.adb.executeCommand("shell settings put system accelerometer_rotation 1");
             orientationUnlocked = true;
-
-            if (progress) {
-              await progress(40, 100, "Temporarily unlocked orientation...");
-            }
           }
 
           // Disable accelerometer rotation and set user rotation
           await this.adb.executeCommand("shell settings put system accelerometer_rotation 0");
           await this.adb.executeCommand(`shell settings put system user_rotation ${value}`);
 
-          if (progress) {
-            await progress(60, 100, "Waiting for rotation to complete...");
-          }
-
           // Wait for rotation to complete
           await this.awaitIdle.waitForRotation(value);
-
-          if (progress) {
-            await progress(80, 100, "Verifying new orientation...");
-          }
 
           // If orientation was originally locked, restore the lock
           if (orientationUnlocked) {
