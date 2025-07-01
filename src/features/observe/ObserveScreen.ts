@@ -1,5 +1,5 @@
 import { logger } from "../../utils/logger";
-import { ActiveWindowInfo, ObserveResult } from "../../models";
+import { ObserveResult } from "../../models";
 import { GetScreenSize } from "./GetScreenSize";
 import { GetSystemInsets } from "./GetSystemInsets";
 import { ViewHierarchy } from "./ViewHierarchy";
