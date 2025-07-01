@@ -38,4 +38,4 @@ Configuration for your favorite MCP client:
 }
 ```
 
-![firebender-mcp-server-setup.png](img/firebender-mcp-server-setup-dev.png)
+![firebender-mcp-server-setup.png](../img/firebender-mcp-server-setup-dev.png)

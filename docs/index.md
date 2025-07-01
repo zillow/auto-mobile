@@ -16,7 +16,7 @@ The first platform supported is Android with plans to extend to iOS.
 - [FAQ](faq.md) - Frequently asked questions
 - [Why build this?](origin.md) - Motivation and origin story
 - [Technical Architecture](features/architecture.md) - Understand how AutoMobile works 
-- [Local Development](local-development.md) - If you're looking to contribute to the project
+- [Local Development](contributing/local-development.md) - If you're looking to contribute to the project
 - [Security](security.md) - Responsible vulnerability disclosure & use
 
 ## Acknowledgement

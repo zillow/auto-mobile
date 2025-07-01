@@ -6,18 +6,27 @@ Right now this guide assumes you are a software engineer. Eventually I'll have a
 
 - Node.js 18 or later
 
-AutoMobile will automatically download and install the following unless they already exist.
-- Command line tools installed via Homebrew or manually in $ANDROID_HOME/cmdline_tools
-- Android SDK installed at ANDROID_HOME,
+#### Android SDK + Emulator Setup
+
+AutoMobile will automatically download and install the following unless they already exist:
+
+- Command line tools installed via Homebrew or manually in `$ANDROID_HOME/cmdline_tools`
+- Android SDK installed at `$ANDROID_HOME`
 - At least one Android device or emulator
 
 Physical devices do need USB debugging enabled for AutoMobile to function with them. Ripgrep makes it go faster.
 
-### Setup
+### MCP Client Setup
 
 AutoMobile is distributed mainly as an NPM package.
 
-Its primary use case for local development environments is as an MCP server. Copy the following into Firebender/Cursor/your favorite MCP client:
+Its primary use case for local development environments is as an MCP server.
+
+1-click install:
+
+- [Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=auto-mobile&config=eyJfX3R5cGVuYW1lIjoiQ2F0YWxvZ0l0ZW1NY3BDb25maWdDb21tYW5kIiwiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJhdXRvLW1vYmlsZUBsYXRlc3QiXSwiZW52IjpudWxsfQ==)
+
+If your favorite MCP client doesn't have that capability yet, copy the following into your MCP config:
 
 ```json
 {
