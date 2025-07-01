@@ -3,36 +3,31 @@
 AutoMobile is a set of tools for mobile device automation. You can use it for UI testing or as a development workflow
 assistant.
 
-Its component parts:
-
-- MCP server that doubles as a CLI tool
-- A Kotlin test authoring Clikt app
-- A custom JUnitRunner
-- Accessibility service to expose data quickly
-
 The first platform supported is Android with plans to extend to iOS.
 
-# How do I get started?
+**How do I get started?**
 
 - [Installation](installation.md) - Gets you setup with your IDE & MCP Client combination
-- [Authoring your first test](test-authoring-and-execution/first-plan-and-test.md) - Using AutoMobile MCP to automatically author a test
+- [Authoring your first test](test-authoring/overview.md) - Using AutoMobile MCP to automatically author a test
 - [Model Provider Guides](providers/overview.md) - To enable AutoMobile agent test recovery
 - [Running on CI](ci.md) - Automated testing capabilities
 
-# Why build this
+**Why build this**
 
 - [Origin](origin.md)
 
-## Additional Resources
+**Additional Resources**
 
 - [FAQ](faq.md) - Frequently asked questions
+- [Technical Architecture](architecture.md) - Understand how AutoMobile works 
+- [Local Development](local-development.md) - If you're looking to contribute to the project
 - [Security](security.md) - Responsible vulnerability disclosure & use
 
-# Acknowledgement
+## Acknowledgement
 
-By continuing to use AutoMobile, you acknowledge and agree to the warnings and responsible use requirements above.
+By continuing to use AutoMobile, you acknowledge and agree to the warnings and [responsible use requirements](security.md).
 
-# License
+## License
 
 ```text
 Copyright (C) 2025 Zillow Group

@@ -27,9 +27,8 @@ Any MCP-compatible tool calling client can use AutoMobile's MCP, including:
 - claude code
 - Other MCP-compatible tools and frameworks
 
-I'm a single author and don't have time to test every client. As I can put integration tests in place for clients I will,
-but mostly I plan to do integration testing against `fast-agent` because it has a complete MCP client implementation and
-is open source.
+I don't have time to test every client. As I can put integration tests in place for clients I will, but mostly I plan
+to do integration testing against `fast-agent` because it has a complete MCP client implementation and is open source.
 
 ### What are the system requirements?
 
@@ -85,7 +84,7 @@ significantly, ensuring accuracy while minimizing redundant operations. I wrote 
 
 ### Can I test apps that require login?
 
-See [docs on user credential](test-authoring-and-execution/todo-user-credentials.md).
+See [docs on user credential](test-authoring/todo-user-credentials.md).
 
 ### How fast are the interactions?
 

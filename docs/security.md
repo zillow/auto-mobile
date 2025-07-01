@@ -8,7 +8,7 @@ To report security issues, please follow [Zillow Group's Responsible Disclosure]
 
 ## Responsible Use Disclaimer
 
-AutoMobile is an experimental software project designed to enable AI agent interaction with mobile devices. See [LICENSE](LICENSE).
+AutoMobile is an experimental software project designed to enable AI agent interaction with mobile devices. See [LICENSE](https://github.com/zillow/auto-mobile/blob/main/LICENSE).
 
 ## Warnings and Limitations
 

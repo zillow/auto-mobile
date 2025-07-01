@@ -68,7 +68,7 @@ nav:
   - 'Features':
       - 'Overview': features.md
       - 'Batteries Included': batteries-included.md
-      - 'Plan Authoring & Execution': plan-authoring-execution.md
+      - 'Plan Authoring & Execution': plan-authoring-execution-options.md
       - 'CLI': cli.md
       - 'CI': ci.md
   - 'MCP Client Config':

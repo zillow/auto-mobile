@@ -1,6 +1,6 @@
 # Plans - Exporting
 
-Plans are automatically saved as YAML files and can be [replayed](execution.md) along with KotlinPoet-generated test
+Plans are automatically saved as YAML files and can be [replayed](execution-options.md) along with KotlinPoet-generated test
 files that reference the YAML plans. AutoMobile uses source mapping and heuristics to guide which module tests are
 written to.
 

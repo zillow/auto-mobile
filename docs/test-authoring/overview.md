@@ -1,14 +1,16 @@
-# AutoMobile Plans - Authoring First Test
+# Test Authoring - Overview
 
-This guide walks through creating your first AutoMobile test using automatic export and JUnit runner execution.
+Steps to take whether you're setting up AutoMobile test authoring & execution for the first time or debugging an issue.
 
 ## Prerequisites
 
-- AutoMobile MCP server installed and configured
-- Android device or emulator connected and accessible via ADB
-- Target app installed on the device
+- AutoMobile should be [installed](../installation.md) .
+- Android device or emulator connected and accessible via ADB.
+- The target app installed on the device.
 
-## Step 1: Enable Source Mapping & Test Authoring
+## Automatic Test Authoring
+
+#### Configure AutoMobile your project
 
 This is what will allow AutoMobile to recognize what source code you're testing from the view hierarchy. Add
 environment variables to your AutoMobile MCP configuration like so:
@@ -21,7 +23,7 @@ environment variables to your AutoMobile MCP configuration like so:
 }
 ```
 
-## Step 2: Explore your app via AutoMobile
+#### Explore your app via AutoMobile
 
 Give AutoMobile a goal to perform. It can be simple or complex.
 
@@ -31,20 +33,18 @@ Open the My Example App, complete Login with credentials
 testuser@example.com
 password123
 
-## Step 3: Force Close the App
+#### Force Close the App
 
 Once you've completed your interaction sequence, force close the app. AutoMobile will then automatically write the plan
 and test in the relevant module of the tested UI. You can also tell AutoMobile to close the app as part of its prompt.
 
-## Step 4: Run the authored test
+If you have a use-case where you'd prefer to trigger exporting plans differently, please file an issue.
 
-Right-click on the test created in Android Studio and run.
+## Advanced
 
-## Next Steps
-
-- Explore [plan syntax](syntax.md) for more complex interactions
-- Learn about [execution options](execution.md) for different environments
-- Review [export options](export-plan.md) for CI/CD integration
+- Explore [plan syntax](plan-syntax.md) for more complex interactions
+- Learn about [execution options](execution-options.md).
+- Review [export options](automatic-test-authoring.md) for CI/CD integration
 
 Your first AutoMobile test is now ready to run! The automatic export and JUnit runner integration makes it easy to go
 from manual interaction to automated test execution.

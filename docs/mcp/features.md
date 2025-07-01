@@ -76,5 +76,4 @@
 ### Security Considerations
 
 - **Non-Root Operation**: All functionality works without device root access
-- **Controlled Access**: Operates within standard ADB security boundaries
-- **Safe Defaults**: Conservative timing and interaction patterns to prevent device issues
+
