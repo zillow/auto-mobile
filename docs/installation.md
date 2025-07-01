@@ -15,14 +15,9 @@ Physical devices do need USB debugging enabled for AutoMobile to function with t
 
 ### Setup
 
-As we're not yet published on npm you need to build it from source, install it, then run the local installation:
+AutoMobile is distributed mainly as an NPM package.
 
-```shell
-# clone the rep
-npm install -g auto-mobile@latest
-```
-
-Copy the following into Firebender/Cursor/your favorite MCP client:
+Its primary use case for local development environments is as an MCP server. Copy the following into Firebender/Cursor/your favorite MCP client:
 
 ```json
 {
@@ -38,9 +33,16 @@ Copy the following into Firebender/Cursor/your favorite MCP client:
 }
 ```
 
+You can also install it directly as a CLI tool.
+
+```shell
+npm install -g auto-mobile@latest
+
+# Test CLI mode to check installation succeeded
+auto-mobile --cli
+```
+
 For full integration:
 
 1. Follow [MCP client config](mcp/overview.md) guide.
-2. Add [AutoMobile JUnitRunner dependency](junitrunner/setup.md)
-3. Begin interacting with your device through AI commands. Ask to export a plan when you want to write a test with it.
-4. Point your agent at an existing test (Espresso/Maestro/Zephyr) and ask it to rewrite it with AutoMobile.
+2. Add [AutoMobile JUnitRunner test dependency](junitrunner/setup.md) to all Android application and library modules.

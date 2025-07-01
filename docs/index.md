@@ -7,18 +7,14 @@ The first platform supported is Android with plans to extend to iOS.
 
 **How do I get started?**
 
-- [Installation](installation.md) - Gets you setup with your IDE & MCP Client combination
-- [Authoring your first test](test-authoring/overview.md) - Using AutoMobile MCP to automatically author a test
-- [Model Provider Guides](providers/overview.md) - To enable AutoMobile agent test recovery
-- [Running on CI](ci.md) - Automated testing capabilities
-
-**Why build this**
-
-- [Origin](origin.md)
+- [Installation](installation.md) - Install AutoMobile in your environment or IDE
+- [Test Authoring](test-authoring/overview.md) - Automatically write tests
+- [Test Execution](test-execution/overview.md) - Run tests locally or on CI
 
 **Additional Resources**
 
 - [FAQ](faq.md) - Frequently asked questions
+- [Why build this?](origin.md) - Motivation and origin story
 - [Technical Architecture](architecture.md) - Understand how AutoMobile works 
 - [Local Development](local-development.md) - If you're looking to contribute to the project
 - [Security](security.md) - Responsible vulnerability disclosure & use

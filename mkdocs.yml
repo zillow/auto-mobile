@@ -61,23 +61,29 @@ markdown_extensions:
   - md_in_html
 
 nav:
-  - 'Introduction': index.md
+  - 'Overview': index.md
   - 'Installation': installation.md
-  - 'Local Development': local-development.md
-  - 'FAQ': faq.md
   - 'Features':
-      - 'Overview': features.md
-      - 'Batteries Included': batteries-included.md
-      - 'Plan Authoring & Execution': plan-authoring-execution-options.md
-      - 'CLI': cli.md
-      - 'CI': ci.md
+      - 'Overview': features/overview.md
+      - 'Test Authoring':
+          - 'Overview': features/test-authoring/overview.md
+          - 'Installation': features/test-authoring/plan-syntax.md
+      - 'Test Execution':
+          - 'Overview': features/test-execution/overview.md
+          - 'Options': features/test-execution/options.md
+          - 'CI': features/test-execution/ci.md
+      - 'Batteries Included': features/batteries-included.md
+      - 'CLI': features/cli.md
   - 'MCP Client Config':
       - 'Overview': mcp/overview.md
-      - 'Firebender': mcp/firebender.md
+      - 'Firebender ': mcp/firebender.md
       - 'Cursor': mcp/cursor.md
       - 'Goose': mcp/goose.md
-  - 'GitHub Discussions': https://github.com/zillow/auto-mobile/discussions
-  - 'Contributing': contributing.md
-  - 'Change Log': changelog.md
+  - 'Contributing':
+      - 'How': contributing/overview.md
+      - 'Local Development': contributing/local-development.md
+      - 'GitHub Discussions': https://github.com/zillow/auto-mobile/discussions
+  - 'FAQ': faq.md
   - 'Security': security.md
+  - 'Change Log': changelog.md
 

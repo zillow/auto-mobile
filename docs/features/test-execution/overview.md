@@ -2,9 +2,11 @@
 
 ## Environments
 
+If you haven't already, add [AutoMobile JUnitRunner dependency](../junitrunner/setup.md).
+
 #### Local
 
-Right-click on the test created in Android Studio and run. See other [execution options](execution-options.md).
+Right-click on the test created in Android Studio and run. See other [execution options](options.md).
 
 #### CI
 

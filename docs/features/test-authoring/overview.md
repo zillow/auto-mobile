@@ -29,9 +29,15 @@ Give AutoMobile a goal to perform. It can be simple or complex.
 
 Example Prompt:
 
+```
 Open the My Example App, complete Login with credentials
 testuser@example.com
 password123
+```
+
+Unless there is some non-standard UX that AutoMobile doesn't understand how to navigate it shouldn't need overly
+specific instructions. You can also point your agent at an existing test (Espresso/Maestro/Zephyr) and ask it to
+perform the same operations.
 
 #### Force Close the App
 

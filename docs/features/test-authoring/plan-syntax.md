@@ -1,4 +1,4 @@
-# Plans - Syntax
+# Test Authoring - Plan Syntax
 
 ## General Format
 

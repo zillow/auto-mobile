@@ -1,4 +1,4 @@
-# CI with AutoMobile
+# Test Execution - CI
 
 Since AutoMobile is a tool designed to automate mobile interactions one of the big early use cases is running it on CI.
 
