@@ -1,17 +1,35 @@
 import { expect } from "chai";
 import { registerDeepLinkTools } from "../../src/server/deepLinkTools";
 import { ToolRegistry } from "../../src/server/toolRegistry";
+import { EmulatorUtils } from "../../src/utils/emulator";
+
+// Helper function to check if AVDs are available
+async function checkAvdAvailability(): Promise<boolean> {
+  try {
+    const emulatorUtils = new EmulatorUtils();
+    const avds = await emulatorUtils.listAvds();
+    return avds.length > 0;
+  } catch (error) {
+    // If we can't list AVDs (e.g., Android SDK not available), return false
+    return false;
+  }
+}
 
 describe("Deep Link Tools Registration", function() {
   this.timeout(5000);
-  let mockGetCurrentDeviceId: () => string | undefined;
+  let avdsAvailable: boolean;
+
+  before(async function() {
+    // Check if AVDs are available once before all tests
+    avdsAvailable = await checkAvdAvailability();
+    if (!avdsAvailable) {
+      console.log("⚠️  Skipping device-dependent tests: No AVDs available or Android SDK not found");
+    }
+  });
 
   beforeEach(() => {
     // Clear the tool registry before each test
     (ToolRegistry as any).tools.clear();
-
-    // Mock device ID getter
-    mockGetCurrentDeviceId = () => "test-device";
   });
 
   afterEach(() => {
@@ -21,7 +39,7 @@ describe("Deep Link Tools Registration", function() {
 
   describe("registerDeepLinkTools", () => {
     it("should register all deep link tools", () => {
-      registerDeepLinkTools(mockGetCurrentDeviceId);
+      registerDeepLinkTools();
 
       const registeredTools = ToolRegistry.getToolDefinitions();
       const toolNames = registeredTools.map(tool => tool.name);
@@ -32,7 +50,7 @@ describe("Deep Link Tools Registration", function() {
     });
 
     it("should register getDeepLinks tool with correct schema", () => {
-      registerDeepLinkTools(mockGetCurrentDeviceId);
+      registerDeepLinkTools();
 
       const tool = ToolRegistry.getTool("getDeepLinks");
       expect(tool).to.not.be.undefined;
@@ -48,7 +66,7 @@ describe("Deep Link Tools Registration", function() {
     });
 
     it("should register detectIntentChooser tool with correct schema", () => {
-      registerDeepLinkTools(mockGetCurrentDeviceId);
+      registerDeepLinkTools();
 
       const tool = ToolRegistry.getTool("detectIntentChooser");
       expect(tool).to.not.be.undefined;
@@ -64,7 +82,7 @@ describe("Deep Link Tools Registration", function() {
     });
 
     it("should register handleIntentChooser tool with correct schema", () => {
-      registerDeepLinkTools(mockGetCurrentDeviceId);
+      registerDeepLinkTools();
 
       const tool = ToolRegistry.getTool("handleIntentChooser");
       expect(tool).to.not.be.undefined;
@@ -87,13 +105,17 @@ describe("Deep Link Tools Registration", function() {
     });
   });
 
-  describe("Tool Handlers", () => {
+  describe("Tool Handlers", function() {
     beforeEach(() => {
-      registerDeepLinkTools(mockGetCurrentDeviceId);
+      registerDeepLinkTools();
     });
 
     describe("getDeepLinks handler", () => {
-      it("should handle valid app ID", async () => {
+      it("should handle valid app ID", async function() {
+        if (!avdsAvailable) {
+          this.skip();
+        }
+
         const tool = ToolRegistry.getTool("getDeepLinks");
         expect(tool).to.not.be.undefined;
 
@@ -117,7 +139,11 @@ describe("Deep Link Tools Registration", function() {
     });
 
     describe("detectIntentChooser handler", () => {
-      it("should handle optional view hierarchy", async () => {
+      it("should handle optional view hierarchy", async function() {
+        if (!avdsAvailable) {
+          this.skip();
+        }
+
         const tool = ToolRegistry.getTool("detectIntentChooser");
         expect(tool).to.not.be.undefined;
 
@@ -129,7 +155,11 @@ describe("Deep Link Tools Registration", function() {
         }
       });
 
-      it("should handle provided view hierarchy", async () => {
+      it("should handle provided view hierarchy", async function() {
+        if (!avdsAvailable) {
+          this.skip();
+        }
+
         const tool = ToolRegistry.getTool("detectIntentChooser");
         expect(tool).to.not.be.undefined;
 
@@ -143,7 +173,11 @@ describe("Deep Link Tools Registration", function() {
     });
 
     describe("handleIntentChooser handler", () => {
-      it("should handle all preference options", async () => {
+      it("should handle all preference options", async function() {
+        if (!avdsAvailable) {
+          this.skip();
+        }
+
         const tool = ToolRegistry.getTool("handleIntentChooser");
         expect(tool).to.not.be.undefined;
 
@@ -159,7 +193,11 @@ describe("Deep Link Tools Registration", function() {
         }
       });
 
-      it("should handle custom app package", async () => {
+      it("should handle custom app package", async function() {
+        if (!avdsAvailable) {
+          this.skip();
+        }
+
         const tool = ToolRegistry.getTool("handleIntentChooser");
         expect(tool).to.not.be.undefined;
 
@@ -189,12 +227,16 @@ describe("Deep Link Tools Registration", function() {
     });
   });
 
-  describe("Error Handling", () => {
+  describe("Error Handling", function() {
     beforeEach(() => {
-      registerDeepLinkTools(() => undefined); // No device ID available
+      registerDeepLinkTools();
     });
 
-    it("should handle missing device ID gracefully", async () => {
+    it("should handle missing device ID gracefully", async function() {
+      if (!avdsAvailable) {
+        this.skip();
+      }
+
       const tool = ToolRegistry.getTool("getDeepLinks");
       expect(tool).to.not.be.undefined;
 
