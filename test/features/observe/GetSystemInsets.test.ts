@@ -129,7 +129,7 @@ describe("GetSystemInsets", function() {
 
     beforeEach(async function() {
       adb = new AdbUtils();
-      getSystemInsets = new GetSystemInsets(null, adb);
+      getSystemInsets = new GetSystemInsets("test-device", adb);
 
       // Check if any devices are connected
       try {

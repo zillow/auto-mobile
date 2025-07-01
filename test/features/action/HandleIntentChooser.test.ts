@@ -91,11 +91,6 @@ describe("HandleIntentChooser", () => {
       const instance = new HandleIntentChooser("test-device");
       expect(instance).to.be.instanceOf(HandleIntentChooser);
     });
-
-    it("should create HandleIntentChooser without device ID", () => {
-      const instance = new HandleIntentChooser();
-      expect(instance).to.be.instanceOf(HandleIntentChooser);
-    });
   });
 
   describe("execute", () => {

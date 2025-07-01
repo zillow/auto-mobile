@@ -279,8 +279,8 @@ describe("ObserveScreen", function() {
     beforeEach(async function() {
       // Initialize with real ADB connection
       adb = new AdbUtils();
-      observeScreen = new ObserveScreen(null, adb);
-      awaitIdle = new AwaitIdle(null, adb);
+      observeScreen = new ObserveScreen("test-device", adb);
+      awaitIdle = new AwaitIdle("test-device", adb);
 
       // Check if any devices are connected
       try {

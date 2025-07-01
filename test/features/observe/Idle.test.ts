@@ -7,7 +7,7 @@ describe("Idle - Unit Tests", function() {
 
   beforeEach(function() {
     // Create instance with mock adb to avoid real ADB calls
-    idle = new Idle();
+    idle = new Idle("test-device");
   });
 
   describe("getTouchStatus", function() {

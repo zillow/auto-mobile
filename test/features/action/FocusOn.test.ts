@@ -277,8 +277,8 @@ describe("FocusOn", () => {
   });
 
   describe("constructor", () => {
-    it("should work with null deviceId", () => {
-      const focusOnInstance = new FocusOn(null);
+    it("should work with a non-null deviceId", () => {
+      const focusOnInstance = new FocusOn("test-device");
       assert.isDefined(focusOnInstance);
     });
 

@@ -21,9 +21,9 @@ describe("ViewHierarchy - Sample Data", function() {
   beforeEach(function() {
     // Initialize with test mode
     adb = new AdbUtils();
-    takeScreenshot = new TakeScreenshot(null, adb);
-    window = new Window(null, adb);
-    viewHierarchy = new ViewHierarchy(null, adb, takeScreenshot, window);
+    takeScreenshot = new TakeScreenshot("test-device", adb);
+    window = new Window("test-device", adb);
+    viewHierarchy = new ViewHierarchy("test-device", adb, takeScreenshot, window);
   });
 
   // Helper function to read and parse XML file

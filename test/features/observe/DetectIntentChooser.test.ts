@@ -67,11 +67,6 @@ describe("DetectIntentChooser", () => {
       const instance = new DetectIntentChooser("test-device");
       expect(instance).to.be.instanceOf(DetectIntentChooser);
     });
-
-    it("should create DetectIntentChooser without device ID", () => {
-      const instance = new DetectIntentChooser();
-      expect(instance).to.be.instanceOf(DetectIntentChooser);
-    });
   });
 
   describe("execute", () => {

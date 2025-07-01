@@ -128,7 +128,7 @@ describe("GetScreenSize", function() {
 
     beforeEach(async function() {
       adb = new AdbUtils();
-      getScreenSize = new GetScreenSize(null, adb);
+      getScreenSize = new GetScreenSize("test-device", adb);
 
       // Check if any devices are connected
       try {

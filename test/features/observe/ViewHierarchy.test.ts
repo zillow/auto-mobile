@@ -970,9 +970,9 @@ describe("ViewHierarchy - Integration", function() {
   beforeEach(async function() {
     // Initialize with real ADB connection
     adb = new AdbUtils();
-    takeScreenshot = new TakeScreenshot(null, adb);
-    window = new Window(null, adb);
-    awaitIdle = new AwaitIdle(null, adb);
+    takeScreenshot = new TakeScreenshot("test-device", adb);
+    window = new Window("test-device", adb);
+    awaitIdle = new AwaitIdle("test-device", adb);
     viewHierarchy = new ViewHierarchy("test-device", adb, takeScreenshot, window);
 
     // Check if any devices are connected
