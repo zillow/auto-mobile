@@ -107,6 +107,6 @@ You can build the CLI tool as a standalone binary for distribution:
 ./gradlew assembleDist
 
 # Extract and run
-tar -xf build/distributions/kotlin-test-author-0.0.1-SNAPSHOT.tar
-./kotlin-test-author-0.0.1-SNAPSHOT/bin/kotlin-test-author --test-name testExample --plan test.yaml --module-path app
+tar -xf build/distributions/kotlin-test-author-0.0.2-SNAPSHOT.tar
+./kotlin-test-author-0.0.2-SNAPSHOT/bin/kotlin-test-author --test-name testExample --plan test.yaml --module-path app
 ```

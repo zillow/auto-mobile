@@ -1,6 +1,6 @@
 {
   "name": "auto-mobile",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Mobile device interaction automation via MCP",
   "scripts": {
     "test": "mocha --require esbuild-register test/**/*.ts",
