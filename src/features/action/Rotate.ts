@@ -6,7 +6,7 @@ import { ProgressCallback } from "./BaseVisualChange";
 
 export class Rotate extends BaseVisualChange {
   constructor(
-    deviceId: string | null = null,
+    deviceId: string,
     adb: AdbUtils | null = null
   ) {
     super(deviceId, adb);
@@ -59,18 +59,9 @@ export class Rotate extends BaseVisualChange {
   }
 
   async execute(
-    orientation: string,
+    orientation: "portrait" | "landscape",
     progress?: ProgressCallback
   ): Promise<RotateResult> {
-    // Check orientation is valid
-    if (orientation !== "portrait" && orientation !== "landscape") {
-      return {
-        success: false,
-        orientation,
-        value: -1,
-        error: 'Invalid orientation; must be "portrait" or "landscape"'
-      };
-    }
 
     const value = orientation === "portrait" ? 0 : 1;
 

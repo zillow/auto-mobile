@@ -9,7 +9,7 @@ import { ExecuteGesture } from "./ExecuteGesture";
 export class Fling extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
     this.executeGesture = new ExecuteGesture(deviceId, adb);
   }

@@ -9,7 +9,7 @@ import { SwipeResult } from "../../models/SwipeResult";
  * Executes gestures using adb input commands (no sendevent)
  */
 export class ExecuteGesture extends BaseVisualChange {
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
   }
 

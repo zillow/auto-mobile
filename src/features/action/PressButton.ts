@@ -3,7 +3,7 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { PressButtonResult } from "../../models/PressButtonResult";
 
 export class PressButton extends BaseVisualChange {
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
   }
 

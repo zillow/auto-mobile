@@ -49,7 +49,7 @@ export class SwipeFromElementToElement extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
     this.executeGesture = new ExecuteGesture(deviceId, adb);
     this.elementUtils = new ElementUtils();

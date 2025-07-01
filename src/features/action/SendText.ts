@@ -7,7 +7,7 @@ import { logger } from "../../utils/logger";
 export class SendText extends BaseVisualChange {
   private virtualKeyboardManager: VirtualKeyboardManager;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
     this.virtualKeyboardManager = new VirtualKeyboardManager(deviceId);
   }

@@ -12,7 +12,7 @@ export class PinchToZoom extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string | null = null) {
+  constructor(deviceId: string) {
     super(deviceId);
     this.executeGesture = new ExecuteGesture(deviceId);
     this.elementUtils = new ElementUtils();

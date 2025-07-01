@@ -1,15 +1,13 @@
 import { logger } from "../../utils/logger";
-import { ObserveResult } from "../../models";
+import { ActiveWindowInfo, ObserveResult } from "../../models";
 import { GetScreenSize } from "./GetScreenSize";
 import { GetSystemInsets } from "./GetSystemInsets";
 import { ViewHierarchy } from "./ViewHierarchy";
 import { Window } from "./Window";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { AdbUtils } from "../../utils/adb";
-import { ScreenSize } from "../../models";
-import { SystemInsets } from "../../models";
-import { ViewHierarchyResult } from "../../models";
 import { DeepLinkManager } from "../../utils/deepLinkManager";
+import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 
 /**
  * Observe command class that combines screen details, view hierarchy and screenshot
@@ -23,7 +21,14 @@ export class ObserveScreen {
   private adb: AdbUtils;
   private deepLinkManager: DeepLinkManager;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  // Static cache for accessibility service availability (session-wide)
+  private static accessibilityServiceAvailable: boolean | null = null;
+
+  // Instance cache for dumpsys window output (per execute call)
+  private cachedDumpsysWindow: string | null = null;
+  private pendingDumpsysWindow: Promise<string> | null = null;
+
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
     this.screenSize = new GetScreenSize(deviceId, this.adb);
     this.systemInsets = new GetSystemInsets(deviceId, this.adb);
@@ -31,6 +36,57 @@ export class ObserveScreen {
     this.window = new Window(deviceId, this.adb);
     this.screenshotUtil = new TakeScreenshot(deviceId, this.adb);
     this.deepLinkManager = new DeepLinkManager(deviceId);
+  }
+
+  /**
+   * Clear the accessibility service availability cache (e.g., on failure)
+   */
+  public static clearAccessibilityServiceCache(): void {
+    ObserveScreen.accessibilityServiceAvailable = null;
+    AccessibilityServiceClient.clearAvailabilityCache();
+  }
+
+  /**
+   * Get cached dumpsys window output or fetch if not available
+   */
+  private async getCachedDumpsysWindow(): Promise<string> {
+    if (this.cachedDumpsysWindow) {
+      logger.debug("Using cached dumpsys window output");
+      return this.cachedDumpsysWindow;
+    }
+
+    // If a fetch is already in progress, wait for it
+    if (this.pendingDumpsysWindow) {
+      logger.debug("Waiting for pending dumpsys window fetch");
+      return this.pendingDumpsysWindow;
+    }
+
+    // Start a new fetch and cache the promise
+    logger.debug("Fetching fresh dumpsys window output");
+    this.pendingDumpsysWindow = this.adb.executeCommand('shell "dumpsys window"')
+      .then(result => {
+        this.cachedDumpsysWindow = result.stdout;
+        this.pendingDumpsysWindow = null;
+        return result.stdout;
+      })
+      .catch(error => {
+        this.pendingDumpsysWindow = null;
+        throw error;
+      });
+
+    return this.pendingDumpsysWindow;
+  }
+
+  /**
+   * Set cached active window from external source (e.g., UI stability waiting)
+   * This now delegates to the Window class
+   */
+  public setCachedActiveWindow(activeWindow: ActiveWindowInfo): void {
+    this.window.setCachedActiveWindow(activeWindow);
+  }
+
+  public getCachedActiveWindow(): ActiveWindowInfo | null {
+    return this.window.getCachedActiveWindow();
   }
 
   /**
@@ -49,17 +105,38 @@ export class ObserveScreen {
   }
 
   /**
-   * Collect system insets and handle errors
+   * Collect system insets using cached dumpsys window output
    * @param result - ObserveResult to update
    */
   public async collectSystemInsets(result: ObserveResult): Promise<void> {
     try {
       const insetsStart = Date.now();
-      result.systemInsets = await this.systemInsets.execute();
+      // Pass cached dumpsys window output to avoid duplicate call
+      const dumpsysWindow = await this.getCachedDumpsysWindow();
+      result.systemInsets = await this.systemInsets.executeWithCache(dumpsysWindow);
       logger.debug(`System insets retrieval took ${Date.now() - insetsStart}ms`);
     } catch (error) {
       logger.warn("Failed to get system insets:", error);
       this.appendError(result, "Failed to retrieve system insets");
+    }
+  }
+
+  /**
+   * Collect rotation info using cached dumpsys window output
+   * @param result - ObserveResult to update
+   */
+  public async collectRotationInfo(result: ObserveResult): Promise<void> {
+    try {
+      const rotationStart = Date.now();
+      const dumpsysWindow = await this.getCachedDumpsysWindow();
+      // Extract rotation from cached output
+      const rotationMatch = dumpsysWindow.match(/mRotation=(\d)/);
+      if (rotationMatch) {
+        result.rotation = parseInt(rotationMatch[1], 10);
+      }
+      logger.debug(`Rotation info retrieval took ${Date.now() - rotationStart}ms`);
+    } catch (error) {
+      logger.warn("Failed to get rotation info:", error);
     }
   }
 
@@ -88,7 +165,7 @@ export class ObserveScreen {
   }
 
   /**
-   * Collect view hierarchy and handle errors
+   * Collect view hierarchy and handle errors with accessibility service caching
    * @param result - ObserveResult to update
    * @param withViewHierarchy - Whether to collect view hierarchy
    */
@@ -99,24 +176,72 @@ export class ObserveScreen {
 
     try {
       const viewHierarchyStart = Date.now();
-      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(result.screenshotPath);
-      logger.debug(`View hierarchy retrieval took ${Date.now() - viewHierarchyStart}ms`);
-      if (viewHierarchy) {
-        result.viewHierarchy = viewHierarchy;
 
-        // Extract focused element from view hierarchy
-        const focusedElement = this.viewHierarchy.findFocusedElement(viewHierarchy);
-        if (focusedElement) {
-          result.focusedElement = focusedElement;
-          logger.debug(`Found focused element: ${focusedElement.text || focusedElement["resource-id"] || "no text/id"}`);
+      // Check cached accessibility service availability
+      if (ObserveScreen.accessibilityServiceAvailable === null) {
+        // First time check or after cache clear
+        try {
+          const viewHierarchy = await this.viewHierarchy.getViewHierarchy(result.screenshotPath, false);
+          ObserveScreen.accessibilityServiceAvailable = true; // Successfully used
+          logger.debug("Accessibility service availability cached as: true");
+
+          if (viewHierarchy) {
+            result.viewHierarchy = viewHierarchy;
+            const focusedElement = this.viewHierarchy.findFocusedElement(viewHierarchy);
+            if (focusedElement) {
+              result.focusedElement = focusedElement;
+              logger.debug(`Found focused element: ${focusedElement.text || focusedElement["resource-id"] || "no text/id"}`);
+            }
+            const hierarchyXml = typeof viewHierarchy === "string" ? viewHierarchy : JSON.stringify(viewHierarchy);
+            await this.detectIntentChooser(result, hierarchyXml);
+          }
+        } catch (error) {
+          // If it fails, mark as unavailable and handle error
+          ObserveScreen.accessibilityServiceAvailable = false;
+          logger.debug("Accessibility service availability cached as: false");
+          throw error;
         }
-
-        // Automatically detect intent chooser - ensure we have a string to work with
-        const hierarchyXml = typeof viewHierarchy === "string" ? viewHierarchy : JSON.stringify(viewHierarchy);
-        await this.detectIntentChooser(result, hierarchyXml);
+      } else if (ObserveScreen.accessibilityServiceAvailable) {
+        // Use accessibility service (we know it's available)
+        logger.debug("Using cached accessibility service availability: true");
+        const viewHierarchy = await this.viewHierarchy.getViewHierarchy(result.screenshotPath, false);
+        if (viewHierarchy) {
+          result.viewHierarchy = viewHierarchy;
+          const focusedElement = this.viewHierarchy.findFocusedElement(viewHierarchy);
+          if (focusedElement) {
+            result.focusedElement = focusedElement;
+            logger.debug(`Found focused element: ${focusedElement.text || focusedElement["resource-id"] || "no text/id"}`);
+          }
+          const hierarchyXml = typeof viewHierarchy === "string" ? viewHierarchy : JSON.stringify(viewHierarchy);
+          await this.detectIntentChooser(result, hierarchyXml);
+        }
+      } else {
+        // Accessibility service is not available, skip
+        logger.debug("Using cached accessibility service availability: false, trying fallback");
+        // Try without accessibility service
+        try {
+          const viewHierarchy = await this.viewHierarchy.getViewHierarchy(result.screenshotPath, true);
+          if (viewHierarchy) {
+            result.viewHierarchy = viewHierarchy;
+            const focusedElement = this.viewHierarchy.findFocusedElement(viewHierarchy);
+            if (focusedElement) {
+              result.focusedElement = focusedElement;
+              logger.debug(`Found focused element: ${focusedElement.text || focusedElement["resource-id"] || "no text/id"}`);
+            }
+            const hierarchyXml = typeof viewHierarchy === "string" ? viewHierarchy : JSON.stringify(viewHierarchy);
+            await this.detectIntentChooser(result, hierarchyXml);
+          }
+        } catch (fallbackError) {
+          this.appendError(result, "Accessibility service not available and fallback failed");
+        }
       }
+
+      logger.debug(`View hierarchy retrieval took ${Date.now() - viewHierarchyStart}ms`);
     } catch (error) {
       logger.warn("Failed to get view hierarchy:", error);
+
+      // Clear cache on failure
+      ObserveScreen.clearAccessibilityServiceCache();
 
       // Check if the error is due to screen being off
       const errorStr = String(error);
@@ -154,13 +279,16 @@ export class ObserveScreen {
   }
 
   /**
-   * Collect active window information and handle errors
+   * Collect active window information using cache if available
    * @param result - ObserveResult to update
    */
   public async collectActiveWindow(result: ObserveResult): Promise<void> {
     try {
+      logger.info("[OBSERVER] collectActiveWindow");
       const windowStart = Date.now();
+
       const activeWindow = await this.window.getActive();
+
       logger.info(`Active window retrieval took ${Date.now() - windowStart}ms`);
       if (activeWindow) {
         result.activeWindow = activeWindow;
@@ -172,16 +300,29 @@ export class ObserveScreen {
   }
 
   /**
-   * Collect all observation data
+   * Collect all observation data with parallelization
    * @param result - ObserveResult to update
    * @param withViewHierarchy - Whether to collect view hierarchy
    */
   public async collectAllData(result: ObserveResult, withViewHierarchy: boolean): Promise<void> {
-    await this.collectScreenSize(result);
-    await this.collectSystemInsets(result);
-    await this.collectScreenshot(result);
-    await this.collectViewHierarchy(result, withViewHierarchy);
-    await this.collectActiveWindow(result);
+    // Pre-fetch dumpsys window to ensure cache is populated before parallel operations
+    await this.getCachedDumpsysWindow();
+
+    // Now run all operations in parallel (they'll use the cached dumpsys)
+    const parallelPromises: Promise<void>[] = [
+      this.collectScreenSize(result),
+      this.collectSystemInsets(result),
+      this.collectRotationInfo(result),
+      this.collectActiveWindow(result),
+    ];
+
+    // View hierarchy can run in parallel with others
+    if (withViewHierarchy) {
+      parallelPromises.push(this.collectViewHierarchy(result, withViewHierarchy));
+    }
+
+    // Execute all operations in parallel
+    await Promise.all(parallelPromises);
   }
 
   /**
@@ -215,15 +356,19 @@ export class ObserveScreen {
    * @returns The observation result
    */
   async execute(): Promise<ObserveResult> {
-
     try {
       logger.debug("Executing observe command");
       const startTime = Date.now();
 
+      // Clear instance-level caches for this execution
+      this.cachedDumpsysWindow = null;
+      this.pendingDumpsysWindow = null;
+      // Note: cachedActiveWindow is now managed by the Window class
+
       // Create base result object with timestamp
       const result = this.createBaseResult();
 
-      // Collect all data components
+      // Collect all data components with parallelization
       await this.collectAllData(result, true);
 
       logger.debug("Observe command completed");
@@ -238,51 +383,5 @@ export class ObserveScreen {
         error: "Observation failed due to device access error"
       };
     }
-  }
-
-  /**
-   * Get screen size
-   */
-  private async getScreenSize(): Promise<ScreenSize> {
-    return this.screenSize.execute();
-  }
-
-  /**
-	 * Get system insets
-	 */
-  private async getSystemInsets(): Promise<SystemInsets> {
-    return this.systemInsets.execute();
-  }
-
-  /**
-	 * Get view hierarchy
-	 */
-  private async getViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
-    return this.viewHierarchy.getViewHierarchy(screenshotPath);
-  }
-
-  /**
-	 * Get active window
-	 */
-  private async getActiveWindow(): Promise<any> {
-    return this.window.getActive();
-  }
-
-  /**
-	 * Get active window hash
-	 */
-  private async getActiveWindowHash(): Promise<any> {
-    return this.window.getActiveHash();
-  }
-
-  /**
-	 * Take screenshot
-	 */
-  private async takeScreenshot(activityHash: string): Promise<string> {
-    const result = await this.screenshotUtil.execute(activityHash);
-    if (!result.success || !result.path) {
-      throw new Error(result.error || "Failed to take screenshot");
-    }
-    return result.path;
   }
 }

@@ -19,6 +19,9 @@ export interface ObserveResult {
   /** System UI insets */
   systemInsets: SystemInsets;
 
+  /** Screen rotation (0: portrait, 1: landscape 90°, 2: reverse portrait 180°, 3: reverse landscape 270°) */
+  rotation?: number;
+
   /** View hierarchy data */
   viewHierarchy?: any;
 

@@ -6,7 +6,7 @@ export class AwaitIdle {
   private adb: AdbUtils;
   private idle: Idle;
 
-  private stabilityThresholdMs = 100;
+  private stabilityThresholdMs = 60;
   private pollIntervalMs = 17;
   private activeProcesses: Set<any> = new Set(); // Track active processes for cleanup
 
@@ -14,7 +14,7 @@ export class AwaitIdle {
    * Create a AwaitIdle instance
    * @param deviceId - Optional device ID
    */
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
     this.idle = new Idle(deviceId, this.adb);
   }
@@ -182,7 +182,7 @@ export class AwaitIdle {
     }
 
     // Give a moment for frame data to accumulate
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     return {
       startTime,
@@ -253,6 +253,61 @@ export class AwaitIdle {
       updatedState,
       shouldUpdateLastNonIdleTime: stabilityResult.shouldUpdateLastNonIdleTime
     };
+  }
+
+  /**
+   * Wait for UI to become stable by monitoring frame rendering with existing initialization state
+   * @param packageName - Package name of the app to monitor
+   * @param timeoutMs - Maximum time to wait for stability
+   * @param initState - Pre-initialized state from initializeUiStabilityTracking
+   * @returns Promise that resolves when UI is stable
+   */
+  async waitForUiStabilityWithState(
+    packageName: string,
+    timeoutMs: number,
+    initState: {
+      startTime: number;
+      lastNonIdleTime: number;
+      prevMissedVsync: number | null;
+      prevSlowUiThread: number | null;
+      prevFrameDeadlineMissed: number | null;
+      firstGfxInfoLog: boolean;
+    }
+  ): Promise<void> {
+    logger.info(`[AwaitIdle] Continuing UI stability wait with existing state for package: ${packageName}`);
+
+    // Use the provided state instead of initializing
+    let state = initState;
+
+    try {
+      while (true) {
+        const timeoutCheck = this.checkUiStabilityTimeout(state.lastNonIdleTime, state.startTime, timeoutMs);
+
+        logger.info(`[AwaitIdle] Checking stability: ${timeoutCheck.elapsedTime}ms elapsed of ${timeoutMs}ms timeout`);
+
+        if (timeoutCheck.isStable) {
+          logger.info(`[AwaitIdle] UI stable after ${timeoutCheck.elapsedTime}ms (stable for ${timeoutCheck.stableTime}ms)`);
+          return;
+        }
+
+        if (!timeoutCheck.shouldContinue) {
+          logger.info(`[AwaitIdle] Timeout waiting for UI stability after ${timeoutMs}ms`);
+          return;
+        }
+
+        // Process single stability check
+        const checkResult = await this.processSingleUiStabilityCheck(packageName, state);
+        state = { ...state, ...checkResult.updatedState };
+
+        logger.info(`[AwaitIdle] Waiting for stability: ${timeoutCheck.stableTime}ms/${this.stabilityThresholdMs}ms`);
+
+        // Wait before checking again
+        await new Promise(resolve => setTimeout(resolve, this.pollIntervalMs));
+      }
+    } finally {
+      // Ensure any remaining processes are cleaned up
+      // this.cleanupProcesses();
+    }
   }
 
   /**

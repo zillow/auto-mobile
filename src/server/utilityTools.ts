@@ -2,9 +2,9 @@ import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import { ActionableError } from "../models/ActionableError";
 import { DemoMode } from "../features/utility/DemoMode";
-import { AdbUtils } from "../utils/adb";
 import { logger } from "../utils/logger";
-import { createJSONToolResponse, verifyDeviceIsReady } from "../utils/toolUtils";
+import { createJSONToolResponse } from "../utils/toolUtils";
+import { DeviceSessionManager } from "../utils/deviceSessionManager";
 
 // Schema definitions
 export const enableDemoModeSchema = z.object({
@@ -39,16 +39,10 @@ export interface SetActiveDeviceArgs {
 }
 
 // Register tools
-export function registerUtilityTools(
-  getCurrentDeviceId: () => string | undefined,
-  setCurrentDeviceId: (deviceId: string | undefined) => void
-) {
+export function registerUtilityTools() {
   // Enable demo mode handler
-  const enableDemoModeHandler = async (args: EnableDemoModeArgs) => {
+  const enableDemoModeHandler = async (deviceId: string, args: EnableDemoModeArgs) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const demoMode = new DemoMode(deviceId);
       const result = await demoMode.execute(args);
 
@@ -65,11 +59,8 @@ export function registerUtilityTools(
   };
 
   // Disable demo mode handler
-  const disableDemoModeHandler = async () => {
+  const disableDemoModeHandler = async (deviceId: string) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const demoMode = new DemoMode(deviceId);
       const result = await demoMode.exitDemoMode();
 
@@ -88,26 +79,11 @@ export function registerUtilityTools(
   // Set active device handler
   const setActiveDeviceHandler = async (args: SetActiveDeviceArgs) => {
     try {
-      // Verify the device exists and is connected
-      const adb = new AdbUtils();
-      const devices = await adb.getDevices();
-
-      if (!devices.includes(args.deviceId)) {
-        throw new ActionableError(
-          `Device '${args.deviceId}' is not connected. Available devices: ${devices.join(", ") || "none"}`
-        );
-      }
-
-      // Verify the device is ready for use
-      await verifyDeviceIsReady(args.deviceId);
-
-      // Set the device as active
-      setCurrentDeviceId(args.deviceId);
+      await DeviceSessionManager.getInstance().ensureDeviceReady(args.deviceId, true);
 
       return createJSONToolResponse({
         message: `Active device set to '${args.deviceId}'`,
         deviceId: args.deviceId,
-        availableDevices: devices
       });
     } catch (error) {
       logger.error("Failed to set active device:", error);
@@ -116,14 +92,14 @@ export function registerUtilityTools(
   };
 
   // Register with the tool registry
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "enableDemoMode",
     "Enable demo mode with consistent status bar indicators for screenshots",
     enableDemoModeSchema,
     enableDemoModeHandler
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "disableDemoMode",
     "Disable demo mode and return to normal status bar behavior",
     disableDemoModeSchema,

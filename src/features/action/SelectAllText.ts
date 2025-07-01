@@ -5,10 +5,12 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { DoubleTap } from "./DoubleTap";
 
 export class SelectAllText extends BaseVisualChange {
+  private readonly deviceId: string;
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
+    this.deviceId = deviceId;
     this.elementUtils = new ElementUtils();
   }
 
@@ -53,7 +55,7 @@ export class SelectAllText extends BaseVisualChange {
           const center = this.elementUtils.getElementCenter(targetElement);
 
           // Perform double tap to select all text
-          const doubleTap = new DoubleTap(this.adb.deviceId);
+          const doubleTap = new DoubleTap(this.deviceId);
           await doubleTap.execute(center.x, center.y);
 
           return {

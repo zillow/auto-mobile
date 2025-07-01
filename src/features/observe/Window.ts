@@ -2,24 +2,141 @@ import { AdbUtils } from "../../utils/adb";
 import { ActiveWindowInfo } from "../../models/ActiveWindowInfo";
 import { logger } from "../../utils/logger";
 import { CryptoUtils } from "../../utils/crypto";
+import * as fs from "fs/promises";
+import * as path from "path";
 
 export class Window {
   private adb: AdbUtils;
+  private cachedActiveWindow: ActiveWindowInfo | null = null;
+  private readonly deviceId: string;
+  private cacheDir: string = "/tmp/auto-mobile/window";
 
   /**
    * Create a Window instance
    * @param deviceId - Optional device ID
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
+    this.deviceId = deviceId;
+  }
+
+  /**
+   * Get the cache file path based on device ID
+   */
+  private getCacheFilePath(): string {
+    const deviceHash = CryptoUtils.generateCacheKey(this.deviceId);
+    return path.join(this.cacheDir, deviceHash);
+  }
+
+  public getDeviceId(): string {
+    return this.deviceId;
+  }
+
+  /**
+   * Write cache to disk
+   */
+  private async writeCacheToDisk(activeWindow: ActiveWindowInfo): Promise<void> {
+    const filePath = this.getCacheFilePath();
+    if (!filePath) {
+      logger.info("[WINDOW] No device ID, skipping disk cache write");
+      return;
+    }
+
+    try {
+      // Ensure directory exists
+      await fs.mkdir(this.cacheDir, { recursive: true });
+
+      // Write cache to disk
+      await fs.writeFile(filePath, JSON.stringify(activeWindow), "utf-8");
+      logger.debug(`Wrote active window cache to disk: ${filePath}`);
+    } catch (err) {
+      logger.error(`Failed to write cache to disk: ${err}`);
+    }
+  }
+
+  /**
+   * Read cache from disk
+   */
+  private async readCacheFromDisk(): Promise<ActiveWindowInfo | null> {
+    const filePath = this.getCacheFilePath();
+    if (!filePath) {
+      logger.info("[WINDOW] No device ID, skipping disk cache read");
+      return null;
+    }
+
+    try {
+      const data = await fs.readFile(filePath, "utf-8");
+      const activeWindow = JSON.parse(data) as ActiveWindowInfo;
+      logger.debug(`Read active window cache from disk: ${filePath}`);
+      return activeWindow;
+    } catch (err) {
+      // File doesn't exist or other error - this is normal
+      logger.debug(`No disk cache found or error reading: ${err}`);
+      return null;
+    }
+  }
+
+  /**
+   * Set cached active window from external source (e.g., UI stability waiting)
+   */
+  public async setCachedActiveWindow(activeWindow: ActiveWindowInfo): Promise<void> {
+    this.cachedActiveWindow = activeWindow;
+    await this.writeCacheToDisk(activeWindow);
+    logger.info("[WINDOW] Cached active window from external source");
+  }
+
+  /**
+   * Get cached active window
+   */
+  public getCachedActiveWindow(): ActiveWindowInfo | null {
+    return this.cachedActiveWindow;
+  }
+
+  /**
+   * Clear the cached active window
+   */
+  public async clearCache(): Promise<void> {
+    this.cachedActiveWindow = null;
+
+    // Also remove from disk
+    const filePath = this.getCacheFilePath();
+    if (filePath) {
+      try {
+        await fs.unlink(filePath);
+        logger.info("[WINDOW] Cleared cached active window from disk");
+      } catch (err) {
+        // File might not exist, which is fine
+        logger.debug(`Could not remove disk cache: ${err}`);
+      }
+    }
+
+    logger.info("[WINDOW] Cleared cached active window");
   }
 
   /**
    * Get information about the active window
+   * @param forceRefresh - Force refresh the cache (default: false)
    * @returns Promise with active window information
    */
-  async getActive(): Promise<ActiveWindowInfo> {
+  async getActive(forceRefresh: boolean = false): Promise<ActiveWindowInfo> {
+    // Return cached value if available and not forcing refresh
+    if (!forceRefresh && this.cachedActiveWindow) {
+      logger.info("[WINDOW] Using memory cached active window");
+      return this.cachedActiveWindow;
+    }
+
+    // Try to read from disk cache if not in memory and not forcing refresh
+    if (!forceRefresh && !this.cachedActiveWindow) {
+      logger.info("[WINDOW] Using disk cached active window");
+      const diskCache = await this.readCacheFromDisk();
+      if (diskCache) {
+        this.cachedActiveWindow = diskCache;
+        logger.info("[WINDOW] Using disk cached active window");
+        return diskCache;
+      }
+    }
+
     try {
       const { stdout } = await this.adb.executeCommand(`shell "dumpsys window windows"`);
 
@@ -93,7 +210,14 @@ export class Window {
         }
       }
 
-      return { appId: packageName, activityName, layoutSeqSum };
+      const result = { appId: packageName, activityName, layoutSeqSum };
+
+      // Cache the result
+      this.cachedActiveWindow = result;
+      await this.writeCacheToDisk(result);
+      logger.info("C[WINDOW] ached new active window information");
+
+      return result;
     } catch (err) {
       logger.error(`Failed to get active window information: ${err}`);
       return {
@@ -109,7 +233,9 @@ export class Window {
    * @returns Promise with activity name hash
    */
   async getActiveHash(): Promise<string> {
-    const activeWindow = await this.getActive();
+    logger.info("[WINDOW] Getting hash of active window");
+    // Always force refresh when getting hash to ensure it reflects current state
+    const activeWindow = await this.getActive(true);
     const activityString = JSON.stringify(activeWindow);
     return CryptoUtils.generateCacheKey(activityString);
   }

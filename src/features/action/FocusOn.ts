@@ -12,11 +12,13 @@ export interface FocusOnOptions {
 }
 
 export class FocusOn extends BaseVisualChange {
+  private readonly deviceId: string;
   private elementUtils: ElementUtils;
   private singleTap: SingleTap;
 
-  constructor(deviceId: string | null = null, adb: any = null) {
+  constructor(deviceId: string, adb: any = null) {
     super(deviceId, adb);
+    this.deviceId = deviceId;
     this.elementUtils = new ElementUtils();
     this.singleTap = new SingleTap(deviceId, adb);
   }
@@ -35,7 +37,7 @@ export class FocusOn extends BaseVisualChange {
         }
 
         // Get current view hierarchy
-        const observeScreen = new ObserveScreen(this.adb.deviceId, this.adb);
+        const observeScreen = new ObserveScreen(this.deviceId, this.adb);
         const observation = await observeScreen.execute();
 
         if (!observation.viewHierarchy) {

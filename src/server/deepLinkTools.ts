@@ -4,7 +4,7 @@ import { GetDeepLinks } from "../features/utility/GetDeepLinks";
 import { DetectIntentChooser } from "../features/observe/DetectIntentChooser";
 import { HandleIntentChooser } from "../features/action/HandleIntentChooser";
 import { ActionableError } from "../models";
-import { createJSONToolResponse, verifyDeviceIsReady } from "../utils/toolUtils";
+import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
 
 // Schema definitions for tool arguments
@@ -38,14 +38,11 @@ export interface HandleIntentChooserArgs {
 }
 
 // Register tools
-export function registerDeepLinkTools(getCurrentDeviceId: () => string | undefined) {
+export function registerDeepLinkTools() {
 
   // Get deep links handler
-  const getDeepLinksHandler = async (args: GetDeepLinksArgs) => {
+  const getDeepLinksHandler = async (deviceId: string, args: GetDeepLinksArgs) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const getDeepLinks = new GetDeepLinks(deviceId);
       const result = await getDeepLinks.execute(args.appId);
 
@@ -67,11 +64,8 @@ export function registerDeepLinkTools(getCurrentDeviceId: () => string | undefin
   };
 
   // Detect intent chooser handler
-  const detectIntentChooserHandler = async (args: DetectIntentChooserArgs) => {
+  const detectIntentChooserHandler = async (deviceId: string, args: DetectIntentChooserArgs) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const detectIntentChooser = new DetectIntentChooser(deviceId);
       const result = await detectIntentChooser.execute(args.viewHierarchy);
 
@@ -89,11 +83,8 @@ export function registerDeepLinkTools(getCurrentDeviceId: () => string | undefin
   };
 
   // Handle intent chooser handler
-  const handleIntentChooserHandler = async (args: HandleIntentChooserArgs) => {
+  const handleIntentChooserHandler = async (deviceId: string, args: HandleIntentChooserArgs) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const handleIntentChooser = new HandleIntentChooser(deviceId);
       const result = await handleIntentChooser.execute(
         args.preference || "just_once",
@@ -119,7 +110,7 @@ export function registerDeepLinkTools(getCurrentDeviceId: () => string | undefin
   };
 
   // Register with the tool registry
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "getDeepLinks",
     "Query available deep links and intent filters for an Android application",
     getDeepLinksSchema,
@@ -127,7 +118,7 @@ export function registerDeepLinkTools(getCurrentDeviceId: () => string | undefin
     false // Does not support progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "detectIntentChooser",
     "Detect system intent chooser dialog in the current view hierarchy",
     detectIntentChooserSchema,
@@ -135,7 +126,7 @@ export function registerDeepLinkTools(getCurrentDeviceId: () => string | undefin
     false // Does not support progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "handleIntentChooser",
     "Automatically handle system intent chooser dialog with specified preferences",
     handleIntentChooserSchema,

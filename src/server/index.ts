@@ -9,6 +9,7 @@ import { logger } from "../utils/logger";
 import { logToolCall } from "../utils/toolLogger";
 import { ConfigurationManager } from "../utils/configurationManager";
 import { TestAuthoringManager } from "../utils/testAuthoringManager";
+import { DeviceSessionManager } from "../utils/deviceSessionManager";
 
 // Import the tool registry
 import { ToolRegistry } from "./toolRegistry";
@@ -21,7 +22,6 @@ import { registerUtilityTools } from "./utilityTools";
 import { registerEmulatorTools } from "./emulatorTools";
 import { registerSourceIndexingTools } from "./sourceIndexingTools";
 import { registerPlanTools } from "./planTools";
-import { registerAssertionTools } from "./assertionTools";
 import { registerConfigurationTools } from "./configurationTools";
 import { registerDeepLinkTools } from "./deepLinkTools";
 
@@ -32,32 +32,20 @@ interface AndroidAppConfig {
 }
 
 export const createMcpServer = (androidApps: AndroidAppConfig[] = []): McpServer => {
-  // Store device ID and Android app configurations
-  let currentDeviceId: string | undefined = undefined;
-
-  // Get configuration and test authoring managers
+  // Get configuration, device session, and test authoring managers
   const configManager = ConfigurationManager.getInstance();
   const testAuthoringManager = TestAuthoringManager.getInstance();
 
-  // Create getter and setter functions
-  const getCurrentDeviceId = () => currentDeviceId;
-  const setCurrentDeviceId = (deviceId: string | undefined) => {
-    currentDeviceId = deviceId;
-    // Update test authoring manager with new device ID
-    testAuthoringManager.setDeviceId(deviceId);
-  };
-
   // Register all tool categories
-  registerObserveTools(getCurrentDeviceId);
-  registerInteractionTools(getCurrentDeviceId);
-  registerAppTools(getCurrentDeviceId, setCurrentDeviceId);
-  registerUtilityTools(getCurrentDeviceId, setCurrentDeviceId);
+  registerObserveTools();
+  registerInteractionTools();
+  registerAppTools();
+  registerUtilityTools();
   registerEmulatorTools();
   registerSourceIndexingTools();
   registerPlanTools();
-  registerAssertionTools(getCurrentDeviceId);
   registerConfigurationTools();
-  registerDeepLinkTools(getCurrentDeviceId);
+  registerDeepLinkTools();
 
   // Create a new MCP server
   const server = new McpServer({
@@ -169,7 +157,14 @@ export const createMcpServer = (androidApps: AndroidAppConfig[] = []): McpServer
 
     try {
       // Execute the handler with optional progress callback
-      const response = await tool.handler(parsedParams, progressCallback);
+      const deviceSessionManager = DeviceSessionManager.getInstance();
+      const deviceId = deviceSessionManager.ensureDeviceReady();
+      let response: any | undefined;
+      if (deviceId === undefined) {
+        throw new ActionableError("No device available");
+      } else {
+        response = await tool.handler(parsedParams, progressCallback);
+      }
 
       // Log successful tool call
       await logToolCall(name, parsedParams, {

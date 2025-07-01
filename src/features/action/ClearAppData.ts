@@ -4,7 +4,7 @@ import { ClearAppDataResult } from "../../models/ClearAppDataResult";
 export class ClearAppData {
   private adb: AdbUtils;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
   }
 

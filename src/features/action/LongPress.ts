@@ -3,7 +3,7 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { LongPressResult } from "../../models/LongPressResult";
 
 export class LongPress extends BaseVisualChange {
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
   }
 

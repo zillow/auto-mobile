@@ -24,7 +24,7 @@ export class TakeScreenshot {
    * @param adb - Optional AdbUtils instance for testing
    */
   constructor(
-    deviceId: string | null = null,
+    deviceId: string,
     adb: AdbUtils | null = null
   ) {
     this.adb = adb || new AdbUtils(deviceId);

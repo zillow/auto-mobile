@@ -15,7 +15,7 @@ export class HomeScreen extends BaseVisualChange {
   private static readonly CACHE_DURATION_MS = 300000; // 5 minutes
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
     this.elementUtils = new ElementUtils();
   }

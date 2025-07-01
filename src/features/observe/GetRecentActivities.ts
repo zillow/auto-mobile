@@ -9,7 +9,7 @@ export class GetRecentActivities {
    * @param deviceId - Optional device ID
    * @param adbUtils - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
   }
 

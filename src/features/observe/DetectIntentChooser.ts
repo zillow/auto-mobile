@@ -4,12 +4,10 @@ import { ObserveScreen } from "./ObserveScreen";
 import { IntentChooserResult } from "../../models";
 
 export class DetectIntentChooser {
-  private deviceId: string | null;
   private deepLinkManager: DeepLinkManager;
   private observeScreen: ObserveScreen;
 
-  constructor(deviceId: string | null = null) {
-    this.deviceId = deviceId;
+  constructor(deviceId: string) {
     this.deepLinkManager = new DeepLinkManager(deviceId);
     this.observeScreen = new ObserveScreen(deviceId);
   }

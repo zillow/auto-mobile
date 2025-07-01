@@ -10,7 +10,7 @@ export class Idle {
    * @param deviceId - Optional device ID
    * @param adb
    */
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
   }
 
@@ -381,9 +381,9 @@ export class Idle {
     const isStable = deltas.missedVsyncDelta === 0 &&
       deltas.slowUiThreadDelta === 0 &&
       deltas.frameDeadlineMissedDelta === 0 &&
-      p50Int < 100 &&
-      p90Int < 100 &&
-      p95Int < 200;
+      p50Int < 200 &&
+      p90Int < 200 &&
+      p95Int < 400;
 
     if (isStable) {
       logger.info("[AwaitIdle] UI appears stable (criteria met)");

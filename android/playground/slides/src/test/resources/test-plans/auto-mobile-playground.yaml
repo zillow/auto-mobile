@@ -6,9 +6,16 @@ steps:
     orientation: portrait
     label: Orient device to portrait mode
 
-  - tool: pressButton
-    button: back
-    label: Use back button to exit slides
+  - tool: stopApp
+    appId: com.zillow.automobile.playground
+    label: Stop the AutoMobile playground app
+
+  - tool: openLink
+    url: "automobile://playground/discover"
+
+  - tool: tapOn
+    text: "Tap"
+    label: Make sure we're on the tap screen
 
   - tool: tapOn
     text: "Button"

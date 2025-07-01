@@ -4,7 +4,7 @@ import { ImeActionResult } from "../../models";
 import { logger } from "../../utils/logger";
 
 export class ImeAction extends BaseVisualChange {
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
   }
 

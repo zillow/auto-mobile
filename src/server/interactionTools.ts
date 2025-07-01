@@ -24,7 +24,7 @@ import { TerminateApp } from "../features/action/TerminateApp";
 import { ClearAppData } from "../features/action/ClearAppData";
 import { OpenURL } from "../features/action/OpenURL";
 import { ActionableError } from "../models";
-import { createJSONToolResponse, verifyDeviceIsReady } from "../utils/toolUtils";
+import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
 
 // Type definitions for better TypeScript support
@@ -293,14 +293,11 @@ function parseTarget(args: { text?: string; id?: string; x?: number; y?: number 
 }
 
 // Register tools
-export function registerInteractionTools(getCurrentDeviceId: () => string | undefined) {
+export function registerInteractionTools() {
   const elementUtils = new ElementUtils();
 
   // Tap on handler
-  const tapOnHandler = async (args: TapOnArgs, progress?: ProgressCallback) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const tapOnHandler = async (deviceId: string, args: TapOnArgs, progress?: ProgressCallback) => {
     const selector = parseTarget(args);
 
     if (selector.type === "coordinates") {
@@ -368,10 +365,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Double tap on handler
-  const doubleTapOnHandler = async (args: DoubleTapOnArgs, progress?: ProgressCallback) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const doubleTapOnHandler = async (deviceId: string, args: DoubleTapOnArgs, progress?: ProgressCallback) => {
     const selector = parseTarget(args);
 
     if (selector.type === "coordinates") {
@@ -390,10 +384,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Long press on handler
-  const longPressOnHandler = async (args: LongPressOnArgs, progress?: ProgressCallback) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const longPressOnHandler = async (deviceId: string, args: LongPressOnArgs, progress?: ProgressCallback) => {
     const selector = parseTarget(args);
 
     if (selector.type === "coordinates") {
@@ -412,11 +403,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Clear text handler
-  const clearTextHandler = async (args: ClearTextArgs, progress?: ProgressCallback) => {
+  const clearTextHandler = async (deviceId: string, args: ClearTextArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const clearText = new ClearText(deviceId);
       const result = await clearText.execute(progress);
 
@@ -431,11 +419,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Select all text handler
-  const selectAllTextHandler = async (args: SelectAllTextArgs, progress?: ProgressCallback) => {
+  const selectAllTextHandler = async (deviceId: string, args: SelectAllTextArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const selectAllText = new SelectAllText(deviceId);
       const result = await selectAllText.execute(progress);
 
@@ -450,11 +435,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Press button handler
-  const pressButtonHandler = async (args: PressButtonArgs, progress?: ProgressCallback) => {
+  const pressButtonHandler = async (deviceId: string, args: PressButtonArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const pressButton = new PressButton(deviceId);
       const result = await pressButton.execute(args.button, progress); // observe = true
 
@@ -469,11 +451,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Swipe on element handler
-  const swipeOnElementHandler = async (args: SwipeOnElementArgs, progress?: ProgressCallback) => {
+  const swipeOnElementHandler = async (deviceId: string, args: SwipeOnElementArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       // Validate element ID format
       const elementId = args.elementId;
 
@@ -553,11 +532,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Swipe on screen handler
-  const swipeOnScreenHandler = async (args: SwipeOnScreenArgs, progress?: ProgressCallback) => {
+  const swipeOnScreenHandler = async (deviceId: string, args: SwipeOnScreenArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const swipeOnScreen = new SwipeOnScreen(deviceId);
 
       const result = await swipeOnScreen.execute(
@@ -580,11 +556,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Drag and drop handler
-  const dragAndDropHandler = async (args: DragAndDropArgs, progress?: ProgressCallback) => {
+  const dragAndDropHandler = async (deviceId: string, args: DragAndDropArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const swipeFromElementToElement = new SwipeFromElementToElement(deviceId);
 
       const result = await swipeFromElementToElement.execute(
@@ -606,11 +579,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Pull to refresh handler
-  const pullToRefreshHandler = async (args: PullToRefreshArgs, progress?: ProgressCallback) => {
+  const pullToRefreshHandler = async (deviceId: string, args: PullToRefreshArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const observeScreen = new ObserveScreen(deviceId);
       const pullToRefresh = new PullToRefresh(deviceId);
 
@@ -661,11 +631,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Open system tray handler
-  const openSystemTrayHandler = async (args: OpenSystemTrayArgs, progress?: ProgressCallback) => {
+  const openSystemTrayHandler = async (deviceId: string, args: OpenSystemTrayArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const swipeOnScreen = new SwipeOnScreen(deviceId);
 
       const result = await swipeOnScreen.execute(
@@ -688,7 +655,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Pinch to zoom handler
-  // const pinchToZoomHandler = async (args: PinchToZoomArgs) => {
+  // const pinchToZoomHandler = async (deviceId: string, args: PinchToZoomArgs) => {
   //   try {
   //     const deviceId = getCurrentDeviceId();
   //     await verifyDeviceIsReady(deviceId);
@@ -714,10 +681,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   // };
 
   // Scroll handler
-  const scrollHandler = async (args: ScrollArgs, progress?: ProgressCallback) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const scrollHandler = async (deviceId: string, args: ScrollArgs, progress?: ProgressCallback) => {
     // Element-specific scrolling
     const observeScreen = new ObserveScreen(deviceId);
     const swipe = new SwipeOnElement(deviceId);
@@ -833,10 +797,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Press key handler
-  const pressKeyHandler = async (args: PressKeyArgs, progress?: ProgressCallback) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const pressKeyHandler = async (deviceId: string, args: PressKeyArgs, progress?: ProgressCallback) => {
     const pressButton = new PressButton(deviceId);
     const result = await pressButton.execute(args.key, progress);
 
@@ -848,10 +809,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Stop app handler
-  const stopAppHandler = async (args: StopAppArgs, progress?: ProgressCallback) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const stopAppHandler = async (deviceId: string, args: StopAppArgs, progress?: ProgressCallback) => {
     const terminateApp = new TerminateApp(deviceId);
     const result = await terminateApp.execute(args.appId, progress);
 
@@ -863,10 +821,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Clear state handler
-  const clearStateHandler = async (args: ClearStateArgs) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const clearStateHandler = async (deviceId: string, args: ClearStateArgs) => {
     const clearAppData = new ClearAppData(deviceId);
     const result = await clearAppData.execute(args.appId);
 
@@ -878,10 +833,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Input text handler
-  const inputTextHandler = async (args: InputTextArgs) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const inputTextHandler = async (deviceId: string, args: InputTextArgs) => {
     const sendText = new SendText(deviceId);
     const result = await sendText.execute(args.text, args.imeAction);
 
@@ -894,10 +846,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Open link handler
-  const openLinkHandler = async (args: OpenLinkArgs) => {
-    const deviceId = getCurrentDeviceId();
-    await verifyDeviceIsReady(deviceId);
-
+  const openLinkHandler = async (deviceId: string, args: OpenLinkArgs) => {
     const openUrl = new OpenURL(deviceId);
     const result = await openUrl.execute(args.url);
 
@@ -909,11 +858,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Shake handler
-  const shakeHandler = async (args: ShakeArgs, progress?: ProgressCallback) => {
+  const shakeHandler = async (deviceId: string, args: ShakeArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const shake = new Shake(deviceId);
       const result = await shake.execute({
         duration: args.duration ?? 1000,
@@ -931,11 +877,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Focus on handler
-  const focusOnHandler = async (args: FocusOnArgs, progress?: ProgressCallback) => {
+  const focusOnHandler = async (deviceId: string, args: FocusOnArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const focusOn = new FocusOn(deviceId);
       const result = await focusOn.execute(args.elementId, {
         retryCount: args.retryCount ?? 3,
@@ -953,11 +896,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // IME action handler
-  const imeActionHandler = async (args: ImeActionArgs, progress?: ProgressCallback) => {
+  const imeActionHandler = async (deviceId: string, args: ImeActionArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const imeAction = new ImeAction(deviceId);
       const result = await imeAction.execute(args.action, progress);
 
@@ -972,11 +912,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Recent Apps handler
-  const recentAppsHandler = async (args: RecentAppsArgs, progress?: ProgressCallback) => {
+  const recentAppsHandler = async (deviceId: string, args: RecentAppsArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const recentApps = new RecentApps(deviceId);
       const result = await recentApps.execute(progress);
 
@@ -991,11 +928,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Home Screen handler
-  const homeScreenHandler = async (args: any, progress?: ProgressCallback) => {
+  const homeScreenHandler = async (deviceId: string, args: any, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const homeScreen = new HomeScreen(deviceId);
       const result = await homeScreen.execute(progress);
 
@@ -1010,11 +944,8 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Rotate handler
-  const rotateHandler = async (args: RotateArgs, progress?: ProgressCallback) => {
+  const rotateHandler = async (deviceId: string, args: RotateArgs, progress?: ProgressCallback) => {
     try {
-      const deviceId = getCurrentDeviceId();
-      await verifyDeviceIsReady(deviceId);
-
       const rotate = new Rotate(deviceId);
       const result = await rotate.execute(args.orientation, progress);
 
@@ -1029,7 +960,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   };
 
   // Register with the tool registry
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "clearText",
     "Clear text from the currently focused input field",
     clearTextSchema,
@@ -1037,7 +968,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "selectAllText",
     "Select all text in the currently focused input field using long press + tap on 'Select All'",
     selectAllTextSchema,
@@ -1045,7 +976,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "pressButton",
     "Press a hardware button on the device",
     pressButtonSchema,
@@ -1053,7 +984,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "swipeOnElement",
     "Swipe on a specific element",
     swipeOnElementSchema,
@@ -1061,7 +992,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "swipeOnScreen",
     "Swipe on screen in a specific direction",
     swipeOnScreenSchema,
@@ -1069,7 +1000,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "dragAndDrop",
     "Drag an element to another element using index-based selection",
     dragAndDropSchema,
@@ -1077,7 +1008,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "pullToRefresh",
     "Perform a pull-to-refresh gesture on a list",
     pullToRefreshSchema,
@@ -1085,7 +1016,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "openSystemTray",
     "Open the system notification tray by swiping down from the status bar",
     openSystemTraySchema,
@@ -1093,7 +1024,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  // ToolRegistry.register(
+  // ToolRegistry.registerDeviceAware(
   //   "pinchToZoom",
   //   "Perform a pinch to zoom gesture in a specific direction",
   //   pinchToZoomSchema,
@@ -1103,7 +1034,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   // Register Maestro-aligned tools
 
   // Phase 1: Core Command Renames
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "pressKey",
     "Press a hardware key on the device (Maestro equivalent of pressButton)",
     pressKeySchema,
@@ -1111,7 +1042,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "stopApp",
     "Stop a running app (Maestro equivalent of terminateApp)",
     stopAppSchema,
@@ -1119,7 +1050,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "clearState",
     "Clear app state and data (Maestro equivalent of clearAppData)",
     clearStateSchema,
@@ -1127,7 +1058,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     false // Does not support progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "inputText",
     "Input text to the device (Maestro equivalent of sendText)",
     inputTextSchema,
@@ -1135,15 +1066,15 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     false // Does not support progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "openLink",
-    "Open a URL in the default browser (Maestro equivalent of openUrl)",
+    "Open a URL in the default browser",
     openLinkSchema,
     openLinkHandler,
     false // Does not support progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "tapOn",
     "Unified tap command supporting coordinates, text, and selectors",
     tapOnSchema,
@@ -1151,7 +1082,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "doubleTapOn",
     "Unified double tap command supporting coordinates, text, and selectors",
     doubleTapOnSchema,
@@ -1159,7 +1090,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "longPressOn",
     "Unified long press command supporting coordinates, text, and selectors",
     longPressOnSchema,
@@ -1167,7 +1098,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "scroll",
     "Scroll in a direction on a scrollable container, optionally to find an element (supports text and selectors)",
     scrollSchema,
@@ -1175,7 +1106,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "swipe",
     "Unified scroll command supporting direction and speed (no index support due to reliability)",
     scrollSchema,
@@ -1183,7 +1114,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "shake",
     "Shake the device",
     shakeSchema,
@@ -1191,7 +1122,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "focusOn",
     "Focus on a specific element",
     focusOnSchema,
@@ -1199,7 +1130,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "imeAction",
     "Perform an IME action (e.g., done, next, search)",
     imeActionSchema,
@@ -1207,7 +1138,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "recentApps",
     "Open the recent apps list",
     recentAppsSchema,
@@ -1215,7 +1146,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "homeScreen",
     "Return to the home screen by pressing the home button",
     homeScreenSchema,
@@ -1224,7 +1155,7 @@ export function registerInteractionTools(getCurrentDeviceId: () => string | unde
   );
 
   // Register the new rotate tool
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "rotate",
     "Rotate the device to a specific orientation",
     rotateSchema,

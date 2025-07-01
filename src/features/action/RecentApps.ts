@@ -15,7 +15,7 @@ export class RecentApps extends BaseVisualChange {
   private pressButton: PressButton;
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
     this.swipeOnScreen = new SwipeOnScreen(deviceId, adb);
     this.singleTap = new SingleTap(deviceId, adb);

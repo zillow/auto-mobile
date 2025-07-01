@@ -13,7 +13,7 @@ export class TapOnTextCommand extends BaseVisualChange {
   private viewHierarchy: ViewHierarchy;
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
     this.viewHierarchy = new ViewHierarchy(deviceId, this.adb);
     this.elementUtils = new ElementUtils();

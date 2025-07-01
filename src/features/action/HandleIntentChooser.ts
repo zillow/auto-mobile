@@ -8,7 +8,7 @@ export class HandleIntentChooser {
   private deepLinkManager: DeepLinkManager;
   private observeScreen: ObserveScreen;
 
-  constructor(deviceId: string | null = null) {
+  constructor(deviceId: string) {
     this.deviceId = deviceId;
     this.deepLinkManager = new DeepLinkManager(deviceId);
     this.observeScreen = new ObserveScreen(deviceId);

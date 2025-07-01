@@ -10,7 +10,7 @@ export class GetSystemInsets {
    * @param deviceId - Optional device ID
    * @param adbUtils - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
   }
 
@@ -62,6 +62,45 @@ export class GetSystemInsets {
     const width = parseInt(match[3], 10) - parseInt(match[1], 10);
     const height = parseInt(match[4], 10) - parseInt(match[2], 10);
     return { width, height };
+  }
+
+  /**
+   * Get the system UI insets using cached dumpsys window output
+   * @param cachedDumpsysWindow - Pre-fetched dumpsys window output
+   * @returns Promise with inset values
+   */
+  async executeWithCache(cachedDumpsysWindow: string): Promise<SystemInsets> {
+    try {
+      // Extract just the inset-related lines from the cached output
+      const insetLines = cachedDumpsysWindow.split("\n").filter(line =>
+        line.toLowerCase().includes("inset") ||
+              line.includes("statusBars") ||
+              line.includes("navigationBars") ||
+              line.includes("systemGestures")
+      ).join("\n");
+
+      const statusBarHeight = this.parseStatusBarHeight(insetLines);
+      const navBarHeight = this.parseNavigationBarHeight(insetLines);
+      const { left: leftInset, right: rightInset } = this.parseGestureInsets(insetLines);
+
+      logger.debug("System insets detected from cache: %o", {
+        top: statusBarHeight,
+        bottom: navBarHeight,
+        left: leftInset,
+        right: rightInset
+      });
+
+      return {
+        top: statusBarHeight,
+        right: rightInset,
+        bottom: navBarHeight,
+        left: leftInset
+      };
+    } catch (error) {
+      logger.warn("Failed to parse insets from cached dumpsys, falling back to separate query");
+      // Fallback to original execute method
+      return this.execute();
+    }
   }
 
   /**

@@ -6,6 +6,8 @@ import { ViewHierarchyResult } from "../../models/ViewHierarchyResult";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
+import { ActiveWindowInfo } from "../../models";
+import { assert } from "chai";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -32,7 +34,7 @@ export class BaseVisualChange {
    * @param deviceId - Optional device ID
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
     this.awaitIdle = new AwaitIdle(deviceId, this.adb);
     this.observeScreen = new ObserveScreen(deviceId, this.adb);
@@ -85,35 +87,83 @@ export class BaseVisualChange {
 
     // Get package name for UI stability waiting
     let packageName = options.packageName;
+
+    // Dynamic parallel promises
+    const promises: Promise<any>[] = [];
+    const cachedPackageName = this.observeScreen.getCachedActiveWindow()?.appId;
+
+    // If no package name provided and we have a cached one, start optimistic initialization
     if (!packageName) {
-      logger.info("[AwaitIdle] No package name provided, attempting to get active window package name...");
+      if (cachedPackageName) {
+        packageName = cachedPackageName;
+        logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: $packageName`);
+        // Start the initialization in the background
+        promises.push(this.awaitIdle.initializeUiStabilityTracking(
+          packageName,
+          timeoutMs
+        ).catch(error => {
+          logger.debug(`[BaseVisualChange] Optimistic initialization failed: ${error}`);
+          return null;
+        }));
+      } else {
+        logger.info("[BaseVisualChange] There was no cached active window");
+      }
+
+      logger.info("[BaseVisualChange] No package name provided, attempting to get active window package name...");
       try {
-        const windowInfo = await this.window.getActive();
-        packageName = windowInfo.appId;
-        logger.info(`[AwaitIdle] Active window package name: ${packageName}`);
+        promises.push(
+          this.window.getActive()
+            .catch(error => {
+              // If we can't get the active window package name, we'll just wait for touch events
+              packageName = undefined;
+            })
+        );
       } catch (error) {
         // If we can't get the active window package name, we'll just wait for touch events
         packageName = undefined;
       }
-    } else {
-      logger.info(`[AwaitIdle] Using provided package name: ${packageName}`);
     }
 
     if (progress) {
-      await progress(50, 100, "Waiting for touch events to settle...");
+      await progress(50, 100, "Waiting for UI to stabilize...");
     }
 
-    // Run touch idle waiting and UI stability waiting in parallel
-    const promises: Promise<any>[] = [
-      this.awaitIdle.waitForIdleTouchEvents(100)
-    ];
+    const results = await Promise.all(promises);
+    const resultsSize = results.length;
+
+    results.forEach((result, index) => {
+      assert.isTrue(result.success, `Call ${index} should succeed`);
+    });
+
+    // Get results from promises and cast to correct types
+    let initState: any = null;
+    let activeWindowResult: ActiveWindowInfo | undefined = undefined;
+    if (resultsSize === 2) {
+      // Both initialization and active window promises were created
+      initState = results[0];
+      activeWindowResult = results[1] as ActiveWindowInfo;
+    } else if (resultsSize === 1) {
+      // Only one promise was created, must be active window promise was created
+      activeWindowResult = results[0] as ActiveWindowInfo;
+    }
+
+    // Update package name from active window result if needed
+    if (activeWindowResult && activeWindowResult.appId) {
+      packageName = activeWindowResult.appId;
+      this.observeScreen.setCachedActiveWindow(activeWindowResult);
+      logger.info(`[BaseVisualChange] Updated package name from active window: ${packageName}`);
+    }
 
     // Only add UI stability waiting if we have a package name
-    // For launcher/system UI, we might not have a meaningful package name
     if (packageName && packageName.trim() !== "") {
-      promises.push(this.awaitIdle.waitForUiStability(packageName, timeoutMs));
+      if (packageName !== cachedPackageName) {
+        await this.awaitIdle.waitForUiStability(packageName, timeoutMs);
+      } else {
+        await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState);
+      }
+
       if (progress) {
-        await progress(60, 100, `Waiting for UI stability (${packageName})...`);
+        await progress(70, 100, `UI stability achieved for ${packageName}`);
       }
     }
 

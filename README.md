@@ -1,6 +1,6 @@
 # AutoMobile
 
-![AutoMobile logo](docs/img/auto-mobile.png)
+![AutoMobile sticker](android/playground/app/src/main/res/drawable/auto_mobile_sticker_sm.png)
 
 AutoMobile is a comprehensive set of tools that enables AI agents to interact with mobile devices. It provides automated
 testing, performance monitoring, and device interaction via an MCP server, custom test runner, and agentic loop that is

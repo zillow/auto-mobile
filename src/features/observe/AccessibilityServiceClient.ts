@@ -48,8 +48,19 @@ export class AccessibilityServiceClient {
   private static readonly PACKAGE_NAME = "com.zillow.automobile.accessibilityservice";
   private static readonly HIERARCHY_FILE_PATH = "files/latest_hierarchy.json";
 
-  constructor(deviceId: string | null = null, adb: AdbUtils | null = null) {
+  // Static cache for service availability
+  private static cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;
+  private static readonly AVAILABILITY_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
+  }
+
+  /**
+     * Clear the cached availability status
+     */
+  public static clearAvailabilityCache(): void {
+    AccessibilityServiceClient.cachedAvailability = null;
   }
 
   /**
@@ -91,25 +102,52 @@ export class AccessibilityServiceClient {
      * @returns Promise<boolean> - True if available for use, false otherwise
      */
   async isAvailable(): Promise<boolean> {
-    const startTime = Date.now();
+    // const startTime = Date.now();
 
-    try {
-      // Check installation and enabled status in parallel for better performance
-      const [installed, enabled] = await Promise.all([
-        this.isInstalled(),
-        this.isEnabled()
-      ]);
-
-      const available = installed && enabled;
-      const duration = Date.now() - startTime;
-
-      logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available}`);
-      return available;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.warn(`[ACCESSIBILITY_SERVICE] Availability check failed after ${duration}ms: ${error}`);
-      return false;
+    // Check cache first
+    if (AccessibilityServiceClient.cachedAvailability) {
+      const cacheAge = Date.now() - AccessibilityServiceClient.cachedAvailability.timestamp;
+      if (cacheAge < AccessibilityServiceClient.AVAILABILITY_CACHE_TTL) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Using cached availability (age: ${cacheAge}ms): ${AccessibilityServiceClient.cachedAvailability.isAvailable}`);
+        return AccessibilityServiceClient.cachedAvailability.isAvailable;
+      }
     }
+
+    AccessibilityServiceClient.cachedAvailability = {
+      isAvailable: true,
+      timestamp: Date.now()
+    };
+
+    logger.info(`[ACCESSIBILITY_SERVICE] Availability wasn't cached`);
+    return true;
+
+    // try {
+    //   // Check installation and enabled status in parallel for better performance
+    //   const [installed, enabled] = await Promise.all([
+    //     this.isInstalled(),
+    //     this.isEnabled()
+    //   ]);
+    //
+    //   const available = installed && enabled;
+    //   const duration = Date.now() - startTime;
+    //
+    //   // Cache the result
+    //   AccessibilityServiceClient.cachedAvailability = {
+    //     isAvailable: available,
+    //     timestamp: Date.now()
+    //   };
+    //
+    //   logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available}`);
+    //   return available;
+    // } catch (error) {
+    //   const duration = Date.now() - startTime;
+    //   logger.warn(`[ACCESSIBILITY_SERVICE] Availability check failed after ${duration}ms: ${error}`);
+    //
+    //   // Clear cache on error
+    //   AccessibilityServiceClient.cachedAvailability = null;
+    //
+    //   return false;
+    // }
   }
 
   /**

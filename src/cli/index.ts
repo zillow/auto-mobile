@@ -10,7 +10,6 @@ import { registerUtilityTools } from "../server/utilityTools";
 import { registerEmulatorTools } from "../server/emulatorTools";
 import { registerSourceIndexingTools } from "../server/sourceIndexingTools";
 import { registerPlanTools } from "../server/planTools";
-import { registerAssertionTools } from "../server/assertionTools";
 
 // Interface for Android app configuration
 interface AndroidAppConfig {
@@ -20,24 +19,15 @@ interface AndroidAppConfig {
 
 // Initialize tool registry for CLI mode
 export function initializeCliTools(androidApps: AndroidAppConfig[] = []): void {
-  // Store device ID - in CLI mode we'll use the first available device or undefined
-  let currentDeviceId: string | undefined = undefined;
-
-  // Create getter and setter functions
-  const getCurrentDeviceId = () => currentDeviceId;
-  const setCurrentDeviceId = (deviceId: string | undefined) => {
-    currentDeviceId = deviceId;
-  };
 
   // Register all tool categories
-  registerObserveTools(getCurrentDeviceId);
-  registerInteractionTools(getCurrentDeviceId);
-  registerAppTools(getCurrentDeviceId, setCurrentDeviceId);
-  registerUtilityTools(getCurrentDeviceId, setCurrentDeviceId);
+  registerObserveTools();
+  registerInteractionTools();
+  registerAppTools();
+  registerUtilityTools();
   registerEmulatorTools();
   registerSourceIndexingTools();
   registerPlanTools();
-  registerAssertionTools(getCurrentDeviceId);
 }
 
 // Parse CLI arguments into tool name and parameters
