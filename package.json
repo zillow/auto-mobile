@@ -16,7 +16,7 @@
     "dev:sse": "ts-node-dev --respawn --transpile-only src/index.ts --transport sse",
     "dev:streamable": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",
     "dev:streamable:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port",
-    "prepublishOnly": "cp README.md README.md.backup && node scripts/transform-readme.js",
+    "prepublishOnly": "cp README.md README.md.backup && node scripts/npm/transform-readme.js",
     "postpublish": "mv README.md.backup README.md || true"
   },
   "engines": {
