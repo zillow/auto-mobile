@@ -86,7 +86,7 @@ describe("SwipeFromElementToElement", () => {
 
   describe("constructor", () => {
     it("should initialize with default values", () => {
-      const instance = new SwipeFromElementToElement();
+      const instance = new SwipeFromElementToElement("test-device");
       assert.instanceOf(instance, SwipeFromElementToElement);
     });
 
