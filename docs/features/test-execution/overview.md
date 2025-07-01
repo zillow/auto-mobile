@@ -2,7 +2,7 @@
 
 ## Environments
 
-If you haven't already, add [AutoMobile JUnitRunner dependency](../junitrunner/setup.md).
+If you haven't already, add [AutoMobile JUnitRunner dependency](junitrunner.md).
 
 #### Local
 

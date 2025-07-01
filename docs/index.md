@@ -8,14 +8,14 @@ The first platform supported is Android with plans to extend to iOS.
 **How do I get started?**
 
 - [Installation](installation.md) - Install AutoMobile in your environment or IDE
-- [Test Authoring](test-authoring/overview.md) - Automatically write tests
-- [Test Execution](test-execution/overview.md) - Run tests locally or on CI
+- [Test Authoring](features/test-authoring/overview.md) - Automatically write tests
+- [Test Execution](features/test-execution/overview.md) - Run tests locally or on CI
 
 **Additional Resources**
 
 - [FAQ](faq.md) - Frequently asked questions
 - [Why build this?](origin.md) - Motivation and origin story
-- [Technical Architecture](architecture.md) - Understand how AutoMobile works 
+- [Technical Architecture](features/architecture.md) - Understand how AutoMobile works 
 - [Local Development](local-development.md) - If you're looking to contribute to the project
 - [Security](security.md) - Responsible vulnerability disclosure & use
 

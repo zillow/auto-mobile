@@ -21,3 +21,8 @@ npm-debug.log*
 
 # Generated MkDocs for GitHub Pages
 /site
+
+docs/changelog.md
+docs/contributing/overview.md
+
+

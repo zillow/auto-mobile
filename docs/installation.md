@@ -45,4 +45,4 @@ auto-mobile --cli
 For full integration:
 
 1. Follow [MCP client config](mcp/overview.md) guide.
-2. Add [AutoMobile JUnitRunner test dependency](junitrunner/setup.md) to all Android application and library modules.
+2. Add [AutoMobile JUnitRunner test dependency](junitrunner/junitrunner.md) to all Android application and library modules.

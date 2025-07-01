@@ -55,5 +55,5 @@ class D,E,H logic;
 class B,C,F decision;
         """
                     .trimIndent()),
-        SlideContent.Emoji(emoji = PresentationEmoji.ROCKET, caption = "85% faster observations"),
+        SlideContent.Emoji(emoji = PresentationEmoji.ROCKET, caption = "97.5% faster observations"),
     )
