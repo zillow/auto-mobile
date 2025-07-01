@@ -68,79 +68,79 @@ jobs:
       - name: "Run Tests"
         run: npm run test
 
-#  build-junit-runner-library:
-#    name: "Build JUnitRunner Library"
-#    runs-on: ubuntu-latest
-#    defaults:
-#      run:
-#        working-directory: android
-#    steps:
-#      - name: "Git Checkout"
-#        uses: actions/checkout@v4
-#
-#      - uses: ./.github/actions/setup-auto-mobile-npm-package
-#
-#      - uses: ./.github/actions/gradle-task-run
-#        with:
-#          gradle-tasks: ":junitRunner:assemble"
-#          gradle-project-directory: "android"
-#          reuse-configuration-cache: true
-#          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-#
-#      - name: "Store AAR"
-#        uses: actions/upload-artifact@v4.4.0
-#        with:
-#          name: aar
-#          path: core/build/outputs/aar/core-debug.aar
+  build-junit-runner-library:
+    name: "Build JUnitRunner Library"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
 
-#  build-kotlin-test-author-clikt-app:
-#    name: "Build Kotlin Test Author Clikt App"
-#    runs-on: ubuntu-latest
-#    defaults:
-#      run:
-#        working-directory: android
-#    steps:
-#      - name: "Git Checkout"
-#        uses: actions/checkout@v4
-#
-#      - uses: ./.github/actions/gradle-task-run
-#        with:
-#          gradle-tasks: ":kotlinTestAuthor:assembleDist"
-#          gradle-project-directory: "android"
-#          reuse-configuration-cache: true
-#          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-#
-#      - name: "Store AAR"
-#        uses: actions/upload-artifact@v4.4.0
-#        with:
-#          name: aar
-#          path: core/build/outputs/aar/core-debug.aar
-#
-#  build-playground-app:
-#    name: "Build Playground App"
-#    runs-on: ubuntu-latest
-#    defaults:
-#      run:
-#        working-directory: android
-#    steps:
-#      - name: "Git Checkout"
-#        uses: actions/checkout@v4
-#
-#      - uses: ./.github/actions/setup-auto-mobile-npm-package
-#
-#      - uses: ./.github/actions/gradle-task-run
-#        with:
-#          gradle-tasks: ":playground:app:assembleDebug"
-#          gradle-project-directory: "android"
-#          reuse-configuration-cache: true
-#          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-#
-#      - name: "Store Sample APK"
-#        uses: actions/upload-artifact@v4.4.0
-#        if: success()  # Only upload if build succeeded
-#        with:
-#          name: playground-app-apk
-#          path: android/playground/app/build/outputs/apk/debug/playground-app-debug.apk
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":junitRunner:assemble"
+          gradle-project-directory: "android"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Store AAR"
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: aar
+          path: core/build/outputs/aar/core-debug.aar
+
+  build-kotlin-test-author-clikt-app:
+    name: "Build Kotlin Test Author Clikt App"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":kotlinTestAuthor:assembleDist"
+          gradle-project-directory: "android"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Store AAR"
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: aar
+          path: core/build/outputs/aar/core-debug.aar
+
+  build-playground-app:
+    name: "Build Playground App"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":playground:app:assembleDebug"
+          gradle-project-directory: "android"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Store Sample APK"
+        uses: actions/upload-artifact@v4.4.0
+        if: success()  # Only upload if build succeeded
+        with:
+          name: playground-app-apk
+          path: android/playground/app/build/outputs/apk/debug/playground-app-debug.apk
 
   deploy-docs:
     name: "Deploy Documentation"
