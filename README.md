@@ -1,34 +1,52 @@
 # AutoMobile
 
-![AutoMobile sticker](android/playground/app/src/main/res/drawable/auto_mobile_sticker_sm.png)
+![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
-AutoMobile is a comprehensive set of tools that enables AI agents to interact with mobile devices. It provides automated
-testing, performance monitoring, and device interaction via an MCP server, custom test runner, and agentic loop that is
-compatible with multiple foundation model providers. The first platform supported is Android with plans to extend to iOS.
+AutoMobile is a set of tools for mobile device automation. You can use it for UI testing or as a development workflow
+assistant.
 
-## Features
+The first platform supported is Android with plans to extend to iOS.
 
-- **Source Mapping**: After setup it can use source mapping to identify where tests should be written.
-- **Comprehensive Interaction**: Complete set of commands for device automation supporting coordinate, text, and element ID-based interactions.
-- **Advanced UI Analysis**: Comprehensive view hierarchy analysis and intelligent element selection that leverages and incentivizes accessibility.
-- **Device Management**: Multi-device support with emulator control and app lifecycle management.
-- **Progress Notifications**: Real-time progress updates for long-running operations like emulator startup.
+## How it works
+
+- 🔧 **[Powerful MCP Server](docs/features/mcp-server/index.md)**: AutoMobile provides comprehensive [actions](docs/features/mcp-server/actions.md) through MCP
+  tool calls with a fast [observations](docs/features/mcp-server/observation.md) to drive the
+  [interaction loop](docs/features/mcp-server/interaction-loop.md).
+- 🗺️ **Source Mappping**: Combining project path config with deep view hierarchy analysis we know exactly what code is being rendered.
+- ✍️ **[Automated Test Authoring](docs/features/test-authoring/overview.md)**: When used in test authoring mode AutoMobile will write tests for you. It is the only way it writes tests.
+- 🧪 **[Test Execution](docs/features/test-execution/overview.md)** - Run tests locally or on CI without extra infrastructure.
+- 📱 **Device Management**: Multi-device support with emulator control and app lifecycle management.
+
+All together you get a system that looks like this:
+  ```mermaid
+  stateDiagram-v2
+      Agent: 🤖 AI Agent
+      RequestHandler: MCP Server 
+      DeviceSessionManager: Device Session Manager
+      InteractionLoop: Interaction Loop
+      AuthorTest: ✍️ Author Test
+      
+      Agent --> RequestHandler
+      RequestHandler --> Agent
+      RequestHandler --> DeviceSessionManager
+      InteractionLoop --> RequestHandler: 🖼️ Processed Results 
+      DeviceSessionManager --> InteractionLoop: 📱
+      RequestHandler --> AuthorTest: on App Stopped
+  ```
 
 ## Documentation
 
-- [Installation](docs/installation.md)
-- [AutoMobile Origin](docs/index.md) - Origin story
-- [CLI Reference](docs/cli.md) - Complete command-line interface documentation
-- [Batteries Included](docs/batteries-included.md) - Built-in features and automation
-- [Local Development](docs/local-development.md)
-- [Change Log](CHANGELOG.md) - coming soon
+- 💻 [Installation](docs/installation.md) - AutoMobile is [published on npm](https://www.npmjs.com/package/auto-mobile)
+  and we have instructions for agents we've tested with.
+- 🔋 [Batteries Included](docs/features/batteries-included.md) - Minimized and automated setup
+- 📝 [Change Log](CHANGELOG.md) - coming soon
 
 ## Contributing
 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
-- [SECURITY](SECURITY.md) - Responsible disclosure & use
-- [CONTRIBUTING](.github/CONTRIBUTING.md) - coming soon
+- [Responsible disclosure & use](SECURITY.md)
+- [Contributing](.github/CONTRIBUTING.md) - coming soon
 
 # Acknowledgement 
 
-By continuing to use AutoMobile, you acknowledge and agree to the warnings and responsible use requirements above.
+By continuing to use AutoMobile, [you acknowledge and agree to the warnings and responsible use requirements](SECURITY.md).

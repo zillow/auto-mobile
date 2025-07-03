@@ -13,6 +13,6 @@ TODO: bash script for parallel test execution & clearing app data between tests.
 ## Run plans on CI with agentic healing, parallelism, and reporting
 
 1. Add [AutoMobile's JUnitRunner](junitrunner.md) to your Android app & libraries.
-2. Read ([provider guides](../../mcp/overview.md) setup relevant environment variables 
+2. Read ([provider guides](../../mcp-clients/overview.md) setup relevant environment variables 
 3. Ensure one or more Android emulators are running and detectable by `adb devices` before unit tests are run
 4. Run unit tests via `./gradlew testUnitTestDebug`

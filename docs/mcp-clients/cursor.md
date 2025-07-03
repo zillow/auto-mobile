@@ -16,5 +16,4 @@ or copy the following into your Cursor `mcp.json`:
   }
 }
 ```
-
-![cursor-mcp-server-success.png](../img/cursor-mcp-server-success.png)
+<img src="../img/cursor-mcp-server-success.png" width="400" alt="cursor-mcp-server-success.png">

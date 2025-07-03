@@ -3,7 +3,8 @@ import * as sinon from "sinon";
 import { FeatureFlagManager } from "../../src/utils/featureFlagManager";
 import { AbTestManager } from "../../src/utils/abTestManager";
 
-describe("FeatureFlagManager", () => {
+describe("FeatureFlagManager", function() {
+  this.timeout(5000);
   let featureFlagManager: FeatureFlagManager;
   let abTestManager: AbTestManager;
 

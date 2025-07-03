@@ -8,20 +8,36 @@ The first platform supported is Android with plans to extend to iOS.
 **How do I get started?**
 
 - [Installation](installation.md) - Install AutoMobile in your environment or IDE
-- [Test Authoring](features/test-authoring/overview.md) - Automatically write tests
-- [Test Execution](features/test-execution/overview.md) - Run tests locally or on CI
+- [Test Authoring](features/test-authoring/index.md) - Automatically write tests
+- [Test Execution](features/test-execution/index.md) - Run tests locally or on CI
+
+```mermaid
+stateDiagram-v2
+    Agent: Agent
+    RequestHandler: Request Handler
+    DeviceSessionManager: Device Session Manager
+    InteractionLoop: Interaction Loop
+    AuthorTest: Author Test
+    
+    Agent --> RequestHandler
+    RequestHandler --> Agent
+    RequestHandler --> DeviceSessionManager
+    InteractionLoop --> RequestHandler: 🖼️ Processed Results 
+    DeviceSessionManager --> InteractionLoop: 📱
+    RequestHandler --> AuthorTest: on App Stopped
+    
+```
 
 **Additional Resources**
 
 - [FAQ](faq.md) - Frequently asked questions
 - [Why build this?](origin.md) - Motivation and origin story
-- [Technical Architecture](features/architecture.md) - Understand how AutoMobile works 
-- [Local Development](contributing/local-development.md) - If you're looking to contribute to the project
-- [Security](security.md) - Responsible vulnerability disclosure & use
+- [Features](features/index.md) - Understand how AutoMobile works 
+- [Contributing](contributing/index.md) - If you're looking to contribute to the project
 
 ## Acknowledgement
 
-By continuing to use AutoMobile, you acknowledge and agree to the warnings and [responsible use requirements](security.md).
+By continuing to use AutoMobile, [you acknowledge and agree to the warnings and responsible use requirements](security.md).
 
 ## License
 

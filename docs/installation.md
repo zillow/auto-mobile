@@ -1,22 +1,9 @@
 # Installation
 
-Right now this guide assumes you are a software engineer. Eventually I'll have a more non-technical guide.
+Right now this guide assumes you are a software engineer who is roughly familiar with AI coding assistants like Cursor,
+Claude Code, or Firebender.
 
-### Prerequisites
-
-- Node.js 18 or later
-
-#### Android SDK + Emulator Setup
-
-AutoMobile will automatically download and install the following unless they already exist:
-
-- Command line tools installed via Homebrew or manually in `$ANDROID_HOME/cmdline_tools`
-- Android SDK installed at `$ANDROID_HOME`
-- At least one Android device or emulator
-
-Physical devices do need USB debugging enabled for AutoMobile to function with them. Ripgrep makes it go faster.
-
-### MCP Client Setup
+### MCP Server Configuration for your Agent
 
 AutoMobile is distributed mainly as an npm package.
 
@@ -41,6 +28,21 @@ If your favorite MCP client doesn't have that capability yet, copy the following
   }
 }
 ```
+
+### Prerequisites
+
+- Node.js 20 or later
+
+#### Android SDK + Emulator Setup
+
+AutoMobile will automatically download and install the following unless they already exist:
+
+- Command line tools installed via Homebrew or manually in `$ANDROID_HOME/cmdline_tools`
+- Android SDK installed at `$ANDROID_HOME`
+- At least one Android device or emulator
+
+Physical devices do need USB debugging enabled for AutoMobile to function with them. Ripgrep makes it go faster.
+
 
 If you have a private npm registry for proxying public npm:
 
@@ -71,5 +73,5 @@ auto-mobile --cli
 
 For full integration:
 
-1. Follow [MCP client config](mcp/overview.md) guide.
-2. Add [AutoMobile JUnitRunner test dependency](junitrunner/junitrunner.md) to all Android application and library modules.
+1. Follow [MCP client config](mcp-clients/index.md) guide.
+2. Add [AutoMobile JUnitRunner test dependency](features/test-execution/junitrunner.md) to all Android application and library modules.

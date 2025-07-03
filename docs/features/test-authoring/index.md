@@ -1,10 +1,10 @@
-# Test Authoring - Overview
+# Test Authoring
 
 Steps to take whether you're setting up AutoMobile test authoring & execution for the first time or debugging an issue.
 
 ## Prerequisites
 
-- AutoMobile should be [installed](../installation.md) .
+- AutoMobile should be [installed](../installation.md).
 - Android device or emulator connected and accessible via ADB.
 - The target app installed on the device.
 

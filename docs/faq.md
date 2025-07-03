@@ -32,7 +32,7 @@ to do integration testing against `fast-agent` because it has a complete MCP cli
 
 ### What are the system requirements?
 
-- Node.js 18 or later
+- Node.js 20 or later
 
 AutoMobile will automatically download and install the following unless they already exist.
 - Command line tools installed via Homebrew or manually in $ANDROID_HOME/cmdline_tools
@@ -82,10 +82,6 @@ The system intelligently caches view hierarchy data to improve performance. Cach
 significantly, ensuring accuracy while minimizing redundant operations. I wrote a
 [blog post](../blog/01-view-hierarchy-cache-system.md) about this. 
 
-### Can I test apps that require login?
-
-See [docs on user credential](test-authoring/todo-user-credentials.md).
-
 ### How fast are the interactions?
 
 Interaction speed depends on device performance and complexity. Typical operations:
@@ -129,18 +125,20 @@ That's your app implementation. If AutoMobile can cause it to crash, a user can 
 
 ### Can I integrate with CI/CD systems?
 
-See [ci setup docs](ci.md).
+See [ci setup docs](features/test-execution/ci.md).
 
 ### Is there API documentation?
 
-For CLI
+AutoMobile's [MCP Server](features/mcp-server/index.md) is fully documented with system design diagrams and
+explanations. If you find any of this wanting feel free to file an issue.
+
+For AutoMobile's CLI you can always run the tool without commands to get helpful explanations. It is not going to have
+a dedicated documentation page beyond running tool output and updating [this page](features/cli.md).
 
 ```text
 npm install -g auto-mobile@latest
-auto-mobile --cli list
+auto-mobile --cli
 ```
-
-For MCP [here is the latest docs](mcp/todo-tool-list.md)
 
 ### Can I extend the functionality?
 
@@ -150,9 +148,10 @@ how it gets used. If there are components worth extracting we'll extract them.
 
 ### How do I report bugs or request features?
 
-- File issues on the GitHub repository
+- [File issues on the GitHub repository](https://github.com/zillow/auto-mobile/issues)
 - Include device information, logs, and reproduction steps. For bonus points include an AutoMobile plan. It would be best
-if reproductions could point at publicly available apps that have been released. I've done my testing against Zillow, Slack, Google Keep, YouTube Music. 
+  if reproductions could point at publicly available apps that have been released. I've done my testing against Zillow,
+  Slack, Google Keep, YouTube Music, Bluesky, Google Calendar, and more.  
 - Feature requests are welcomed as are contributions. Please file an issue before starting a contribution.
 
 ### What data is collected?

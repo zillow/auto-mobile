@@ -21,7 +21,6 @@ import { registerAppTools } from "./appTools";
 import { registerUtilityTools } from "./utilityTools";
 import { registerEmulatorTools } from "./emulatorTools";
 import { registerSourceIndexingTools } from "./sourceIndexingTools";
-import { registerPlanTools } from "./planTools";
 import { registerConfigurationTools } from "./configurationTools";
 import { registerDeepLinkTools } from "./deepLinkTools";
 
@@ -43,7 +42,6 @@ export const createMcpServer = (androidApps: AndroidAppConfig[] = []): McpServer
   registerUtilityTools();
   registerEmulatorTools();
   registerSourceIndexingTools();
-  registerPlanTools();
   registerConfigurationTools();
   registerDeepLinkTools();
 

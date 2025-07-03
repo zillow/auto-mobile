@@ -53,3 +53,5 @@ src/test/resources/test-plans/generated/
 local.properties
 
 /roadmap
+
+/keystore

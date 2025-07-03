@@ -1,4 +1,4 @@
-# Model Providers - Overview
+# Model Providers
 
 AutoMobile comes equiped with an agent primarily accessible via its JUnitRunner. It will stay bundled with the JUnitRunner
 unless we find usecases to make it a more general component. It is generally able to access most of the top model providers

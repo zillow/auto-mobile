@@ -1,4 +1,4 @@
-# AutoMobile JUnitRunner
+# Test Execution - JUnitRunner
 
 Add this test Gradle dependency to all Android apps and libraries in your codebase. You could opt to only add it to some
 modules, but AutoMobile's automatic test authoring will still attempt to place tests in the module it thinks most closely
