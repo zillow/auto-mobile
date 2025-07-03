@@ -18,6 +18,14 @@ plugins {
   alias(libs.plugins.android.application) apply false
   alias(libs.plugins.kotlin.serialization) apply false
   alias(libs.plugins.compose.compiler) apply false
+  id("org.owasp.dependencycheck") version "10.0.4"
+}
+
+// Configure OWASP Dependency Check
+dependencyCheck {
+  formats = listOf("HTML", "JSON")
+  suppressionFile = "owasp-suppressions.xml"
+  failBuildOnCVSS = 7.0f
 }
 
 val gradleWorkerJvmArgs = providers.gradleProperty("org.gradle.testWorker.jvmargs").get()
