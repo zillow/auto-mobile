@@ -14,6 +14,154 @@ permissions:
   packages: write
 
 jobs:
+  # Security Checks
+  security-dependency-scan:
+    name: "Security - Dependency Vulnerability Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: "Install Dependencies"
+        run: npm ci
+
+      - name: "Run npm audit"
+        run: npm audit --audit-level=moderate
+
+      - name: "Setup Java"
+        uses: actions/setup-java@6a0805fcefea3d4657a47ac4c165951e33482018 # v4.2.2
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: "Run Gradle Dependency Check"
+        working-directory: android
+        run: ./gradlew dependencyCheckAnalyze
+
+      - name: "Upload Dependency Check Report"
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        if: always()
+        with:
+          name: dependency-check-report
+          path: android/build/reports/dependency-check-report.html
+
+  security-trivy-scan:
+    name: "Security - Trivy Vulnerability Scanner"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: "Run Trivy vulnerability scanner"
+        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b9ceecbf5 # v0.24.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: "Upload Trivy scan results to GitHub Security tab"
+        uses: github/codeql-action/upload-sarif@4f3212b61783c3c68e8309a0f18a699764811cda # v3.27.1
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  security-secrets-scan:
+    name: "Security - Secret Scanning"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+        with:
+          fetch-depth: 0
+
+      - name: "Run TruffleHog OSS"
+        uses: trufflesecurity/trufflehog@v3.82.12
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  security-codeql:
+    name: "Security - CodeQL Analysis"
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['javascript', 'java']
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: "Initialize CodeQL"
+        uses: github/codeql-action/init@4f3212b61783c3c68e8309a0f18a699764811cda # v3.27.1
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: "Autobuild"
+        uses: github/codeql-action/autobuild@4f3212b61783c3c68e8309a0f18a699764811cda # v3.27.1
+
+      - name: "Perform CodeQL Analysis"
+        uses: github/codeql-action/analyze@4f3212b61783c3c68e8309a0f18a699764811cda # v3.27.1
+        with:
+          category: "/language:${{matrix.language}}"
+
+  security-license-scan:
+    name: "Security - License Compliance"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@1e60f620b9541d16bece96c5465dc8ee9832be0b # v4.0.3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: "Install Dependencies"
+        run: npm ci
+
+      - name: "Run License Checker"
+        run: |
+          npx license-checker --summary --excludePrivatePackages --failOn 'GPL;AGPL;LGPL;UNLICENSED' --csv > license-report.csv || true
+
+      - name: "Upload License Report"
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: license-report
+          path: license-report.csv
+
+  security-sbom:
+    name: "Security - Generate SBOM"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: "Generate SBOM"
+        uses: CycloneDX/gh-node-module-generatebom@00866aa15f5084917b6c6c43e7a0f1b6b6f1db8f # v1.0.3
+        with:
+          path: ./
+          output: ./sbom.json
+
+      - name: "Upload SBOM"
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
+        with:
+          name: sbom
+          path: sbom.json
+
 # TODO: Fix Node tests on view hierachy sample dumps
 #  validate-xml:
 #    name: "Validate XML"
@@ -34,7 +182,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: "Run ktfmt"
         shell: "bash"
@@ -46,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - name: "Run ShellCheck"
         shell: "bash"
@@ -58,7 +206,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -76,7 +224,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -88,7 +236,7 @@ jobs:
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: "Store AAR"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: aar
           path: core/build/outputs/aar/core-debug.aar
@@ -101,7 +249,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - uses: ./.github/actions/gradle-task-run
         with:
@@ -111,7 +259,7 @@ jobs:
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: "Store AAR"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         with:
           name: aar
           path: core/build/outputs/aar/core-debug.aar
@@ -124,7 +272,7 @@ jobs:
         working-directory: android
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
@@ -136,7 +284,7 @@ jobs:
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: "Store Sample APK"
-        uses: actions/upload-artifact@v4.4.0
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874 # v4.4.0
         if: success()  # Only upload if build succeeded
         with:
           name: playground-app-apk
@@ -155,18 +303,18 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: "Git Checkout"
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0  # Fetch full history for git-revision-date-localized plugin
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "Setup Python"
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.2.0
         with:
           python-version: '3.11'
 
       - name: "Install uv"
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@077f83722b23763735a0b73c5a5c9c60b5fd3db0 # v4.1.1
         with:
           enable-cache: true
 
@@ -178,13 +326,13 @@ jobs:
         run: scripts/github/deploy_pages.py build
 
       - name: "Setup Pages"
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
 
       - name: "Upload artifact"
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           path: './site'
 
       - name: "Deploy to GitHub Pages"
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
