@@ -64,7 +64,7 @@ export class TerminateApp extends BaseVisualChange {
 
     const isForeground = isTopApp || isImeTarget;
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         await this.adb.executeCommand(`shell am force-stop ${packageName}`);
 

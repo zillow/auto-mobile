@@ -12,7 +12,7 @@ export class ClearText extends BaseVisualChange {
   }
 
   async execute(progress?: ProgressCallback): Promise<ClearTextResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           // First, observe the screen to find input fields with text

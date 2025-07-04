@@ -1159,17 +1159,19 @@ export class ViewHierarchy {
    * Find an element in the view hierarchy that matches the specified text
    * @param viewHierarchy - The view hierarchy to search
    * @param text - The text to search for
+   * @param containerElementId - Container element resource ID to restrict the search within its child nodes
    * @param fuzzyMatch - Whether to use fuzzy matching (partial text match)
    * @param caseSensitive - Whether to use case-sensitive matching
    * @returns The found element or null
    */
   findElementByText(
-    viewHierarchy: any,
+    viewHierarchy: ViewHierarchyResult,
     text: string,
+    containerElementId: string,
     fuzzyMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element | null {
-    return this.elementUtils.findElementByText(viewHierarchy, text, fuzzyMatch, caseSensitive);
+    return this.elementUtils.findElementByText(viewHierarchy, text, containerElementId, fuzzyMatch, caseSensitive);
   }
 
   /**

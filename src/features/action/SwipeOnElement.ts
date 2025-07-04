@@ -33,7 +33,7 @@ export class SwipeOnElement extends BaseVisualChange {
     options: GestureOptions = {},
     progress?: ProgressCallback
   ): Promise<SwipeResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
           direction,

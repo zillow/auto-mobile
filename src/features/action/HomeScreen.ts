@@ -203,7 +203,7 @@ export class HomeScreen extends BaseVisualChange {
     cached: boolean,
     progress?: ProgressCallback
   ): Promise<HomeScreenResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           let result: HomeScreenResult;

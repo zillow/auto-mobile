@@ -211,7 +211,7 @@ describe("ViewHierarchy - Sample Data", function() {
     logger.info(`Found ${clickableElements.length} clickable elements`);
     expect(clickableElements.length).to.be.greaterThan(0, "Should find clickable elements");
 
-    const textElement = viewHierarchy.findElementByText(filteredHierarchy, "Search", true, false);
+    const textElement = viewHierarchy.findElementByText(filteredHierarchy, "Search", "TextView", true, false);
     logger.info(`Found text element: ${textElement ? "yes" : "no"}`);
 
     const scrollableElements = viewHierarchy.findScrollableElements(filteredHierarchy);

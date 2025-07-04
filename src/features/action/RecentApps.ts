@@ -5,6 +5,7 @@ import { SwipeOnScreen } from "./SwipeOnScreen";
 import { SingleTap } from "./SingleTap";
 import { PressButton } from "./PressButton";
 import { ElementUtils } from "../utility/ElementUtils";
+import { ObserveResult, ViewHierarchyResult } from "../../models";
 
 /**
  * Opens the recent apps screen using intelligent navigation detection
@@ -29,22 +30,17 @@ export class RecentApps extends BaseVisualChange {
    * @returns Result of the recent apps operation
    */
   async execute(progress?: ProgressCallback): Promise<RecentAppsResult> {
-    return this.observedChange(
-      async () => {
-        // First observe the current state to analyze navigation style
-        const observeResult = await this.observeScreen.execute();
-        if (!observeResult.viewHierarchy || !observeResult.screenSize) {
-          throw new Error("Could not get view hierarchy for navigation detection");
-        }
+    return this.observedInteractionWithChange(
+      async (observeResult: ObserveResult) => {
 
-        const navigationMethod = this.detectNavigationStyle(observeResult.viewHierarchy);
+        const navigationMethod = this.detectNavigationStyle(observeResult);
 
         switch (navigationMethod) {
           case "gesture":
             await this.executeGestureNavigation(observeResult);
             return { success: true, method: "gesture" };
           case "legacy":
-            await this.executeLegacyNavigation(observeResult.viewHierarchy);
+            await this.executeLegacyNavigation(observeResult);
             return { success: true, method: "legacy" };
           case "hardware":
           default:
@@ -65,7 +61,7 @@ export class RecentApps extends BaseVisualChange {
    * @param viewHierarchy - Current view hierarchy
    * @returns Navigation style type
    */
-  private detectNavigationStyle(viewHierarchy: any): "gesture" | "legacy" | "hardware" {
+  private detectNavigationStyle(viewHierarchy: ViewHierarchyResult): "gesture" | "legacy" | "hardware" {
     // Look for common navigation bar elements
     const navigationBarIds = [
       "navigationBarBackground",

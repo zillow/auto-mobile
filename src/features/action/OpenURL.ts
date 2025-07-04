@@ -19,7 +19,7 @@ export class OpenURL extends BaseVisualChange {
       };
     }
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${url}"`);

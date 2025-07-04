@@ -32,7 +32,7 @@ export class PullToRefresh extends BaseVisualChange {
     options: GestureOptions = {},
     progress?: ProgressCallback
   ): Promise<any> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         const center = this.elementUtils.getElementCenter(element);
         const bounds = element.bounds;

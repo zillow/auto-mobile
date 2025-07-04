@@ -32,7 +32,7 @@ export class PinchToZoom extends BaseVisualChange {
     duration: number = 300,
     elementId?: string
   ): Promise<PinchResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         const { centerX, centerY } = await this.findCenterPoint(elementId);
         const { startingMagnitude, endingMagnitude } = this.calculateMagnitudes(direction, magnitude);

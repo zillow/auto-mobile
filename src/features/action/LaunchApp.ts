@@ -66,7 +66,7 @@ export class LaunchApp extends BaseVisualChange {
       };
     }
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         let targetActivity = activityName;
 

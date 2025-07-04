@@ -31,7 +31,7 @@ export class PressButton extends BaseVisualChange {
       };
     }
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           await this.adb.executeCommand(`shell input keyevent ${keyCode}`);

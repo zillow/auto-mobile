@@ -8,7 +8,7 @@ import {
   ObserveResult,
   ActiveWindowInfo,
   TapResult,
-  TapOnTextResult,
+  TapOnElementResult,
   ExitDialogResult,
   LaunchAppResult,
   TerminateAppResult,
@@ -168,7 +168,7 @@ export class ResultFaker {
   /**
    * Generate fake TapOnTextResult
    */
-  static tapOnTextResult(overrides: Partial<TapOnTextResult> = {}): TapOnTextResult {
+  static tapOnTextResult(overrides: Partial<TapOnElementResult> = {}): TapOnElementResult {
     const text = overrides.text ?? faker.lorem.words({ min: 1, max: 5 });
     const x = overrides.x ?? faker.number.int({ min: 0, max: 1080 });
     const y = overrides.y ?? faker.number.int({ min: 0, max: 1920 });

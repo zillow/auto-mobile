@@ -30,7 +30,7 @@ export class ExecuteGesture extends BaseVisualChange {
     y2: number,
     options: GestureOptions = {}
   ): Promise<SwipeResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         await this.adb.executeCommand(`shell input swipe ${x1} ${y1} ${x2} ${y2} ${options.duration}`);
 
@@ -60,7 +60,7 @@ export class ExecuteGesture extends BaseVisualChange {
     path: Point[] | FingerPath[],
     duration: number = 300,
   ): Promise<any> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         // Generate and execute adb touch events
         if (Array.isArray(path) && path.length > 0) {

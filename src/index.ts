@@ -4,11 +4,11 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer as createHttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { createMcpServer } from "./server/index";
+import { createMcpServer } from "./server";
 import { logger } from "./utils/logger";
 import { SourceMapper } from "./utils/sourceMapper";
 import { ConfigurationManager } from "./utils/configurationManager";
-import { runCliCommand } from "./cli/index";
+import { runCliCommand } from "./cli";
 
 // Interface for Android app configuration
 interface AndroidAppConfig {
@@ -124,7 +124,7 @@ function parseArgs(): {
 }
 
 // Create and start Streamable HTTP server
-async function startStreamableServer(transport: TransportConfig, allAppConfigs: AndroidAppConfig[]): Promise<void> {
+async function startStreamableServer(transport: TransportConfig): Promise<void> {
   const server = createHttpServer();
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
@@ -187,7 +187,7 @@ async function startStreamableServer(transport: TransportConfig, allAppConfigs: 
         });
 
         // Create and connect MCP server
-        const mcpServer = createMcpServer(allAppConfigs);
+        const mcpServer = createMcpServer();
 
         // Setup cleanup handlers
         streamableTransport.onclose = () => {
@@ -254,7 +254,7 @@ async function startStreamableServer(transport: TransportConfig, allAppConfigs: 
 }
 
 // Create and start SSE server
-async function startSSEServer(transport: TransportConfig, allAppConfigs: AndroidAppConfig[]): Promise<void> {
+async function startSSEServer(transport: TransportConfig): Promise<void> {
   const server = createHttpServer();
   const sessions = new Map<string, SSEServerTransport>();
 
@@ -281,7 +281,7 @@ async function startSSEServer(transport: TransportConfig, allAppConfigs: Android
       sessions.set(sessionId, sseTransport);
 
       // Create MCP server instance for this session
-      const mcpServer = createMcpServer(allAppConfigs);
+      const mcpServer = createMcpServer();
 
       // Handle cleanup when connection closes
       sseTransport.onclose = () => {
@@ -428,16 +428,16 @@ async function main() {
       // Run as Streamable HTTP server
       logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
       logger.enableStdoutLogging();
-      await startStreamableServer(transport, allAppConfigs);
+      await startStreamableServer(transport);
     } else if (transport.type === "sse") {
       // Run as SSE server (deprecated)
       logger.info(`Starting SSE transport on ${transport.host}:${transport.port} (deprecated - consider using streamable)`);
       logger.enableStdoutLogging();
-      await startSSEServer(transport, allAppConfigs);
+      await startSSEServer(transport);
     } else {
       // Run as MCP server with STDIO transport (default)
       const stdioTransport = new StdioServerTransport();
-      const server = createMcpServer(allAppConfigs);
+      const server = createMcpServer();
       await server.connect(stdioTransport);
       logger.info("AutoMobile MCP server running on stdio");
     }

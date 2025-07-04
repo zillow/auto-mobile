@@ -69,7 +69,7 @@ export class SwipeFromElementToElement extends BaseVisualChange {
     options: GestureOptions = {},
     progress?: ProgressCallback
   ): Promise<SwipeFromElementToElementResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         // First, get the current view hierarchy
         const observeResult = await this.observeScreen.execute();

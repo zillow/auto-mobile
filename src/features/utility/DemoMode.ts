@@ -35,7 +35,7 @@ export class DemoMode extends BaseVisualChange {
       hideNotifications = true,
     } = options;
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           // Get current package name from active window
@@ -101,7 +101,7 @@ export class DemoMode extends BaseVisualChange {
    * @returns Promise with result indicating success or failure
    */
   async exitDemoMode(): Promise<DemoModeResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           // Get current package name from active window

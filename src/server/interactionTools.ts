@@ -1,11 +1,8 @@
 import { z } from "zod";
 import { ToolRegistry, ProgressCallback } from "./toolRegistry";
-import { SingleTap } from "../features/action/SingleTap";
-import { DoubleTap } from "../features/action/DoubleTap";
-import { TapOnTextCommand } from "../features/action/TapOnText";
+import { TapOnElement } from "../features/action/TapOnElement";
 import { SendText } from "../features/action/SendText";
 import { ClearText } from "../features/action/ClearText";
-import { LongPress } from "../features/action/LongPress";
 import { SelectAllText } from "../features/action/SelectAllText";
 import { PressButton } from "../features/action/PressButton";
 import { SwipeOnElement } from "../features/action/SwipeOnElement";
@@ -13,7 +10,6 @@ import { SwipeOnScreen } from "../features/action/SwipeOnScreen";
 import { SwipeFromElementToElement } from "../features/action/SwipeFromElementToElement";
 import { PullToRefresh } from "../features/action/PullToRefresh";
 import { Shake } from "../features/action/Shake";
-import { FocusOn } from "../features/action/FocusOn";
 import { ImeAction } from "../features/action/ImeAction";
 import { RecentApps } from "../features/action/RecentApps";
 import { HomeScreen } from "../features/action/HomeScreen";
@@ -64,27 +60,20 @@ export interface OpenLinkArgs {
 }
 
 export interface TapOnArgs {
-  text?: string;
-  id?: string;
-  x?: number;
-  y?: number;
-  fuzzyMatch?: boolean;
-  caseSensitive?: boolean;
+  containerElementId: string;
+  text?: SearchForTextArgs;
+  id?: SearchForIdArgs;
+  action: "tap" | "doubleTap" | "longPress" | "focus";
 }
 
-export interface DoubleTapOnArgs {
-  text?: string;
-  id?: string;
-  x?: number;
-  y?: number;
+export interface SearchForIdArgs {
+  id: string;
 }
 
-export interface LongPressOnArgs {
-  text?: string;
-  id?: string;
-  x?: number;
-  y?: number;
-  duration?: number;
+export interface SearchForTextArgs {
+  text: string;
+  fuzzyMatch: boolean;
+  caseSensitive: boolean;
 }
 
 export interface SwipeOnScreenArgs {
@@ -94,6 +83,7 @@ export interface SwipeOnScreenArgs {
 }
 
 export interface SwipeOnElementArgs {
+  containerElementId: string;
   elementId: string;
   direction: "up" | "down" | "left" | "right";
   duration: number;
@@ -133,12 +123,6 @@ export interface ShakeArgs {
   intensity?: number;
 }
 
-export interface FocusOnArgs {
-  elementId: string;
-  retryCount?: number;
-  verificationTimeoutMs?: number;
-}
-
 export interface ImeActionArgs {
   action: "done" | "next" | "search" | "send" | "go" | "previous";
 }
@@ -147,7 +131,7 @@ export interface RecentAppsArgs {
 }
 
 export interface RotateArgs {
-    orientation: "portrait" | "landscape";
+  orientation: "portrait" | "landscape";
 }
 
 // Schema definitions for tool arguments
@@ -156,37 +140,20 @@ export const shakeSchema = z.object({
   intensity: z.number().optional().describe("Intensity of the shake acceleration (default: 100)")
 });
 
-export const focusOnSchema = z.object({
-  elementId: z.string().describe("ID of the element to focus on"),
-  retryCount: z.number().optional().describe("Number of times to retry finding the element (default: 3)"),
-  verificationTimeoutMs: z.number().optional().describe("Timeout in milliseconds for element verification (default: 5000)")
-});
-
 export const tapOnSchema = z.object({
-  text: z.string().optional().describe("Text to tap on"),
-  id: z.string().optional().describe("Element ID to tap on"),
-  x: z.number().optional().describe("X coordinate to tap"),
-  y: z.number().optional().describe("Y coordinate to tap"),
-  fuzzyMatch: z.boolean().optional().describe("Use fuzzy text matching (default: true)"),
-  caseSensitive: z.boolean().optional().describe("Use case-sensitive text matching (default: false)")
-});
-
-export const doubleTapOnSchema = z.object({
-  text: z.string().optional().describe("Text to double tap on"),
-  id: z.string().optional().describe("Element ID to double tap on"),
-  x: z.number().optional().describe("X coordinate to double tap"),
-  y: z.number().optional().describe("Y coordinate to double tap")
-});
-
-export const longPressOnSchema = z.object({
-  text: z.string().optional().describe("Text to long press on"),
-  id: z.string().optional().describe("Element ID to long press on"),
-  x: z.number().optional().describe("X coordinate to long press"),
-  y: z.number().optional().describe("Y coordinate to long press"),
-  duration: z.number().optional().describe("Duration of long press in milliseconds (default: 1000)")
+  containerElementId: z.string().describe("Container element ID to restrict the search within"),
+  text: z.object({
+    text: z.string().describe("Text to tap on"),
+    fuzzyMatch: z.boolean().describe("Use fuzzy text matching"),
+    caseSensitive: z.boolean().describe("Use case-sensitive text matching")
+  }).optional().describe("Text search parameters"),
+  id: z.object({
+    id: z.string().describe("Element ID to tap on")
+  }).optional().describe("ID search parameters")
 });
 
 export const swipeOnElementSchema = z.object({
+  containerElementId: z.string().describe("Container element ID to restrict the search within"),
   elementId: z.string().describe("ID of the element to swipe on"),
   direction: z.enum(["up", "down", "left", "right"]).describe("Direction to swipe"),
   duration: z.number().describe("Duration of the swipe in milliseconds")
@@ -219,12 +186,6 @@ export const scrollSchema = z.object({
     maxTime: z.number().optional().describe("Maximum amount of time to spend scrolling, (default 10 seconds)")
   }).optional().describe("What we're searching for while scrolling"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed")
-});
-
-export const sendTextSchema = z.object({
-  text: z.string().describe("Text to send to the device"),
-  imeAction: z.enum(["done", "next", "search", "send", "go", "previous"]).optional()
-    .describe("Optional IME action to perform after text input")
 });
 
 export const clearTextSchema = z.object({});
@@ -279,17 +240,14 @@ export const rotateSchema = z.object({
 });
 
 // Helper functions
-function parseTarget(args: { text?: string; id?: string; x?: number; y?: number }): { type: string; value: any } {
-  if (args.x !== undefined && args.y !== undefined) {
-    return { type: "coordinates", value: { coordinates: [args.x, args.y] } };
-  }
+function parseTarget(args: { text?: string; id?: string }): { type: string; value: any } {
   if (args.text) {
     return { type: "text", value: { text: args.text } };
   }
   if (args.id) {
     return { type: "id", value: { id: args.id } };
   }
-  throw new Error("Must specify either text, id, or coordinates (x, y)");
+  throw new Error("Must specify either text or id");
 }
 
 // Register tools
@@ -298,108 +256,19 @@ export function registerInteractionTools() {
 
   // Tap on handler
   const tapOnHandler = async (deviceId: string, args: TapOnArgs, progress?: ProgressCallback) => {
-    const selector = parseTarget(args);
+    const tapOnTextCommand = new TapOnElement(deviceId);
+    const result = await tapOnTextCommand.execute({
+      containerElementId: args.containerElementId,
+      text: args.text,
+      elementId: args.id,
+      action: args.action,
+    }, progress);
 
-    if (selector.type === "coordinates") {
-      const singleTap = new SingleTap(deviceId);
-      const [x, y] = selector.value.coordinates;
-      const result = await singleTap.execute(x, y, progress);
-
-      return createJSONToolResponse({
-        message: `Tapped at coordinates (${x}, ${y})`,
-        observation: result.observation,
-        ...result
-      });
-    } else if (selector.type === "text") {
-      const tapOnTextCommand = new TapOnTextCommand(deviceId);
-      const result = await tapOnTextCommand.execute({
-        text: selector.value.text,
-        fuzzyMatch: args.fuzzyMatch ?? true,
-        caseSensitive: args.caseSensitive ?? false,
-      }, progress);
-
-      return createJSONToolResponse({
-        message: `Tapped on text "${selector.value.text}"`,
-        observation: result.observation,
-        ...result
-      });
-    } else if (selector.type === "id") {
-      // First observe to get current view hierarchy
-      const observeScreen = new ObserveScreen(deviceId);
-      const observation = await observeScreen.execute();
-
-      if (!observation.viewHierarchy) {
-        throw new ActionableError("Could not get view hierarchy to find element by ID");
-      }
-
-      // Find the element by resource ID
-      const elements = elementUtils.findElementsByResourceId(
-        observation.viewHierarchy,
-        selector.value.id,
-        true // partial match
-      );
-
-      if (elements.length === 0) {
-        throw new ActionableError(`Element not found with ID: ${selector.value.id}`);
-      }
-
-      // Use the first found element
-      const element = elements[0];
-      const center = elementUtils.getElementCenter(element);
-
-      // Tap on the element
-      const singleTap = new SingleTap(deviceId);
-      const result = await singleTap.execute(center.x, center.y, progress);
-
-      return createJSONToolResponse({
-        ...result,
-        message: `Tapped on element with ID "${selector.value.id}"`,
-        element,
-        x: center.x,
-        y: center.y,
-        observation: result.observation
-      });
-    } else {
-      throw new ActionableError(`Selector type ${selector.type} not yet implemented for tapOn`);
-    }
-  };
-
-  // Double tap on handler
-  const doubleTapOnHandler = async (deviceId: string, args: DoubleTapOnArgs, progress?: ProgressCallback) => {
-    const selector = parseTarget(args);
-
-    if (selector.type === "coordinates") {
-      const doubleTap = new DoubleTap(deviceId);
-      const [x, y] = selector.value.coordinates;
-      const result = await doubleTap.execute(x, y, progress);
-
-      return createJSONToolResponse({
-        message: `Double tapped at coordinates (${x}, ${y})`,
-        observation: result.observation,
-        ...result
-      });
-    } else {
-      throw new ActionableError(`Selector type ${selector.type} not yet implemented for doubleTapOn`);
-    }
-  };
-
-  // Long press on handler
-  const longPressOnHandler = async (deviceId: string, args: LongPressOnArgs, progress?: ProgressCallback) => {
-    const selector = parseTarget(args);
-
-    if (selector.type === "coordinates") {
-      const longPress = new LongPress(deviceId);
-      const [x, y] = selector.value.coordinates;
-      const result = await longPress.execute(x, y, args.duration ?? 1000, progress);
-
-      return createJSONToolResponse({
-        message: `Long pressed at coordinates (${x}, ${y}) for ${args.duration ?? 1000}ms`,
-        observation: result.observation,
-        ...result
-      });
-    } else {
-      throw new ActionableError(`Selector type ${selector.type} not yet implemented for longPressOn`);
-    }
+    return createJSONToolResponse({
+      message: `Tapped on element`,
+      observation: result.observation,
+      ...result
+    });
   };
 
   // Clear text handler
@@ -749,6 +618,8 @@ export function registerInteractionTools() {
           foundElement = elementUtils.findElementByText(
             lastObservation.viewHierarchy,
             args.lookFor.text,
+            "TextView",
+            args.containerElementId, // Search within the specific container
             true, // fuzzy match
             false // case-sensitive
           );
@@ -873,25 +744,6 @@ export function registerInteractionTools() {
       });
     } catch (error) {
       throw new ActionableError(`Failed to shake device: ${error}`);
-    }
-  };
-
-  // Focus on handler
-  const focusOnHandler = async (deviceId: string, args: FocusOnArgs, progress?: ProgressCallback) => {
-    try {
-      const focusOn = new FocusOn(deviceId);
-      const result = await focusOn.execute(args.elementId, {
-        retryCount: args.retryCount ?? 3,
-        verificationTimeoutMs: args.verificationTimeoutMs ?? 5000
-      }, progress);
-
-      return createJSONToolResponse({
-        message: `Focused on element with ID "${args.elementId}"`,
-        observation: result.observation,
-        ...result
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to focus on element: ${error}`);
     }
   };
 
@@ -1076,7 +928,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "tapOn",
-    "Unified tap command supporting coordinates, text, and selectors",
+    "Unified tap command supporting text, and selectors",
     tapOnSchema,
     tapOnHandler,
     true // Supports progress notifications
@@ -1084,7 +936,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "doubleTapOn",
-    "Unified double tap command supporting coordinates, text, and selectors",
+    "Unified double tap command supporting text, and selectors",
     doubleTapOnSchema,
     doubleTapOnHandler,
     true // Supports progress notifications
@@ -1092,7 +944,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "longPressOn",
-    "Unified long press command supporting coordinates, text, and selectors",
+    "Unified long press command supporting text, and selectors",
     longPressOnSchema,
     longPressOnHandler,
     true // Supports progress notifications

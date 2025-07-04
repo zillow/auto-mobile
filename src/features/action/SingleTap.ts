@@ -12,7 +12,7 @@ export class SingleTap extends BaseVisualChange {
     y: number,
     progress?: ProgressCallback
   ): Promise<TapResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         await this.adb.executeCommand(`shell input tap ${x} ${y}`);
 

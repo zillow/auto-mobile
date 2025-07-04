@@ -4,12 +4,10 @@ import { ObserveResult } from "./ObserveResult";
 /**
  * Result of a tap on text operation
  */
-export interface TapOnTextResult {
+export interface TapOnElementResult {
   success: boolean;
-  text: string;
+  action: string;
   element: Element;
-  x: number;
-  y: number;
   observation?: ObserveResult;
   error?: string;
 }

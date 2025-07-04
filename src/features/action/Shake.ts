@@ -15,7 +15,7 @@ export class Shake extends BaseVisualChange {
     const duration = options.duration ?? 1000; // Default 1 second
     const intensity = options.intensity ?? 100; // Default intensity of 100
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           // Start the shake by setting high acceleration values

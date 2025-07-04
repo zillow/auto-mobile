@@ -21,7 +21,7 @@ export class ImeAction extends BaseVisualChange {
       };
     }
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           await this.executeImeAction(action);

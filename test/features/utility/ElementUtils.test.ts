@@ -249,4 +249,327 @@ describe("ElementUtils", () => {
       assert.isTrue(result);
     });
   });
+
+  describe("findElementByText", () => {
+    const mockViewHierarchyWithContainer = {
+      hierarchy: {
+        node: {
+          $: {
+            "bounds": "[0,0][1080,2400]",
+            "class": "android.widget.FrameLayout",
+            "resource-id": "android:id/content"
+          },
+          node: [
+            {
+              $: {
+                "bounds": "[0,0][1080,800]",
+                "class": "android.widget.LinearLayout",
+                "resource-id": "com.example:id/header_container"
+              },
+              node: {
+                $: {
+                  "bounds": "[100,100][500,200]",
+                  "class": "android.widget.TextView",
+                  "text": "Header Text"
+                }
+              }
+            },
+            {
+              $: {
+                "bounds": "[0,800][1080,2000]",
+                "class": "android.widget.ScrollView",
+                "resource-id": "com.example:id/main_container"
+              },
+              node: [
+                {
+                  $: {
+                    "bounds": "[50,850][1030,950]",
+                    "class": "android.widget.TextView",
+                    "text": "Item 1"
+                  }
+                },
+                {
+                  $: {
+                    "bounds": "[50,950][1030,1050]",
+                    "class": "android.widget.EditText",
+                    "text": "Item 2"
+                  }
+                },
+                {
+                  $: {
+                    "bounds": "[50,1050][1030,1150]",
+                    "class": "android.widget.TextView",
+                    "text": "Item 3"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    };
+
+    it("should find element by text within specified container", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "Item 1",
+        "main_container",
+        true,
+        false
+      );
+
+      assert.isNotNull(result);
+      assert.equal(result?.text, "Item 1");
+      assert.deepEqual(result?.bounds, { left: 50, top: 850, right: 1030, bottom: 950 });
+    });
+
+    it("should not find element when it's outside the specified container", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "Header Text",
+        "main_container",
+        true,
+        false
+      );
+
+      assert.isNull(result);
+    });
+
+    it("should return null when container is not found", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "Item 1",
+        "non_existent_container",
+        true,
+        false
+      );
+
+      assert.isNull(result);
+    });
+
+    it("should find element regardless of element type", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "Item 2",
+        "main_container",
+        true,
+        false
+      );
+
+      assert.isNotNull(result);
+      assert.equal(result?.text, "Item 2");
+      assert.include(result?.class || "", "EditText");
+    });
+
+    it("should find all matching elements including different types", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "Item",
+        "main_container",
+        true, // fuzzy match enabled
+        false
+      );
+
+      assert.isNotNull(result);
+      assert.include(result?.text || "", "Item");
+    });
+
+    it("should handle exact text matching", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "Item",
+        "main_container",
+        false, // fuzzy match disabled
+        false
+      );
+
+      assert.isNull(result); // Should not find partial matches
+    });
+
+    it("should handle case-sensitive matching", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "item 1", // lowercase
+        "main_container",
+        true,
+        true // case sensitive
+      );
+
+      assert.isNull(result); // Should not find due to case mismatch
+    });
+
+    it("should handle case-insensitive matching", () => {
+      const result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "item 1", // lowercase
+        "main_container",
+        true,
+        false // case-insensitive
+      );
+
+      assert.isNotNull(result);
+      assert.equal(result?.text, "Item 1");
+    });
+
+    it("should prefer smaller elements when multiple matches exist", () => {
+      const hierarchyWithMultipleMatches = {
+        hierarchy: {
+          node: {
+            $: {
+              "bounds": "[0,0][1080,2400]",
+              "class": "android.widget.FrameLayout",
+              "resource-id": "com.example:id/container"
+            },
+            node: [
+              {
+                $: {
+                  "bounds": "[0,0][1080,500]", // Larger element
+                  "class": "android.widget.TextView",
+                  "text": "Click me"
+                }
+              },
+              {
+                $: {
+                  "bounds": "[400,200][680,300]", // Smaller element
+                  "class": "android.widget.TextView",
+                  "text": "Click me"
+                }
+              }
+            ]
+          }
+        }
+      };
+
+      const result = elementUtils.findElementByText(
+        hierarchyWithMultipleMatches,
+        "Click me",
+        "container",
+        true,
+        false
+      );
+
+      assert.isNotNull(result);
+      // Should return the smaller element
+      assert.deepEqual(result?.bounds, { left: 400, top: 200, right: 680, bottom: 300 });
+    });
+
+    it("should handle content-desc attribute", () => {
+      const hierarchyWithContentDesc = {
+        hierarchy: {
+          node: {
+            $: {
+              "bounds": "[0,0][1080,2400]",
+              "class": "android.widget.FrameLayout",
+              "resource-id": "com.example:id/container"
+            },
+            node: {
+              $: {
+                "bounds": "[100,100][300,200]",
+                "class": "android.widget.ImageView",
+                "content-desc": "Profile Picture"
+              }
+            }
+          }
+        }
+      };
+
+      const result = elementUtils.findElementByText(
+        hierarchyWithContentDesc,
+        "Profile Picture",
+        "container",
+        true,
+        false
+      );
+
+      assert.isNotNull(result);
+      assert.deepEqual(result?.bounds, { left: 100, top: 100, right: 300, bottom: 200 });
+    });
+
+    it("should handle missing required parameters", () => {
+      // Missing viewHierarchy
+      let result = elementUtils.findElementByText(
+        null,
+        "text",
+        "container",
+        true,
+        false
+      );
+      assert.isNull(result);
+
+      // Missing text
+      result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "",
+        "container",
+        true,
+        false
+      );
+      assert.isNull(result);
+
+      // Missing containerElementId
+      result = elementUtils.findElementByText(
+        mockViewHierarchyWithContainer,
+        "text",
+        "",
+        true,
+        false
+      );
+      assert.isNull(result);
+    });
+
+    it("should handle nested containers", () => {
+      const nestedHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              "bounds": "[0,0][1080,2400]",
+              "class": "android.widget.FrameLayout",
+              "resource-id": "com.example:id/root"
+            },
+            node: {
+              $: {
+                "bounds": "[0,0][1080,1200]",
+                "class": "android.widget.LinearLayout",
+                "resource-id": "com.example:id/outer_container"
+              },
+              node: {
+                $: {
+                  "bounds": "[100,100][980,1000]",
+                  "class": "android.widget.FrameLayout",
+                  "resource-id": "com.example:id/inner_container"
+                },
+                node: {
+                  $: {
+                    "bounds": "[200,200][800,300]",
+                    "class": "android.widget.TextView",
+                    "text": "Nested Text"
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+
+      // Should find in inner container
+      let result = elementUtils.findElementByText(
+        nestedHierarchy,
+        "Nested Text",
+        "inner_container",
+        true,
+        false
+      );
+      assert.isNotNull(result);
+
+      // Should also find when searching in outer container
+      result = elementUtils.findElementByText(
+        nestedHierarchy,
+        "Nested Text",
+        "outer_container",
+        true,
+        false
+      );
+      assert.isNotNull(result);
+    });
+  });
 });

@@ -15,7 +15,7 @@ export class SelectAllText extends BaseVisualChange {
   }
 
   async execute(progress?: ProgressCallback): Promise<SelectAllTextResult> {
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           // Observe the screen with tolerancePercent 0 to get latest ViewHierarchy

@@ -28,7 +28,7 @@ export class SendText extends BaseVisualChange {
     // Determine input method
     const inputMethod = VirtualKeyboardManager.getInputMethod(text);
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
           if (inputMethod === "virtual") {

@@ -90,7 +90,7 @@ export class Rotate extends BaseVisualChange {
     const isLocked = await this.isOrientationLocked();
     let orientationUnlocked = false;
 
-    return this.observedChange(
+    return this.observedInteraction(
       async () => {
         try {
 

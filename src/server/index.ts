@@ -24,13 +24,7 @@ import { registerSourceIndexingTools } from "./sourceIndexingTools";
 import { registerConfigurationTools } from "./configurationTools";
 import { registerDeepLinkTools } from "./deepLinkTools";
 
-// Interface for Android app configuration
-interface AndroidAppConfig {
-  appId: string;
-  sourceDir: string;
-}
-
-export const createMcpServer = (androidApps: AndroidAppConfig[] = []): McpServer => {
+export const createMcpServer = (): McpServer => {
   // Get configuration, device session, and test authoring managers
   const configManager = ConfigurationManager.getInstance();
   const testAuthoringManager = TestAuthoringManager.getInstance();

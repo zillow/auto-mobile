@@ -1,6 +1,6 @@
 import { Element } from "../../models/Element";
 import { Point } from "../../models/Point";
-import { ElementBounds } from "../../models";
+import { ElementBounds, Hierarchy, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
 
 /**
  * Utility class for working with UI elements
@@ -154,47 +154,6 @@ export class ElementUtils {
   }
 
   /**
-   * Check if an element is fully visible on screen accounting for system insets
-   * @param element - The element to check
-   * @param screenSize - The screen size
-   * @param systemInsets - The system insets
-   * @returns Whether the element is fully visible
-   */
-  isElementFullyVisible(
-    element: Element,
-    screenSize: { width: number; height: number },
-    systemInsets: { top: number; right: number; bottom: number; left: number }
-  ): boolean {
-    return (
-      element.bounds.left >= systemInsets.left &&
-      element.bounds.top >= systemInsets.top &&
-      element.bounds.right <= (screenSize.width - systemInsets.right) &&
-      element.bounds.bottom <= (screenSize.height - systemInsets.bottom)
-    );
-  }
-
-  /**
-   * Check if an element is partially visible on screen accounting for system insets
-   * @param element - The element to check
-   * @param screenSize - The screen size
-   * @param systemInsets - The system insets
-   * @returns Whether the element is at least partially visible
-   */
-  isElementPartiallyVisible(
-    element: Element,
-    screenSize: { width: number; height: number },
-    systemInsets: { top: number; right: number; bottom: number; left: number }
-  ): boolean {
-    // Check if element is completely outside the visible area
-    return !(
-      element.bounds.right <= systemInsets.left ||
-      element.bounds.bottom <= systemInsets.top ||
-      element.bounds.left >= (screenSize.width - systemInsets.right) ||
-      element.bounds.top >= (screenSize.height - systemInsets.bottom)
-    );
-  }
-
-  /**
    * Perform fuzzy text matching between two strings
    * @param text1 - First string to compare
    * @param text2 - Second string to compare
@@ -241,7 +200,7 @@ export class ElementUtils {
    * @param boundsString - The bounds string in format [left,top][right,bottom]
    * @returns The parsed bounds or null if invalid
    */
-  parseBounds(boundsString: string): Element["bounds"] | null {
+  parseBounds(boundsString: string): ElementBounds | null {
     if (!boundsString) {return null;}
 
     const boundsParts = boundsString.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
@@ -260,7 +219,7 @@ export class ElementUtils {
    * @param node - The node to extract properties from
    * @returns The node properties
    */
-  extractNodeProperties(node: any): any {
+  extractNodeProperties(node: ViewHierarchyNode): any {
     // XML parser from xml2js puts properties in $ object
     return node && node.$ ? node.$ : node;
   }
@@ -270,12 +229,12 @@ export class ElementUtils {
    * @param node - The node to parse
    * @returns The node with parsed bounds or null
    */
-  parseNodeBounds(node: any): Element | null {
+  parseNodeBounds(node: ViewHierarchyNode): Element | null {
     if (!node) {return null;}
 
     // Create a copy of the node properties
     const nodeProperties = this.extractNodeProperties(node);
-    const parsedNode: any = { ...nodeProperties };
+    const parsedNode: ViewHierarchyNode = { ...nodeProperties };
 
     // Parse bounds if they're in string format
     if (typeof nodeProperties.bounds === "string") {
@@ -295,10 +254,10 @@ export class ElementUtils {
    * @param viewHierarchy - The view hierarchy to extract from
    * @returns Array of root nodes
    */
-  extractRootNodes(viewHierarchy: any): any[] {
+  extractRootNodes(viewHierarchy: ViewHierarchyResult): ViewHierarchyNode[] {
     if (!viewHierarchy) {return [];}
 
-    let rootNodes: any[] = [];
+    let rootNodes: ViewHierarchyNode[] = [];
 
     if (viewHierarchy.hierarchy && viewHierarchy.hierarchy.node) {
       // Standard hierarchy from UI Automator
@@ -307,16 +266,6 @@ export class ElementUtils {
       } else {
         rootNodes = [viewHierarchy.hierarchy.node];
       }
-    } else if (viewHierarchy.node) {
-      // Direct node structure
-      if (Array.isArray(viewHierarchy.node)) {
-        rootNodes = viewHierarchy.node;
-      } else {
-        rootNodes = [viewHierarchy.node];
-      }
-    } else if (viewHierarchy) {
-      // Try using viewHierarchy directly
-      rootNodes = [viewHierarchy];
     }
 
     return rootNodes;
@@ -350,17 +299,19 @@ export class ElementUtils {
    * Find an element in the view hierarchy that matches the specified text
    * @param viewHierarchy - The view hierarchy to search
    * @param text - The text to search for
+   * @param containerElementId - Container element resource ID to restrict the search within its child nodes
    * @param fuzzyMatch - Whether to use fuzzy matching (partial text match)
    * @param caseSensitive - Whether to use case-sensitive matching
    * @returns The found element or null
    */
   findElementByText(
-    viewHierarchy: any,
+    viewHierarchy: ViewHierarchyResult,
     text: string,
+    containerElementId: string,
     fuzzyMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element | null {
-    if (!viewHierarchy || !text) {
+    if (!viewHierarchy || !text || !containerElementId) {
       return null;
     }
 
@@ -369,33 +320,56 @@ export class ElementUtils {
     const rootNodes = this.extractRootNodes(viewHierarchy);
     const matches: Element[] = [];
 
-    // Process each root node
+    // First find the container node
+    let containerNode: any = null;
     for (const rootNode of rootNodes) {
       this.traverseNode(rootNode, (node: any) => {
+        if (containerNode) {
+          return; // Already found
+        }
+
         const nodeProperties = this.extractNodeProperties(node);
-        let isMatch = false;
+        const nodeResourceId = nodeProperties["resource-id"];
 
-        // Check text attribute
-        if (nodeProperties.text && typeof nodeProperties.text === "string" && matchesText(nodeProperties.text)) {
-          isMatch = true;
-        }
-
-        // Check content-desc attribute
-        if (!isMatch && nodeProperties["content-desc"] &&
-            typeof nodeProperties["content-desc"] === "string" &&
-            matchesText(nodeProperties["content-desc"])) {
-          isMatch = true;
-        }
-
-        if (isMatch) {
-          // Parse bounds if they're in string format
-          const parsedNode = this.parseNodeBounds(node);
-          if (parsedNode) {
-            matches.push(parsedNode);
-          }
+        if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
+          containerNode = node;
         }
       });
+      if (containerNode) {
+        break;
+      }
     }
+
+    if (!containerNode) {
+      // Container not found, return null
+      return null;
+    }
+
+    // Search only within the container node's subtree
+    this.traverseNode(containerNode, (node: any) => {
+      const nodeProperties = this.extractNodeProperties(node);
+
+      let isMatch = false;
+
+      // Check text attribute
+      if (nodeProperties.text && typeof nodeProperties.text === "string" && matchesText(nodeProperties.text)) {
+        isMatch = true;
+      }
+
+      // Check content-desc attribute
+      if (!isMatch && nodeProperties["content-desc"] &&
+        typeof nodeProperties["content-desc"] === "string" &&
+        matchesText(nodeProperties["content-desc"])) {
+        isMatch = true;
+      }
+
+      if (isMatch) {
+        const parsedNode = this.parseNodeBounds(node);
+        if (parsedNode) {
+          matches.push(parsedNode);
+        }
+      }
+    });
 
     // Sort matches by size (smaller elements first) to prefer exact matches
     if (matches.length > 0) {
@@ -411,15 +385,36 @@ export class ElementUtils {
   }
 
   /**
+   * Check if an element is currently focused based on view hierarchy attributes
+   * @param element - The element to check
+   * @returns True if the element appears to be focused
+   */
+  isElementFocused(element: any): boolean {
+    // Check for focus-related attributes
+    const focused = element.focused === "true" || element.focused === true;
+    const selected = element.selected === "true" || element.selected === true;
+
+    // Some UI frameworks use 'isFocused' instead of 'focused'
+    const isFocused = element.isFocused === "true" || element.isFocused === true;
+
+    // Check if element has keyboard focus (for text inputs)
+    const hasKeyboardFocus = element["has-keyboard-focus"] === "true" || element["has-keyboard-focus"] === true;
+
+    return focused || selected || isFocused || hasKeyboardFocus;
+  }
+
+  /**
    * Find elements by resource ID
    * @param viewHierarchy - The view hierarchy to search
    * @param resourceId - Resource ID to search for
+   * @param containerElementId - Container element resource ID to restrict the search within its child nodes
    * @param partialMatch - Whether to allow partial ID matching
    * @returns Array of matching elements
    */
   findElementsByResourceId(
-    viewHierarchy: any,
+    viewHierarchy: ViewHierarchyResult,
     resourceId: string,
+    containerElementId: string,
     partialMatch: boolean = false
   ): Element[] {
     if (!viewHierarchy || !resourceId) {
@@ -429,70 +424,44 @@ export class ElementUtils {
     const rootNodes = this.extractRootNodes(viewHierarchy);
     const matches: Element[] = [];
 
-    // Process each root node
+    // First find the container node
+    let containerNode: any = null;
     for (const rootNode of rootNodes) {
       this.traverseNode(rootNode, (node: any) => {
-        const nodeProperties = this.extractNodeProperties(node);
-        if (nodeProperties["resource-id"] && typeof nodeProperties["resource-id"] === "string") {
-          const nodeResourceId = nodeProperties["resource-id"];
+        if (containerNode) {
+          return; // Already found
+        }
 
-          if ((partialMatch && nodeResourceId.toLowerCase().includes(resourceId.toLowerCase())) ||
-              (!partialMatch && nodeResourceId === resourceId)) {
-            const parsedNode = this.parseNodeBounds(node);
-            if (parsedNode) {
-              matches.push(parsedNode);
-            }
-          }
+        const nodeProperties = this.extractNodeProperties(node);
+        const nodeResourceId = nodeProperties["resource-id"];
+
+        if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
+          containerNode = node;
         }
       });
+      if (containerNode) {
+        break;
+      }
     }
 
-    return matches;
-  }
-
-  /**
-   * Find an element by resource ID (returns first match)
-   * @param viewHierarchy - The view hierarchy to search
-   * @param resourceId - Resource ID to search for
-   * @returns The found element or null
-   */
-  findElementByResourceId(
-    viewHierarchy: any,
-    resourceId: string
-  ): Element | null {
-    const elements = this.findElementsByResourceId(viewHierarchy, resourceId, false);
-    return elements.length > 0 ? elements[0] : null;
-  }
-
-  /**
-   * Find elements by class name
-   * @param viewHierarchy - The view hierarchy to search
-   * @param className - Class name to search for
-   * @returns Array of matching elements
-   */
-  findElementsByClassName(
-    viewHierarchy: any,
-    className: string
-  ): Element[] {
-    if (!viewHierarchy || !className) {
+    if (!containerNode) {
+      // Container not found, return empty list
       return [];
     }
 
-    const rootNodes = this.extractRootNodes(viewHierarchy);
-    const matches: Element[] = [];
-
-    // Process each root node
-    for (const rootNode of rootNodes) {
-      this.traverseNode(rootNode, (node: any) => {
-        const nodeProperties = this.extractNodeProperties(node);
-        if (nodeProperties["class"] && nodeProperties["class"] === className) {
+    // Search only within the container node's subtree
+    this.traverseNode(containerNode, (node: any) => {
+      const nodeProperties = this.extractNodeProperties(node);
+      if (nodeProperties["resource-id"] && typeof nodeProperties["resource-id"] === "string") {
+        const nodeResourceId = nodeProperties["resource-id"];
+        if (nodeResourceId === resourceId || (partialMatch && nodeResourceId.toLowerCase().includes(resourceId.toLowerCase()))) {
           const parsedNode = this.parseNodeBounds(node);
           if (parsedNode) {
             matches.push(parsedNode);
           }
         }
-      });
-    }
+      }
+    });
 
     return matches;
   }
@@ -502,7 +471,7 @@ export class ElementUtils {
    * @param viewHierarchy - The view hierarchy to search
    * @returns Array of scrollable elements
    */
-  findScrollableElements(viewHierarchy: any): Element[] {
+  findScrollableElements(viewHierarchy: ViewHierarchyResult): Element[] {
     if (!viewHierarchy) {
       return [];
     }
@@ -531,7 +500,7 @@ export class ElementUtils {
    * @param viewHierarchy - The view hierarchy to search
    * @returns Array of clickable elements
    */
-  findClickableElements(viewHierarchy: any): Element[] {
+  findClickableElements(viewHierarchy: ViewHierarchyResult): Element[] {
     if (!viewHierarchy) {
       return [];
     }
@@ -556,71 +525,12 @@ export class ElementUtils {
   }
 
   /**
-   * Find elements that look like dialogs
-   * @param viewHierarchy - The view hierarchy to search
-   * @returns Array of potential dialog elements
-   */
-  findDialogElements(viewHierarchy: any): Element[] {
-    if (!viewHierarchy) {
-      return [];
-    }
-
-    const rootNodes = this.extractRootNodes(viewHierarchy);
-    const dialogs: Element[] = [];
-
-    // Common dialog identifiers
-    const dialogClasses = [
-      "android.app.Dialog",
-      "android.app.AlertDialog",
-      "androidx.appcompat.app.AlertDialog",
-      "com.google.android.material.dialog",
-      "Dialog",
-      "AlertDialog"
-    ];
-
-    const dialogResourceIdPartials = [
-      "dialog",
-      "alert",
-      "popup",
-      "modal"
-    ];
-
-    // Process each root node
-    for (const rootNode of rootNodes) {
-      this.traverseNode(rootNode, (node: any) => {
-        let isDialog = false;
-        const nodeProperties = this.extractNodeProperties(node);
-
-        // Check class
-        if (nodeProperties.class && dialogClasses.some(c => nodeProperties.class.includes(c))) {
-          isDialog = true;
-        }
-
-        // Check resource-id
-        if (!isDialog && nodeProperties["resource-id"] &&
-            dialogResourceIdPartials.some(id => nodeProperties["resource-id"].toLowerCase().includes(id))) {
-          isDialog = true;
-        }
-
-        if (isDialog) {
-          const parsedNode = this.parseNodeBounds(node);
-          if (parsedNode) {
-            dialogs.push(parsedNode);
-          }
-        }
-      });
-    }
-
-    return dialogs;
-  }
-
-  /**
    * Find child elements within a parent element's bounds
    * @param viewHierarchy - The view hierarchy to search
    * @param parentElement - The parent element
    * @returns Array of child elements
    */
-  findChildElements(viewHierarchy: any, parentElement: Element): Element[] {
+  findChildElements(viewHierarchy: ViewHierarchyResult, parentElement: Element): Element[] {
     if (!viewHierarchy || !parentElement) {
       return [];
     }
@@ -735,7 +645,7 @@ export class ElementUtils {
      * @param viewHierarchy - The view hierarchy to flatten
      * @returns Array of elements with their indices
      */
-  flattenViewHierarchy(viewHierarchy: any): Array<{ element: Element; index: number; text?: string }> {
+  flattenViewHierarchy(viewHierarchy: ViewHierarchyResult): Array<{ element: Element; index: number; text?: string }> {
     if (!viewHierarchy) {
       return [];
     }
@@ -771,7 +681,7 @@ export class ElementUtils {
      * @param index - The index of the element to find
      * @returns The element at the specified index or null if not found
      */
-  findElementByIndex(viewHierarchy: any, index: number): { element: Element; text?: string } | null {
+  findElementByIndex(viewHierarchy: ViewHierarchyResult, index: number): { element: Element; text?: string } | null {
     if (!viewHierarchy || index < 0) {
       return null;
     }

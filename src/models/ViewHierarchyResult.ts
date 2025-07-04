@@ -1,11 +1,15 @@
+import { ElementBounds } from "./ElementBounds";
+
 /**
  * Represents the ViewHierarchy dump result from a device.
  */
 export interface ViewHierarchyResult {
-  hierarchy: {
-    error?: string;
-    node?: Node;
-  };
+  hierarchy: Hierarchy;
+}
+
+export interface Hierarchy {
+  error?: string;
+  node?: ViewHierarchyNode;
 }
 
 // Define types for the view hierarchy structure
@@ -13,7 +17,8 @@ export interface NodeAttributes {
   [key: string]: string;
 }
 
-export interface Node {
+export interface ViewHierarchyNode {
   $: NodeAttributes;
-  node?: Node[];
+  node?: ViewHierarchyNode[];
+  bounds?: ElementBounds;
 }
