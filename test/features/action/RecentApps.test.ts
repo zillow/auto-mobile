@@ -95,7 +95,7 @@ describe("RecentApps", () => {
     hierarchy: {
       node: {
         $: {
-          class: "android.widget.FrameLayout",
+          "class": "android.widget.FrameLayout",
           "resource-id": "@android:id/content"
         },
         node: [
@@ -336,7 +336,7 @@ describe("RecentApps", () => {
         hierarchy: {
           node: {
             $: {
-              class: "android.widget.FrameLayout",
+              "class": "android.widget.FrameLayout",
               "resource-id": "@android:id/content"
             },
             node: [
@@ -352,13 +352,8 @@ describe("RecentApps", () => {
         }
       };
 
-      // Explicitly provide screenSize and systemInsets to avoid undefined error
-      const mockCachedObservation = {
-        timestamp: Date.now(),
-        screenSize: {width: 1080, height: 1920},
-        systemInsets: {top: 48, bottom: 120, left: 0, right: 0},
-        viewHierarchy: hierarchyWithoutRecentButton
-      };
+      // Use the helper to avoid undefined error and promote consistency
+      const mockCachedObservation = createMockObserveResult(hierarchyWithoutRecentButton);
       mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
       mockAdb.executeCommand.resolves(createMockExecResult(""));
 
