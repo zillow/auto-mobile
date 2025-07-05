@@ -1,7 +1,7 @@
 import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { GestureOptions } from "../../models/GestureOptions";
-import { Element } from "../../models/Element";
+import { GestureOptions } from "../../models";
+import { Element } from "../../models";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { ElementUtils } from "../utility/ElementUtils";
 import { SwipeResult } from "../../models";

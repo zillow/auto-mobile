@@ -1,6 +1,6 @@
 import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { OpenURLResult } from "../../models/OpenURLResult";
+import { OpenURLResult } from "../../models";
 
 export class OpenURL extends BaseVisualChange {
   constructor(deviceId: string, adb: AdbUtils | null = null) {

@@ -1,6 +1,6 @@
 import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { PressButtonResult } from "../../models/PressButtonResult";
+import { PressButtonResult } from "../../models";
 
 export class PressButton extends BaseVisualChange {
   constructor(deviceId: string, adb: AdbUtils | null = null) {

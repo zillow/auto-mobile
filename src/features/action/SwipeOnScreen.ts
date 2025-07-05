@@ -1,9 +1,10 @@
 import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { GestureOptions } from "../../models/GestureOptions";
+import { GestureOptions } from "../../models";
 import { ExecuteGesture } from "./ExecuteGesture";
-import { SwipeResult } from "../../models/SwipeResult";
+import { SwipeResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
+import { ActionableError, ObserveResult } from "../../models";
 
 /**
  * Executes swipe gestures on the screen, respecting system insets
@@ -31,33 +32,31 @@ export class SwipeOnScreen extends BaseVisualChange {
     progress?: ProgressCallback
   ): Promise<SwipeResult> {
 
-    // First, get the screen dimensions and system insets
-    const observeResult = await this.observeScreen.execute();
-    if (!observeResult.screenSize) {
-      throw new Error("Could not determine screen size");
-    }
-
-    const screenWidth = observeResult.screenSize.width;
-    const screenHeight = observeResult.screenSize.height;
-    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
-
-    // Calculate the bounds based on system insets
-    const bounds = (options.includeSystemInsets === true)
-      ? {
-        left: 0,
-        top: 0,
-        right: screenWidth,
-        bottom: screenHeight
-      }
-      : {
-        left: insets.left,
-        top: insets.top,
-        right: screenWidth - insets.right,
-        bottom: screenHeight - insets.bottom
-      };
-
     return this.observedInteraction(
-      async () => {
+      async (observeResult: ObserveResult) => {
+
+        if (!observeResult.screenSize) {
+          throw new ActionableError("Could not determine screen size");
+        }
+
+        const screenWidth = observeResult.screenSize.width;
+        const screenHeight = observeResult.screenSize.height;
+        const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
+
+        // Calculate the bounds based on system insets
+        const bounds = (options.includeSystemInsets === true)
+          ? {
+            left: 0,
+            top: 0,
+            right: screenWidth,
+            bottom: screenHeight
+          }
+          : {
+            left: insets.left,
+            top: insets.top,
+            right: screenWidth - insets.right,
+            bottom: screenHeight - insets.bottom
+          };
 
         const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
           direction,
@@ -74,7 +73,6 @@ export class SwipeOnScreen extends BaseVisualChange {
       }, {
         changeExpected: false,
         timeoutMs: 500,
-        previousViewHierarchy: observeResult.viewHierarchy,
         progress
       }
     );

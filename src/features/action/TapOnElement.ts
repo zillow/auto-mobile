@@ -21,7 +21,7 @@ export class TapOnElement extends BaseVisualChange {
 
   /**
    * Create an error result with consistent structure
-   * @param text - The text that was being searched for
+   * @param action - The intended action
    * @param error - The error message
    * @returns TapOnTextResult with error state
    */
@@ -85,7 +85,7 @@ export class TapOnElement extends BaseVisualChange {
 
     try {
       // Tap on the calculated point using observedChange
-      return await this.observedInteractionWithChange(
+      return await this.observedInteraction(
         async (observeResult: ObserveResult) => {
 
           const element = this.findElementToTap(options, observeResult.viewHierarchy);

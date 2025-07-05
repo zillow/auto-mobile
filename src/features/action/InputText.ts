@@ -4,7 +4,7 @@ import { SendTextResult } from "../../models";
 import { VirtualKeyboardManager } from "../../utils/virtualKeyboardManager";
 import { logger } from "../../utils/logger";
 
-export class SendText extends BaseVisualChange {
+export class InputText extends BaseVisualChange {
   private virtualKeyboardManager: VirtualKeyboardManager;
 
   constructor(deviceId: string, adb: AdbUtils | null = null) {

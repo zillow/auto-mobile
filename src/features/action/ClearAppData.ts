@@ -1,5 +1,5 @@
 import { AdbUtils } from "../../utils/adb";
-import { ClearAppDataResult } from "../../models/ClearAppDataResult";
+import { ClearAppDataResult } from "../../models";
 
 export class ClearAppData {
   private adb: AdbUtils;

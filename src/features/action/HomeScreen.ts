@@ -1,7 +1,8 @@
 import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { HomeScreenResult } from "../../models/HomeScreenResult";
+import { HomeScreenResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
+import { ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 
 interface NavigationCache {
@@ -27,7 +28,7 @@ export class HomeScreen extends BaseVisualChange {
     const cachedMethod = this.getCachedNavigationMethod(deviceId);
     if (cachedMethod) {
       logger.info(`[HomeScreen] Using cached navigation method: ${cachedMethod}`);
-      return this.executeNavigationMethod(cachedMethod, true, progress);
+      return this.executeNavigationMethod(cachedMethod, progress);
     }
 
     // Detect navigation style
@@ -36,7 +37,7 @@ export class HomeScreen extends BaseVisualChange {
     // Cache the detected method (without getting device props again)
     this.cacheNavigationMethodSimple(deviceId, detectedMethod);
 
-    return this.executeNavigationMethod(detectedMethod, false, progress);
+    return this.executeNavigationMethod(detectedMethod, progress);
   }
 
   private getCachedNavigationMethod(deviceId: string): "gesture" | "hardware" | "element" | null {
@@ -58,20 +59,6 @@ export class HomeScreen extends BaseVisualChange {
       timestamp: Date.now()
     });
     logger.info(`[HomeScreen] Cached navigation method: ${method} for device: ${deviceId}`);
-  }
-
-  private async cacheNavigationMethod(deviceId: string, method: "gesture" | "hardware" | "element"): Promise<void> {
-    try {
-      const deviceProps = await this.getDeviceProperties();
-      HomeScreen.navigationCache.set(deviceId, {
-        method,
-        timestamp: Date.now(),
-        deviceProps
-      });
-      logger.info(`[HomeScreen] Cached navigation method: ${method} for device: ${deviceId}`);
-    } catch (error) {
-      logger.warn(`[HomeScreen] Failed to cache navigation method: ${error}`);
-    }
   }
 
   private async detectNavigationStyle(progress?: ProgressCallback): Promise<"gesture" | "hardware" | "element"> {
@@ -200,34 +187,19 @@ export class HomeScreen extends BaseVisualChange {
 
   private async executeNavigationMethod(
     method: "gesture" | "hardware" | "element",
-    cached: boolean,
     progress?: ProgressCallback
   ): Promise<HomeScreenResult> {
     return this.observedInteraction(
-      async () => {
-        try {
-          let result: HomeScreenResult;
-          switch (method) {
-            case "gesture":
-              result = await this.executeGestureNavigation(progress);
-              break;
-            case "element":
-              result = await this.executeElementNavigation(progress);
-              break;
-            case "hardware":
-              result = await this.executeHardwareNavigation(progress);
-              break;
-            default:
-              throw new Error(`Unknown navigation method: ${method}`);
-          }
-
-          // Set the cached property
-          result.cached = cached;
-          return result;
-        } catch (error) {
-          // Try fallback methods
-          logger.warn(`[HomeScreen] Primary method ${method} failed: ${error}`);
-          return await this.executeFallbackNavigation(method, progress);
+      async (observeResult: ObserveResult) => {
+        switch (method) {
+          case "gesture":
+            return await this.executeGestureNavigation(observeResult, progress);
+          case "element":
+            return await this.executeElementNavigation(observeResult, progress);
+          case "hardware":
+            return await this.executeHardwareNavigation(progress);
+          default:
+            throw new Error(`Unknown navigation method: ${method}`);
         }
       },
       {
@@ -238,18 +210,17 @@ export class HomeScreen extends BaseVisualChange {
     );
   }
 
-  private async executeGestureNavigation(progress?: ProgressCallback): Promise<HomeScreenResult> {
+  private async executeGestureNavigation(oberveResult: ObserveResult, progress?: ProgressCallback): Promise<HomeScreenResult> {
     if (progress) {
       await progress(60, 100, "Executing gesture navigation...");
     }
 
     // Get screen dimensions for gesture calculation
-    const observation = await this.observeScreen.execute();
-    if (!observation.screenSize) {
+    if (!oberveResult.screenSize) {
       throw new Error("Could not get screen size for gesture navigation");
     }
 
-    const { width, height } = observation.screenSize;
+    const { width, height } = oberveResult.screenSize;
 
     // Calculate swipe coordinates from bottom center
     const startX = width / 2;
@@ -268,18 +239,17 @@ export class HomeScreen extends BaseVisualChange {
     };
   }
 
-  private async executeElementNavigation(progress?: ProgressCallback): Promise<HomeScreenResult> {
+  private async executeElementNavigation(oberveResult: ObserveResult, progress?: ProgressCallback): Promise<HomeScreenResult> {
     if (progress) {
       await progress(60, 100, "Executing element navigation...");
     }
 
-    const observation = await this.observeScreen.execute();
-    if (!observation.viewHierarchy) {
+    if (!oberveResult.viewHierarchy) {
       throw new Error("Could not get view hierarchy for element navigation");
     }
 
     // Handle both .hierarchy and direct structures
-    const hierarchyRoot = observation.viewHierarchy.hierarchy || observation.viewHierarchy;
+    const hierarchyRoot = oberveResult.viewHierarchy.hierarchy || oberveResult.viewHierarchy;
     const rootNodes = this.elementUtils.extractRootNodes(hierarchyRoot);
 
     for (const rootNode of rootNodes) {
@@ -337,54 +307,6 @@ export class HomeScreen extends BaseVisualChange {
     return {
       success: true,
       navigationMethod: "hardware"
-    };
-  }
-
-  private async executeFallbackNavigation(
-    failedMethod: "gesture" | "hardware" | "element",
-    progress?: ProgressCallback
-  ): Promise<HomeScreenResult> {
-    if (progress) {
-      await progress(80, 100, "Trying fallback navigation methods...");
-    }
-
-    // Try methods in order of reliability
-    const fallbackOrder: Array<"gesture" | "hardware" | "element"> =
-            failedMethod === "hardware" ? ["element", "gesture"] :
-              failedMethod === "element" ? ["hardware", "gesture"] :
-                ["hardware", "element"];
-
-    for (const method of fallbackOrder) {
-      try {
-        logger.info(`[HomeScreen] Trying fallback method: ${method}`);
-
-        let result: HomeScreenResult;
-        switch (method) {
-          case "gesture":
-            result = await this.executeGestureNavigation(progress);
-            break;
-          case "element":
-            result = await this.executeElementNavigation(progress);
-            break;
-          case "hardware":
-            result = await this.executeHardwareNavigation(progress);
-            break;
-        }
-
-        // Mark as not cached since this is a fallback
-        result.cached = false;
-        return result;
-      } catch (error) {
-        logger.warn(`[HomeScreen] Fallback method ${method} failed: ${error}`);
-        continue;
-      }
-    }
-
-    return {
-      success: false,
-      navigationMethod: failedMethod,
-      cached: false,
-      error: `All navigation methods failed. Primary: ${failedMethod}`
     };
   }
 }

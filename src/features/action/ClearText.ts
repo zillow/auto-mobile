@@ -2,6 +2,7 @@ import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { ClearTextResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
+import { ObserveResult } from "../../models";
 
 export class ClearText extends BaseVisualChange {
   private elementUtils: ElementUtils;
@@ -13,12 +14,9 @@ export class ClearText extends BaseVisualChange {
 
   async execute(progress?: ProgressCallback): Promise<ClearTextResult> {
     return this.observedInteraction(
-      async () => {
+      async (observeResult: ObserveResult) => {
         try {
-          // First, observe the screen to find input fields with text
-          const observation = await this.observeScreen.execute();
-
-          if (!observation.viewHierarchy) {
+          if (!observeResult.viewHierarchy) {
             // Fallback: if we can't get view hierarchy, use a reasonable default
             await this.clearWithDeletes(200);
             return { success: true };
@@ -27,7 +25,7 @@ export class ClearText extends BaseVisualChange {
           let textLength = 0;
 
           // Look for focused elements first by traversing and checking attributes
-          textLength = this.findFocusedElementTextLength(observation.viewHierarchy);
+          textLength = this.findFocusedElementTextLength(observeResult.viewHierarchy);
 
           // TODO: Move cursor to the end of the text
 

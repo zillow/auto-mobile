@@ -33,7 +33,6 @@ export interface ObserveResult {
 
   /**
    * Categorized elements from the view hierarchy
-   * Only available in tool.observe results
    */
   elements?: {
     clickable: Element[];

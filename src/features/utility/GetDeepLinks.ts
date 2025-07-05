@@ -3,11 +3,9 @@ import { DeepLinkManager } from "../../utils/deepLinkManager";
 import { DeepLinkResult } from "../../models";
 
 export class GetDeepLinks {
-  private deviceId: string | null;
   private deepLinkManager: DeepLinkManager;
 
   constructor(deviceId: string | null = null) {
-    this.deviceId = deviceId;
     this.deepLinkManager = new DeepLinkManager(deviceId);
   }
 

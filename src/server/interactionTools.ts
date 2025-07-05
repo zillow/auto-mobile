@@ -1,14 +1,12 @@
 import { z } from "zod";
 import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { TapOnElement } from "../features/action/TapOnElement";
-import { SendText } from "../features/action/SendText";
+import { InputText } from "../features/action/InputText";
 import { ClearText } from "../features/action/ClearText";
 import { SelectAllText } from "../features/action/SelectAllText";
 import { PressButton } from "../features/action/PressButton";
 import { SwipeOnElement } from "../features/action/SwipeOnElement";
 import { SwipeOnScreen } from "../features/action/SwipeOnScreen";
-import { SwipeFromElementToElement } from "../features/action/SwipeFromElementToElement";
-import { PullToRefresh } from "../features/action/PullToRefresh";
 import { Shake } from "../features/action/Shake";
 import { ImeAction } from "../features/action/ImeAction";
 import { RecentApps } from "../features/action/RecentApps";
@@ -16,8 +14,6 @@ import { HomeScreen } from "../features/action/HomeScreen";
 import { Rotate } from "../features/action/Rotate";
 import { ElementUtils } from "../features/utility/ElementUtils";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
-import { TerminateApp } from "../features/action/TerminateApp";
-import { ClearAppData } from "../features/action/ClearAppData";
 import { OpenURL } from "../features/action/OpenURL";
 import { ActionableError } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -39,15 +35,6 @@ export interface OpenSystemTrayArgs {
 
 export interface PressKeyArgs {
   key: "home" | "back" | "menu" | "power" | "volume_up" | "volume_down" | "recent";
-}
-
-export interface StopAppArgs {
-  appId: string;
-}
-
-export interface ClearStateArgs {
-  appId: string;
-  clearKeychain?: boolean;
 }
 
 export interface InputTextArgs {
@@ -89,18 +76,6 @@ export interface SwipeOnElementArgs {
   duration: number;
 }
 
-export interface DragAndDropArgs {
-  from: {
-    index: number;
-    text?: string;
-  };
-  to: {
-    index: number;
-    text?: string;
-  };
-  duration?: number;
-}
-
 export interface ScrollArgs {
   containerElementId: string;
   direction: "up" | "down" | "left" | "right";
@@ -112,10 +87,6 @@ export interface ScrollLookForArgs {
   elementId?: string;
   text?: string;
   maxTime?: number;
-}
-
-export interface PullToRefreshArgs {
-  listId?: string;
 }
 
 export interface ShakeArgs {
@@ -223,10 +194,6 @@ export const openLinkSchema = z.object({
   url: z.string().describe("URL to open in the default browser")
 });
 
-export const pullToRefreshSchema = z.object({
-  listId: z.string().optional().describe("ID of the list to pull")
-});
-
 export const imeActionSchema = z.object({
   action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action to perform")
 });
@@ -238,17 +205,6 @@ export const homeScreenSchema = z.object({});
 export const rotateSchema = z.object({
   orientation: z.enum(["portrait", "landscape"]).describe("The orientation to set")
 });
-
-// Helper functions
-function parseTarget(args: { text?: string; id?: string }): { type: string; value: any } {
-  if (args.text) {
-    return { type: "text", value: { text: args.text } };
-  }
-  if (args.id) {
-    return { type: "id", value: { id: args.id } };
-  }
-  throw new Error("Must specify either text or id");
-}
 
 // Register tools
 export function registerInteractionTools() {
@@ -353,6 +309,7 @@ export function registerInteractionTools() {
       const elements = elementUtils.findElementsByResourceId(
         observeResult.viewHierarchy,
         elementId,
+        args.containerElementId, // Search within the specific container
         true // partial match
       );
       if (elements.length > 0) {
@@ -424,81 +381,6 @@ export function registerInteractionTools() {
     }
   };
 
-  // Drag and drop handler
-  const dragAndDropHandler = async (deviceId: string, args: DragAndDropArgs, progress?: ProgressCallback) => {
-    try {
-      const swipeFromElementToElement = new SwipeFromElementToElement(deviceId);
-
-      const result = await swipeFromElementToElement.execute(
-        args.from,
-        args.to,
-        { duration: args.duration || 500 },
-        progress
-      );
-
-      return createJSONToolResponse({
-        message: `Dragged from element at index ${args.from.index} to element at index ${args.to.index}`,
-        fromElement: result.fromElement,
-        toElement: result.toElement,
-        observation: result.observation
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to perform drag and drop: ${error}`);
-    }
-  };
-
-  // Pull to refresh handler
-  const pullToRefreshHandler = async (deviceId: string, args: PullToRefreshArgs, progress?: ProgressCallback) => {
-    try {
-      const observeScreen = new ObserveScreen(deviceId);
-      const pullToRefresh = new PullToRefresh(deviceId);
-
-      const observeResult = await observeScreen.execute();
-      if (!observeResult.viewHierarchy || !observeResult.screenSize) {
-        throw new ActionableError("Could not get view hierarchy for pull to refresh.");
-      }
-
-      let element = null;
-      if (args.listId) {
-        const elements = elementUtils.findElementsByResourceId(
-          observeResult.viewHierarchy,
-          args.listId,
-          true // partial match
-        );
-        if (elements.length > 0) {
-          element = elements[0];
-        }
-      } else {
-        const scrollables = elementUtils.findScrollableElements(observeResult.viewHierarchy);
-        if (scrollables.length > 0) {
-          element = scrollables[0];
-        }
-      }
-
-      if (!element) {
-        // Fallback to root element if no specific scrollable is found
-        element = elementUtils.parseNodeBounds(observeResult.viewHierarchy.node || observeResult.viewHierarchy); // Get root
-        if (!element) {
-          throw new ActionableError("Could not find any element for pull-to-refresh.");
-        }
-      }
-
-      const result = await pullToRefresh.execute(
-        element,
-        300, // distance
-        { duration: 300 },
-        progress
-      );
-
-      return createJSONToolResponse({
-        message: "Performed pull-to-refresh",
-        observation: result.observation
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to perform pull-to-refresh: ${error}`);
-    }
-  };
-
   // Open system tray handler
   const openSystemTrayHandler = async (deviceId: string, args: OpenSystemTrayArgs, progress?: ProgressCallback) => {
     try {
@@ -523,32 +405,6 @@ export function registerInteractionTools() {
     }
   };
 
-  // Pinch to zoom handler
-  // const pinchToZoomHandler = async (deviceId: string, args: PinchToZoomArgs) => {
-  //   try {
-  //     const deviceId = getCurrentDeviceId();
-  //     await verifyDeviceIsReady(deviceId);
-  //
-  //     const pinchToZoom = new PinchToZoom(deviceId);
-  //
-  //     const result = await pinchToZoom.execute(
-  //       args.direction,
-  //       args.magnitude,
-  //       args.duration,
-  //       args.elementId
-  //     );
-  //
-  //     const elementMessage = args.elementId ? ` on element "${args.elementId}"` : "";
-  //     return createJSONToolResponse({
-  //       message: `Performed pinch ${args.direction} gesture with magnitude ${args.magnitude} pixels${elementMessage}`,
-  //       observation: result.observation,
-  //       ...result
-  //     });
-  //   } catch (error) {
-  //     throw new ActionableError(`Failed to perform pinch to zoom: ${error}`);
-  //   }
-  // };
-
   // Scroll handler
   const scrollHandler = async (deviceId: string, args: ScrollArgs, progress?: ProgressCallback) => {
     // Element-specific scrolling
@@ -563,6 +419,7 @@ export function registerInteractionTools() {
     // Find the element by resource ID
     const elements = elementUtils.findElementsByResourceId(
       observeResult.viewHierarchy,
+      args.containerElementId,
       args.containerElementId,
       true // partial match
     );
@@ -618,7 +475,6 @@ export function registerInteractionTools() {
           foundElement = elementUtils.findElementByText(
             lastObservation.viewHierarchy,
             args.lookFor.text,
-            "TextView",
             args.containerElementId, // Search within the specific container
             true, // fuzzy match
             false // case-sensitive
@@ -627,6 +483,7 @@ export function registerInteractionTools() {
           const elements = elementUtils.findElementsByResourceId(
             lastObservation.viewHierarchy,
             args.lookFor.elementId,
+            args.containerElementId, // Search within the specific container
             true // partial match
           );
           foundElement = elements.length > 0 ? elements[0] : null;
@@ -679,38 +536,12 @@ export function registerInteractionTools() {
     });
   };
 
-  // Stop app handler
-  const stopAppHandler = async (deviceId: string, args: StopAppArgs, progress?: ProgressCallback) => {
-    const terminateApp = new TerminateApp(deviceId);
-    const result = await terminateApp.execute(args.appId, progress);
-
-    return createJSONToolResponse({
-      message: `Stopped app ${args.appId}`,
-      observation: result.observation,
-      ...result
-    });
-  };
-
-  // Clear state handler
-  const clearStateHandler = async (deviceId: string, args: ClearStateArgs) => {
-    const clearAppData = new ClearAppData(deviceId);
-    const result = await clearAppData.execute(args.appId);
-
-    return createJSONToolResponse({
-      message: `Cleared state for app ${args.appId}`,
-      observation: result.observation,
-      ...result
-    });
-  };
-
   // Input text handler
   const inputTextHandler = async (deviceId: string, args: InputTextArgs) => {
-    const sendText = new SendText(deviceId);
-    const result = await sendText.execute(args.text, args.imeAction);
-
-    const imeMessage = args.imeAction ? ` with IME action "${args.imeAction}"` : "";
+    const inputText = new InputText(deviceId);
+    const result = await inputText.execute(args.text, args.imeAction);
     return createJSONToolResponse({
-      message: `Input text "${args.text}"${imeMessage}`,
+      message: `Input text`,
       observation: result.observation,
       ...result
     });
@@ -853,37 +684,12 @@ export function registerInteractionTools() {
   );
 
   ToolRegistry.registerDeviceAware(
-    "dragAndDrop",
-    "Drag an element to another element using index-based selection",
-    dragAndDropSchema,
-    dragAndDropHandler,
-    true // Supports progress notifications
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "pullToRefresh",
-    "Perform a pull-to-refresh gesture on a list",
-    pullToRefreshSchema,
-    pullToRefreshHandler,
-    true // Supports progress notifications
-  );
-
-  ToolRegistry.registerDeviceAware(
     "openSystemTray",
     "Open the system notification tray by swiping down from the status bar",
     openSystemTraySchema,
     openSystemTrayHandler,
     true // Supports progress notifications
   );
-
-  // ToolRegistry.registerDeviceAware(
-  //   "pinchToZoom",
-  //   "Perform a pinch to zoom gesture in a specific direction",
-  //   pinchToZoomSchema,
-  //   pinchToZoomHandler
-  // );
-
-  // Register Maestro-aligned tools
 
   // Phase 1: Core Command Renames
   ToolRegistry.registerDeviceAware(
@@ -895,24 +701,8 @@ export function registerInteractionTools() {
   );
 
   ToolRegistry.registerDeviceAware(
-    "stopApp",
-    "Stop a running app (Maestro equivalent of terminateApp)",
-    stopAppSchema,
-    stopAppHandler,
-    true // Supports progress notifications
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "clearState",
-    "Clear app state and data (Maestro equivalent of clearAppData)",
-    clearStateSchema,
-    clearStateHandler,
-    false // Does not support progress notifications
-  );
-
-  ToolRegistry.registerDeviceAware(
     "inputText",
-    "Input text to the device (Maestro equivalent of sendText)",
+    "Input text to the device",
     inputTextSchema,
     inputTextHandler,
     false // Does not support progress notifications
@@ -931,22 +721,6 @@ export function registerInteractionTools() {
     "Unified tap command supporting text, and selectors",
     tapOnSchema,
     tapOnHandler,
-    true // Supports progress notifications
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "doubleTapOn",
-    "Unified double tap command supporting text, and selectors",
-    doubleTapOnSchema,
-    doubleTapOnHandler,
-    true // Supports progress notifications
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "longPressOn",
-    "Unified long press command supporting text, and selectors",
-    longPressOnSchema,
-    longPressOnHandler,
     true // Supports progress notifications
   );
 
@@ -971,14 +745,6 @@ export function registerInteractionTools() {
     "Shake the device",
     shakeSchema,
     shakeHandler,
-    true // Supports progress notifications
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "focusOn",
-    "Focus on a specific element",
-    focusOnSchema,
-    focusOnHandler,
     true // Supports progress notifications
   );
 

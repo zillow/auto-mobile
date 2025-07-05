@@ -1,9 +1,9 @@
 import { AdbUtils } from "../../utils/adb";
-import { Point } from "../../models/Point";
-import { FingerPath } from "../../models/FingerPath";
-import { GestureOptions } from "../../models/GestureOptions";
+import { Point } from "../../models";
+import { FingerPath } from "../../models";
+import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { SwipeResult } from "../../models/SwipeResult";
+import { SwipeResult } from "../../models";
 
 /**
  * Executes gestures using adb input commands (no sendevent)
@@ -19,7 +19,6 @@ export class ExecuteGesture extends BaseVisualChange {
    * @param y1 - Starting Y coordinate
    * @param x2 - Ending X coordinate
    * @param y2 - Ending Y coordinate
-   * @param duration - Duration in milliseconds
    * @param options - Additional gesture options
    * @returns Result of the swipe operation
    */

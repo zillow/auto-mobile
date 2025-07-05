@@ -1,6 +1,6 @@
 import { Element } from "../../models/Element";
 import { Point } from "../../models/Point";
-import { ElementBounds, Hierarchy, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
+import { ElementBounds, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
 
 /**
  * Utility class for working with UI elements
@@ -19,6 +19,36 @@ export class ElementUtils {
     };
   }
 
+  findFocusedTextInput(viewHierarchy: any): any {
+    const rootNodes = this.extractRootNodes(viewHierarchy);
+    const inputClasses = [
+      "android.widget.EditText",
+      "android.widget.AutoCompleteTextView",
+      "android.widget.MultiAutoCompleteTextView",
+      "androidx.appcompat.widget.AppCompatEditText"
+    ];
+
+    for (const rootNode of rootNodes) {
+      let foundElement: any = null;
+      this.traverseNode(rootNode, (node: any) => {
+        if (foundElement) {return;} // Already found one
+
+        const nodeProperties = this.extractNodeProperties(node);
+        if ((nodeProperties.focused === "true" || nodeProperties.focused === true) &&
+          nodeProperties.class &&
+          inputClasses.some(cls => nodeProperties.class.includes(cls))) {
+          const parsedNode = this.parseNodeBounds(node);
+          if (parsedNode) {
+            foundElement = parsedNode;
+          }
+        }
+      });
+
+      if (foundElement) {return foundElement;}
+    }
+
+    return null;
+  }
   getSwipeDirectionForScroll(
     direction: "up" | "down" | "left" | "right"
   ): "up" | "down" | "left" | "right" {
@@ -293,6 +323,67 @@ export class ElementUtils {
         this.traverseNode(children, callback);
       }
     }
+  }
+
+  /**
+   * Find elements in the view hierarchy that match the specified class name
+   * @param viewHierarchy - The view hierarchy to search
+   * @param className - Class name to search for
+   * @param containerElementId - Container element resource ID to restrict the search within its child nodes
+   * @param partialMatch - Whether to allow partial class name matching
+   */
+  findElementsByClass(
+    viewHierarchy: ViewHierarchyResult,
+    className: string,
+    containerElementId: string,
+    partialMatch: boolean = false
+  ): Element[] {
+    if (!viewHierarchy || !className) {
+      return [];
+    }
+
+    const rootNodes = this.extractRootNodes(viewHierarchy);
+    const matches: Element[] = [];
+
+    // First find the container node
+    let containerNode: any = null;
+    for (const rootNode of rootNodes) {
+      this.traverseNode(rootNode, (node: any) => {
+        if (containerNode) {
+          return; // Already found
+        }
+
+        const nodeProperties = this.extractNodeProperties(node);
+        const nodeResourceId = nodeProperties["resource-id"];
+
+        if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
+          containerNode = node;
+        }
+      });
+      if (containerNode) {
+        break;
+      }
+    }
+
+    if (!containerNode) {
+      // Container not found, return empty list
+      return [];
+    }
+    // Search only within the container node's subtree
+    this.traverseNode(containerNode, (node: any) => {
+      const nodeProperties = this.extractNodeProperties(node);
+      if (nodeProperties.class && typeof nodeProperties.class === "string") {
+        const nodeClass = nodeProperties.class;
+        if (nodeClass === className || (partialMatch && nodeClass.toLowerCase().includes(className.toLowerCase()))) {
+          const parsedNode = this.parseNodeBounds(node);
+          if (parsedNode) {
+            matches.push(parsedNode);
+          }
+        }
+      }
+    });
+
+    return matches;
   }
 
   /**

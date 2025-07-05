@@ -13,13 +13,11 @@ export const getDeepLinksSchema = z.object({
 });
 
 export const detectIntentChooserSchema = z.object({
-  viewHierarchy: z.string().optional().describe("Optional view hierarchy XML to analyze (will observe screen if not provided)")
 });
 
 export const handleIntentChooserSchema = z.object({
   preference: z.enum(["always", "just_once", "custom"]).optional().describe("Preference for handling intent chooser (default: 'just_once')"),
   customAppPackage: z.string().optional().describe("Specific app package to select when preference is 'custom'"),
-  viewHierarchy: z.string().optional().describe("Optional view hierarchy XML to analyze (will observe screen if not provided)")
 });
 
 // Type definitions for better TypeScript support
@@ -28,13 +26,11 @@ export interface GetDeepLinksArgs {
 }
 
 export interface DetectIntentChooserArgs {
-    viewHierarchy?: string;
 }
 
 export interface HandleIntentChooserArgs {
     preference?: "always" | "just_once" | "custom";
     customAppPackage?: string;
-    viewHierarchy?: string;
 }
 
 // Register tools
@@ -67,7 +63,7 @@ export function registerDeepLinkTools() {
   const detectIntentChooserHandler = async (deviceId: string, args: DetectIntentChooserArgs) => {
     try {
       const detectIntentChooser = new DetectIntentChooser(deviceId);
-      const result = await detectIntentChooser.execute(args.viewHierarchy);
+      const result = await detectIntentChooser.execute();
 
       return createJSONToolResponse({
         message: `Intent chooser detection completed. Detected: ${result.detected}`,
@@ -89,7 +85,6 @@ export function registerDeepLinkTools() {
       const result = await handleIntentChooser.execute(
         args.preference || "just_once",
         args.customAppPackage,
-        args.viewHierarchy
       );
 
       return createJSONToolResponse({

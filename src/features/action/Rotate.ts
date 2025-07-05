@@ -1,6 +1,6 @@
 import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { RotateResult } from "../../models/RotateResult";
+import { RotateResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { ProgressCallback } from "./BaseVisualChange";
 
@@ -62,36 +62,18 @@ export class Rotate extends BaseVisualChange {
     orientation: "portrait" | "landscape",
     progress?: ProgressCallback
   ): Promise<RotateResult> {
-
-    const value = orientation === "portrait" ? 0 : 1;
-
-    // Get current orientation
-    const currentOrientation = await this.getCurrentOrientation();
-
-    // Check if we're already in the desired orientation
-    if (currentOrientation === orientation) {
-      logger.info(`Device is already in ${orientation} orientation, no rotation needed`);
-
-      // Still take an observation for consistency
-      const observation = await this.observeScreen.execute();
-
-      return {
-        success: true,
-        orientation,
-        value,
-        observation,
-        currentOrientation,
-        rotationPerformed: false,
-        message: `Device was already in ${orientation} orientation`
-      };
-    }
-
-    // Check if orientation is locked
-    const isLocked = await this.isOrientationLocked();
-    let orientationUnlocked = false;
-
     return this.observedInteraction(
       async () => {
+
+        const value = orientation === "portrait" ? 0 : 1;
+
+        // Get current orientation
+        const currentOrientation = await this.getCurrentOrientation();
+
+        // Check if orientation is locked
+        const isLocked = await this.isOrientationLocked();
+        let orientationUnlocked = false;
+
         try {
 
           // If orientation is locked, unlock it temporarily

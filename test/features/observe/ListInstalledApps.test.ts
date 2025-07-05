@@ -25,7 +25,7 @@ describe("ListInstalledApps", function() {
       }
     };
 
-    listInstalledApps = new ListInstalledApps(null, mockAdb as AdbUtils);
+    listInstalledApps = new ListInstalledApps("test-device", mockAdb as AdbUtils);
   });
 
   describe("execute", function() {

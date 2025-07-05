@@ -78,9 +78,6 @@ describe("MCP Tools Registry", () => {
       // App management tools (lifecycle management)
       app: ["listApps", "launchApp", "terminateApp", "clearAppData", "installApp"],
 
-      // Scroll tools (list and scrollable content manipulation)
-      scroll: ["scrollListToText", "flingList", "pullToRefresh"],
-
       // Utility tools (device state and configuration)
       utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog", "enableDemoMode", "disableDemoMode"],
 

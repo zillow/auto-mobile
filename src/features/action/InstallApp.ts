@@ -7,7 +7,7 @@ export class InstallApp {
   /**
    * Create an InstallApp instance
    * @param deviceId - Optional device ID
-   * @param adbUtils - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbUtils instance for testing
    */
   constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);

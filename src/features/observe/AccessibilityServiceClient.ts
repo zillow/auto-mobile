@@ -1,6 +1,6 @@
 import { AdbUtils } from "../../utils/adb";
 import { logger } from "../../utils/logger";
-import { ViewHierarchyResult } from "../../models/ViewHierarchyResult";
+import { ViewHierarchyResult } from "../../models";
 
 /**
  * Interface for accessibility service node format
@@ -112,11 +112,6 @@ export class AccessibilityServiceClient {
         return AccessibilityServiceClient.cachedAvailability.isAvailable;
       }
     }
-
-    AccessibilityServiceClient.cachedAvailability = {
-      isAvailable: true,
-      timestamp: Date.now()
-    };
 
     logger.debug(`[ACCESSIBILITY_SERVICE] Availability wasn't cached`);
 

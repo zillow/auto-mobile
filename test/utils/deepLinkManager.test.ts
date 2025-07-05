@@ -174,64 +174,100 @@ Receiver Resolver Table:
 
   describe("detectIntentChooser", () => {
     it("should detect intent chooser with ChooserActivity", () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity" />
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ChooserActivity"
+            }
+          }
+        }
+      };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
       expect(detected).to.be.true;
     });
 
     it("should detect intent chooser with ResolverActivity", () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ResolverActivity" />
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ResolverActivity"
+            }
+          }
+        }
+      };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
       expect(detected).to.be.true;
     });
 
     it("should detect intent chooser with 'Choose an app' text", () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node text="Choose an app" />
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              text: "Choose an app"
+            }
+          }
+        }
+      };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
       expect(detected).to.be.true;
     });
 
     it("should detect intent chooser with 'Always' and 'Just once' buttons", () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node text="Always" />
-          <node text="Just once" />
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: [
+            {
+              $: {
+                text: "Always"
+              }
+            },
+            {
+              $: {
+                text: "Just once"
+              }
+            }
+          ]
+        }
+      };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
       expect(detected).to.be.true;
     });
 
     it("should not detect intent chooser in normal app screens", () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="android.widget.Button" text="Click me" />
-          <node class="android.widget.TextView" text="Some text" />
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: [
+            {
+              $: {
+                class: "android.widget.Button",
+                text: "Click me"
+              }
+            },
+            {
+              $: {
+                class: "android.widget.TextView",
+                text: "Some text"
+              }
+            }
+          ]
+        }
+      };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
       expect(detected).to.be.false;
     });
 
     it("should handle malformed view hierarchy", () => {
-      const viewHierarchy = "invalid xml";
+      const viewHierarchy = {
+        hierarchy: {}
+      };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
       expect(detected).to.be.false;
@@ -262,13 +298,22 @@ Receiver Resolver Table:
     });
 
     it("should handle intent chooser with 'always' preference", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity">
-            <node text="Always" class="android.widget.Button" bounds="[100,200][300,400]" />
-          </node>
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ChooserActivity"
+            },
+            node: [{
+              $: {
+                text: "Always",
+                class: "android.widget.Button",
+                bounds: "[100,200][300,400]"
+              }
+            }]
+          }
+        }
+      };
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "always");
 
@@ -278,13 +323,22 @@ Receiver Resolver Table:
     });
 
     it("should handle intent chooser with 'just_once' preference", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ResolverActivity">
-            <node text="Just once" class="android.widget.Button" bounds="[100,200][300,400]" />
-          </node>
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ResolverActivity"
+            },
+            node: [{
+              $: {
+                text: "Just once",
+                class: "android.widget.Button",
+                bounds: "[100,200][300,400]"
+              }
+            }]
+          }
+        }
+      };
 
       // Update mock to return "Just once" button
       (deepLinkManager as any).findButtonByText = (node: any, textOptions: string[]) => {
@@ -302,13 +356,20 @@ Receiver Resolver Table:
     });
 
     it("should handle intent chooser with custom app selection", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity">
-            <node resource-id="com.example.customapp:id/app_icon" />
-          </node>
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ChooserActivity"
+            },
+            node: [{
+              $: {
+                "resource-id": "com.example.customapp:id/app_icon"
+              }
+            }]
+          }
+        }
+      };
 
       // Mock findAppInChooser method
       (deepLinkManager as any).findAppInChooser = (node: any, appPackage: string) => {
@@ -331,13 +392,34 @@ Receiver Resolver Table:
     });
 
     it("should return success false when no intent chooser is detected", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="android.widget.LinearLayout">
-            <node text="Normal app content" />
-          </node>
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "android.widget.LinearLayout"
+            },
+            node: [{
+              $: {
+                text: "Normal app content"
+              }
+            }]
+          }
+        }
+      };
+
+      // Reset mocks for this specific test
+      (mockElementUtils as any).extractRootNodes = () => [
+        {
+          $: {
+            class: "android.widget.LinearLayout"
+          },
+          node: [{
+            $: {
+              text: "Normal app content"
+            }
+          }]
+        }
+      ];
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "always");
 
@@ -346,13 +428,20 @@ Receiver Resolver Table:
     });
 
     it("should return success false when target element not found", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity">
-            <node text="Some other button" />
-          </node>
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ChooserActivity"
+            },
+            node: [{
+              $: {
+                text: "Some other button"
+              }
+            }]
+          }
+        }
+      };
 
       // Mock to return null (no matching button found)
       (deepLinkManager as any).findButtonByText = () => null;
@@ -365,13 +454,22 @@ Receiver Resolver Table:
     });
 
     it("should handle ADB command failures during tap", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity">
-            <node text="Always" class="android.widget.Button" bounds="[100,200][300,400]" />
-          </node>
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ChooserActivity"
+            },
+            node: [{
+              $: {
+                text: "Always",
+                class: "android.widget.Button",
+                bounds: "[100,200][300,400]"
+              }
+            }]
+          }
+        }
+      };
 
       // Create a failing mock for input tap command
       const failingMock = async (command: string): Promise<ExecResult> => {

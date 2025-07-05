@@ -1,60 +1,48 @@
 import { logger } from "../../utils/logger";
 import { DeepLinkManager } from "../../utils/deepLinkManager";
-import { ObserveScreen } from "./ObserveScreen";
-import { IntentChooserResult } from "../../models";
+import { IntentChooserResult, ObserveResult } from "../../models";
+import { BaseVisualChange } from "../action/BaseVisualChange";
+import { AdbUtils } from "../../utils/adb";
 
-export class DetectIntentChooser {
+export class DetectIntentChooser extends BaseVisualChange {
   private deepLinkManager: DeepLinkManager;
-  private observeScreen: ObserveScreen;
 
-  constructor(deviceId: string) {
+  constructor(deviceId: string, adb: AdbUtils | null = null) {
+    super(deviceId, adb);
     this.deepLinkManager = new DeepLinkManager(deviceId);
-    this.observeScreen = new ObserveScreen(deviceId);
   }
 
   /**
      * Execute intent chooser detection
-     * @param viewHierarchy - Optional view hierarchy XML, will observe screen if not provided
      * @returns Promise with intent chooser detection results
      */
-  async execute(viewHierarchy?: string): Promise<IntentChooserResult> {
-    try {
-      logger.info("[DetectIntentChooser] Starting intent chooser detection");
+  async execute(): Promise<IntentChooserResult> {
+    return this.observedInteraction(
+      async (observeResult: ObserveResult) => {
+        try {
+          logger.info("[DetectIntentChooser] Starting intent chooser detection");
+          const detected = this.deepLinkManager.detectIntentChooser(observeResult.viewHierarchy);
 
-      let hierarchyXml = viewHierarchy;
-      let observation = null;
+          logger.info(`[DetectIntentChooser] Intent chooser detection completed. Detected: ${detected}`);
 
-      if (!hierarchyXml) {
-        // Observe the screen to get current view hierarchy
-        observation = await this.observeScreen.execute();
-        if (!observation.viewHierarchy) {
-          throw new Error("Could not get view hierarchy for intent chooser detection");
+          return {
+            success: true,
+            detected,
+            observeResult
+          };
+        } catch (error) {
+          logger.error(`[DetectIntentChooser] Failed to detect intent chooser: ${error}`);
+
+          return {
+            success: false,
+            detected: false,
+            error: error instanceof Error ? error.message : String(error)
+          };
         }
-        hierarchyXml = observation.viewHierarchy;
+      },
+      {
+        changeExpected: false
       }
-
-      // Ensure hierarchyXml is a string before passing to detectIntentChooser
-      if (typeof hierarchyXml !== "string") {
-        throw new Error("View hierarchy must be a string");
-      }
-
-      const detected = this.deepLinkManager.detectIntentChooser(hierarchyXml);
-
-      logger.info(`[DetectIntentChooser] Intent chooser detection completed. Detected: ${detected}`);
-
-      return {
-        success: true,
-        detected,
-        observation
-      };
-    } catch (error) {
-      logger.error(`[DetectIntentChooser] Failed to detect intent chooser: ${error}`);
-
-      return {
-        success: false,
-        detected: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
+    );
   }
 }

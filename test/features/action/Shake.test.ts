@@ -215,7 +215,7 @@ describe("Shake", () => {
 
   describe("constructor", () => {
     it("should work with null deviceId", () => {
-      const shakeInstance = new Shake(null);
+      const shakeInstance = new Shake("test-device");
       assert.isDefined(shakeInstance);
     });
 

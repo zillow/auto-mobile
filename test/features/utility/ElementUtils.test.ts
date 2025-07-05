@@ -1,6 +1,7 @@
 import { assert } from "chai";
 import { ElementUtils } from "../../../src/features/utility/ElementUtils";
-import { Element } from "../../../src/models/Element";
+import { Element } from "../../../src/models";
+import { ObserveResult } from "../../../src/models";
 
 describe("ElementUtils", () => {
   let elementUtils: ElementUtils;
@@ -14,6 +15,14 @@ describe("ElementUtils", () => {
 
   beforeEach(() => {
     elementUtils = new ElementUtils();
+  });
+
+  // Helper function to create mock ObserveResult
+  const createMockObserveResult = (viewHierarchy?: any): ObserveResult => ({
+    timestamp: Date.now(),
+    screenSize: { width: 1080, height: 1920 },
+    systemInsets: { top: 48, bottom: 120, left: 0, right: 0 },
+    viewHierarchy: viewHierarchy || { hierarchy: { node: {} } }
   });
 
   describe("flattenViewHierarchy", () => {
@@ -46,7 +55,8 @@ describe("ElementUtils", () => {
         }
       };
 
-      const result = elementUtils.flattenViewHierarchy(viewHierarchy);
+      const mockObserveResult = createMockObserveResult(viewHierarchy);
+      const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
 
       assert.lengthOf(result, 3);
       assert.equal(result[0].index, 0);
@@ -58,7 +68,7 @@ describe("ElementUtils", () => {
     });
 
     it("should handle empty view hierarchy", () => {
-      const result = elementUtils.flattenViewHierarchy(null);
+      const result = elementUtils.flattenViewHierarchy(null as any);
       assert.deepEqual(result, []);
     });
 
@@ -74,7 +84,8 @@ describe("ElementUtils", () => {
         }
       };
 
-      const result = elementUtils.flattenViewHierarchy(viewHierarchy);
+      const mockObserveResult = createMockObserveResult(viewHierarchy);
+      const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
       assert.deepEqual(result, []);
     });
 
@@ -92,7 +103,8 @@ describe("ElementUtils", () => {
         }
       };
 
-      const result = elementUtils.flattenViewHierarchy(viewHierarchy);
+      const mockObserveResult = createMockObserveResult(viewHierarchy);
+      const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
 
       assert.lengthOf(result, 1);
       assert.equal(result[0].text, "Button Text");
@@ -111,7 +123,8 @@ describe("ElementUtils", () => {
         }
       };
 
-      const result = elementUtils.flattenViewHierarchy(viewHierarchy);
+      const mockObserveResult = createMockObserveResult(viewHierarchy);
+      const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
 
       assert.lengthOf(result, 1);
       assert.equal(result[0].text, "Image Description");
@@ -147,7 +160,8 @@ describe("ElementUtils", () => {
     };
 
     it("should find element by valid index", () => {
-      const result = elementUtils.findElementByIndex(mockViewHierarchy, 1);
+      const mockObserveResult = createMockObserveResult(mockViewHierarchy);
+      const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, 1);
 
       assert.isNotNull(result);
       assert.deepEqual(result?.element.bounds, { left: 10, top: 10, right: 50, bottom: 50 });
@@ -155,17 +169,19 @@ describe("ElementUtils", () => {
     });
 
     it("should return null for invalid index", () => {
-      const result = elementUtils.findElementByIndex(mockViewHierarchy, 10);
+      const mockObserveResult = createMockObserveResult(mockViewHierarchy);
+      const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, 10);
       assert.isNull(result);
     });
 
     it("should return null for negative index", () => {
-      const result = elementUtils.findElementByIndex(mockViewHierarchy, -1);
+      const mockObserveResult = createMockObserveResult(mockViewHierarchy);
+      const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, -1);
       assert.isNull(result);
     });
 
     it("should return null for empty view hierarchy", () => {
-      const result = elementUtils.findElementByIndex(null, 0);
+      const result = elementUtils.findElementByIndex(null as any, 0);
       assert.isNull(result);
     });
 
@@ -181,7 +197,8 @@ describe("ElementUtils", () => {
         }
       };
 
-      const result = elementUtils.findElementByIndex(viewHierarchy, 0);
+      const mockObserveResult = createMockObserveResult(viewHierarchy);
+      const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, 0);
 
       assert.isNotNull(result);
       assert.isUndefined(result?.text);
@@ -266,13 +283,15 @@ describe("ElementUtils", () => {
                 "class": "android.widget.LinearLayout",
                 "resource-id": "com.example:id/header_container"
               },
-              node: {
-                $: {
-                  "bounds": "[100,100][500,200]",
-                  "class": "android.widget.TextView",
-                  "text": "Header Text"
+              node: [
+                {
+                  $: {
+                    "bounds": "[100,100][500,200]",
+                    "class": "android.widget.TextView",
+                    "text": "Header Text"
+                  }
                 }
-              }
+              ]
             },
             {
               $: {
@@ -310,8 +329,9 @@ describe("ElementUtils", () => {
     };
 
     it("should find element by text within specified container", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "Item 1",
         "main_container",
         true,
@@ -324,8 +344,9 @@ describe("ElementUtils", () => {
     });
 
     it("should not find element when it's outside the specified container", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "Header Text",
         "main_container",
         true,
@@ -336,8 +357,9 @@ describe("ElementUtils", () => {
     });
 
     it("should return null when container is not found", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "Item 1",
         "non_existent_container",
         true,
@@ -348,8 +370,9 @@ describe("ElementUtils", () => {
     });
 
     it("should find element regardless of element type", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "Item 2",
         "main_container",
         true,
@@ -362,8 +385,9 @@ describe("ElementUtils", () => {
     });
 
     it("should find all matching elements including different types", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "Item",
         "main_container",
         true, // fuzzy match enabled
@@ -375,8 +399,9 @@ describe("ElementUtils", () => {
     });
 
     it("should handle exact text matching", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "Item",
         "main_container",
         false, // fuzzy match disabled
@@ -387,8 +412,9 @@ describe("ElementUtils", () => {
     });
 
     it("should handle case-sensitive matching", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "item 1", // lowercase
         "main_container",
         true,
@@ -399,8 +425,9 @@ describe("ElementUtils", () => {
     });
 
     it("should handle case-insensitive matching", () => {
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "item 1", // lowercase
         "main_container",
         true,
@@ -440,8 +467,9 @@ describe("ElementUtils", () => {
         }
       };
 
+      const mockObserveResult = createMockObserveResult(hierarchyWithMultipleMatches);
       const result = elementUtils.findElementByText(
-        hierarchyWithMultipleMatches,
+        mockObserveResult.viewHierarchy,
         "Click me",
         "container",
         true,
@@ -462,19 +490,22 @@ describe("ElementUtils", () => {
               "class": "android.widget.FrameLayout",
               "resource-id": "com.example:id/container"
             },
-            node: {
-              $: {
-                "bounds": "[100,100][300,200]",
-                "class": "android.widget.ImageView",
-                "content-desc": "Profile Picture"
+            node: [
+              {
+                $: {
+                  "bounds": "[100,100][300,200]",
+                  "class": "android.widget.ImageView",
+                  "content-desc": "Profile Picture"
+                }
               }
-            }
+            ]
           }
         }
       };
 
+      const mockObserveResult = createMockObserveResult(hierarchyWithContentDesc);
       const result = elementUtils.findElementByText(
-        hierarchyWithContentDesc,
+        mockObserveResult.viewHierarchy,
         "Profile Picture",
         "container",
         true,
@@ -488,7 +519,7 @@ describe("ElementUtils", () => {
     it("should handle missing required parameters", () => {
       // Missing viewHierarchy
       let result = elementUtils.findElementByText(
-        null,
+        null as any,
         "text",
         "container",
         true,
@@ -497,8 +528,9 @@ describe("ElementUtils", () => {
       assert.isNull(result);
 
       // Missing text
+      const mockObserveResult = createMockObserveResult(mockViewHierarchyWithContainer);
       result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "",
         "container",
         true,
@@ -508,7 +540,7 @@ describe("ElementUtils", () => {
 
       // Missing containerElementId
       result = elementUtils.findElementByText(
-        mockViewHierarchyWithContainer,
+        mockObserveResult.viewHierarchy,
         "text",
         "",
         true,
@@ -526,34 +558,42 @@ describe("ElementUtils", () => {
               "class": "android.widget.FrameLayout",
               "resource-id": "com.example:id/root"
             },
-            node: {
-              $: {
-                "bounds": "[0,0][1080,1200]",
-                "class": "android.widget.LinearLayout",
-                "resource-id": "com.example:id/outer_container"
-              },
-              node: {
+            node: [
+              {
                 $: {
-                  "bounds": "[100,100][980,1000]",
-                  "class": "android.widget.FrameLayout",
-                  "resource-id": "com.example:id/inner_container"
+                  "bounds": "[0,0][1080,1200]",
+                  "class": "android.widget.LinearLayout",
+                  "resource-id": "com.example:id/outer_container"
                 },
-                node: {
-                  $: {
-                    "bounds": "[200,200][800,300]",
-                    "class": "android.widget.TextView",
-                    "text": "Nested Text"
+                node: [
+                  {
+                    $: {
+                      "bounds": "[100,100][980,1000]",
+                      "class": "android.widget.FrameLayout",
+                      "resource-id": "com.example:id/inner_container"
+                    },
+                    node: [
+                      {
+                        $: {
+                          "bounds": "[200,200][800,300]",
+                          "class": "android.widget.TextView",
+                          "text": "Nested Text"
+                        }
+                      }
+                    ]
                   }
-                }
+                ]
               }
-            }
+            ]
           }
         }
       };
 
+      const mockObserveResult = createMockObserveResult(nestedHierarchy);
+
       // Should find in inner container
       let result = elementUtils.findElementByText(
-        nestedHierarchy,
+        mockObserveResult.viewHierarchy,
         "Nested Text",
         "inner_container",
         true,
@@ -563,7 +603,7 @@ describe("ElementUtils", () => {
 
       // Should also find when searching in outer container
       result = elementUtils.findElementByText(
-        nestedHierarchy,
+        mockObserveResult.viewHierarchy,
         "Nested Text",
         "outer_container",
         true,

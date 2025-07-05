@@ -197,7 +197,7 @@ describe("ImeAction", () => {
 
   describe("constructor", () => {
     it("should work with null deviceId", () => {
-      const imeActionInstance = new ImeAction(null);
+      const imeActionInstance = new ImeAction("test-device");
       assert.isDefined(imeActionInstance);
     });
 

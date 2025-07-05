@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { GetSystemInsets } from "../../../src/features/observe/GetSystemInsets";
 import { AdbUtils } from "../../../src/utils/adb";
+import { ExecResult } from "../../../src/models";
 
 describe("GetSystemInsets", function() {
   describe("Unit Tests for Extracted Methods", function() {
@@ -12,7 +13,7 @@ describe("GetSystemInsets", function() {
       mockAdb = {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
-      getSystemInsets = new GetSystemInsets(null, mockAdb);
+      getSystemInsets = new GetSystemInsets("test-device", mockAdb);
     });
 
     it("should parse status bar height correctly", function() {
@@ -146,7 +147,9 @@ describe("GetSystemInsets", function() {
     });
 
     it("should get system insets from real device", async function() {
-      const result = await getSystemInsets.execute();
+      const result = await getSystemInsets.execute({
+        stdout: ""
+      } as ExecResult);
 
       expect(result).to.have.property("top");
       expect(result).to.have.property("right");

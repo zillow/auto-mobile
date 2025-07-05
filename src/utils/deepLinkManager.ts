@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import { AdbUtils } from "./adb";
-import { DeepLinkResult, IntentFilter, DeepLinkInfo, IntentChooserResult } from "../models";
+import { DeepLinkResult, IntentFilter, DeepLinkInfo, IntentChooserResult, ViewHierarchyResult } from "../models";
 import { ElementUtils } from "../features/utility/ElementUtils";
 
 export class DeepLinkManager {
@@ -191,44 +191,99 @@ export class DeepLinkManager {
 
   /**
      * Detect system intent chooser dialog in view hierarchy
-     * @param viewHierarchy - Current view hierarchy XML
+   * @param viewHierarchy - Current view hierarchy result
      * @returns True if intent chooser is detected
      */
-  detectIntentChooser(viewHierarchy: string): boolean {
+  detectIntentChooser(viewHierarchy: ViewHierarchyResult): boolean {
     try {
+      // If the hierarchy is empty, return false
+      if (!viewHierarchy || !viewHierarchy.hierarchy || !viewHierarchy.hierarchy.node) {
+        return false;
+      }
+
       // Look for common intent chooser indicators
-      const indicators = [
-        "com.android.internal.app.ChooserActivity",
-        "com.android.internal.app.ResolverActivity",
+      const textIndicators = [
         "Choose an app",
         "Open with",
         "Complete action using",
         "Always",
-        "Just once",
+        "Just once"
+      ];
+
+      const classIndicators = [
+        "com.android.internal.app.ChooserActivity",
+        "com.android.internal.app.ResolverActivity"
+      ];
+
+      const resourceIdIndicators = [
         "android:id/button_always",
         "android:id/button_once",
         "resolver_list",
         "chooser_list"
       ];
 
-      return indicators.some(indicator =>
-        viewHierarchy.toLowerCase().includes(indicator.toLowerCase())
-      );
+      // Get root nodes from the view hierarchy
+      const rootNodes = this.elementUtils.extractRootNodes(viewHierarchy);
+
+      // Check all nodes in the hierarchy
+      for (const rootNode of rootNodes) {
+        let foundIndicator = false;
+
+        this.elementUtils.traverseNode(rootNode, (node: any) => {
+          if (foundIndicator) {return;}
+
+          const nodeProperties = this.elementUtils.extractNodeProperties(node);
+          const nodeClass = nodeProperties.class || "";
+          const nodeText = nodeProperties.text || nodeProperties["content-desc"] || "";
+          const nodeResourceId = nodeProperties["resource-id"] || "";
+
+          // Check for class indicators
+          for (const className of classIndicators) {
+            if (nodeClass.includes(className)) {
+              foundIndicator = true;
+              return;
+            }
+          }
+
+          // Check for text indicators (exact match)
+          for (const text of textIndicators) {
+            if (nodeText === text) {
+              foundIndicator = true;
+              return;
+            }
+          }
+
+          // Check for resource ID indicators
+          for (const resourceId of resourceIdIndicators) {
+            if (nodeResourceId.includes(resourceId)) {
+              foundIndicator = true;
+              return;
+            }
+          }
+        });
+
+        if (foundIndicator) {
+          return true;
+        }
+      }
+
+      return false;
     } catch (error) {
       logger.warn(`[DeepLinkManager] Error detecting intent chooser: ${error}`);
       return false;
     }
   }
 
+
   /**
      * Handle system intent chooser dialog automatically
-     * @param viewHierarchy - Current view hierarchy XML
+   * @param viewHierarchy - Current view hierarchy result
      * @param preference - User preference for handling ("always", "just_once", or "custom")
      * @param customAppPackage - Optional specific app package to select
      * @returns Result of intent chooser handling
      */
   async handleIntentChooser(
-    viewHierarchy: string,
+    viewHierarchy: ViewHierarchyResult,
     preference: "always" | "just_once" | "custom" = "just_once",
     customAppPackage?: string
   ): Promise<IntentChooserResult> {

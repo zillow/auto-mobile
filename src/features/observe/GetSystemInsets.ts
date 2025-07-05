@@ -1,6 +1,7 @@
 import { AdbUtils } from "../../utils/adb";
 import { logger } from "../../utils/logger";
-import { SystemInsets } from "../../models/SystemInsets";
+import { SystemInsets } from "../../models";
+import { ExecResult } from "../../models";
 
 export class GetSystemInsets {
   private adb: AdbUtils;
@@ -8,7 +9,7 @@ export class GetSystemInsets {
   /**
    * Create a Window instance
    * @param deviceId - Optional device ID
-   * @param adbUtils - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbUtils instance for testing
    */
   constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
@@ -66,13 +67,15 @@ export class GetSystemInsets {
 
   /**
    * Get the system UI insets using cached dumpsys window output
-   * @param cachedDumpsysWindow - Pre-fetched dumpsys window output
+   * @param dumpsysWindow - Pre-fetched dumpsys window output
    * @returns Promise with inset values
    */
-  async executeWithCache(cachedDumpsysWindow: string): Promise<SystemInsets> {
+  async execute(dumpsysWindow: ExecResult): Promise<SystemInsets> {
     try {
       // Extract just the inset-related lines from the cached output
-      const insetLines = cachedDumpsysWindow.split("\n").filter(line =>
+      const insetMatches = dumpsysWindow.stdout.match(/inset/);
+      const insetOutput = insetMatches ? insetMatches.join("\n") : "";
+      const insetLines = insetOutput.split("\n").filter(line =>
         line.toLowerCase().includes("inset") ||
               line.includes("statusBars") ||
               line.includes("navigationBars") ||
@@ -98,8 +101,7 @@ export class GetSystemInsets {
       };
     } catch (error) {
       logger.warn("Failed to parse insets from cached dumpsys, falling back to separate query");
-      // Fallback to original execute method
-      return this.execute();
+      return this.getFallbackInsets(dumpsysWindow);
     }
   }
 
@@ -107,16 +109,14 @@ export class GetSystemInsets {
    * Get fallback insets from alternative dumpsys output
    * @returns Promise with fallback system insets
    */
-  private async getFallbackInsets(): Promise<SystemInsets> {
+  private async getFallbackInsets(dumpsysWindow: ExecResult): Promise<SystemInsets> {
     try {
-      const { stdout } = await this.adb.executeCommand("shell dumpsys window");
-
       // Try to find status bar height
-      const statusBarHeightMatch = stdout.match(/mStatusBarHeight=(\d+)/);
+      const statusBarHeightMatch = dumpsysWindow.stdout.match(/mStatusBarHeight=(\d+)/);
       const statusBarHeight = statusBarHeightMatch ? parseInt(statusBarHeightMatch[1], 10) : 0;
 
       // Try to find navigation bar height
-      const navBarHeightMatch = stdout.match(/mNavigationBarHeight=(\d+)/);
+      const navBarHeightMatch = dumpsysWindow.stdout.match(/mNavigationBarHeight=(\d+)/);
       const navBarHeight = navBarHeightMatch ? parseInt(navBarHeightMatch[1], 10) : 0;
 
       logger.debug("Using fallback system insets: %o", {
@@ -141,38 +141,6 @@ export class GetSystemInsets {
         bottom: 48, // Typical nav bar height in dp
         left: 0
       };
-    }
-  }
-
-  /**
-   * Get the system UI insets
-   * @returns Promise with inset values
-   */
-  async execute(): Promise<SystemInsets> {
-    try {
-      // Modern Android uses WindowInsets instead of overscan
-      const { stdout } = await this.adb.executeCommand("shell dumpsys window | grep -i inset");
-
-      const statusBarHeight = this.parseStatusBarHeight(stdout);
-      const navBarHeight = this.parseNavigationBarHeight(stdout);
-      const { left: leftInset, right: rightInset } = this.parseGestureInsets(stdout);
-
-      logger.debug("System insets detected: %o", {
-        top: statusBarHeight,
-        bottom: navBarHeight,
-        left: leftInset,
-        right: rightInset
-      });
-
-      return {
-        top: statusBarHeight,
-        right: rightInset,
-        bottom: navBarHeight,
-        left: leftInset
-      };
-    } catch (error) {
-      // Fallback to dumpsys window without grep to get heights
-      return this.getFallbackInsets();
     }
   }
 }

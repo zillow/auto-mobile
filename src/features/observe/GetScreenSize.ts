@@ -1,17 +1,82 @@
 import { AdbUtils } from "../../utils/adb";
 import { logger } from "../../utils/logger";
-import { ScreenSize } from "../../models/ScreenSize";
+import { ExecResult, ScreenSize } from "../../models";
+import * as fs from "fs";
+import * as path from "path";
+import * as crypto from "crypto";
 
 export class GetScreenSize {
   private adb: AdbUtils;
+  private readonly deviceId: string;
+  private static memoryCache = new Map<string, ScreenSize>();
+  private static cacheDir = path.join(process.cwd(), ".cache", "screen-size");
 
   /**
    * Create a Window instance
    * @param deviceId - Optional device ID
-   * @param adbUtils - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbUtils instance for testing
    */
   constructor(deviceId: string, adb: AdbUtils | null = null) {
+    this.deviceId = deviceId;
     this.adb = adb || new AdbUtils(deviceId);
+  }
+
+  /**
+   * Generate cache key from deviceId
+   * @param deviceId - Device identifier
+   * @returns Hashed cache key
+   */
+  private generateCacheKey(deviceId: string): string {
+    return crypto.createHash("md5").update(deviceId).digest("hex");
+  }
+
+  /**
+   * Get disk cache file path
+   * @param cacheKey - Cache key for the device
+   * @returns Full path to cache file
+   */
+  private getCacheFilePath(cacheKey: string): string {
+    return path.join(GetScreenSize.cacheDir, `${cacheKey}.json`);
+  }
+
+  /**
+   * Load screen size from disk cache
+   * @param cacheKey - Cache key for the device
+   * @returns Screen size if found, null otherwise
+   */
+  private loadFromDiskCache(cacheKey: string): ScreenSize | null {
+    try {
+      const cacheFile = this.getCacheFilePath(cacheKey);
+      if (fs.existsSync(cacheFile)) {
+        const data = fs.readFileSync(cacheFile, "utf8");
+        const cached = JSON.parse(data);
+        logger.debug(`Screen size loaded from disk cache for key: ${cacheKey}`);
+        return cached;
+      }
+    } catch (err) {
+      logger.warn(`Failed to load screen size from disk cache: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return null;
+  }
+
+  /**
+   * Save screen size to disk cache
+   * @param cacheKey - Cache key for the device
+   * @param screenSize - Screen size to cache
+   */
+  private saveToDiskCache(cacheKey: string, screenSize: ScreenSize): void {
+    try {
+      // Ensure cache directory exists
+      if (!fs.existsSync(GetScreenSize.cacheDir)) {
+        fs.mkdirSync(GetScreenSize.cacheDir, { recursive: true });
+      }
+
+      const cacheFile = this.getCacheFilePath(cacheKey);
+      fs.writeFileSync(cacheFile, JSON.stringify(screenSize, null, 2));
+      logger.debug(`Screen size saved to disk cache for key: ${cacheKey}`);
+    } catch (err) {
+      logger.warn(`Failed to save screen size to disk cache: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   /**
@@ -34,9 +99,8 @@ export class GetScreenSize {
    * Detect device rotation
    * @returns Promise with rotation value (0-3)
    */
-  public async detectDeviceRotation(): Promise<number> {
-    const { stdout: rotationOutput } = await this.adb.executeCommand('shell dumpsys window | grep -i "mRotation\\|mCurrentRotation"');
-    const rotationMatch = rotationOutput.match(/mRotation=(\d+)|mCurrentRotation=(\d+)/);
+  public async detectDeviceRotation(dumpsysResult: ExecResult): Promise<number> {
+    const rotationMatch = dumpsysResult.stdout.match(/mRotation=(\d+)|mCurrentRotation=(\d+)/);
 
     let rotation = 0;
     if (rotationMatch) {
@@ -77,16 +141,40 @@ export class GetScreenSize {
    * Get the screen size and resolution
    * @returns Promise with width and height
    */
-  async execute(): Promise<ScreenSize> {
+  async execute(dumpsysResult: ExecResult): Promise<ScreenSize> {
+    const cacheKey = this.generateCacheKey(this.deviceId);
+
+    // Check memory cache first
+    if (GetScreenSize.memoryCache.has(cacheKey)) {
+      logger.debug(`Screen size retrieved from memory cache for device: ${this.deviceId}`);
+      return GetScreenSize.memoryCache.get(cacheKey)!;
+    }
+
+    // Check disk cache
+    const diskCached = this.loadFromDiskCache(cacheKey);
+    if (diskCached) {
+      // Store in memory cache for faster access next time
+      GetScreenSize.memoryCache.set(cacheKey, diskCached);
+      return diskCached;
+    }
+
+    // Execute actual command if not cached
     try {
       // First get the physical screen size
       const { stdout } = await this.adb.executeCommand("shell wm size");
       const { width: physicalWidth, height: physicalHeight } = this.parsePhysicalDimensions(stdout);
 
       // Then check the current rotation to determine actual dimensions
-      const rotation = await this.detectDeviceRotation();
+      const rotation = await this.detectDeviceRotation(dumpsysResult);
 
-      return this.adjustDimensionsForRotation(physicalWidth, physicalHeight, rotation);
+      const screenSize = this.adjustDimensionsForRotation(physicalWidth, physicalHeight, rotation);
+
+      // Cache the result in both memory and disk
+      GetScreenSize.memoryCache.set(cacheKey, screenSize);
+      this.saveToDiskCache(cacheKey, screenSize);
+
+      logger.debug(`Screen size computed and cached for device: ${this.deviceId}`);
+      return screenSize;
     } catch (err) {
       throw new Error(`Failed to get screen size: ${err instanceof Error ? err.message : String(err)}`);
     }

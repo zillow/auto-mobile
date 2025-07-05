@@ -4,17 +4,16 @@ import xml2js from "xml2js";
 import { AdbUtils } from "../../utils/adb";
 import { logger } from "../../utils/logger";
 import { CryptoUtils } from "../../utils/crypto";
-import { ViewHierarchyCache } from "../../models/ViewHierarchyCache";
-import { Element } from "../../models/Element";
-import { ViewHierarchyResult } from "../../models/ViewHierarchyResult";
+import { ViewHierarchyCache } from "../../models";
+import { Element } from "../../models";
+import { ViewHierarchyResult } from "../../models";
 import { TakeScreenshot } from "./TakeScreenshot";
-import { Window } from "./Window";
 import { ElementUtils } from "../utility/ElementUtils";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { ScreenshotUtils } from "../../utils/screenshot-utils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { SourceMapper } from "../../utils/sourceMapper";
-import { ActivityInfo, FragmentInfo, ViewInfo } from "../../models/SourceIndexing";
+import { ActivityInfo, FragmentInfo, ViewInfo } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 
 /**
@@ -59,9 +58,8 @@ interface ExtendedViewHierarchyResult extends ViewHierarchyResult {
 }
 
 export class ViewHierarchy {
-  private adb: AdbUtils;
+  private readonly adb: AdbUtils;
   private takeScreenshot: TakeScreenshot;
-  private window: Window;
   private elementUtils: ElementUtils;
   private sourceMapper: SourceMapper;
   private accessibilityServiceClient: AccessibilityServiceClient;
@@ -70,34 +68,22 @@ export class ViewHierarchy {
   private static screenshotCacheDir: string = path.join("/tmp/auto-mobile", "screenshots");
   private static readonly MAX_CACHE_SIZE_BYTES = 128 * 1024 * 1024; // 128MB
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-  private static readonly EXTENDED_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes for testing
-
-  /**
-   * Get the appropriate cache TTL based on current context
-   * @param isTestingContext - Whether this is in a testing/development context
-   * @returns Cache TTL in milliseconds
-   */
-  private static getCacheTTL(isTestingContext: boolean = false): number {
-    return isTestingContext ? ViewHierarchy.EXTENDED_CACHE_TTL_MS : ViewHierarchy.CACHE_TTL_MS;
-  }
 
   /**
    * Create a ViewHierarchy instance
    * @param deviceId - Optional device ID
    * @param adb - Optional AdbUtils instance for testing
    * @param takeScreenshot - Optional TakeScreenshot instance for testing
-   * @param window - Optional Window instance for testing
+   * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
    */
   constructor(
     deviceId: string,
     adb: AdbUtils | null = null,
     takeScreenshot: TakeScreenshot | null = null,
-    window: Window | null = null,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
     this.adb = adb || new AdbUtils(deviceId);
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(deviceId, this.adb);
-    this.window = window || new Window(deviceId, this.adb);
     this.elementUtils = new ElementUtils();
     this.sourceMapper = SourceMapper.getInstance();
     this.accessibilityServiceClient = accessibilityServiceClient || new AccessibilityServiceClient(deviceId, this.adb);
@@ -244,8 +230,7 @@ export class ViewHierarchy {
 
     // Calculate accessibility for each clickable element
     for (const clickableElement of clickableElements) {
-      const accessibility = this.calculateAccessibility(clickableElement, allElements);
-      clickableElement.element.accessible = accessibility;
+      clickableElement.element.accessible = this.calculateAccessibility(clickableElement, allElements);
     }
 
     const duration = Date.now() - startTime;
@@ -516,25 +501,22 @@ export class ViewHierarchy {
   /**
    * Retrieve the view hierarchy of the current screen
    * @param screenshotPath - Optional path to an existing screenshot to use for caching
-   * @param skipAccessibilityService - Skip accessibility service check (e.g., when cached as unavailable)
    * @returns Promise with parsed XML view hierarchy
    */
-  async getViewHierarchy(screenshotPath: string | null = null, skipAccessibilityService: boolean = false): Promise<ViewHierarchyResult> {
+  async getViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
-    logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"}, skipAccessibility: ${skipAccessibilityService})`);
+    logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
 
     // First try accessibility service if available and not skipped
-    if (!skipAccessibilityService) {
-      try {
-        const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy();
-        if (accessibilityHierarchy) {
-          const accessibilityDuration = Date.now() - startTime;
-          logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
-          return accessibilityHierarchy;
-        }
-      } catch (err) {
-        logger.warn(`[VIEW_HIERARCHY] Failed to get hierarchy from accessibility service: ${err}`);
+    try {
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy();
+      if (accessibilityHierarchy) {
+        const accessibilityDuration = Date.now() - startTime;
+        logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
+        return accessibilityHierarchy;
       }
+    } catch (err) {
+      logger.warn(`[VIEW_HIERARCHY] Failed to get hierarchy from accessibility service: ${err}`);
     }
 
     try {
@@ -558,8 +540,7 @@ export class ViewHierarchy {
         logger.info(`[VIEW_HIERARCHY] *** CACHE HIT: Found cached view hierarchy using fuzzy matching in ${fuzzyDuration}ms, total getViewHierarchy time: ${totalDuration}ms ***`);
 
         // Try to augment with source indexing if not already present
-        const extendedResult = await this.augmentWithSourceIndexing(cachedResult as ExtendedViewHierarchyResult);
-        return extendedResult;
+        return await this.augmentWithSourceIndexing(cachedResult as ExtendedViewHierarchyResult);
       }
 
       logger.info(`[VIEW_HIERARCHY] No fuzzy match found after ${fuzzyDuration}ms`);
@@ -634,9 +615,10 @@ export class ViewHierarchy {
   /**
    * Find a fuzzy match with cache by scanning up to 100 recent screenshots
    * @param targetBuffer - Screenshot buffer to compare against
+   * @param limit - Number of recent screenshots to scan
    * @returns Promise with cached view hierarchy or null if not found
    */
-  private async findFuzzyMatchWithCache(targetBuffer: Buffer, limit = 100): Promise<ViewHierarchyResult | null> {
+  private async findFuzzyMatchWithCache(targetBuffer: Buffer, limit: number): Promise<ViewHierarchyResult | null> {
     logger.info(`Scanning up to ${limit} recent screenshots for fuzzy match with cached view hierarchy`);
 
     try {
@@ -706,42 +688,6 @@ export class ViewHierarchy {
     } catch (error) {
       logger.warn(`Error in findFuzzyMatchWithCache: ${(error as Error).message}`);
       return null;
-    }
-  }
-
-  /**
-   * Background cache warming: preload recent screenshots into memory cache
-   */
-  private async backgroundCacheWarming(): Promise<void> {
-    try {
-      const screenshotFiles = await ScreenshotUtils.getScreenshotFiles(ViewHierarchy.screenshotCacheDir);
-      if (screenshotFiles.length === 0) {return;}
-
-      // Get 10 most recent screenshots
-      const filesWithStats = await Promise.all(
-        screenshotFiles.slice(0, 20).map(async filePath => {
-          const stats = await statAsync(filePath);
-          return { filePath, mtime: stats.mtime.getTime() };
-        })
-      );
-
-      filesWithStats.sort((a, b) => b.mtime - a.mtime);
-      const recentFiles = filesWithStats.slice(0, 10);
-
-      // Preload into ScreenshotUtils cache in background
-      const warmupPromises = recentFiles.map(async ({ filePath }) => {
-        try {
-          await ScreenshotUtils.getCachedScreenshot(filePath);
-          logger.debug(`Warmed up cache for: ${path.basename(filePath)}`);
-        } catch (error) {
-          // Ignore individual warmup failures
-        }
-      });
-
-      await Promise.all(warmupPromises);
-      logger.info(`Background cache warming completed for ${recentFiles.length} screenshots`);
-    } catch (error) {
-      logger.debug(`Background cache warming error: ${(error as Error).message}`);
     }
   }
 
@@ -1245,15 +1191,6 @@ export class ViewHierarchy {
    */
   getElementCenter(element: Element): { x: number, y: number } {
     return this.elementUtils.getElementCenter(element);
-  }
-
-  /**
-   * Find spannable elements within a parent element
-   * @param element - The parent element to search within
-   * @returns Array of spannable elements or null if none found
-   */
-  findSpannables(element: Element): Element[] | null {
-    return this.elementUtils.findSpannables(element);
   }
 
   /**

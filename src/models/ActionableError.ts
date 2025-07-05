@@ -6,12 +6,3 @@ export class ActionableError extends Error {
     super(message);
   }
 }
-
-/**
- * Error thrown when an operation requires root access but the emulator is not rooted
- */
-export class EmulatorNotRootedError extends ActionableError {
-  constructor() {
-    super("Current emulator is not rooted, which is required for precise multi-finger gestures. Please use a rooted emulator image.");
-  }
-}
