@@ -13,32 +13,18 @@ The first platform supported is Android with plans to extend to iOS.
   tool calls with a fast [observations](docs/features/mcp-server/observation.md) to drive the
   [interaction loop](docs/features/mcp-server/interaction-loop.md).
 - 🗺️ **Source Mappping**: Combining project path config with deep view hierarchy analysis we know exactly what code is being rendered.
-- ✍️ **[Automated Test Authoring](docs/features/test-authoring/overview.md)**: When used in test authoring mode AutoMobile will write tests for you. It is the only way it writes tests.
-- 🧪 **[Test Execution](docs/features/test-execution/overview.md)** - Run tests locally or on CI without extra infrastructure.
+- ✍️ **[Automated Test Authoring](docs/features/test-authoring/index.md)**: When used in test authoring mode AutoMobile will write tests for you. It is the only way it writes tests.
+- 🧪 **[Test Execution](docs/features/test-execution/index.md)** - Run tests locally or on CI without extra infrastructure.
 - 📱 **Device Management**: Multi-device support with emulator control and app lifecycle management.
 
 All together you get a system that looks like this:
-  ```mermaid
-  stateDiagram-v2
-      Agent: 🤖 AI Agent
-      RequestHandler: MCP Server 
-      DeviceSessionManager: Device Session Manager
-      InteractionLoop: Interaction Loop
-      AuthorTest: ✍️ Author Test
-      
-      Agent --> RequestHandler
-      RequestHandler --> Agent
-      RequestHandler --> DeviceSessionManager
-      InteractionLoop --> RequestHandler: 🖼️ Processed Results 
-      DeviceSessionManager --> InteractionLoop: 📱
-      RequestHandler --> AuthorTest: on App Stopped
-  ```
+
+<img src="docs/img/automobile_system_design.png" alt="automobile_system_design.png" width="400">
 
 ## Documentation
 
-- 💻 [Installation](docs/installation.md) - AutoMobile is [published on npm](https://www.npmjs.com/package/auto-mobile)
+- 💻 [Installation & Getting Started](docs/installation.md) - AutoMobile is [published on npm](https://www.npmjs.com/package/auto-mobile)
   and we have instructions for agents we've tested with.
-- 🔋 [Batteries Included](docs/features/batteries-included.md) - Minimized and automated setup
 - 📝 [Change Log](CHANGELOG.md) - coming soon
 
 ## Contributing
