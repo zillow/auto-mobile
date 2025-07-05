@@ -2,11 +2,11 @@ import { expect } from "chai";
 import { registerDeepLinkTools } from "../../src/server/deepLinkTools";
 import { ToolRegistry } from "../../src/server/toolRegistry";
 import { EmulatorUtils } from "../../src/utils/emulator";
-import {ObserveScreen} from "../../src/features/observe/ObserveScreen";
-import {Window} from "../../src/features/observe/Window";
-import {AwaitIdle} from "../../src/features/observe/AwaitIdle";
-import {DeviceSessionManager} from "../../src/utils/deviceSessionManager";
-import {ObserveResult} from "../../src/models";
+import { ObserveScreen } from "../../src/features/observe/ObserveScreen";
+import { Window } from "../../src/features/observe/Window";
+import { AwaitIdle } from "../../src/features/observe/AwaitIdle";
+import { DeviceSessionManager } from "../../src/utils/deviceSessionManager";
+import { ObserveResult } from "../../src/models";
 import sinon from "sinon";
 
 // Helper function to check if AVDs are available
@@ -31,8 +31,8 @@ describe("Deep Link Tools Registration", function() {
 
   const mockObserveResult: ObserveResult = {
     timestamp: "2025-01-01T00:00:00.000Z",
-    screenSize: {width: 1080, height: 1920},
-    systemInsets: {top: 0, right: 0, bottom: 0, left: 0},
+    screenSize: { width: 1080, height: 1920 },
+    systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
     viewHierarchy: `
       <hierarchy>
         <node class="android.widget.LinearLayout">
@@ -74,7 +74,7 @@ describe("Deep Link Tools Registration", function() {
 
     // Set up default mock responses
     mockWindow.getCachedActiveWindow.resolves(null);
-    mockWindow.getActive.resolves({appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123});
+    mockWindow.getActive.resolves({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
     mockAwaitIdle.initializeUiStabilityTracking.resolves();
     mockAwaitIdle.waitForUiStability.resolves();
     mockAwaitIdle.waitForUiStabilityWithState.resolves();
