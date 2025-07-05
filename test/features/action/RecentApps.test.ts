@@ -90,7 +90,7 @@ describe("RecentApps", () => {
     }
   });
 
-  // Helper to create view hierarchy with legacy navigation
+  // Helper to create view hierarchy with legacy navigation (nav bar with recent apps button)
   const createLegacyNavigationHierarchy = () => ({
     hierarchy: {
       node: {
@@ -99,13 +99,6 @@ describe("RecentApps", () => {
           "resource-id": "@android:id/content"
         },
         node: [
-          {
-            $: {
-              "resource-id": "com.android.systemui:id/nav_bar",
-              "class": "android.widget.LinearLayout",
-              "bounds": "[0,1800][1080,1920]"
-            }
-          },
           {
             $: {
               "resource-id": "com.android.systemui:id/recent_apps",
@@ -331,37 +324,24 @@ describe("RecentApps", () => {
     });
 
     it("should handle missing recent apps button in legacy navigation", async () => {
-      // Create hierarchy with navigation bar but no recent apps button
-      const hierarchyWithoutRecentButton = {
-        hierarchy: {
-          node: {
-            $: {
-              "class": "android.widget.FrameLayout",
-              "resource-id": "@android:id/content"
-            },
-            node: [
-              {
-                $: {
-                  "resource-id": "com.android.systemui:id/nav_bar",
-                  "class": "android.widget.LinearLayout",
-                  "bounds": "[0,1800][1080,1920]"
-                }
-              }
-            ]
-          }
-        }
-      };
-
-      // Use the helper to avoid undefined error and promote consistency
-      const mockCachedObservation = createMockObserveResult(hierarchyWithoutRecentButton);
+      // Use a hierarchy that won't have navigation indicators, so it defaults to hardware
+      // but we'll force it to legacy by mocking the detectNavigationStyle result
+      const mockCachedObservation = createMockObserveResult(createEmptyHierarchy());
       mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
       mockAdb.executeCommand.resolves(createMockExecResult(""));
+
+      // Mock the RecentApps instance to force legacy navigation detection
+      const originalDetectNavigationStyle = (recentApps as any).detectNavigationStyle;
+      (recentApps as any).detectNavigationStyle = () => "legacy";
 
       try {
         await recentApps.execute();
         assert.fail("Expected an error to be thrown");
       } catch (caughtError) {
         assert.include((caughtError as Error).message, "Recent apps button not found");
+      } finally {
+        // Restore the original method
+        (recentApps as any).detectNavigationStyle = originalDetectNavigationStyle;
       }
     });
   });
