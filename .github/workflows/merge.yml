@@ -82,6 +82,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":junit-runner:test"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -98,11 +99,12 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":kotlinTestAuthor:test"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
   android-accessibility-service-unit-tests:
-    name: "Run KotlinTestAuthor Unit Tests"
+    name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -114,6 +116,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":accessibility-service:testDebugUnitTest"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -166,7 +169,7 @@ jobs:
           path: core/build/outputs/aar/core-debug.aar
 
   build-android-accessibility-service:
-    name: "Run KotlinTestAuthor Unit Tests"
+    name: "Build Accessibility Service"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -178,6 +181,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":accessibility-service:assembleDebug"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
