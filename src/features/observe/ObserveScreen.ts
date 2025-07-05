@@ -198,12 +198,37 @@ export class ObserveScreen {
   }
 
   /**
+   * Collect screenshot and handle errors
+   * @param result - ObserveResult to update
+   */
+  public async collectScreenshot(result: ObserveResult): Promise<void> {
+    try {
+      const screenshotStart = Date.now();
+      const screenshotResult = await this.screenshotUtil.execute();
+
+      if (screenshotResult.success && screenshotResult.path) {
+        result.screenshotPath = screenshotResult.path;
+        logger.debug(`Screenshot capture took ${Date.now() - screenshotStart}ms`);
+      } else {
+        logger.warn("Failed to take screenshot:", screenshotResult.error);
+        this.appendError(result, "Failed to take screenshot");
+      }
+    } catch (error) {
+      logger.warn("Failed to take screenshot:", error);
+      this.appendError(result, "Failed to take screenshot");
+    }
+  }
+
+  /**
    * Collect all observation data with parallelization
    * @param result - ObserveResult to update
    */
   public async collectAllData(result: ObserveResult): Promise<void> {
     // Start dumpsys window fetch early since multiple operations need it
     const dumpsysWindowPromise = this.dumpsysWindow.execute();
+
+    // Take screenshot first since view hierarchy collection needs it
+    await this.collectScreenshot(result);
 
     // Start these operations in parallel while dumpsys is running
     const parallelPromises: Promise<any>[] = [

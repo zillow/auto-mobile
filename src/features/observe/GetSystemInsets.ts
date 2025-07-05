@@ -72,19 +72,12 @@ export class GetSystemInsets {
    */
   async execute(dumpsysWindow: ExecResult): Promise<SystemInsets> {
     try {
-      // Extract just the inset-related lines from the cached output
-      const insetMatches = dumpsysWindow.stdout.match(/inset/);
-      const insetOutput = insetMatches ? insetMatches.join("\n") : "";
-      const insetLines = insetOutput.split("\n").filter(line =>
-        line.toLowerCase().includes("inset") ||
-              line.includes("statusBars") ||
-              line.includes("navigationBars") ||
-              line.includes("systemGestures")
-      ).join("\n");
+      // Use the full dumpsys output since we need to find status bar, nav bar, and gesture lines
+      const fullOutput = dumpsysWindow.stdout;
 
-      const statusBarHeight = this.parseStatusBarHeight(insetLines);
-      const navBarHeight = this.parseNavigationBarHeight(insetLines);
-      const { left: leftInset, right: rightInset } = this.parseGestureInsets(insetLines);
+      const statusBarHeight = this.parseStatusBarHeight(fullOutput);
+      const navBarHeight = this.parseNavigationBarHeight(fullOutput);
+      const { left: leftInset, right: rightInset } = this.parseGestureInsets(fullOutput);
 
       logger.debug("System insets detected from cache: %o", {
         top: statusBarHeight,

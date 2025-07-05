@@ -141,7 +141,7 @@ export class GetScreenSize {
    * Get the screen size and resolution
    * @returns Promise with width and height
    */
-  async execute(dumpsysResult: ExecResult): Promise<ScreenSize> {
+  async execute(dumpsysResult?: ExecResult): Promise<ScreenSize> {
     const cacheKey = this.generateCacheKey(this.deviceId);
 
     // Check memory cache first
@@ -165,7 +165,14 @@ export class GetScreenSize {
       const { width: physicalWidth, height: physicalHeight } = this.parsePhysicalDimensions(stdout);
 
       // Then check the current rotation to determine actual dimensions
-      const rotation = await this.detectDeviceRotation(dumpsysResult);
+      let rotation = 0;
+      if (dumpsysResult) {
+        rotation = await this.detectDeviceRotation(dumpsysResult);
+      } else {
+        // Get dumpsys result if not provided
+        const dumpsysOutput = await this.adb.executeCommand("shell dumpsys window");
+        rotation = await this.detectDeviceRotation(dumpsysOutput);
+      }
 
       const screenSize = this.adjustDimensionsForRotation(physicalWidth, physicalHeight, rotation);
 

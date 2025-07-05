@@ -403,7 +403,7 @@ export class ElementUtils {
     fuzzyMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element | null {
-    if (!viewHierarchy || !text) {
+    if (!viewHierarchy || !text || containerElementId === "") {
       return null;
     }
 
