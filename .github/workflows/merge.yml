@@ -14,20 +14,19 @@ permissions:
   packages: write
 
 jobs:
-# TODO: Fix Node tests on view hierachy sample dumps
-#  validate-xml:
-#    name: "Validate XML"
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: "Git Checkout"
-#        uses: actions/checkout@v4
-#
-#      - name: "Run XMLStarlet"
-#        shell: "bash"
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install xmlstarlet
-#          scripts/xml/validate_xml.sh
+  validate-xml:
+    name: "Validate XML"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Run XMLStarlet"
+        shell: "bash"
+        run: |
+          sudo apt-get update
+          sudo apt-get install xmlstarlet
+          scripts/xml/validate_xml.sh
 
   ktfmt:
     name: "ktfmt"
