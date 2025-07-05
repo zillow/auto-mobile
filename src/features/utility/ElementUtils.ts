@@ -1,7 +1,7 @@
 import { Element } from "../../models/Element";
 import { Point } from "../../models/Point";
 import { ElementBounds, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
-import {logger} from "../../utils/logger";
+import { logger } from "../../utils/logger";
 
 /**
  * Utility class for working with UI elements
