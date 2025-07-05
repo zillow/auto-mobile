@@ -61,4 +61,4 @@ platform tools.
 
 The Model Context Protocol ([MCP](https://modelcontextprotocol.io/introduction)) server is the core component of AutoMobile, built with Node.js and TypeScript using the
 MCP TypeScript SDK. It serves as both a server for AI agents to interact with Android devices and a command-line
-interface for direct usage. You can read more about its setup and system design in our [MCP server docs](mcp-server/overview.md)
+interface for direct usage. You can read more about its setup and system design in our [MCP server docs](mcp-server/index.md)

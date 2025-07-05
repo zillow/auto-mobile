@@ -19,7 +19,7 @@ The first platform supported is Android with plans to extend to iOS.
 
 All together you get a system that looks like this:
 
-<img src="docs/img/automobile_system_design.png" alt="automobile_system_design.png" width="400">
+![automobile_system_design.png](docs/img/automobile_system_design.png)
 
 ## Documentation
 

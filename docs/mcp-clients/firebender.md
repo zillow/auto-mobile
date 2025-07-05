@@ -11,4 +11,4 @@
 }
 ```
 
-<img src="../img/firebender-mcp-server-setup-prod.png" width="400" alt="firebender-mcp-server-setup-prod.png">
+![firebender-mcp-server-setup-prod.png](../img/firebender-mcp-server-setup-prod.png)
