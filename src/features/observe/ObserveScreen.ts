@@ -227,14 +227,11 @@ export class ObserveScreen {
     // Start dumpsys window fetch early since multiple operations need it
     const dumpsysWindowPromise = this.dumpsysWindow.execute();
 
-    // Take screenshot first since view hierarchy collection needs it
-    await this.collectScreenshot(result);
-
     // Start these operations in parallel while dumpsys is running
     const parallelPromises: Promise<any>[] = [
       dumpsysWindowPromise,
       this.collectActiveWindow(result),
-      this.collectViewHierarchy(result),
+      this.collectScreenshot(result),
     ];
 
     const [dumpsysWindow] = await Promise.all(parallelPromises);
@@ -244,6 +241,7 @@ export class ObserveScreen {
       this.collectScreenSize(dumpsysWindow, result),
       this.collectSystemInsets(dumpsysWindow, result),
       this.collectRotationInfo(dumpsysWindow, result),
+      this.collectViewHierarchy(result),
     ];
 
     // Execute all remaining operations in parallel

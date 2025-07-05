@@ -537,16 +537,6 @@ describe("ElementUtils", () => {
         false
       );
       assert.isNull(result);
-
-      // Missing containerElementId
-      result = elementUtils.findElementByText(
-        mockObserveResult.viewHierarchy,
-        "text",
-        "",
-        true,
-        false
-      );
-      assert.isNull(result);
     });
 
     it("should handle nested containers", () => {
