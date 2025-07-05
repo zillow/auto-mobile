@@ -74,55 +74,46 @@ export class BaseVisualChange {
 
     // Get package name for UI stability waiting
     let packageName = options.packageName;
-
-    // Dynamic parallel promises
-    const promises: Promise<any>[] = [];
     const cachedPackageName = (await this.window.getCachedActiveWindow())?.appId;
 
-    // Start optimistic initialization with full active window fetch
-    if (!packageName) {
-      if (cachedPackageName) {
-        packageName = cachedPackageName;
-        logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: ${packageName}`);
-        // Start the initialization in the background
-        promises.push(this.awaitIdle.initializeUiStabilityTracking(
-          packageName,
-          timeoutMs
-        ).catch(error => {
-          logger.debug(`[BaseVisualChange] Optimistic initialization failed: ${error}`);
-          return null;
-        }));
-      } else {
-        logger.info("[BaseVisualChange] There was no cached active window");
-      }
+    // Start all parallel operations immediately
+    const parallelPromises: Promise<any>[] = [];
 
-      logger.info("[BaseVisualChange] No package name provided, attempting to get active window package name...");
-      try {
-        promises.push(
-          this.window.getActive(true)
-            .catch(error => {
-              // If we can't get the active window package name, we'll just wait for touch events
-              packageName = undefined;
-            })
-        );
-      } catch (error) {
-        // If we can't get the active window package name, we'll just wait for touch events
-        packageName = undefined;
-      }
+    // Always start UI stability tracking if we have a cached package name
+    if (!packageName && cachedPackageName) {
+      packageName = cachedPackageName;
+      logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: ${packageName}`);
+      parallelPromises.push(this.awaitIdle.initializeUiStabilityTracking(
+        packageName,
+        timeoutMs
+      ).catch(error => {
+        logger.debug(`[BaseVisualChange] Optimistic initialization failed: ${error}`);
+        return null;
+      }));
     }
 
-    const results = await Promise.all(promises);
-    const resultsSize = results.length;
+    // Always start active window fetch to ensure we have the latest info
+    logger.info("[BaseVisualChange] Starting active window fetch in parallel");
+    parallelPromises.push(
+      this.window.getActive(true).catch(error => {
+        logger.debug(`[BaseVisualChange] Active window fetch failed: ${error}`);
+        return null;
+      })
+    );
 
-    // Get results from promises and cast to correct types
+    // Execute all parallel operations
+    const results = await Promise.all(parallelPromises);
+
+    // Process results
     let initState: any = null;
     let activeWindowResult: ActiveWindowInfo | undefined = undefined;
-    if (resultsSize === 2) {
-      // Both initialization and active window promises were created
+
+    if (results.length === 2) {
+      // Both UI stability and active window promises were created
       initState = results[0];
       activeWindowResult = results[1] as ActiveWindowInfo;
-    } else if (resultsSize === 1) {
-      // Only one promise was created, must be active window promise was created
+    } else if (results.length === 1) {
+      // Only active window promise was created
       activeWindowResult = results[0] as ActiveWindowInfo;
     }
 
@@ -132,17 +123,14 @@ export class BaseVisualChange {
       logger.info(`[BaseVisualChange] Updated package name from active window: ${packageName}`);
     }
 
-    // Only add UI stability waiting if we have a package name
+    // Execute UI stability waiting with appropriate state
     if (packageName && packageName.trim() !== "") {
-      if (packageName !== cachedPackageName) {
-        await this.awaitIdle.waitForUiStability(packageName, timeoutMs);
-      } else {
+      if (initState !== null) {
         await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState);
+      } else {
+        await this.awaitIdle.waitForUiStability(packageName, timeoutMs);
       }
     }
-
-    // Wait for both operations to complete
-    await Promise.all(promises);
 
     return await this.takeObservation(blockResult, previousObserveResult, {
       changeExpected: options.changeExpected,

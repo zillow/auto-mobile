@@ -202,23 +202,27 @@ export class ObserveScreen {
    * @param result - ObserveResult to update
    */
   public async collectAllData(result: ObserveResult): Promise<void> {
-    const basePromises: Promise<any>[] = [
-      this.dumpsysWindow.execute(),
+    // Start dumpsys window fetch early since multiple operations need it
+    const dumpsysWindowPromise = this.dumpsysWindow.execute();
+
+    // Start these operations in parallel while dumpsys is running
+    const parallelPromises: Promise<any>[] = [
+      dumpsysWindowPromise,
       this.collectActiveWindow(result),
       this.collectViewHierarchy(result),
     ];
 
-    const baseResults = await Promise.all(basePromises);
-    const dumpsysWindow = baseResults[0];
+    const [dumpsysWindow] = await Promise.all(parallelPromises);
 
-    const parallelPromises: Promise<void>[] = [
+    // Now run the remaining operations in parallel using the shared dumpsys data
+    const finalPromises: Promise<void>[] = [
       this.collectScreenSize(dumpsysWindow, result),
       this.collectSystemInsets(dumpsysWindow, result),
       this.collectRotationInfo(dumpsysWindow, result),
     ];
 
-    // Execute all operations in parallel
-    await Promise.all(parallelPromises);
+    // Execute all remaining operations in parallel
+    await Promise.all(finalPromises);
   }
 
   /**

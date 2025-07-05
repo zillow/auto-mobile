@@ -25,6 +25,10 @@ export class AdbUtils {
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
   spawnFn: typeof spawn;
 
+  // Static cache for device list
+  private static deviceListCache: { devices: string[], timestamp: number } | null = null;
+  private static readonly DEVICE_LIST_CACHE_TTL = 5000; // 5 seconds
+
   /**
    * Create an AdbUtils instance
    * @param deviceId - Optional device ID
@@ -96,9 +100,9 @@ export class AdbUtils {
       let timeoutId: NodeJS.Timeout;
 
       const timeoutPromise = new Promise<ExecResult>((_, reject) => {
-        timeoutId = setTimeout(() =>
-          reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
-                               timeoutMs
+        timeoutId = setTimeout(
+          () => reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
+          timeoutMs
         );
       });
 
@@ -134,16 +138,33 @@ export class AdbUtils {
    * @returns Promise with an array of device IDs
    */
   async getDevices(): Promise<string[]> {
+    // Check cache first
+    if (AdbUtils.deviceListCache) {
+      const cacheAge = Date.now() - AdbUtils.deviceListCache.timestamp;
+      if (cacheAge < AdbUtils.DEVICE_LIST_CACHE_TTL) {
+        logger.info(`Getting list of connected devices (cached, age: ${cacheAge}ms)`);
+        return AdbUtils.deviceListCache.devices;
+      }
+    }
+
     logger.info("Getting list of connected devices");
     // Use raw ADB command without device ID since we're listing devices
     const result = await this.execAsync("$ANDROID_HOME/platform-tools/adb devices");
     const lines = result.stdout.split("\n").slice(1); // Skip the first line which is the header
 
-    return lines
+    const devices = lines
       .filter(line => line.trim().length > 0)
       .map(line => {
         const parts = line.split("\t");
         return parts[0];
       });
+
+    // Cache the result
+    AdbUtils.deviceListCache = {
+      devices,
+      timestamp: Date.now()
+    };
+
+    return devices;
   }
 }
