@@ -41,8 +41,8 @@ clikt = "5.0.3"
 junit-jupiter-api = "5.11.4"
 junit-vintage-engine = "5.11.4"
 koog-agents = "0.2.1"
-mockk = "1.13.17"
-mockk-android = "1.13.17"
+mockk = "1.14.4"
+mockk-android = "1.14.4"
 robolectric = "4.14.1"
 snakeyaml = "2.3"
 test-junit = "4.13.2"
@@ -57,16 +57,9 @@ kotlinx-serialization-json = "1.7.3"
 kotlin-poet = "2.2.0"
 appcompat = "1.7.1"
 material = "1.12.0"
-constraintlayout = "2.2.1"
-navigation-fragment-ktx = "2.9.0"
-navigation-ui-ktx = "2.9.0"
-annotation = "1.9.1"
-preference = "1.2.0"
 lifecycleViewmodelNavigation3Android = "1.0.0-alpha02"
 
 [plugins]
-sortDependencies = { id = "com.squareup.sort-dependencies", version.ref = "build-gradle-sortDependencies" }
-doctor = { id = "com.osacky.doctor", version.ref = "build-gradle-doctor" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "build-kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "build-kotlin" }
 android-library = { id = "com.android.library", version.ref = "build-android-agp" }
@@ -84,7 +77,6 @@ kgp = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "bui
 agp = { module = "com.android.tools.build:gradle", version.ref = "build-android-agp" }
 
 koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog-agents" }
-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "build-kotlin" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines-test" }
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "build-kotlin-coroutines" }
@@ -93,7 +85,6 @@ kotlinx-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-
 kotlin-poet = { module = "com.squareup:kotlinpoet", version.ref = "kotlin-poet" }
 
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
-mockk-android = { module = "io.mockk:mockk-android", version.ref = "mockk-android" }
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
 
@@ -122,14 +113,8 @@ androidx-junit = { module = "androidx.test.ext:junit", version.ref = "test-andro
 androidx-espresso = { module = "androidx.test.espresso:espresso-core", version.ref = "test-androidx-espresso" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
-androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
-androidx-lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
-androidx-navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigation-fragment-ktx" }
-androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigation-ui-ktx" }
-androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "annotation" }
-androidx-preference = { group = "androidx.preference", name = "preference", version.ref = "preference" }
 
 # Media libraries
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
@@ -144,11 +129,6 @@ androidx-lifecycle-viewmodel-navigation3-android = { group = "androidx.lifecycle
 # Libraries can be bundled together for easier import
 [bundles]
 kotlinx-ecosystem = ["kotlinx-datetime", "kotlinx-serialization", "kotlinx-coroutines"]
-kotlin = [
-  "kotlin-stdlib-jdk8",
-  "kotlinx-datetime",
-  "kotlinx-coroutines"
-]
 compose-ui = [
   "androidx-activity-compose",
   "compose-ui-core",
@@ -174,7 +154,6 @@ unit-test = [
   "kotlinx-coroutines",
   "kotlinx-coroutines-test",
   "mockk",
-  "mockk-android"
 ]
 media-libraries = [
   "coil-compose",

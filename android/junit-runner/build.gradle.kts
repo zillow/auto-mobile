@@ -42,7 +42,6 @@ dependencies {
   testImplementation(libs.bundles.unit.test)
   testImplementation(libs.junit.jupiter)
   testImplementation(libs.junit.vintage.engine) // For JUnit 4 compatibility
-  testImplementation(libs.mockk)
 }
 
 // Configure Kotlin compilation options
