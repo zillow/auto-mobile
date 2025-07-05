@@ -37,14 +37,14 @@ export class TapOnElement extends BaseVisualChange {
   }
 
   findElementToTap(options: TapOnElementOptions, viewHierarchy: ViewHierarchyResult): Element {
-    if (options.text && options.text.text) {
+    if (options.text) {
       // Find the UI element that contains the text
       const element = this.elementUtils.findElementByText(
         viewHierarchy,
-        options.text.text,
+        options.text,
         options.containerElementId,
-        options.text.fuzzyMatch,
-        options.text.caseSensitive
+        true,
+        false,
       );
 
       if (!element) {
@@ -52,11 +52,11 @@ export class TapOnElement extends BaseVisualChange {
       }
 
       return element;
-    } else if (options.elementId && options.elementId.id) {
+    } else if (options.elementId) {
       // Find the UI element that matches the id
       const elements = this.elementUtils.findElementsByResourceId(
         viewHierarchy,
-        options.elementId.id,
+        options.elementId,
         options.containerElementId,
       );
 
@@ -65,10 +65,8 @@ export class TapOnElement extends BaseVisualChange {
       }
 
       return elements[0];
-    } else if (options.text) {
-      throw new ActionableError(`tapOn with text requires non-blank text value to interact with`);
     } else {
-      throw new ActionableError(`tapOn with resourceId requires non-blank id to interact with`);
+      throw new ActionableError(`tapOn requires non-blank text or elementId to interact with`);
     }
   }
 
@@ -134,7 +132,7 @@ export class TapOnElement extends BaseVisualChange {
         }
       );
     } catch (error) {
-      throw new ActionableError(`Failed to perform tap on element`);
+      throw new ActionableError(`Failed to perform tap on element: ${error}`);
     }
   }
 }

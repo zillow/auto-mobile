@@ -47,20 +47,10 @@ export interface OpenLinkArgs {
 }
 
 export interface TapOnArgs {
-  containerElementId: string;
-  text?: SearchForTextArgs;
-  id?: SearchForIdArgs;
+  containerElementId?: string;
+  text?: string;
+  id?: string;
   action: "tap" | "doubleTap" | "longPress" | "focus";
-}
-
-export interface SearchForIdArgs {
-  id: string;
-}
-
-export interface SearchForTextArgs {
-  text: string;
-  fuzzyMatch: boolean;
-  caseSensitive: boolean;
 }
 
 export interface SwipeOnScreenArgs {
@@ -70,7 +60,7 @@ export interface SwipeOnScreenArgs {
 }
 
 export interface SwipeOnElementArgs {
-  containerElementId: string;
+  containerElementId?: string;
   elementId: string;
   direction: "up" | "down" | "left" | "right";
   duration: number;
@@ -112,19 +102,14 @@ export const shakeSchema = z.object({
 });
 
 export const tapOnSchema = z.object({
-  containerElementId: z.string().describe("Container element ID to restrict the search within"),
-  text: z.object({
-    text: z.string().describe("Text to tap on"),
-    fuzzyMatch: z.boolean().describe("Use fuzzy text matching"),
-    caseSensitive: z.boolean().describe("Use case-sensitive text matching")
-  }).optional().describe("Text search parameters"),
-  id: z.object({
-    id: z.string().describe("Element ID to tap on")
-  }).optional().describe("ID search parameters")
+  containerElementId: z.string().optional().describe("Container element ID to restrict the search within"),
+  action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action to perform on the element"),
+  text: z.string().optional().describe("Text to tap on"),
+  id: z.string().optional().describe("Element ID to tap on")
 });
 
 export const swipeOnElementSchema = z.object({
-  containerElementId: z.string().describe("Container element ID to restrict the search within"),
+  containerElementId: z.string().optional().describe("Container element ID to restrict the search within"),
   elementId: z.string().describe("ID of the element to swipe on"),
   direction: z.enum(["up", "down", "left", "right"]).describe("Direction to swipe"),
   duration: z.number().describe("Duration of the swipe in milliseconds")
@@ -718,7 +703,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "tapOn",
-    "Unified tap command supporting text, and selectors",
+    "Tap supporting text or resourceId",
     tapOnSchema,
     tapOnHandler,
     true // Supports progress notifications

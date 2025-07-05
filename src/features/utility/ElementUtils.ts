@@ -1,6 +1,7 @@
 import { Element } from "../../models/Element";
 import { Point } from "../../models/Point";
 import { ElementBounds, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
+import {logger} from "../../utils/logger";
 
 /**
  * Utility class for working with UI elements
@@ -398,11 +399,11 @@ export class ElementUtils {
   findElementByText(
     viewHierarchy: ViewHierarchyResult,
     text: string,
-    containerElementId: string,
+    containerElementId: string | null = null,
     fuzzyMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element | null {
-    if (!viewHierarchy || !text || !containerElementId) {
+    if (!viewHierarchy || !text) {
       return null;
     }
 
@@ -413,52 +414,54 @@ export class ElementUtils {
 
     // First find the container node
     let containerNode: any = null;
-    for (const rootNode of rootNodes) {
-      this.traverseNode(rootNode, (node: any) => {
+    if (containerElementId) {
+      for (const rootNode of rootNodes) {
+        this.traverseNode(rootNode, (node: any) => {
+          if (containerNode) {
+            return; // Already found
+          }
+
+          const nodeProperties = this.extractNodeProperties(node);
+          const nodeResourceId = nodeProperties["resource-id"];
+
+          if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
+            containerNode = node;
+          }
+        });
         if (containerNode) {
-          return; // Already found
+          break;
         }
-
-        const nodeProperties = this.extractNodeProperties(node);
-        const nodeResourceId = nodeProperties["resource-id"];
-
-        if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
-          containerNode = node;
-        }
-      });
-      if (containerNode) {
-        break;
       }
-    }
 
-    if (!containerNode) {
-      // Container not found, return null
-      return null;
+      if (!containerNode) {
+        // Container not found, return null
+        return null;
+      }
+    } else {
+      containerNode = rootNodes[0];
     }
 
     // Search only within the container node's subtree
     this.traverseNode(containerNode, (node: any) => {
       const nodeProperties = this.extractNodeProperties(node);
 
-      let isMatch = false;
-
       // Check text attribute
       if (nodeProperties.text && typeof nodeProperties.text === "string" && matchesText(nodeProperties.text)) {
-        isMatch = true;
-      }
-
-      // Check content-desc attribute
-      if (!isMatch && nodeProperties["content-desc"] &&
-        typeof nodeProperties["content-desc"] === "string" &&
-        matchesText(nodeProperties["content-desc"])) {
-        isMatch = true;
-      }
-
-      if (isMatch) {
+        logger.info("[Element] Matches text property");
         const parsedNode = this.parseNodeBounds(node);
         if (parsedNode) {
           matches.push(parsedNode);
         }
+      } else if (nodeProperties["content-desc"] &&
+        typeof nodeProperties["content-desc"] === "string" &&
+        matchesText(nodeProperties["content-desc"])) {
+        logger.info("[Element] Matches content-desc property");
+        const parsedNode = this.parseNodeBounds(node);
+        if (parsedNode) {
+          matches.push(parsedNode);
+        }
+      } else {
+        logger.info(`[Element] No match found in properties: ${nodeProperties}`);
       }
     });
 
@@ -505,7 +508,7 @@ export class ElementUtils {
   findElementsByResourceId(
     viewHierarchy: ViewHierarchyResult,
     resourceId: string,
-    containerElementId: string,
+    containerElementId: string | null = null,
     partialMatch: boolean = false
   ): Element[] {
     if (!viewHierarchy || !resourceId) {
@@ -517,27 +520,31 @@ export class ElementUtils {
 
     // First find the container node
     let containerNode: any = null;
-    for (const rootNode of rootNodes) {
-      this.traverseNode(rootNode, (node: any) => {
+    if (containerElementId) {
+      for (const rootNode of rootNodes) {
+        this.traverseNode(rootNode, (node: any) => {
+          if (containerNode) {
+            return; // Already found
+          }
+
+          const nodeProperties = this.extractNodeProperties(node);
+          const nodeResourceId = nodeProperties["resource-id"];
+
+          if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
+            containerNode = node;
+          }
+        });
         if (containerNode) {
-          return; // Already found
+          break;
         }
-
-        const nodeProperties = this.extractNodeProperties(node);
-        const nodeResourceId = nodeProperties["resource-id"];
-
-        if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
-          containerNode = node;
-        }
-      });
-      if (containerNode) {
-        break;
       }
-    }
 
-    if (!containerNode) {
-      // Container not found, return empty list
-      return [];
+      if (!containerNode) {
+        // Container not found, return empty list
+        return [];
+      }
+    } else {
+      containerNode = rootNodes[0];
     }
 
     // Search only within the container node's subtree

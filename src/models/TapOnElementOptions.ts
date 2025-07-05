@@ -3,22 +3,12 @@
  */
 export interface TapOnElementOptions {
   // Element selection - one of these must be provided
-  text?: SearchForTextArgs;
-  elementId?: SearchForIdArgs;
+  text?: string;
+  elementId?: string;
 
   // Container to restrict search
-  containerElementId: string;
+  containerElementId?: string;
 
   // Action to perform
   action: "tap" | "doubleTap" | "longPress" | "focus";
-}
-
-export interface SearchForIdArgs {
-  id: string;
-}
-
-export interface SearchForTextArgs {
-  text: string;
-  fuzzyMatch: boolean;
-  caseSensitive: boolean;
 }
