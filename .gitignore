@@ -25,4 +25,4 @@ npm-debug.log*
 docs/changelog.md
 docs/contributing/index.md
 
-
+/.cache
