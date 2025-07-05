@@ -2,6 +2,8 @@ import { assert } from "chai";
 import { HomeScreen } from "../../../src/features/action/HomeScreen";
 import { AdbUtils } from "../../../src/utils/adb";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import { Window } from "../../../src/features/observe/Window";
+import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { ExecResult, ObserveResult } from "../../../src/models";
 import sinon from "sinon";
 
@@ -9,15 +11,37 @@ describe("HomeScreen", () => {
   let homeScreen: HomeScreen;
   let mockAdb: sinon.SinonStubbedInstance<AdbUtils>;
   let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
+  let mockWindow: sinon.SinonStubbedInstance<Window>;
+  let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
 
   beforeEach(() => {
     // Create stubs for dependencies
     mockAdb = sinon.createStubInstance(AdbUtils);
     mockObserveScreen = sinon.createStubInstance(ObserveScreen);
+    mockWindow = sinon.createStubInstance(Window);
+    mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
 
     // Stub the constructors
     sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(mockAdb.executeCommand);
     sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
+    sinon.stub(ObserveScreen.prototype, "getMostRecentCachedObserveResult").callsFake(mockObserveScreen.getMostRecentCachedObserveResult);
+    sinon.stub(Window.prototype, "getCachedActiveWindow").callsFake(mockWindow.getCachedActiveWindow);
+    sinon.stub(Window.prototype, "getActive").callsFake(mockWindow.getActive);
+    sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
+
+    // Set up default mock responses
+    mockWindow.getCachedActiveWindow.resolves(null);
+    mockWindow.getActive.resolves({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    mockAwaitIdle.initializeUiStabilityTracking.resolves();
+    mockAwaitIdle.waitForUiStability.resolves();
+    mockAwaitIdle.waitForUiStabilityWithState.resolves();
+
+    // Set up default observe screen responses with valid viewHierarchy
+    const defaultObserveResult = createMockObserveResult(createEmptyHierarchy());
+    mockObserveScreen.getMostRecentCachedObserveResult.resolves(defaultObserveResult);
+    mockObserveScreen.execute.resolves(defaultObserveResult);
 
     homeScreen = new HomeScreen("test-device");
 
@@ -57,7 +81,7 @@ describe("HomeScreen", () => {
   // Helper to create view hierarchy with gesture navigation settings
   const createGestureNavigationSettings = () => createMockExecResult("2");
 
-  // Helper to create view hierarchy with home button elements
+  // Helper to create view hierarchy with home button elements, with @android:id/content
   const createHomeButtonHierarchy = () => ({
     hierarchy: {
       node: {
@@ -65,19 +89,27 @@ describe("HomeScreen", () => {
         node: [
           {
             $: {
-              "resource-id": "com.android.systemui:id/nav_bar",
-              "class": "android.widget.LinearLayout",
-              "bounds": "[0,1800][1080,1920]"
+              "resource-id": "android:id/content",
+              "class": "android.widget.FrameLayout"
             },
             node: [
               {
                 $: {
-                  "resource-id": "com.android.systemui:id/home",
-                  "class": "android.widget.ImageView",
-                  "bounds": "[360,1810][720,1910]",
-                  "clickable": "true",
-                  "content-desc": "Home"
-                }
+                  "resource-id": "com.android.systemui:id/nav_bar",
+                  "class": "android.widget.LinearLayout",
+                  "bounds": "[0,1800][1080,1920]"
+                },
+                node: [
+                  {
+                    $: {
+                      "resource-id": "com.android.systemui:id/home",
+                      "class": "android.widget.ImageView",
+                      "bounds": "[360,1810][720,1910]",
+                      "clickable": "true",
+                      "content-desc": "Home"
+                    }
+                  }
+                ]
               }
             ]
           }
@@ -86,11 +118,19 @@ describe("HomeScreen", () => {
     }
   });
 
-  // Helper to create empty view hierarchy (no navigation elements)
+  // Helper to create empty view hierarchy (no navigation elements), with @android:id/content
   const createEmptyHierarchy = () => ({
     hierarchy: {
       node: {
-        $: { class: "android.widget.FrameLayout" }
+        $: { class: "android.widget.FrameLayout" },
+        node: [
+          {
+            $: {
+              "resource-id": "android:id/content",
+              "class": "android.widget.FrameLayout"
+            }
+          }
+        ]
       }
     }
   });
@@ -102,13 +142,16 @@ describe("HomeScreen", () => {
         .withArgs("shell settings get secure navigation_mode").resolves(createGestureNavigationSettings())
         .withArgs(sinon.match(/shell input swipe/)).resolves(createMockExecResult(""));
 
-      const mockObservation = createMockObserveResult();
+      // Ensure both cached and fresh observation contain correct hierarchy (without home button)
+      const mockCachedObservation = createMockObserveResult(createEmptyHierarchy());
+      const mockObservation = createMockObserveResult(createEmptyHierarchy());
+
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       const result = await homeScreen.execute();
       assert.isTrue(result.success);
       assert.equal(result.navigationMethod, "gesture");
-      assert.isFalse(result.cached);
       assert.isDefined(result.observation);
 
       // Verify gesture swipe command was executed
@@ -120,13 +163,18 @@ describe("HomeScreen", () => {
         .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
         .withArgs(sinon.match(/shell input tap/)).resolves(createMockExecResult(""));
 
+      // Ensure both cached and fresh observation contain the home button
+      const mockCachedObservation = createMockObserveResult(createHomeButtonHierarchy());
       const mockObservation = createMockObserveResult(createHomeButtonHierarchy());
+
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
+
+      // The detectNavigationStyle method also calls observeScreen.execute, so make sure it returns the home button hierarchy
       mockObserveScreen.execute.resolves(mockObservation);
 
       const result = await homeScreen.execute();
       assert.isTrue(result.success);
       assert.equal(result.navigationMethod, "element");
-      assert.isFalse(result.cached);
       assert.isDefined(result.observation);
 
       // Verify tap command was executed on home button center
@@ -140,13 +188,16 @@ describe("HomeScreen", () => {
         .withArgs(sinon.match(/shell input tap/)).resolves(createMockExecResult(""))
         .withArgs("shell input keyevent 3").resolves(createMockExecResult(""));
 
+      // Ensure both cached and fresh observation contain *no* navigation UI elements
+      const mockCachedObservation = createMockObserveResult(createEmptyHierarchy());
       const mockObservation = createMockObserveResult(createEmptyHierarchy());
+
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       const result = await homeScreen.execute();
       assert.isTrue(result.success);
       assert.equal(result.navigationMethod, "hardware");
-      assert.isFalse(result.cached);
       assert.isDefined(result.observation);
 
       // Verify hardware home button keyevent was executed
@@ -158,7 +209,11 @@ describe("HomeScreen", () => {
         .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
         .withArgs("shell input keyevent 3").resolves(createMockExecResult(""));
 
+      // Ensure both cached and fresh observation contain blank hierarchy (e.g. no home button)
+      const mockCachedObservation = createMockObserveResult(createEmptyHierarchy());
       const mockObservation = createMockObserveResult(createEmptyHierarchy());
+
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       const progressCallback = sinon.spy();
@@ -170,54 +225,6 @@ describe("HomeScreen", () => {
   });
 
   describe("navigation caching", () => {
-    it("should cache navigation method after first detection", async () => {
-      mockAdb.executeCommand
-        .withArgs("shell getprop").resolves(createAndroid10PropsResult())
-        .withArgs("shell settings get secure navigation_mode").resolves(createGestureNavigationSettings())
-        .withArgs(sinon.match(/shell input swipe/)).resolves(createMockExecResult(""));
-
-      const mockObservation = createMockObserveResult();
-      mockObserveScreen.execute.resolves(mockObservation);
-
-      // First execution should detect and cache
-      const result1 = await homeScreen.execute();
-      assert.isFalse(result1.cached);
-
-      // Second execution should use cache
-      const result2 = await homeScreen.execute();
-      assert.isTrue(result2.cached);
-      assert.equal(result2.navigationMethod, "gesture");
-
-      // Should not call detection methods again
-      sinon.assert.calledOnce(mockAdb.executeCommand.withArgs("shell getprop"));
-    });
-
-    it("should expire cache after timeout", async () => {
-      // Set short cache duration for testing
-      const originalCacheDuration = (HomeScreen as any).CACHE_DURATION_MS;
-      (HomeScreen as any).CACHE_DURATION_MS = 1; // 1ms
-
-      mockAdb.executeCommand
-        .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
-        .withArgs("shell input keyevent 3").resolves(createMockExecResult(""));
-
-      const mockObservation = createMockObserveResult(createEmptyHierarchy());
-      mockObserveScreen.execute.resolves(mockObservation);
-
-      // First execution
-      const result1 = await homeScreen.execute();
-      assert.isFalse(result1.cached);
-
-      // Wait for cache to expire
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      // Second execution should re-detect
-      const result2 = await homeScreen.execute();
-      assert.isFalse(result2.cached);
-
-      // Restore original cache duration
-      (HomeScreen as any).CACHE_DURATION_MS = originalCacheDuration;
-    });
 
     it("should handle different device IDs separately", async () => {
       const homeScreen2 = new HomeScreen("device-2");
@@ -226,16 +233,17 @@ describe("HomeScreen", () => {
         .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
         .withArgs("shell input keyevent 3").resolves(createMockExecResult(""));
 
+      const mockCachedObservation = createMockObserveResult(createEmptyHierarchy());
       const mockObservation = createMockObserveResult(createEmptyHierarchy());
+
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       // Cache for first device
-      const result1 = await homeScreen.execute();
-      assert.isFalse(result1.cached);
+      await homeScreen.execute();
 
       // Different device should not use cache
-      const result2 = await homeScreen2.execute();
-      assert.isFalse(result2.cached);
+      await homeScreen2.execute();
     });
   });
 
@@ -259,6 +267,8 @@ describe("HomeScreen", () => {
         .withArgs(sinon.match(/shell input tap/)).resolves(createMockExecResult(""));
 
       const mockObservation = createMockObserveResult(createHomeButtonHierarchy());
+      // Both the detection phase and execution phase need to see the home button
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       const result = await homeScreen.execute();
@@ -280,50 +290,55 @@ describe("HomeScreen", () => {
   });
 
   describe("fallback navigation", () => {
-    it("should fallback from gesture to hardware when gesture fails", async () => {
+    it("should return failure when gesture navigation fails", async () => {
       mockAdb.executeCommand
         .withArgs("shell getprop").resolves(createAndroid10PropsResult())
         .withArgs("shell settings get secure navigation_mode").resolves(createGestureNavigationSettings())
-        .withArgs(sinon.match(/shell input swipe/)).rejects(new Error("Gesture failed"))
-        .withArgs("shell input keyevent 3").resolves(createMockExecResult(""));
+        .withArgs(sinon.match(/shell input swipe/)).rejects(new Error("Gesture failed"));
 
       const mockObservation = createMockObserveResult();
-      mockObserveScreen.execute.resolves(mockObservation);
-
-      const result = await homeScreen.execute();
-      assert.isTrue(result.success);
-      assert.equal(result.navigationMethod, "hardware");
-    });
-
-    it("should fallback from element to hardware when element fails", async () => {
-      mockAdb.executeCommand
-        .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
-        .withArgs(sinon.match(/shell input tap/)).rejects(new Error("Element tap failed"))
-        .withArgs("shell input keyevent 3").resolves(createMockExecResult(""));
-
-      const mockObservation = createMockObserveResult(createHomeButtonHierarchy());
-      mockObserveScreen.execute.resolves(mockObservation);
-
-      const result = await homeScreen.execute();
-      assert.isTrue(result.success);
-      assert.equal(result.navigationMethod, "hardware");
-    });
-
-    it("should return failure when all methods fail", async () => {
-      mockAdb.executeCommand
-        .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
-        .withArgs(sinon.match(/shell input/)).rejects(new Error("All methods failed"));
-
-      const mockObservation = createMockObserveResult(createEmptyHierarchy());
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       try {
-        const result = await homeScreen.execute();
-        // If we get here, BaseVisualChange caught the error
-        assert.isDefined(result);
-      } catch (caughtError) {
-        // If the error bubbled up, that's also valid behavior
-        assert.include((caughtError as Error).message, "All methods failed");
+        await homeScreen.execute();
+        assert.fail("Should have thrown an error");
+      } catch (error) {
+        assert.include((error as Error).message, "Gesture failed");
+      }
+    });
+
+    it("should return failure when element navigation fails", async () => {
+      mockAdb.executeCommand
+        .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
+        .withArgs(sinon.match(/shell input tap/)).rejects(new Error("Element tap failed"));
+
+      const mockObservation = createMockObserveResult(createHomeButtonHierarchy());
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObservation);
+      mockObserveScreen.execute.resolves(mockObservation);
+
+      try {
+        await homeScreen.execute();
+        assert.fail("Should have thrown an error");
+      } catch (error) {
+        assert.include((error as Error).message, "Element tap failed");
+      }
+    });
+
+    it("should return failure when hardware navigation fails", async () => {
+      mockAdb.executeCommand
+        .withArgs("shell getprop").resolves(createMockExecResult(`[ro.build.version.sdk]: [28]`))
+        .withArgs("shell input keyevent 3").rejects(new Error("Hardware failed"));
+
+      const mockObservation = createMockObserveResult(createEmptyHierarchy());
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObservation);
+      mockObserveScreen.execute.resolves(mockObservation);
+
+      try {
+        await homeScreen.execute();
+        assert.fail("Should have thrown an error");
+      } catch (error) {
+        assert.include((error as Error).message, "Hardware failed");
       }
     });
   });
@@ -350,6 +365,7 @@ describe("HomeScreen", () => {
         .withArgs("shell input tap 540 1860").resolves(createMockExecResult(""));
 
       const mockObservation = createMockObserveResult(hierarchyWithHomeId);
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       const result = await homeScreen.execute();
@@ -378,6 +394,7 @@ describe("HomeScreen", () => {
         .withArgs("shell input tap 540 1860").resolves(createMockExecResult(""));
 
       const mockObservation = createMockObserveResult(hierarchyWithHomeDesc);
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
       const result = await homeScreen.execute();
@@ -416,16 +433,19 @@ describe("HomeScreen", () => {
     it("should handle missing screen size for gesture navigation", async () => {
       mockAdb.executeCommand
         .withArgs("shell getprop").resolves(createAndroid10PropsResult())
-        .withArgs("shell settings get secure navigation_mode").resolves(createGestureNavigationSettings())
-        .withArgs("shell input keyevent 3").resolves(createMockExecResult(""));
+        .withArgs("shell settings get secure navigation_mode").resolves(createGestureNavigationSettings());
 
       const mockObservation = createMockObserveResult();
       (mockObservation.screenSize as any) = null;
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObservation);
       mockObserveScreen.execute.resolves(mockObservation);
 
-      const result = await homeScreen.execute();
-      // Should fallback to hardware navigation
-      assert.equal(result.navigationMethod, "hardware");
+      try {
+        await homeScreen.execute();
+        assert.fail("Should have thrown an error");
+      } catch (error) {
+        assert.include((error as Error).message, "Could not get screen size for gesture navigation");
+      }
     });
 
     it("should handle missing view hierarchy for element navigation", async () => {

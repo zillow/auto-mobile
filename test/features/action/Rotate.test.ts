@@ -2,6 +2,7 @@ import { assert } from "chai";
 import { Rotate } from "../../../src/features/action/Rotate";
 import { AdbUtils } from "../../../src/utils/adb";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import {Window} from "../../../src/features/observe/Window";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { ExecResult, ObserveResult } from "../../../src/models";
 import sinon from "sinon";
@@ -10,23 +11,40 @@ describe("Rotate", () => {
   let rotate: Rotate;
   let mockAdb: sinon.SinonStubbedInstance<AdbUtils>;
   let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
+  let mockWindow: sinon.SinonStubbedInstance<Window>;
   let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
+
 
   beforeEach(() => {
     // Create stubs for dependencies
     mockAdb = sinon.createStubInstance(AdbUtils);
     mockObserveScreen = sinon.createStubInstance(ObserveScreen);
+    mockWindow = sinon.createStubInstance(Window);
     mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
 
     // Stub the constructors
     sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(mockAdb.executeCommand);
     sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
-    sinon.stub(AwaitIdle.prototype, "waitForRotation").callsFake(mockAwaitIdle.waitForRotation);
+    sinon.stub(ObserveScreen.prototype, "getMostRecentCachedObserveResult").callsFake(mockObserveScreen.getMostRecentCachedObserveResult);
+    sinon.stub(Window.prototype, "getCachedActiveWindow").callsFake(mockWindow.getCachedActiveWindow);
+    sinon.stub(Window.prototype, "getActive").callsFake(mockWindow.getActive);
+    sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
     sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
+    sinon.stub(AwaitIdle.prototype, "waitForRotation").callsFake(mockAwaitIdle.waitForRotation);
 
-    // Set up default mock implementations
-    mockAwaitIdle.waitForRotation.resolves();
+    // Set up default mock responses
+    mockWindow.getCachedActiveWindow.resolves(null);
+    mockWindow.getActive.resolves({appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123});
+    mockAwaitIdle.initializeUiStabilityTracking.resolves();
     mockAwaitIdle.waitForUiStability.resolves();
+    mockAwaitIdle.waitForUiStabilityWithState.resolves();
+    mockAwaitIdle.waitForRotation.resolves();
+
+    // Set up default observe screen responses with valid viewHierarchy
+    const defaultObserveResult = createMockObserveResult();
+    mockObserveScreen.getMostRecentCachedObserveResult.resolves(defaultObserveResult);
+    mockObserveScreen.execute.resolves(defaultObserveResult);
 
     rotate = new Rotate("test-device");
   });

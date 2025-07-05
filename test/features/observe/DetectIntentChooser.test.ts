@@ -2,12 +2,17 @@ import { expect } from "chai";
 import { DetectIntentChooser } from "../../../src/features/observe/DetectIntentChooser";
 import { DeepLinkManager } from "../../../src/utils/deepLinkManager";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import { Window } from "../../../src/features/observe/Window";
+import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { ObserveResult } from "../../../src/models";
+import sinon from "sinon";
 
 describe("DetectIntentChooser", () => {
   let detectIntentChooser: DetectIntentChooser;
   let mockDeepLinkManager: DeepLinkManager;
-  let mockObserveScreen: ObserveScreen;
+  let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
+  let mockWindow: sinon.SinonStubbedInstance<Window>;
+  let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
 
   const mockObserveResult: ObserveResult = {
     timestamp: "2025-01-01T00:00:00.000Z",
@@ -25,6 +30,29 @@ describe("DetectIntentChooser", () => {
   };
 
   beforeEach(() => {
+    // Create stubs for dependencies
+    mockObserveScreen = sinon.createStubInstance(ObserveScreen);
+    mockWindow = sinon.createStubInstance(Window);
+    mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
+
+    // Stub the constructors
+    sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
+    sinon.stub(ObserveScreen.prototype, "getMostRecentCachedObserveResult").callsFake(mockObserveScreen.getMostRecentCachedObserveResult);
+    sinon.stub(Window.prototype, "getCachedActiveWindow").callsFake(mockWindow.getCachedActiveWindow);
+    sinon.stub(Window.prototype, "getActive").callsFake(mockWindow.getActive);
+    sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
+
+    // Set up default mock responses
+    mockWindow.getCachedActiveWindow.resolves(null);
+    mockWindow.getActive.resolves({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    mockAwaitIdle.initializeUiStabilityTracking.resolves();
+    mockAwaitIdle.waitForUiStability.resolves();
+    mockAwaitIdle.waitForUiStabilityWithState.resolves();
+    mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObserveResult);
+    mockObserveScreen.execute.resolves(mockObserveResult);
+
     // Create DetectIntentChooser instance
     detectIntentChooser = new DetectIntentChooser("test-device");
 
@@ -52,14 +80,12 @@ describe("DetectIntentChooser", () => {
       }
     } as any;
 
-    // Create mock ObserveScreen
-    mockObserveScreen = {
-      execute: async () => mockObserveResult
-    } as any;
-
     // Replace the internal managers with our mocks
     (detectIntentChooser as any).deepLinkManager = mockDeepLinkManager;
-    (detectIntentChooser as any).observeScreen = mockObserveScreen;
+  });
+
+  afterEach(() => {
+    sinon.restore();
   });
 
   describe("constructor", () => {
@@ -71,23 +97,15 @@ describe("DetectIntentChooser", () => {
 
   describe("execute", () => {
     it("should detect intent chooser when provided with view hierarchy", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity">
-            <node text="Choose an app" />
-          </node>
-        </hierarchy>
-      `;
-
-      const result = await detectIntentChooser.execute(viewHierarchy);
+      const result = await detectIntentChooser.execute();
 
       expect(result.success).to.be.true;
       expect(result.detected).to.be.true;
-      expect(result.observation).to.be.null;
+      expect(result.observation).to.equal(mockObserveResult);
     });
 
     it("should not detect intent chooser in normal app view hierarchy", async () => {
-      const viewHierarchy = `
+      const normalViewHierarchy = `
         <hierarchy>
           <node class="android.widget.LinearLayout">
             <node text="Normal app content" />
@@ -95,11 +113,19 @@ describe("DetectIntentChooser", () => {
         </hierarchy>
       `;
 
-      const result = await detectIntentChooser.execute(viewHierarchy);
+      const normalObserveResult = {
+        ...mockObserveResult,
+        viewHierarchy: normalViewHierarchy
+      };
+
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(normalObserveResult);
+      mockObserveScreen.execute.resolves(normalObserveResult);
+
+      const result = await detectIntentChooser.execute();
 
       expect(result.success).to.be.true;
       expect(result.detected).to.be.false;
-      expect(result.observation).to.be.null;
+      expect(result.observation).to.equal(normalObserveResult);
     });
 
     it("should observe screen when no view hierarchy provided", async () => {
@@ -111,31 +137,31 @@ describe("DetectIntentChooser", () => {
     });
 
     it("should handle observe screen failure", async () => {
-      // Mock observe screen to fail
-      mockObserveScreen.execute = async () => {
-        throw new Error("Failed to observe screen");
-      };
+      // Mock getMostRecentCachedObserveResult to fail
+      mockObserveScreen.getMostRecentCachedObserveResult.rejects(new Error("Failed to get cached result"));
 
-      const result = await detectIntentChooser.execute();
-
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.false;
-      expect(result.error).to.include("Failed to observe screen");
+      try {
+        await detectIntentChooser.execute();
+        expect.fail("Expected an error to be thrown");
+      } catch (error) {
+        expect((error as Error).message).to.include("Cannot perform action without view hierarchy");
+      }
     });
 
     it("should handle observe screen returning null view hierarchy", async () => {
       // Mock observe screen to return result without view hierarchy
-      mockObserveScreen.execute = async () => ({
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves({
         timestamp: "2025-01-01T00:00:00.000Z",
         screenSize: { width: 1080, height: 1920 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
-      });
+      } as ObserveResult);
 
-      const result = await detectIntentChooser.execute();
-
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.false;
-      expect(result.error).to.include("Could not get view hierarchy");
+      try {
+        await detectIntentChooser.execute();
+        expect.fail("Expected an error to be thrown");
+      } catch (error) {
+        expect((error as Error).message).to.include("Cannot perform action without view hierarchy");
+      }
     });
 
     it("should handle deep link manager detection failure", async () => {
@@ -144,13 +170,7 @@ describe("DetectIntentChooser", () => {
         throw new Error("Detection failed");
       };
 
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity" />
-        </hierarchy>
-      `;
-
-      const result = await detectIntentChooser.execute(viewHierarchy);
+      const result = await detectIntentChooser.execute();
 
       expect(result.success).to.be.false;
       expect(result.detected).to.be.false;
@@ -167,7 +187,12 @@ describe("DetectIntentChooser", () => {
       ];
 
       for (const viewHierarchy of testCases) {
-        const result = await detectIntentChooser.execute(viewHierarchy);
+        mockObserveScreen.getMostRecentCachedObserveResult.resolves({
+          ...mockObserveResult,
+          viewHierarchy
+        });
+
+        const result = await detectIntentChooser.execute();
         expect(result.success).to.be.true;
         expect(result.detected).to.be.true;
       }
@@ -181,7 +206,12 @@ describe("DetectIntentChooser", () => {
       ];
 
       for (const viewHierarchy of testCases) {
-        const result = await detectIntentChooser.execute(viewHierarchy);
+        mockObserveScreen.getMostRecentCachedObserveResult.resolves({
+          ...mockObserveResult,
+          viewHierarchy
+        });
+
+        const result = await detectIntentChooser.execute();
         expect(result.success).to.be.true;
         expect(result.detected).to.be.false;
       }

@@ -2,6 +2,8 @@ import { assert } from "chai";
 import { Shake } from "../../../src/features/action/Shake";
 import { AdbUtils } from "../../../src/utils/adb";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import {Window} from "../../../src/features/observe/Window";
+import {AwaitIdle} from "../../../src/features/observe/AwaitIdle";
 import { ExecResult, ObserveResult } from "../../../src/models";
 import sinon from "sinon";
 
@@ -9,22 +11,8 @@ describe("Shake", () => {
   let shake: Shake;
   let mockAdb: sinon.SinonStubbedInstance<AdbUtils>;
   let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
-
-  beforeEach(() => {
-    // Create stubs for dependencies
-    mockAdb = sinon.createStubInstance(AdbUtils);
-    mockObserveScreen = sinon.createStubInstance(ObserveScreen);
-
-    // Stub the constructors
-    sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(mockAdb.executeCommand);
-    sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
-
-    shake = new Shake("test-device");
-  });
-
-  afterEach(() => {
-    sinon.restore();
-  });
+  let mockWindow: sinon.SinonStubbedInstance<Window>;
+  let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
 
   // Helper function to create mock ExecResult
   const createMockExecResult = (stdout: string = ""): ExecResult => ({
@@ -38,9 +26,45 @@ describe("Shake", () => {
   // Helper function to create mock ObserveResult
   const createMockObserveResult = (): ObserveResult => ({
     timestamp: Date.now(),
-    screenSize: { width: 1080, height: 1920 },
-    systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
-    viewHierarchy: { node: {} }
+    screenSize: {width: 1080, height: 1920},
+    systemInsets: {top: 0, bottom: 0, left: 0, right: 0},
+    viewHierarchy: {node: {}}
+  });
+
+  beforeEach(() => {
+    // Create stubs for dependencies
+    mockAdb = sinon.createStubInstance(AdbUtils);
+    mockObserveScreen = sinon.createStubInstance(ObserveScreen);
+    mockWindow = sinon.createStubInstance(Window);
+    mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
+
+    // Stub the constructors/functions
+    sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(mockAdb.executeCommand);
+    sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
+    sinon.stub(ObserveScreen.prototype, "getMostRecentCachedObserveResult").callsFake(mockObserveScreen.getMostRecentCachedObserveResult);
+    sinon.stub(Window.prototype, "getCachedActiveWindow").callsFake(mockWindow.getCachedActiveWindow);
+    sinon.stub(Window.prototype, "getActive").callsFake(mockWindow.getActive);
+    sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
+
+    // Set up default mock responses
+    mockWindow.getCachedActiveWindow.resolves(null);
+    mockWindow.getActive.resolves({appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123});
+    mockAwaitIdle.initializeUiStabilityTracking.resolves();
+    mockAwaitIdle.waitForUiStability.resolves();
+    mockAwaitIdle.waitForUiStabilityWithState.resolves();
+
+    // Set up default observe screen responses with valid viewHierarchy
+    const defaultObserveResult = createMockObserveResult();
+    mockObserveScreen.getMostRecentCachedObserveResult.resolves(defaultObserveResult);
+    mockObserveScreen.execute.resolves(defaultObserveResult);
+
+    shake = new Shake("test-device");
+  });
+
+  afterEach(() => {
+    sinon.restore();
   });
 
   describe("execute", () => {

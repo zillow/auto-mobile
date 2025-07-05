@@ -2,6 +2,8 @@ import { assert } from "chai";
 import { ImeAction } from "../../../src/features/action/ImeAction";
 import { AdbUtils } from "../../../src/utils/adb";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import { Window } from "../../../src/features/observe/Window";
+import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { ExecResult, ObserveResult } from "../../../src/models";
 import sinon from "sinon";
 
@@ -9,15 +11,38 @@ describe("ImeAction", () => {
   let imeAction: ImeAction;
   let mockAdb: sinon.SinonStubbedInstance<AdbUtils>;
   let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
+  let mockWindow: sinon.SinonStubbedInstance<Window>;
+  let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
+
 
   beforeEach(() => {
     // Create stubs for dependencies
     mockAdb = sinon.createStubInstance(AdbUtils);
     mockObserveScreen = sinon.createStubInstance(ObserveScreen);
+    mockWindow = sinon.createStubInstance(Window);
+    mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
 
-    // Stub the constructors
+    // Stub the constructors and static calls
     sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(mockAdb.executeCommand);
     sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
+    sinon.stub(ObserveScreen.prototype, "getMostRecentCachedObserveResult").callsFake(mockObserveScreen.getMostRecentCachedObserveResult);
+    sinon.stub(Window.prototype, "getCachedActiveWindow").callsFake(mockWindow.getCachedActiveWindow);
+    sinon.stub(Window.prototype, "getActive").callsFake(mockWindow.getActive);
+    sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
+
+    // Set up default mock responses
+    mockWindow.getCachedActiveWindow.resolves(null);
+    mockWindow.getActive.resolves({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    mockAwaitIdle.initializeUiStabilityTracking.resolves();
+    mockAwaitIdle.waitForUiStability.resolves();
+    mockAwaitIdle.waitForUiStabilityWithState.resolves();
+
+    // Set up default observe screen responses with valid viewHierarchy
+    const defaultObserveResult = createMockObserveResult();
+    mockObserveScreen.getMostRecentCachedObserveResult.resolves(defaultObserveResult);
+    mockObserveScreen.execute.resolves(defaultObserveResult);
 
     imeAction = new ImeAction("test-device");
   });
@@ -225,7 +250,23 @@ describe("ImeAction", () => {
   });
 
   describe("error handling", () => {
+    it("should handle missing view hierarchy gracefully", async () => {
+      // Mock getMostRecentCachedObserveResult to return null to trigger the error
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(null);
+
+      try {
+        await imeAction.execute("done");
+        assert.fail("Expected an error to be thrown");
+      } catch (caughtError) {
+        assert.include((caughtError as Error).message, "Cannot perform action without view hierarchy");
+      }
+    });
+
     it("should handle observation failure", async () => {
+      // Set up valid cached result but make execute fail
+      const mockCachedObservation = createMockObserveResult();
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
+
       mockAdb.executeCommand.resolves(createMockExecResult());
       const observationError = new Error("Failed to observe screen");
       mockObserveScreen.execute.rejects(observationError);

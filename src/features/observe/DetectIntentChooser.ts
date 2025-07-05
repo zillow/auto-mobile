@@ -27,8 +27,7 @@ export class DetectIntentChooser extends BaseVisualChange {
 
           return {
             success: true,
-            detected,
-            observeResult
+            detected
           };
         } catch (error) {
           logger.error(`[DetectIntentChooser] Failed to detect intent chooser: ${error}`);

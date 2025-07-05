@@ -2,12 +2,17 @@ import { expect } from "chai";
 import { HandleIntentChooser } from "../../../src/features/action/HandleIntentChooser";
 import { DeepLinkManager } from "../../../src/utils/deepLinkManager";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import { Window } from "../../../src/features/observe/Window";
+import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { IntentChooserResult, ObserveResult } from "../../../src/models";
+import sinon from "sinon";
 
 describe("HandleIntentChooser", () => {
   let handleIntentChooser: HandleIntentChooser;
   let mockDeepLinkManager: DeepLinkManager;
-  let mockObserveScreen: ObserveScreen;
+  let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
+  let mockWindow: sinon.SinonStubbedInstance<Window>;
+  let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
 
   const mockObserveResult: ObserveResult = {
     timestamp: "2025-01-01T00:00:00.000Z",
@@ -37,6 +42,29 @@ describe("HandleIntentChooser", () => {
   };
 
   beforeEach(() => {
+    // Create stubs for dependencies
+    mockObserveScreen = sinon.createStubInstance(ObserveScreen);
+    mockWindow = sinon.createStubInstance(Window);
+    mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
+
+    // Stub the constructors
+    sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
+    sinon.stub(ObserveScreen.prototype, "getMostRecentCachedObserveResult").callsFake(mockObserveScreen.getMostRecentCachedObserveResult);
+    sinon.stub(Window.prototype, "getCachedActiveWindow").callsFake(mockWindow.getCachedActiveWindow);
+    sinon.stub(Window.prototype, "getActive").callsFake(mockWindow.getActive);
+    sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
+    sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
+
+    // Set up default mock responses
+    mockWindow.getCachedActiveWindow.resolves(null);
+    mockWindow.getActive.resolves({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+    mockAwaitIdle.initializeUiStabilityTracking.resolves();
+    mockAwaitIdle.waitForUiStability.resolves();
+    mockAwaitIdle.waitForUiStabilityWithState.resolves();
+    mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObserveResult);
+    mockObserveScreen.execute.resolves(mockUpdatedObserveResult);
+
     // Create HandleIntentChooser instance
     handleIntentChooser = new HandleIntentChooser("test-device");
 
@@ -76,14 +104,12 @@ describe("HandleIntentChooser", () => {
       }
     } as any;
 
-    // Create mock ObserveScreen that always returns the updated result
-    mockObserveScreen = {
-      execute: async () => mockUpdatedObserveResult
-    } as any;
-
     // Replace the internal managers with our mocks
     (handleIntentChooser as any).deepLinkManager = mockDeepLinkManager;
-    (handleIntentChooser as any).observeScreen = mockObserveScreen;
+  });
+
+  afterEach(() => {
+    sinon.restore();
   });
 
   describe("constructor", () => {
@@ -95,15 +121,8 @@ describe("HandleIntentChooser", () => {
 
   describe("execute", () => {
     it("should handle intent chooser with 'always' preference", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity">
-            <node text="Always" class="android.widget.Button" />
-          </node>
-        </hierarchy>
-      `;
-
-      const result = await handleIntentChooser.execute("always", undefined, viewHierarchy);
+      // The test will use the default mockObserveResult which contains ChooserActivity
+      const result = await handleIntentChooser.execute("always");
 
       expect(result.success).to.be.true;
       expect(result.detected).to.be.true;
@@ -113,15 +132,20 @@ describe("HandleIntentChooser", () => {
     });
 
     it("should handle intent chooser with 'just_once' preference", async () => {
-      const viewHierarchy = `
+      // Update the mock to return ResolverActivity hierarchy
+      const resolverHierarchy = `
         <hierarchy>
           <node class="com.android.internal.app.ResolverActivity">
             <node text="Just once" class="android.widget.Button" />
           </node>
         </hierarchy>
       `;
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves({
+        ...mockObserveResult,
+        viewHierarchy: resolverHierarchy
+      });
 
-      const result = await handleIntentChooser.execute("just_once", undefined, viewHierarchy);
+      const result = await handleIntentChooser.execute("just_once");
 
       expect(result.success).to.be.true;
       expect(result.detected).to.be.true;
@@ -131,15 +155,20 @@ describe("HandleIntentChooser", () => {
     });
 
     it("should handle intent chooser with custom app selection", async () => {
-      const viewHierarchy = `
+      // Update the mock to return custom app hierarchy
+      const customHierarchy = `
         <hierarchy>
           <node class="com.android.internal.app.ChooserActivity">
             <node resource-id="com.example.customapp:id/app_icon" />
           </node>
         </hierarchy>
       `;
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves({
+        ...mockObserveResult,
+        viewHierarchy: customHierarchy
+      });
 
-      const result = await handleIntentChooser.execute("custom", "com.example.customapp", viewHierarchy);
+      const result = await handleIntentChooser.execute("custom", "com.example.customapp");
 
       expect(result.success).to.be.true;
       expect(result.detected).to.be.true;
@@ -149,13 +178,7 @@ describe("HandleIntentChooser", () => {
     });
 
     it("should use default 'just_once' preference when none specified", async () => {
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity" />
-        </hierarchy>
-      `;
-
-      const result = await handleIntentChooser.execute(undefined, undefined, viewHierarchy);
+      const result = await handleIntentChooser.execute();
 
       expect(result.success).to.be.true;
       expect(result.detected).to.be.true;
@@ -164,13 +187,8 @@ describe("HandleIntentChooser", () => {
 
     it("should observe screen when no view hierarchy provided", async () => {
       // Create a new mock for this specific test
-      let callCount = 0;
-      mockObserveScreen.execute = async () => {
-        callCount++;
-        // First call should return the initial observation with chooser
-        // Second call should return updated observation
-        return callCount === 1 ? mockObserveResult : mockUpdatedObserveResult;
-      };
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObserveResult);
+      mockObserveScreen.execute.resolves(mockUpdatedObserveResult);
 
       const result = await handleIntentChooser.execute("always");
 
@@ -181,25 +199,31 @@ describe("HandleIntentChooser", () => {
     });
 
     it("should handle no intent chooser detected", async () => {
-      const viewHierarchy = `
+      // Update mock to return hierarchy without intent chooser
+      const normalHierarchy = `
         <hierarchy>
           <node class="android.widget.LinearLayout">
             <node text="Normal app content" />
           </node>
         </hierarchy>
       `;
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves({
+        ...mockObserveResult,
+        viewHierarchy: normalHierarchy
+      });
 
-      const result = await handleIntentChooser.execute("always", undefined, viewHierarchy);
+      const result = await handleIntentChooser.execute("always");
 
       expect(result.success).to.be.true;
       expect(result.detected).to.be.false;
-      expect(result.observation).to.be.null;
+      expect(result.observation).to.be.not.null;
     });
 
     it("should handle observe screen failure", async () => {
       // Mock observe screen to fail only when called for updated observation
       let callCount = 0;
-      mockObserveScreen.execute = async () => {
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObserveResult);
+      mockObserveScreen.execute.callsFake(async () => {
         callCount++;
         if (callCount === 1) {
           // First call when no viewHierarchy provided - should succeed
@@ -208,7 +232,7 @@ describe("HandleIntentChooser", () => {
           // Second call for updated observation - should fail
           throw new Error("Failed to observe screen");
         }
-      };
+      });
 
       const result = await handleIntentChooser.execute("always");
 
@@ -220,17 +244,18 @@ describe("HandleIntentChooser", () => {
 
     it("should handle observe screen returning null view hierarchy", async () => {
       // Mock observe screen to return result without view hierarchy
-      mockObserveScreen.execute = async () => ({
+      mockObserveScreen.getMostRecentCachedObserveResult.resolves({
         timestamp: "2025-01-01T00:00:00.000Z",
         screenSize: { width: 1080, height: 1920 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
-      });
+      } as ObserveResult);
 
-      const result = await handleIntentChooser.execute("always");
-
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.false;
-      expect(result.error).to.include("Could not get view hierarchy");
+      try {
+        await handleIntentChooser.execute("always");
+        expect.fail("Expected an error to be thrown");
+      } catch (error) {
+        expect((error as Error).message).to.include("Cannot perform action without view hierarchy");
+      }
     });
 
     it("should handle deep link manager failure", async () => {
@@ -239,17 +264,12 @@ describe("HandleIntentChooser", () => {
         throw new Error("Handling failed");
       };
 
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity" />
-        </hierarchy>
-      `;
-
-      const result = await handleIntentChooser.execute("always", undefined, viewHierarchy);
-
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.false;
-      expect(result.error).to.include("Handling failed");
+      try {
+        await handleIntentChooser.execute("always");
+        expect.fail("Expected an error to be thrown");
+      } catch (error) {
+        expect((error as Error).message).to.include("Handling failed");
+      }
     });
 
     it("should handle deep link manager returning failure", async () => {
@@ -260,18 +280,12 @@ describe("HandleIntentChooser", () => {
         error: "Could not find target element"
       });
 
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity" />
-        </hierarchy>
-      `;
-
-      const result = await handleIntentChooser.execute("always", undefined, viewHierarchy);
+      const result = await handleIntentChooser.execute("always");
 
       expect(result.success).to.be.false;
       expect(result.detected).to.be.true;
       expect(result.error).to.equal("Could not find target element");
-      expect(result.observation).to.be.null; // Should be null when viewHierarchy provided directly
+      expect(result.observation).to.equal(mockUpdatedObserveResult);
     });
 
     it("should preserve original observation when handling unsuccessful", async () => {
@@ -282,18 +296,12 @@ describe("HandleIntentChooser", () => {
         error: "Target element not found"
       });
 
-      const viewHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity" />
-        </hierarchy>
-    `;
-
-      const result = await handleIntentChooser.execute("always", undefined, viewHierarchy);
+      const result = await handleIntentChooser.execute("always");
 
       expect(result.success).to.be.false;
       expect(result.detected).to.be.true;
       expect(result.error).to.equal("Target element not found");
-      expect(result.observation).to.be.null; // Should be null when viewHierarchy provided directly
+      expect(result.observation).to.equal(mockUpdatedObserveResult);
     });
   });
 });

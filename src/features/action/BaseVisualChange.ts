@@ -163,7 +163,13 @@ export class BaseVisualChange {
         blockResult.error = "No visual change observed";
       }
     } else {
-      blockResult.success = true;
+      if (blockResult && "error" in blockResult && blockResult.error !== undefined) {
+        blockResult.success = false;
+      } else if (blockResult && !("success" in blockResult)) {
+        blockResult.success = true;
+      } else if (blockResult && "success" in blockResult && blockResult.success === undefined) {
+        blockResult.success = true;
+      }
     }
 
     blockResult.observation = latestObservation;

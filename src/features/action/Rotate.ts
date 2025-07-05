@@ -70,6 +70,20 @@ export class Rotate extends BaseVisualChange {
         // Get current orientation
         const currentOrientation = await this.getCurrentOrientation();
 
+        // Check if device is already in the desired orientation
+        if (currentOrientation === orientation) {
+          return {
+            success: true,
+            orientation,
+            value,
+            currentOrientation,
+            previousOrientation: currentOrientation,
+            rotationPerformed: false,
+            orientationLockHandled: false,
+            message: `Device is already in ${orientation} orientation`
+          };
+        }
+
         // Check if orientation is locked
         const isLocked = await this.isOrientationLocked();
         let orientationUnlocked = false;

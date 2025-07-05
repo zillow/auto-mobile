@@ -28,16 +28,17 @@ export class HomeScreen extends BaseVisualChange {
     const cachedMethod = this.getCachedNavigationMethod(deviceId);
     if (cachedMethod) {
       logger.info(`[HomeScreen] Using cached navigation method: ${cachedMethod}`);
-      return this.executeNavigationMethod(cachedMethod, progress);
+      // Only try the cached method, if it fails, surface the error to the caller.
+      return await this.executeNavigationMethod(cachedMethod, progress);
     }
 
-    // Detect navigation style
+    // Detect navigation style and only try that, no fallback logic.
     const detectedMethod = await this.detectNavigationStyle(progress);
 
     // Cache the detected method (without getting device props again)
     this.cacheNavigationMethodSimple(deviceId, detectedMethod);
 
-    return this.executeNavigationMethod(detectedMethod, progress);
+    return await this.executeNavigationMethod(detectedMethod, progress);
   }
 
   private getCachedNavigationMethod(deviceId: string): "gesture" | "hardware" | "element" | null {
@@ -66,49 +67,36 @@ export class HomeScreen extends BaseVisualChange {
       await progress(10, 100, "Detecting navigation style...");
     }
 
-    try {
-      // First, check device properties for navigation hints
-      const deviceProps = await this.getDeviceProperties();
-      const sdkVersion = parseInt(deviceProps["ro.build.version.sdk"] || "0", 10);
+    // First, check device properties for navigation hints (to determine gesture navigation)
+    const deviceProps = await this.getDeviceProperties();
+    const sdkVersion = parseInt(deviceProps["ro.build.version.sdk"] || "0", 10);
+    logger.info(`[HomeScreen] SDK version: ${sdkVersion}`);
 
-      logger.info(`[HomeScreen] SDK version: ${sdkVersion}`);
-
-      // Android 10+ (API 29+) typically uses gesture navigation by default
-      if (sdkVersion >= 29) {
-        const hasGestureNav = await this.checkGestureNavigationEnabled();
-        if (hasGestureNav) {
-          logger.info("[HomeScreen] Detected gesture navigation (Android 10+)");
-          return "gesture";
-        }
+    // Android 10+ (API 29+) typically uses gesture navigation by default
+    if (sdkVersion >= 29) {
+      const hasGestureNav = await this.checkGestureNavigationEnabled();
+      if (hasGestureNav) {
+        logger.info("[HomeScreen] Detected gesture navigation (Android 10+)");
+        return "gesture";
       }
-
-      // Check view hierarchy for navigation elements
-      if (progress) {
-        await progress(30, 100, "Analyzing view hierarchy for navigation elements...");
-      }
-
-      const observation = await this.observeScreen.execute();
-      if (observation.viewHierarchy) {
-        logger.info("[HomeScreen] Got view hierarchy, checking for home button");
-        const hasHomeButton = this.findHomeButton(observation.viewHierarchy);
-        if (hasHomeButton) {
-          logger.info("[HomeScreen] Detected navigation bar with home button");
-          return "element";
-        } else {
-          logger.info("[HomeScreen] No home button found in view hierarchy");
-        }
-      } else {
-        logger.info("[HomeScreen] No view hierarchy available");
-      }
-
-      // Fallback to hardware button
-      logger.info("[HomeScreen] Falling back to hardware home button");
-      return "hardware";
-
-    } catch (error) {
-      logger.warn(`[HomeScreen] Navigation detection failed, using hardware fallback: ${error}`);
-      return "hardware";
     }
+
+    // Check view hierarchy for navigation elements
+    if (progress) {
+      await progress(30, 100, "Analyzing view hierarchy for navigation elements...");
+    }
+
+    const observation = await this.observeScreen.execute();
+    if (observation.viewHierarchy) {
+      const hasHomeButton = this.findHomeButton(observation.viewHierarchy);
+      if (hasHomeButton) {
+        logger.info("[HomeScreen] Detected navigation bar with home button");
+        return "element";
+      }
+    }
+
+    logger.info("[HomeScreen] Defaulting to hardware home button");
+    return "hardware";
   }
 
   private async getDeviceProperties(): Promise<Record<string, string>> {
@@ -146,10 +134,8 @@ export class HomeScreen extends BaseVisualChange {
 
   private findHomeButton(viewHierarchy: any): boolean {
     try {
-      // Handle both .hierarchy and direct structures
-      const hierarchyRoot = viewHierarchy.hierarchy || viewHierarchy;
-
-      const rootNodes = this.elementUtils.extractRootNodes(hierarchyRoot);
+      // Pass the full viewHierarchy to extractRootNodes, not just the hierarchy part
+      const rootNodes = this.elementUtils.extractRootNodes(viewHierarchy);
 
       for (const rootNode of rootNodes) {
         let found = false;
@@ -175,7 +161,9 @@ export class HomeScreen extends BaseVisualChange {
           }
         });
 
-        if (found) {return true;}
+        if (found) {
+          return true;
+        }
       }
 
       return false;
@@ -189,25 +177,41 @@ export class HomeScreen extends BaseVisualChange {
     method: "gesture" | "hardware" | "element",
     progress?: ProgressCallback
   ): Promise<HomeScreenResult> {
-    return this.observedInteraction(
-      async (observeResult: ObserveResult) => {
-        switch (method) {
-          case "gesture":
-            return await this.executeGestureNavigation(observeResult, progress);
-          case "element":
-            return await this.executeElementNavigation(observeResult, progress);
-          case "hardware":
-            return await this.executeHardwareNavigation(progress);
-          default:
-            throw new Error(`Unknown navigation method: ${method}`);
-        }
-      },
-      {
-        changeExpected: true,
-        timeoutMs: 5000,
-        progress
-      }
-    );
+    // Each method is tried directly. If it fails, error is surfaced.
+    switch (method) {
+      case "gesture":
+        return await this.observedInteraction(
+          async (observeResult: ObserveResult) =>
+            await this.executeGestureNavigation(observeResult, progress),
+          {
+            changeExpected: true,
+            timeoutMs: 5000,
+            progress
+          }
+        );
+      case "element":
+        return await this.observedInteraction(
+          async (observeResult: ObserveResult) =>
+            await this.executeElementNavigation(observeResult, progress),
+          {
+            changeExpected: true,
+            timeoutMs: 5000,
+            progress
+          }
+        );
+      case "hardware":
+        return await this.observedInteraction(
+          async () =>
+            await this.executeHardwareNavigation(progress),
+          {
+            changeExpected: true,
+            timeoutMs: 5000,
+            progress
+          }
+        );
+      default:
+        throw new Error(`Unknown navigation method: ${method}`);
+    }
   }
 
   private async executeGestureNavigation(oberveResult: ObserveResult, progress?: ProgressCallback): Promise<HomeScreenResult> {
@@ -248,9 +252,8 @@ export class HomeScreen extends BaseVisualChange {
       throw new Error("Could not get view hierarchy for element navigation");
     }
 
-    // Handle both .hierarchy and direct structures
-    const hierarchyRoot = oberveResult.viewHierarchy.hierarchy || oberveResult.viewHierarchy;
-    const rootNodes = this.elementUtils.extractRootNodes(hierarchyRoot);
+    // Pass the full viewHierarchy to extractRootNodes, not just the hierarchy part
+    const rootNodes = this.elementUtils.extractRootNodes(oberveResult.viewHierarchy);
 
     for (const rootNode of rootNodes) {
       let homeButton: any = null;
