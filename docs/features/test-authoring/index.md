@@ -2,13 +2,11 @@
 
 Steps to take whether you're setting up AutoMobile test authoring & execution for the first time or debugging an issue.
 
-## Prerequisites
+#### Ensure prerequisites are met
 
-- AutoMobile should be [installed](../installation.md).
+- AutoMobile should be [installed](../../installation.md).
 - Android device or emulator connected and accessible via ADB.
 - The target app installed on the device.
-
-## Automatic Test Authoring
 
 #### Configure AutoMobile your project
 
@@ -46,11 +44,7 @@ and test in the relevant module of the tested UI. You can also tell AutoMobile t
 
 If you have a use-case where you'd prefer to trigger exporting plans differently, please file an issue.
 
-## Advanced
+## Next
 
 - Explore [plan syntax](plan-syntax.md) for more complex interactions
-- Learn about [execution options](execution-options.md).
-- Review [export options](automatic-test-authoring.md) for CI/CD integration
-
-Your first AutoMobile test is now ready to run! The automatic export and JUnit runner integration makes it easy to go
-from manual interaction to automated test execution.
+- Learn about [test execution options](../test-execution/index.md).

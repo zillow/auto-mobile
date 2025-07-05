@@ -27,9 +27,7 @@ It leverages the Clikt library for creating intuitive command-line interfaces an
 server's capabilities and native Android testing frameworks. This component enables developers to author tests in Kotlin
 while benefiting from the comprehensive device automation capabilities provided by the broader AutoMobile ecosystem.
 
-
 #### Test Execution
-
 
 The Android JUnitRunner is responsible for executing authored tests on Android devices and emulators. It extends the
 standard Android testing framework to provide enhanced capabilities including intelligent test execution, detailed

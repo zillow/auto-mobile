@@ -8,6 +8,7 @@ repo_url: https://github.com/zillow/auto-mobile
 site_description: "Mobile interaction automation"
 site_author: Zillow
 remote_branch: gh-pages
+use_directory_urls: true
 
 copyright: 'Copyright &copy; 2025 Zillow Group'
 

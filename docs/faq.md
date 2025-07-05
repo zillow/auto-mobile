@@ -76,17 +76,9 @@ experience it's great.
 When AutoMobile is invoked as an MCP it gives feedback as to why the interaction failed with relevant detail about the
 current view hierarchy, 
 
-### How does view hierarchy caching work?
-
-The system intelligently caches view hierarchy data to improve performance. Cache is invalidated when the UI changes
-significantly, ensuring accuracy while minimizing redundant operations. I wrote a
-[blog post](../blog/01-view-hierarchy-cache-system.md) about this. 
-
 ### How fast are the interactions?
 
 Interaction speed depends on device performance and complexity. Typical operations:
-
-TODO: Rebaseline performance numbers before OSS release
 
 - Simple taps: 98-167ms
 - Complex scrolling: 1-3 seconds, longer if you need to search for a specific element in a long list
@@ -97,15 +89,13 @@ I'm constantly looking to improve the speed of operations, suggestions and contr
 
 ### Does it affect app performance?
 
-View hierarchy dumps do take time to run (2-4 seconds depending on screen complexity), however they are only taken after
-verifying the UI is stable by analyzing `adb gfxinfo` which has neglibile performance impact. Therefore this tool has no
-inherent performance impact on the app itself.
+Nope.
 
 ### How much device storage is used?
 
 AutoMobile stores temporary files for screenshots, logs, etc, typically using less than 100MB of device storage. It cleans
-up old files automatically once you reach the storage limit by using internal heuristics on what information is least 
-valuable to keep (screenshots and view hierarchy).
+up old files automatically once you reach the storage limit by using internal heuristics on what information is the least 
+valuable to keep (screenshots and view hierarchy). This is all stored 
 
 ### Tool calls are failing
 

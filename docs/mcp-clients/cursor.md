@@ -1,4 +1,4 @@
-# Firebender MCP Config
+# Cursor MCP Config
 
 This is a simple sample of how to get AutoMobile running with Cursor, for other options see the
 [overview](overview.md).

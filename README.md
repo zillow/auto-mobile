@@ -2,7 +2,7 @@
 
 ![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
-AutoMobile is a set of tools for mobile device automation. You can use it for UI testing or as a development workflow
+AutoMobile is a set of tools for mobile automation. You can use it for UI testing or as a development workflow
 assistant.
 
 The first platform supported is Android with plans to extend to iOS.
