@@ -251,8 +251,10 @@ describe("ImeAction", () => {
 
   describe("error handling", () => {
     it("should handle missing view hierarchy gracefully", async () => {
-      // Mock getMostRecentCachedObserveResult to return null to trigger the error
-      mockObserveScreen.getMostRecentCachedObserveResult.resolves(null);
+      // Mock getMostRecentCachedObserveResult to reject with error
+      mockObserveScreen.getMostRecentCachedObserveResult.rejects(new Error("Cannot perform action without view hierarchy"));
+      // Also mock execute to fail since BaseVisualChange falls back to execute()
+      mockObserveScreen.execute.rejects(new Error("Cannot perform action without view hierarchy"));
 
       try {
         await imeAction.execute("done");

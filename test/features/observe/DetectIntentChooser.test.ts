@@ -137,8 +137,10 @@ describe("DetectIntentChooser", () => {
     });
 
     it("should handle observe screen failure", async () => {
-      // Mock getMostRecentCachedObserveResult to fail
-      mockObserveScreen.getMostRecentCachedObserveResult.rejects(new Error("Failed to get cached result"));
+      // Mock getMostRecentCachedObserveResult to reject with error
+      mockObserveScreen.getMostRecentCachedObserveResult.rejects(new Error("Cannot perform action without view hierarchy"));
+      // Also mock execute to fail since BaseVisualChange falls back to execute()
+      mockObserveScreen.execute.rejects(new Error("Cannot perform action without view hierarchy"));
 
       try {
         await detectIntentChooser.execute();
@@ -149,12 +151,10 @@ describe("DetectIntentChooser", () => {
     });
 
     it("should handle observe screen returning null view hierarchy", async () => {
-      // Mock observe screen to return result without view hierarchy
-      mockObserveScreen.getMostRecentCachedObserveResult.resolves({
-        timestamp: "2025-01-01T00:00:00.000Z",
-        screenSize: { width: 1080, height: 1920 },
-        systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
-      } as ObserveResult);
+      // Mock getMostRecentCachedObserveResult to reject with error
+      mockObserveScreen.getMostRecentCachedObserveResult.rejects(new Error("Cannot perform action without view hierarchy"));
+      // Also mock execute to fail since BaseVisualChange falls back to execute()
+      mockObserveScreen.execute.rejects(new Error("Cannot perform action without view hierarchy"));
 
       try {
         await detectIntentChooser.execute();

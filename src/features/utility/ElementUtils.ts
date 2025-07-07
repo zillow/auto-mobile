@@ -380,8 +380,9 @@ export class ElementUtils {
     }
 
     // Search only within the container node's subtree
-    for (const rootNode of rootNodes) {
-      this.traverseNode(rootNode, (node: any) => {
+    const searchNodes = containerNode ? [containerNode] : rootNodes;
+    for (const searchNode of searchNodes) {
+      this.traverseNode(searchNode, (node: any) => {
         const nodeProperties = this.extractNodeProperties(node);
         logger.info(`[Element] node: ${nodeProperties["text"]} ${nodeProperties["content-desc"]}`);
 

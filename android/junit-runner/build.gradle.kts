@@ -1,3 +1,4 @@
+import org.bouncycastle.cms.RecipientId.password
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -6,6 +7,8 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
   `maven-publish`
   `java-library`
+  signing
+  id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
 }
 
 group = "com.zillow.automobile"
@@ -97,17 +100,21 @@ publishing {
       name = "Local"
       url = uri(layout.buildDirectory.dir("repo"))
     }
+  }
+}
 
-    // Maven Central via Sonatype
-    maven {
-      name = "Central"
-      url = uri("https://central.sonatype.com/api/v1/publisher/upload")
-      credentials {
-        username =
-            findProperty("sonatype.username") as String? ?: System.getenv("SONATYPE_USERNAME")
-        password =
-            findProperty("sonatype.password") as String? ?: System.getenv("SONATYPE_PASSWORD")
-      }
+signing { sign(publishing.publications["maven"]) }
+
+// Configure Nexus publishing
+nexusPublishing {
+  repositories {
+    sonatype {
+      nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+      snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+      username.set(
+          findProperty("sonatypeUsername") as String? ?: System.getenv("SONATYPE_USERNAME"))
+      password.set(
+          findProperty("sonatypePassword") as String? ?: System.getenv("SONATYPE_PASSWORD"))
     }
   }
 }
