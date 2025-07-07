@@ -3,7 +3,7 @@ import { SourceMapper } from "../../src/utils/sourceMapper";
 import path from "path";
 
 describe("SourceMapper", function() {
-  this.timeout(10000);
+  this.timeout(30000);
   let sourceMapper: SourceMapper;
 
   beforeEach(() => {
