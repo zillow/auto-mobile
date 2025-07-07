@@ -95,12 +95,20 @@ export class DeviceSessionManager {
         this.window = new Window(deviceId);
       }
 
-      const activeWindow = await this.window.getActive();
-
+      let activeWindow = await this.window.getActive();
       if (!activeWindow || !activeWindow.appId || !activeWindow.activityName) {
-        throw new ActionableError(
-          `Cannot get active window information from device ${deviceId}. The device may not be fully booted or is in an unusual state.`
-        );
+        activeWindow = await this.window.getActive(true);
+        if (!activeWindow || !activeWindow.appId || !activeWindow.activityName) {
+          logger.warn(`[DeviceSessionManager] Device ${deviceId} is not fully ready`);
+          if (activeWindow) {
+            logger.warn(`[DeviceSessionManager] activeWindow.appId: ${activeWindow.appId} | activeWindow.activityName: ${activeWindow.activityName}`);
+          } else {
+            logger.warn(`[DeviceSessionManager] activeWindow: ${activeWindow}`);
+          }
+          throw new ActionableError(
+            `Cannot get active window information from device ${deviceId}. The device may not be fully booted or is in an unusual state.`
+          );
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

@@ -327,67 +327,6 @@ export class ElementUtils {
   }
 
   /**
-   * Find elements in the view hierarchy that match the specified class name
-   * @param viewHierarchy - The view hierarchy to search
-   * @param className - Class name to search for
-   * @param containerElementId - Container element resource ID to restrict the search within its child nodes
-   * @param partialMatch - Whether to allow partial class name matching
-   */
-  findElementsByClass(
-    viewHierarchy: ViewHierarchyResult,
-    className: string,
-    containerElementId: string,
-    partialMatch: boolean = false
-  ): Element[] {
-    if (!viewHierarchy || !className) {
-      return [];
-    }
-
-    const rootNodes = this.extractRootNodes(viewHierarchy);
-    const matches: Element[] = [];
-
-    // First find the container node
-    let containerNode: any = null;
-    for (const rootNode of rootNodes) {
-      this.traverseNode(rootNode, (node: any) => {
-        if (containerNode) {
-          return; // Already found
-        }
-
-        const nodeProperties = this.extractNodeProperties(node);
-        const nodeResourceId = nodeProperties["resource-id"];
-
-        if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
-          containerNode = node;
-        }
-      });
-      if (containerNode) {
-        break;
-      }
-    }
-
-    if (!containerNode) {
-      // Container not found, return empty list
-      return [];
-    }
-    // Search only within the container node's subtree
-    this.traverseNode(containerNode, (node: any) => {
-      const nodeProperties = this.extractNodeProperties(node);
-      if (nodeProperties.class && typeof nodeProperties.class === "string") {
-        const nodeClass = nodeProperties.class;
-        if (nodeClass === className || (partialMatch && nodeClass.toLowerCase().includes(className.toLowerCase()))) {
-          const parsedNode = this.parseNodeBounds(node);
-          if (parsedNode) {
-            matches.push(parsedNode);
-          }
-        }
-      }
-    });
-
-    return matches;
-  }
-
-  /**
    * Find an element in the view hierarchy that matches the specified text
    * @param viewHierarchy - The view hierarchy to search
    * @param text - The text to search for
@@ -411,6 +350,7 @@ export class ElementUtils {
     const matchesText = this.createTextMatcher(text, fuzzyMatch, caseSensitive);
     const rootNodes = this.extractRootNodes(viewHierarchy);
     const matches: Element[] = [];
+    const exactMatches: Element[] = [];
 
     // First find the container node
     let containerNode: any = null;
@@ -437,35 +377,52 @@ export class ElementUtils {
         // Container not found, return null
         return null;
       }
-    } else {
-      containerNode = rootNodes[0];
     }
 
     // Search only within the container node's subtree
-    this.traverseNode(containerNode, (node: any) => {
-      const nodeProperties = this.extractNodeProperties(node);
+    for (const rootNode of rootNodes) {
+      this.traverseNode(rootNode, (node: any) => {
+        const nodeProperties = this.extractNodeProperties(node);
+        logger.info(`[Element] node: ${nodeProperties["text"]} ${nodeProperties["content-desc"]}`);
 
-      // Check text attribute
-      if (nodeProperties.text && typeof nodeProperties.text === "string" && matchesText(nodeProperties.text)) {
-        logger.info("[Element] Matches text property");
-        const parsedNode = this.parseNodeBounds(node);
-        if (parsedNode) {
-          matches.push(parsedNode);
+        // Check text attribute
+        if (nodeProperties.text && typeof nodeProperties.text === "string" && matchesText(nodeProperties.text)) {
+          logger.info("[Element] Matches text property");
+          const parsedNode = this.parseNodeBounds(node);
+          if (parsedNode) {
+            if (nodeProperties.text === text) {
+              exactMatches.push(parsedNode);
+            } else {
+              matches.push(parsedNode);
+            }
+          }
+        } else if (nodeProperties["content-desc"] &&
+          typeof nodeProperties["content-desc"] === "string" &&
+          matchesText(nodeProperties["content-desc"])) {
+          logger.info("[Element] Matches content-desc property");
+          const parsedNode = this.parseNodeBounds(node);
+          if (parsedNode) {
+            if (nodeProperties["content-desc"] === text) {
+              exactMatches.push(parsedNode);
+            } else {
+              matches.push(parsedNode);
+            }
+          }
+        } else {
+          logger.info(`[Element] No match found in properties`);
         }
-      } else if (nodeProperties["content-desc"] &&
-        typeof nodeProperties["content-desc"] === "string" &&
-        matchesText(nodeProperties["content-desc"])) {
-        logger.info("[Element] Matches content-desc property");
-        const parsedNode = this.parseNodeBounds(node);
-        if (parsedNode) {
-          matches.push(parsedNode);
-        }
-      } else {
-        logger.info(`[Element] No match found in properties: ${nodeProperties}`);
-      }
-    });
+      });
+    }
 
-    // Sort matches by size (smaller elements first) to prefer exact matches
+    if (exactMatches.length > 0) {
+      exactMatches.sort((a, b) => {
+        const aArea = (a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top);
+        const bArea = (b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top);
+        return aArea - bArea;
+      });
+      return exactMatches[0];
+    }
+
     if (matches.length > 0) {
       matches.sort((a, b) => {
         const aArea = (a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top);
@@ -543,23 +500,23 @@ export class ElementUtils {
         // Container not found, return empty list
         return [];
       }
-    } else {
-      containerNode = rootNodes[0];
     }
 
     // Search only within the container node's subtree
-    this.traverseNode(containerNode, (node: any) => {
-      const nodeProperties = this.extractNodeProperties(node);
-      if (nodeProperties["resource-id"] && typeof nodeProperties["resource-id"] === "string") {
-        const nodeResourceId = nodeProperties["resource-id"];
-        if (nodeResourceId === resourceId || (partialMatch && nodeResourceId.toLowerCase().includes(resourceId.toLowerCase()))) {
-          const parsedNode = this.parseNodeBounds(node);
-          if (parsedNode) {
-            matches.push(parsedNode);
+    for (const rootNode of rootNodes) {
+      this.traverseNode(rootNode, (node: any) => {
+        const nodeProperties = this.extractNodeProperties(node);
+        if (nodeProperties["resource-id"] && typeof nodeProperties["resource-id"] === "string") {
+          const nodeResourceId = nodeProperties["resource-id"];
+          if (nodeResourceId === resourceId || (partialMatch && nodeResourceId.toLowerCase().includes(resourceId.toLowerCase()))) {
+            const parsedNode = this.parseNodeBounds(node);
+            if (parsedNode) {
+              matches.push(parsedNode);
+            }
           }
         }
-      }
-    });
+      });
+    }
 
     return matches;
   }

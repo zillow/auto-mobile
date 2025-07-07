@@ -145,12 +145,13 @@ export class AccessibilityServiceClient {
     const startTime = Date.now();
 
     // Check cache first
-    if (AccessibilityServiceClient.cachedAvailability) {
+    if (AccessibilityServiceClient.cachedAvailability && AccessibilityServiceClient.cachedAvailability.isAvailable) {
       const cacheAge = Date.now() - AccessibilityServiceClient.cachedAvailability.timestamp;
       if (cacheAge < AccessibilityServiceClient.AVAILABILITY_CACHE_TTL) {
         logger.info(`[ACCESSIBILITY_SERVICE] Using cached overall availability (age: ${cacheAge}ms): ${AccessibilityServiceClient.cachedAvailability.isAvailable}`);
-        return AccessibilityServiceClient.cachedAvailability.isAvailable;
+        return true;
       } else {
+        AccessibilityServiceClient.cachedAvailability.isAvailable = false;
         logger.info(`[ACCESSIBILITY_SERVICE] Overall availability cache expired (age: ${cacheAge}ms > TTL: ${AccessibilityServiceClient.AVAILABILITY_CACHE_TTL}ms)`);
       }
     }

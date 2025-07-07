@@ -41,7 +41,6 @@ export * from "./SourceIndexing";
 export * from "./SourceMapping";
 export * from "./SwipeResult";
 export * from "./SystemInsets";
-export * from "./TapOnTextOptions";
 export * from "./TapOnElementResult";
 export * from "./TapOptions";
 export * from "./TapResult";

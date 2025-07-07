@@ -61,10 +61,10 @@ export class BaseVisualChange {
       }
       previousObserveResult = await this.observeScreen.getMostRecentCachedObserveResult();
       if (!previousObserveResult?.viewHierarchy || !previousObserveResult.viewHierarchy || previousObserveResult.viewHierarchy.error) {
-        previousObserveResult = null;
+        previousObserveResult = await this.observeScreen.execute();
       }
     } catch (error) {
-      previousObserveResult = null;
+      previousObserveResult = await this.observeScreen.execute();
     }
 
     if (!previousObserveResult) {
