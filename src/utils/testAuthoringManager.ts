@@ -264,6 +264,15 @@ export class TestAuthoringManager {
    * Check if Kotlin test generation should be performed
    */
   private shouldGenerateKotlinTest(config: any, session?: TestAuthoringSession): boolean {
+    // Check if we have a source directory configuration for the app
+    const appConfig = session?.appId ? SourceMapper.getInstance().getMatchingAppConfig(session.appId) : undefined;
+
+    // Only generate Kotlin tests if we have source directory configuration
+    if (!appConfig || !appConfig.sourceDir) {
+      logger.info("[TEST-AUTHORING] Kotlin test generation skipped - no source directory configuration");
+      return false;
+    }
+
     // Check if all required conditions are met
     if (!config.androidProjectPath || !config.androidAppId || config.mode !== "testAuthoring") {
       return false;
@@ -399,7 +408,21 @@ export class TestAuthoringManager {
     const config = SourceMapper.getInstance().getMatchingAppConfig(session.appId);
 
     if (!config) {
-      throw new ActionableError(`[TEST-AUTHORING] No Android project source configured.`);
+      // Fallback for apps without source directory configuration
+      // This allows test authoring for production apps we don't have source code for
+      const fallbackDir = path.join("/tmp", "auto-mobile", "test-authoring", session.appId || "unknown-app");
+
+      try {
+        await fs.mkdir(fallbackDir, { recursive: true });
+        logger.info(`[TEST-AUTHORING] Using fallback directory for app without source config: ${fallbackDir}`);
+        return fallbackDir;
+      } catch (error) {
+        logger.warn(`Failed to create fallback test authoring directory: ${error}`);
+        // Final fallback to a generic location
+        const genericFallback = path.join("/tmp", "auto-mobile", "test-authoring", "generic");
+        await fs.mkdir(genericFallback, { recursive: true });
+        return genericFallback;
+      }
     }
 
     if (config.platform !== "android") {
