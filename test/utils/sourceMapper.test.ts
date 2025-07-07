@@ -222,7 +222,9 @@ describe("SourceMapper", function() {
     it("should index source files for AutoMobile Playground", async function() {
 
       const currentDir = process.cwd();
+      console.log(`currentDir: ${currentDir}`);
       const androidPath = path.join(currentDir, "android");
+      console.log(`androidPath: ${androidPath}`);
       const appId = "com.zillow.automobile.playground";
 
       const result = await sourceMapper.indexSourceFiles(appId, androidPath);
@@ -254,13 +256,13 @@ describe("SourceMapper", function() {
       expect(accessibilityActivity!.className).to.equal("MainActivity");
       expect(accessibilityActivity!.packageName).to.equal("com.zillow.automobile.accessibilityservice");
       expect(accessibilityActivity!.fullClassName).to.equal("com.zillow.automobile.accessibilityservice.MainActivity");
-      expect(accessibilityActivity!.sourceFile).to.equal("/Users/jasonpe/zillow/auto-mobile/android/accessibility-service/src/main/java/com/zillow/automobile/accessibilityservice/MainActivity.kt");
+      expect(accessibilityActivity!.sourceFile).to.equal(`${androidPath}/accessibility-service/src/main/java/com/zillow/automobile/accessibilityservice/MainActivity.kt`);
 
       expect(playgroundActivity).to.not.be.undefined;
       expect(playgroundActivity!.className).to.equal("MainActivity");
       expect(playgroundActivity!.packageName).to.equal("com.zillow.automobile.playground");
       expect(playgroundActivity!.fullClassName).to.equal("com.zillow.automobile.playground.MainActivity");
-      expect(playgroundActivity!.sourceFile).to.equal("/Users/jasonpe/zillow/auto-mobile/android/playground/app/src/main/java/com/zillow/automobile/playground/MainActivity.kt");
+      expect(playgroundActivity!.sourceFile).to.equal(`${androidPath}/playground/app/src/main/java/com/zillow/automobile/playground/MainActivity.kt`);
 
       expect(result.fragments.size).to.be.equal(0);
       expect(result.views.size).to.be.equal(0);
