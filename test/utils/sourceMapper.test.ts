@@ -132,7 +132,8 @@ describe("SourceMapper", function() {
         fragmentClasses: ["com.example.app.SearchFragment"],
         packageHints: ["com.example.app"],
         resourceIds: ["com.example.app:id/button"],
-        customViews: []
+        customViews: [],
+        composables: []
       };
 
       const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, "/test/project", "com.example.app");
@@ -153,7 +154,8 @@ describe("SourceMapper", function() {
         fragmentClasses: [],
         packageHints: ["com.zillow.automobile.playground"],
         resourceIds: [],
-        customViews: []
+        customViews: [],
+        composables: []
       };
 
       const currentDir = process.cwd();
@@ -176,7 +178,8 @@ describe("SourceMapper", function() {
         fragmentClasses: [],
         packageHints: ["com.zillow.automobile.discover"],
         resourceIds: [],
-        customViews: []
+        customViews: [],
+        composables: []
       };
 
       const currentDir = process.cwd();
@@ -239,30 +242,29 @@ describe("SourceMapper", function() {
 
       const activities = Array.from(result.activities.values());
 
-      // Verify activity structure
-      expect(activities[0].className).to.equal("MainActivity");
-      expect(activities[0].packageName).to.equal("com.zillow.automobile.accessibilityservice");
-      expect(activities[0].fullClassName).to.equal("com.zillow.automobile.accessibilityservice.MainActivity");
-      expect(activities[0].sourceFile).to.equal("/Users/jasonpe/zillow/auto-mobile/android/accessibility-service/src/main/java/com/zillow/automobile/accessibilityservice/MainActivity.kt");
+      // Verify activity structure - find activities by package name since order is not guaranteed
+      const accessibilityActivity = activities.find(activity =>
+        activity.packageName === "com.zillow.automobile.accessibilityservice"
+      );
+      const playgroundActivity = activities.find(activity =>
+        activity.packageName === "com.zillow.automobile.playground"
+      );
 
-      expect(activities[1].className).to.equal("MainActivity");
-      expect(activities[1].packageName).to.equal("com.zillow.automobile.playground");
-      expect(activities[1].fullClassName).to.equal("com.zillow.automobile.playground.MainActivity");
-      expect(activities[1].sourceFile).to.equal("/Users/jasonpe/zillow/auto-mobile/android/playground/app/src/main/java/com/zillow/automobile/playground/MainActivity.kt");
+      expect(accessibilityActivity).to.not.be.undefined;
+      expect(accessibilityActivity!.className).to.equal("MainActivity");
+      expect(accessibilityActivity!.packageName).to.equal("com.zillow.automobile.accessibilityservice");
+      expect(accessibilityActivity!.fullClassName).to.equal("com.zillow.automobile.accessibilityservice.MainActivity");
+      expect(accessibilityActivity!.sourceFile).to.equal("/Users/jasonpe/zillow/auto-mobile/android/accessibility-service/src/main/java/com/zillow/automobile/accessibilityservice/MainActivity.kt");
+
+      expect(playgroundActivity).to.not.be.undefined;
+      expect(playgroundActivity!.className).to.equal("MainActivity");
+      expect(playgroundActivity!.packageName).to.equal("com.zillow.automobile.playground");
+      expect(playgroundActivity!.fullClassName).to.equal("com.zillow.automobile.playground.MainActivity");
+      expect(playgroundActivity!.sourceFile).to.equal("/Users/jasonpe/zillow/auto-mobile/android/playground/app/src/main/java/com/zillow/automobile/playground/MainActivity.kt");
 
       expect(result.fragments.size).to.be.equal(0);
       expect(result.views.size).to.be.equal(0);
       expect(result.composables.size).to.be.equal(95);
-      //
-      // // Verify view structure if any views exist
-      // if (result.views.size > 0) {
-      //   const firstView = Array.from(result.views.values())[0];
-      //   expect(firstView).to.have.property("className");
-      //   expect(firstView).to.have.property("packageName");
-      //   expect(firstView).to.have.property("fullClassName");
-      //   expect(firstView).to.have.property("sourceFile");
-      //   expect(firstView.className).to.equal("ChatView");
-      // }
     });
   });
 
