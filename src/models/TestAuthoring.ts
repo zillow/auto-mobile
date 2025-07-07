@@ -13,7 +13,7 @@ export interface TestAuthoringSession {
     sessionId: string;
     startTime: Date;
     endTime?: Date;
-    appId?: string;
+    appId: string;
     toolCalls: LoggedToolCall[];
     isActive: boolean;
 }

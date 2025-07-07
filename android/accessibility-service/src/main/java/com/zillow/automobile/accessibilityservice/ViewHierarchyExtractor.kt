@@ -1,13 +1,12 @@
 package com.zillow.automobile.accessibilityservice
 
 import android.graphics.Rect
+import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
 import com.zillow.automobile.accessibilityservice.models.ElementBounds
 import com.zillow.automobile.accessibilityservice.models.UIElementInfo
 import com.zillow.automobile.accessibilityservice.models.ViewHierarchy
-import com.zillow.automobile.accessibilityservice.models.WindowInfo
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.serialization.builtins.ListSerializer
@@ -25,8 +24,15 @@ class ViewHierarchyExtractor {
 
   companion object {
     private const val TAG = "ViewHierarchyExtractor"
-    private const val MAX_DEPTH = 50 // Prevent infinite recursion
-    private const val MAX_CHILDREN = 64 // Limit children to prevent memory issues
+    private const val MAX_DEPTH = 100 // Prevent infinite recursion
+    private const val MAX_CHILDREN = 256 // Limit children to prevent memory issues
+
+    private val GENERIC_CLASS_NAMES =
+        setOf(
+            "android.view.View",
+            "android.widget.FrameLayout",
+            "android.widget.ScrollView",
+            "android.widget.TextView")
   }
 
   private val json = Json { ignoreUnknownKeys = true }
@@ -49,46 +55,9 @@ class ViewHierarchyExtractor {
     }
   }
 
-  /** Extracts view hierarchy from all windows */
-  fun extractFromAllWindows(windows: List<AccessibilityWindowInfo>): List<ViewHierarchy> {
-    val hierarchies = mutableListOf<ViewHierarchy>()
-
-    for (window in windows) {
-      try {
-        val rootNode = window.root
-        if (rootNode != null) {
-          val windowInfo =
-              WindowInfo(
-                  id = window.id,
-                  type = window.type,
-                  isActive = window.isActive,
-                  isFocused = window.isFocused,
-                  bounds = extractWindowBounds(window))
-
-          val rootElement = extractNodeInfo(rootNode, 0)
-          val processedElement = rootElement?.let { processForAccessibility(it) }
-
-          val hierarchy =
-              ViewHierarchy(
-                  packageName = rootNode.packageName?.toString(),
-                  hierarchy = processedElement,
-                  windowInfo = windowInfo)
-          hierarchies.add(hierarchy)
-        }
-      } catch (e: Exception) {
-        Log.e(TAG, "Error extracting hierarchy from window ${window.id}", e)
-        hierarchies.add(
-            ViewHierarchy(error = "Failed to extract from window ${window.id}: ${e.message}"))
-      }
-    }
-
-    return hierarchies
-  }
-
   /** Recursively extracts node information with depth limiting */
   private fun extractNodeInfo(node: AccessibilityNodeInfo, depth: Int): UIElementInfo? {
     if (depth > MAX_DEPTH) {
-      Log.w(TAG, "Maximum depth reached, stopping recursion")
       return null
     }
 
@@ -106,8 +75,119 @@ class ViewHierarchyExtractor {
           if (childInfo != null) {
             children.add(childInfo)
           }
-          child.recycle() // Important: recycle child nodes
         }
+      }
+
+      // Extract extra semantics fields
+      var stateDescription: String? = null
+      var text: String? = null
+      var textSize: Float? = null
+      var textColor: String? = null
+      var tooltipText: String? = null
+      var paneTitle: String? = null
+      var liveRegion: String? = null
+      var collectionInfo: String? = null
+      var collectionItemInfo: String? = null
+      var rangeInfo: String? = null
+      var inputType: String? = null
+      var actions: List<String>? = null
+
+      // Check direct APIs if available
+      if (Build.VERSION.SDK_INT >= 30) {
+        stateDescription = node.stateDescription?.toString()
+      }
+      val hintText: String? = node.hintText?.toString()
+      val errorMessage: String? = node.error?.toString()
+      if (Build.VERSION.SDK_INT >= 28) {
+        tooltipText = node.tooltipText?.toString()
+        paneTitle = node.paneTitle?.toString()
+      }
+
+      // Extract accessibility actions
+      val actionList = node.actionList
+      if (actionList != null && actionList.isNotEmpty()) {
+        actions =
+            actionList.mapNotNull { action ->
+              when (action.id) {
+                AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS -> "accessibility_focus"
+                AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS ->
+                    "clear_accessibility_focus"
+                AccessibilityNodeInfo.ACTION_CLEAR_FOCUS -> "clear_focus"
+                AccessibilityNodeInfo.ACTION_CLEAR_SELECTION -> "clear_selection"
+                AccessibilityNodeInfo.ACTION_CLICK -> "click"
+                AccessibilityNodeInfo.ACTION_COLLAPSE -> "collapse"
+                AccessibilityNodeInfo.ACTION_COPY -> "copy"
+                AccessibilityNodeInfo.ACTION_CUT -> "cut"
+                AccessibilityNodeInfo.ACTION_DISMISS -> "dismiss"
+                AccessibilityNodeInfo.ACTION_EXPAND -> "expand"
+                AccessibilityNodeInfo.ACTION_FOCUS -> "focus"
+                AccessibilityNodeInfo.ACTION_LONG_CLICK -> "long_click"
+                AccessibilityNodeInfo.ACTION_NEXT_AT_MOVEMENT_GRANULARITY ->
+                    "next_at_movement_granularity"
+                AccessibilityNodeInfo.ACTION_NEXT_HTML_ELEMENT -> "next_html_element"
+                AccessibilityNodeInfo.ACTION_PASTE -> "paste"
+                AccessibilityNodeInfo.ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY ->
+                    "previous_at_movement_granularity"
+                AccessibilityNodeInfo.ACTION_PREVIOUS_HTML_ELEMENT -> "previous_html_element"
+                AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD -> "scroll_backward"
+                AccessibilityNodeInfo.ACTION_SCROLL_FORWARD -> "scroll_forward"
+                AccessibilityNodeInfo.ACTION_SELECT -> "select"
+                AccessibilityNodeInfo.ACTION_SET_SELECTION -> "set_selection"
+                AccessibilityNodeInfo.ACTION_SET_TEXT -> "set_text"
+                else -> null
+              }
+            }
+
+        if (actions.isEmpty()) {
+          actions = null
+        }
+      }
+
+      // Extract collection info
+      node.collectionInfo?.let { collectionInfo = "rows:${it.rowCount},cols:${it.columnCount}" }
+
+      // Extract collection item info
+      node.collectionItemInfo?.let {
+        collectionItemInfo = "row:${it.rowIndex},col:${it.columnIndex}"
+      }
+
+      // Extract range info
+      node.rangeInfo?.let { rangeInfo = "current:${it.current},min:${it.min},max:${it.max}" }
+
+      val inputTypeInt = node.inputType
+      if (inputTypeInt != 0) {
+        inputType =
+            when (inputTypeInt) {
+              android.text.InputType.TYPE_CLASS_TEXT -> "text"
+              android.text.InputType.TYPE_CLASS_NUMBER -> "number"
+              android.text.InputType.TYPE_CLASS_PHONE -> "phone"
+              android.text.InputType.TYPE_CLASS_DATETIME -> "datetime"
+              android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS -> "email_address"
+              android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_SUBJECT -> "email_subject"
+              android.text.InputType.TYPE_TEXT_VARIATION_FILTER -> "filter"
+              android.text.InputType.TYPE_TEXT_VARIATION_LONG_MESSAGE -> "long_message"
+              android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD -> "password"
+              android.text.InputType.TYPE_TEXT_VARIATION_PERSON_NAME -> "person_name"
+              android.text.InputType.TYPE_TEXT_VARIATION_PHONETIC -> "phonetic"
+              android.text.InputType.TYPE_TEXT_VARIATION_POSTAL_ADDRESS -> "postal_address"
+              android.text.InputType.TYPE_TEXT_VARIATION_SHORT_MESSAGE -> "short_message"
+              android.text.InputType.TYPE_TEXT_VARIATION_URI -> "uri"
+              android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD -> "visible_password"
+              android.text.InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT -> "web_edit_text"
+              android.text.InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS -> "web_email_address"
+              android.text.InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD -> "web_password"
+              else -> null
+            }
+      }
+
+      val liveRegionMode = node.liveRegion
+      if (liveRegionMode != 0) {
+        liveRegion =
+            when (liveRegionMode) {
+              1 -> "polite"
+              2 -> "assertive"
+              else -> "live_region_$liveRegionMode"
+            }
       }
 
       // Create the child node structure
@@ -118,49 +198,77 @@ class ViewHierarchyExtractor {
             else -> json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
           }
 
-      UIElementInfo(
-          text = node.text?.toString(),
-          contentDesc = node.contentDescription?.toString(),
-          className = node.className?.toString(),
-          resourceId = node.viewIdResourceName,
-          packageName = node.packageName?.toString(),
-          bounds = ElementBounds(bounds),
-          clickable = if (node.isClickable) "true" else "false",
-          enabled = if (node.isEnabled) "true" else "false",
-          focusable = if (node.isFocusable) "true" else "false",
-          focused = if (node.isFocused) "true" else "false",
-          scrollable = if (node.isScrollable) "true" else "false",
-          password = if (node.isPassword) "true" else "false",
-          checkable = if (node.isCheckable) "true" else "false",
-          checked = if (node.isChecked) "true" else "false",
-          selected = if (node.isSelected) "true" else "false",
-          longClickable = if (node.isLongClickable) "true" else "false",
-          node = nodeElement)
+      val className =
+          if (node.className.isNullOrBlank() || GENERIC_CLASS_NAMES.contains(node.className)) {
+            null
+          } else {
+            node.className?.toString()
+          }
+
+      node.text?.toString()?.let {
+        text = it
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+          textSize = node.extraRenderingInfo?.textSizeInPx
+        }
+        textColor = null // Remove the getTextColorHex(node) call
+      }
+
+      val elementInfo =
+          UIElementInfo(
+              text = text,
+              textSize = textSize,
+              textColor = textColor,
+              contentDesc = node.contentDescription?.toString(),
+              className = className,
+              resourceId = node.viewIdResourceName,
+              bounds = ElementBounds(bounds),
+              clickable = if (node.isClickable) "true" else null,
+              enabled = if (!node.isEnabled) "false" else null, // Only include if disabled
+              focusable = if (node.isFocusable) "true" else null,
+              focused = if (node.isFocused) "true" else null,
+              scrollable = if (node.isScrollable) "true" else null,
+              password = if (node.isPassword) "true" else null,
+              checkable = if (node.isCheckable) "true" else null,
+              checked = if (node.isChecked) "true" else null,
+              selected = if (node.isSelected) "true" else null,
+              longClickable = if (node.isLongClickable) "true" else null,
+              node = nodeElement,
+              stateDescription = stateDescription,
+              hintText = hintText,
+              errorMessage = errorMessage,
+              tooltipText = tooltipText,
+              paneTitle = paneTitle,
+              liveRegion = liveRegion,
+              collectionInfo = collectionInfo,
+              collectionItemInfo = collectionItemInfo,
+              rangeInfo = rangeInfo,
+              inputType = inputType,
+              actions = actions,
+          )
+
+      if (childCount == 0 && !meetsFilterCriteria(elementInfo)) {
+        null
+      } else {
+        elementInfo
+      }
     } catch (e: Exception) {
       Log.e(TAG, "Error extracting node info at depth $depth", e)
       null
     }
   }
 
-  /** Extracts bounds from AccessibilityWindowInfo */
-  private fun extractWindowBounds(window: AccessibilityWindowInfo): ElementBounds? {
-    return try {
-      val bounds = Rect()
-      window.getBoundsInScreen(bounds)
-      ElementBounds(bounds)
-    } catch (e: Exception) {
-      Log.e(TAG, "Error extracting window bounds", e)
-      null
-    }
-  }
-
   /** Processes the hierarchy to add accessibility information (z-index analysis) */
   private fun processForAccessibility(element: UIElementInfo): UIElementInfo {
-    return if (element.isClickable && element.bounds != null) {
+    return if (element.isClickable ||
+        element.isLongClickable ||
+        element.isCheckable ||
+        element.isSelected ||
+        element.isScrollable ||
+        element.isFocusable) {
       val accessibilityScore = calculateAccessibilityScore(element)
       element.copy(accessible = accessibilityScore)
     } else {
-      // Process children
+      // Process children - copy() preserves all fields by default
       val processedNode = element.node?.let { processNodeForAccessibility(it) }
       element.copy(node = processedNode)
     }
@@ -172,8 +280,8 @@ class ViewHierarchyExtractor {
       nodeElement is JsonObject -> {
         // Single child - convert to UIElementInfo and process
         try {
-          val childElement = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
-          val processedChild = processForAccessibility(childElement)
+          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
+          val processedChild = processForAccessibility(child)
           json.encodeToJsonElement(UIElementInfo.serializer(), processedChild)
         } catch (e: Exception) {
           nodeElement
@@ -184,8 +292,8 @@ class ViewHierarchyExtractor {
         val processedChildren =
             nodeElement.jsonArray.map { childJson ->
               try {
-                val childElement = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
-                val processedChild = processForAccessibility(childElement)
+                val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+                val processedChild = processForAccessibility(child)
                 json.encodeToJsonElement(UIElementInfo.serializer(), processedChild)
               } catch (e: Exception) {
                 childJson
@@ -211,7 +319,8 @@ class ViewHierarchyExtractor {
     val accessibleArea = totalArea - coveredArea
 
     val score = accessibleArea.toDouble() / totalArea.toDouble()
-    return kotlin.math.round(score * 1000.0) / 1000.0 // Round to 3 decimal places
+    return max(
+        0.0, min(1.0, kotlin.math.round(score * 1000.0) / 1000.0)) // Round to 3 decimal places
   }
 
   /** Calculate area covered by overlapping elements */
@@ -256,59 +365,38 @@ class ViewHierarchyExtractor {
     if (nodeElement == null) return emptyList()
 
     return try {
-      when {
-        nodeElement is JsonObject -> {
-          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
-          listOf(child)
-        }
-
-        nodeElement is JsonArray -> {
-          nodeElement.jsonArray.mapNotNull { childJson ->
-            try {
-              json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
-            } catch (e: Exception) {
-              null
+      val children =
+          when {
+            nodeElement is JsonObject -> {
+              val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
+              listOf(child)
             }
-          }
-        }
 
-        else -> emptyList()
+            nodeElement is JsonArray -> {
+              nodeElement.jsonArray.mapNotNull { childJson ->
+                try {
+                  json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+                } catch (e: Exception) {
+                  null
+                }
+              }
+            }
+
+            else -> emptyList()
+          }
+
+      // Apply filter criteria to maintain consistency with extractNodeInfo behavior
+      children.filter { child ->
+        // If the child has its own children, keep it regardless of filter criteria
+        // Otherwise, apply the filter criteria
+        if (child.node != null) {
+          true
+        } else {
+          meetsFilterCriteria(child)
+        }
       }
     } catch (e: Exception) {
       emptyList()
-    }
-  }
-
-  /** Filters view hierarchy to remove noise and focus on interactive elements */
-  fun filterViewHierarchy(hierarchy: ViewHierarchy): ViewHierarchy {
-    val filteredRoot = hierarchy.hierarchy?.let { filterElement(it) }
-    return hierarchy.copy(hierarchy = filteredRoot)
-  }
-
-  /** Recursively filters elements to keep only useful ones */
-  private fun filterElement(element: UIElementInfo): UIElementInfo? {
-    // Keep elements that meet filter criteria (match test expectations)
-    val shouldKeep = meetsFilterCriteria(element)
-
-    // Filter children recursively
-    val filteredChildren = extractChildrenFromNode(element.node).mapNotNull { filterElement(it) }
-
-    // Update node with filtered children
-    val filteredNode =
-        when {
-          filteredChildren.isEmpty() -> null
-          filteredChildren.size == 1 ->
-              json.encodeToJsonElement(UIElementInfo.serializer(), filteredChildren[0])
-
-          else ->
-              json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), filteredChildren)
-        }
-
-    // If this element should be kept or has filtered children, keep it
-    return if (shouldKeep || filteredChildren.isNotEmpty()) {
-      element.copy(node = filteredNode)
-    } else {
-      null
     }
   }
 
@@ -318,7 +406,14 @@ class ViewHierarchyExtractor {
     val hasStringCriteria =
         !element.text.isNullOrBlank() ||
             !element.resourceId.isNullOrBlank() ||
-            !element.contentDesc.isNullOrBlank()
+            !element.contentDesc.isNullOrBlank() ||
+            !element.testTag.isNullOrBlank() ||
+            !element.role.isNullOrBlank() ||
+            !element.stateDescription.isNullOrBlank() ||
+            !element.errorMessage.isNullOrBlank() ||
+            !element.hintText.isNullOrBlank() ||
+            !element.tooltipText.isNullOrBlank() ||
+            !element.paneTitle.isNullOrBlank()
 
     // Boolean filter criteria
     val hasBooleanCriteria =
@@ -331,125 +426,16 @@ class ViewHierarchyExtractor {
             element.selected == "true" ||
             element.longClickable == "true"
 
-    return hasStringCriteria || hasBooleanCriteria
-  }
+    // Accessibility feature criteria
+    val hasAccessibilityFeatures =
+        !element.liveRegion.isNullOrBlank() ||
+            !element.collectionInfo.isNullOrBlank() ||
+            !element.collectionItemInfo.isNullOrBlank() ||
+            !element.rangeInfo.isNullOrBlank() ||
+            !element.inputType.isNullOrBlank() ||
+            !element.actions.isNullOrEmpty() ||
+            !element.extras.isNullOrEmpty()
 
-  /** Finds all clickable elements in the hierarchy */
-  fun findClickableElements(hierarchy: ViewHierarchy): List<UIElementInfo> {
-    val clickableElements = mutableListOf<UIElementInfo>()
-    hierarchy.hierarchy?.let { findClickableElementsRecursive(it, clickableElements) }
-    return clickableElements
-  }
-
-  private fun findClickableElementsRecursive(
-      element: UIElementInfo,
-      result: MutableList<UIElementInfo>
-  ) {
-    if (element.isClickable) {
-      result.add(element)
-    }
-    extractChildrenFromNode(element.node).forEach { findClickableElementsRecursive(it, result) }
-  }
-
-  /** Finds all scrollable elements in the hierarchy */
-  fun findScrollableElements(hierarchy: ViewHierarchy): List<UIElementInfo> {
-    val scrollableElements = mutableListOf<UIElementInfo>()
-    hierarchy.hierarchy?.let { findScrollableElementsRecursive(it, scrollableElements) }
-    return scrollableElements
-  }
-
-  private fun findScrollableElementsRecursive(
-      element: UIElementInfo,
-      result: MutableList<UIElementInfo>
-  ) {
-    if (element.isScrollable) {
-      result.add(element)
-    }
-    extractChildrenFromNode(element.node).forEach { findScrollableElementsRecursive(it, result) }
-  }
-
-  /** Finds element by text content */
-  fun findElementByText(
-      hierarchy: ViewHierarchy,
-      text: String,
-      caseSensitive: Boolean = false
-  ): UIElementInfo? {
-    return hierarchy.hierarchy?.let { findElementByTextRecursive(it, text, caseSensitive) }
-  }
-
-  private fun findElementByTextRecursive(
-      element: UIElementInfo,
-      text: String,
-      caseSensitive: Boolean
-  ): UIElementInfo? {
-    val elementText = element.text ?: ""
-    val contentDesc = element.contentDesc ?: ""
-
-    val matches =
-        if (caseSensitive) {
-          elementText.contains(text) || contentDesc.contains(text)
-        } else {
-          elementText.contains(text, ignoreCase = true) ||
-              contentDesc.contains(text, ignoreCase = true)
-        }
-
-    if (matches) {
-      return element
-    }
-
-    // Search in children
-    for (child in extractChildrenFromNode(element.node)) {
-      val found = findElementByTextRecursive(child, text, caseSensitive)
-      if (found != null) {
-        return found
-      }
-    }
-
-    return null
-  }
-
-  /** Finds element by resource ID */
-  fun findElementByResourceId(hierarchy: ViewHierarchy, resourceId: String): UIElementInfo? {
-    return hierarchy.hierarchy?.let { findElementByResourceIdRecursive(it, resourceId) }
-  }
-
-  private fun findElementByResourceIdRecursive(
-      element: UIElementInfo,
-      resourceId: String
-  ): UIElementInfo? {
-    if (element.resourceId == resourceId) {
-      return element
-    }
-
-    // Search in children
-    for (child in extractChildrenFromNode(element.node)) {
-      val found = findElementByResourceIdRecursive(child, resourceId)
-      if (found != null) {
-        return found
-      }
-    }
-
-    return null
-  }
-
-  /** Find focused element in hierarchy */
-  fun findFocusedElement(hierarchy: ViewHierarchy): UIElementInfo? {
-    return hierarchy.hierarchy?.let { findFocusedElementRecursive(it) }
-  }
-
-  private fun findFocusedElementRecursive(element: UIElementInfo): UIElementInfo? {
-    if (element.isFocused && element.bounds != null) {
-      return element
-    }
-
-    // Search in children
-    for (child in extractChildrenFromNode(element.node)) {
-      val found = findFocusedElementRecursive(child)
-      if (found != null) {
-        return found
-      }
-    }
-
-    return null
+    return hasStringCriteria || hasBooleanCriteria || hasAccessibilityFeatures
   }
 }

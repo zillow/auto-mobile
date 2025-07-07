@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { DeepLinkManager } from "../../src/utils/deepLinkManager";
 import { AdbUtils } from "../../src/utils/adb";
 import { ElementUtils } from "../../src/features/utility/ElementUtils";
-import { ExecResult } from "../../src/models";
+import { ExecResult, ViewHierarchyResult } from "../../src/models";
 
 describe("DeepLinkManager", () => {
   let deepLinkManager: DeepLinkManager;
@@ -174,7 +174,7 @@ Receiver Resolver Table:
 
   describe("detectIntentChooser", () => {
     it("should detect intent chooser with ChooserActivity", () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -189,7 +189,7 @@ Receiver Resolver Table:
     });
 
     it("should detect intent chooser with ResolverActivity", () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -204,7 +204,7 @@ Receiver Resolver Table:
     });
 
     it("should detect intent chooser with 'Choose an app' text", () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -219,20 +219,23 @@ Receiver Resolver Table:
     });
 
     it("should detect intent chooser with 'Always' and 'Just once' buttons", () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
-          node: [
-            {
-              $: {
-                text: "Always"
+          node: {
+            $: {},
+            node: [
+              {
+                $: {
+                  text: "Always"
+                }
+              },
+              {
+                $: {
+                  text: "Just once"
+                }
               }
-            },
-            {
-              $: {
-                text: "Just once"
-              }
-            }
-          ]
+            ]
+          }
         }
       };
 
@@ -241,22 +244,25 @@ Receiver Resolver Table:
     });
 
     it("should not detect intent chooser in normal app screens", () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
-          node: [
-            {
-              $: {
-                class: "android.widget.Button",
-                text: "Click me"
+          node: {
+            $: {},
+            node: [
+              {
+                $: {
+                  class: "android.widget.Button",
+                  text: "Click me"
+                }
+              },
+              {
+                $: {
+                  class: "android.widget.TextView",
+                  text: "Some text"
+                }
               }
-            },
-            {
-              $: {
-                class: "android.widget.TextView",
-                text: "Some text"
-              }
-            }
-          ]
+            ]
+          }
         }
       };
 
@@ -265,7 +271,7 @@ Receiver Resolver Table:
     });
 
     it("should handle malformed view hierarchy", () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {}
       };
 
@@ -298,7 +304,7 @@ Receiver Resolver Table:
     });
 
     it("should handle intent chooser with 'always' preference", async () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -323,7 +329,7 @@ Receiver Resolver Table:
     });
 
     it("should handle intent chooser with 'just_once' preference", async () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -356,7 +362,7 @@ Receiver Resolver Table:
     });
 
     it("should handle intent chooser with custom app selection", async () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -392,7 +398,7 @@ Receiver Resolver Table:
     });
 
     it("should return success false when no intent chooser is detected", async () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -428,7 +434,7 @@ Receiver Resolver Table:
     });
 
     it("should return success false when target element not found", async () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {
@@ -454,7 +460,7 @@ Receiver Resolver Table:
     });
 
     it("should handle ADB command failures during tap", async () => {
-      const viewHierarchy = {
+      const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
             $: {

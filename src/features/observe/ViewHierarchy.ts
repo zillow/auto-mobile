@@ -13,7 +13,7 @@ import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../ut
 import { ScreenshotUtils } from "../../utils/screenshot-utils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { SourceMapper } from "../../utils/sourceMapper";
-import { ActivityInfo, FragmentInfo, ViewInfo } from "../../models";
+import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 
 /**
@@ -50,9 +50,10 @@ interface ElementWithZOrder {
  */
 interface ExtendedViewHierarchyResult extends ViewHierarchyResult {
   sourceInfo?: {
-    activityInfo?: ActivityInfo;
-    fragmentInfos?: FragmentInfo[];
-    viewInfos?: ViewInfo[];
+    activity?: ActivityInfo;
+    fragments?: FragmentInfo[];
+    views?: ViewInfo[];
+    composables?: ComposableInfo[];
     appId?: string;
   };
 }
@@ -513,7 +514,7 @@ export class ViewHierarchy {
       if (accessibilityHierarchy) {
         const accessibilityDuration = Date.now() - startTime;
         logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
-        return accessibilityHierarchy;
+        return await this.augmentWithSourceIndexing(accessibilityHierarchy as ExtendedViewHierarchyResult);
       }
     } catch (err) {
       logger.warn(`[VIEW_HIERARCHY] Failed to get hierarchy from accessibility service: ${err}`);
@@ -1389,12 +1390,7 @@ export class ViewHierarchy {
 
       logger.info(`[SOURCE_INDEXING] Current activity: ${currentActivity.activityName}, package: ${currentActivity.packageName}`);
 
-      // Find matching app configuration by package name
-      const appConfigs = this.sourceMapper.getAppConfigs();
-      const matchingConfig = appConfigs.find((config: { appId: string; sourceDir: string }) =>
-        currentActivity.packageName.startsWith(config.appId) ||
-        config.appId.startsWith(currentActivity.packageName)
-      );
+      const matchingConfig = this.sourceMapper.getMatchingAppConfig(currentActivity.packageName);
 
       if (!matchingConfig) {
         logger.info(`[SOURCE_INDEXING] No app configuration found for package: ${currentActivity.packageName}`);
@@ -1404,22 +1400,22 @@ export class ViewHierarchy {
       logger.info(`[SOURCE_INDEXING] Found matching app config: ${matchingConfig.appId}`);
 
       // Find activity source information
-      let activityInfo: ActivityInfo | null = null;
+      let activity: ActivityInfo | null = null;
       try {
-        activityInfo = await this.sourceMapper.findActivityInfo(
+        activity = await this.sourceMapper.findActivityInfo(
           matchingConfig.appId,
           currentActivity.activityName
         );
 
-        if (activityInfo) {
-          logger.info(`[SOURCE_INDEXING] Found activity source: ${activityInfo.sourceFile}`);
+        if (activity) {
+          logger.info(`[SOURCE_INDEXING] Found activity source: ${activity.sourceFile}`);
         }
       } catch (error) {
         logger.warn(`[SOURCE_INDEXING] Error finding activity source: ${error}`);
       }
 
       // Find fragment source information
-      const fragmentInfos: FragmentInfo[] = [];
+      const fragments: FragmentInfo[] = [];
       const fragmentNames = this.extractFragmentNames(viewHierarchy);
 
       for (const fragmentName of fragmentNames) {
@@ -1427,11 +1423,11 @@ export class ViewHierarchy {
           const fragmentInfo = await this.sourceMapper.findFragmentInfo(
             matchingConfig.appId,
             fragmentName,
-            activityInfo || undefined
+            activity
           );
 
           if (fragmentInfo) {
-            fragmentInfos.push(fragmentInfo);
+            fragments.push(fragmentInfo);
             logger.info(`[SOURCE_INDEXING] Found fragment source: ${fragmentInfo.sourceFile}`);
           }
         } catch (error) {
@@ -1440,7 +1436,7 @@ export class ViewHierarchy {
       }
 
       // Find custom View source information
-      const viewInfos: ViewInfo[] = [];
+      const views: ViewInfo[] = [];
       const viewNames = this.extractViewNames(viewHierarchy);
 
       for (const viewName of viewNames) {
@@ -1448,12 +1444,12 @@ export class ViewHierarchy {
           const viewInfo = await this.sourceMapper.findViewInfo(
             matchingConfig.appId,
             viewName,
-            activityInfo || undefined,
-            fragmentInfos.length > 0 ? fragmentInfos[0] : undefined
+            activity || undefined,
+            fragments.length > 0 ? fragments[0] : undefined
           );
 
           if (viewInfo) {
-            viewInfos.push(viewInfo);
+            views.push(viewInfo);
             logger.info(`[SOURCE_INDEXING] Found view source: ${viewInfo.sourceFile}`);
           }
         } catch (error) {
@@ -1461,15 +1457,37 @@ export class ViewHierarchy {
         }
       }
 
+      // Find composable source information
+      const composables: ComposableInfo[] = [];
+      const composableNames = this.extractComposableNames(viewHierarchy);
+      for (const composableName of composableNames) {
+        try {
+          const composableInfo = await this.sourceMapper.findComposableInfo(
+            matchingConfig.appId,
+            composableName,
+            activity || undefined,
+            fragments.length > 0 ? fragments[0] : undefined
+          );
+
+          if (composableInfo) {
+            composables.push(composableInfo);
+            logger.info(`[SOURCE_INDEXING] Found composable source: ${composableInfo.sourceFile}`);
+          }
+        } catch (error) {
+          logger.warn(`[SOURCE_INDEXING] Error finding composable source for ${composableName}: ${error}`);
+        }
+      }
+
       // Add source information to the result
       viewHierarchy.sourceInfo = {
-        activityInfo: activityInfo || undefined,
-        fragmentInfos: fragmentInfos.length > 0 ? fragmentInfos : undefined,
-        viewInfos: viewInfos.length > 0 ? viewInfos : undefined,
+        activity: activity || undefined,
+        fragments: fragments.length > 0 ? fragments : undefined,
+        views: views.length > 0 ? views : undefined,
+        composables: composables.length > 0 ? composables : undefined,
         appId: matchingConfig.appId
       };
 
-      logger.info(`[SOURCE_INDEXING] Augmented view hierarchy with ${activityInfo ? 1 : 0} activity, ${fragmentInfos.length} fragment, and ${viewInfos.length} view source references`);
+      logger.info(`[SOURCE_INDEXING] Augmented view hierarchy with ${activity ? 1 : 0} activity, ${fragments.length} fragment, ${views.length} view, and ${composables.length} composable source references`);
 
     } catch (error) {
       logger.warn(`[SOURCE_INDEXING] Error during source indexing augmentation: ${error}`);
@@ -1590,7 +1608,7 @@ export class ViewHierarchy {
       return;
     }
 
-    // Function to recursively augment nodes with class and fragment information
+    // Function to recursively augment nodes with class, fragment, view, and composable information
     const augmentNode = (node: any): void => {
       if (!node) {
         return;
@@ -1635,6 +1653,13 @@ export class ViewHierarchy {
         }
       }
 
+      // Mark composable if node has "composable" property
+      if (node.composable && typeof node.composable === "string" && node.composable.length > 0) {
+        node["isComposable"] = true;
+        // Optionally, establish a standard property for composable name
+        node["composableName"] = node.composable;
+      }
+
       // Recursively augment child nodes
       if (node.node) {
         const children = Array.isArray(node.node) ? node.node : [node.node];
@@ -1646,5 +1671,38 @@ export class ViewHierarchy {
 
     // Start augmentation from the root node
     augmentNode(viewHierarchy.hierarchy);
+  }
+
+  /**
+   * Extract composable names from view hierarchy augmentation data
+   * @param viewHierarchy - The view hierarchy to search
+   * @returns Array of composable names
+   */
+  private extractComposableNames(viewHierarchy: ViewHierarchyResult): string[] {
+    const composableNames: string[] = [];
+
+    // Traverse the hierarchy looking for composable information
+    const traverseNode = (node: any): void => {
+      // Best-effort heuristic: look for nodes marked as composable or having a composable name
+      if (node.composable && typeof node.composable === "string" && node.composable.length > 0) {
+        composableNames.push(node.composable);
+      } else if (node.composableName && typeof node.composableName === "string" && node.composableName.length > 0) {
+        composableNames.push(node.composableName);
+      }
+
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        for (const child of children) {
+          traverseNode(child);
+        }
+      }
+    };
+
+    if (viewHierarchy.hierarchy) {
+      traverseNode(viewHierarchy.hierarchy);
+    }
+
+    // Remove duplicates
+    return Array.from(new Set(composableNames));
   }
 }

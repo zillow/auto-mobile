@@ -5,29 +5,36 @@ import {
   ActivityInfo,
   FragmentInfo,
   ViewInfo,
+  ComposableInfo,
   SourceIndexResult
-} from "../../src/models/SourceIndexing";
+} from "../../src/models";
+import { ConfigurationManager } from "../../src/utils/configurationManager";
 
 describe("SourceMapper - Source Indexing", () => {
   let sourceMapper: SourceMapper;
 
   beforeEach(() => {
+    // Reset the singleton instance completely for clean slate
+    (SourceMapper as any).instance = undefined;
+
+    // Get a fresh instance and clear all state more thoroughly
     sourceMapper = SourceMapper.getInstance();
-    // Clear all state
     sourceMapper.clearCache();
 
-    // Reset the internal app configs by creating a fresh instance
-    // Since it's a singleton, we need to clear the internal state
-    (sourceMapper as any).appConfigs = new Map();
-    (sourceMapper as any).sourceIndex = new Map();
+    ConfigurationManager.getInstance().resetServerConfig();
   });
 
   afterEach(() => {
     sinon.restore();
-    // Ensure clean state after each test
+    // Ensure complete cleanup after each test
     sourceMapper.clearCache();
     (sourceMapper as any).appConfigs = new Map();
     (sourceMapper as any).sourceIndex = new Map();
+    (sourceMapper as any).projectScanResultCache = new Map();
+    (sourceMapper as any).androidApplicationPluginCache = new Map();
+
+    // Reset the singleton instance for the next test
+    (SourceMapper as any).instance = undefined;
   });
 
   describe("App Configuration Management", () => {
@@ -38,7 +45,7 @@ describe("SourceMapper - Source Indexing", () => {
       // Mock file system check
       const fsExistsStub = sinon.stub(require("fs"), "existsSync").returns(true);
 
-      await sourceMapper.addAppConfig(appId, sourceDir);
+      await sourceMapper.addAppConfig(appId, sourceDir, "android");
 
       const configs = sourceMapper.getAppConfigs();
       expect(configs).to.have.length(1);
@@ -55,7 +62,7 @@ describe("SourceMapper - Source Indexing", () => {
       const fsExistsStub = sinon.stub(require("fs"), "existsSync").returns(false);
 
       try {
-        await sourceMapper.addAppConfig(appId, sourceDir);
+        await sourceMapper.addAppConfig(appId, sourceDir, "android");
         expect.fail("Should have thrown an error");
       } catch (error) {
         expect((error as Error).message).to.include("Source directory does not exist");
@@ -70,7 +77,7 @@ describe("SourceMapper - Source Indexing", () => {
 
       const fsExistsStub = sinon.stub(require("fs"), "existsSync").returns(true);
 
-      await sourceMapper.addAppConfig(appId, sourceDir);
+      await sourceMapper.addAppConfig(appId, sourceDir, "android");
 
       const retrievedSourceDir = sourceMapper.getSourceDir(appId);
       expect(retrievedSourceDir).to.equal(sourceDir);
@@ -82,6 +89,7 @@ describe("SourceMapper - Source Indexing", () => {
     });
 
     it("should return empty array for no configurations", () => {
+      ConfigurationManager.getInstance().resetServerConfig();
       const configs = sourceMapper.getAppConfigs();
       expect(configs).to.be.an("array");
       expect(configs).to.have.length(0);
@@ -104,6 +112,7 @@ describe("SourceMapper - Source Indexing", () => {
         activities: new Map([["com.example.testapp.MainActivity", mockActivityInfo]]),
         fragments: new Map(),
         views: new Map(),
+        composables: new Map(),
         lastIndexed: Date.now()
       };
 
@@ -131,12 +140,20 @@ describe("SourceMapper - Source Indexing", () => {
         activities: new Map(),
         fragments: new Map([["com.example.testapp.search.SearchFragment", mockFragmentInfo]]),
         views: new Map(),
+        composables: new Map(),
         lastIndexed: Date.now()
+      };
+
+      const mockActivityInfo: ActivityInfo = {
+        className: "MainActivity",
+        packageName: "com.example.testapp.main",
+        fullClassName: "com.example.testapp.main.MainActivity",
+        sourceFile: "/test/source/MainActivity.java"
       };
 
       const getSourceIndexStub = sinon.stub(sourceMapper, "getSourceIndex").resolves(mockSourceIndex);
 
-      const result = await sourceMapper.findFragmentInfo(appId, "SearchFragment");
+      const result = await sourceMapper.findFragmentInfo(appId, "SearchFragment", mockActivityInfo);
 
       expect(result).to.deep.equal(mockFragmentInfo);
       expect(getSourceIndexStub.calledWith(appId)).to.be.true;
@@ -158,6 +175,7 @@ describe("SourceMapper - Source Indexing", () => {
         activities: new Map(),
         fragments: new Map(),
         views: new Map([["com.example.testapp.ui.CustomButtonView", mockViewInfo]]),
+        composables: new Map(),
         lastIndexed: Date.now()
       };
 
@@ -171,18 +189,55 @@ describe("SourceMapper - Source Indexing", () => {
       getSourceIndexStub.restore();
     });
 
+    it("should find composable info by function name", async () => {
+      const appId = "com.example.testapp";
+
+      const mockComposableInfo: ComposableInfo = {
+        className: "UserProfile",
+        packageName: "com.example.testapp.ui",
+        fullClassName: "com.example.testapp.ui.UserProfile",
+        sourceFile: "/test/source/UserProfile.kt"
+      };
+
+      const mockSourceIndex: SourceIndexResult = {
+        activities: new Map(),
+        fragments: new Map(),
+        views: new Map(),
+        composables: new Map([["com.example.testapp.ui.UserProfile", mockComposableInfo]]),
+        lastIndexed: Date.now()
+      };
+
+      const getSourceIndexStub = sinon.stub(sourceMapper, "getSourceIndex").resolves(mockSourceIndex);
+
+      const result = await sourceMapper.findComposableInfo(appId, "UserProfile");
+
+      expect(result).to.deep.equal(mockComposableInfo);
+      expect(getSourceIndexStub.calledWith(appId)).to.be.true;
+
+      getSourceIndexStub.restore();
+    });
+
     it("should return null when no source index available", async () => {
       const appId = "com.example.testapp";
 
       const getSourceIndexStub = sinon.stub(sourceMapper, "getSourceIndex").resolves(null);
 
+      const mockActivityInfo: ActivityInfo = {
+        className: "MainActivity",
+        packageName: "com.example.testapp.main",
+        fullClassName: "com.example.testapp.main.MainActivity",
+        sourceFile: "/test/source/MainActivity.java"
+      };
+
       const activityResult = await sourceMapper.findActivityInfo(appId, "MainActivity");
-      const fragmentResult = await sourceMapper.findFragmentInfo(appId, "SearchFragment");
+      const fragmentResult = await sourceMapper.findFragmentInfo(appId, "SearchFragment", mockActivityInfo);
       const viewResult = await sourceMapper.findViewInfo(appId, "CustomView");
+      const composableResult = await sourceMapper.findComposableInfo(appId, "UserProfile");
 
       expect(activityResult).to.be.null;
       expect(fragmentResult).to.be.null;
       expect(viewResult).to.be.null;
+      expect(composableResult).to.be.null;
 
       getSourceIndexStub.restore();
     });
@@ -194,6 +249,7 @@ describe("SourceMapper - Source Indexing", () => {
         activities: new Map(),
         fragments: new Map(),
         views: new Map(),
+        composables: new Map(),
         lastIndexed: Date.now()
       };
 
@@ -220,6 +276,7 @@ describe("SourceMapper - Source Indexing", () => {
         activities: new Map([["com.example.testapp.MainActivity", mockActivityInfo]]),
         fragments: new Map(),
         views: new Map(),
+        composables: new Map(),
         lastIndexed: Date.now()
       };
 
@@ -264,6 +321,7 @@ describe("SourceMapper - Source Indexing", () => {
           ["com.example.testapp.other.SearchFragment", mockFragmentInfo2]
         ]),
         views: new Map(),
+        composables: new Map(),
         lastIndexed: Date.now()
       };
 
@@ -272,6 +330,51 @@ describe("SourceMapper - Source Indexing", () => {
       const result = await sourceMapper.findFragmentInfo(appId, "SearchFragment", mockActivityInfo);
 
       expect(result).to.deep.equal(mockFragmentInfo1);
+      expect(result?.associatedActivity).to.equal(mockActivityInfo.fullClassName);
+
+      getSourceIndexStub.restore();
+    });
+
+    it("should prefer composables in same package as activity", async () => {
+      const appId = "com.example.testapp";
+
+      const mockActivityInfo: ActivityInfo = {
+        className: "MainActivity",
+        packageName: "com.example.testapp.main",
+        fullClassName: "com.example.testapp.main.MainActivity",
+        sourceFile: "/test/source/MainActivity.java"
+      };
+
+      const mockComposableInfo1: ComposableInfo = {
+        className: "UserProfile",
+        packageName: "com.example.testapp.main", // Same package as activity
+        fullClassName: "com.example.testapp.main.UserProfile",
+        sourceFile: "/test/source/UserProfile.kt"
+      };
+
+      const mockComposableInfo2: ComposableInfo = {
+        className: "UserProfile",
+        packageName: "com.example.testapp.other", // Different package
+        fullClassName: "com.example.testapp.other.UserProfile",
+        sourceFile: "/test/source/other/UserProfile.kt"
+      };
+
+      const mockSourceIndex: SourceIndexResult = {
+        activities: new Map(),
+        fragments: new Map(),
+        views: new Map(),
+        composables: new Map([
+          ["com.example.testapp.main.UserProfile", mockComposableInfo1],
+          ["com.example.testapp.other.UserProfile", mockComposableInfo2]
+        ]),
+        lastIndexed: Date.now()
+      };
+
+      const getSourceIndexStub = sinon.stub(sourceMapper, "getSourceIndex").resolves(mockSourceIndex);
+
+      const result = await sourceMapper.findComposableInfo(appId, "UserProfile", mockActivityInfo);
+
+      expect(result).to.deep.equal(mockComposableInfo1);
       expect(result?.associatedActivity).to.equal(mockActivityInfo.fullClassName);
 
       getSourceIndexStub.restore();
@@ -293,7 +396,7 @@ describe("SourceMapper - Source Indexing", () => {
 
       const fsExistsStub = sinon.stub(require("fs"), "existsSync").returns(true);
 
-      await sourceMapper.addAppConfig(appId, sourceDir);
+      await sourceMapper.addAppConfig(appId, sourceDir, "android");
 
       // Mock the private indexSourceFiles method to throw an error
       const indexStub = sinon.stub(sourceMapper as any, "indexSourceFiles").rejects(new Error("Indexing failed"));
@@ -305,6 +408,7 @@ describe("SourceMapper - Source Indexing", () => {
       expect(result?.activities).to.be.an.instanceof(Map);
       expect(result?.fragments).to.be.an.instanceof(Map);
       expect(result?.views).to.be.an.instanceof(Map);
+      expect(result?.composables).to.be.an.instanceof(Map);
 
       fsExistsStub.restore();
       indexStub.restore();

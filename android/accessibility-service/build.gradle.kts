@@ -2,6 +2,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.serialization)
+  alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -25,6 +26,9 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
   }
+
+  buildFeatures { compose = true }
+
   compileOptions {
     sourceCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
     targetCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
@@ -39,6 +43,11 @@ android {
 dependencies {
   implementation(libs.androidx.core)
 
+  // Compose BOM
+  implementation(platform(libs.compose.bom))
+  implementation(libs.bundles.compose.ui)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
+
   // Kotlin coroutines
   implementation(libs.kotlinx.coroutines)
 
@@ -49,4 +58,8 @@ dependencies {
   testImplementation(libs.bundles.unit.test)
   testImplementation(projects.junitRunner)
   testImplementation(libs.robolectric)
+
+  // Compose test dependencies
+  androidTestImplementation(libs.bundles.compose.ui.espresso.test)
+  debugImplementation(libs.bundles.compose.ui.debug)
 }

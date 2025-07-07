@@ -83,7 +83,9 @@ fun OnboardingScreen(onFinish: () -> Unit) {
   val pagerState = rememberPagerState(pageCount = { pages.size })
   val coroutineScope = rememberCoroutineScope()
 
-  Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+  Column(
+      modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+  ) {
     // Skip button
     Row(
         modifier = Modifier.fillMaxWidth().padding(16.dp),

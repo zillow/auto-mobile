@@ -9,12 +9,7 @@ import { logger } from "./utils/logger";
 import { SourceMapper } from "./utils/sourceMapper";
 import { ConfigurationManager } from "./utils/configurationManager";
 import { runCliCommand } from "./cli";
-
-// Interface for Android app configuration
-interface AndroidAppConfig {
-  appId: string;
-  sourceDir: string;
-}
+import { AppConfig } from "./models";
 
 // Interface for transport configuration
 interface TransportConfig {
@@ -25,13 +20,13 @@ interface TransportConfig {
 
 // Parse command line arguments
 function parseArgs(): {
-  androidApps: AndroidAppConfig[];
+  apps: AppConfig[];
   cliMode: boolean;
   cliArgs: string[];
   transport: TransportConfig;
   } {
   const args = process.argv.slice(2);
-  const androidApps: AndroidAppConfig[] = [];
+  const apps: AppConfig[] = [];
 
   // Default transport configuration
   const transport: TransportConfig = {
@@ -93,7 +88,7 @@ function parseArgs(): {
         if (sourceDirIndex < args.length && args[sourceDirIndex] === "--android-source-dir") {
           const sourceDir = args[sourceDirIndex + 1];
           if (sourceDir && !sourceDir.startsWith("--")) {
-            androidApps.push({ appId, sourceDir });
+            apps.push({ appId, sourceDir, platform: "android" });
             i = sourceDirIndex + 1; // Skip past both pairs
           } else {
             logger.warn(`Missing value for --android-source-dir after app ID: ${appId}`);
@@ -120,7 +115,7 @@ function parseArgs(): {
     }
   }
 
-  return { androidApps, cliMode, cliArgs, transport };
+  return { apps, cliMode, cliArgs, transport };
 }
 
 // Create and start Streamable HTTP server
@@ -396,34 +391,25 @@ async function main() {
 
     // Initialize source index manager and load persistent app configurations
     const sourceMapper = SourceMapper.getInstance();
-    await sourceMapper.loadAppConfigs();
 
     // Parse command line arguments for additional app configs
-    const { androidApps, cliMode, cliArgs, transport } = parseArgs();
+    const { apps, cliMode, cliArgs, transport } = parseArgs();
 
     // Add any command line app configs to the source index manager
-    for (const { appId, sourceDir } of androidApps) {
+    for (const { appId, sourceDir, platform } of apps) {
       try {
-        await sourceMapper.addAppConfig(appId, sourceDir);
+        await sourceMapper.addAppConfig(appId, sourceDir, platform);
         logger.info(`Added command line app configuration: ${appId} -> ${sourceDir}`);
       } catch (error) {
         logger.warn(`Failed to add command line app configuration ${appId}: ${error}`);
       }
     }
 
-    // Get all app configurations (persistent + command line)
-    const allAppConfigs = sourceMapper.getAppConfigs();
-    if (allAppConfigs.length > 0) {
-      allAppConfigs.forEach(({ appId, sourceDir }: { appId: string; sourceDir: string }) => {
-        logger.info(`Android app configured: ${appId} with source directory: ${sourceDir}`);
-      });
-    }
-
     if (cliMode) {
       // Run in CLI mode
       logger.info("Running in CLI mode");
       // logger.enableStdoutLogging();
-      await runCliCommand(cliArgs, allAppConfigs);
+      await runCliCommand(cliArgs);
     } else if (transport.type === "streamable") {
       // Run as Streamable HTTP server
       logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);

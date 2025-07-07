@@ -36,6 +36,7 @@ data class BottomNavItem(val label: String, val icon: ImageVector, val route: St
 
 @Composable
 fun HomeScreen(
+    modifier: Modifier = Modifier,
     onNavigateToVideoPlayer: (String) -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
     onLogout: () -> Unit = {},
@@ -43,18 +44,19 @@ fun HomeScreen(
 ) {
   var bottomNavSelection by remember { mutableIntStateOf(0) }
   HomeScreenCore(
+      modifier = modifier,
       bottomNavSelected = bottomNavSelection,
       setBottomNavSelection = { bottomNavSelection = it },
       onNavigateToVideoPlayer = onNavigateToVideoPlayer,
       onNavigateToSlides = onNavigateToSlides,
       onLogout = onLogout,
-      onGuestModeNavigateToLogin = onGuestModeNavigateToLogin,
-  )
+      onGuestModeNavigateToLogin = onGuestModeNavigateToLogin)
 }
 
 @Composable
 fun HomeScreenCore(
     bottomNavSelected: Int,
+    modifier: Modifier = Modifier,
     setBottomNavSelection: (Int) -> Unit = {},
     onNavigateToVideoPlayer: (String) -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
@@ -96,7 +98,8 @@ fun HomeScreenCore(
                 label = { Text(item.label) })
           }
         }
-      }) { paddingValues ->
+      },
+      modifier = modifier) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
           when (bottomNavSelected) {
             0 -> DiscoverVideoScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)

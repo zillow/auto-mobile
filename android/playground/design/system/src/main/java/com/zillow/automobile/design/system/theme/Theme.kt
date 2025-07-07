@@ -123,11 +123,14 @@ fun AutoMobileTheme(
         else -> AutoMobileLightColorScheme
       }
 
-  CompositionLocalProvider(LocalExperiments provides experiments) {
+  CompositionLocalProvider(
+      LocalExperiments provides experiments,
+  ) {
     MaterialTheme(
         colorScheme = colorScheme,
         typography = AutoMobileTypography,
         shapes = AutoMobileShapes,
-        content = content)
+        content = content,
+    )
   }
 }

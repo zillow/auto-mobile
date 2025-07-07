@@ -6,6 +6,15 @@ export interface ModuleMapping {
     activities: string[];
     fragments: string[];
     buildGradlePath?: string;
+    isApplicationModule: boolean;
+    kotlinSource: boolean;
+    javaSource: boolean;
+}
+
+export interface ApplicationModuleDetails {
+  absolutePath: string;
+  applicationId: string;
+  gradleTasks: string[];
 }
 
 export interface SourceAnalysis {
@@ -23,6 +32,7 @@ export interface ViewHierarchyAnalysis {
     packageHints: string[];
     resourceIds: string[];
     customViews: string[];
+    composables: string[];
 }
 
 export interface TestPlanPlacementResult {
@@ -33,8 +43,11 @@ export interface TestPlanPlacementResult {
     reasoning: string;
 }
 
-export interface ModuleDiscoveryResult {
+export interface ProjectScanResult {
     modules: ModuleMapping[];
-    mainModule?: ModuleMapping;
+  applicationModules?: ModuleMapping[];
     totalModules: number;
+  gradlePlugins?: string[];
+  mavenDependencies?: string[];
+  currentApplicationModule?: ApplicationModuleDetails;
 }

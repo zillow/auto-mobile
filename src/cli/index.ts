@@ -8,17 +8,10 @@ import { registerInteractionTools } from "../server/interactionTools";
 import { registerAppTools } from "../server/appTools";
 import { registerUtilityTools } from "../server/utilityTools";
 import { registerEmulatorTools } from "../server/emulatorTools";
-import { registerSourceIndexingTools } from "../server/sourceIndexingTools";
 import { registerPlanTools } from "../server/planTools";
 
-// Interface for Android app configuration
-interface AndroidAppConfig {
-    appId: string;
-    sourceDir: string;
-}
-
 // Initialize tool registry for CLI mode
-export function initializeCliTools(androidApps: AndroidAppConfig[] = []): void {
+export function initializeCliTools(): void {
 
   // Register all tool categories
   registerObserveTools();
@@ -26,7 +19,6 @@ export function initializeCliTools(androidApps: AndroidAppConfig[] = []): void {
   registerAppTools();
   registerUtilityTools();
   registerEmulatorTools();
-  registerSourceIndexingTools();
   registerPlanTools();
 }
 
@@ -67,10 +59,10 @@ function parseCliArgs(args: string[]): { toolName: string; params: Record<string
 }
 
 // Main CLI command runner
-export async function runCliCommand(args: string[], androidApps: AndroidAppConfig[] = []): Promise<void> {
+export async function runCliCommand(args: string[]): Promise<void> {
   try {
     // Initialize tool registry
-    initializeCliTools(androidApps);
+    initializeCliTools();
 
     if (args.length === 0) {
       // Show help with available tools

@@ -6,13 +6,15 @@ import { ConfigurationManager } from "./configurationManager";
 import { KotlinTestGenerator } from "./kotlinTestGenerator";
 import { logger } from "./logger";
 import {
+  ActionableError,
   TestAuthoringSession,
   LoggedToolCall,
   TestPlan,
   StartTestAuthoringResult,
   StopTestAuthoringResult,
   TestGenerationOptions
-} from "../models/TestAuthoring";
+} from "../models";
+import { SourceMapper } from "./sourceMapper";
 
 export class TestAuthoringManager {
   private currentSession?: TestAuthoringSession;
@@ -40,7 +42,7 @@ export class TestAuthoringManager {
   /**
    * Start a test authoring session
    */
-  public async startAuthoringSession(appId?: string): Promise<StartTestAuthoringResult> {
+  public async startAuthoringSession(appId: string): Promise<StartTestAuthoringResult> {
     try {
       if (this.currentSession?.isActive) {
         logger.warn("Test authoring session is already active");
@@ -66,10 +68,8 @@ export class TestAuthoringManager {
       }
 
       // Track the specific app if provided
-      if (appId) {
-        this.appMonitor.trackPackage(appId);
-        logger.info(`[TEST-AUTHORING] Now tracking package for lifecycle events: ${appId}`);
-      }
+      this.appMonitor.trackPackage(appId);
+      logger.info(`[TEST-AUTHORING] Now tracking package for lifecycle events: ${appId}`);
 
       logger.info(`[TEST-AUTHORING] Test authoring session started: ${sessionId}`);
 
@@ -230,7 +230,7 @@ export class TestAuthoringManager {
     session?: TestAuthoringSession
   ): Promise<{ success: boolean; testFilePath?: string }> {
     try {
-      const config = this.configManager.getConfig();
+      const config = this.configManager.getServerConfig();
 
       // Check if Kotlin test generation is enabled
       if (!this.shouldGenerateKotlinTest(config, session)) {
@@ -395,14 +395,15 @@ export class TestAuthoringManager {
   /**
    * Determine the target directory for the test plan
    */
-  private async determineTargetDirectory(session: TestAuthoringSession): Promise<string> {
-    const config = this.configManager.getConfig();
+  async determineTargetDirectory(session: TestAuthoringSession): Promise<string> {
+    const config = SourceMapper.getInstance().getMatchingAppConfig(session.appId);
 
-    // Default to a general test-plans directory if no project source is configured
-    if (!config.androidProjectPath) {
-      const defaultDir = path.join(process.cwd(), "test-plans");
-      logger.info(`[TEST-AUTHORING] No project source directory configured, using default: ${defaultDir}`);
-      return defaultDir;
+    if (!config) {
+      throw new ActionableError(`[TEST-AUTHORING] No Android project source configured.`);
+    }
+
+    if (config.platform !== "android") {
+      throw new ActionableError(`[TEST-AUTHORING] Only Android platform is supported for test authoring at this time.`);
     }
 
     try {
@@ -411,15 +412,15 @@ export class TestAuthoringManager {
       const sourceMapper = SourceMapper.getInstance();
 
       // Try to get the last view hierarchy from the session's tool calls
-      const lastObserveCall = [...session.toolCalls].reverse().find(call => call.toolName === "observe");
+      const lastViewHierarchy = [...session.toolCalls].reverse().find(call => call.result?.data?.viewHierarchy);
 
-      if (lastObserveCall && lastObserveCall.result?.data?.viewHierarchy) {
+      if (lastViewHierarchy && lastViewHierarchy.result?.data?.viewHierarchy) {
         logger.info("Using source mapping for intelligent test plan placement");
 
-        const viewHierarchyXml = lastObserveCall.result.data.viewHierarchy;
+        const viewHierarchyXml = lastViewHierarchy.result.data.viewHierarchy;
         const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
-        const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, config.androidProjectPath);
-        const placementResult = await sourceMapper.determineTestPlanLocation(sourceAnalysis, config.androidProjectPath);
+        const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, config.sourceDir, config.appId);
+        const placementResult = await sourceMapper.determineTestPlanLocation(sourceAnalysis, config.sourceDir, config.appId);
 
         if (placementResult.success) {
           logger.info(`[TEST-AUTHORING] Source mapping selected module: ${placementResult.moduleName} (confidence: ${placementResult.confidence.toFixed(2)})`);
@@ -427,17 +428,10 @@ export class TestAuthoringManager {
         }
       }
 
-      // Fallback: Use basic directory structure
-      logger.info("Falling back to basic test plan placement");
-      const testPlansDir = path.join(config.androidProjectPath, "src", "test", "resources", "test-plans");
-      return testPlansDir;
+      throw new ActionableError("Failed to determine test plan location, source mapping could not find a suitable location.");
     } catch (error) {
-      logger.warn(`Source mapping failed, using fallback: ${error}`);
-
-      // Final fallback: Use basic directory structure
-      const testPlansDir = path.join(config.androidProjectPath, "src", "test", "resources", "test-plans");
-      logger.info(`[TEST-AUTHORING] Using project test plans directory: ${testPlansDir}`);
-      return testPlansDir;
+      logger.warn(`Source mapping failed: ${error}`);
+      throw new ActionableError("Error in source mapping, could not determine test plan location.");
     }
   }
 

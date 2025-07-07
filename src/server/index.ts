@@ -20,13 +20,11 @@ import { registerInteractionTools } from "./interactionTools";
 import { registerAppTools } from "./appTools";
 import { registerUtilityTools } from "./utilityTools";
 import { registerEmulatorTools } from "./emulatorTools";
-import { registerSourceIndexingTools } from "./sourceIndexingTools";
 import { registerConfigurationTools } from "./configurationTools";
 import { registerDeepLinkTools } from "./deepLinkTools";
 
 export const createMcpServer = (): McpServer => {
   // Get configuration, device session, and test authoring managers
-  const configManager = ConfigurationManager.getInstance();
   const testAuthoringManager = TestAuthoringManager.getInstance();
 
   // Register all tool categories
@@ -35,7 +33,6 @@ export const createMcpServer = (): McpServer => {
   registerAppTools();
   registerUtilityTools();
   registerEmulatorTools();
-  registerSourceIndexingTools();
   registerConfigurationTools();
   registerDeepLinkTools();
 
@@ -123,8 +120,11 @@ export const createMcpServer = (): McpServer => {
     }
 
     // Start test authoring session if enabled and not already active
-    if (configManager.isTestAuthoringEnabled() && !testAuthoringManager.isActive()) {
-      await testAuthoringManager.startAuthoringSession();
+    if (ConfigurationManager.getInstance().isTestAuthoringEnabled() && !testAuthoringManager.isActive()) {
+      const appConfig = ConfigurationManager.getInstance().getServerConfig();
+      if (appConfig.appId) {
+        await testAuthoringManager.startAuthoringSession(appConfig.appId);
+      }
     }
 
     // Create progress callback if tool supports progress

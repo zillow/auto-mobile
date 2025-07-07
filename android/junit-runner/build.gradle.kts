@@ -78,7 +78,7 @@ publishing {
           developer {
             id.set("zillow")
             name.set("Zillow OSS")
-            email.set("oss@zillow.com")
+            email.set("oss@zillowgroup.com")
           }
         }
 

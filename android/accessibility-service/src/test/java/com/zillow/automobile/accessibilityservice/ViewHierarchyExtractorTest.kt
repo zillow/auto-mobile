@@ -3,7 +3,6 @@ package com.zillow.automobile.accessibilityservice
 import android.graphics.Rect
 import com.zillow.automobile.accessibilityservice.models.ElementBounds
 import com.zillow.automobile.accessibilityservice.models.UIElementInfo
-import com.zillow.automobile.accessibilityservice.models.ViewHierarchy
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -56,169 +55,13 @@ class ViewHierarchyExtractorTest {
 
     val rootElement = UIElementInfo(className = "android.widget.LinearLayout", node = childrenJson)
 
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-    val filtered = extractor.filterViewHierarchy(hierarchy)
-
-    assertNotNull(filtered.hierarchy)
-
     // Extract children from filtered hierarchy
-    val filteredChildren = extractor.extractChildrenFromHierarchy(filtered.hierarchy!!)
+    val filteredChildren = extractor.extractChildrenFromHierarchy(rootElement)
     assertEquals(2, filteredChildren.size)
 
     // Should keep interactive element and element with content
     assertTrue(filteredChildren.any { it.text == "Button" && it.isClickable })
     assertTrue(filteredChildren.any { it.text == "Some text" })
-  }
-
-  @Test
-  fun `findClickableElements returns all clickable elements`() = runTest {
-    val clickableChild1 = UIElementInfo(text = "Button 1", clickable = "true")
-    val clickableChild2 = UIElementInfo(text = "Button 2", clickable = "true")
-    val nonClickableChild = UIElementInfo(text = "Text", clickable = "false")
-
-    val children = listOf(clickableChild1, nonClickableChild, clickableChild2)
-    val childrenJson =
-        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
-
-    val rootElement = UIElementInfo(className = "android.widget.LinearLayout", node = childrenJson)
-
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-    val clickableElements = extractor.findClickableElements(hierarchy)
-
-    assertEquals(2, clickableElements.size)
-    assertTrue(clickableElements.any { it.text == "Button 1" })
-    assertTrue(clickableElements.any { it.text == "Button 2" })
-  }
-
-  @Test
-  fun `findScrollableElements returns all scrollable elements`() = runTest {
-    val scrollableChild = UIElementInfo(text = "List", scrollable = "true")
-    val nonScrollableChild = UIElementInfo(text = "Text", scrollable = "false")
-
-    val children = listOf(scrollableChild, nonScrollableChild)
-    val childrenJson =
-        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
-
-    val rootElement = UIElementInfo(className = "android.widget.LinearLayout", node = childrenJson)
-
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-    val scrollableElements = extractor.findScrollableElements(hierarchy)
-
-    assertEquals(1, scrollableElements.size)
-    assertEquals("List", scrollableElements[0].text)
-    assertTrue(scrollableElements[0].isScrollable)
-  }
-
-  @Test
-  fun `findElementByText finds element case insensitive by default`() = runTest {
-    val targetElement = UIElementInfo(text = "Submit Button")
-    val otherElement = UIElementInfo(text = "Cancel")
-
-    val children = listOf(targetElement, otherElement)
-    val childrenJson =
-        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
-
-    val rootElement = UIElementInfo(node = childrenJson)
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-
-    val found1 = extractor.findElementByText(hierarchy, "submit", false)
-    assertNotNull(found1)
-    assertEquals("Submit Button", found1!!.text)
-
-    val found2 = extractor.findElementByText(hierarchy, "SUBMIT", false)
-    assertNotNull(found2)
-    assertEquals("Submit Button", found2!!.text)
-  }
-
-  @Test
-  fun `findElementByText respects case sensitivity`() = runTest {
-    val targetElement = UIElementInfo(text = "Submit Button")
-    val childrenJson = json.encodeToJsonElement(UIElementInfo.serializer(), targetElement)
-
-    val rootElement = UIElementInfo(node = childrenJson)
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-
-    val found = extractor.findElementByText(hierarchy, "submit", true)
-    assertNull(found)
-
-    val foundCaseSensitive = extractor.findElementByText(hierarchy, "Submit", true)
-    assertNotNull(foundCaseSensitive)
-    assertEquals("Submit Button", foundCaseSensitive!!.text)
-  }
-
-  @Test
-  fun `findElementByText searches content description`() = runTest {
-    val targetElement = UIElementInfo(text = null, contentDesc = "Submit Button")
-    val childrenJson = json.encodeToJsonElement(UIElementInfo.serializer(), targetElement)
-
-    val rootElement = UIElementInfo(node = childrenJson)
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-
-    val found = extractor.findElementByText(hierarchy, "Submit")
-    assertNotNull(found)
-    assertEquals("Submit Button", found!!.contentDesc)
-  }
-
-  @Test
-  fun `findElementByResourceId finds correct element`() = runTest {
-    val targetElement = UIElementInfo(resourceId = "com.example:id/submit_button")
-    val otherElement = UIElementInfo(resourceId = "com.example:id/cancel_button")
-
-    val children = listOf(targetElement, otherElement)
-    val childrenJson =
-        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
-
-    val rootElement = UIElementInfo(node = childrenJson)
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-
-    val found = extractor.findElementByResourceId(hierarchy, "com.example:id/submit_button")
-
-    assertNotNull(found)
-    assertEquals("com.example:id/submit_button", found!!.resourceId)
-  }
-
-  @Test
-  fun `findElementByResourceId returns null when not found`() = runTest {
-    val element = UIElementInfo(resourceId = "com.example:id/other_button")
-    val childrenJson = json.encodeToJsonElement(UIElementInfo.serializer(), element)
-
-    val rootElement = UIElementInfo(node = childrenJson)
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-
-    val found = extractor.findElementByResourceId(hierarchy, "com.example:id/submit_button")
-    assertNull(found)
-  }
-
-  @Test
-  fun `findFocusedElement finds focused element with bounds`() = runTest {
-    val focusedElement =
-        UIElementInfo(
-            text = "Focused Input", focused = "true", bounds = ElementBounds(0, 0, 100, 50))
-    val unfocusedElement = UIElementInfo(text = "Unfocused Input", focused = "false")
-
-    val children = listOf(focusedElement, unfocusedElement)
-    val childrenJson =
-        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
-
-    val rootElement = UIElementInfo(node = childrenJson)
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-
-    val found = extractor.findFocusedElement(hierarchy)
-    assertNotNull(found)
-    assertEquals("Focused Input", found!!.text)
-    assertTrue(found.isFocused)
-  }
-
-  @Test
-  fun `findFocusedElement returns null when no focused element with bounds exists`() = runTest {
-    val element = UIElementInfo(text = "Input", focused = "false")
-    val childrenJson = json.encodeToJsonElement(UIElementInfo.serializer(), element)
-
-    val rootElement = UIElementInfo(node = childrenJson)
-    val hierarchy = ViewHierarchy(hierarchy = rootElement)
-
-    val found = extractor.findFocusedElement(hierarchy)
-    assertNull(found)
   }
 
   @Test
@@ -309,6 +152,167 @@ class ViewHierarchyExtractorTest {
             )
 
     assertEquals(0.75, clickableElement.accessible!!, 0.001)
+  }
+
+  @Test
+  fun `meetsFilterCriteria excludes UIElementInfo with no values`() = runTest {
+    val plainElement = UIElementInfo()
+
+    val children = listOf(plainElement)
+    val childrenJson =
+        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
+
+    val rootElement = UIElementInfo(node = childrenJson)
+    val filteredChildren = extractor.extractChildrenFromHierarchy(rootElement)
+
+    // Should keep all elements with semantic properties but not the plain element
+    assertEquals(0, filteredChildren.size)
+  }
+
+  @Test
+  fun `meetsFilterCriteria includes elements with semantic properties`() = runTest {
+    val elementWithTestTag =
+        UIElementInfo(text = "", testTag = "submit-button", clickable = "false")
+    val elementWithRole = UIElementInfo(text = "", role = "button", clickable = "false")
+    val elementWithState =
+        UIElementInfo(text = "", stateDescription = "Expanded", clickable = "false")
+    val elementWithHint = UIElementInfo(text = "", hintText = "Enter name", clickable = "false")
+    val elementWithError = UIElementInfo(text = "", errorMessage = "Required", clickable = "false")
+    val elementWithActions =
+        UIElementInfo(text = "", actions = listOf("click", "focus"), clickable = "false")
+    val elementWithRange =
+        UIElementInfo(text = "", rangeInfo = "current:50,min:0,max:100", clickable = "false")
+
+    val children =
+        listOf(
+            elementWithTestTag,
+            elementWithRole,
+            elementWithState,
+            elementWithHint,
+            elementWithError,
+            elementWithActions,
+            elementWithRange)
+    val childrenJson =
+        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
+
+    val rootElement = UIElementInfo(node = childrenJson)
+    val filteredChildren = extractor.extractChildrenFromHierarchy(rootElement)
+
+    // Should keep all elements with semantic properties but not the plain element
+    assertEquals(7, filteredChildren.size)
+    assertTrue(filteredChildren.any { it.testTag == "submit-button" })
+    assertTrue(filteredChildren.any { it.role == "button" })
+    assertTrue(filteredChildren.any { it.stateDescription == "Expanded" })
+    assertTrue(filteredChildren.any { it.hintText == "Enter name" })
+    assertTrue(filteredChildren.any { it.errorMessage == "Required" })
+    assertTrue(filteredChildren.any { it.actions?.contains("click") == true })
+    assertTrue(filteredChildren.any { it.rangeInfo == "current:50,min:0,max:100" })
+
+    // Plain element should be filtered out
+    assertFalse(
+        filteredChildren.any {
+          it.text == "" &&
+              it.testTag == null &&
+              it.role == null &&
+              it.stateDescription == null &&
+              it.hintText == null &&
+              it.errorMessage == null &&
+              it.actions == null &&
+              it.rangeInfo == null
+        })
+  }
+
+  @Test
+  fun `UIElementInfo semantic properties are properly handled`() {
+    val element =
+        UIElementInfo(
+            text = "Button",
+            testTag = "submit-button",
+            role = "button",
+            stateDescription = "Enabled",
+            errorMessage = null,
+            hintText = "Click to submit",
+            tooltipText = "Submit form",
+            paneTitle = "Main Form",
+            liveRegion = "polite",
+            collectionInfo = "rows:5,cols:3",
+            collectionItemInfo = "row:1,col:2",
+            rangeInfo = "current:50,min:0,max:100",
+            inputType = "text",
+            actions = listOf("click", "focus"),
+            extras = mapOf("custom-property" to "custom-value"))
+
+    assertEquals("submit-button", element.testTag)
+    assertEquals("button", element.role)
+    assertEquals("Enabled", element.stateDescription)
+    assertNull(element.errorMessage)
+    assertEquals("Click to submit", element.hintText)
+    assertEquals("Submit form", element.tooltipText)
+    assertEquals("Main Form", element.paneTitle)
+    assertEquals("polite", element.liveRegion)
+    assertEquals("rows:5,cols:3", element.collectionInfo)
+    assertEquals("row:1,col:2", element.collectionItemInfo)
+    assertEquals("current:50,min:0,max:100", element.rangeInfo)
+    assertEquals("text", element.inputType)
+    assertEquals(listOf("click", "focus"), element.actions)
+    assertEquals(mapOf("custom-property" to "custom-value"), element.extras)
+  }
+
+  @Test
+  fun `processForAccessibility preserves semantic fields`() = runTest {
+    // Create an element with semantic properties
+    val originalElement =
+        UIElementInfo(
+            text = "Test Button",
+            testTag = "test-button",
+            role = "button",
+            stateDescription = "Enabled",
+            hintText = "Click me",
+            actions = listOf("click", "focus"),
+            clickable = "false", // Not clickable so it goes through the non-clickable path
+            bounds = ElementBounds(0, 0, 100, 50))
+
+    // Use reflection to access the private processForAccessibility method
+    val extractor = ViewHierarchyExtractor()
+    val method =
+        extractor.javaClass.getDeclaredMethod("processForAccessibility", UIElementInfo::class.java)
+    method.isAccessible = true
+
+    val processedElement = method.invoke(extractor, originalElement) as UIElementInfo
+
+    // Verify all semantic fields are preserved
+    assertEquals("test-button", processedElement.testTag)
+    assertEquals("button", processedElement.role)
+    assertEquals("Enabled", processedElement.stateDescription)
+    assertEquals("Click me", processedElement.hintText)
+    assertEquals(listOf("click", "focus"), processedElement.actions)
+
+    // Verify other fields are also preserved
+    assertEquals("Test Button", processedElement.text)
+    assertEquals("false", processedElement.clickable)
+  }
+
+  @Test
+  fun `semantic fields are serialized to JSON correctly`() {
+    val element =
+        UIElementInfo(
+            text = "Button",
+            testTag = "submit-button",
+            role = "button",
+            stateDescription = "Enabled",
+            actions = listOf("click"),
+            extras = mapOf("custom" to "value"))
+
+    val json = Json { prettyPrint = true }
+    val jsonString = json.encodeToString(UIElementInfo.serializer(), element)
+
+    // Verify semantic fields appear in JSON with correct serialization names
+    assertTrue("JSON should contain test-tag field", jsonString.contains("test-tag"))
+    assertTrue("JSON should contain role field", jsonString.contains("\"role\""))
+    assertTrue(
+        "JSON should contain state-description field", jsonString.contains("state-description"))
+    assertTrue("JSON should contain actions field", jsonString.contains("\"actions\""))
+    assertTrue("JSON should contain extras field", jsonString.contains("\"extras\""))
   }
 
   // Helper method to extract children from hierarchy (this would be made public in the actual

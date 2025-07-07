@@ -36,16 +36,6 @@
           android:resource="@xml/accessibility_service_config" />
       </service>
 
-    <!-- Broadcast receiver for accessibility commands -->
-    <receiver
-      android:name=".AccessibilityCommandReceiver"
-      android:exported="true">
-      <intent-filter>
-        <action android:name="com.zillow.automobile.GET_LATEST_HIERARCHY" />
-        <action android:name="com.zillow.automobile.GET_HIERARCHY_SYNC" />
-      </intent-filter>
-    </receiver>
-
   </application>
 
 </manifest>

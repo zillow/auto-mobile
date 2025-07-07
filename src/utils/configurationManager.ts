@@ -1,16 +1,23 @@
 import * as fs from "fs/promises";
 import * as path from "path";
-import { McpServerConfig, AbTestTreatment, Experiment } from "../models/McpServerConfiguration";
 import { logger } from "./logger";
+import { AppConfig, McpServerConfig } from "../models";
+import { ConfigArgs } from "../server/configurationTools";
 
 export class ConfigurationManager {
-  private config: McpServerConfig = {};
+  private serverConfig: McpServerConfig = {};
   private configFilePath: string;
   private static instance: ConfigurationManager;
+  private appSourceConfigs: Map<string, AppConfig> = new Map();
 
   private constructor() {
-    // Default config file path in project root
-    this.configFilePath = path.join(process.cwd(), ".auto-mobile-config.json");
+    // home should either be process.env.HOME or bash resolution of home for current user
+    const homeDir = process.env.HOME || require("os").homedir();
+    if (!homeDir) {
+      throw new Error("Home directory for current user not found");
+    }
+    this.configFilePath = path.join(homeDir, ".auto-mobile", "app-configs.json");
+    this.ensureDirectoriesExist();
   }
 
   public static getInstance(): ConfigurationManager {
@@ -20,22 +27,73 @@ export class ConfigurationManager {
     return ConfigurationManager.instance;
   }
 
+  // ===========================================
+  // App Configuration Management
+  // ===========================================
+
+  private ensureDirectoriesExist(): void {
+    const baseDir = path.dirname(this.configFilePath);
+    if (!require("fs").existsSync(baseDir)) {
+      require("fs").mkdirSync(baseDir, { recursive: true });
+    }
+  }
+
+  /**
+   * Add or update an app configuration
+   */
+  public async addAppConfig(appId: string, sourceDir: string, platform: "android" | "ios"): Promise<void> {
+    if (!require("fs").existsSync(sourceDir)) {
+      throw new Error(`Source directory does not exist: ${sourceDir}`);
+    }
+
+    this.appSourceConfigs.set(appId, { appId, sourceDir, platform });
+    await this.saveAppConfigs();
+
+    logger.debug(`[SOURCE] Added app configuration: ${appId} -> ${sourceDir}`);
+  }
+
+  /**
+   * Get all app configurations
+   */
+  public getAppConfigs(): AppConfig[] {
+    return Array.from(this.appSourceConfigs.values());
+  }
+
   /**
      * Load configuration from disk on server startup
      */
   public async loadFromDisk(): Promise<void> {
     try {
       const configData = await fs.readFile(this.configFilePath, "utf8");
-      this.config = JSON.parse(configData);
+      const parsedData = JSON.parse(configData);
+      this.serverConfig = parsedData.serverConfig || {};
+      for (const config of parsedData.apps) {
+        this.appSourceConfigs.set(config.appId, config);
+      }
       logger.info(`Configuration loaded from ${this.configFilePath}`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         logger.info("No existing configuration file found, using default config");
-        this.config = {};
+        this.serverConfig = {};
+        this.appSourceConfigs = new Map();
       } else {
         logger.warn(`Failed to load configuration: ${error}`);
-        this.config = {};
+        this.serverConfig = {};
+        this.appSourceConfigs = new Map();
       }
+    }
+  }
+
+  /**
+   * Save app configurations to disk
+   */
+  public async saveAppConfigs(): Promise<void> {
+    try {
+      const configs = Array.from(this.appSourceConfigs.values());
+      await fs.writeFile(this.configFilePath, JSON.stringify(configs, null, 2));
+      logger.debug(`[SOURCE] Saved ${configs.length} app configurations to disk`);
+    } catch (error) {
+      logger.warn(`Failed to save app configurations: ${error}`);
     }
   }
 
@@ -44,8 +102,12 @@ export class ConfigurationManager {
      */
   public async saveToDisk(): Promise<void> {
     try {
-      const configData = JSON.stringify(this.config, null, 2);
-      await fs.writeFile(this.configFilePath, configData, "utf8");
+      const configData = {
+        serverConfig: this.serverConfig,
+        apps: Array.from(this.appSourceConfigs.values())
+      };
+      const configJson = JSON.stringify(configData, null, 2);
+      await fs.writeFile(this.configFilePath, configJson, "utf8");
       logger.info(`Configuration saved to ${this.configFilePath}`);
     } catch (error) {
       logger.error(`Failed to save configuration: ${error}`);
@@ -56,83 +118,41 @@ export class ConfigurationManager {
   /**
      * Update configuration with partial data
      */
-  public async updateConfig(partial: Partial<McpServerConfig>): Promise<void> {
-    // Validate experiments if provided
-    if (partial.experiments) {
-      this.validateExperiments(partial.experiments);
-    }
-
+  public async updateConfig(args: ConfigArgs): Promise<void> {
     // Merge with existing configuration
-    this.config = {
-      ...this.config,
-      ...partial
-    };
+    this.serverConfig.mode = args.mode;
 
     // Persist to disk immediately
     await this.saveToDisk();
   }
 
   /**
-   * Validate experiments have non-blank names
-   */
-  private validateExperiments(experiments: Experiment[]): void {
-    for (const experiment of experiments) {
-      if (!experiment.name || experiment.name.trim() === "") {
-        throw new Error(`Experiment ${experiment.id} must have a non-blank name`);
-      }
-    }
-  }
-
-  /**
      * Get current configuration
      */
-  public getConfig(): McpServerConfig {
-    return { ...this.config };
+  public getServerConfig(): McpServerConfig {
+    return { ...this.serverConfig };
   }
 
   /**
      * Get specific configuration value
      */
-  public getConfigValue<K extends keyof McpServerConfig>(key: K): McpServerConfig[K] {
-    return this.config[key];
+  public getServerConfigValue<K extends keyof McpServerConfig>(key: K): McpServerConfig[K] {
+    return this.serverConfig[key];
   }
 
   /**
      * Check if test authoring is enabled
      */
   public isTestAuthoringEnabled(): boolean {
-    return this.config.mode === "testAuthoring";
-  }
-
-  /**
-     * Get active A/B test experiments
-     */
-  public getAbTestExperiments(): Experiment[] {
-    return this.config.experiments || [];
-  }
-
-  /**
-     * Get A/B test treatment for an experiment
-     */
-  public getAbTestTreatment(experimentId: string): AbTestTreatment | undefined {
-    if (!this.config.treatments) {
-      return undefined;
-    }
-    return this.config.treatments[experimentId];
-  }
-
-  /**
-   * Get all A/B test treatments
-   */
-  public getAllAbTestTreatments(): Record<string, AbTestTreatment> {
-    return this.config.treatments || {};
+    return this.serverConfig.mode === "testAuthoring";
   }
 
   /**
      * Reset configuration to defaults
      */
-  public async resetConfig(): Promise<void> {
-    this.config = {};
+  public async resetServerConfig(): Promise<void> {
+    this.serverConfig = {};
+    this.appSourceConfigs.clear();
     await this.saveToDisk();
   }
 

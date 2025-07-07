@@ -187,11 +187,11 @@ export class AppLifecycleMonitor extends EventEmitter {
    * Update the set of currently running tracked packages
    */
   private async updateRunningPackages(): Promise<void> {
-    this.runningPackages.clear();
-
     for (const packageName of this.trackedPackages) {
       if (await this.isPackageRunning(packageName)) {
         this.runningPackages.add(packageName);
+      } else {
+        this.runningPackages.delete(packageName);
       }
     }
   }
