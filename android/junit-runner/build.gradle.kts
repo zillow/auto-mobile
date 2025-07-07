@@ -7,7 +7,6 @@ plugins {
   `maven-publish`
   `java-library`
   signing
-  id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
 }
 
 group = "com.zillow.automobile"
