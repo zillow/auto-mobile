@@ -13,8 +13,9 @@ java {
   // Configure Gradle daemon to use same JDK
   System.setProperty("org.gradle.java.home", System.getProperty("java.home"))
   withSourcesJar()
-  withJavadocJar()
 }
+
+version = "0.0.1-SNAPSHOT"
 
 dependencies {
   // JUnit dependencies
@@ -48,11 +49,42 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 mavenPublishing {
-  publishToMavenCentral(automaticRelease = true)
-  coordinates(project.group.toString(), "junit-runner", project.version.toString())
+  publishToMavenCentral()
+  signAllPublications()
+
+  println(
+      "Publishing JUnit Runner to Maven... com.zillow.automobile:junit-runner:${project.version}")
+  coordinates("com.zillow.automobile", "junit-runner", project.version.toString())
 
   pom {
     name.set("AutoMobile JUnit Runner")
-    description.set("A description of what my library does.")
+    description.set("Runs AutoMobile JUnit tests with AutoMobile CLI.")
+    inceptionYear.set("2025")
+    url.set("https://zillow.github.io/auto-mobile/")
+    licenses {
+      license {
+        name.set("The Apache Software License, Version 2.0")
+        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+        distribution.set("repo")
+      }
+    }
+    developers {
+      developer {
+        id.set("Zillow")
+        name.set("Zillow OSS")
+        url.set("https://github.com/Zillow/")
+      }
+    }
+    scm {
+      url.set("https://github.com/zillow/auto-mobile/")
+      connection.set("scm:git:git://github.com/zillow/auto-mobile.git")
+      developerConnection.set("scm:git:ssh://git@github.com/zillow/auto-mobile.git")
+    }
+  }
+}
+
+tasks.configureEach {
+  if (name == "generateMetadataFileForMavenPublication") {
+    dependsOn("plainJavadocJar")
   }
 }
