@@ -4,7 +4,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
   kotlin("jvm")
   alias(libs.plugins.kotlin.serialization)
-  alias(libs.plugins.mavenPublish)
 
   // Apply the Application plugin to add support for building an executable JVM application.
   application
@@ -46,13 +45,4 @@ application {
   // Define the Fully Qualified Name for the application main class
   // (Note that Kotlin compiles `App.kt` to a class with FQN `com.example.app.AppKt`.
   mainClass = "com.zillow.automobile.kotlintestauthor.AppKt"
-}
-
-mavenPublishing {
-  coordinates(project.group.toString(), "android-test-author", project.version.toString())
-
-  pom {
-    name.set("AutoMobile Android Test Author")
-    description.set("AutoMobile Kotlin test authoring tool for Android")
-  }
 }
