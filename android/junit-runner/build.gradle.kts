@@ -48,6 +48,7 @@ tasks.withType<KotlinCompile>().configureEach {
 }
 
 mavenPublishing {
+  publishToMavenCentral(automaticRelease = true)
   coordinates(project.group.toString(), "junit-runner", project.version.toString())
 
   pom {
