@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { AdbUtils } from "../../../src/utils/adb";
-import { AccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
+import { AccessibilityServiceManager } from "../../../src/utils/accessibilityServiceManager";
 
 describe("AccessibilityServiceClient", function() {
   let accessibilityServiceClient: AccessibilityServiceClient;
