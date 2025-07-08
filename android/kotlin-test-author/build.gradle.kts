@@ -10,12 +10,6 @@ plugins {
   application
 }
 
-group = "com.zillow.automobile.kotlintestauthor"
-
-version = "0.0.1-SNAPSHOT"
-
-description = "AutoMobile Kotlin test authoring tool for Android"
-
 java {
   toolchain { languageVersion.set(JavaLanguageVersion.of(libs.versions.build.java.target.get())) }
   // Configure Gradle daemon to use same JDK
@@ -54,49 +48,11 @@ application {
   mainClass = "com.zillow.automobile.kotlintestauthor.AppKt"
 }
 
-publishing {
-  publications {
-    create<MavenPublication>("maven") {
-      from(components["java"])
+mavenPublishing {
+  coordinates(project.group.toString(), "android-test-author", project.version.toString())
 
-      groupId = project.group.toString()
-      artifactId = "kotlin-test-author"
-      version = project.version.toString()
-
-      pom {
-        name.set("AutoMobile Kotlin Test Author")
-        description.set("Kotlin test authoring tool for AutoMobile CLI")
-        url.set("https://github.com/zillow/auto-mobile")
-
-        licenses {
-          license {
-            name.set("Apache License 2.0")
-            url.set("https://www.apache.org/licenses/LICENSE-2.0")
-          }
-        }
-
-        developers {
-          developer {
-            id.set("zillow")
-            name.set("Zillow Engineering")
-            email.set("engineering@zillow.com")
-          }
-        }
-
-        scm {
-          connection.set("scm:git:git://github.com/zillow/auto-mobile.git")
-          developerConnection.set("scm:git:ssh://github.com/zillow/auto-mobile.git")
-          url.set("https://github.com/zillow/auto-mobile")
-        }
-      }
-    }
-  }
-
-  repositories {
-    // For local development
-    maven {
-      name = "LocalRepo"
-      url = uri(layout.buildDirectory.dir("repo"))
-    }
+  pom {
+    name.set("AutoMobile Android Test Author")
+    description.set("AutoMobile Kotlin test authoring tool for Android")
   }
 }

@@ -8,12 +8,6 @@ plugins {
   alias(libs.plugins.mavenPublish)
 }
 
-group = "com.zillow.automobile"
-
-version = "0.0.1-SNAPSHOT"
-
-description = "AutoMobile JUnit runner"
-
 java {
   toolchain { languageVersion.set(JavaLanguageVersion.of(libs.versions.build.java.target.get())) }
   // Configure Gradle daemon to use same JDK
