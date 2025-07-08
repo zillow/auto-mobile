@@ -115,7 +115,7 @@ export class VirtualKeyboardManager {
       const actualChecksum = sha256sum.split(" ")[0];
 
       // Expected checksum for the ADBKeyboard APK
-      const expectedChecksum = "8dd0b6924e45ac5565f77f13cf8e8eaf47dbb1b0";
+      const expectedChecksum = "e698adea5633135a067b038f9a0cf41baa4de09888713a81593fb2b9682cdc59";
 
       if (actualChecksum !== expectedChecksum) {
         logger.warn("APK checksum verification failed", {

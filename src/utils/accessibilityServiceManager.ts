@@ -16,7 +16,7 @@ export class AccessibilityServiceManager {
   private adb: AdbUtils;
   public static readonly PACKAGE = "com.zillow.automobile.accessibilityservice";
   public static readonly ACTIVITY = "com.zillow.automobile.accessibilityservice.MainActivity";
-  private static readonly APK_URL = "https://github.com/zillow/auto-mobile/releases/download/0.0.2/accessibility-service-debug.apk";
+  private static readonly APK_URL = "https://github.com/zillow/auto-mobile/releases/download/0.0.3/accessibility-service-debug.apk";
 
   // Static cache for service availability
   private static cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;
@@ -185,7 +185,7 @@ export class AccessibilityServiceManager {
       const actualChecksum = sha256sum.split(" ")[0];
 
       // Expected checksum for the APK
-      const expectedChecksum = "8a8a43be9501b2c40eba0db047b125c1f00a7be1ed9f6bfaa03f64a1704263b1";
+      const expectedChecksum = "979fa82f632d004a3f94dd7cd366be2a8bbab55f19d0bfd722f852c3cea674d4";
 
       if (actualChecksum !== expectedChecksum) {
         logger.warn("APK checksum verification failed", {
