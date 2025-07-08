@@ -52,8 +52,6 @@ mavenPublishing {
   publishToMavenCentral()
   signAllPublications()
 
-  println(
-      "Publishing JUnit Runner to Maven... com.zillow.automobile:junit-runner:${project.version}")
   coordinates("com.zillow.automobile", "junit-runner", project.version.toString())
 
   pom {
@@ -73,6 +71,7 @@ mavenPublishing {
         id.set("Zillow")
         name.set("Zillow OSS")
         url.set("https://github.com/Zillow/")
+        email.set("oss@zillowgroup.com")
       }
     }
     scm {
