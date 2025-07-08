@@ -4,9 +4,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
   kotlin("jvm")
   alias(libs.plugins.kotlin.serialization)
-  `maven-publish`
   `java-library`
-  signing
+  alias(libs.plugins.mavenPublish)
 }
 
 group = "com.zillow.automobile"
@@ -54,61 +53,11 @@ tasks.withType<KotlinCompile>().configureEach {
   }
 }
 
-publishing {
-  publications {
-    create<MavenPublication>("maven") {
-      from(components["java"])
+mavenPublishing {
+  coordinates(project.group.toString(), "junit-runner", project.version.toString())
 
-      groupId = project.group.toString()
-      artifactId = "junit-runner"
-      version = project.version.toString()
-
-      pom {
-        name.set("AutoMobile JUnit Runner")
-        description.set("JUnit runner for AutoMobile CLI integration with Android UI tests")
-        url.set("https://github.com/zillow/auto-mobile")
-
-        licenses {
-          license {
-            name.set("Apache License 2.0")
-            url.set("https://www.apache.org/licenses/LICENSE-2.0")
-          }
-        }
-
-        developers {
-          developer {
-            id.set("zillow")
-            name.set("Zillow OSS")
-            email.set("oss@zillowgroup.com")
-          }
-        }
-
-        scm {
-          connection.set("scm:git:git://github.com/zillow/auto-mobile.git")
-          developerConnection.set("scm:git:ssh://github.com/zillow/auto-mobile.git")
-          url.set("https://github.com/zillow/auto-mobile")
-        }
-      }
-    }
-  }
-
-  repositories {
-    // For local development
-    maven {
-      name = "Local"
-      url = uri(layout.buildDirectory.dir("repo"))
-    }
-
-    // Maven Central via Sonatype
-    maven {
-      name = "Central"
-      url = uri("https://central.sonatype.com/api/v1/publisher/upload")
-      credentials {
-        username =
-            findProperty("sonatype.username") as String? ?: System.getenv("SONATYPE_USERNAME")
-        password =
-            findProperty("sonatype.password") as String? ?: System.getenv("SONATYPE_PASSWORD")
-      }
-    }
+  pom {
+    name.set("AutoMobile JUnit Runner")
+    description.set("A description of what my library does.")
   }
 }

@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
   kotlin("jvm")
   alias(libs.plugins.kotlin.serialization)
-  `maven-publish`
+  alias(libs.plugins.mavenPublish)
 
   // Apply the Application plugin to add support for building an executable JVM application.
   application

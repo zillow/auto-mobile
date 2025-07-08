@@ -11,7 +11,7 @@ export class VirtualKeyboardManager {
   private adb: AdbUtils;
   private static readonly ADB_KEYBOARD_ID = "com.android.adbkeyboard/.AdbIME";
   private static readonly ADB_KEYBOARD_PACKAGE = "com.android.adbkeyboard";
-  private static readonly APK_URL = "https://github.com/senzhk/ADBKeyBoard/raw/master/ADBKeyboard.apk";
+  private static readonly APK_URL = "https://github.com/senzhk/ADBKeyBoard/blob/8dd0b6924e45ac5565f77f13cf8e8eaf47dbb1b0/ADBKeyboard.apk";
 
   constructor(deviceId: string | null = null) {
     this.adb = new AdbUtils(deviceId);
@@ -90,8 +90,9 @@ export class VirtualKeyboardManager {
    * Download ADBKeyboard APK
    */
   async downloadAdbKeyboardApk(): Promise<string> {
-    const tempDir = "/tmp";
-    const apkPath = path.join(tempDir, `adbkeyboard_${Date.now()}.apk`);
+    const tempDir = "/tmp/auto-mobile/adbkeyboard/";
+    const apkPath = path.join(tempDir, `adbkeyboard.apk`);
+    await fs.mkdir(tempDir, { recursive: true });
 
     try {
       logger.info("Downloading ADBKeyboard APK", { url: VirtualKeyboardManager.APK_URL, destination: apkPath });
@@ -108,6 +109,23 @@ export class VirtualKeyboardManager {
       if (stats.size < 10000) {
         throw new Error(`Downloaded APK is too small (${stats.size} bytes), likely invalid`);
       }
+
+      // Perform checksum verification
+      const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
+      const actualChecksum = sha256sum.split(" ")[0];
+
+      // Expected checksum for the ADBKeyboard APK
+      const expectedChecksum = "8dd0b6924e45ac5565f77f13cf8e8eaf47dbb1b0";
+
+      if (actualChecksum !== expectedChecksum) {
+        logger.warn("APK checksum verification failed", {
+          expected: expectedChecksum,
+          actual: actualChecksum
+        });
+        throw new Error(`APK checksum verification failed. Expected: ${expectedChecksum}, Got: ${actualChecksum}`);
+      }
+
+      logger.info("APK checksum verified successfully", { checksum: actualChecksum });
 
       logger.info("ADBKeyboard APK downloaded successfully", { path: apkPath, size: stats.size });
       return apkPath;

@@ -41,7 +41,7 @@ export function registerObserveTools() {
   // Register with the tool registry using the new device-aware method
   ToolRegistry.registerDeviceAware(
     "observe",
-    "Take a screenshot and get the view hierarchy of what is displayed on screen",
+    "Get the view hierarchy of what is displayed on screen",
     observeSchema,
     observeHandler,
   );

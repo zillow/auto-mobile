@@ -1,15 +1,20 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
-import { ActionableError } from "../models/ActionableError";
+import { ActionableError } from "../models";
 import { LaunchApp } from "../features/action/LaunchApp";
 import { TerminateApp } from "../features/action/TerminateApp";
-import { ClearAppData } from "../features/action/ClearAppData";
 import { InstallApp } from "../features/action/InstallApp";
 import { createJSONToolResponse } from "../utils/toolUtils";
 
 // Schema definitions
 export const packageNameSchema = z.object({
   appId: z.string().describe("App package ID of the app")
+});
+
+export const launchAppSchema = z.object({
+  appId: z.string().describe("App package ID of the app"),
+  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default true"),
+  clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false")
 });
 
 export const installAppSchema = z.object({
@@ -21,6 +26,12 @@ export interface AppActionArgs {
   appId: string;
 }
 
+export interface LaunchAppActionArgs {
+  appId: string;
+  coldBoot?: boolean;
+  clearAppData?: boolean;
+}
+
 export interface InstallAppArgs {
   apkPath: string;
 }
@@ -29,10 +40,15 @@ export interface InstallAppArgs {
 export function registerAppTools(
 ) {
   // Launch app handler
-  const launchAppHandler = async (deviceId: string, args: AppActionArgs) => {
+  const launchAppHandler = async (deviceId: string, args: LaunchAppActionArgs) => {
     try {
       const launchApp = new LaunchApp(deviceId);
-      const result = await launchApp.execute(args.appId, undefined);
+      const result = await launchApp.execute(
+        args.appId,
+        args.coldBoot || true,
+        args.clearAppData || false,
+        undefined
+      );
 
       return createJSONToolResponse({
         message: `Launched app ${args.appId}`,
@@ -60,22 +76,6 @@ export function registerAppTools(
     }
   };
 
-  // Clear app data handler
-  const clearAppDataHandler = async (deviceId: string, args: AppActionArgs) => {
-    try {
-      const clearAppData = new ClearAppData(deviceId);
-      const result = await clearAppData.execute(args.appId);
-
-      return createJSONToolResponse({
-        message: `Cleared data for app ${args.appId}`,
-        observation: result.observation,
-        ...result
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to clear app data: ${error}`);
-    }
-  };
-
   // Install app handler
   const installAppHandler = async (deviceId: string, args: InstallAppArgs) => {
     try {
@@ -95,7 +95,7 @@ export function registerAppTools(
   ToolRegistry.registerDeviceAware(
     "launchApp",
     "Launch an app by package name",
-    packageNameSchema,
+    launchAppSchema,
     launchAppHandler
   );
 
@@ -104,13 +104,6 @@ export function registerAppTools(
     "Terminate an app by package name",
     packageNameSchema,
     terminateAppHandler
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "clearAppData",
-    "Clear data for an app by package name",
-    packageNameSchema,
-    clearAppDataHandler
   );
 
   ToolRegistry.registerDeviceAware(

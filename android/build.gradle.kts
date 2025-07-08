@@ -1,3 +1,4 @@
+import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -18,6 +19,19 @@ plugins {
   alias(libs.plugins.android.application) apply false
   alias(libs.plugins.kotlin.serialization) apply false
   alias(libs.plugins.compose.compiler) apply false
+  alias(libs.plugins.mavenPublish) apply false
+}
+
+plugins.withId(libs.plugins.mavenPublish.get().pluginId) {
+  if (project.path != ":compiler") {
+    apply(plugin = "org.jetbrains.dokka")
+  }
+  configure<MavenPublishBaseExtension> { publishToMavenCentral(automaticRelease = true) }
+
+  // configuration required to produce unique META-INF/*.kotlin_module file names
+  tasks.withType<KotlinCompile>().configureEach {
+    compilerOptions { moduleName.set(project.property("POM_ARTIFACT_ID") as String) }
+  }
 }
 
 val gradleWorkerJvmArgs = providers.gradleProperty("org.gradle.testWorker.jvmargs").get()

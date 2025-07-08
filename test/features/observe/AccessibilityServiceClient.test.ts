@@ -2,6 +2,7 @@ import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { AdbUtils } from "../../../src/utils/adb";
+import { AccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
 
 describe("AccessibilityServiceClient", function() {
   let accessibilityServiceClient: AccessibilityServiceClient;
@@ -15,139 +16,6 @@ describe("AccessibilityServiceClient", function() {
 
     accessibilityServiceClient = new AccessibilityServiceClient("test-device", mockAdb);
     AccessibilityServiceClient.clearAvailabilityCache();
-  });
-
-  describe("isInstalled", function() {
-    it("should return true when accessibility service package is installed", async function() {
-      mockAdb.executeCommand = async () => ({
-        stdout: "package:com.zillow.automobile.accessibilityservice\n",
-        stderr: ""
-      });
-
-      const result = await accessibilityServiceClient.isInstalled();
-      expect(result).to.be.true;
-    });
-
-    it("should return false when accessibility service package is not installed", async function() {
-      mockAdb.executeCommand = async () => ({
-        stdout: "package:com.other.app\n",
-        stderr: ""
-      });
-
-      const result = await accessibilityServiceClient.isInstalled();
-      expect(result).to.be.false;
-    });
-
-    it("should return false when ADB command fails", async function() {
-      mockAdb.executeCommand = async () => {
-        throw new Error("ADB command failed");
-      };
-
-      const result = await accessibilityServiceClient.isInstalled();
-      expect(result).to.be.false;
-    });
-  });
-
-  describe("isEnabled", function() {
-    it("should return true when accessibility service is enabled", async function() {
-      mockAdb.executeCommand = async () => ({
-        stdout: "com.zillow.automobile.accessibilityservice/com.zillow.automobile.accessibilityservice.AutomobileAccessibilityService:other.service/SomeService",
-        stderr: ""
-      });
-
-      const result = await accessibilityServiceClient.isEnabled();
-      expect(result).to.be.true;
-    });
-
-    it("should return false when accessibility service is not enabled", async function() {
-      mockAdb.executeCommand = async () => ({
-        stdout: "other.service/SomeService",
-        stderr: ""
-      });
-
-      const result = await accessibilityServiceClient.isEnabled();
-      expect(result).to.be.false;
-    });
-
-    it("should return false when ADB command fails", async function() {
-      mockAdb.executeCommand = async () => {
-        throw new Error("ADB command failed");
-      };
-
-      const result = await accessibilityServiceClient.isEnabled();
-      expect(result).to.be.false;
-    });
-  });
-
-  describe("isAvailable", function() {
-    it("should return true when service is both installed and enabled", async function() {
-      let callCount = 0;
-      mockAdb.executeCommand = async (cmd: string) => {
-        callCount++;
-        if (cmd.includes("pm list packages")) {
-          return {
-            stdout: "package:com.zillow.automobile.accessibilityservice\n",
-            stderr: ""
-          };
-        } else if (cmd.includes("settings get secure")) {
-          return {
-            stdout: "com.zillow.automobile.accessibilityservice/com.zillow.automobile.accessibilityservice.AutomobileAccessibilityService",
-            stderr: ""
-          };
-        }
-        return { stdout: "", stderr: "" };
-      };
-
-      const result = await accessibilityServiceClient.isAvailable();
-      expect(result).to.be.true;
-      expect(callCount).to.equal(2); // Should call both installation and enabled checks
-    });
-
-    it("should return false when service is installed but not enabled", async function() {
-      let callCount = 0;
-      mockAdb.executeCommand = async (cmd: string) => {
-        callCount++;
-        if (cmd.includes("pm list packages")) {
-          return {
-            stdout: "package:com.zillow.automobile.accessibilityservice\n",
-            stderr: ""
-          };
-        } else if (cmd.includes("settings get secure")) {
-          return {
-            stdout: "other.service/SomeService",
-            stderr: ""
-          };
-        }
-        return { stdout: "", stderr: "" };
-      };
-
-      const result = await accessibilityServiceClient.isAvailable();
-      expect(result).to.be.false;
-      expect(callCount).to.equal(2);
-    });
-
-    it("should return false when service is not installed", async function() {
-      let callCount = 0;
-      mockAdb.executeCommand = async (cmd: string) => {
-        callCount++;
-        if (cmd.includes("pm list packages")) {
-          return {
-            stdout: "package:com.other.app\n",
-            stderr: ""
-          };
-        } else if (cmd.includes("settings get secure")) {
-          return {
-            stdout: "com.zillow.automobile.accessibilityservice/com.zillow.automobile.accessibilityservice.AutomobileAccessibilityService",
-            stderr: ""
-          };
-        }
-        return { stdout: "", stderr: "" };
-      };
-
-      const result = await accessibilityServiceClient.isAvailable();
-      expect(result).to.be.false;
-      expect(callCount).to.equal(2);
-    });
   });
 
   describe("getLatestHierarchy", function() {
@@ -205,7 +73,7 @@ describe("AccessibilityServiceClient", function() {
 
     it("should return null when ADB command fails", async function() {
       mockAdb.executeCommand = async () => {
-        throw new Error("run-as: Package 'com.zillow.automobile.accessibilityservice' is not debuggable");
+        throw new Error(`run-as: Package '${AccessibilityServiceManager.PACKAGE}' is not debuggable`);
       };
 
       const result = await accessibilityServiceClient.getLatestHierarchy();
@@ -335,12 +203,13 @@ describe("AccessibilityServiceClient", function() {
         commandCount++;
         if (cmd.includes("pm list packages")) {
           return {
-            stdout: "package:com.zillow.automobile.accessibilityservice\n",
+            stdout: `package:${AccessibilityServiceManager.PACKAGE}
+`,
             stderr: ""
           };
         } else if (cmd.includes("settings get secure")) {
           return {
-            stdout: "com.zillow.automobile.accessibilityservice/com.zillow.automobile.accessibilityservice.AutomobileAccessibilityService",
+            stdout: `${AccessibilityServiceManager.PACKAGE}/${AccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService`,
             stderr: ""
           };
         } else if (cmd.includes("run-as")) {
@@ -368,12 +237,13 @@ describe("AccessibilityServiceClient", function() {
         commandCount++;
         if (cmd.includes("pm list packages")) {
           return {
-            stdout: "package:com.zillow.automobile.accessibilityservice\n",
+            stdout: `package:${AccessibilityServiceManager.PACKAGE}
+`,
             stderr: ""
           };
         } else if (cmd.includes("settings get secure")) {
           return {
-            stdout: "com.zillow.automobile.accessibilityservice/com.zillow.automobile.accessibilityservice.AutomobileAccessibilityService",
+            stdout: `${AccessibilityServiceManager.PACKAGE}/${AccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService`,
             stderr: ""
           };
         } else if (cmd.includes("run-as")) {

@@ -1,6 +1,7 @@
 import { AdbUtils } from "../../utils/adb";
 import { logger } from "../../utils/logger";
 import { ViewHierarchyResult } from "../../models";
+import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
 
 /**
  * Interface for accessibility service node format
@@ -45,146 +46,21 @@ interface AccessibilityHierarchy {
  */
 export class AccessibilityServiceClient {
   private adb: AdbUtils;
+  private accessibilityServiceManager: AccessibilityServiceManager;
   private static readonly PACKAGE_NAME = "com.zillow.automobile.accessibilityservice";
   private static readonly HIERARCHY_FILE_PATH = "files/latest_hierarchy.json";
 
-  // Static cache for service availability
-  private static cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;
-  private static readonly AVAILABILITY_CACHE_TTL = 60 * 60 * 1000; // 1 hour
-
-  // Static caches for individual status checks
-  private static cachedInstallation: { isInstalled: boolean; timestamp: number } | null = null;
-  private static cachedEnabled: { isEnabled: boolean; timestamp: number } | null = null;
-  private static readonly STATUS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-
   constructor(deviceId: string, adb: AdbUtils | null = null) {
     this.adb = adb || new AdbUtils(deviceId);
+    this.accessibilityServiceManager = new AccessibilityServiceManager(deviceId, adb);
   }
 
   /**
      * Clear the cached availability status
      */
   public static clearAvailabilityCache(): void {
-    AccessibilityServiceClient.cachedAvailability = null;
-    AccessibilityServiceClient.cachedInstallation = null;
-    AccessibilityServiceClient.cachedEnabled = null;
+    AccessibilityServiceManager.clearAvailabilityCache();
     logger.info("[ACCESSIBILITY_SERVICE] Cleared all availability caches");
-  }
-
-  /**
-     * Check if the accessibility service package is installed
-     * @returns Promise<boolean> - True if installed, false otherwise
-     */
-  async isInstalled(): Promise<boolean> {
-    // Check cache first
-    if (AccessibilityServiceClient.cachedInstallation) {
-      const cacheAge = Date.now() - AccessibilityServiceClient.cachedInstallation.timestamp;
-      if (cacheAge < AccessibilityServiceClient.STATUS_CACHE_TTL) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Using cached installation status (age: ${cacheAge}ms): ${AccessibilityServiceClient.cachedInstallation.isInstalled ? "installed" : "not installed"}`);
-        return AccessibilityServiceClient.cachedInstallation.isInstalled;
-      }
-    }
-
-    try {
-      logger.info("[ACCESSIBILITY_SERVICE] Checking if accessibility service is installed");
-      const result = await this.adb.executeCommand("shell pm list packages | grep automobile.accessibility");
-      const isInstalled = result.stdout.includes(AccessibilityServiceClient.PACKAGE_NAME);
-
-      // Cache the result
-      AccessibilityServiceClient.cachedInstallation = {
-        isInstalled,
-        timestamp: Date.now()
-      };
-
-      logger.info(`[ACCESSIBILITY_SERVICE] Service installation status: ${isInstalled ? "installed" : "not installed"} (cached for ${AccessibilityServiceClient.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
-      return isInstalled;
-    } catch (error) {
-      logger.warn(`[ACCESSIBILITY_SERVICE] Error checking installation status: ${error}`);
-      return false;
-    }
-  }
-
-  /**
-     * Check if the accessibility service is enabled
-     * @returns Promise<boolean> - True if enabled, false otherwise
-     */
-  async isEnabled(): Promise<boolean> {
-    // Check cache first
-    if (AccessibilityServiceClient.cachedEnabled) {
-      const cacheAge = Date.now() - AccessibilityServiceClient.cachedEnabled.timestamp;
-      if (cacheAge < AccessibilityServiceClient.STATUS_CACHE_TTL) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Using cached enabled status (age: ${cacheAge}ms): ${AccessibilityServiceClient.cachedEnabled.isEnabled ? "enabled" : "disabled"}`);
-        return AccessibilityServiceClient.cachedEnabled.isEnabled;
-      }
-    }
-
-    try {
-      logger.info("[ACCESSIBILITY_SERVICE] Checking if accessibility service is enabled");
-      const result = await this.adb.executeCommand("shell settings get secure enabled_accessibility_services");
-      const isEnabled = result.stdout.includes(AccessibilityServiceClient.PACKAGE_NAME);
-
-      // Cache the result
-      AccessibilityServiceClient.cachedEnabled = {
-        isEnabled,
-        timestamp: Date.now()
-      };
-
-      logger.info(`[ACCESSIBILITY_SERVICE] Service enabled status: ${isEnabled ? "enabled" : "disabled"} (cached for ${AccessibilityServiceClient.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
-      return isEnabled;
-    } catch (error) {
-      logger.warn(`[ACCESSIBILITY_SERVICE] Error checking enabled status: ${error}`);
-      return false;
-    }
-  }
-
-  /**
-     * Check if the accessibility service is both installed and enabled
-     * @returns Promise<boolean> - True if available for use, false otherwise
-     */
-  async isAvailable(): Promise<boolean> {
-    const startTime = Date.now();
-
-    // Check cache first
-    if (AccessibilityServiceClient.cachedAvailability && AccessibilityServiceClient.cachedAvailability.isAvailable) {
-      const cacheAge = Date.now() - AccessibilityServiceClient.cachedAvailability.timestamp;
-      if (cacheAge < AccessibilityServiceClient.AVAILABILITY_CACHE_TTL) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Using cached overall availability (age: ${cacheAge}ms): ${AccessibilityServiceClient.cachedAvailability.isAvailable}`);
-        return true;
-      } else {
-        AccessibilityServiceClient.cachedAvailability.isAvailable = false;
-        logger.info(`[ACCESSIBILITY_SERVICE] Overall availability cache expired (age: ${cacheAge}ms > TTL: ${AccessibilityServiceClient.AVAILABILITY_CACHE_TTL}ms)`);
-      }
-    }
-
-    logger.info(`[ACCESSIBILITY_SERVICE] Checking availability (no cached result available)`);
-
-    try {
-      // Check installation and enabled status in parallel for better performance
-      const [installed, enabled] = await Promise.all([
-        this.isInstalled(),
-        this.isEnabled()
-      ]);
-
-      const available = installed && enabled;
-      const duration = Date.now() - startTime;
-
-      // Cache the result
-      AccessibilityServiceClient.cachedAvailability = {
-        isAvailable: available,
-        timestamp: Date.now()
-      };
-
-      logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available} (cached for ${AccessibilityServiceClient.AVAILABILITY_CACHE_TTL / 1000 / 60} minutes)`);
-      return available;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.warn(`[ACCESSIBILITY_SERVICE] Availability check failed after ${duration}ms: ${error}`);
-
-      // Clear cache on error
-      AccessibilityServiceClient.cachedAvailability = null;
-
-      return false;
-    }
   }
 
   /**
@@ -337,24 +213,16 @@ export class AccessibilityServiceClient {
   }
 
   /**
-     * Get view hierarchy from accessibility service with automatic fallback
+     * Get view hierarchy from accessibility service
      * This is the main entry point for getting hierarchy data from the accessibility service
      * @returns Promise<ViewHierarchyResult | null> - The hierarchy or null if service unavailable
      */
   async getAccessibilityHierarchy(): Promise<ViewHierarchyResult | null> {
-    return this.getViewHierarchyWithFallback();
-  }
-
-  /**
-   * Get view hierarchy from accessibility service with automatic fallback
-   * @returns Promise<ViewHierarchyResult | null> - The hierarchy or null if service unavailable
-   */
-  async getViewHierarchyWithFallback(): Promise<ViewHierarchyResult | null> {
     const startTime = Date.now();
 
     try {
       // Check if service is available
-      const available = await this.isAvailable();
+      const available = this.accessibilityServiceManager.isAvailable();
       if (!available) {
         logger.info("[ACCESSIBILITY_SERVICE] Service not available, will use fallback");
         return null;

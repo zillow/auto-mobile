@@ -2,8 +2,11 @@ import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { LaunchAppResult } from "../../models";
 import { ActionableError } from "../../models";
+import { TerminateApp } from "./TerminateApp";
+import { ClearAppData } from "./ClearAppData";
 
 export class LaunchApp extends BaseVisualChange {
+  private deviceId: string;
   /**
    * Create an LaunchApp instance
    * @param deviceId - Optional device ID
@@ -11,6 +14,7 @@ export class LaunchApp extends BaseVisualChange {
    */
   constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
+    this.deviceId = deviceId;
   }
 
   /**
@@ -45,10 +49,14 @@ export class LaunchApp extends BaseVisualChange {
   /**
    * Launch an app by package name
    * @param packageName - The package name to launch
+   * @param clearAppData - Whether clear app data before launch
+   * @param coldBoot - Whether to cold boot the app or resume if already running
    * @param activityName - Optional activity name to launch
    */
   async execute(
     packageName: string,
+    clearAppData: boolean,
+    coldBoot: boolean,
     activityName?: string
   ): Promise<LaunchAppResult> {
 
@@ -64,6 +72,41 @@ export class LaunchApp extends BaseVisualChange {
         activityName,
         error: "App is not installed"
       };
+    }
+
+    // Check if app is running
+    const isRunningCmd = `shell ps | grep ${packageName} | grep -v grep | wc -l`;
+    const isRunningOutput = await this.adb.executeCommand(isRunningCmd);
+    const isRunning = parseInt(isRunningOutput.trim(), 10) > 0;
+
+    if (isRunning) {
+
+      if (clearAppData) {
+        await new ClearAppData(this.deviceId, this.adb).execute(packageName);
+      } else if (coldBoot) {
+        await new TerminateApp(this.deviceId, this.adb).execute(packageName);
+      }
+
+      // Check if app is in foreground
+      const currentAppCmd = `shell "dumpsys window windows | grep '${packageName}'"`;
+      const currentAppOutput = await this.adb.executeCommand(currentAppCmd);
+
+      // App is in foreground if it's either the top app or an IME target
+      const isTopApp = currentAppOutput.includes(`topApp=ActivityRecord{`) &&
+        currentAppOutput.includes(`${packageName}`);
+      const isImeTarget = currentAppOutput.includes(`imeLayeringTarget`) &&
+        currentAppOutput.includes(`${packageName}`);
+
+      const isForeground = isTopApp || isImeTarget;
+
+      if (isForeground) {
+        return {
+          success: true,
+          packageName,
+          activityName,
+          error: "App is already in foreground"
+        };
+      }
     }
 
     return this.observedInteraction(

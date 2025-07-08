@@ -4,6 +4,7 @@ import { AdbUtils } from "./adb";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
 import { TestAuthoringManager } from "./testAuthoringManager";
+import { AccessibilityServiceManager } from "./accessibilityServiceManager";
 
 export class DeviceSessionManager {
   private currentDeviceId: string | undefined;
@@ -115,6 +116,13 @@ export class DeviceSessionManager {
       throw new ActionableError(
         `Failed to verify device ${deviceId} readiness: ${errorMessage}`
       );
+    }
+
+    try {
+      await new AccessibilityServiceManager(deviceId).setup();
+    }  catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`[DeviceSessionManager] Failed to setup accessibility service: ${errorMessage}`);
     }
   }
 

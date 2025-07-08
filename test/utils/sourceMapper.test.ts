@@ -137,7 +137,6 @@ describe("SourceMapper", function() {
       };
 
       const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, "/test/project", "com.example.app");
-      console.log(sourceAnalysis);
 
       expect(sourceAnalysis).to.have.property("primaryActivity");
       expect(sourceAnalysis).to.have.property("fragments");
@@ -161,7 +160,6 @@ describe("SourceMapper", function() {
       const currentDir = process.cwd();
       const androidPath = path.join(currentDir, "android");
       const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, androidPath, "com.zillow.automobile.playground");
-      console.log(sourceAnalysis);
 
       expect(sourceAnalysis).to.have.property("primaryActivity");
       expect(sourceAnalysis).to.have.property("fragments");
@@ -185,7 +183,6 @@ describe("SourceMapper", function() {
       const currentDir = process.cwd();
       const androidPath = path.join(currentDir, "android");
       const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, androidPath, "com.zillow.automobile.playground");
-      console.log(sourceAnalysis);
 
       expect(sourceAnalysis).to.have.property("primaryActivity");
       expect(sourceAnalysis).to.have.property("fragments");
@@ -222,9 +219,7 @@ describe("SourceMapper", function() {
     it("should index source files for AutoMobile Playground", async function() {
 
       const currentDir = process.cwd();
-      console.log(`currentDir: ${currentDir}`);
       const androidPath = path.join(currentDir, "android");
-      console.log(`androidPath: ${androidPath}`);
       const appId = "com.zillow.automobile.playground";
 
       const result = await sourceMapper.indexSourceFiles(appId, androidPath);

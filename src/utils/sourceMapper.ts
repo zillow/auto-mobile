@@ -966,7 +966,7 @@ export class SourceMapper {
     const views = new Map<string, ViewInfo>();
     const composables = new Map<string, ComposableInfo>();
 
-    console.log(`[SOURCE] Starting source indexing for app: ${appId}`);
+    logger.info(`[SOURCE] Starting source indexing for app: ${appId}`);
 
     try {
       // Find all Java/Kotlin files that contain "Activity" class definitions
@@ -1058,7 +1058,7 @@ export class SourceMapper {
               sourceFile: file
             });
 
-            console.log(`[SOURCE] Indexed view: ${fullClassName} -> ${file}`);
+            logger.info(`[SOURCE] Indexed view: ${fullClassName} -> ${file}`);
           }
         } catch (error) {
           logger.warn(`Failed to process view file ${file}: ${error}`);

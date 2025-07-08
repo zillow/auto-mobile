@@ -76,7 +76,7 @@ describe("MCP Tools Registry", () => {
       interaction: ["tapOn", "sendText", "pressButton", "swipeOnScreen", "swipeOnElement"],
 
       // App management tools (lifecycle management)
-      app: ["listApps", "launchApp", "terminateApp", "clearAppData", "installApp"],
+      app: ["listApps", "launchApp", "terminateApp", "installApp"],
 
       // Utility tools (device state and configuration)
       utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog", "enableDemoMode", "disableDemoMode"],
