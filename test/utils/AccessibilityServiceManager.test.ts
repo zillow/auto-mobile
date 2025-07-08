@@ -14,7 +14,7 @@ describe("AccessibilityServiceManager", function() {
     } as unknown as AdbUtils;
 
     accessibilityServiceClient = new AccessibilityServiceManager("test-device", mockAdb);
-    AccessibilityServiceManager.clearAvailabilityCache();
+    accessibilityServiceClient.clearAvailabilityCache();
   });
 
   describe("isInstalled", function() {

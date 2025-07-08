@@ -8,10 +8,10 @@ import { TakeScreenshot } from "./TakeScreenshot";
 import { GetDumpsysWindow } from "./GetDumpsysWindow";
 import { AdbUtils } from "../../utils/adb";
 import { DeepLinkManager } from "../../utils/deepLinkManager";
-import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
+import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
 
 /**
  * Interface for cached observe result
@@ -25,6 +25,7 @@ interface ObserveResultCache {
  * Observe command class that combines screen details, view hierarchy and screenshot
  */
 export class ObserveScreen {
+  private deviceId: string;
   private screenSize: GetScreenSize;
   private systemInsets: GetSystemInsets;
   private viewHierarchy: ViewHierarchy;
@@ -40,6 +41,7 @@ export class ObserveScreen {
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
   constructor(deviceId: string, adb: AdbUtils | null = null) {
+    this.deviceId = deviceId;
     this.adb = adb || new AdbUtils(deviceId);
     this.screenSize = new GetScreenSize(deviceId, this.adb);
     this.systemInsets = new GetSystemInsets(deviceId, this.adb);
@@ -53,13 +55,6 @@ export class ObserveScreen {
     if (!fs.existsSync(ObserveScreen.observeResultCacheDir)) {
       fs.mkdirSync(ObserveScreen.observeResultCacheDir, { recursive: true });
     }
-  }
-
-  /**
-   * Clear the accessibility service availability cache (e.g., on failure)
-   */
-  public static clearAccessibilityServiceCache(): void {
-    AccessibilityServiceClient.clearAvailabilityCache();
   }
 
   /**
@@ -139,7 +134,7 @@ export class ObserveScreen {
       logger.warn("Failed to get view hierarchy:", error);
 
       // Clear cache on failure
-      ObserveScreen.clearAccessibilityServiceCache();
+      AccessibilityServiceManager.getInstance(this.deviceId, this.adb).clearAvailabilityCache();
 
       // Check if the error is due to screen being off
       const errorStr = String(error);

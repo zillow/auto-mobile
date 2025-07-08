@@ -12,33 +12,58 @@ import { TerminateApp } from "../features/action/TerminateApp";
 const execAsync = promisify(exec);
 
 export class AccessibilityServiceManager {
-  private deviceId: string;
+  private readonly deviceId: string;
   private adb: AdbUtils;
   public static readonly PACKAGE = "com.zillow.automobile.accessibilityservice";
   public static readonly ACTIVITY = "com.zillow.automobile.accessibilityservice.MainActivity";
   private static readonly APK_URL = "https://github.com/zillow/auto-mobile/releases/download/0.0.3/accessibility-service-debug.apk";
 
   // Static cache for service availability
-  private static cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;
+  private cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;
   private static readonly AVAILABILITY_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
   // Static caches for individual status checks
-  private static cachedInstallation: { isInstalled: boolean; timestamp: number } | null = null;
-  private static cachedEnabled: { isEnabled: boolean; timestamp: number } | null = null;
+  private cachedInstallation: { isInstalled: boolean; timestamp: number } | null = null;
+  private cachedEnabled: { isEnabled: boolean; timestamp: number } | null = null;
   private static readonly STATUS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
+  private attemptedAutomatedSetup: boolean = false;
+  private static instances: Map<string, AccessibilityServiceManager> = new Map();
+
+  private constructor(deviceId: string, adb: AdbUtils) {
+    // home should either be process.env.HOME or bash resolution of home for current user
+    const homeDir = process.env.HOME || require("os").homedir();
+    if (!homeDir) {
+      throw new Error("Home directory for current user not found");
+    }
     this.deviceId = deviceId;
     this.adb = adb || new AdbUtils(this.deviceId);
+  }
+
+  public static getInstance(deviceId: string, adb: AdbUtils | null = null): AccessibilityServiceManager {
+    if (!AccessibilityServiceManager.instances.has(deviceId)) {
+      AccessibilityServiceManager.instances.set(deviceId, new AccessibilityServiceManager(
+        deviceId,
+        adb || new AdbUtils(deviceId)
+      ));
+    }
+    return AccessibilityServiceManager.instances.get(deviceId)!;
+  }
+
+  /**
+   * Reset all instances (for testing)
+   */
+  public static resetInstances(): void {
+    AccessibilityServiceManager.instances.clear();
   }
 
   /**
    * Clear the cached availability status
    */
-  public static clearAvailabilityCache(): void {
-    AccessibilityServiceManager.cachedAvailability = null;
-    AccessibilityServiceManager.cachedInstallation = null;
-    AccessibilityServiceManager.cachedEnabled = null;
+  public clearAvailabilityCache(): void {
+    this.cachedAvailability = null;
+    this.cachedInstallation = null;
+    this.cachedEnabled = null;
     logger.info("[ACCESSIBILITY_SERVICE] Cleared all availability caches");
   }
 
@@ -47,11 +72,13 @@ export class AccessibilityServiceManager {
    */
   async isInstalled(): Promise<boolean> {
     // Check cache first
-    if (AccessibilityServiceManager.cachedInstallation) {
-      const cacheAge = Date.now() - AccessibilityServiceManager.cachedInstallation.timestamp;
+    if (this.cachedInstallation && this.cachedInstallation.isInstalled) {
+      const cacheAge = Date.now() - this.cachedInstallation.timestamp;
       if (cacheAge < AccessibilityServiceManager.STATUS_CACHE_TTL) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Using cached installation status (age: ${cacheAge}ms): ${AccessibilityServiceManager.cachedInstallation.isInstalled ? "installed" : "not installed"}`);
-        return AccessibilityServiceManager.cachedInstallation.isInstalled;
+        logger.info(`[ACCESSIBILITY_SERVICE] Using cached installation status (age: ${cacheAge}ms): ${this.cachedInstallation.isInstalled ? "installed" : "not installed"}`);
+        return this.cachedInstallation.isInstalled;
+      } else {
+        this.cachedInstallation = null;
       }
     }
 
@@ -61,7 +88,7 @@ export class AccessibilityServiceManager {
       const isInstalled = result.stdout.includes(AccessibilityServiceManager.PACKAGE);
 
       // Cache the result
-      AccessibilityServiceManager.cachedInstallation = {
+      this.cachedInstallation = {
         isInstalled,
         timestamp: Date.now()
       };
@@ -79,11 +106,13 @@ export class AccessibilityServiceManager {
    */
   async isEnabled(): Promise<boolean> {
     // Check cache first
-    if (AccessibilityServiceManager.cachedEnabled) {
-      const cacheAge = Date.now() - AccessibilityServiceManager.cachedEnabled.timestamp;
+    if (this.cachedEnabled && this.cachedEnabled.isEnabled) {
+      const cacheAge = Date.now() - this.cachedEnabled.timestamp;
       if (cacheAge < AccessibilityServiceManager.STATUS_CACHE_TTL) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Using cached enabled status (age: ${cacheAge}ms): ${AccessibilityServiceManager.cachedEnabled.isEnabled ? "enabled" : "disabled"}`);
-        return AccessibilityServiceManager.cachedEnabled.isEnabled;
+        logger.info(`[ACCESSIBILITY_SERVICE] Using cached enabled status (age: ${cacheAge}ms): ${this.cachedEnabled.isEnabled ? "enabled" : "disabled"}`);
+        return this.cachedEnabled.isEnabled;
+      } else {
+        this.cachedEnabled = null;
       }
     }
 
@@ -93,7 +122,7 @@ export class AccessibilityServiceManager {
       const isEnabled = result.stdout.includes(AccessibilityServiceManager.PACKAGE);
 
       // Cache the result
-      AccessibilityServiceManager.cachedEnabled = {
+      this.cachedEnabled = {
         isEnabled,
         timestamp: Date.now()
       };
@@ -114,14 +143,13 @@ export class AccessibilityServiceManager {
     const startTime = Date.now();
 
     // Check cache first
-    if (AccessibilityServiceManager.cachedAvailability && AccessibilityServiceManager.cachedAvailability.isAvailable) {
-      const cacheAge = Date.now() - AccessibilityServiceManager.cachedAvailability.timestamp;
+    if (this.cachedAvailability && this.cachedAvailability.isAvailable) {
+      const cacheAge = Date.now() - this.cachedAvailability.timestamp;
       if (cacheAge < AccessibilityServiceManager.AVAILABILITY_CACHE_TTL) {
-        logger.info(`[ACCESSIBILITY_SERVICE] Using cached overall availability (age: ${cacheAge}ms): ${AccessibilityServiceManager.cachedAvailability.isAvailable}`);
-        return true;
+        logger.info(`[ACCESSIBILITY_SERVICE] Using cached overall availability (age: ${cacheAge}ms): ${this.cachedAvailability.isAvailable}`);
+        return this.cachedAvailability.isAvailable;
       } else {
-        AccessibilityServiceManager.cachedAvailability.isAvailable = false;
-        logger.info(`[ACCESSIBILITY_SERVICE] Overall availability cache expired (age: ${cacheAge}ms > TTL: ${AccessibilityServiceManager.AVAILABILITY_CACHE_TTL}ms)`);
+        this.cachedAvailability = null;
       }
     }
 
@@ -138,7 +166,7 @@ export class AccessibilityServiceManager {
       const duration = Date.now() - startTime;
 
       // Cache the result
-      AccessibilityServiceManager.cachedAvailability = {
+      this.cachedAvailability = {
         isAvailable: available,
         timestamp: Date.now()
       };
@@ -150,7 +178,7 @@ export class AccessibilityServiceManager {
       logger.warn(`[ACCESSIBILITY_SERVICE] Availability check failed after ${duration}ms: ${error}`);
 
       // Clear cache on error
-      AccessibilityServiceManager.cachedAvailability = null;
+      this.cachedAvailability = null;
 
       return false;
     }
@@ -246,7 +274,7 @@ export class AccessibilityServiceManager {
       await new LaunchApp(this.deviceId).execute(
         AccessibilityServiceManager.PACKAGE,
         false,
-        true,
+        false,
         AccessibilityServiceManager.ACTIVITY
       );
 
@@ -304,6 +332,12 @@ export class AccessibilityServiceManager {
     error?: string;
   }> {
     let apkPath: string | null = null;
+    if (this.attemptedAutomatedSetup) {
+      return {
+        success: false,
+        message: "Setup already attempted",
+      };
+    }
 
     try {
       // Check if already installed and setup (unless force is true)
@@ -314,6 +348,7 @@ export class AccessibilityServiceManager {
         };
       }
 
+      this.attemptedAutomatedSetup = true;
       // Download APK if not installed or force is true
       if (force || !await this.isInstalled()) {
         apkPath = await this.downloadApk();

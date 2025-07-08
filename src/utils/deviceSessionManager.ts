@@ -119,7 +119,7 @@ export class DeviceSessionManager {
     }
 
     try {
-      await new AccessibilityServiceManager(deviceId).setup();
+      await AccessibilityServiceManager.getInstance(deviceId).setup();
     }  catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`[DeviceSessionManager] Failed to setup accessibility service: ${errorMessage}`);

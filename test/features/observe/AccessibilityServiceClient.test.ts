@@ -14,8 +14,11 @@ describe("AccessibilityServiceClient", function() {
       executeCommand: async () => ({ stdout: "", stderr: "" })
     } as unknown as AdbUtils;
 
+    // Reset singleton instances for clean test state
+    AccessibilityServiceManager.resetInstances();
+
     accessibilityServiceClient = new AccessibilityServiceClient("test-device", mockAdb);
-    AccessibilityServiceClient.clearAvailabilityCache();
+    AccessibilityServiceManager.getInstance("test-device", mockAdb).clearAvailabilityCache();
   });
 
   describe("getLatestHierarchy", function() {

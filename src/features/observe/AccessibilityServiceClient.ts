@@ -45,22 +45,15 @@ interface AccessibilityHierarchy {
  * Client for interacting with the AutoMobile Accessibility Service
  */
 export class AccessibilityServiceClient {
+  private deviceId: string;
   private adb: AdbUtils;
-  private accessibilityServiceManager: AccessibilityServiceManager;
   private static readonly PACKAGE_NAME = "com.zillow.automobile.accessibilityservice";
   private static readonly HIERARCHY_FILE_PATH = "files/latest_hierarchy.json";
 
   constructor(deviceId: string, adb: AdbUtils | null = null) {
+    this.deviceId = deviceId;
     this.adb = adb || new AdbUtils(deviceId);
-    this.accessibilityServiceManager = new AccessibilityServiceManager(deviceId, adb);
-  }
-
-  /**
-     * Clear the cached availability status
-     */
-  public static clearAvailabilityCache(): void {
-    AccessibilityServiceManager.clearAvailabilityCache();
-    logger.info("[ACCESSIBILITY_SERVICE] Cleared all availability caches");
+    AccessibilityServiceManager.getInstance(deviceId, adb);
   }
 
   /**
@@ -222,7 +215,8 @@ export class AccessibilityServiceClient {
 
     try {
       // Check if service is available
-      const available = this.accessibilityServiceManager.isAvailable();
+
+      const available = await AccessibilityServiceManager.getInstance(this.deviceId, this.adb).isAvailable();
       if (!available) {
         logger.info("[ACCESSIBILITY_SERVICE] Service not available, will use fallback");
         return null;

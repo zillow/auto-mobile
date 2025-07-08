@@ -223,11 +223,11 @@ export class ViewHierarchy {
     const zOrder = { value: 0 };
     this.collectElementsWithZOrder(viewHierarchy.hierarchy, zOrder, allElements);
 
-    logger.info(`[Z_INDEX_ANALYSIS] Collected ${allElements.length} elements for Z-index analysis`);
+    logger.debug(`[Z_INDEX_ANALYSIS] Collected ${allElements.length} elements for Z-index analysis`);
 
     // Filter clickable elements
     const clickableElements = allElements.filter(el => el.isClickable);
-    logger.info(`[Z_INDEX_ANALYSIS] Found ${clickableElements.length} clickable elements`);
+    logger.debug(`[Z_INDEX_ANALYSIS] Found ${clickableElements.length} clickable elements`);
 
     // Calculate accessibility for each clickable element
     for (const clickableElement of clickableElements) {
@@ -235,7 +235,7 @@ export class ViewHierarchy {
     }
 
     const duration = Date.now() - startTime;
-    logger.info(`[Z_INDEX_ANALYSIS] Z-index accessibility analysis completed in ${duration}ms`);
+    logger.debug(`[Z_INDEX_ANALYSIS] Z-index accessibility analysis completed in ${duration}ms`);
   }
 
   /**
@@ -254,10 +254,10 @@ export class ViewHierarchy {
    */
   async checkInMemoryCache(targetBuffer: Buffer): Promise<ViewHierarchyResult | null> {
     const cacheSize = ViewHierarchy.viewHierarchyCache.size;
-    logger.info(`Checking in-memory cache with fuzzy matching, cache size: ${cacheSize}`);
+    logger.debug(`Checking in-memory cache with fuzzy matching, cache size: ${cacheSize}`);
 
     if (cacheSize === 0) {
-      logger.info("In-memory cache is empty");
+      logger.debug("In-memory cache is empty");
       return null;
     }
 
@@ -270,7 +270,7 @@ export class ViewHierarchy {
       const age = now - cachedEntry.timestamp;
       if (age >= cacheTtl) {
         expiredKeys.push(key);
-        logger.info(`Removing expired cache entry: ${key} (age: ${age}ms > TTL: ${cacheTtl}ms)`);
+        logger.debug(`Removing expired cache entry: ${key} (age: ${age}ms > TTL: ${cacheTtl}ms)`);
       }
     }
 
@@ -279,16 +279,16 @@ export class ViewHierarchy {
     }
 
     if (ViewHierarchy.viewHierarchyCache.size === 0) {
-      logger.info("All cache entries were expired and removed");
+      logger.debug("All cache entries were expired and removed");
       return null;
     }
 
     // Try to find a cached screenshot that matches with fuzzy comparison
-    logger.info(`Performing fuzzy matching against ${ViewHierarchy.viewHierarchyCache.size} cached entries (tolerance: ${DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT}%)`);
+    logger.debug(`Performing fuzzy matching against ${ViewHierarchy.viewHierarchyCache.size} cached entries (tolerance: ${DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT}%)`);
 
     const screenshotFiles = await ScreenshotUtils.getScreenshotFiles(ViewHierarchy.screenshotCacheDir);
     if (screenshotFiles.length === 0) {
-      logger.info("No screenshot files found for fuzzy comparison");
+      logger.debug("No screenshot files found for fuzzy comparison");
       return null;
     }
 
@@ -307,17 +307,17 @@ export class ViewHierarchy {
         if (cachedEntry) {
           const age = now - cachedEntry.timestamp;
           if (age < cacheTtl) {
-            logger.info(`Found fuzzy match in memory cache: ${hash} (${similarResult.similarity.toFixed(2)}% similarity, age: ${age}ms)`);
+            logger.debug(`Found fuzzy match in memory cache: ${hash} (${similarResult.similarity.toFixed(2)}% similarity, age: ${age}ms)`);
             return cachedEntry.viewHierarchy;
           } else {
-            logger.info(`Fuzzy match found but cache entry expired: ${hash} (age: ${age}ms > TTL: ${cacheTtl}ms)`);
+            logger.debug(`Fuzzy match found but cache entry expired: ${hash} (age: ${age}ms > TTL: ${cacheTtl}ms)`);
             ViewHierarchy.viewHierarchyCache.delete(hash);
           }
         }
       }
     }
 
-    logger.info("No fuzzy match found in in-memory cache");
+    logger.debug("No fuzzy match found in in-memory cache");
     return null;
   }
 
@@ -327,7 +327,7 @@ export class ViewHierarchy {
    * @returns Promise with cached view hierarchy or null if not found/expired
    */
   async checkDiskCache(targetBuffer: Buffer): Promise<ViewHierarchyResult | null> {
-    logger.info("Checking disk cache with fuzzy matching");
+    logger.debug("Checking disk cache with fuzzy matching");
 
     const cacheTtl = ViewHierarchy.CACHE_TTL_MS;
 
@@ -339,7 +339,7 @@ export class ViewHierarchy {
     );
 
     if (!similarResult.matchFound) {
-      logger.info("No fuzzy match found in disk cache");
+      logger.debug("No fuzzy match found in disk cache");
       return null;
     }
 
@@ -351,7 +351,7 @@ export class ViewHierarchy {
     }
 
     const diskCachePath = path.join(ViewHierarchy.cacheDir, `${hash}.json`);
-    logger.info(`Found fuzzy match in disk cache: ${path.basename(similarResult.filePath)} (${similarResult.similarity.toFixed(2)}% similarity)`);
+    logger.debug(`Found fuzzy match in disk cache: ${path.basename(similarResult.filePath)} (${similarResult.similarity.toFixed(2)}% similarity)`);
 
     if (!fs.existsSync(diskCachePath)) {
       logger.warn(`Disk cache JSON file does not exist: ${diskCachePath}`);
@@ -362,10 +362,10 @@ export class ViewHierarchy {
       const fileStats = await statAsync(diskCachePath);
       const fileAge = Date.now() - fileStats.mtimeMs;
 
-      logger.info(`Disk cache file found with age ${fileAge}ms (TTL: ${cacheTtl}ms)`);
+      logger.debug(`Disk cache file found with age ${fileAge}ms (TTL: ${cacheTtl}ms)`);
 
       if (fileAge < cacheTtl) {
-        logger.info(`Using fuzzy matched disk cached view hierarchy: ${hash}`);
+        logger.debug(`Using fuzzy matched disk cached view hierarchy: ${hash}`);
         const cacheData = await readFileAsync(diskCachePath, "utf8");
         const cachedViewHierarchy = JSON.parse(cacheData);
 
@@ -376,10 +376,10 @@ export class ViewHierarchy {
           viewHierarchy: cachedViewHierarchy
         });
 
-        logger.info(`Updated in-memory cache from fuzzy matched disk cache: ${hash}`);
+        logger.debug(`Updated in-memory cache from fuzzy matched disk cache: ${hash}`);
         return cachedViewHierarchy;
       } else {
-        logger.info(`Fuzzy matched disk cache file expired (age: ${fileAge}ms > TTL: ${cacheTtl}ms)`);
+        logger.debug(`Fuzzy matched disk cache file expired (age: ${fileAge}ms > TTL: ${cacheTtl}ms)`);
       }
     } catch (err) {
       logger.warn(`Failed to load fuzzy matched disk cached view hierarchy: ${err}`);
@@ -394,23 +394,23 @@ export class ViewHierarchy {
    * @returns Promise with cached view hierarchy or null if not found
    */
   public async checkCacheHierarchyWithFuzzyMatching(screenshotBuffer: Buffer): Promise<ViewHierarchyResult | null> {
-    logger.info("Checking cache hierarchy using fuzzy matching");
+    logger.debug("Checking cache hierarchy using fuzzy matching");
 
     // Check in-memory cache first
     const cachedResult = await this.checkInMemoryCache(screenshotBuffer);
     if (cachedResult) {
-      logger.info("Found result in in-memory cache using fuzzy matching");
+      logger.debug("Found result in in-memory cache using fuzzy matching");
       return cachedResult;
     }
 
     // Check disk cache
     const diskCachedResult = await this.checkDiskCache(screenshotBuffer);
     if (diskCachedResult) {
-      logger.info("Found result in disk cache using fuzzy matching");
+      logger.debug("Found result in disk cache using fuzzy matching");
       return diskCachedResult;
     }
 
-    logger.info("No cached result found using fuzzy matching");
+    logger.debug("No cached result found using fuzzy matching");
     return null;
   }
 
@@ -420,7 +420,6 @@ export class ViewHierarchy {
    * @returns Promise with cached view hierarchy or null if not found
    */
   public async checkCacheHierarchy(screenshotHash: string): Promise<ViewHierarchyResult | null> {
-    logger.info(`Checking cache hierarchy for hash ${screenshotHash} (legacy hash-based method)`);
 
     // Check in-memory cache first using exact hash match
     const cachedEntry = ViewHierarchy.viewHierarchyCache.get(screenshotHash);
@@ -429,13 +428,13 @@ export class ViewHierarchy {
 
     if (cachedEntry) {
       const age = now - cachedEntry.timestamp;
-      logger.info(`Found cached entry with age ${age}ms (TTL: ${cacheTtl}ms)`);
+      logger.debug(`Found cached entry with age ${age}ms (TTL: ${cacheTtl}ms)`);
 
       if (age < cacheTtl) {
-        logger.info(`Using cached view hierarchy for screenshot hash ${screenshotHash}`);
+        logger.debug(`Using cached view hierarchy for screenshot hash ${screenshotHash}`);
         return cachedEntry.viewHierarchy;
       } else {
-        logger.info(`Cached entry expired (age: ${age}ms > TTL: ${cacheTtl}ms), removing from cache`);
+        logger.debug(`Cached entry expired (age: ${age}ms > TTL: ${cacheTtl}ms), removing from cache`);
         ViewHierarchy.viewHierarchyCache.delete(screenshotHash);
       }
     }
@@ -443,7 +442,6 @@ export class ViewHierarchy {
     // Check disk cache using exact hash match
     const diskCachePath = path.join(ViewHierarchy.cacheDir, `${screenshotHash}.json`);
     if (!fs.existsSync(diskCachePath)) {
-      logger.info(`Disk cache file does not exist for hash ${screenshotHash}`);
       return null;
     }
 
@@ -451,10 +449,8 @@ export class ViewHierarchy {
       const fileStats = await statAsync(diskCachePath);
       const fileAge = Date.now() - fileStats.mtimeMs;
 
-      logger.info(`Disk cache file found with age ${fileAge}ms (TTL: ${cacheTtl}ms)`);
-
       if (fileAge < cacheTtl) {
-        logger.info(`Using disk cached view hierarchy for screenshot hash ${screenshotHash}`);
+        logger.debug(`Using disk cached view hierarchy for screenshot hash ${screenshotHash}`);
         const cacheData = await readFileAsync(diskCachePath, "utf8");
         const cachedViewHierarchy = JSON.parse(cacheData);
 
@@ -465,16 +461,15 @@ export class ViewHierarchy {
           viewHierarchy: cachedViewHierarchy
         });
 
-        logger.info(`Updated in-memory cache from disk cache for hash ${screenshotHash}`);
         return cachedViewHierarchy;
       } else {
-        logger.info(`Disk cache file expired (age: ${fileAge}ms > TTL: ${cacheTtl}ms)`);
+        logger.debug(`Disk cache file expired (age: ${fileAge}ms > TTL: ${cacheTtl}ms)`);
       }
     } catch (err) {
       logger.warn(`Failed to load disk cached view hierarchy: ${err}`);
     }
 
-    logger.info(`No cached result found for hash ${screenshotHash}`);
+    logger.debug(`No cached result found for hash ${screenshotHash}`);
     return null;
   }
 
@@ -485,7 +480,7 @@ export class ViewHierarchy {
    */
   public async cacheViewHierarchy(timestamp: number, viewHierarchy: ViewHierarchyResult): Promise<void> {
     // Cache the result using the timestamp
-    logger.info(`Caching view hierarchy with timestamp ${timestamp}, in-memory cache size will be: ${ViewHierarchy.viewHierarchyCache.size + 1}`);
+    logger.debug(`Caching view hierarchy with timestamp ${timestamp}, in-memory cache size will be: ${ViewHierarchy.viewHierarchyCache.size + 1}`);
 
     const timestampKey = timestamp.toString();
     ViewHierarchy.viewHierarchyCache.set(timestampKey, {
@@ -506,14 +501,14 @@ export class ViewHierarchy {
    */
   async getViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
-    logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
+    logger.debug(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
 
     // First try accessibility service if available and not skipped
     try {
       const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy();
       if (accessibilityHierarchy) {
         const accessibilityDuration = Date.now() - startTime;
-        logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
+        logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
         return await this.augmentWithSourceIndexing(accessibilityHierarchy as ExtendedViewHierarchyResult);
       }
     } catch (err) {
@@ -525,57 +520,57 @@ export class ViewHierarchy {
       const parallelOperationsStartTime = Date.now();
       const screenshotBufferResult = await this.getOrCreateScreenshotBuffer(screenshotPath);
       const parallelOperationsDuration = Date.now() - parallelOperationsStartTime;
-      logger.info(`[VIEW_HIERARCHY] Screenshot + activity hash obtained in parallel in ${parallelOperationsDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] Screenshot + activity hash obtained in parallel in ${parallelOperationsDuration}ms`);
 
       const { buffer: screenshotBuffer } = screenshotBufferResult;
-      logger.info(`[VIEW_HIERARCHY] Screenshot buffer size: ${screenshotBuffer.length} bytes`);
+      logger.debug(`[VIEW_HIERARCHY] Screenshot buffer size: ${screenshotBuffer.length} bytes`);
 
       // Scan backwards through up to 200 recent screenshots to find one that actually has cached view hierarchy data
-      logger.info("[VIEW_HIERARCHY] Scanning recent screenshots for fuzzy matches with cached view hierarchy");
+      logger.debug("[VIEW_HIERARCHY] Scanning recent screenshots for fuzzy matches with cached view hierarchy");
       const fuzzyStartTime = Date.now();
       const cachedResult = await this.findFuzzyMatchWithCache(screenshotBuffer, 200);
       const fuzzyDuration = Date.now() - fuzzyStartTime;
 
       if (cachedResult) {
         const totalDuration = Date.now() - startTime;
-        logger.info(`[VIEW_HIERARCHY] *** CACHE HIT: Found cached view hierarchy using fuzzy matching in ${fuzzyDuration}ms, total getViewHierarchy time: ${totalDuration}ms ***`);
+        logger.debug(`[VIEW_HIERARCHY] *** CACHE HIT: Found cached view hierarchy using fuzzy matching in ${fuzzyDuration}ms, total getViewHierarchy time: ${totalDuration}ms ***`);
 
         // Try to augment with source indexing if not already present
         return await this.augmentWithSourceIndexing(cachedResult as ExtendedViewHierarchyResult);
       }
 
-      logger.info(`[VIEW_HIERARCHY] No fuzzy match found after ${fuzzyDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] No fuzzy match found after ${fuzzyDuration}ms`);
 
-      logger.info("[VIEW_HIERARCHY] *** CACHE MISS: No cached view hierarchy found, fetching new hierarchy ***");
+      logger.debug("[VIEW_HIERARCHY] *** CACHE MISS: No cached view hierarchy found, fetching new hierarchy ***");
 
       // Get fresh view hierarchy
       const freshStartTime = Date.now();
       const viewHierarchy = await this._getViewHierarchyWithoutCache();
       const freshDuration = Date.now() - freshStartTime;
-      logger.info(`[VIEW_HIERARCHY] Fresh hierarchy fetched in ${freshDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] Fresh hierarchy fetched in ${freshDuration}ms`);
 
       // Augment with source indexing information
       const sourceStartTime = Date.now();
       const extendedViewHierarchy = await this.augmentWithSourceIndexing(viewHierarchy as ExtendedViewHierarchyResult);
       const sourceDuration = Date.now() - sourceStartTime;
-      logger.info(`[VIEW_HIERARCHY] Source indexing augmentation took ${sourceDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] Source indexing augmentation took ${sourceDuration}ms`);
 
       // Cache the result using a timestamp
       const cacheStartTime = Date.now();
       const timestamp = Date.now();
-      logger.info(`[VIEW_HIERARCHY] Caching view hierarchy with timestamp: ${timestamp}`);
+      logger.debug(`[VIEW_HIERARCHY] Caching view hierarchy with timestamp: ${timestamp}`);
       await this.cacheViewHierarchy(timestamp, extendedViewHierarchy);
       const cacheDuration = Date.now() - cacheStartTime;
-      logger.info(`[VIEW_HIERARCHY] Caching completed in ${cacheDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] Caching completed in ${cacheDuration}ms`);
 
       // Save the screenshot with the same timestamp for future fuzzy matching
       const saveScreenshotStartTime = Date.now();
       await this.saveScreenshotForFuzzyMatching(screenshotBuffer, timestamp.toString());
       const saveScreenshotDuration = Date.now() - saveScreenshotStartTime;
-      logger.info(`[VIEW_HIERARCHY] Screenshot save for fuzzy matching took ${saveScreenshotDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] Screenshot save for fuzzy matching took ${saveScreenshotDuration}ms`);
 
       const totalDuration = Date.now() - startTime;
-      logger.info(`[VIEW_HIERARCHY] *** FRESH HIERARCHY: getViewHierarchy completed in ${totalDuration}ms (fresh hierarchy) ***`);
+      logger.debug(`[VIEW_HIERARCHY] *** FRESH HIERARCHY: getViewHierarchy completed in ${totalDuration}ms (fresh hierarchy) ***`);
       return viewHierarchy;
     } catch (err) {
       const totalDuration = Date.now() - startTime;
@@ -587,14 +582,14 @@ export class ViewHierarchy {
         (err.message.includes("null root node returned by UiTestAutomationBridge") ||
           err.message.includes("cat:") ||
           err.message.includes("No such file or directory"))) {
-        logger.info("[VIEW_HIERARCHY] Specific ADB error detected, calling _getViewHierarchyWithoutCache to get its specific error message.");
+        logger.debug("[VIEW_HIERARCHY] Specific ADB error detected, calling _getViewHierarchyWithoutCache to get its specific error message.");
         return await this._getViewHierarchyWithoutCache();
       }
 
       // If screenshot-related error, fall back to getting view hierarchy without cache
       // (this might also lead to one of the specific errors above if _getViewHierarchyWithoutCache fails)
       if (err instanceof Error && err.message.includes("screenshot")) {
-        logger.info("[VIEW_HIERARCHY] Screenshot error detected, falling back to view hierarchy without cache");
+        logger.debug("[VIEW_HIERARCHY] Screenshot error detected, falling back to view hierarchy without cache");
         const fallbackResult = await this._getViewHierarchyWithoutCache();
         // If the fallback result has a specific error message, preserve it
         if (fallbackResult.hierarchy && (fallbackResult.hierarchy as any).error) {
@@ -604,7 +599,7 @@ export class ViewHierarchy {
       }
 
       // For all other unhandled errors from getViewHierarchy itself, return the generic message.
-      logger.info("[VIEW_HIERARCHY] Unhandled error in getViewHierarchy, returning generic error message.");
+      logger.debug("[VIEW_HIERARCHY] Unhandled error in getViewHierarchy, returning generic error message.");
       return {
         hierarchy: {
           error: "Failed to retrieve view hierarchy"
@@ -620,13 +615,13 @@ export class ViewHierarchy {
    * @returns Promise with cached view hierarchy or null if not found
    */
   private async findFuzzyMatchWithCache(targetBuffer: Buffer, limit: number): Promise<ViewHierarchyResult | null> {
-    logger.info(`Scanning up to ${limit} recent screenshots for fuzzy match with cached view hierarchy`);
+    logger.debug(`Scanning up to ${limit} recent screenshots for fuzzy match with cached view hierarchy`);
 
     try {
       // Get list of recent screenshots (up to limit, sorted by modification time)
       const screenshotFiles = await ScreenshotUtils.getScreenshotFiles(ViewHierarchy.screenshotCacheDir);
       if (screenshotFiles.length === 0) {
-        logger.info("No recent screenshots found for fuzzy comparison");
+        logger.debug("No recent screenshots found for fuzzy comparison");
         return null;
       }
 
@@ -640,7 +635,7 @@ export class ViewHierarchy {
       filesWithStats.sort((a, b) => b.mtime - a.mtime);
       const recentFiles = filesWithStats.slice(0, limit);
 
-      logger.info(`Pre-filtering ${recentFiles.length} recent screenshots for cached data availability`);
+      logger.debug(`Pre-filtering ${recentFiles.length} recent screenshots for cached data availability`);
 
       // Pre-filter: Find files that have cached view hierarchy data (parallel check)
       const filesWithCachePromises = recentFiles.map(async ({ filePath }) => {
@@ -655,11 +650,11 @@ export class ViewHierarchy {
         .filter((item): item is NonNullable<typeof item> => item !== null);
 
       if (filesWithCache.length === 0) {
-        logger.info("No recent screenshots have valid cached view hierarchy data");
+        logger.debug("No recent screenshots have valid cached view hierarchy data");
         return null;
       }
 
-      logger.info(`Found ${filesWithCache.length} screenshots with valid cached data, starting parallel fuzzy matching`);
+      logger.debug(`Found ${filesWithCache.length} screenshots with valid cached data, starting parallel fuzzy matching`);
 
       // Use optimized batch comparison for even better performance
       const filePaths = filesWithCache.map(item => item.filePath);
@@ -674,17 +669,17 @@ export class ViewHierarchy {
       for (const comparisonResult of batchComparisonResults) {
         const matchingFile = filesWithCache.find(item => item.filePath === comparisonResult.filePath);
         if (matchingFile && comparisonResult.matchFound) {
-          logger.info(`✓ Found fuzzy match with cached data: ${matchingFile.hash} (${comparisonResult.similarity.toFixed(2)}% similarity)`);
+          logger.debug(`✓ Found fuzzy match with cached data: ${matchingFile.hash} (${comparisonResult.similarity.toFixed(2)}% similarity)`);
           return matchingFile.cachedResult;
         }
       }
 
       // Log all comparison results for debugging
       batchComparisonResults.forEach(result => {
-        logger.info(`${path.basename(result.filePath)}: ${result.similarity.toFixed(2)}% similarity (cached data available)`);
+        logger.debug(`${path.basename(result.filePath)}: ${result.similarity.toFixed(2)}% similarity (cached data available)`);
       });
 
-      logger.info("No fuzzy match found with cached view hierarchy data");
+      logger.debug("No fuzzy match found with cached view hierarchy data");
       return null;
     } catch (error) {
       logger.warn(`Error in findFuzzyMatchWithCache: ${(error as Error).message}`);
@@ -694,7 +689,7 @@ export class ViewHierarchy {
 
   async getMostRecentCachedViewHierarchy(): Promise<ViewHierarchyResult> {
     if (ViewHierarchy.viewHierarchyCache.size === 0) {
-      logger.info("View hierarchy cache is empty.");
+      logger.debug("View hierarchy cache is empty.");
       // Consider if a more specific error or a different return type for "not found" is appropriate.
       // For now, returning a structure indicating an error, similar to other methods.
       return {
@@ -713,7 +708,7 @@ export class ViewHierarchy {
     }
 
     if (mostRecentEntry) {
-      logger.info(`Returning most recent cached view hierarchy from timestamp: ${new Date(mostRecentEntry.timestamp).toISOString()}`);
+      logger.debug(`Returning most recent cached view hierarchy from timestamp: ${new Date(mostRecentEntry.timestamp).toISOString()}`);
       return mostRecentEntry.viewHierarchy;
     }
 
@@ -755,14 +750,14 @@ export class ViewHierarchy {
       } as unknown as ViewHierarchyResult;
     }
 
-    logger.info("Starting analysis on view hierarchy");
+    logger.debug("Starting analysis on view hierarchy");
     const analysisStart = Date.now();
     const result = await this.parseXmlToViewHierarchy(xmlData);
 
     // Add Z-index accessibility analysis
     this.analyzeZIndexAccessibility(result);
 
-    logger.info(`hierarchy analysis took ${Date.now() - analysisStart}ms`);
+    logger.debug(`hierarchy analysis took ${Date.now() - analysisStart}ms`);
 
     return result;
   }
@@ -833,7 +828,7 @@ export class ViewHierarchy {
    */
   filterViewHierarchy(viewHierarchy: any): any {
     if (!viewHierarchy || !viewHierarchy.hierarchy) {
-      logger.info("No hierarchy found");
+      logger.debug("No hierarchy found");
       return viewHierarchy;
     }
 
@@ -886,7 +881,7 @@ export class ViewHierarchy {
   calculateFilteringStats(original: any, filtered: any): void {
     const originalResultSize = Buffer.byteLength(JSON.stringify(original), "utf8");
     const filteredResultSize = Buffer.byteLength(JSON.stringify(filtered), "utf8");
-    logger.info(`filtering ${originalResultSize} bytes down to ${filteredResultSize} bytes`);
+    logger.debug(`filtering ${originalResultSize} bytes down to ${filteredResultSize} bytes`);
   }
 
   /**
@@ -967,14 +962,14 @@ export class ViewHierarchy {
       ]);
       const dumpsysOutput = dumpsysResult.stdout || "";
 
-      logger.info(`uiautomator dump && dumpsys activity top took ${Date.now() - dumpStart}ms`);
+      logger.debug(`uiautomator dump && dumpsys activity top took ${Date.now() - dumpStart}ms`);
 
       // Process XML data into view hierarchy result
       const hierarchyResult = await this.processXmlData(xmlData);
 
       // Augment the view hierarchy with class and fragment info from dumpsys output
       const activityTopData = this.parseDumpsysActivityTop(dumpsysOutput);
-      logger.info(`Found ${activityTopData.classOverrides.size} class overrides, ${activityTopData.fragmentData.size} fragments, and ${activityTopData.viewData.size} custom views from dumpsys activity top`);
+      logger.debug(`Found ${activityTopData.classOverrides.size} class overrides, ${activityTopData.fragmentData.size} fragments, and ${activityTopData.viewData.size} custom views from dumpsys activity top`);
 
       this.augmentViewHierarchyWithClassAndFragment(hierarchyResult, activityTopData);
 
@@ -1042,7 +1037,7 @@ export class ViewHierarchy {
           if (sizeToFree <= 0) {break;}
         }
 
-        logger.info(`Cleared ${fileStats.length} old cache files to maintain cache size limit`);
+        logger.debug(`Cleared ${fileStats.length} old cache files to maintain cache size limit`);
       }
     } catch (err) {
       logger.warn(`Error maintaining cache size: ${err}`);
@@ -1060,7 +1055,7 @@ export class ViewHierarchy {
         path.join(ViewHierarchy.cacheDir, `hierarchy_${timestamp}.json`),
         JSON.stringify(viewHierarchy)
       );
-      logger.info(`Saved view hierarchy to disk cache with timestamp ${timestamp}`);
+      logger.debug(`Saved view hierarchy to disk cache with timestamp ${timestamp}`);
     } catch (err) {
       logger.warn(`Failed to save view hierarchy to disk cache: ${err}`);
     }
@@ -1075,15 +1070,15 @@ export class ViewHierarchy {
     const startTime = Date.now();
 
     if (screenshotPath) {
-      logger.info(`[VIEW_HIERARCHY] Using provided screenshot for view hierarchy caching: ${screenshotPath}`);
+      logger.debug(`[VIEW_HIERARCHY] Using provided screenshot for view hierarchy caching: ${screenshotPath}`);
       const readStartTime = Date.now();
       const buffer = await readFileAsync(screenshotPath);
       const readDuration = Date.now() - readStartTime;
       const totalDuration = Date.now() - startTime;
-      logger.info(`[VIEW_HIERARCHY] Read existing screenshot in ${readDuration}ms, total getOrCreateScreenshotBuffer: ${totalDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] Read existing screenshot in ${readDuration}ms, total getOrCreateScreenshotBuffer: ${totalDuration}ms`);
       return { buffer, path: screenshotPath };
     } else {
-      logger.info("[VIEW_HIERARCHY] Taking new screenshot for view hierarchy caching");
+      logger.debug("[VIEW_HIERARCHY] Taking new screenshot for view hierarchy caching");
       const screenshotStartTime = Date.now();
       const screenshotResult = await this.takeScreenshot.execute();
       const screenshotDuration = Date.now() - screenshotStartTime;
@@ -1097,7 +1092,7 @@ export class ViewHierarchy {
       const readDuration = Date.now() - readStartTime;
       const totalDuration = Date.now() - startTime;
 
-      logger.info(`[VIEW_HIERARCHY] Screenshot capture: ${screenshotDuration}ms, file read: ${readDuration}ms, total getOrCreateScreenshotBuffer: ${totalDuration}ms`);
+      logger.debug(`[VIEW_HIERARCHY] Screenshot capture: ${screenshotDuration}ms, file read: ${readDuration}ms, total getOrCreateScreenshotBuffer: ${totalDuration}ms`);
       return { buffer, path: screenshotResult.path };
     }
   }
@@ -1262,7 +1257,7 @@ export class ViewHierarchy {
     try {
       const screenshotPath = path.join(ViewHierarchy.screenshotCacheDir, `screenshot_${timestamp}.png`);
       await fs.writeFile(screenshotPath, screenshotBuffer);
-      logger.info(`Saved screenshot for fuzzy matching with timestamp ${timestamp}`);
+      logger.debug(`Saved screenshot for fuzzy matching with timestamp ${timestamp}`);
     } catch (err) {
       logger.warn(`Failed to save screenshot for fuzzy matching: ${err}`);
     }
@@ -1379,25 +1374,25 @@ export class ViewHierarchy {
         return viewHierarchy;
       }
 
-      logger.info("[SOURCE_INDEXING] Attempting to augment view hierarchy with source information");
+      logger.debug("[SOURCE_INDEXING] Attempting to augment view hierarchy with source information");
 
       // Extract activity information from the current activity
       const currentActivity = await this.getCurrentActivityInfo();
       if (!currentActivity) {
-        logger.info("[SOURCE_INDEXING] No current activity found");
+        logger.debug("[SOURCE_INDEXING] No current activity found");
         return viewHierarchy;
       }
 
-      logger.info(`[SOURCE_INDEXING] Current activity: ${currentActivity.activityName}, package: ${currentActivity.packageName}`);
+      logger.debug(`[SOURCE_INDEXING] Current activity: ${currentActivity.activityName}, package: ${currentActivity.packageName}`);
 
       const matchingConfig = this.sourceMapper.getMatchingAppConfig(currentActivity.packageName);
 
       if (!matchingConfig) {
-        logger.info(`[SOURCE_INDEXING] No app configuration found for package: ${currentActivity.packageName}`);
+        logger.debug(`[SOURCE_INDEXING] No app configuration found for package: ${currentActivity.packageName}`);
         return viewHierarchy;
       }
 
-      logger.info(`[SOURCE_INDEXING] Found matching app config: ${matchingConfig.appId}`);
+      logger.debug(`[SOURCE_INDEXING] Found matching app config: ${matchingConfig.appId}`);
 
       // Find activity source information
       let activity: ActivityInfo | null = null;
@@ -1408,7 +1403,7 @@ export class ViewHierarchy {
         );
 
         if (activity) {
-          logger.info(`[SOURCE_INDEXING] Found activity source: ${activity.sourceFile}`);
+          logger.debug(`[SOURCE_INDEXING] Found activity source: ${activity.sourceFile}`);
         }
       } catch (error) {
         logger.warn(`[SOURCE_INDEXING] Error finding activity source: ${error}`);
@@ -1428,7 +1423,7 @@ export class ViewHierarchy {
 
           if (fragmentInfo) {
             fragments.push(fragmentInfo);
-            logger.info(`[SOURCE_INDEXING] Found fragment source: ${fragmentInfo.sourceFile}`);
+            logger.debug(`[SOURCE_INDEXING] Found fragment source: ${fragmentInfo.sourceFile}`);
           }
         } catch (error) {
           logger.warn(`[SOURCE_INDEXING] Error finding fragment source for ${fragmentName}: ${error}`);
@@ -1450,7 +1445,7 @@ export class ViewHierarchy {
 
           if (viewInfo) {
             views.push(viewInfo);
-            logger.info(`[SOURCE_INDEXING] Found view source: ${viewInfo.sourceFile}`);
+            logger.debug(`[SOURCE_INDEXING] Found view source: ${viewInfo.sourceFile}`);
           }
         } catch (error) {
           logger.warn(`[SOURCE_INDEXING] Error finding view source for ${viewName}: ${error}`);
@@ -1471,7 +1466,7 @@ export class ViewHierarchy {
 
           if (composableInfo) {
             composables.push(composableInfo);
-            logger.info(`[SOURCE_INDEXING] Found composable source: ${composableInfo.sourceFile}`);
+            logger.debug(`[SOURCE_INDEXING] Found composable source: ${composableInfo.sourceFile}`);
           }
         } catch (error) {
           logger.warn(`[SOURCE_INDEXING] Error finding composable source for ${composableName}: ${error}`);
@@ -1487,7 +1482,7 @@ export class ViewHierarchy {
         appId: matchingConfig.appId
       };
 
-      logger.info(`[SOURCE_INDEXING] Augmented view hierarchy with ${activity ? 1 : 0} activity, ${fragments.length} fragment, ${views.length} view, and ${composables.length} composable source references`);
+      logger.debug(`[SOURCE_INDEXING] Augmented view hierarchy with ${activity ? 1 : 0} activity, ${fragments.length} fragment, ${views.length} view, and ${composables.length} composable source references`);
 
     } catch (error) {
       logger.warn(`[SOURCE_INDEXING] Error during source indexing augmentation: ${error}`);
