@@ -227,172 +227,178 @@ export class SourceMapper {
   /**
    * Discover all Android modules in a project
    */
-  public async scanProject(projectRoot: string, applicationId: string): Promise<ProjectScanResult> {
-    try {
-      // Check cache first
-      if (this.projectScanResultCache.has(projectRoot)) {
-        return this.projectScanResultCache.get(projectRoot)!;
-      }
+  public async scanProject(applicationId: string): Promise<ProjectScanResult> {
 
-      logger.debug(`[SOURCE] Discovering Android modules in: ${projectRoot}`);
-
-      // Find the android.application plugin definition
-      const androidApplicationPlugin = await this.findAndroidApplicationPlugin(projectRoot);
-      const { plugins: gradlePlugins, dependencies: mavenDependencies } = await this.readGradleTomlFiles(projectRoot);
-
-      const modules: ModuleMapping[] = [];
-
-      // Find all build.gradle files that indicate modules
-      const buildGradleFiles = await glob("**/build.gradle{,.kts}", {
-        cwd: projectRoot,
-        ignore: ["**/build/**", "**/node_modules/**"]
-      });
-
-      logger.debug(`[SOURCE] Found ${buildGradleFiles.length} build.gradle files`);
-
-      for (const buildGradlePath of buildGradleFiles) {
-        const moduleDir = path.dirname(buildGradlePath);
-        const moduleName = path.basename(moduleDir);
-
-        // Skip root build.gradle
-        if (moduleDir === "." || moduleName === path.basename(projectRoot)) {
-          continue;
-        }
-
-        const fullModulePath = path.join(projectRoot, moduleDir);
-        const fullBuildGradlePath = path.join(projectRoot, buildGradlePath);
-
-        // Check if this is an Android module by looking for android block
-        const isAndroidModule = await this.isAndroidModule(fullBuildGradlePath);
-        // const isJvmModule = !isAndroidModule && await this.isJvmModule(fullBuildGradlePath);
-        // Discover source and test directories
-        const sourceMainJavaDirectory = path.join(fullModulePath, "src", "main", "java");
-        const sourceMainKotlinDirectory = path.join(fullModulePath, "src", "main", "kotlin");
-        const testDirectory = path.join(fullModulePath, "src", "test");
-
-        // Extract package prefix from source files
-        let packagePrefix: string;
-        let kotlinSource: boolean = false;
-        let javaSource: boolean = false;
-        const javaPackagePrefix = await this.extractPackagePrefix(sourceMainJavaDirectory);
-        const kotlinPackagePrefix = await this.extractPackagePrefix(sourceMainKotlinDirectory);
-
-        if (kotlinPackagePrefix && javaPackagePrefix) {
-          packagePrefix = kotlinPackagePrefix;
-          kotlinSource = true;
-          javaSource = true;
-        } else if (kotlinPackagePrefix) {
-          packagePrefix = kotlinPackagePrefix;
-          kotlinSource = true;
-        } else if (javaPackagePrefix) {
-          packagePrefix = kotlinPackagePrefix;
-          javaSource = true;
-        } else {
-          packagePrefix = "";
-        }
-
-        let isApplicationModule: boolean = false;
-        let activities: string[] = [];
-        let fragments: string[] = [];
-        if (isAndroidModule) {
-          // Check if this is an application module
-          isApplicationModule = androidApplicationPlugin
-            ? await this.isAndroidApplicationModule(fullBuildGradlePath, androidApplicationPlugin)
-            : false;
-
-          // Find activities and fragments
-          const activityFragmentResult = await this.findActivitiesAndFragments(sourceMainJavaDirectory);
-          activities = activityFragmentResult.activities;
-          fragments = activityFragmentResult.fragments;
-        }
-        const moduleMapping: ModuleMapping = {
-          moduleName,
-          sourceDirectory: sourceMainJavaDirectory,
-          testDirectory,
-          packagePrefix,
-          activities,
-          fragments,
-          buildGradlePath: fullBuildGradlePath,
-          isApplicationModule,
-          kotlinSource,
-          javaSource
-        };
-
-        modules.push(moduleMapping);
-        const moduleType = isApplicationModule ? "application" : "library";
-        logger.debug(`[SOURCE] Discovered ${moduleType} module: ${moduleName} with ${activities.length} activities, ${fragments.length} fragments, Package prefix: ${packagePrefix}`);
-      }
-
-      logger.debug(`[SOURCE] Project root: ${projectRoot}`);
-
-      const applicationModules = modules.filter(m => m.isApplicationModule);
-      logger.debug(`[SOURCE] Discovered ${modules.length} Android modules (${applicationModules.length} application modules)`);
-
-      if (!applicationModules || applicationModules.length === 0) {
-        throw new ActionableError("No Android application modules found in the project.");
-      }
-
-      logger.debug(`[SOURCE] Starting to look for primary app module with applicationId: ${applicationId}`);
-
-      // Find the application module that matches the provided applicationId
-      let primaryAppModule: ModuleMapping | undefined;
-      for (const module of applicationModules) {
-        if (module.buildGradlePath) {
-          const moduleApplicationId = await this.getApplicationId(module.buildGradlePath);
-          logger.debug(`[SOURCE] Module: ${module.moduleName}, gradleBuildPath: ${module.buildGradlePath}, Application ID: ${moduleApplicationId}`);
-          if (moduleApplicationId === applicationId) {
-            primaryAppModule = module;
-          }
-        }
-      }
-
-      // If no exact match found, fall back to first application module
-      if (!primaryAppModule) {
-        throw new ActionableError("Specified Android applicationId not found in project modules.");
-      }
-
-      logger.debug(`[SOURCE] Primary application module: ${primaryAppModule.moduleName}`);
-      // Get details for the primary application module
-      let currentApplicationModule: ApplicationModuleDetails | undefined;
-
-      if (primaryAppModule?.buildGradlePath) {
-        const modulePath = path.relative(projectRoot, path.dirname(primaryAppModule.buildGradlePath));
-        const absolutePath = path.join(projectRoot, modulePath);
-        const moduleApplicationId = await this.getApplicationId(primaryAppModule.buildGradlePath);
-        const gradleTasks = await this.getGradleTasks(projectRoot, modulePath);
-        logger.debug(`[SOURCE] Primary application module: ${primaryAppModule.moduleName}, Application ID: ${moduleApplicationId}, gradle tasks ${gradleTasks}`);
-
-        if (moduleApplicationId) {
-          currentApplicationModule = {
-            absolutePath,
-            applicationId: moduleApplicationId,
-            gradleTasks
-          };
-        }
-      }
-
-      const result: ProjectScanResult = {
-        modules,
-        applicationModules,
-        totalModules: modules.length,
-        gradlePlugins,
-        mavenDependencies,
-        currentApplicationModule
-      };
-
-      // Cache the results
-      this.projectScanResultCache.set(projectRoot, result);
-
-
-      return result;
-    } catch (error) {
-      logger.error(`Failed to discover modules: ${error}`);
-      return {
-        modules: [],
-        applicationModules: [],
-        totalModules: 0
-      };
+    const appConfig = this.getMatchingAppConfig(applicationId);
+    if (!appConfig || !appConfig.sourceDir) {
+      throw new ActionableError(`Unable to scan application source without a path`);
     }
+
+    const projectRoot = appConfig.sourceDir;
+
+    // Check cache first
+    if (this.projectScanResultCache.has(projectRoot)) {
+      return this.projectScanResultCache.get(projectRoot)!;
+    }
+
+    logger.debug(`[SOURCE] Discovering Android modules in: ${projectRoot}`);
+
+    // Find the android.application plugin definition
+    const androidApplicationPlugin = await this.findAndroidApplicationPlugin(projectRoot);
+    const { plugins: gradlePlugins, dependencies: mavenDependencies } = await this.readGradleTomlFiles(projectRoot);
+
+    let primaryAppModule: ModuleMapping | undefined;
+    const modules: ModuleMapping[] = [];
+
+    // Find all build.gradle files that indicate modules
+    const buildGradleFiles = await glob("**/build.gradle{,.kts}", {
+      cwd: projectRoot,
+      ignore: ["**/build/**", "**/node_modules/**"]
+    });
+
+    logger.debug(`[SOURCE] Found ${buildGradleFiles.length} build.gradle files`);
+
+    for (const buildGradlePath of buildGradleFiles) {
+      const moduleDir = path.dirname(buildGradlePath);
+      const moduleName = path.basename(moduleDir);
+
+      // Skip root build.gradle
+      if (moduleDir === "." || moduleName === path.basename(projectRoot)) {
+        continue;
+      }
+
+      const fullModulePath = path.join(projectRoot, moduleDir);
+      const fullBuildGradlePath = path.join(projectRoot, buildGradlePath);
+
+      // Check if this is an Android module by looking for android block
+      const isAndroidModule = await this.isAndroidModule(fullBuildGradlePath);
+      // const isJvmModule = !isAndroidModule && await this.isJvmModule(fullBuildGradlePath);
+      // Discover source and test directories
+      const sourceMainJavaDirectory = path.join(fullModulePath, "src", "main", "java");
+      const sourceMainKotlinDirectory = path.join(fullModulePath, "src", "main", "kotlin");
+      const testDirectory = path.join(fullModulePath, "src", "test");
+
+      // Extract package prefix from source files
+      let packagePrefix: string;
+      let kotlinSource: boolean = false;
+      let javaSource: boolean = false;
+      const javaPackagePrefix = await this.extractPackagePrefix(sourceMainJavaDirectory);
+      const kotlinPackagePrefix = await this.extractPackagePrefix(sourceMainKotlinDirectory);
+
+      if (kotlinPackagePrefix && javaPackagePrefix) {
+        packagePrefix = kotlinPackagePrefix;
+        kotlinSource = true;
+        javaSource = true;
+      } else if (kotlinPackagePrefix) {
+        packagePrefix = kotlinPackagePrefix;
+        kotlinSource = true;
+      } else if (javaPackagePrefix) {
+        packagePrefix = javaPackagePrefix;
+        javaSource = true;
+      } else {
+        packagePrefix = "";
+      }
+
+      let isApplicationModule: boolean = false;
+      let activities: string[] = [];
+      let fragments: string[] = [];
+      if (isAndroidModule) {
+        // Check if this is an application module
+        isApplicationModule = androidApplicationPlugin
+          ? await this.isAndroidApplicationModule(fullBuildGradlePath, androidApplicationPlugin)
+          : false;
+
+
+        // Find activities and fragments
+        const activityFragmentResult = await this.findActivitiesAndFragments(sourceMainJavaDirectory);
+        activities = activityFragmentResult.activities;
+        fragments = activityFragmentResult.fragments;
+      }
+      const moduleMapping: ModuleMapping = {
+        moduleName,
+        sourceDirectory: sourceMainJavaDirectory,
+        testDirectory,
+        packagePrefix,
+        activities,
+        fragments,
+        buildGradlePath: fullBuildGradlePath,
+        isApplicationModule,
+        kotlinSource,
+        javaSource
+      };
+
+      if (isApplicationModule) {
+        const moduleApplicationId = await this.getApplicationId(fullBuildGradlePath);
+        logger.debug(`[SOURCE] Module: ${moduleName}, gradleBuildPath: ${fullBuildGradlePath}, Application ID: ${moduleApplicationId}`);
+        if (moduleApplicationId === applicationId) {
+          primaryAppModule = moduleMapping;
+        }
+      }
+
+      modules.push(moduleMapping);
+      const moduleType = isApplicationModule ? "application" : "library";
+      logger.debug(`[SOURCE] Discovered ${moduleType} module: ${moduleName} with ${activities.length} activities, ${fragments.length} fragments, Package prefix: ${packagePrefix}`);
+    }
+
+    logger.debug(`[SOURCE] Project root: ${projectRoot}`);
+
+    const applicationModules = modules.filter(m => m.isApplicationModule);
+    logger.debug(`[SOURCE] Discovered ${modules.length} Android modules (${applicationModules.length} application modules)`);
+
+    if (!applicationModules || applicationModules.length === 0) {
+      throw new ActionableError("No Android application modules found in the project.");
+    }
+
+    logger.debug(`[SOURCE] Starting to look for primary app module with applicationId: ${applicationId}`);
+
+    // Find the application module that matches the provided applicationId
+    for (const module of applicationModules) {
+      if (module.buildGradlePath) {
+        const moduleApplicationId = await this.getApplicationId(module.buildGradlePath);
+        logger.debug(`[SOURCE] Module: ${module.moduleName}, gradleBuildPath: ${module.buildGradlePath}, Application ID: ${moduleApplicationId}`);
+        if (moduleApplicationId === applicationId) {
+          primaryAppModule = module;
+        }
+      }
+    }
+
+    if (!primaryAppModule) {
+      throw new ActionableError("Specified Android applicationId not found in project modules.");
+    }
+
+    logger.debug(`[SOURCE] Primary application module: ${primaryAppModule.moduleName}`);
+    // Get details for the primary application module
+    let currentApplicationModule: ApplicationModuleDetails | undefined;
+
+    if (primaryAppModule?.buildGradlePath) {
+      const modulePath = path.relative(projectRoot, path.dirname(primaryAppModule.buildGradlePath));
+      const absolutePath = path.join(projectRoot, modulePath);
+      const moduleApplicationId = await this.getApplicationId(primaryAppModule.buildGradlePath);
+      const gradleTasks = await this.getGradleTasks(projectRoot, modulePath);
+      logger.debug(`[SOURCE] Primary application module: ${primaryAppModule.moduleName}, Application ID: ${moduleApplicationId}, gradle tasks ${gradleTasks}`);
+
+      if (moduleApplicationId) {
+        currentApplicationModule = {
+          absolutePath,
+          applicationId: moduleApplicationId,
+          gradleTasks
+        };
+      }
+    }
+
+    const result: ProjectScanResult = {
+      modules,
+      applicationModules,
+      totalModules: modules.length,
+      gradlePlugins,
+      mavenDependencies,
+      currentApplicationModule
+    };
+
+    // Cache the results
+    this.projectScanResultCache.set(projectRoot, result);
+
+    return result;
   }
 
   /**
@@ -699,14 +705,47 @@ export class SourceMapper {
   }
 
   /**
-     * Map view hierarchy analysis to source modules
+     * Extract package hints from class names and resource IDs
      */
-  public async mapViewHierarchyToModule(
+  private extractPackageHints(classNames: string[], resourceIds: string[]): string[] {
+    const packageHints = new Set<string>();
+
+    // Extract from class names
+    for (const className of classNames) {
+      const parts = className.split(".");
+      if (parts.length >= 3) {
+        // Add various package combinations
+        packageHints.add(parts.slice(0, -1).join(".")); // Full package
+        packageHints.add(parts.slice(0, -2).join(".")); // Parent package
+        if (parts.length >= 4) {
+          packageHints.add(parts.slice(0, 3).join(".")); // Base package
+        }
+      }
+    }
+
+    // Extract from resource IDs (e.g., com.example.app:id/button)
+    for (const resourceId of resourceIds) {
+      const parts = resourceId.split(":");
+      if (parts.length >= 2) {
+        packageHints.add(parts[0]);
+      }
+    }
+
+    return Array.from(packageHints);
+  }
+
+  // ===========================================
+  // Test Plan Placement
+  // ===========================================
+
+  /**
+     * Determine the best location for a test plan
+     */
+  public async determineTestPlanLocation(
     analysis: ViewHierarchyAnalysis,
-    projectRoot: string,
     applicationId: string
-  ): Promise<SourceAnalysis> {
-    const moduleDiscovery = await this.scanProject(projectRoot, applicationId);
+  ): Promise<TestPlanPlacementResult> {
+    const moduleDiscovery = await this.scanProject(applicationId);
     const modules = moduleDiscovery.modules;
 
     let bestMatch: ModuleMapping | undefined;
@@ -769,6 +808,8 @@ export class SourceMapper {
         moduleReasons.push("fallback to app module");
       }
 
+      logger.debug(`[SOURCE] Module ${module.moduleName} (package: ${module.packagePrefix}, isApp: ${module.isApplicationModule}): score=${moduleScore}, reasons=${moduleReasons.join(", ")}`);
+
       if (moduleScore > confidence) {
         confidence = moduleScore;
         bestMatch = module;
@@ -791,84 +832,25 @@ export class SourceMapper {
 
     logger.debug(`[SOURCE] Source analysis completed: module=${bestMatch?.moduleName}, confidence=${normalizedConfidence.toFixed(2)}`);
 
-    return sourceAnalysis;
-  }
-
-  /**
-     * Extract package hints from class names and resource IDs
-     */
-  private extractPackageHints(classNames: string[], resourceIds: string[]): string[] {
-    const packageHints = new Set<string>();
-
-    // Extract from class names
-    for (const className of classNames) {
-      const parts = className.split(".");
-      if (parts.length >= 3) {
-        // Add various package combinations
-        packageHints.add(parts.slice(0, -1).join(".")); // Full package
-        packageHints.add(parts.slice(0, -2).join(".")); // Parent package
-        if (parts.length >= 4) {
-          packageHints.add(parts.slice(0, 3).join(".")); // Base package
-        }
-      }
-    }
-
-    // Extract from resource IDs (e.g., com.example.app:id/button)
-    for (const resourceId of resourceIds) {
-      const parts = resourceId.split(":");
-      if (parts.length >= 2) {
-        packageHints.add(parts[0]);
-      }
-    }
-
-    return Array.from(packageHints);
-  }
-
-  // ===========================================
-  // Test Plan Placement
-  // ===========================================
-
-  /**
-     * Determine the best location for a test plan
-     */
-  public async determineTestPlanLocation(
-    analysis: SourceAnalysis,
-    projectRoot: string,
-    applicationId: string
-  ): Promise<TestPlanPlacementResult> {
-    const moduleDiscovery = await this.scanProject(projectRoot, applicationId);
-    const modules = moduleDiscovery.modules;
-
     // Find the suggested module or fallback to first application module
-    let targetModule = modules.find(m => m.moduleName === analysis.suggestedModule);
+    let targetModule = modules.find(m => m.moduleName === sourceAnalysis.suggestedModule);
     if (!targetModule) {
       targetModule = moduleDiscovery.applicationModules?.[0] || modules[0];
     }
 
     if (!targetModule) {
-      return {
-        success: false,
-        targetDirectory: path.join(projectRoot, "test-plans"),
-        moduleName: "unknown",
-        confidence: 0,
-        reasoning: "No Android modules found in project"
-      };
+      throw new ActionableError("No target module found for source analysis");
     }
 
     // Ensure test plan directory exists
     const testPlanDir = path.join(targetModule.testDirectory, "resources", "test-plans");
-
-    try {
-      await fs.mkdir(testPlanDir, { recursive: true });
-    } catch (error) {
-      logger.warn(`Failed to create test plan directory: ${error}`);
-    }
+    await fs.mkdir(testPlanDir, { recursive: true });
 
     return {
       success: true,
       targetDirectory: testPlanDir,
       moduleName: targetModule.moduleName,
-      confidence: analysis.confidence,
+      confidence: sourceAnalysis.confidence,
       reasoning: `Selected module '${targetModule.moduleName}' based on source analysis`
     };
   }
@@ -1064,8 +1046,6 @@ export class SourceMapper {
           logger.warn(`Failed to process view file ${file}: ${error}`);
         }
       }
-
-      console.log("looking for composables now");
 
       // Find all Kotlin files that contain @Composable functions (excluding @Preview)
       const composablePattern = "@Composable";

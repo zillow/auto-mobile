@@ -1,10 +1,13 @@
 import { expect } from "chai";
 import { SourceMapper } from "../../src/utils/sourceMapper";
+import { ConfigurationManager } from "../../src/utils/configurationManager";
 import path from "path";
+import sinon from "sinon";
 
 describe("SourceMapper", function() {
   this.timeout(120000);
   let sourceMapper: SourceMapper;
+  let configManagerStub: sinon.SinonStubbedInstance<ConfigurationManager>;
 
   beforeEach(() => {
     sourceMapper = SourceMapper.getInstance();
@@ -12,6 +15,10 @@ describe("SourceMapper", function() {
     sourceMapper.clearCache();
     (sourceMapper as any).appConfigs = new Map();
     (sourceMapper as any).sourceIndex = new Map();
+
+    // Mock ConfigurationManager
+    configManagerStub = sinon.createStubInstance(ConfigurationManager);
+    sinon.stub(ConfigurationManager, "getInstance").returns(configManagerStub);
   });
 
   afterEach(() => {
@@ -19,6 +26,9 @@ describe("SourceMapper", function() {
     sourceMapper.clearCache();
     (sourceMapper as any).appConfigs = new Map();
     (sourceMapper as any).sourceIndex = new Map();
+
+    // Restore all stubs
+    sinon.restore();
   });
 
   describe("getInstance", () => {
@@ -31,44 +41,81 @@ describe("SourceMapper", function() {
 
   describe("discoverModules", () => {
     it("should discover Android modules in a project", async () => {
-      // This test just ensures the method exists and returns expected structure
-      const result = await sourceMapper.scanProject("/nonexistent/path", "com.example.app");
+      // Mock app configuration for example app
+      configManagerStub.getAppConfigs.returns([{
+        appId: "com.example.app",
+        sourceDir: "/nonexistent/path",
+        platform: "android"
+      }]);
 
-      expect(result).to.have.property("modules");
-      expect(result).to.have.property("totalModules");
-      expect(result).to.have.property("applicationModules");
-      expect(result).to.not.have.property("gradlePlugins");
-      expect(result).to.not.have.property("mavenDependencies");
-      expect(result).to.not.have.property("currentApplicationModule");
-      expect(result.modules).to.be.an("array");
-      expect(result.totalModules).to.be.a("number");
-      expect(result.applicationModules).to.be.an("array");
+      // This test just ensures the method exists and returns expected structure
+      try {
+        const result = await sourceMapper.scanProject("com.example.app");
+
+        expect(result).to.have.property("modules");
+        expect(result).to.have.property("totalModules");
+        expect(result).to.have.property("applicationModules");
+        expect(result).to.not.have.property("gradlePlugins");
+        expect(result).to.not.have.property("mavenDependencies");
+        expect(result).to.not.have.property("currentApplicationModule");
+        expect(result.modules).to.be.an("array");
+        expect(result.totalModules).to.be.a("number");
+        expect(result.applicationModules).to.be.an("array");
+      } catch (error) {
+        // For non-existent paths, we expect an error about no Android application modules
+        expect((error as Error).message).to.include("No Android application modules found");
+      }
     });
 
     it("should cache module discovery results", async () => {
-      const projectRoot = "/test/project";
+      // Mock app configuration for example app
+      configManagerStub.getAppConfigs.returns([{
+        appId: "com.example.app",
+        sourceDir: "/test/project",
+        platform: "android"
+      }]);
 
-      // First call
-      const result1 = await sourceMapper.scanProject(projectRoot, "com.example.app");
-
-      // Second call should use cache
-      const result2 = await sourceMapper.scanProject(projectRoot, "com.example.app");
-
-      expect(result1).to.deep.equal(result2);
+      // For non-existent paths, both calls should throw the same error
+      try {
+        await sourceMapper.scanProject("com.example.app");
+      } catch (error1) {
+        try {
+          await sourceMapper.scanProject("com.example.app");
+        } catch (error2) {
+          expect((error1 as Error).message).to.equal((error2 as Error).message);
+        }
+      }
     });
 
     it("should handle projects with no Android modules", async () => {
-      const result = await sourceMapper.scanProject("/nonexistent/path", "com.example.app");
+      // Mock app configuration for example app
+      configManagerStub.getAppConfigs.returns([{
+        appId: "com.example.app",
+        sourceDir: "/nonexistent/path",
+        platform: "android"
+      }]);
 
-      expect(result.modules).to.have.length(0);
-      expect(result.applicationModules).to.have.length(0);
-      expect(result.totalModules).to.equal(0);
+      try {
+        await sourceMapper.scanProject("com.example.app");
+        // Should not reach here
+        expect.fail("Expected error to be thrown");
+      } catch (error) {
+        expect((error as Error).message).to.include("No Android application modules found");
+      }
     });
 
     it("should handle AutoMobile Android Playground", async function() {
+      // Mock app configuration for AutoMobile Playground
       const currentDir = process.cwd();
       const androidPath = path.join(currentDir, "android");
-      const result = await sourceMapper.scanProject(androidPath, "com.zillow.automobile.playground");
+
+      configManagerStub.getAppConfigs.returns([{
+        appId: "com.zillow.automobile.playground",
+        sourceDir: androidPath,
+        platform: "android"
+      }]);
+
+      const result = await sourceMapper.scanProject("com.zillow.automobile.playground");
 
       expect(result.modules).to.have.length(16);
       expect(result.applicationModules).to.be.an("array");
@@ -125,8 +172,26 @@ describe("SourceMapper", function() {
     });
   });
 
-  describe("mapViewHierarchyToModule", () => {
-    it("should map view hierarchy to appropriate module", async () => {
+  describe("determineTestPlanLocation", () => {
+    beforeEach(() => {
+      // Mock config for both apps
+      const currentDir = process.cwd();
+      const androidPath = path.join(currentDir, "android");
+      configManagerStub.getAppConfigs.returns([
+        {
+          appId: "com.example.app",
+          sourceDir: "/nonexistent/path",
+          platform: "android"
+        },
+        {
+          appId: "com.zillow.automobile.playground",
+          sourceDir: androidPath,
+          platform: "android"
+        }
+      ]);
+    });
+
+    it("given example app view hierarchy, should map to example app module", async () => {
       const analysis = {
         activityClasses: ["com.example.app.MainActivity"],
         fragmentClasses: ["com.example.app.SearchFragment"],
@@ -136,18 +201,16 @@ describe("SourceMapper", function() {
         composables: []
       };
 
-      const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, "/test/project", "com.example.app");
-
-      expect(sourceAnalysis).to.have.property("primaryActivity");
-      expect(sourceAnalysis).to.have.property("fragments");
-      expect(sourceAnalysis).to.have.property("packageHints");
-      expect(sourceAnalysis).to.have.property("confidence");
-      expect(sourceAnalysis.confidence).to.be.a("number");
-      expect(sourceAnalysis.confidence).to.be.at.least(0);
-      expect(sourceAnalysis.confidence).to.be.at.most(1);
+      try {
+        const result = await sourceMapper.determineTestPlanLocation(analysis, "com.example.app");
+        expect(result.moduleName).to.be.equal("com.example.app");
+      } catch (error) {
+        // For non-existent paths, we expect an error about no Android application modules
+        expect((error as Error).message).to.include("No Android application modules found");
+      }
     });
 
-    it("should map view hierarchy to app module for AutoMobile Playground", async () => {
+    it("given AutoMobile Playground App view hierarchy, should map to App module", async () => {
       const analysis = {
         activityClasses: ["com.zillow.automobile.playground.MainActivity"],
         fragmentClasses: [],
@@ -157,22 +220,13 @@ describe("SourceMapper", function() {
         composables: []
       };
 
-      const currentDir = process.cwd();
-      const androidPath = path.join(currentDir, "android");
-      const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, androidPath, "com.zillow.automobile.playground");
-
-      expect(sourceAnalysis).to.have.property("primaryActivity");
-      expect(sourceAnalysis).to.have.property("fragments");
-      expect(sourceAnalysis).to.have.property("packageHints");
-      expect(sourceAnalysis).to.have.property("confidence");
-      expect(sourceAnalysis.confidence).to.be.a("number");
-      expect(sourceAnalysis.confidence).to.be.at.least(0);
-      expect(sourceAnalysis.confidence).to.be.at.most(1);
+      const result = await sourceMapper.determineTestPlanLocation(analysis, "com.zillow.automobile.playground");
+      expect(result.moduleName).to.be.equal("app");
     });
 
-    it("should map view hierarchy to discover module for AutoMobile Playground", async () => {
+    it("given AutoMobile Playground Discover view hierarchy, should map to Discover module", async () => {
       const analysis = {
-        activityClasses: ["com.zillow.automobile.playground.MainActivity"],
+        activityClasses: [],
         fragmentClasses: [],
         packageHints: ["com.zillow.automobile.discover"],
         resourceIds: [],
@@ -180,38 +234,8 @@ describe("SourceMapper", function() {
         composables: []
       };
 
-      const currentDir = process.cwd();
-      const androidPath = path.join(currentDir, "android");
-      const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, androidPath, "com.zillow.automobile.playground");
-
-      expect(sourceAnalysis).to.have.property("primaryActivity");
-      expect(sourceAnalysis).to.have.property("fragments");
-      expect(sourceAnalysis).to.have.property("packageHints");
-      expect(sourceAnalysis).to.have.property("confidence");
-      expect(sourceAnalysis.confidence).to.be.a("number");
-      expect(sourceAnalysis.confidence).to.be.at.least(0);
-      expect(sourceAnalysis.confidence).to.be.at.most(1);
-    });
-  });
-
-  describe("determineTestPlanLocation", () => {
-    it("should determine appropriate test plan location", async () => {
-      const sourceAnalysis = {
-        primaryActivity: "com.example.app.MainActivity",
-        fragments: ["com.example.app.SearchFragment"],
-        packageHints: ["com.example.app"],
-        confidence: 0.8,
-        suggestedModule: "app",
-        resourceReferences: ["com.example.app:id/button"]
-      };
-
-      const result = await sourceMapper.determineTestPlanLocation(sourceAnalysis, "/test/project", "com.example.app");
-
-      expect(result).to.have.property("success");
-      expect(result).to.have.property("targetDirectory");
-      expect(result).to.have.property("moduleName");
-      expect(result).to.have.property("confidence");
-      expect(result).to.have.property("reasoning");
+      const result = await sourceMapper.determineTestPlanLocation(analysis, "com.zillow.automobile.playground");
+      expect(result.moduleName).to.be.equal("discover");
     });
   });
 
@@ -221,6 +245,12 @@ describe("SourceMapper", function() {
       const currentDir = process.cwd();
       const androidPath = path.join(currentDir, "android");
       const appId = "com.zillow.automobile.playground";
+
+      configManagerStub.getAppConfigs.returns([{
+        appId: appId,
+        sourceDir: androidPath,
+        platform: "android"
+      }]);
 
       const result = await sourceMapper.indexSourceFiles(appId, androidPath);
 

@@ -16,7 +16,7 @@ export class ConfigurationManager {
     if (!homeDir) {
       throw new Error("Home directory for current user not found");
     }
-    this.configFilePath = path.join(homeDir, ".auto-mobile", "app-configs.json");
+    this.configFilePath = path.join(homeDir, ".auto-mobile", "config.json");
     this.ensureDirectoriesExist();
   }
 
@@ -134,13 +134,6 @@ export class ConfigurationManager {
   }
 
   /**
-     * Get specific configuration value
-     */
-  public getServerConfigValue<K extends keyof McpServerConfig>(key: K): McpServerConfig[K] {
-    return this.serverConfig[key];
-  }
-
-  /**
      * Check if test authoring is enabled
      */
   public isTestAuthoringEnabled(): boolean {
@@ -154,12 +147,5 @@ export class ConfigurationManager {
     this.serverConfig = {};
     this.appSourceConfigs.clear();
     await this.saveToDisk();
-  }
-
-  /**
-     * Set configuration file path (for testing)
-     */
-  public setConfigFilePath(filePath: string): void {
-    this.configFilePath = filePath;
   }
 }

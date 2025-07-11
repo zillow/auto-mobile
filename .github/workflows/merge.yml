@@ -79,12 +79,6 @@ jobs:
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
-      - uses: ./.github/actions/setup-auto-mobile-npm-package
-
-      - uses: actions/download-artifact@v4.1.8
-        with:
-          name: apk
-
       - uses: ./.github/actions/android-emulator
         with:
           script: "echo 'Ready for running tests'"

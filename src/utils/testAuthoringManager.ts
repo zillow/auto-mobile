@@ -405,27 +405,18 @@ export class TestAuthoringManager {
    * Determine the target directory for the test plan
    */
   async determineTargetDirectory(session: TestAuthoringSession): Promise<string> {
-    const config = SourceMapper.getInstance().getMatchingAppConfig(session.appId);
 
-    if (!config) {
+    const fallbackDir = path.join("/tmp", "auto-mobile", "test-authoring", session.appId);
+    const appConfig = SourceMapper.getInstance().getMatchingAppConfig(session.appId);
+    if (!appConfig || !appConfig.sourceDir) {
       // Fallback for apps without source directory configuration
       // This allows test authoring for production apps we don't have source code for
-      const fallbackDir = path.join("/tmp", "auto-mobile", "test-authoring", session.appId || "unknown-app");
-
-      try {
-        await fs.mkdir(fallbackDir, { recursive: true });
-        logger.info(`[TEST-AUTHORING] Using fallback directory for app without source config: ${fallbackDir}`);
-        return fallbackDir;
-      } catch (error) {
-        logger.warn(`Failed to create fallback test authoring directory: ${error}`);
-        // Final fallback to a generic location
-        const genericFallback = path.join("/tmp", "auto-mobile", "test-authoring", "generic");
-        await fs.mkdir(genericFallback, { recursive: true });
-        return genericFallback;
-      }
+      await fs.mkdir(fallbackDir, { recursive: true });
+      logger.info(`[TEST-AUTHORING] Using fallback directory for app without source config: ${fallbackDir}`);
+      return fallbackDir;
     }
 
-    if (config.platform !== "android") {
+    if (appConfig.platform !== "android") {
       throw new ActionableError(`[TEST-AUTHORING] Only Android platform is supported for test authoring at this time.`);
     }
 
@@ -442,8 +433,7 @@ export class TestAuthoringManager {
 
         const viewHierarchyXml = lastViewHierarchy.result.data.viewHierarchy;
         const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
-        const sourceAnalysis = await sourceMapper.mapViewHierarchyToModule(analysis, config.sourceDir, config.appId);
-        const placementResult = await sourceMapper.determineTestPlanLocation(sourceAnalysis, config.sourceDir, config.appId);
+        const placementResult = await sourceMapper.determineTestPlanLocation(analysis, appConfig.appId);
 
         if (placementResult.success) {
           logger.info(`[TEST-AUTHORING] Source mapping selected module: ${placementResult.moduleName} (confidence: ${placementResult.confidence.toFixed(2)})`);
