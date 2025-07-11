@@ -15,6 +15,14 @@ inputs:
     example: "35"
     default: "35"
     required: "true"
+  arch:
+    description: "CPU architecture"
+    default: "x86_64"
+    required: "true"
+  target:
+    description: "System image target"
+    default: "default"
+    required: "true"
 
 runs:
   using: "composite"
@@ -30,4 +38,6 @@ runs:
       uses: reactivecircus/android-emulator-runner@v2
       with:
         api-level:  ${{ inputs.api_level }}
+        arch: ${{ inputs.arch }}
+        target: ${{ inputs.target }}
         script:  ${{ inputs.script }}
