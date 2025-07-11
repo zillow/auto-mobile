@@ -79,6 +79,16 @@ jobs:
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - uses: actions/download-artifact@v4.1.8
+        with:
+          name: apk
+
+      - uses: ./.github/actions/android-emulator
+        with:
+          script: "echo 'Ready for running tests'"
+
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":junit-runner:test"
@@ -210,6 +220,30 @@ jobs:
         with:
           name: playground-app-apk
           path: android/playground/app/build/outputs/apk/debug/playground-app-debug.apk
+
+#  playground-app-unit-tests:
+#    name: "Build Playground App"
+#    runs-on: ubuntu-latest
+#    defaults:
+#      run:
+#        working-directory: android
+#    steps:
+#      - name: "Git Checkout"
+#        uses: actions/checkout@v4
+#
+#      - uses: ./.github/actions/setup-auto-mobile-npm-package
+#
+#      - uses: actions/download-artifact@v4.1.8
+#        with:
+#          name: apk
+#
+#      - uses: ./.github/actions/android-emulator
+#        with:
+#          script: ":playground:app:installDebug"
+#
+#      - uses: ./.github/actions/android-emulator
+#        with:
+#          script: ":playground:app:testDebugUnitTest"
 
   deploy-docs:
     name: "Deploy Documentation"
