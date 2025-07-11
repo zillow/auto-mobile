@@ -18,7 +18,10 @@ internal object AutoMobilePlanExecutor {
     val startTime = System.currentTimeMillis()
 
     try {
-      // Check device availability before executing plan
+      // Resolve and validate the plan file path first, before any other checks
+      val resolvedPlanPath = resolvePlanPath(planPath)
+
+      // Check device availability after plan file validation
       if (!AutoMobileSharedUtils.deviceChecker.areDevicesAvailable()) {
         val executionTime = System.currentTimeMillis() - startTime
         return AutoMobilePlanExecutionResult(
@@ -28,9 +31,6 @@ internal object AutoMobilePlanExecutor {
             executionTimeMs = executionTime,
             parametersUsed = parameters)
       }
-
-      // Resolve the plan file path
-      val resolvedPlanPath = resolvePlanPath(planPath)
 
       // Load and process the plan with parameter substitution
       val processedPlanContent = loadAndProcessPlan(resolvedPlanPath, parameters)

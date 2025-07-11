@@ -6,5 +6,5 @@ steps:
     appId: com.google.android.deskclock
     label: Launch Clock application
 
-  - tool: stopApp
+  - tool: terminateApp
     appId: com.google.android.deskclock

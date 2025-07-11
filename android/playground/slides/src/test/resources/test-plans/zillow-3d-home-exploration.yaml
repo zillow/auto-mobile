@@ -10,59 +10,75 @@ steps:
   # Open search interface
   - tool: tapOn
     id: com.zillow.android.zillowmap:id/search_toolbar
+    action: "tap"
     label: Open search interface
 
   - tool: inputText
     text: "32 Flatlands 9 St UNIT 22A, Brooklyn, NY 11236"
+    action: "tap"
     label: Enter search query for 3D tour homes in NYC
 
   # Execute search by tapping the suggestion
   - tool: tapOn
     text: "32 Flatlands 9 St #22A Brooklyn, NY 11236"
+    action: "tap"
     label: Execute search from suggestion dropdown
 
   - tool: "tapOn"
     text: "3D Home"
+    action: "tap"
 
   - tool: "tapOn"
     text: "Living room"
+    action: "tap"
 
   - tool: "swipeOnScreen"
     direction: "left"
+    action: "tap"
     includeSystemInsets: false
     duration: 1000
 
   - tool: "tapOn"
     text: "Kitchen"
+    action: "tap"
 
   - tool: "swipeOnScreen"
     direction: "right"
+    action: "tap"
     includeSystemInsets: false
     duration: 1000
 
   - tool: "tapOn"
     text: "Front yard"
+    action: "tap"
 
   - tool: "tapOn"
     text: "Photos"
+    action: "tap"
 
   - tool: "tapOn"
     text: "Request a tour"
+    action: "tap"
 
   - tool: "tapOn"
     text: "Jun 26"
+    action: "tap"
 
   - tool: "tapOn"
     text: "Jun 27"
+    action: "tap"
 
   - tool: "tapOn"
     text: "3:30 PM"
+    action: "tap"
 
   - tool: "tapOn"
     text: "Select time"
+    action: "tap"
 
   - tool: "tapOn"
     text: "Next"
+    action: "tap"
 
   # Terminate the app
   - tool: terminateApp

@@ -12,27 +12,30 @@ steps:
   - tool: launchApp
     appId: com.google.android.deskclock
     label: Launch Clock application
-    forceCold: true
-    clearPackageData: true
 
   - tool: tapOn
     text: "Alarm"
+    action: "tap"
 
   - tool: tapOn
     id: "com.google.android.deskclock:id/fab"
     label: Tap add alarm button
+    action: "tap"
 
   - tool: tapOn
     text: "6"
     label: Select 6 for hour
+    action: "tap"
 
   - tool: tapOn
     text: "30"
     label: Select 30 for minutes
+    action: "tap"
 
   - tool: tapOn
     text: "OK"
     label: Confirm alarm time selection
+    action: "tap"
 
-  - tool: stopApp
+  - tool: terminateApp
     appId: com.google.android.deskclock

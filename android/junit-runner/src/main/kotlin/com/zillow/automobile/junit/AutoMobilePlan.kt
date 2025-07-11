@@ -41,6 +41,17 @@ class AutoMobilePlan(
   fun execute(
       options: AutoMobilePlanExecutionOptions = AutoMobilePlanExecutionOptions()
   ): AutoMobilePlanExecutionResult {
+    // Validate plan file exists first, throw exception if not found
+    val classLoader = Thread.currentThread().contextClassLoader
+    val resource = classLoader.getResource(planPath)
+
+    if (resource == null) {
+      val file = java.io.File(planPath)
+      if (!file.exists()) {
+        throw AssertionError("YAML plan not found: $planPath")
+      }
+    }
+
     // Ensure device availability is checked
     AutoMobileSharedUtils.deviceChecker.checkDeviceAvailability()
 
