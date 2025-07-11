@@ -29,5 +29,5 @@ runs:
     - name: Run Emulator
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: ${{ input.api_level }}
-        script: ${{ input.script }}
+        api-level:  ${{ inputs.api_level }}
+        script:  ${{ inputs.script }}
