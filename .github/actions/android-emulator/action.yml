@@ -23,6 +23,10 @@ inputs:
     description: "System image target"
     default: "default"
     required: "true"
+  working-directory:
+    description: "Working directory"
+    default: "./"
+    required: "true"
 
 runs:
   using: "composite"
@@ -72,6 +76,7 @@ runs:
         arch: ${{ inputs.arch }}
         target: ${{ inputs.target }}
         script:  ${{ inputs.script }}
+        working-directory: ${{ inputs.working-directory }}
 #        force-avd-creation: false
 #        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
 #        disable-animations: false
