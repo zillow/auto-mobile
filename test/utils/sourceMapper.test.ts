@@ -140,10 +140,12 @@ describe("SourceMapper", function() {
       const viewHierarchy = {
         hierarchy: {
           node: {
-            class: "com.example.app.MainActivity"
+            $: {
+              class: "com.example.app.MainActivity"
+            }
           }
         }
-      };
+      } as ViewHierarchyResult;
 
       const analysis = sourceMapper.analyzeViewHierarchy("com.example.app", viewHierarchy);
 
@@ -157,7 +159,9 @@ describe("SourceMapper", function() {
       const viewHierarchy = {
         hierarchy: {
           node: {
-            class: "com.example.SearchFragment"
+            $: {
+              class: "com.example.SearchFragment"
+            }
           }
         }
       } as ViewHierarchyResult;
@@ -170,7 +174,9 @@ describe("SourceMapper", function() {
       const viewHierarchy = {
         hierarchy: {
           node: {
-            "resource-id": "com.example.app:id/button"
+            $: {
+              "resource-id": "com.example.app:id/button"
+            }
           }
         }
       } as ViewHierarchyResult;

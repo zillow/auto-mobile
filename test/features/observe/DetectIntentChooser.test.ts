@@ -4,7 +4,7 @@ import { DeepLinkManager } from "../../../src/utils/deepLinkManager";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { Window } from "../../../src/features/observe/Window";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
-import { ObserveResult } from "../../../src/models";
+import {ObserveResult, ViewHierarchyResult} from "../../../src/models";
 import sinon from "sinon";
 
 describe("DetectIntentChooser", () => {
@@ -18,15 +18,34 @@ describe("DetectIntentChooser", () => {
     timestamp: "2025-01-01T00:00:00.000Z",
     screenSize: { width: 1080, height: 1920 },
     systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
-    viewHierarchy: `
-      <hierarchy>
-        <node class="com.android.internal.app.ChooserActivity">
-          <node text="Choose an app" />
-          <node text="Always" class="android.widget.Button" />
-          <node text="Just once" class="android.widget.Button" />
-        </node>
-      </hierarchy>
-    `
+    viewHierarchy: {
+      hierarchy: {
+        node: {
+          $: {
+            class: "com.android.internal.app.ChooserActivity"
+          },
+          node: [
+            {
+              $: {
+                text: "Choose an app"
+              }
+            },
+            {
+              $: {
+                text: "Always",
+                class: "android.widget.Button"
+              }
+            },
+            {
+              $: {
+                text: "Just once",
+                class: "android.widget.Button"
+              }
+            }
+          ]
+        }
+      }
+    }
   };
 
   beforeEach(() => {
@@ -58,7 +77,7 @@ describe("DetectIntentChooser", () => {
 
     // Create mock DeepLinkManager
     mockDeepLinkManager = {
-      detectIntentChooser: (viewHierarchy: string) => {
+      detectIntentChooser: (viewHierarchy: any) => {
         // Look for common intent chooser indicators
         const indicators = [
           "com.android.internal.app.ChooserActivity",
@@ -74,9 +93,24 @@ describe("DetectIntentChooser", () => {
           "chooser_list"
         ];
 
-        return indicators.some(indicator =>
-          viewHierarchy.toLowerCase().includes(indicator.toLowerCase())
-        );
+        const hierarchy = viewHierarchy.hierarchy;
+        if (hierarchy && hierarchy.node) {
+          const node = hierarchy.node;
+          if (node.$ && node.$.class && indicators.includes(node.$.class)) {
+            return true;
+          }
+          if (node.$ && node.$.text && indicators.includes(node.$.text)) {
+            return true;
+          }
+          if (node.node) {
+            for (const childNode of node.node) {
+              if (childNode.$ && childNode.$.text && indicators.includes(childNode.$.text)) {
+                return true;
+              }
+            }
+          }
+        }
+        return false;
       }
     } as any;
 
@@ -105,17 +139,24 @@ describe("DetectIntentChooser", () => {
     });
 
     it("should not detect intent chooser in normal app view hierarchy", async () => {
-      const normalViewHierarchy = `
-        <hierarchy>
-          <node class="android.widget.LinearLayout">
-            <node text="Normal app content" />
-          </node>
-        </hierarchy>
-      `;
-
       const normalObserveResult = {
         ...mockObserveResult,
-        viewHierarchy: normalViewHierarchy
+        viewHierarchy: {
+          hierarchy: {
+            node: {
+              $: {
+                class: "android.widget.LinearLayout"
+              },
+              node: [
+                {
+                  $: {
+                    text: "Normal app content"
+                  }
+                }
+              ]
+            }
+          }
+        }
       };
 
       mockObserveScreen.getMostRecentCachedObserveResult.resolves(normalObserveResult);
@@ -178,12 +219,62 @@ describe("DetectIntentChooser", () => {
     });
 
     it("should detect various intent chooser indicators", async () => {
-      const testCases = [
-        '<hierarchy><node class="com.android.internal.app.ChooserActivity" /></hierarchy>',
-        '<hierarchy><node class="com.android.internal.app.ResolverActivity" /></hierarchy>',
-        '<hierarchy><node text="Choose an app" /></hierarchy>',
-        '<hierarchy><node text="Open with" /></hierarchy>',
-        '<hierarchy><node text="Always" /><node text="Just once" /></hierarchy>'
+      const testCases: ViewHierarchyResult[] = [
+        {
+          hierarchy: {
+            node: {
+              $: {
+                class: "com.android.internal.app.ChooserActivity"
+              }
+            }
+          }
+        },
+        {
+          hierarchy: {
+            node: {
+              $: {
+                class: "com.android.internal.app.ResolverActivity"
+              }
+            }
+          }
+        },
+        {
+          hierarchy: {
+            node: {
+              $: {
+                text: "Choose an app"
+              }
+            }
+          }
+        },
+        {
+          hierarchy: {
+            node: {
+              $: {
+                text: "Open with"
+              }
+            }
+          }
+        },
+        {
+          hierarchy: {
+            node: {
+              $: {},
+              node: [
+                {
+                  $: {
+                    text: "Always"
+                  }
+                },
+                {
+                  $: {
+                    text: "Just once"
+                  }
+                }
+              ]
+            }
+          }
+        }
       ];
 
       for (const viewHierarchy of testCases) {
@@ -199,10 +290,35 @@ describe("DetectIntentChooser", () => {
     });
 
     it("should not detect intent chooser in non-chooser screens", async () => {
-      const testCases = [
-        '<hierarchy><node class="android.widget.Button" text="Click me" /></hierarchy>',
-        '<hierarchy><node text="Welcome to the app" /></hierarchy>',
-        '<hierarchy><node class="com.example.MainActivity" /></hierarchy>'
+      const testCases: ViewHierarchyResult[] = [
+        {
+          hierarchy: {
+            node: {
+              $: {
+                class: "android.widget.Button",
+                text: "Click me"
+              }
+            }
+          }
+        },
+        {
+          hierarchy: {
+            node: {
+              $: {
+                text: "Welcome to the app"
+              }
+            }
+          }
+        },
+        {
+          hierarchy: {
+            node: {
+              $: {
+                class: "com.example.MainActivity"
+              }
+            }
+          }
+        }
       ];
 
       for (const viewHierarchy of testCases) {
