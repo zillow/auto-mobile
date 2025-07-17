@@ -20,8 +20,14 @@ export class DetectIntentChooser extends BaseVisualChange {
     return this.observedInteraction(
       async (observeResult: ObserveResult) => {
         try {
+
+          const viewHierarchy = observeResult.viewHierarchy;
+          if (!viewHierarchy) {
+            return { success: false, error: "View hierarchy not found" };
+          }
+
           logger.info("[DetectIntentChooser] Starting intent chooser detection");
-          const detected = this.deepLinkManager.detectIntentChooser(observeResult.viewHierarchy);
+          const detected = this.deepLinkManager.detectIntentChooser(viewHierarchy);
 
           logger.info(`[DetectIntentChooser] Intent chooser detection completed. Detected: ${detected}`);
 

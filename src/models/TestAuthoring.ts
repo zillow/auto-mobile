@@ -1,3 +1,5 @@
+import { ViewHierarchyAnalysis } from "./SourceMapping";
+
 export interface LoggedToolCall {
     timestamp: Date;
     toolName: string;
@@ -13,8 +15,10 @@ export interface TestAuthoringSession {
     sessionId: string;
     startTime: Date;
     endTime?: Date;
+    deviceId: string;
     appId: string;
     toolCalls: LoggedToolCall[];
+    analysis: ViewHierarchyAnalysis[];
     isActive: boolean;
 }
 

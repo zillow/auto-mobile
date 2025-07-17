@@ -1,6 +1,6 @@
 import { AdbUtils } from "../../utils/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { RecentAppsResult } from "../../models";
+import { RecentAppsResult, ViewHierarchyResult } from "../../models";
 import { SwipeOnScreen } from "./SwipeOnScreen";
 import { PressButton } from "./PressButton";
 import { ElementUtils } from "../utility/ElementUtils";
@@ -30,7 +30,12 @@ export class RecentApps extends BaseVisualChange {
     return this.observedInteraction(
       async (observeResult: ObserveResult) => {
 
-        const navigationMethod = this.detectNavigationStyle(observeResult);
+        const viewHierarchy = observeResult.viewHierarchy;
+        if (!viewHierarchy) {
+          return { success: false, method: "unknown" };
+        }
+
+        const navigationMethod = this.detectNavigationStyle(viewHierarchy);
 
         switch (navigationMethod) {
           case "gesture":
@@ -55,10 +60,10 @@ export class RecentApps extends BaseVisualChange {
 
   /**
    * Detect navigation style from view hierarchy
-   * @param observeResult - Latest observe result with view hierarchy
+   * @param viewHierarchy - Latest ViewHierarchyResult
    * @returns Navigation style type
    */
-  private detectNavigationStyle(observeResult: ObserveResult): "gesture" | "legacy" | "hardware" {
+  private detectNavigationStyle(viewHierarchy: ViewHierarchyResult): "gesture" | "legacy" | "hardware" {
     // Look for common navigation bar elements
     const navigationBarIds = [
       "navigationBarBackground",
@@ -77,7 +82,7 @@ export class RecentApps extends BaseVisualChange {
 
     // Check for legacy navigation bar with recent apps button
     for (const buttonId of recentAppsButtonIds) {
-      const elements = this.elementUtils.findElementsByResourceId(observeResult.viewHierarchy, buttonId, "@android:id/content", true);
+      const elements = this.elementUtils.findElementsByResourceId(viewHierarchy, buttonId, "@android:id/content", true);
       if (elements.length > 0) {
         return "legacy";
       }
@@ -85,7 +90,7 @@ export class RecentApps extends BaseVisualChange {
 
     // Check for navigation bar presence (indicates gesture navigation if no recent button found)
     for (const navId of navigationBarIds) {
-      const elements = this.elementUtils.findElementsByResourceId(observeResult.viewHierarchy, navId, "@android:id/content", true);
+      const elements = this.elementUtils.findElementsByResourceId(viewHierarchy, navId, "@android:id/content", true);
       if (elements.length > 0) {
         return "gesture";
       }
@@ -100,7 +105,7 @@ export class RecentApps extends BaseVisualChange {
     ];
 
     for (const indicator of gestureIndicators) {
-      const elements = this.elementUtils.findElementsByResourceId(observeResult.viewHierarchy, indicator, "@android:id/content", true);
+      const elements = this.elementUtils.findElementsByResourceId(viewHierarchy, indicator, "@android:id/content", true);
       if (elements.length > 0) {
         return "gesture";
       }
@@ -155,10 +160,20 @@ export class RecentApps extends BaseVisualChange {
       "overview_button"
     ];
 
+
+    const viewHierarchy = observeResult.viewHierarchy;
+    if (!viewHierarchy) {
+      return {
+        success: false,
+        method: "legacy",
+        error: "View hierarchy not available"
+      };
+    }
+
     // Find the recent apps button
     let recentButton = null;
     for (const buttonId of recentAppsButtonIds) {
-      const elements = this.elementUtils.findElementsByResourceId(observeResult.viewHierarchy, buttonId, "@android:id/content", true);
+      const elements = this.elementUtils.findElementsByResourceId(viewHierarchy, buttonId, "@android:id/content", true);
       if (elements.length > 0) {
         recentButton = elements[0];
         break;

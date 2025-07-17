@@ -31,8 +31,14 @@ export class HandleIntentChooser extends BaseVisualChange {
 
     return this.observedInteraction(
       async (observeResult: ObserveResult) => {
+
+        const viewHierarchy = observeResult.viewHierarchy;
+        if (!viewHierarchy) {
+          return { success: false, error: "View hierarchy not found" };
+        }
+
         return await this.deepLinkManager.handleIntentChooser(
-          observeResult.viewHierarchy,
+          viewHierarchy,
           preference,
           customAppPackage
         );

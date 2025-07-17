@@ -26,6 +26,7 @@ export interface SourceAnalysis {
 }
 
 export interface ViewHierarchyAnalysis {
+  appId: string;
   activityClasses: string[];
   fragmentClasses: string[];
   resourceIds: string[];

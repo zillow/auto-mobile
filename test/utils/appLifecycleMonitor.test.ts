@@ -1,64 +1,85 @@
 import { expect } from "chai";
 import sinon from "sinon";
-import { EventEmitter } from "events";
 import { AppLifecycleMonitor, AppLifecycleEvent } from "../../src/utils/appLifecycleMonitor";
 import { AdbUtils } from "../../src/utils/adb";
-import { ExecResult } from "../../src/models/ExecResult";
+import { ExecResult } from "../../src/models";
 
 describe("AppLifecycleMonitor", () => {
   let monitor: AppLifecycleMonitor;
   let adbUtilsStub: sinon.SinonStubbedInstance<AdbUtils>;
-  let clock: sinon.SinonFakeTimers;
 
   beforeEach(() => {
-    // Create a fake timer to control setInterval behavior
-    clock = sinon.useFakeTimers();
-
     // Stub the AdbUtils constructor and its methods
     adbUtilsStub = sinon.createStubInstance(AdbUtils);
     sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(adbUtilsStub.executeCommand);
 
-    monitor = new AppLifecycleMonitor("test-device");
+    monitor = AppLifecycleMonitor.getInstance();
   });
 
   afterEach(async () => {
-    // Stop monitoring first to clean up intervals
-    if (monitor.isMonitoring()) {
-      await monitor.stopMonitoring();
+    // Clean up singleton state
+    const trackedPackages = monitor.getTrackedPackages();
+    for (const pkg of trackedPackages) {
+      await monitor.untrackPackage("test-device", pkg);
     }
-    // Clean up
-    clock.restore();
+
+    // Clear all event listeners
+    monitor.removeAllListeners();
+
+    // Clean up sinon stubs
     sinon.restore();
   });
 
-  describe("constructor", () => {
-    it("should create instance with device ID", () => {
-      const testMonitor = new AppLifecycleMonitor("test-device");
-      expect(testMonitor).to.be.instanceOf(AppLifecycleMonitor);
-      expect(testMonitor).to.be.instanceOf(EventEmitter);
-    });
-
-    it("should create instance without device ID", () => {
-      const testMonitor = new AppLifecycleMonitor();
-      expect(testMonitor).to.be.instanceOf(AppLifecycleMonitor);
+  describe("singleton pattern", () => {
+    it("should return the same instance", () => {
+      const instance1 = AppLifecycleMonitor.getInstance();
+      const instance2 = AppLifecycleMonitor.getInstance();
+      expect(instance1).to.equal(instance2);
     });
   });
 
   describe("package tracking", () => {
-    it("should track packages", () => {
-      monitor.trackPackage("com.example.app");
+    it("should track packages", async () => {
+      const mockOutput: ExecResult = {
+        stdout: "",
+        stderr: "",
+        toString: () => "",
+        trim: () => "",
+        includes: () => false
+      };
+      adbUtilsStub.executeCommand.resolves(mockOutput);
+
+      await monitor.trackPackage("test-device", "com.example.app");
       expect(monitor.getTrackedPackages()).to.include("com.example.app");
     });
 
-    it("should untrack packages", () => {
-      monitor.trackPackage("com.example.app");
-      monitor.untrackPackage("com.example.app");
+    it("should untrack packages", async () => {
+      const mockOutput: ExecResult = {
+        stdout: "",
+        stderr: "",
+        toString: () => "",
+        trim: () => "",
+        includes: () => false
+      };
+      adbUtilsStub.executeCommand.resolves(mockOutput);
+
+      await monitor.trackPackage("test-device", "com.example.app");
+      await monitor.untrackPackage("test-device", "com.example.app");
       expect(monitor.getTrackedPackages()).to.not.include("com.example.app");
     });
 
-    it("should track multiple packages", () => {
-      monitor.trackPackage("com.example.app1");
-      monitor.trackPackage("com.example.app2");
+    it("should track multiple packages", async () => {
+      const mockOutput: ExecResult = {
+        stdout: "",
+        stderr: "",
+        toString: () => "",
+        trim: () => "",
+        includes: () => false
+      };
+      adbUtilsStub.executeCommand.resolves(mockOutput);
+
+      await monitor.trackPackage("test-device", "com.example.app1");
+      await monitor.trackPackage("test-device", "com.example.app2");
       expect(monitor.getTrackedPackages()).to.have.length(2);
       expect(monitor.getTrackedPackages()).to.include("com.example.app1");
       expect(monitor.getTrackedPackages()).to.include("com.example.app2");
@@ -76,7 +97,7 @@ describe("AppLifecycleMonitor", () => {
       };
       adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      const isRunning = await monitor.isPackageRunning("com.example.app");
+      const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
       expect(isRunning).to.be.true;
       expect(adbUtilsStub.executeCommand.calledWith("shell pidof com.example.app")).to.be.true;
     });
@@ -91,86 +112,15 @@ describe("AppLifecycleMonitor", () => {
       };
       adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      const isRunning = await monitor.isPackageRunning("com.example.app");
+      const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
       expect(isRunning).to.be.false;
     });
 
     it("should return false when pidof command fails", async () => {
       adbUtilsStub.executeCommand.rejects(new Error("pidof failed"));
 
-      const isRunning = await monitor.isPackageRunning("com.example.app");
+      const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
       expect(isRunning).to.be.false;
-    });
-  });
-
-  describe("startMonitoring", () => {
-    it("should start monitoring successfully", async () => {
-      monitor.trackPackage("com.example.app");
-
-      const mockOutput: ExecResult = {
-        stdout: "12345",
-        stderr: "",
-        toString: () => "12345",
-        trim: () => "12345",
-        includes: (str: string) => mockOutput.stdout.includes(str)
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
-
-      await monitor.startMonitoring();
-
-      expect(monitor.isMonitoring()).to.be.true;
-      expect(adbUtilsStub.executeCommand.calledWith("shell pidof com.example.app")).to.be.true;
-    });
-
-    it("should not start monitoring if already active", async () => {
-      const mockOutput: ExecResult = {
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
-
-      await monitor.startMonitoring();
-      const firstCallCount = adbUtilsStub.executeCommand.callCount;
-
-      await monitor.startMonitoring();
-      const secondCallCount = adbUtilsStub.executeCommand.callCount;
-
-      expect(secondCallCount).to.equal(firstCallCount);
-    });
-
-    it("should handle ADB command failure gracefully", async () => {
-      monitor.trackPackage("com.example.app");
-      adbUtilsStub.executeCommand.rejects(new Error("ADB command failed"));
-
-      await monitor.startMonitoring();
-
-      expect(monitor.isMonitoring()).to.be.true;
-    });
-  });
-
-  describe("stopMonitoring", () => {
-    it("should stop monitoring when active", async () => {
-      const mockOutput: ExecResult = {
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
-
-      await monitor.startMonitoring();
-      await monitor.stopMonitoring();
-
-      expect(monitor.isMonitoring()).to.be.false;
-    });
-
-    it("should handle stopping when not monitoring", async () => {
-      await monitor.stopMonitoring();
-      expect(monitor.isMonitoring()).to.be.false;
     });
   });
 
@@ -179,9 +129,7 @@ describe("AppLifecycleMonitor", () => {
       expect(monitor.getRunningPackages()).to.have.length(0);
     });
 
-    it("should return running packages after monitoring starts", async () => {
-      monitor.trackPackage("com.example.app");
-
+    it("should return running packages after checkForChanges", async () => {
       const mockOutput: ExecResult = {
         stdout: "12345",
         stderr: "",
@@ -191,8 +139,8 @@ describe("AppLifecycleMonitor", () => {
       };
       adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      await monitor.startMonitoring();
-
+      await monitor.trackPackage("test-device", "com.example.app");
+      await monitor.checkForChanges("test-device");
       expect(monitor.getRunningPackages()).to.include("com.example.app");
     });
   });
@@ -215,22 +163,10 @@ describe("AppLifecycleMonitor", () => {
     });
 
     it("should emit launch event for new package", async () => {
-      monitor.trackPackage("com.example.app");
-
-      // Start with package not running
-      let mockOutput: ExecResult = {
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
-
-      await monitor.startMonitoring();
+      await monitor.trackPackage("test-device", "com.example.app");
 
       // Simulate package launch
-      mockOutput = {
+      const mockOutput: ExecResult = {
         stdout: "12345",
         stderr: "",
         toString: () => "12345",
@@ -239,8 +175,8 @@ describe("AppLifecycleMonitor", () => {
       };
       adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      // Trigger polling cycle
-      await clock.tickAsync(1000);
+      // Explicitly check for changes
+      await monitor.checkForChanges("test-device");
 
       expect(launchEvents).to.have.length(1);
       expect(launchEvents[0].type).to.equal("launch");
@@ -249,9 +185,9 @@ describe("AppLifecycleMonitor", () => {
     });
 
     it("should emit terminate event when package stops", async () => {
-      monitor.trackPackage("com.example.app");
+      await monitor.trackPackage("test-device", "com.example.app");
 
-      // Start with package running
+      // First, simulate package running
       let mockOutput: ExecResult = {
         stdout: "12345",
         stderr: "",
@@ -261,7 +197,11 @@ describe("AppLifecycleMonitor", () => {
       };
       adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      await monitor.startMonitoring();
+      // Check for changes to establish running state
+      await monitor.checkForChanges("test-device");
+
+      // Clear events from the launch
+      launchEvents.length = 0;
 
       // Simulate package termination
       mockOutput = {
@@ -273,8 +213,8 @@ describe("AppLifecycleMonitor", () => {
       };
       adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      // Trigger polling cycle
-      await clock.tickAsync(1000);
+      // Check for changes to detect termination
+      await monitor.checkForChanges("test-device");
 
       expect(terminateEvents).to.have.length(1);
       expect(terminateEvents[0].type).to.equal("terminate");
@@ -283,19 +223,8 @@ describe("AppLifecycleMonitor", () => {
     });
 
     it("should handle multiple packages", async () => {
-      monitor.trackPackage("com.example.app1");
-      monitor.trackPackage("com.example.app2");
-
-      // Start with no packages running
-      adbUtilsStub.executeCommand.resolves({
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      });
-
-      await monitor.startMonitoring();
+      await monitor.trackPackage("test-device", "com.example.app1");
+      await monitor.trackPackage("test-device", "com.example.app2");
 
       // Simulate both packages launching
       adbUtilsStub.executeCommand.callsFake(async (command: string) => {
@@ -317,95 +246,12 @@ describe("AppLifecycleMonitor", () => {
         };
       });
 
-      // Trigger polling cycle
-      await clock.tickAsync(1000);
+      // Check for changes to detect launches
+      await monitor.checkForChanges("test-device");
 
       expect(launchEvents).to.have.length(2);
       expect(launchEvents.map(e => e.appId)).to.include("com.example.app1");
       expect(launchEvents.map(e => e.appId)).to.include("com.example.app2");
-    });
-  });
-
-  describe("polling configuration", () => {
-    it("should use default polling interval", async () => {
-      monitor.trackPackage("com.example.app");
-
-      const mockOutput: ExecResult = {
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
-
-      await monitor.startMonitoring();
-
-      // Default interval is 1000ms
-      const initialCalls = adbUtilsStub.executeCommand.callCount;
-      await clock.tickAsync(999);
-      expect(adbUtilsStub.executeCommand.callCount).to.equal(initialCalls);
-
-      await clock.tickAsync(1);
-      expect(adbUtilsStub.executeCommand.callCount).to.be.greaterThan(initialCalls);
-    });
-
-    it("should use custom polling interval", async () => {
-      monitor.trackPackage("com.example.app");
-
-      const mockOutput: ExecResult = {
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
-
-      monitor.setPollingInterval(2000);
-      await monitor.startMonitoring();
-
-      const initialCalls = adbUtilsStub.executeCommand.callCount;
-      await clock.tickAsync(1999);
-      expect(adbUtilsStub.executeCommand.callCount).to.equal(initialCalls);
-
-      await clock.tickAsync(1);
-      expect(adbUtilsStub.executeCommand.callCount).to.be.greaterThan(initialCalls);
-    });
-
-    it("should update polling interval while monitoring", async () => {
-      monitor.trackPackage("com.example.app");
-
-      const mockOutput: ExecResult = {
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
-
-      await monitor.startMonitoring();
-
-      // Change interval while running
-      monitor.setPollingInterval(500);
-
-      const initialCalls = adbUtilsStub.executeCommand.callCount;
-      await clock.tickAsync(500);
-      expect(adbUtilsStub.executeCommand.callCount).to.be.greaterThan(initialCalls);
-    });
-  });
-
-  describe("device management", () => {
-    it("should set device ID", () => {
-      monitor.setDeviceId("new-device");
-      // Device ID change should be reflected in subsequent ADB calls
-      // This is tested indirectly through the AdbUtils constructor call
-    });
-
-    it("should work without device ID", () => {
-      const noDeviceMonitor = new AppLifecycleMonitor();
-      expect(noDeviceMonitor).to.be.instanceOf(AppLifecycleMonitor);
     });
   });
 
@@ -421,11 +267,12 @@ describe("AppLifecycleMonitor", () => {
     });
   });
 
-  describe("error handling", () => {
-    it("should continue monitoring despite polling errors", async () => {
-      monitor.trackPackage("com.example.app");
+  describe("checkForChanges", () => {
+    it("should detect package state changes", async () => {
+      await monitor.trackPackage("test-device", "com.example.app");
 
-      const mockOutput: ExecResult = {
+      // Initially package is not running
+      let mockOutput: ExecResult = {
         stdout: "",
         stderr: "",
         toString: () => "",
@@ -434,35 +281,32 @@ describe("AppLifecycleMonitor", () => {
       };
       adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      await monitor.startMonitoring();
+      await monitor.checkForChanges("test-device");
+      expect(monitor.getRunningPackages()).to.not.include("com.example.app");
 
-      // Make subsequent calls fail
-      adbUtilsStub.executeCommand.rejects(new Error("ADB error"));
+      // Package starts running
+      mockOutput = {
+        stdout: "12345",
+        stderr: "",
+        toString: () => "12345",
+        trim: () => "12345",
+        includes: (str: string) => mockOutput.stdout.includes(str)
+      };
+      adbUtilsStub.executeCommand.resolves(mockOutput);
 
-      // Should not throw and monitoring should continue
-      await clock.tickAsync(1000);
-
-      expect(monitor.isMonitoring()).to.be.true;
+      await monitor.checkForChanges("test-device");
+      expect(monitor.getRunningPackages()).to.include("com.example.app");
     });
+  });
 
+  describe("error handling", () => {
     it("should handle event emission errors gracefully", async () => {
-      monitor.trackPackage("com.example.app");
-
-      const mockOutput: ExecResult = {
-        stdout: "",
-        stderr: "",
-        toString: () => "",
-        trim: () => "",
-        includes: () => false
-      };
-      adbUtilsStub.executeCommand.resolves(mockOutput);
+      await monitor.trackPackage("test-device", "com.example.app");
 
       // Add listener that throws
       monitor.addEventListener("launch", async () => {
         throw new Error("Event handler error");
       });
-
-      await monitor.startMonitoring();
 
       // Simulate package launch
       const launchOutput: ExecResult = {
@@ -475,9 +319,7 @@ describe("AppLifecycleMonitor", () => {
       adbUtilsStub.executeCommand.resolves(launchOutput);
 
       // Should not throw
-      await clock.tickAsync(1000);
-
-      expect(monitor.isMonitoring()).to.be.true;
+      await monitor.checkForChanges("test-device");
     });
   });
 });

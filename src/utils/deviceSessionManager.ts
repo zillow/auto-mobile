@@ -1,4 +1,4 @@
-import { ActionableError } from "../models/ActionableError";
+import { ActionableError } from "../models";
 import { EmulatorUtils } from "./emulator";
 import { AdbUtils } from "./adb";
 import { Window } from "../features/observe/Window";
@@ -28,16 +28,21 @@ export class DeviceSessionManager {
   }
 
   /**
+   * Get the current device ID
+   */
+  public getCurrentDeviceId(): string | undefined {
+    return this.currentDeviceId;
+  }
+
+  /**
      * Set the current device ID
      */
-  public setCurrentDeviceId(deviceId: string | undefined): void {
+  public setCurrentDeviceId(deviceId: string): void {
     this.currentDeviceId = deviceId;
     // Update AdbUtils with new device ID
-    this.adbUtils = new AdbUtils(deviceId || null);
+    this.adbUtils = new AdbUtils(deviceId);
     // Reset window when device changes
     this.window = undefined;
-    // Update test authoring manager with new device ID
-    this.testAuthoringManager.setDeviceId(deviceId);
   }
 
   /**
@@ -168,16 +173,5 @@ export class DeviceSessionManager {
 
     await this.verifyDevice(newDeviceId);
     return newDeviceId;
-  }
-
-  /**
-     * Clear the current device session
-     */
-  public clearSession(): void {
-    this.currentDeviceId = undefined;
-    this.window = undefined;
-    this.adbUtils = new AdbUtils(null);
-    // Clear device from test authoring manager
-    this.testAuthoringManager.setDeviceId(undefined);
   }
 }

@@ -6,7 +6,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
-import { logToolCall } from "../utils/toolLogger";
 import { ConfigurationManager } from "../utils/configurationManager";
 import { TestAuthoringManager } from "../utils/testAuthoringManager";
 import { DeviceSessionManager } from "../utils/deviceSessionManager";
@@ -131,7 +130,8 @@ export const createMcpServer = (): McpServer => {
         const appId = deviceConfig.testAuthoring.appId;
         const appConfig = ConfigurationManager.getInstance().getConfigForApp(appId);
         if (appConfig && appConfig.appId) {
-          await testAuthoringManager.startAuthoringSession(appConfig.appId);
+          await testAuthoringManager.startAuthoringSession(deviceId, appConfig.appId);
+
         }
       }
     }
@@ -159,7 +159,7 @@ export const createMcpServer = (): McpServer => {
     try {
       // Execute the handler with optional progress callback
       const deviceSessionManager = DeviceSessionManager.getInstance();
-      const deviceId = deviceSessionManager.ensureDeviceReady();
+      const deviceId = await deviceSessionManager.ensureDeviceReady();
       let response: any | undefined;
       if (deviceId === undefined) {
         throw new ActionableError("No device available");
@@ -167,15 +167,9 @@ export const createMcpServer = (): McpServer => {
         response = await tool.handler(parsedParams, progressCallback);
       }
 
-      // Log successful tool call
-      await logToolCall(name, parsedParams, {
-        success: true,
-        data: response
-      });
-
       // Log tool call to test authoring session if active
       if (testAuthoringManager.isActive()) {
-        await testAuthoringManager.logToolCall(name, parsedParams, {
+        await testAuthoringManager.logToolCall(deviceId, name, parsedParams, {
           success: true,
           data: response
         });
@@ -183,15 +177,9 @@ export const createMcpServer = (): McpServer => {
 
       return response;
     } catch (error) {
-      // Log failed tool call
-      await logToolCall(name, parsedParams, {
-        success: false,
-        error: error instanceof ActionableError ? error.message : `${error}`
-      });
-
       // Log failed tool call to test authoring session if active
       if (testAuthoringManager.isActive()) {
-        await testAuthoringManager.logToolCall(name, parsedParams, {
+        await testAuthoringManager.logToolCall(deviceId, name, parsedParams, {
           success: false,
           error: error instanceof ActionableError ? error.message : `${error}`
         });

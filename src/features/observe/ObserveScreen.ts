@@ -125,8 +125,7 @@ export class ObserveScreen {
           result.focusedElement = focusedElement;
           logger.debug(`Found focused element: ${focusedElement.text || focusedElement["resource-id"] || "no text/id"}`);
         }
-        const hierarchyXml = typeof viewHierarchy === "string" ? viewHierarchy : JSON.stringify(viewHierarchy);
-        await this.detectIntentChooser(result, hierarchyXml);
+        await this.detectIntentChooser(result);
       }
 
       logger.debug(`View hierarchy retrieval took ${Date.now() - viewHierarchyStart}ms`);
@@ -153,9 +152,13 @@ export class ObserveScreen {
   /**
    * Detect intent chooser dialog in the view hierarchy
    * @param result - ObserveResult to update
-   * @param viewHierarchy - View hierarchy to analyze
    */
-  private async detectIntentChooser(result: ObserveResult, viewHierarchy: string): Promise<void> {
+  private async detectIntentChooser(result: ObserveResult): Promise<void> {
+
+    if (!result.viewHierarchy) {
+      return;
+    }
+
     try {
       const intentChooserDetected = this.deepLinkManager.detectIntentChooser(result.viewHierarchy);
 

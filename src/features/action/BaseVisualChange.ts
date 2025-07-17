@@ -60,7 +60,7 @@ export class BaseVisualChange {
         await progress(10, 100, "Getting previous view hierarchy...");
       }
       previousObserveResult = await this.observeScreen.getMostRecentCachedObserveResult();
-      if (!previousObserveResult?.viewHierarchy || !previousObserveResult.viewHierarchy || previousObserveResult.viewHierarchy.error) {
+      if (!previousObserveResult?.viewHierarchy || !previousObserveResult.viewHierarchy || previousObserveResult.viewHierarchy.hierarchy.error) {
         previousObserveResult = await this.observeScreen.execute();
       }
     } catch (error) {

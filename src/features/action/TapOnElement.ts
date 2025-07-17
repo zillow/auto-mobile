@@ -86,7 +86,12 @@ export class TapOnElement extends BaseVisualChange {
       return await this.observedInteraction(
         async (observeResult: ObserveResult) => {
 
-          const element = this.findElementToTap(options, observeResult.viewHierarchy);
+          const viewHierarchy = observeResult.viewHierarchy;
+          if (!viewHierarchy) {
+            return { success: false, error: "Unable to get view hierarchy, cannot tap on element" };
+          }
+
+          const element = this.findElementToTap(options, viewHierarchy);
           const tapPoint = this.elementUtils.getElementCenter(element);
 
           if (options.action === "focus") {
@@ -115,7 +120,7 @@ export class TapOnElement extends BaseVisualChange {
             await this.adb.executeCommand(`shell input swipe ${tapPoint.x} ${tapPoint.y} ${tapPoint.x} ${tapPoint.y} 1000`);
           } else if (options.action === "doubleTap") {
             await this.adb.executeCommand(`shell input tap ${tapPoint.x} ${tapPoint.y}`);
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 200));
             await this.adb.executeCommand(`shell input tap ${tapPoint.x} ${tapPoint.y}`);
           }
 

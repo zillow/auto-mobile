@@ -16,7 +16,7 @@ import {
   SourceIndexResult,
   TestPlanPlacementResult,
   ViewHierarchyAnalysis,
-  ViewInfo
+  ViewInfo, ViewHierarchyResult
 } from "../models";
 import { ConfigurationManager } from "./configurationManager";
 
@@ -831,8 +831,9 @@ export class SourceMapper {
   /**
      * Analyze view hierarchy to extract source mapping information
      */
-  public analyzeViewHierarchy(viewHierarchyXml: string): ViewHierarchyAnalysis {
+  public analyzeViewHierarchy(appId: string, viewHierarchy: ViewHierarchyResult): ViewHierarchyAnalysis {
     const analysis: ViewHierarchyAnalysis = {
+      appId: appId,
       activityClasses: [],
       fragmentClasses: [],
       resourceIds: [],
@@ -840,51 +841,77 @@ export class SourceMapper {
     };
 
     try {
-      // Extract activity class names
-      const activityMatches = viewHierarchyXml.match(/mCurrentFocus.*?Activity.*?(\w+\.\w+\.\w+\.\w+Activity)/g);
-      if (activityMatches) {
-        analysis.activityClasses = activityMatches
-          .map(match => {
-            const classMatch = match.match(/(\w+(?:\.\w+)*\..*Activity)/);
-            return classMatch ? classMatch[1] : null;
-          })
-          .filter(Boolean) as string[];
+      if (!viewHierarchy || !viewHierarchy.hierarchy || !viewHierarchy.hierarchy.node) {
+        return analysis;
       }
 
-      // Extract fragment class names from hierarchy
-      const fragmentMatches = viewHierarchyXml.match(/class="([^"]*Fragment[^"]*)"/g);
-      if (fragmentMatches) {
-        analysis.fragmentClasses = fragmentMatches
-          .map(match => {
-            const classMatch = match.match(/class="([^"]*)"/);
-            return classMatch ? classMatch[1] : null;
-          })
-          .filter(Boolean) as string[];
-      }
+      // Extract activity class names (these would come from current activity info)
+      // For now, we'll collect any class names that end with "Activity"
+      const activityClasses = new Set<string>();
+      const fragmentClasses = new Set<string>();
+      const resourceIds = new Set<string>();
+      const customViews = new Set<string>();
 
-      // Extract resource IDs
-      const resourceMatches = viewHierarchyXml.match(/resource-id="([^"]+)"/g);
-      if (resourceMatches) {
-        analysis.resourceIds = resourceMatches
-          .map(match => {
-            const idMatch = match.match(/resource-id="([^"]+)"/);
-            return idMatch ? idMatch[1] : null;
-          })
-          .filter(Boolean) as string[];
-      }
+      // Traverse the hierarchy to collect information
+      const traverseNode = (node: any): void => {
+        if (!node) {
+          return;
+        }
 
-      // Extract custom view components
-      const customViewMatches = viewHierarchyXml.match(/class="([^"]*\.[A-Z][^"]*View[^"]*)"/g);
-      if (customViewMatches) {
-        analysis.customViews = customViewMatches
-          .map(match => {
-            const classMatch = match.match(/class="([^"]*)"/);
-            return classMatch ? classMatch[1] : null;
-          })
-          .filter(Boolean) as string[];
-      }
+        // Extract resource IDs
+        const resourceId = node["resource-id"] || node.resourceId;
+        if (resourceId) {
+          resourceIds.add(resourceId);
+        }
 
-      logger.debug(`[SOURCE] View hierarchy analysis found: ${analysis.activityClasses.length} activities, ${analysis.fragmentClasses.length} fragments`);
+        // Extract class names
+        const className = node["class"] || node.className;
+        if (className) {
+          if (className.includes("Activity")) {
+            activityClasses.add(className);
+          } else if (className.includes("Fragment")) {
+            fragmentClasses.add(className);
+          } else if (
+            !className.startsWith("android.") &&
+            !className.startsWith("com.android.") &&
+            !className.startsWith("androidx.")
+          ) {
+            // Custom view classes (not Android framework classes)
+            customViews.add(className);
+          }
+        }
+
+        // Extract fragment information from augmented data
+        const fragmentName = node["fragment"];
+        if (fragmentName) {
+          fragmentClasses.add(fragmentName);
+        }
+
+        // Extract custom view information from augmented data
+        const customView = node["customView"];
+        if (customView) {
+          customViews.add(customView);
+        }
+
+        // Recursively traverse child nodes
+        if (node.node) {
+          const children = Array.isArray(node.node) ? node.node : [node.node];
+          for (const child of children) {
+            traverseNode(child);
+          }
+        }
+      };
+
+      // Start traversal from the root node
+      traverseNode(viewHierarchy.hierarchy.node);
+
+      // Convert sets to arrays
+      analysis.activityClasses = Array.from(activityClasses);
+      analysis.fragmentClasses = Array.from(fragmentClasses);
+      analysis.resourceIds = Array.from(resourceIds);
+      analysis.customViews = Array.from(customViews);
+
+      logger.debug(`[SOURCE] View hierarchy analysis found: ${analysis.activityClasses.length} activities, ${analysis.fragmentClasses.length} fragments, ${analysis.resourceIds.length} resource IDs, ${analysis.customViews.length} custom views`);
     } catch (error) {
       logger.warn(`Failed to analyze view hierarchy: ${error}`);
       // Rethrow ActionableErrors to preserve their specific error messages

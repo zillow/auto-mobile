@@ -4,7 +4,7 @@ import { DeepLinkManager } from "../../../src/utils/deepLinkManager";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { Window } from "../../../src/features/observe/Window";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
-import { IntentChooserResult, ObserveResult } from "../../../src/models";
+import { IntentChooserResult, ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import sinon from "sinon";
 
 describe("HandleIntentChooser", () => {
@@ -18,27 +18,55 @@ describe("HandleIntentChooser", () => {
     timestamp: "2025-01-01T00:00:00.000Z",
     screenSize: { width: 1080, height: 1920 },
     systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
-    viewHierarchy: `
-      <hierarchy>
-        <node class="com.android.internal.app.ChooserActivity">
-          <node text="Choose an app" />
-          <node text="Always" class="android.widget.Button" />
-          <node text="Just once" class="android.widget.Button" />
-        </node>
-      </hierarchy>
-    `
+    viewHierarchy: {
+      hierarchy: {
+        node: {
+          $: {
+            class: "com.android.internal.app.ChooserActivity"
+          },
+          node: [
+            {
+              $: {
+                text: "Choose an app"
+              }
+            },
+            {
+              $: {
+                text: "Always",
+                class: "android.widget.Button"
+              }
+            },
+            {
+              $: {
+                text: "Just once",
+                class: "android.widget.Button"
+              }
+            }
+          ]
+        }
+      }
+    } as ViewHierarchyResult
   };
 
   const mockUpdatedObserveResult: ObserveResult = {
     ...mockObserveResult,
     timestamp: "2025-01-01T00:00:00.001Z",
-    viewHierarchy: `
-      <hierarchy>
-        <node class="com.example.MainActivity">
-          <node text="App content after chooser" />
-        </node>
-      </hierarchy>
-    `
+    viewHierarchy: {
+      hierarchy: {
+        node: {
+          $: {
+            class: "com.example.MainActivity"
+          },
+          node: [
+            {
+              $: {
+                text: "App content after chooser"
+              }
+            }
+          ]
+        }
+      }
+    } as ViewHierarchyResult
   };
 
   beforeEach(() => {
@@ -70,7 +98,7 @@ describe("HandleIntentChooser", () => {
 
     // Create mock DeepLinkManager
     mockDeepLinkManager = {
-      handleIntentChooser: async (viewHierarchy: string, preference: string, customAppPackage?: string): Promise<IntentChooserResult> => {
+      handleIntentChooser: async (viewHierarchy: ViewHierarchyResult, preference: string, customAppPackage?: string): Promise<IntentChooserResult> => {
         // Look for common intent chooser indicators
         const indicators = [
           "com.android.internal.app.ChooserActivity",
@@ -86,8 +114,9 @@ describe("HandleIntentChooser", () => {
           "chooser_list"
         ];
 
+        const viewHierarchyString = JSON.stringify(viewHierarchy);
         const detected = indicators.some(indicator =>
-          viewHierarchy.toLowerCase().includes(indicator.toLowerCase())
+          viewHierarchyString.toLowerCase().includes(indicator.toLowerCase())
         );
 
         if (!detected) {
@@ -133,13 +162,24 @@ describe("HandleIntentChooser", () => {
 
     it("should handle intent chooser with 'just_once' preference", async () => {
       // Update the mock to return ResolverActivity hierarchy
-      const resolverHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ResolverActivity">
-            <node text="Just once" class="android.widget.Button" />
-          </node>
-        </hierarchy>
-      `;
+      const resolverHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ResolverActivity"
+            },
+            node: [
+              {
+                $: {
+                  text: "Just once",
+                  class: "android.widget.Button"
+                }
+              }
+            ]
+          }
+        }
+      } as ViewHierarchyResult;
+
       mockObserveScreen.getMostRecentCachedObserveResult.resolves({
         ...mockObserveResult,
         viewHierarchy: resolverHierarchy
@@ -156,13 +196,23 @@ describe("HandleIntentChooser", () => {
 
     it("should handle intent chooser with custom app selection", async () => {
       // Update the mock to return custom app hierarchy
-      const customHierarchy = `
-        <hierarchy>
-          <node class="com.android.internal.app.ChooserActivity">
-            <node resource-id="com.example.customapp:id/app_icon" />
-          </node>
-        </hierarchy>
-      `;
+      const customHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "com.android.internal.app.ChooserActivity"
+            },
+            node: [
+              {
+                $: {
+                  "resource-id": "com.example.customapp:id/app_icon"
+                }
+              }
+            ]
+          }
+        }
+      } as ViewHierarchyResult;
+
       mockObserveScreen.getMostRecentCachedObserveResult.resolves({
         ...mockObserveResult,
         viewHierarchy: customHierarchy
@@ -200,13 +250,23 @@ describe("HandleIntentChooser", () => {
 
     it("should handle no intent chooser detected", async () => {
       // Update mock to return hierarchy without intent chooser
-      const normalHierarchy = `
-        <hierarchy>
-          <node class="android.widget.LinearLayout">
-            <node text="Normal app content" />
-          </node>
-        </hierarchy>
-      `;
+      const normalHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              class: "android.widget.LinearLayout"
+            },
+            node: [
+              {
+                $: {
+                  text: "Normal app content"
+                }
+              }
+            ]
+          }
+        }
+      } as ViewHierarchyResult;
+
       mockObserveScreen.getMostRecentCachedObserveResult.resolves({
         ...mockObserveResult,
         viewHierarchy: normalHierarchy

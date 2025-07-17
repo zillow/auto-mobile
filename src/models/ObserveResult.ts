@@ -2,6 +2,7 @@ import { Element } from "./Element";
 import { ScreenSize } from "./ScreenSize";
 import { SystemInsets } from "./SystemInsets";
 import { ActiveWindowInfo } from "./ActiveWindowInfo";
+import { ViewHierarchyResult } from "./ViewHierarchyResult";
 
 /**
  * Represents the result of observing the device state
@@ -23,7 +24,7 @@ export interface ObserveResult {
   rotation?: number;
 
   /** View hierarchy data */
-  viewHierarchy?: any;
+  viewHierarchy?: ViewHierarchyResult;
 
   /** Path to screenshot file if taken */
   screenshotPath?: string;

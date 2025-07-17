@@ -4,6 +4,7 @@ import { logger } from "./logger";
 
 export interface AppLifecycleEvent {
     type: "launch" | "terminate" | "background" | "foreground" | "crash";
+    deviceId: string;
     appId: string;
     timestamp: Date;
     previousApp?: string;
@@ -17,30 +18,35 @@ export interface AppLifecycleEventListener {
 export class AppLifecycleMonitor extends EventEmitter {
   private trackedPackages: Set<string> = new Set();
   private runningPackages: Set<string> = new Set();
-  private monitoringActive: boolean = false;
-  private pollingInterval?: NodeJS.Timeout;
-  private pollingIntervalMs: number = 1000; // 1 second
-  private deviceId?: string;
+  private static instance: AppLifecycleMonitor;
 
-  constructor(deviceId?: string) {
+  private constructor() {
     super();
-    this.deviceId = deviceId;
+  }
+
+  public static getInstance(): AppLifecycleMonitor {
+    if (!AppLifecycleMonitor.instance) {
+      AppLifecycleMonitor.instance = new AppLifecycleMonitor();
+    }
+    return AppLifecycleMonitor.instance;
   }
 
   /**
    * Add a package to track for lifecycle events
    */
-  public trackPackage(packageName: string): void {
+  public async trackPackage(deviceId: string, packageName: string) {
     this.trackedPackages.add(packageName);
+    await this.checkForChanges(deviceId);
     logger.info(`Now tracking package: ${packageName}`);
   }
 
   /**
    * Remove a package from tracking
    */
-  public untrackPackage(packageName: string): void {
+  public async untrackPackage(deviceId: string, packageName: string) {
     this.trackedPackages.delete(packageName);
     this.runningPackages.delete(packageName);
+    await this.checkForChanges(deviceId);
     logger.info(`Stopped tracking package: ${packageName}`);
   }
 
@@ -52,62 +58,11 @@ export class AppLifecycleMonitor extends EventEmitter {
   }
 
   /**
-     * Start monitoring app lifecycle events
-     */
-  public async startMonitoring(): Promise<void> {
-    if (this.monitoringActive) {
-      logger.warn("App lifecycle monitoring is already active");
-      return;
-    }
-
-    logger.info("Starting app lifecycle monitoring");
-    this.monitoringActive = true;
-
-    // Get initial state of tracked packages
-    try {
-      await this.updateRunningPackages();
-      logger.info(`Initial running packages: ${Array.from(this.runningPackages).join(", ")}`);
-    } catch (error) {
-      logger.warn(`Failed to detect initial running packages: ${error}`);
-    }
-
-    // Start polling for changes
-    this.pollingInterval = setInterval(async () => {
-      try {
-        await this.pollForChanges();
-      } catch (error) {
-        logger.error(`Error during app lifecycle polling: ${error}`);
-      }
-    }, this.pollingIntervalMs);
-
-    logger.info("App lifecycle monitoring started");
-  }
-
-  /**
-     * Stop monitoring app lifecycle events
-     */
-  public async stopMonitoring(): Promise<void> {
-    if (!this.monitoringActive) {
-      return;
-    }
-
-    logger.info("Stopping app lifecycle monitoring");
-    this.monitoringActive = false;
-
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = undefined;
-    }
-
-    logger.info("App lifecycle monitoring stopped");
-  }
-
-  /**
    * Check if a specific package is currently running
    */
-  public async isPackageRunning(packageName: string): Promise<boolean> {
+  public async isPackageRunning(deviceId: string, packageName: string): Promise<boolean> {
     try {
-      const adbUtils = new AdbUtils(this.deviceId ?? null);
+      const adbUtils = new AdbUtils(deviceId);
       const result = await adbUtils.executeCommand(`shell pidof ${packageName}`);
 
       // pidof returns empty stdout if package is not running
@@ -139,45 +94,24 @@ export class AppLifecycleMonitor extends EventEmitter {
   }
 
   /**
-   * Set polling interval in milliseconds
-   */
-  public setPollingInterval(intervalMs: number): void {
-    this.pollingIntervalMs = intervalMs;
-    if (this.monitoringActive && this.pollingInterval) {
-      // Restart polling with new interval
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = setInterval(async () => {
-        try {
-          await this.pollForChanges();
-        } catch (error) {
-          logger.error(`Error during app lifecycle polling: ${error}`);
-        }
-      }, this.pollingIntervalMs);
-    }
-  }
-
-  /**
    * Poll for app state changes
    */
-  private async pollForChanges(): Promise<void> {
-    if (!this.monitoringActive) {
-      return;
-    }
+  public async checkForChanges(deviceId: string): Promise<void> {
 
     const previousRunning = new Set(this.runningPackages);
-    await this.updateRunningPackages();
+    await this.updateRunningPackages(deviceId);
 
     // Check for newly launched packages
     for (const packageName of this.runningPackages) {
       if (!previousRunning.has(packageName)) {
-        await this.handlePackageLaunched(packageName);
+        await this.handlePackageLaunched(deviceId, packageName);
       }
     }
 
     // Check for terminated packages
     for (const packageName of previousRunning) {
       if (!this.runningPackages.has(packageName)) {
-        await this.handlePackageTerminated(packageName);
+        await this.handlePackageTerminated(deviceId, packageName);
       }
     }
   }
@@ -185,9 +119,9 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Update the set of currently running tracked packages
    */
-  private async updateRunningPackages(): Promise<void> {
+  private async updateRunningPackages(deviceId: string) {
     for (const packageName of this.trackedPackages) {
-      if (await this.isPackageRunning(packageName)) {
+      if (await this.isPackageRunning(deviceId, packageName)) {
         this.runningPackages.add(packageName);
       } else {
         this.runningPackages.delete(packageName);
@@ -198,9 +132,10 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Handle package launch event
    */
-  private async handlePackageLaunched(packageName: string): Promise<void> {
+  private async handlePackageLaunched(deviceId: string, packageName: string): Promise<void> {
     const event: AppLifecycleEvent = {
       type: "launch",
+      deviceId: deviceId,
       appId: packageName,
       timestamp: new Date(),
       metadata: {
@@ -215,9 +150,10 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Handle package termination event
    */
-  private async handlePackageTerminated(packageName: string): Promise<void> {
+  private async handlePackageTerminated(deviceId: string, packageName: string): Promise<void> {
     const event: AppLifecycleEvent = {
       type: "terminate",
+      deviceId: deviceId,
       appId: packageName,
       timestamp: new Date(),
       metadata: {
@@ -238,19 +174,5 @@ export class AppLifecycleMonitor extends EventEmitter {
     } catch (error) {
       logger.error(`Error emitting app lifecycle event: ${error}`);
     }
-  }
-
-  /**
-     * Check if monitoring is active
-     */
-  public isMonitoring(): boolean {
-    return this.monitoringActive;
-  }
-
-  /**
-     * Set device ID for ADB operations
-     */
-  public setDeviceId(deviceId?: string): void {
-    this.deviceId = deviceId;
   }
 }

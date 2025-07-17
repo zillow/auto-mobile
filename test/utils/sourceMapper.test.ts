@@ -3,6 +3,7 @@ import { SourceMapper } from "../../src/utils/sourceMapper";
 import { ConfigurationManager } from "../../src/utils/configurationManager";
 import path from "path";
 import sinon from "sinon";
+import { ViewHierarchyResult } from "../../src/models";
 
 describe("SourceMapper", function() {
   this.timeout(120000);
@@ -132,39 +133,19 @@ describe("SourceMapper", function() {
         expect(result.currentApplicationModule).to.have.property("applicationId");
       }
     });
-
-    it("should handle Zillow Android", async function() {
-      // Mock app configuration for AutoMobile Playground
-      const androidPath = path.join(process.env.HOME || require("os").homedir(), "zillow/app-platform/android");
-
-      configManagerStub.getAppConfigs.returns([{
-        appId: "com.zillow.android.zillowmap",
-        sourceDir: androidPath,
-        platform: "android",
-        data: new Map()
-      }]);
-
-      const result = await sourceMapper.scanProject("com.zillow.android.zillowmap");
-
-      expect(result.modules).to.have.length.at.least(1);
-      expect(result.applicationModules).to.have.length.at.least(1);
-      expect(result.totalModules).to.at.least(1);
-      expect(result.gradlePlugins).to.have.length.at.least(1);
-      expect(result.mavenDependencies).to.have.length.at.least(1);
-      expect(result.currentApplicationModule).to.have.property("absolutePath");
-      expect(result.currentApplicationModule).to.have.property("applicationId");
-    });
   });
 
   describe("analyzeViewHierarchy", () => {
     it("should extract activity classes from view hierarchy", () => {
-      const viewHierarchyXml = `
-        <hierarchy>
-          mCurrentFocus=Window{abc123 u0 com.example.app/com.example.app.MainActivity}
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            class: "com.example.app.MainActivity"
+          }
+        }
+      };
 
-      const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
+      const analysis = sourceMapper.analyzeViewHierarchy("com.example.app", viewHierarchy);
 
       expect(analysis.activityClasses).to.be.an("array");
       expect(analysis.fragmentClasses).to.be.an("array");
@@ -173,24 +154,28 @@ describe("SourceMapper", function() {
     });
 
     it("should extract fragment classes from view hierarchy", () => {
-      const viewHierarchyXml = `
-        <hierarchy>
-          <node class="com.example.SearchFragment" />
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            class: "com.example.SearchFragment"
+          }
+        }
+      } as ViewHierarchyResult;
 
-      const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
+      const analysis = sourceMapper.analyzeViewHierarchy("com.example.app", viewHierarchy);
       expect(analysis.fragmentClasses).to.include("com.example.SearchFragment");
     });
 
     it("should extract resource IDs from view hierarchy", () => {
-      const viewHierarchyXml = `
-        <hierarchy>
-          <node resource-id="com.example.app:id/button" />
-        </hierarchy>
-      `;
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            "resource-id": "com.example.app:id/button"
+          }
+        }
+      } as ViewHierarchyResult;
 
-      const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
+      const analysis = sourceMapper.analyzeViewHierarchy("com.example.app", viewHierarchy);
       expect(analysis.resourceIds).to.include("com.example.app:id/button");
     });
   });
@@ -227,6 +212,7 @@ describe("SourceMapper", function() {
 
     it("given example app view hierarchy, should map to example app module", async () => {
       const analysis = {
+        appId: "com.example.app",
         activityClasses: ["com.example.app.MainActivity"],
         fragmentClasses: ["com.example.app.SearchFragment"],
         resourceIds: ["com.example.app:id/button"],
@@ -244,6 +230,7 @@ describe("SourceMapper", function() {
 
     it("given AutoMobile Playground App view hierarchy, should map to App module", async () => {
       const analysis = {
+        appId: "com.zillow.automobile.playground",
         activityClasses: ["com.zillow.automobile.playground.MainActivity"],
         fragmentClasses: [],
         resourceIds: [],
