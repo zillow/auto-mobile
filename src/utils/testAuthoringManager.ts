@@ -336,6 +336,7 @@ export class TestAuthoringManager {
    */
   private async generateTestPlan(session: TestAuthoringSession): Promise<string> {
     const planName = this.generatePlanName(session);
+    logger.info(`[TEST-AUTHORING] Generating test plan: ${planName}`);
     const targetDirectory = await this.determineTargetDirectory(session);
 
     // Create the test plan directory if it doesn't exist
@@ -384,9 +385,6 @@ export class TestAuthoringManager {
       throw new ActionableError(`[TEST-AUTHORING] Only Android platform is supported for test authoring at this time.`);
     }
 
-    // Use source mapping if we have view hierarchy data
-    const sourceMapper = SourceMapper.getInstance();
-
     // Try to get the last view hierarchy from the session's tool calls
     const lastViewHierarchy = [...session.toolCalls].reverse().find(call => call.result?.data?.viewHierarchy);
 
@@ -394,8 +392,8 @@ export class TestAuthoringManager {
       logger.info("Using source mapping for intelligent test plan placement");
 
       const viewHierarchyXml = lastViewHierarchy.result.data.viewHierarchy;
-      const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
-      const placementResult = await sourceMapper.determineTestPlanLocation(analysis, appConfig.appId);
+      const analysis = SourceMapper.getInstance().analyzeViewHierarchy(viewHierarchyXml);
+      const placementResult = await SourceMapper.getInstance().determineTestPlanLocation(analysis, appConfig.appId);
 
       if (placementResult.success) {
         logger.info(`[TEST-AUTHORING] Source mapping selected module: ${placementResult.moduleName} (confidence: ${placementResult.confidence.toFixed(2)})`);

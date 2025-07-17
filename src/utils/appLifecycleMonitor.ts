@@ -113,7 +113,6 @@ export class AppLifecycleMonitor extends EventEmitter {
       // pidof returns empty stdout if package is not running
       return result.stdout.trim().length > 0;
     } catch (error) {
-      logger.warn(`Failed to check if package ${packageName} is running: ${error}`);
       return false;
     }
   }

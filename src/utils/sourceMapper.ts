@@ -24,7 +24,6 @@ export class SourceMapper {
   private static instance: SourceMapper;
   private projectScanResultCache: Map<string, ProjectScanResult> = new Map();
   private sourceIndex: Map<string, SourceIndexResult> = new Map();
-  private readonly configFilePath: string;
   private readonly sourceCacheDir: string;
 
   private constructor() {
@@ -33,7 +32,6 @@ export class SourceMapper {
     if (!homeDir) {
       throw new ActionableError("Home directory for current user not found");
     }
-    this.configFilePath = path.join(homeDir, ".auto-mobile", "app-configs.json");
     this.sourceCacheDir = path.join("/tmp", "auto-mobile", "source-cache");
     this.ensureDirectoriesExist();
   }
@@ -50,10 +48,6 @@ export class SourceMapper {
   // ===========================================
 
   private ensureDirectoriesExist(): void {
-    const baseDir = path.dirname(this.configFilePath);
-    if (!require("fs").existsSync(baseDir)) {
-      require("fs").mkdirSync(baseDir, { recursive: true });
-    }
     if (!require("fs").existsSync(this.sourceCacheDir)) {
       require("fs").mkdirSync(this.sourceCacheDir, { recursive: true });
     }
