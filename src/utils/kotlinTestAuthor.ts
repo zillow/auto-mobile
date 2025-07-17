@@ -25,27 +25,27 @@ export interface KotlinPoetResponse {
   testMethods?: string[];
 }
 
-export class KotlinPoetBridge {
-  private kotlinPoetJarPath: string;
-  private kotlinPoetVersion: string;
+export class KotlinTestAuthor {
+  private kotlinTestAuthorJarPath: string;
+  private kotlinTestAuthorVersion: string;
 
   constructor(version?: string, jarPath?: string) {
     // Initialize version from parameter, environment, or use default
-    this.kotlinPoetVersion = version || process.env.KOTLINPOET_VERSION || "2.2.0";
+    this.kotlinTestAuthorVersion = version || process.env.KOTLINPOET_VERSION || "2.2.0";
 
     // Initialize jar path - can be configured via parameter, environment variable, or default
-    this.kotlinPoetJarPath = jarPath || process.env.KOTLINPOET_JAR_PATH ||
-      path.join("/tmp", "auto-mobile", "kotlinpoet", `kotlinpoet-jvm-${this.kotlinPoetVersion}.jar`);
+    this.kotlinTestAuthorJarPath = jarPath || process.env.KOTLINPOET_JAR_PATH ||
+      path.join("/tmp", "auto-mobile", "kotlinpoet", `kotlinpoet-jvm-${this.kotlinTestAuthorVersion}.jar`);
   }
 
   /**
    * Set KotlinPoet version
    */
   public setVersion(version: string): void {
-    this.kotlinPoetVersion = version;
+    this.kotlinTestAuthorVersion = version;
     // Update jar path to reflect new version if using default path
     if (!process.env.KOTLINPOET_JAR_PATH) {
-      this.kotlinPoetJarPath = path.join("/tmp", "auto-mobile", "kotlinpoet", `kotlinpoet-jvm-${version}.jar`);
+      this.kotlinTestAuthorJarPath = path.join("/tmp", "auto-mobile", "kotlinpoet", `kotlinpoet-jvm-${version}.jar`);
     }
   }
 
@@ -53,28 +53,28 @@ export class KotlinPoetBridge {
    * Get current KotlinPoet version
    */
   public getVersion(): string {
-    return this.kotlinPoetVersion;
+    return this.kotlinTestAuthorVersion;
   }
 
   /**
    * Download KotlinPoet JAR from Maven Central
    */
   private async downloadKotlinPoet(): Promise<void> {
-    if (!this.kotlinPoetJarPath) {
+    if (!this.kotlinTestAuthorJarPath) {
       throw new Error("KotlinPoet JAR path not configured");
     }
 
-    const kotlinPoetDir = path.dirname(this.kotlinPoetJarPath);
-    await fs.mkdir(kotlinPoetDir, { recursive: true });
+    const kotlinTestAuthorDir = path.dirname(this.kotlinTestAuthorJarPath);
+    await fs.mkdir(kotlinTestAuthorDir, { recursive: true });
 
-    const downloadUrl = this.kotlinPoetVersion === "LATEST"
+    const downloadUrl = this.kotlinTestAuthorVersion === "LATEST"
       ? "https://search.maven.org/remote_content?g=com.squareup&a=kotlinpoet-jvm&v=LATEST"
-      : `https://search.maven.org/remote_content?g=com.squareup&a=kotlinpoet-jvm&v=${this.kotlinPoetVersion}`;
+      : `https://search.maven.org/remote_content?g=com.squareup&a=kotlinpoet-jvm&v=${this.kotlinTestAuthorVersion}`;
 
-    logger.info(`Downloading KotlinPoet ${this.kotlinPoetVersion} from Maven Central...`);
+    logger.info(`Downloading KotlinPoet ${this.kotlinTestAuthorVersion} from Maven Central...`);
 
     return new Promise((resolve, reject) => {
-      const file = createWriteStream(this.kotlinPoetJarPath);
+      const file = createWriteStream(this.kotlinTestAuthorJarPath);
 
       https.get(downloadUrl, response => {
         if (response.statusCode === 302 || response.statusCode === 301) {
@@ -96,12 +96,12 @@ export class KotlinPoetBridge {
 
       file.on("finish", () => {
         file.close();
-        logger.info(`KotlinPoet ${this.kotlinPoetVersion} downloaded successfully`);
+        logger.info(`KotlinPoet ${this.kotlinTestAuthorVersion} downloaded successfully`);
         resolve();
       });
 
       file.on("error", (err: Error) => {
-        fs.unlink(this.kotlinPoetJarPath).catch(() => {
+        fs.unlink(this.kotlinTestAuthorJarPath).catch(() => {
         }); // Delete incomplete file
         reject(err);
       });
@@ -112,12 +112,12 @@ export class KotlinPoetBridge {
    * Check if KotlinPoet JAR is available, download if not
    */
   public async ensureAvailable(): Promise<boolean> {
-    // if (!this.kotlinPoetJarPath) {
+    // if (!this.kotlinTestAuthorJarPath) {
     //   return false;
     // }
 
     // Hard coded to skip downloading - assume JAR is available if path is configured
-    logger.info(`Using KotlinPoet JAR at: ${this.kotlinPoetJarPath}`);
+    logger.info(`Using KotlinPoet JAR at: ${this.kotlinTestAuthorJarPath}`);
     return true;
   }
 
@@ -125,12 +125,12 @@ export class KotlinPoetBridge {
    * Check if KotlinPoet JAR is available (without downloading)
    */
   public async isAvailable(): Promise<boolean> {
-    if (!this.kotlinPoetJarPath) {
+    if (!this.kotlinTestAuthorJarPath) {
       return false;
     }
 
     try {
-      await fs.access(this.kotlinPoetJarPath);
+      await fs.access(this.kotlinTestAuthorJarPath);
       return true;
     } catch {
       return false;
@@ -198,7 +198,7 @@ export class KotlinPoetBridge {
     return new Promise((resolve, reject) => {
       const args = [
         "-jar",
-        this.kotlinPoetJarPath,
+        this.kotlinTestAuthorJarPath,
         "--plan", request.planPath,
         "--mode", "json" // Request JSON response
       ];
@@ -271,13 +271,13 @@ export class KotlinPoetBridge {
    * Set custom KotlinPoet JAR path
    */
   public setJarPath(jarPath: string): void {
-    this.kotlinPoetJarPath = jarPath;
+    this.kotlinTestAuthorJarPath = jarPath;
   }
 
   /**
    * Get current KotlinPoet JAR path
    */
   public getJarPath(): string | undefined {
-    return this.kotlinPoetJarPath;
+    return this.kotlinTestAuthorJarPath;
   }
 }

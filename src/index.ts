@@ -88,7 +88,7 @@ function parseArgs(): {
         if (sourceDirIndex < args.length && args[sourceDirIndex] === "--android-source-dir") {
           const sourceDir = args[sourceDirIndex + 1];
           if (sourceDir && !sourceDir.startsWith("--")) {
-            apps.push({ appId, sourceDir, platform: "android" });
+            apps.push({ appId, sourceDir, platform: "android", data: new Map() });
             i = sourceDirIndex + 1; // Skip past both pairs
           } else {
             logger.warn(`Missing value for --android-source-dir after app ID: ${appId}`);
@@ -106,7 +106,6 @@ function parseArgs(): {
         const appIdIndex = i - 2;
         if (appIdIndex >= 0 && args[appIdIndex] === "--android-app-id") {
           // Already handled in the app-id branch above
-          continue;
         } else {
           logger.warn(`Missing --android-app-id before --android-source-dir: ${sourceDir}`);
           i++; // Skip the source dir
@@ -165,8 +164,7 @@ async function startStreamableServer(transport: TransportConfig): Promise<void> 
       }
 
       // Check if this is an initialization request
-      const isInitializeRequest = parsedBody && typeof parsedBody === "object" && parsedBody !== null &&
-        "method" in parsedBody && parsedBody.method === "initialize";
+      const isInitializeRequest = parsedBody && typeof parsedBody === "object" && true && "method" in parsedBody && parsedBody.method === "initialize";
 
       if (sessionId && transports.has(sessionId)) {
         // Use existing transport
@@ -397,11 +395,13 @@ async function main() {
 
     // Add any command line app configs to the source index manager
     for (const { appId, sourceDir, platform } of apps) {
-      try {
-        await sourceMapper.addAppConfig(appId, sourceDir, platform);
-        logger.info(`Added command line app configuration: ${appId} -> ${sourceDir}`);
-      } catch (error) {
-        logger.warn(`Failed to add command line app configuration ${appId}: ${error}`);
+      if (sourceDir) {
+        try {
+          await sourceMapper.addAppConfig(appId, sourceDir, platform);
+          logger.info(`Added command line app configuration: ${appId} -> ${sourceDir}`);
+        } catch (error) {
+          logger.warn(`Failed to add command line app configuration ${appId}: ${error}`);
+        }
       }
     }
 

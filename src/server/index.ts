@@ -119,11 +119,20 @@ export const createMcpServer = (): McpServer => {
       throw new ActionableError(`Invalid parameters for tool ${name}: ${error}`);
     }
 
+    // If there wasn't a deviceId on this session already, lets find one
+    // try to use something like request.params.headerNameToString("X-Device-Id")
+    const deviceSessionManager = DeviceSessionManager.getInstance();
+    const deviceId = await deviceSessionManager.ensureDeviceReady();
+
     // Start test authoring session if enabled and not already active
-    if (ConfigurationManager.getInstance().isTestAuthoringEnabled() && !testAuthoringManager.isActive()) {
-      const appConfig = ConfigurationManager.getInstance().getServerConfig();
-      if (appConfig.appId) {
-        await testAuthoringManager.startAuthoringSession(appConfig.appId);
+    if (ConfigurationManager.getInstance().isTestAuthoringEnabled(deviceId) && !testAuthoringManager.isActive()) {
+      const deviceConfig = ConfigurationManager.getInstance().getConfigForDevice(deviceId);
+      if (deviceConfig && deviceConfig.testAuthoring && deviceConfig.testAuthoring.appId) {
+        const appId = deviceConfig.testAuthoring.appId;
+        const appConfig = ConfigurationManager.getInstance().getConfigForApp(appId);
+        if (appConfig && appConfig.appId) {
+          await testAuthoringManager.startAuthoringSession(appConfig.appId);
+        }
       }
     }
 

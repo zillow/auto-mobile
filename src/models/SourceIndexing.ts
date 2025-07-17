@@ -1,7 +1,8 @@
 export interface AppConfig {
   appId: string;
-  sourceDir: string;
+  sourceDir?: string;
   platform: "android" | "ios";
+  data: Map<string, string>;
 }
 
 export interface ActivityInfo {

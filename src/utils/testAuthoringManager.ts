@@ -12,9 +12,8 @@ import {
   TestPlan,
   StartTestAuthoringResult,
   StopTestAuthoringResult,
-  TestGenerationOptions
+  TestGenerationOptions, AppConfig
 } from "../models";
-import { SourceMapper } from "./sourceMapper";
 
 export class TestAuthoringManager {
   private currentSession?: TestAuthoringSession;
@@ -80,6 +79,10 @@ export class TestAuthoringManager {
       };
     } catch (error) {
       logger.error("Failed to start test authoring session:", error);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
       return {
         success: false,
         message: `Failed to start test authoring session: ${error}`
@@ -91,66 +94,49 @@ export class TestAuthoringManager {
    * Stop the current test authoring session
    */
   public async stopAuthoringSession(): Promise<StopTestAuthoringResult> {
-    try {
-      if (!this.currentSession || !this.currentSession.isActive) {
-        logger.warn("No active test authoring session to stop");
-        return {
-          success: false,
-          message: "No active test authoring session to stop"
-        };
-      }
-
-      const session = this.currentSession;
-      session.endTime = new Date();
-      session.isActive = false;
-
-      logger.info(`[TEST-AUTHORING] Stopping test authoring session: ${session.sessionId}`);
-
-      // Stop tracking the app if we were tracking one
-      if (session.appId) {
-        this.appMonitor.untrackPackage(session.appId);
-        logger.info(`[TEST-AUTHORING] Stopped tracking package: ${session.appId}`);
-      }
-
-      let planGenerated = false;
-      let planPath: string | undefined;
-      let kotlinTestGenerated = false;
-      let kotlinTestPath: string | undefined;
-
-      if (session.toolCalls.length > 0) {
-        try {
-          const result = await this.generateTestPlan(session);
-          planGenerated = result.success;
-          planPath = result.planPath;
-
-          // Generate Kotlin test if plan generation was successful
-          if (result.success && result.planPath) {
-            const kotlinResult = await this.generateKotlinTest(result.planPath, session);
-            kotlinTestGenerated = kotlinResult.success;
-            kotlinTestPath = kotlinResult.testFilePath;
-          }
-        } catch (error) {
-          logger.error("Failed to generate test plan:", error);
-        }
-      }
-
-      this.currentSession = undefined;
-
-      return {
-        success: true,
-        message: "Test authoring session stopped successfully",
-        planGenerated,
-        planPath,
-        kotlinTestGenerated,
-        kotlinTestPath
-      };
-    } catch (error) {
-      logger.error("Failed to stop test authoring session:", error);
+    if (!this.currentSession || !this.currentSession.isActive) {
+      logger.warn("No active test authoring session to stop");
       return {
         success: false,
-        message: `Failed to stop test authoring session: ${error}`
+        message: "No active test authoring session to stop"
       };
     }
+
+    const config = this.configManager.getConfigForApp(this.currentSession.appId);
+    if (!config || !config.appId) {
+      throw new ActionableError("App configuration not found or incomplete");
+    }
+
+    const session = this.currentSession;
+    session.endTime = new Date();
+    session.isActive = false;
+
+    logger.info(`[TEST-AUTHORING] Stopping test authoring session: ${session.sessionId}`);
+
+    // Stop tracking the app if we were tracking one
+    if (session.appId) {
+      this.appMonitor.untrackPackage(session.appId);
+      logger.info(`[TEST-AUTHORING] Stopped tracking package: ${session.appId}`);
+    }
+
+    let kotlinTestPath: string | undefined;
+
+    const planPath = await this.generateTestPlan(session);
+
+    // Generate Kotlin test if plan generation was successful
+    if (planPath && await this.shouldGenerateKotlinTest(config, session)) {
+      const kotlinResult = await this.generateKotlinTest(planPath, config, session);
+      kotlinTestPath = kotlinResult.testFilePath;
+    }
+
+    this.currentSession = undefined;
+
+    return {
+      success: true,
+      message: "Test authoring session stopped successfully",
+      planPath,
+      kotlinTestPath
+    };
   }
 
   /**
@@ -197,13 +183,6 @@ export class TestAuthoringManager {
   }
 
   /**
-   * Get the current session
-   */
-  public getCurrentSession(): TestAuthoringSession | undefined {
-    return this.currentSession;
-  }
-
-  /**
    * Handle app termination for automatic plan generation
    */
   public async onAppTerminated(appId: string): Promise<void> {
@@ -227,16 +206,10 @@ export class TestAuthoringManager {
    */
   public async generateKotlinTest(
     planPath: string,
+    config: AppConfig,
     session?: TestAuthoringSession
-  ): Promise<{ success: boolean; testFilePath?: string }> {
+  ): Promise<{ testFilePath?: string }> {
     try {
-      const config = this.configManager.getServerConfig();
-
-      // Check if Kotlin test generation is enabled
-      if (!this.shouldGenerateKotlinTest(config, session)) {
-        logger.info("Kotlin test generation is not enabled or configured");
-        return { success: false };
-      }
 
       // Determine test generation options
       const options = this.buildTestGenerationOptions(config, session, planPath);
@@ -244,27 +217,31 @@ export class TestAuthoringManager {
       // Generate the Kotlin test
       const result = await this.kotlinTestGenerator.generateTestFromPlan(planPath, options);
 
-      if (result.success) {
+      if (result.testFilePath) {
         logger.info(`[TEST-AUTHORING] Kotlin test generated: ${result.testFilePath}`);
         return {
-          success: true,
           testFilePath: result.testFilePath
         };
       } else {
         logger.warn(`Kotlin test generation failed: ${result.message}`);
-        return { success: false };
+        return {};
       }
     } catch (error) {
       logger.error("Failed to generate Kotlin test:", error);
-      return { success: false };
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
+      return {};
     }
   }
 
   /**
    * Check if Kotlin test generation should be performed
    */
-  private shouldGenerateKotlinTest(config: any, session?: TestAuthoringSession): boolean {
+  private async shouldGenerateKotlinTest(config: any, session?: TestAuthoringSession): Promise<boolean> {
     // Check if we have a source directory configuration for the app
+    const { SourceMapper } = await import("./sourceMapper");
     const appConfig = session?.appId ? SourceMapper.getInstance().getMatchingAppConfig(session.appId) : undefined;
 
     // Only generate Kotlin tests if we have source directory configuration
@@ -274,18 +251,14 @@ export class TestAuthoringManager {
     }
 
     // Check if all required conditions are met
-    if (!config.androidProjectPath || !config.androidAppId || config.mode !== "testAuthoring") {
-      return false;
-    }
-
-    return true;
+    return config.androidProjectPath && config.androidAppId && config.mode === "testAuthoring";
   }
 
   /**
    * Build test generation options from configuration and session
    */
   private buildTestGenerationOptions(
-    config: any,
+    config: AppConfig,
     session: TestAuthoringSession | undefined,
     planPath: string
   ): TestGenerationOptions {
@@ -296,14 +269,14 @@ export class TestAuthoringManager {
     };
 
     // Determine output path based on project structure
-    if (config.androidProjectPath) {
+    if (config.sourceDir) {
       // Use the same directory structure as the test plan but for Kotlin tests
       const planDir = path.dirname(planPath);
-      const relativePlanDir = path.relative(config.androidProjectPath, planDir);
+      const relativePlanDir = path.relative(config.sourceDir, planDir);
 
       // Convert test-plans directory to kotlin test directory
       const kotlinTestDir = relativePlanDir.replace("test-plans", "").replace("resources", "kotlin");
-      options.kotlinTestOutputPath = path.join(config.androidProjectPath, "src", "test", kotlinTestDir);
+      options.kotlinTestOutputPath = path.join(config.sourceDir, "src", "test", kotlinTestDir);
     }
 
     // Generate test class name from plan name
@@ -311,9 +284,9 @@ export class TestAuthoringManager {
     options.testClassName = this.generateTestClassName(planName);
 
     // Determine package name from app ID
-    if (session?.appId || config.androidAppId) {
+    if (session?.appId || config.appId) {
       // Use app ID to generate package name
-      const appId = session?.appId || config.androidAppId;
+      const appId = session?.appId || config.appId;
       const appIdParts = appId.split(".");
       if (appIdParts.length >= 2) {
         options.testPackage = `${appIdParts.slice(0, 2).join(".")}.tests`;
@@ -361,35 +334,25 @@ export class TestAuthoringManager {
   /**
    * Generate a test plan from the current session
    */
-  private async generateTestPlan(session: TestAuthoringSession): Promise<{ success: boolean; planPath?: string }> {
-    try {
-      const planName = this.generatePlanName(session);
-      const targetDirectory = await this.determineTargetDirectory(session);
+  private async generateTestPlan(session: TestAuthoringSession): Promise<string> {
+    const planName = this.generatePlanName(session);
+    const targetDirectory = await this.determineTargetDirectory(session);
 
-      // Create the test plan directory if it doesn't exist
-      await fs.mkdir(targetDirectory, { recursive: true });
+    // Create the test plan directory if it doesn't exist
+    await fs.mkdir(targetDirectory, { recursive: true });
 
-      const planPath = path.join(targetDirectory, `${planName}.yaml`);
+    const planPath = path.join(targetDirectory, `${planName}.yaml`);
 
-      // Generate the plan content
-      const plan = this.createTestPlanFromSession(session, planName);
-      const yamlContent = this.convertPlanToYaml(plan);
+    // Generate the plan content
+    const plan = this.createTestPlanFromSession(session, planName);
+    const yamlContent = this.convertPlanToYaml(plan);
 
-      // Write the plan to disk
-      await fs.writeFile(planPath, yamlContent, "utf8");
+    // Write the plan to disk
+    await fs.writeFile(planPath, yamlContent, "utf8");
 
-      logger.info(`[TEST-AUTHORING] Test plan generated: ${planPath}`);
+    logger.info(`[TEST-AUTHORING] Test plan generated: ${planPath}`);
 
-      return {
-        success: true,
-        planPath
-      };
-    } catch (error) {
-      logger.error("Failed to generate test plan:", error);
-      return {
-        success: false
-      };
-    }
+    return planPath;
   }
 
   /**
@@ -407,6 +370,7 @@ export class TestAuthoringManager {
   async determineTargetDirectory(session: TestAuthoringSession): Promise<string> {
 
     const fallbackDir = path.join("/tmp", "auto-mobile", "test-authoring", session.appId);
+    const { SourceMapper } = await import("./sourceMapper");
     const appConfig = SourceMapper.getInstance().getMatchingAppConfig(session.appId);
     if (!appConfig || !appConfig.sourceDir) {
       // Fallback for apps without source directory configuration
@@ -420,32 +384,30 @@ export class TestAuthoringManager {
       throw new ActionableError(`[TEST-AUTHORING] Only Android platform is supported for test authoring at this time.`);
     }
 
-    try {
-      // Use source mapping if we have view hierarchy data
-      const { SourceMapper } = await import("./sourceMapper");
-      const sourceMapper = SourceMapper.getInstance();
+    // Use source mapping if we have view hierarchy data
+    const sourceMapper = SourceMapper.getInstance();
 
-      // Try to get the last view hierarchy from the session's tool calls
-      const lastViewHierarchy = [...session.toolCalls].reverse().find(call => call.result?.data?.viewHierarchy);
+    // Try to get the last view hierarchy from the session's tool calls
+    const lastViewHierarchy = [...session.toolCalls].reverse().find(call => call.result?.data?.viewHierarchy);
 
-      if (lastViewHierarchy && lastViewHierarchy.result?.data?.viewHierarchy) {
-        logger.info("Using source mapping for intelligent test plan placement");
+    if (lastViewHierarchy && lastViewHierarchy.result?.data?.viewHierarchy) {
+      logger.info("Using source mapping for intelligent test plan placement");
 
-        const viewHierarchyXml = lastViewHierarchy.result.data.viewHierarchy;
-        const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
-        const placementResult = await sourceMapper.determineTestPlanLocation(analysis, appConfig.appId);
+      const viewHierarchyXml = lastViewHierarchy.result.data.viewHierarchy;
+      const analysis = sourceMapper.analyzeViewHierarchy(viewHierarchyXml);
+      const placementResult = await sourceMapper.determineTestPlanLocation(analysis, appConfig.appId);
 
-        if (placementResult.success) {
-          logger.info(`[TEST-AUTHORING] Source mapping selected module: ${placementResult.moduleName} (confidence: ${placementResult.confidence.toFixed(2)})`);
-          return placementResult.targetDirectory;
-        }
+      if (placementResult.success) {
+        logger.info(`[TEST-AUTHORING] Source mapping selected module: ${placementResult.moduleName} (confidence: ${placementResult.confidence.toFixed(2)})`);
+        return placementResult.targetDirectory;
       }
-
-      throw new ActionableError("Failed to determine test plan location, source mapping could not find a suitable location.");
-    } catch (error) {
-      logger.warn(`Source mapping failed: ${error}`);
-      throw new ActionableError("Error in source mapping, could not determine test plan location.");
+    } else if (lastViewHierarchy) {
+      logger.warn("View hierarchy data was present but incomplete, cannot use it to establish the test plan path.");
+    } else {
+      logger.warn("View hierarchy data was missing, cannot use it to establish the test plan path.");
     }
+
+    throw new ActionableError("Failed to determine test plan location, source mapping could not find a suitable location.");
   }
 
   /**

@@ -123,6 +123,10 @@ export class DeviceSessionManager {
     }  catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`[DeviceSessionManager] Failed to setup accessibility service: ${errorMessage}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
   }
 

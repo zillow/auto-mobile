@@ -21,7 +21,7 @@ export * from "./InstallAppResult";
 export * from "./IntentChooserResult";
 export * from "./LaunchAppResult";
 export * from "./LongPressResult";
-export * from "./McpServerConfiguration";
+export * from "./DeviceSessionConfig";
 export * from "./ObserveResult";
 export * from "./OpenURLResult";
 export * from "./PinchResult";

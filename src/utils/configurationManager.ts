@@ -1,13 +1,13 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { logger } from "./logger";
-import { AppConfig, McpServerConfig } from "../models";
-import { ConfigArgs } from "../server/configurationTools";
+import { ActionableError, AppConfig, DeviceConfig } from "../models";
+import { DeviceSessionArgs } from "../server/configurationTools";
 
 export class ConfigurationManager {
-  private serverConfig: McpServerConfig = {};
-  private configFilePath: string;
+  private readonly configFilePath: string;
   private static instance: ConfigurationManager;
+  private deviceSessionConfigs: Map<string, DeviceConfig> = new Map();
   private appSourceConfigs: Map<string, AppConfig> = new Map();
 
   private constructor() {
@@ -39,17 +39,36 @@ export class ConfigurationManager {
   }
 
   /**
-   * Add or update an app configuration
+   * Set an app source configuration
    */
-  public async addAppConfig(appId: string, sourceDir: string, platform: "android" | "ios"): Promise<void> {
+  public async setAppSource(appId: string, sourceDir: string, platform: "android" | "ios", wipeData: boolean): Promise<void> {
     if (!require("fs").existsSync(sourceDir)) {
-      throw new Error(`Source directory does not exist: ${sourceDir}`);
+      throw new ActionableError(`Source directory does not exist: ${sourceDir}`);
     }
 
-    this.appSourceConfigs.set(appId, { appId, sourceDir, platform });
+    const existing = this.appSourceConfigs.get(appId);
+    const newMap = new Map<string, string>();
+    const data = wipeData ? newMap : (existing?.data || newMap);
+    this.appSourceConfigs.set(appId, { appId, sourceDir, platform, data });
     await this.saveAppConfigs();
 
-    logger.debug(`[SOURCE] Added app configuration: ${appId} -> ${sourceDir}`);
+    logger.debug(`[SOURCE] Set app source: ${appId} -> ${sourceDir}`);
+  }
+
+  /**
+   * Set an app source configuration
+   */
+  public async setAndroidAppDataKey(appId: string, key: string, value: string): Promise<void> {
+    const existing = this.appSourceConfigs.get(appId);
+    const newMap = new Map<string, string>();
+    const data = existing?.data || newMap;
+    const sourceDir = existing?.sourceDir || "";
+    const platform = "android";
+    data.set(key, value);
+    this.appSourceConfigs.set(appId, { appId, sourceDir, platform, data });
+    await this.saveAppConfigs();
+
+    logger.debug(`[SOURCE] Set Android app data key: ${appId} -> ${sourceDir}`);
   }
 
   /**
@@ -59,6 +78,10 @@ export class ConfigurationManager {
     return Array.from(this.appSourceConfigs.values());
   }
 
+  public getConfigForApp(appId: string): AppConfig | undefined {
+    return this.appSourceConfigs.get(appId);
+  }
+
   /**
      * Load configuration from disk on server startup
      */
@@ -66,19 +89,27 @@ export class ConfigurationManager {
     try {
       const configData = await fs.readFile(this.configFilePath, "utf8");
       const parsedData = JSON.parse(configData);
-      this.serverConfig = parsedData.serverConfig || {};
-      for (const config of parsedData.apps) {
-        this.appSourceConfigs.set(config.appId, config);
+      if (parsedData.devices) {
+        for (const config of parsedData.devices) {
+          if (typeof config === "object" && config !== null && !Array.isArray(config) && config.deviceId) {
+            this.deviceSessionConfigs.set(config.deviceId, config);
+          }
+        }
+      }
+      if (parsedData.apps) {
+        for (const config of parsedData.apps) {
+          this.appSourceConfigs.set(config.appId, config);
+        }
       }
       logger.info(`Configuration loaded from ${this.configFilePath}`);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        logger.info("No existing configuration file found, using default config");
-        this.serverConfig = {};
+        logger.info("No existing configuration file found, will use defaults");
+        this.deviceSessionConfigs = new Map();
         this.appSourceConfigs = new Map();
       } else {
         logger.warn(`Failed to load configuration: ${error}`);
-        this.serverConfig = {};
+        this.deviceSessionConfigs = new Map();
         this.appSourceConfigs = new Map();
       }
     }
@@ -103,7 +134,7 @@ export class ConfigurationManager {
   public async saveToDisk(): Promise<void> {
     try {
       const configData = {
-        serverConfig: this.serverConfig,
+        devices: Array.from(this.deviceSessionConfigs.values()),
         apps: Array.from(this.appSourceConfigs.values())
       };
       const configJson = JSON.stringify(configData, null, 2);
@@ -116,35 +147,61 @@ export class ConfigurationManager {
   }
 
   /**
-     * Update configuration with partial data
-     */
-  public async updateConfig(args: ConfigArgs): Promise<void> {
-    // Merge with existing configuration
-    this.serverConfig.mode = args.mode;
+   * Set an app source configuration
+   */
+  public async updateDeviceSession(args: DeviceSessionArgs, platform: "android" | "ios"): Promise<void> {
+    let newConfig: DeviceConfig | undefined;
+    if (args.testAuthoring) {
+      newConfig = {
+        platform: platform,
+        activeMode: "testAuthoring",
+        deviceId: args.deviceId,
+        testAuthoring: {
+          appId: args.testAuthoring.appId,
+          persist: args.testAuthoring.persist
+        },
+      };
+    } else if (args.exploration) {
+      newConfig = {
+        platform: platform,
+        activeMode: "exploration",
+        deviceId: args.deviceId,
+        exploration: {
+          deepLinkSkipping: args.exploration.deepLinkSkipping,
+        }
+      };
+    }
 
-    // Persist to disk immediately
-    await this.saveToDisk();
+    if (newConfig) {
+      this.deviceSessionConfigs.set(args.deviceId, newConfig);
+    }
+
+    await this.saveAppConfigs();
   }
 
   /**
-     * Get current configuration
-     */
-  public getServerConfig(): McpServerConfig {
-    return { ...this.serverConfig };
+   * Get all device configurations
+   */
+  public getDeviceConfigs(): DeviceConfig[] {
+    return Array.from(this.deviceSessionConfigs.values());
+  }
+
+  public getConfigForDevice(deviceId: string): DeviceConfig | undefined {
+    return this.deviceSessionConfigs.get(deviceId);
   }
 
   /**
      * Check if test authoring is enabled
      */
-  public isTestAuthoringEnabled(): boolean {
-    return this.serverConfig.mode === "testAuthoring";
+  public isTestAuthoringEnabled(deviceId: string): boolean {
+    return this.getConfigForDevice(deviceId)?.activeMode === "testAuthoring";
   }
 
   /**
      * Reset configuration to defaults
      */
   public async resetServerConfig(): Promise<void> {
-    this.serverConfig = {};
+    this.deviceSessionConfigs.clear();
     this.appSourceConfigs.clear();
     await this.saveToDisk();
   }

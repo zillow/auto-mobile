@@ -1,17 +1,26 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import { ConfigurationManager } from "../utils/configurationManager";
-import { ConfigureMcpServerResult } from "../models";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
-import { SourceMapper } from "../utils/sourceMapper";
+// import { SourceMapper } from "../utils/sourceMapper";
 
 
-export interface ConfigArgs {
-  mode: "exploration" | "testAuthoring";
+export interface DeviceSessionArgs {
+  exploration?: ExplorationArgs;
+  testAuthoring?: TestAuthoringArgs;
+  deviceId: string;
 }
 
+export interface TestAuthoringArgs {
+  appId: string;
+  persist: "never" | "devicePresent" | "always";
+}
+
+export interface ExplorationArgs {
+  deepLinkSkipping: boolean;
+}
 
 export interface AppSourceArgs {
   projectPath: string;
@@ -21,7 +30,14 @@ export interface AppSourceArgs {
 
 // Schema for config tool
 const ConfigSchema = z.object({
-  mode: z.enum(["exploration", "testAuthoring"]),
+  exploration: z.object({
+    deepLinkSkipping: z.boolean()
+  }).optional(),
+  testAuthoring: z.object({
+    appId: z.string(),
+    persist: z.enum(["exploration", "testAuthoring"]),
+  }).optional(),
+  deviceId: z.string()
 });
 
 // Schema for config tool
@@ -35,19 +51,17 @@ export function registerConfigurationTools(): void {
 
   // config tool
   ToolRegistry.register(
-    "config",
-    "Set/update any configuration parameters including project source, app ID, test authoring, and A/B testing options. All parameters are optional and will be merged with existing configuration.",
+    "setDeviceMode",
+    "Set parameters for a particular device in a given mode.",
     ConfigSchema,
-    async (args: ConfigArgs): Promise<any> => {
+    async (args: DeviceSessionArgs): Promise<any> => {
       try {
         // Update configuration with provided parameters
-        await ConfigurationManager.getInstance().updateConfig(args);
-
-        logger.info(`Server now in ${args.mode} mode`);
+        await ConfigurationManager.getInstance().updateDeviceSession(args, "android");
 
         return createJSONToolResponse({
           success: true,
-          message: `Server now in ${args.mode} mode`
+          message: `Device configuration updated successfully`
         });
       } catch (error) {
         logger.error("Failed to configure MCP server:", error);
@@ -61,24 +75,28 @@ export function registerConfigurationTools(): void {
   );
 
   ToolRegistry.registerDeviceAware(
-    "addAppSource",
-    "Set/update any configuration parameters including project source, app ID, test authoring, and A/B testing options. All parameters are optional and will be merged with existing configuration.",
+    "setAppSource",
+    "For a given appId, set the source code path and platform.",
     AppSourceSchema,
     async (deviceId: string, args: AppSourceArgs): Promise<any> => {
       try {
-
         const apps = await new ListInstalledApps(deviceId).execute();
-        if (!apps.includes(args.appId)) {
+        if (apps.find(app => app === args.appId) === undefined) {
           return createJSONToolResponse({
             success: false,
-            message: `App ${args.appId} is not installed on device ${deviceId}`
+            message: `App ${args.appId} is not installed on device ${deviceId}, use listApps and try again.`
           });
         }
 
         // Update configuration with provided parameters
-        await ConfigurationManager.getInstance().addAppConfig(args.appId, args.projectPath, args.platform);
+        await ConfigurationManager.getInstance().setAppSource(
+          args.appId,
+          args.projectPath,
+          args.platform,
+          false
+        );
 
-        await SourceMapper.getInstance().scanProject(args.appId);
+        // await SourceMapper.getInstance().scanProject(args.appId);
 
         logger.info("App source added successfully");
 
@@ -99,17 +117,19 @@ export function registerConfigurationTools(): void {
 
   // getConfig tool - for getting current configuration
   ToolRegistry.register(
-    "getConfig",
+    "getAllConfigs",
     "Retrieve current configuration.",
     z.object({}),
     async (): Promise<any> => {
       try {
-        const currentConfig = ConfigurationManager.getInstance().getServerConfig();
+        const deviceConfig = ConfigurationManager.getInstance().getDeviceConfigs();
+        const appConfig = ConfigurationManager.getInstance().getAppConfigs();
 
-        const result: ConfigureMcpServerResult = {
+        const result = {
           success: true,
           message: "Retrieved current MCP server configuration",
-          currentConfig
+          deviceConfig,
+          appConfig
         };
 
         return createJSONToolResponse(result);
@@ -135,10 +155,9 @@ export function registerConfigurationTools(): void {
 
         await ConfigurationManager.getInstance().resetServerConfig();
 
-        const result: ConfigureMcpServerResult = {
+        const result = {
           success: true,
           message: "MCP server configuration reset to defaults",
-          currentConfig: ConfigurationManager.getInstance().getServerConfig()
         };
 
         return createJSONToolResponse(result);

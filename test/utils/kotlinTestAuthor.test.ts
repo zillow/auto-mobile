@@ -5,9 +5,9 @@ import { EventEmitter } from "events";
 import { TestGenerationOptions } from "../../src/models/TestAuthoring";
 import * as fs from "fs";
 import * as path from "path";
-import { KotlinPoetBridge } from "../../src/utils/kotlinPoetBridge";
+import { KotlinTestAuthor } from "../../src/utils/kotlinTestAuthor";
 
-describe("KotlinPoetBridge", function() {
+describe("KotlinTestAuthor", function() {
   // Increase timeout for async tests
   this.timeout(5000);
 
@@ -23,7 +23,7 @@ describe("KotlinPoetBridge", function() {
     spawnStub = sandbox.stub();
 
     // Use proxyquire to inject stubs
-    const module = proxyquire("../../src/utils/kotlinPoetBridge", {
+    const module = proxyquire("../../src/utils/kotlinTestAuthor", {
       "fs/promises": {
         access: fsAccessStub
       },
@@ -32,7 +32,7 @@ describe("KotlinPoetBridge", function() {
       }
     });
 
-    bridgeModule = module.KotlinPoetBridge;
+    bridgeModule = module.KotlinTestAuthor;
     bridge = new bridgeModule();
   });
 
@@ -248,11 +248,11 @@ describe("KotlinPoetBridge", function() {
       process.env.KOTLINPOET_JAR_PATH = "/custom/kotlinpoet.jar";
 
       // Create new instance with env var set
-      const module = proxyquire("../../src/utils/kotlinPoetBridge", {
+      const module = proxyquire("../../src/utils/kotlinTestAuthor", {
         "fs/promises": { access: fsAccessStub },
         "child_process": { spawn: spawnStub }
       });
-      const customBridge = new module.KotlinPoetBridge();
+      const customBridge = new module.KotlinTestAuthor();
 
       customBridge.setVersion("2.3.0");
       expect(customBridge.getJarPath()).to.equal("/custom/kotlinpoet.jar");
@@ -265,11 +265,11 @@ describe("KotlinPoetBridge", function() {
     it("should use KOTLINPOET_VERSION environment variable", () => {
       process.env.KOTLINPOET_VERSION = "2.1.0";
 
-      const module = proxyquire("../../src/utils/kotlinPoetBridge", {
+      const module = proxyquire("../../src/utils/kotlinTestAuthor", {
         "fs/promises": { access: fsAccessStub },
         "child_process": { spawn: spawnStub }
       });
-      const envBridge = new module.KotlinPoetBridge();
+      const envBridge = new module.KotlinTestAuthor();
 
       expect(envBridge.getVersion()).to.equal("2.1.0");
       expect(envBridge.getJarPath()).to.equal("/tmp/auto-mobile/kotlinpoet/kotlinpoet-jvm-2.1.0.jar");
@@ -280,11 +280,11 @@ describe("KotlinPoetBridge", function() {
     it("should use KOTLINPOET_JAR_PATH environment variable", () => {
       process.env.KOTLINPOET_JAR_PATH = "/env/path/kotlinpoet.jar";
 
-      const module = proxyquire("../../src/utils/kotlinPoetBridge", {
+      const module = proxyquire("../../src/utils/kotlinTestAuthor", {
         "fs/promises": { access: fsAccessStub },
         "child_process": { spawn: spawnStub }
       });
-      const envBridge = new module.KotlinPoetBridge();
+      const envBridge = new module.KotlinTestAuthor();
 
       expect(envBridge.getJarPath()).to.equal("/env/path/kotlinpoet.jar");
 
@@ -331,7 +331,7 @@ describe("KotlinPoetBridge", function() {
       fs.mkdirSync(jarDir, { recursive: true });
       fs.writeFileSync(testJarPath, "dummy jar content");
 
-      const bridge = new KotlinPoetBridge();
+      const bridge = new KotlinTestAuthor();
       const result = await bridge.ensureAvailable();
 
       expect(result).to.be.true;

@@ -24,15 +24,14 @@ export class SourceMapper {
   private static instance: SourceMapper;
   private projectScanResultCache: Map<string, ProjectScanResult> = new Map();
   private sourceIndex: Map<string, SourceIndexResult> = new Map();
-  private configFilePath: string;
-  private sourceCacheDir: string;
-  private androidApplicationPluginCache: Map<string, string> = new Map();
+  private readonly configFilePath: string;
+  private readonly sourceCacheDir: string;
 
   private constructor() {
     // home should either be process.env.HOME or bash resolution of home for current user
     const homeDir = process.env.HOME || require("os").homedir();
     if (!homeDir) {
-      throw new Error("Home directory for current user not found");
+      throw new ActionableError("Home directory for current user not found");
     }
     this.configFilePath = path.join(homeDir, ".auto-mobile", "app-configs.json");
     this.sourceCacheDir = path.join("/tmp", "auto-mobile", "source-cache");
@@ -64,7 +63,7 @@ export class SourceMapper {
    * Add or update an app configuration
    */
   public async addAppConfig(appId: string, sourceDir: string, platform: "android" | "ios"): Promise<void> {
-    return ConfigurationManager.getInstance().addAppConfig(appId, sourceDir, platform);
+    return ConfigurationManager.getInstance().setAppSource(appId, sourceDir, platform, false);
   }
 
   /**
@@ -78,7 +77,7 @@ export class SourceMapper {
    * Get all app configurations
    */
   public getMatchingAppConfig(appId: string): AppConfig | undefined {
-    return ConfigurationManager.getInstance().getAppConfigs().find((config: { appId: string; sourceDir: string }) =>
+    return ConfigurationManager.getInstance().getAppConfigs().find((config: { appId: string }) =>
       appId.startsWith(config.appId) || config.appId.startsWith(appId)
     );
   }
@@ -94,75 +93,271 @@ export class SourceMapper {
   // Module Discovery
   // ===========================================
 
+  private async findAndroidApplicationIdentifiers(appId: string, projectRoot: string): Promise<string[]> {
+    const appConfig = ConfigurationManager.getInstance().getConfigForApp(appId) || {
+      appId: appId,
+      platform: "android",
+      data: new Map()
+    } as AppConfig;
+
+    const catalogIdentifier = await this.findAndroidApplicationCatalogPlugin(appConfig, projectRoot);
+    logger.debug(`[SOURCE] Found catalog identifier: ${catalogIdentifier}`);
+
+    const conventionPlugins = await this.findAndroidApplicationConventionPlugin(appConfig, projectRoot, catalogIdentifier);
+
+    if (catalogIdentifier) {
+      return [catalogIdentifier, ...conventionPlugins];
+    }
+    return conventionPlugins;
+  }
+
   /**
-   * Parse gradle TOML files to find the android.application plugin definition
+   * Parse gradle TOML files to find the android application plugin definition
    */
-  private async findAndroidApplicationPlugin(projectRoot: string): Promise<string | null> {
-    try {
-      // Check cache first
-      if (this.androidApplicationPluginCache.has(projectRoot)) {
-        return this.androidApplicationPluginCache.get(projectRoot)!;
+  private async findAndroidApplicationCatalogPlugin(appConfig: AppConfig, projectRoot: string): Promise<string | null> {
+    // Check cache first
+    const cachedValue = appConfig.data.get("android-application-catalog-plugin");
+    if (cachedValue) {
+      return cachedValue;
+    }
+
+    logger.debug(`[SOURCE] Looking for android.application plugin in gradle TOML files in ${projectRoot}`);
+
+    // Find gradle TOML files
+    const tomlFiles = await glob(`gradle/**/*.toml`, {
+      cwd: projectRoot,
+      ignore: ["**/build/**", "**/node_modules/**"]
+    });
+
+    logger.debug(`[SOURCE] Found ${tomlFiles.length} TOML files: ${tomlFiles.join(", ")}`);
+
+    for (const tomlFile of tomlFiles) {
+      const fullPath = path.join(projectRoot, tomlFile);
+      try {
+        const content = await fs.readFile(fullPath, "utf8");
+
+        // Look for android.application plugin definition
+        // Pattern: android-application = { id = "com.android.application", version = "..." }
+        // or: android-application = "com.android.application:version"
+        // Also handle: android.application = { id = "com.android.application", version = "..." }
+        const pluginMatch = content.match(/([a-zA-Z0-9-._]+)\s*=\s*\{\s*id\s*=\s*["']com\.android\.application["']/) ||
+          content.match(/([a-zA-Z0-9-._]+)\s*=\s*["']com\.android\.application["']/);
+
+        if (pluginMatch) {
+          const pluginName = `libs.plugins.${pluginMatch[1].replaceAll("-", ".")}`;
+          logger.debug(`[SOURCE] Found android.application plugin as: ${pluginName}`);
+          await ConfigurationManager.getInstance().setAndroidAppDataKey(appConfig.appId, "android-application-catalog-plugin", pluginName);
+          return pluginName;
+        }
+      } catch (error) {
+        logger.warn(`Failed to read TOML file ${fullPath}: ${error}`);
       }
+    }
 
-      logger.debug(`[SOURCE] Looking for android.application plugin in gradle TOML files`);
+    return null;
+  }
 
-      // Find gradle TOML files
-      const tomlFiles = await glob("gradle/**/*.toml", {
-        cwd: projectRoot,
+  // ===========================================
+  // Module Discovery
+  // ===========================================
+
+  /**
+   * Parse gradle TOML files to find the android application plugin convention definitions.
+   *
+   * This implementation follows the general steps of the bash script:
+   *  1. Discover included builds via settings.gradle (includeBuild).
+   *  2. Search for registered plugins in included builds (usually in build.gradle files).
+   *  3. For each registered plugin, find the implementation class, and check if it configures ApplicationExtension.
+   */
+  private async findAndroidApplicationConventionPlugin(appConfig: AppConfig, projectRoot: string, catalogIdentifier: string | null): Promise<string[]> {
+    // Check cache first
+    const cachedValue = appConfig.data.get("android-application-convention-plugin")?.split("|") || [];
+    if (cachedValue.length > 0 && !(cachedValue.length === 1 && cachedValue[0] === "")) {
+      return cachedValue;
+    }
+
+    logger.debug(`[SOURCE] Looking for included build in settings...`);
+
+    // Step 1: Discover included builds via settings.gradle/settings.gradle.kts
+    const settingsFiles = await glob("**/settings.gradle{,.kts}", {
+      cwd: projectRoot,
+      ignore: ["**/build/**", "**/node_modules/**"]
+    });
+
+    const includedBuilds: string[] = [];
+
+    for (const settingsFile of settingsFiles) {
+      const fullPath = path.join(projectRoot, settingsFile);
+      try {
+        const content = await fs.readFile(fullPath, "utf8");
+
+        // Look for includeBuild statements (match both function and bare)
+        const includeBuildPattern = /includeBuild\s*\(\s*['"]([^'"]+)['"]\s*\)|includeBuild\s+['"]([^'"]+)['"]/g;
+        let match: RegExpExecArray | null = null;
+        while ((match = includeBuildPattern.exec(content)) !== null) {
+          const includePath = match[1] || match[2];
+          if (includePath) {
+            const absoluteIncludePath = path.resolve(path.dirname(fullPath), includePath);
+            includedBuilds.push(absoluteIncludePath);
+            logger.debug(`[SOURCE] Found included build: ${absoluteIncludePath}`);
+          }
+        }
+      } catch (error) {
+        logger.warn(`Failed to read settings file ${fullPath}: ${error}`);
+      }
+    }
+
+    if (includedBuilds.length === 0) {
+      logger.debug("[SOURCE] No included builds found.");
+      return [];
+    }
+
+    const conventionPlugins: string[] = [];
+
+    // Step 2: For each included build, check for registered plugins & their implementation classes
+    logger.debug(`[SOURCE] Finding registered plugin IDs in included builds...`);
+    for (const includedBuild of includedBuilds) {
+      logger.debug(`[SOURCE] Analyzing build: ${includedBuild}`);
+
+      // Usually the plugin registrations are in buildSrc/build.gradle.kts or build.gradle, or in conventional plugin modules
+      // Simplistic approach: look at every .gradle or .gradle.kts in the included build, searching for "register("PLUGIN_ID")"
+      const gradleFiles = await glob("**/*.gradle{,.kts}", {
+        cwd: includedBuild,
         ignore: ["**/build/**", "**/node_modules/**"]
       });
 
-      logger.debug(`[SOURCE] Found ${tomlFiles.length} TOML files: ${tomlFiles.join(", ")}`);
+      type PluginReg = { pluginId: string, implementationClass: string, buildFile: string };
+      const pluginRegistrations: PluginReg[] = [];
 
-      for (const tomlFile of tomlFiles) {
-        const fullPath = path.join(projectRoot, tomlFile);
+      for (const gradleFile of gradleFiles) {
+        const fullPath = path.join(includedBuild, gradleFile);
         try {
           const content = await fs.readFile(fullPath, "utf8");
 
-          // Look for android.application plugin definition
-          // Pattern: android-application = { id = "com.android.application", version = "..." }
-          // or: android-application = "com.android.application:version"
-          // Also handle: android.application = { id = "com.android.application", version = "..." }
-          const pluginMatch = content.match(/([a-zA-Z0-9-._]+)\s*=\s*\{\s*id\s*=\s*["']com\.android\.application["']/) ||
-            content.match(/([a-zA-Z0-9-._]+)\s*=\s*["']com\.android\.application["']/);
+          // Look for: register("my.plugin.id") { implementationClass = "com.foo.SomeClass" }
+          // const registerMatches = content.matchAll(/register\s*\(\s*"([^"]+)"\s*\)\s*\{([^}]+)\}/g);
+          const registerRegex = /register\s*\(\s*["']([^"']+)["']\s*\)\s*\{([\s\S]*?)}\s*\n?/g;
+          let match: RegExpExecArray | null;
+          while ((match = registerRegex.exec(content)) !== null) {
+            const pluginId = match[1];
+            const blockContent = match[2] || "";
+            // Try to find implementationClass = "...", single or double quotes
+            const implClassRegex = /implementationClass\s*=\s*["']([^"']+)["']/;
+            const implClassMatch = blockContent.match(implClassRegex);
 
-          if (pluginMatch) {
-            const pluginName = pluginMatch[1];
-            logger.debug(`[SOURCE] Found android.application plugin as: ${pluginName}`);
-            this.androidApplicationPluginCache.set(projectRoot, pluginName);
-            return pluginName;
+            if (implClassMatch) {
+              const implementationClass = implClassMatch[1];
+              pluginRegistrations.push({
+                pluginId,
+                implementationClass,
+                buildFile: fullPath
+              });
+              logger.debug(`[SOURCE] Found plugin registration: ${pluginId} -> ${implementationClass}`);
+            }
           }
         } catch (error) {
-          logger.warn(`Failed to read TOML file ${fullPath}: ${error}`);
+          logger.warn(`Failed to read gradle file ${fullPath}: ${error}`);
         }
       }
 
-      // Fallback to common names if not found in TOML
-      const fallbackPluginName = "android-application";
-      logger.debug(`[SOURCE] Android application plugin not found in TOML files, using fallback: ${fallbackPluginName}`);
-      this.androidApplicationPluginCache.set(projectRoot, fallbackPluginName);
-      return fallbackPluginName;
-    } catch (error) {
-      logger.warn(`Error finding android.application plugin: ${error}`);
-      return null;
+      // Step 3: For each plugin registration, find the class file and check for ApplicationExtension references
+      logger.debug(`[SOURCE] Analyzing implementation classes for Application plugin usage...`);
+      for (const registration of pluginRegistrations) {
+        const { pluginId, implementationClass, buildFile } = registration;
+        logger.debug(`[SOURCE] Checking ${pluginId} (${implementationClass})...`);
+
+        // Split to get file/class names
+        const className = implementationClass.split(".").pop() || "";
+        const expectedPackage = implementationClass.split(".").slice(0, -1).join(".");
+
+        // Try to find this class in src/* (src/main/kotlin, src/main/java, etc.)
+        const buildModuleDir = path.dirname(buildFile);
+        let implFile = "";
+
+        // Try src/main/kotlin and src/main/java and src/ (flattened for multiplatform)
+        const candidateSrcDirs = [
+          path.join(buildModuleDir, "src", "main", "kotlin"),
+          path.join(buildModuleDir, "src", "main", "java"),
+          path.join(buildModuleDir, "src")
+        ];
+
+        // Keep track if we found the file
+        let found = false;
+
+        for (const srcDir of candidateSrcDirs) {
+          if (!require("fs").existsSync(srcDir)) {continue;}
+          const kotlinFiles = await glob("**/*.kt", { cwd: srcDir });
+          for (const kotlinFile of kotlinFiles) {
+            const potentialFile = path.join(srcDir, kotlinFile);
+            try {
+              const fileContent = await fs.readFile(potentialFile, "utf8");
+              // Check if file contains correct class and correct package
+              const packageMatch = fileContent.match(/^package\s+([^\s;]+)/m);
+              const classMatch = fileContent.match(new RegExp(`class\\s+${className}\\b`));
+              if (packageMatch && classMatch && packageMatch[1] === expectedPackage) {
+                implFile = potentialFile;
+                found = true;
+                break;
+              }
+            } catch (error) {
+              logger.warn(`Failed to read potential implementation file ${potentialFile}: ${error}`);
+            }
+          }
+          if (found) {break;}
+        }
+
+        if (implFile && require("fs").existsSync(implFile)) {
+          logger.debug(`[SOURCE] Found implementation file: ${implFile}`);
+          try {
+            const fileContent = await fs.readFile(implFile, "utf8");
+            // Check for ApplicationExtension or ApplicationAndroidComponentsExtension, which marks this as an app plugin
+            if (
+              fileContent.match(/ApplicationExtension\b/) ||
+              fileContent.match(/ApplicationAndroidComponentsExtension\b/)
+            ) {
+              logger.debug(`[SOURCE] ✅ FOUND APPLICATION PLUGIN: ${pluginId}`);
+              conventionPlugins.push(pluginId);
+            }
+          } catch (error) {
+            logger.warn(`Failed to read implementation file ${implFile}: ${error}`);
+          }
+        } else {
+          logger.warn(`[SOURCE] ⚠️ Implementation file not found for class: ${className}`);
+        }
+      }
     }
+
+    logger.debug(`[SOURCE] Found ${conventionPlugins.length} application convention plugins: ${conventionPlugins.join(", ")}`);
+
+    // Cache the result if found
+    if (conventionPlugins.length > 0) {
+      await ConfigurationManager.getInstance().setAndroidAppDataKey(appConfig.appId, "android-application-convention-plugin", conventionPlugins.join("|"));
+    }
+
+    return conventionPlugins;
   }
 
   /**
    * Check if a build.gradle file represents an Android module (library or application)
    */
-  private async isAndroidModule(buildGradlePath: string): Promise<boolean> {
+  private async isAndroidModule(buildGradlePath: string, androidConventionPlugins: string[]): Promise<boolean> {
     try {
       const content = await fs.readFile(buildGradlePath, "utf8");
       const hasAndroidBlock = content.includes("android {");
-      logger.debug(`[SOURCE] Checking if ${buildGradlePath} is an Android module... hasAndroidBlock: ${hasAndroidBlock}`);
-      return hasAndroidBlock ||
-        content.includes("apply plugin: 'com.android") ||
+      const appliedAndroidPlugins = content.includes("apply plugin: 'com.android") ||
         content.includes('id("com.android') ||
         content.includes('apply(plugin = "com.android');
+
+      const appliedConventionPlugins = androidConventionPlugins.some(plugin => content.includes(plugin));
+      logger.debug(`[SOURCE] Checking if ${buildGradlePath} is an Android module... hasAndroidBlock: ${hasAndroidBlock}`);
+      return hasAndroidBlock || appliedAndroidPlugins || appliedConventionPlugins;
       // TODO: add content checks for convention plugins that would add any of the above
     } catch (error) {
       logger.error(`Error reading build.gradle file: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
       return false;
     }
   }
@@ -175,6 +370,10 @@ export class SourceMapper {
       return hasJvmPlugin;
     } catch (error) {
       logger.error(`Error reading build.gradle file: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
       return false;
     }
   }
@@ -182,30 +381,13 @@ export class SourceMapper {
   /**
    * Check if a build.gradle file represents an Android application module
    */
-  private async isAndroidApplicationModule(buildGradlePath: string, androidApplicationPlugin: string): Promise<boolean> {
+  private async isAndroidApplicationModule(buildGradlePath: string, androidApplicationIdentifiers: string[]): Promise<boolean> {
     try {
       const content = await fs.readFile(buildGradlePath, "utf8");
       logger.debug(`Application module at ${buildGradlePath}?`);
 
-      // More robust regex patterns to handle different Gradle syntax variations
-      if (buildGradlePath.includes("/apps/") || buildGradlePath.includes("/demos/")) {
-        logger.debug(`Application plugin found in ${buildGradlePath}`);
-        return true;
-      }
-
-      const pluginNames = [
-        androidApplicationPlugin,
-        androidApplicationPlugin.replace(/-/g, "."),
-        androidApplicationPlugin.replace(/\./g, "-"),
-        "com.android.application",
-      ];
-
-      const pluginPatterns = pluginNames.flatMap(pluginName => [
-        new RegExp(`alias\\(libs\\.plugins\\.(${pluginName})\\)`),
-        new RegExp(`id\\s*\\(\\s*["'](${pluginName})["']\\s*\\)`),
-        new RegExp(`id\\s*\\(\\s*libs\\.plugins\\.(${pluginName})\\s*\\)`),
-        new RegExp(`apply\\s*\\(\\s*plugin\\s*=\\s*["'](${pluginName})["']\\s*\\)`),
-        new RegExp(`apply\\s*plugin:\\s*["'](${pluginName})["']`)
+      const pluginPatterns = androidApplicationIdentifiers.flatMap(pluginName => [
+        new RegExp(`\\s*(${pluginName})\\s*`),
       ]);
 
       for (const pattern of pluginPatterns) {
@@ -219,6 +401,10 @@ export class SourceMapper {
       return false;
     } catch (error) {
       logger.error(`Error reading build.gradle file: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
       return false;
     }
   }
@@ -229,6 +415,7 @@ export class SourceMapper {
    */
   public async scanProject(applicationId: string): Promise<ProjectScanResult> {
 
+    let startTime = Date.now();
     const appConfig = this.getMatchingAppConfig(applicationId);
     if (!appConfig || !appConfig.sourceDir) {
       throw new ActionableError(`Unable to scan application source without a path`);
@@ -244,8 +431,15 @@ export class SourceMapper {
     logger.debug(`[SOURCE] Discovering Android modules in: ${projectRoot}`);
 
     // Find the android.application plugin definition
-    const androidApplicationPlugin = await this.findAndroidApplicationPlugin(projectRoot);
+    const androidApplicationIdentifiers = await this.findAndroidApplicationIdentifiers(applicationId, projectRoot);
+    if (!androidApplicationIdentifiers) {
+      throw new ActionableError(`Unable to find android.application plugin in ${projectRoot}`);
+    }
+    logger.debug(`[SOURCE] Found android.application identifiers in ${Date.now() - startTime}ms`);
+    startTime = Date.now();
     const { plugins: gradlePlugins, dependencies: mavenDependencies } = await this.readGradleTomlFiles(projectRoot);
+    logger.debug(`[SOURCE] Read Gradle TOML files in ${Date.now() - startTime}ms`);
+    logger.debug(`[SOURCE] Found ${gradlePlugins.length} Gradle plugins and ${mavenDependencies.length} Maven dependencies`);
 
     let primaryAppModule: ModuleMapping | undefined;
     const modules: ModuleMapping[] = [];
@@ -257,6 +451,8 @@ export class SourceMapper {
     });
 
     logger.debug(`[SOURCE] Found ${buildGradleFiles.length} build.gradle files`);
+
+    startTime = Date.now();
 
     for (const buildGradlePath of buildGradleFiles) {
       const moduleDir = path.dirname(buildGradlePath);
@@ -271,7 +467,7 @@ export class SourceMapper {
       const fullBuildGradlePath = path.join(projectRoot, buildGradlePath);
 
       // Check if this is an Android module by looking for android block
-      const isAndroidModule = await this.isAndroidModule(fullBuildGradlePath);
+      const isAndroidModule = await this.isAndroidModule(fullBuildGradlePath, androidApplicationIdentifiers);
       // const isJvmModule = !isAndroidModule && await this.isJvmModule(fullBuildGradlePath);
       // Discover source and test directories
       const sourceMainJavaDirectory = path.join(fullModulePath, "src", "main", "java");
@@ -304,10 +500,7 @@ export class SourceMapper {
       let fragments: string[] = [];
       if (isAndroidModule) {
         // Check if this is an application module
-        isApplicationModule = androidApplicationPlugin
-          ? await this.isAndroidApplicationModule(fullBuildGradlePath, androidApplicationPlugin)
-          : false;
-
+        isApplicationModule = await this.isAndroidApplicationModule(fullBuildGradlePath, androidApplicationIdentifiers);
 
         // Find activities and fragments
         const activityFragmentResult = await this.findActivitiesAndFragments(sourceMainJavaDirectory);
@@ -315,7 +508,7 @@ export class SourceMapper {
         fragments = activityFragmentResult.fragments;
       }
       const moduleMapping: ModuleMapping = {
-        moduleName,
+        fullModulePath,
         sourceDirectory: sourceMainJavaDirectory,
         testDirectory,
         packagePrefix,
@@ -340,6 +533,8 @@ export class SourceMapper {
       logger.debug(`[SOURCE] Discovered ${moduleType} module: ${moduleName} with ${activities.length} activities, ${fragments.length} fragments, Package prefix: ${packagePrefix}`);
     }
 
+    logger.debug(`[SOURCE] Found and parsed ${modules.length} modules in ${Date.now() - startTime}ms`);
+
     logger.debug(`[SOURCE] Project root: ${projectRoot}`);
 
     const applicationModules = modules.filter(m => m.isApplicationModule);
@@ -351,11 +546,13 @@ export class SourceMapper {
 
     logger.debug(`[SOURCE] Starting to look for primary app module with applicationId: ${applicationId}`);
 
+    startTime = Date.now();
+
     // Find the application module that matches the provided applicationId
     for (const module of applicationModules) {
       if (module.buildGradlePath) {
         const moduleApplicationId = await this.getApplicationId(module.buildGradlePath);
-        logger.debug(`[SOURCE] Module: ${module.moduleName}, gradleBuildPath: ${module.buildGradlePath}, Application ID: ${moduleApplicationId}`);
+        logger.debug(`[SOURCE] Module: ${module.fullModulePath}, gradleBuildPath: ${module.buildGradlePath}, Application ID: ${moduleApplicationId}`);
         if (moduleApplicationId === applicationId) {
           primaryAppModule = module;
         }
@@ -366,7 +563,7 @@ export class SourceMapper {
       throw new ActionableError("Specified Android applicationId not found in project modules.");
     }
 
-    logger.debug(`[SOURCE] Primary application module: ${primaryAppModule.moduleName}`);
+    logger.debug(`[SOURCE] Found primary app module in ${Date.now() - startTime}ms: ${primaryAppModule.fullModulePath}`);
     // Get details for the primary application module
     let currentApplicationModule: ApplicationModuleDetails | undefined;
 
@@ -374,14 +571,13 @@ export class SourceMapper {
       const modulePath = path.relative(projectRoot, path.dirname(primaryAppModule.buildGradlePath));
       const absolutePath = path.join(projectRoot, modulePath);
       const moduleApplicationId = await this.getApplicationId(primaryAppModule.buildGradlePath);
-      const gradleTasks = await this.getGradleTasks(projectRoot, modulePath);
-      logger.debug(`[SOURCE] Primary application module: ${primaryAppModule.moduleName}, Application ID: ${moduleApplicationId}, gradle tasks ${gradleTasks}`);
+      startTime = Date.now();
+      logger.debug(`[SOURCE] Primary application module: ${primaryAppModule.fullModulePath}, Application ID: ${moduleApplicationId}`);
 
       if (moduleApplicationId) {
         currentApplicationModule = {
           absolutePath,
           applicationId: moduleApplicationId,
-          gradleTasks
         };
       }
     }
@@ -424,6 +620,10 @@ export class SourceMapper {
       }
     } catch (error) {
       logger.debug(`[SOURCE] Failed to extract package prefix: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
 
     return "";
@@ -469,6 +669,10 @@ export class SourceMapper {
       }
     } catch (error) {
       logger.debug(`[SOURCE] Failed to find activities and fragments: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
 
     return { activities, fragments };
@@ -492,22 +696,22 @@ export class SourceMapper {
         const content = await fs.readFile(fullPath, "utf8");
 
         // Look for [plugins] section
-        const pluginsMatch = content.match(/\\\[plugins\\\]\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\\[|$)/);
+        const pluginsMatch = content.match(/\[plugins\]\s*\n([\s\S]*?)(?=\n\s*\[|$)/);
         if (pluginsMatch) {
           const pluginBlock = pluginsMatch[1];
           // Regex to find plugin aliases: alias = { id = "...", version = "..." } or alias = "..."
-          const pluginAliases = pluginBlock.matchAll(/^\\s*([a-zA-Z0-9-._]+)\\s*=/gm);
+          const pluginAliases = pluginBlock.matchAll(/^\s*([a-zA-Z0-9-._]+)\s*=/gm);
           for (const match of pluginAliases) {
             plugins.add(match[1]);
           }
         }
 
         // Look for [libraries] section (which corresponds to dependencies)
-        const librariesMatch = content.match(/\\\[libraries\\\]\\s*\\n([\\s\\S]*?)(?=\\n\\s*\\\[|$)/);
+        const librariesMatch = content.match(/\[libraries\]\s*\n([\s\S]*?)(?=\n\s*\[|$)/);
         if (librariesMatch) {
           const libraryBlock = librariesMatch[1];
           // Regex to find library aliases: alias = { module = "...", version.ref = "..." } or "group:artifact:version"
-          const libraryAliases = libraryBlock.matchAll(/^\\s*([a-zA-Z0-9-._]+)\\s*=/gm);
+          const libraryAliases = libraryBlock.matchAll(/^\s*([a-zA-Z0-9-._]+)\s*=/gm);
           for (const match of libraryAliases) {
             dependencies.add(match[1]);
           }
@@ -515,6 +719,10 @@ export class SourceMapper {
       }
     } catch (error) {
       logger.warn(`Failed to read Gradle TOML files: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
 
     return { plugins: Array.from(plugins), dependencies: Array.from(dependencies) };
@@ -565,6 +773,10 @@ export class SourceMapper {
 
     } catch (error) {
       logger.warn(`Failed to read build.gradle to get applicationId for ${buildGradlePath}: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
     return null;
   }
@@ -586,7 +798,7 @@ export class SourceMapper {
         gradlew.kill();
         logger.warn("Gradle tasks command timed out");
         resolve([]);
-      }, 30000); // 30s timeout
+      }, 60000); // 30s timeout
 
       gradlew.stdout.on("data", data => {
         output += data.toString();
@@ -629,10 +841,8 @@ export class SourceMapper {
     const analysis: ViewHierarchyAnalysis = {
       activityClasses: [],
       fragmentClasses: [],
-      packageHints: [],
       resourceIds: [],
       customViews: [],
-      composables: []
     };
 
     try {
@@ -669,10 +879,6 @@ export class SourceMapper {
           .filter(Boolean) as string[];
       }
 
-      // Extract package hints from class names and resource IDs
-      const allClasses = [...analysis.activityClasses, ...analysis.fragmentClasses];
-      analysis.packageHints = this.extractPackageHints(allClasses, analysis.resourceIds);
-
       // Extract custom view components
       const customViewMatches = viewHierarchyXml.match(/class="([^"]*\.[A-Z][^"]*View[^"]*)"/g);
       if (customViewMatches) {
@@ -684,21 +890,13 @@ export class SourceMapper {
           .filter(Boolean) as string[];
       }
 
-      // Extract composable functions from view hierarchy
-      // Look for class names that might be composable wrappers or contain composable references
-      const composableMatches = viewHierarchyXml.match(/class="([^"]*ComposeView[^"]*)"|class="([^"]*Compose[^"]*)"/g);
-      if (composableMatches) {
-        analysis.composables = composableMatches
-          .map(match => {
-            const classMatch = match.match(/class="([^"]*)"/);
-            return classMatch ? classMatch[1] : null;
-          })
-          .filter(Boolean) as string[];
-      }
-
-      logger.debug(`[SOURCE] View hierarchy analysis found: ${analysis.activityClasses.length} activities, ${analysis.fragmentClasses.length} fragments, ${analysis.composables.length} composables`);
+      logger.debug(`[SOURCE] View hierarchy analysis found: ${analysis.activityClasses.length} activities, ${analysis.fragmentClasses.length} fragments`);
     } catch (error) {
       logger.warn(`Failed to analyze view hierarchy: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
 
     return analysis;
@@ -760,6 +958,7 @@ export class SourceMapper {
       // Check activity matches
       for (const activity of analysis.activityClasses) {
         if (module.activities.some(a => a.includes(activity) || activity.includes(a))) {
+          logger.debug(`[SOURCE] Activity match: ${activity} on module ${module.fullModulePath}`);
           moduleScore += 50; // High weight for activity matches
           moduleReasons.push(`activity match: ${activity}`);
         }
@@ -768,50 +967,25 @@ export class SourceMapper {
       // Check fragment matches
       for (const fragment of analysis.fragmentClasses) {
         if (module.fragments.some(f => f.includes(fragment) || fragment.includes(f))) {
-          moduleScore += 30; // Medium weight for fragment matches
+          logger.debug(`[SOURCE] Fragment match: ${fragment} on module ${module.fullModulePath}`);
+          moduleScore += 80; // Medium weight for fragment matches
           moduleReasons.push(`fragment match: ${fragment}`);
         }
       }
 
-      // Check composable matches - check against source index if available
-      if (analysis.composables && analysis.composables.length > 0) {
-        const sourceIndex = await this.getSourceIndex(applicationId);
-        if (sourceIndex) {
-          for (const composable of analysis.composables) {
-            // Look for composables that belong to this module's package
-            for (const [fullClassName, composableInfo] of sourceIndex.composables) {
-              if (composableInfo.packageName.startsWith(module.packagePrefix) &&
-                (fullClassName.includes(composable) || composable.includes(composableInfo.className))) {
-                moduleScore += 25; // Medium-low weight for composable matches
-                moduleReasons.push(`composable match: ${composable}`);
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      // Check package prefix matches
-      for (const packageHint of analysis.packageHints) {
-        if (packageHint.startsWith(module.packagePrefix) || module.packagePrefix.startsWith(packageHint)) {
-          moduleScore += 20; // Lower weight for package matches
-          moduleReasons.push(`package match: ${packageHint}`);
-        }
-      }
-
-      // Prefer application modules if no clear winner
-      if (module.isApplicationModule && moduleScore === 0) {
-        moduleScore = 10; // Higher preference for application modules
+      if (module.fullModulePath === moduleDiscovery.currentApplicationModule?.absolutePath) {
+        moduleScore += 30; // Current main app module
         moduleReasons.push("fallback to application module");
-      } else if (module.moduleName === "app" && moduleScore === 0) {
-        moduleScore = 5; // Lower fallback for "app" named modules
-        moduleReasons.push("fallback to app module");
+      } else if (module.isApplicationModule) {
+        moduleScore += 10; // some other app module
+        moduleReasons.push("fallback to application module");
       }
 
-      logger.debug(`[SOURCE] Module ${module.moduleName} (package: ${module.packagePrefix}, isApp: ${module.isApplicationModule}): score=${moduleScore}, reasons=${moduleReasons.join(", ")}`);
+      logger.debug(`[SOURCE] Module ${module.fullModulePath} (package: ${module.packagePrefix}, isApp: ${module.isApplicationModule}): score=${moduleScore}, reasons=${moduleReasons.join(", ")}`);
 
       if (moduleScore > confidence) {
         confidence = moduleScore;
+        logger.debug(`[SOURCE] New best match: ${module.fullModulePath} with score ${moduleScore}`);
         bestMatch = module;
         reasoningParts.length = 0;
         reasoningParts.push(...moduleReasons);
@@ -824,16 +998,15 @@ export class SourceMapper {
     const sourceAnalysis: SourceAnalysis = {
       primaryActivity: analysis.activityClasses[0],
       fragments: analysis.fragmentClasses,
-      packageHints: analysis.packageHints,
       confidence: normalizedConfidence,
-      suggestedModule: bestMatch?.moduleName,
+      suggestedModule: bestMatch?.fullModulePath,
       resourceReferences: analysis.resourceIds
     };
 
-    logger.debug(`[SOURCE] Source analysis completed: module=${bestMatch?.moduleName}, confidence=${normalizedConfidence.toFixed(2)}`);
+    logger.debug(`[SOURCE] Source analysis completed: module=${bestMatch?.fullModulePath}, confidence=${normalizedConfidence.toFixed(2)}`);
 
     // Find the suggested module or fallback to first application module
-    let targetModule = modules.find(m => m.moduleName === sourceAnalysis.suggestedModule);
+    let targetModule = modules.find(m => m.fullModulePath === sourceAnalysis.suggestedModule);
     if (!targetModule) {
       targetModule = moduleDiscovery.applicationModules?.[0] || modules[0];
     }
@@ -842,6 +1015,8 @@ export class SourceMapper {
       throw new ActionableError("No target module found for source analysis");
     }
 
+    logger.debug(`[SOURCE] Target module: ${targetModule.fullModulePath} (${targetModule.testDirectory}`);
+
     // Ensure test plan directory exists
     const testPlanDir = path.join(targetModule.testDirectory, "resources", "test-plans");
     await fs.mkdir(testPlanDir, { recursive: true });
@@ -849,9 +1024,9 @@ export class SourceMapper {
     return {
       success: true,
       targetDirectory: testPlanDir,
-      moduleName: targetModule.moduleName,
+      moduleName: targetModule.fullModulePath,
       confidence: sourceAnalysis.confidence,
-      reasoning: `Selected module '${targetModule.moduleName}' based on source analysis`
+      reasoning: `Selected module '${targetModule.fullModulePath}' based on source analysis`
     };
   }
 
@@ -977,6 +1152,10 @@ export class SourceMapper {
           }
         } catch (error) {
           logger.warn(`Failed to process activity file ${file}: ${error}`);
+          // Rethrow ActionableErrors to preserve their specific error messages
+          if (error instanceof ActionableError) {
+            throw error;
+          }
         }
       }
 
@@ -1006,6 +1185,10 @@ export class SourceMapper {
           }
         } catch (error) {
           logger.warn(`Failed to process fragment file ${file}: ${error}`);
+          // Rethrow ActionableErrors to preserve their specific error messages
+          if (error instanceof ActionableError) {
+            throw error;
+          }
         }
       }
 
@@ -1044,6 +1227,10 @@ export class SourceMapper {
           }
         } catch (error) {
           logger.warn(`Failed to process view file ${file}: ${error}`);
+          // Rethrow ActionableErrors to preserve their specific error messages
+          if (error instanceof ActionableError) {
+            throw error;
+          }
         }
       }
 
@@ -1093,12 +1280,20 @@ export class SourceMapper {
           }
         } catch (error) {
           logger.warn(`Failed to process composable file ${file}: ${error}`);
+          // Rethrow ActionableErrors to preserve their specific error messages
+          if (error instanceof ActionableError) {
+            throw error;
+          }
         }
       }
 
       logger.debug(`[SOURCE] Source indexing completed: ${activities.size} activities, ${fragments.size} fragments, ${views.size} views, ${composables.size} composables`);
     } catch (error) {
       console.error(`Error during source indexing: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
 
     return {
@@ -1166,6 +1361,10 @@ export class SourceMapper {
       return sourceIndex;
     } catch (error) {
       logger.warn(`Failed to load source index cache: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
       return null;
     }
   }
@@ -1184,6 +1383,10 @@ export class SourceMapper {
       return sourceIndex;
     } catch (error) {
       logger.warn(`Failed to index source files for app ${appId}: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
       // Return a default structure even if indexing fails
       const defaultIndex = {
         activities: new Map(),
@@ -1213,6 +1416,10 @@ export class SourceMapper {
       logger.debug(`[SOURCE] Saved source index to cache for app: ${appId}`);
     } catch (error) {
       logger.warn(`Failed to save source index cache: ${error}`);
+      // Rethrow ActionableErrors to preserve their specific error messages
+      if (error instanceof ActionableError) {
+        throw error;
+      }
     }
   }
 
@@ -1551,6 +1758,5 @@ export class SourceMapper {
   public clearCache(): void {
     this.projectScanResultCache.clear();
     this.sourceIndex.clear();
-    this.androidApplicationPluginCache.clear();
   }
 }

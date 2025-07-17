@@ -45,7 +45,8 @@ describe("SourceMapper", function() {
       configManagerStub.getAppConfigs.returns([{
         appId: "com.example.app",
         sourceDir: "/nonexistent/path",
-        platform: "android"
+        platform: "android",
+        data: new Map()
       }]);
 
       // This test just ensures the method exists and returns expected structure
@@ -72,7 +73,8 @@ describe("SourceMapper", function() {
       configManagerStub.getAppConfigs.returns([{
         appId: "com.example.app",
         sourceDir: "/test/project",
-        platform: "android"
+        platform: "android",
+        data: new Map()
       }]);
 
       // For non-existent paths, both calls should throw the same error
@@ -92,7 +94,8 @@ describe("SourceMapper", function() {
       configManagerStub.getAppConfigs.returns([{
         appId: "com.example.app",
         sourceDir: "/nonexistent/path",
-        platform: "android"
+        platform: "android",
+        data: new Map()
       }]);
 
       try {
@@ -112,7 +115,8 @@ describe("SourceMapper", function() {
       configManagerStub.getAppConfigs.returns([{
         appId: "com.zillow.automobile.playground",
         sourceDir: androidPath,
-        platform: "android"
+        platform: "android",
+        data: new Map()
       }]);
 
       const result = await sourceMapper.scanProject("com.zillow.automobile.playground");
@@ -126,9 +130,29 @@ describe("SourceMapper", function() {
       if (result.currentApplicationModule) {
         expect(result.currentApplicationModule).to.have.property("absolutePath");
         expect(result.currentApplicationModule).to.have.property("applicationId");
-        expect(result.currentApplicationModule).to.have.property("gradleTasks");
-        expect(result.currentApplicationModule.gradleTasks).to.be.an("array");
       }
+    });
+
+    it("should handle Zillow Android", async function() {
+      // Mock app configuration for AutoMobile Playground
+      const androidPath = path.join(process.env.HOME || require("os").homedir(), "zillow/app-platform/android");
+
+      configManagerStub.getAppConfigs.returns([{
+        appId: "com.zillow.android.zillowmap",
+        sourceDir: androidPath,
+        platform: "android",
+        data: new Map()
+      }]);
+
+      const result = await sourceMapper.scanProject("com.zillow.android.zillowmap");
+
+      expect(result.modules).to.have.length.at.least(1);
+      expect(result.applicationModules).to.have.length.at.least(1);
+      expect(result.totalModules).to.at.least(1);
+      expect(result.gradlePlugins).to.have.length.at.least(1);
+      expect(result.mavenDependencies).to.have.length.at.least(1);
+      expect(result.currentApplicationModule).to.have.property("absolutePath");
+      expect(result.currentApplicationModule).to.have.property("applicationId");
     });
   });
 
@@ -144,7 +168,6 @@ describe("SourceMapper", function() {
 
       expect(analysis.activityClasses).to.be.an("array");
       expect(analysis.fragmentClasses).to.be.an("array");
-      expect(analysis.packageHints).to.be.an("array");
       expect(analysis.resourceIds).to.be.an("array");
       expect(analysis.customViews).to.be.an("array");
     });
@@ -176,17 +199,28 @@ describe("SourceMapper", function() {
     beforeEach(() => {
       // Mock config for both apps
       const currentDir = process.cwd();
-      const androidPath = path.join(currentDir, "android");
+      const playgroundPath = path.join(currentDir, "android");
+
+      const zillowPath = path.join(process.env.HOME || require("os").homedir(), "zillow/app-platform/android");
+
       configManagerStub.getAppConfigs.returns([
         {
           appId: "com.example.app",
           sourceDir: "/nonexistent/path",
-          platform: "android"
+          platform: "android",
+          data: new Map()
         },
         {
           appId: "com.zillow.automobile.playground",
-          sourceDir: androidPath,
-          platform: "android"
+          sourceDir: playgroundPath,
+          platform: "android",
+          data: new Map()
+        },
+        {
+          appId: "com.zillow.android.zillowmap",
+          sourceDir: zillowPath,
+          platform: "android",
+          data: new Map()
         }
       ]);
     });
@@ -195,10 +229,8 @@ describe("SourceMapper", function() {
       const analysis = {
         activityClasses: ["com.example.app.MainActivity"],
         fragmentClasses: ["com.example.app.SearchFragment"],
-        packageHints: ["com.example.app"],
         resourceIds: ["com.example.app:id/button"],
         customViews: [],
-        composables: []
       };
 
       try {
@@ -214,28 +246,24 @@ describe("SourceMapper", function() {
       const analysis = {
         activityClasses: ["com.zillow.automobile.playground.MainActivity"],
         fragmentClasses: [],
-        packageHints: ["com.zillow.automobile.playground"],
         resourceIds: [],
         customViews: [],
-        composables: []
       };
 
       const result = await sourceMapper.determineTestPlanLocation(analysis, "com.zillow.automobile.playground");
-      expect(result.moduleName).to.be.equal("app");
+      expect(result.moduleName).to.include("playground/app");
     });
 
     it("given AutoMobile Playground Discover view hierarchy, should map to Discover module", async () => {
       const analysis = {
         activityClasses: [],
         fragmentClasses: [],
-        packageHints: ["com.zillow.automobile.discover"],
         resourceIds: [],
         customViews: [],
-        composables: []
       };
 
       const result = await sourceMapper.determineTestPlanLocation(analysis, "com.zillow.automobile.playground");
-      expect(result.moduleName).to.be.equal("discover");
+      expect(result.moduleName).to.include("playground/discover");
     });
   });
 
@@ -249,7 +277,8 @@ describe("SourceMapper", function() {
       configManagerStub.getAppConfigs.returns([{
         appId: appId,
         sourceDir: androidPath,
-        platform: "android"
+        platform: "android",
+        data: new Map()
       }]);
 
       const result = await sourceMapper.indexSourceFiles(appId, androidPath);

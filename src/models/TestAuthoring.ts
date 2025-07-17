@@ -30,21 +30,19 @@ export interface TestPlan {
 export interface TestStep {
     tool: string;
     params: Record<string, any>;
-    description?: string;
+  description?: string;
 }
 
 export interface StartTestAuthoringResult {
-    success: boolean;
-    message: string;
-    sessionId?: string;
+  success: boolean;
+  message: string;
+  sessionId?: string;
 }
 
 export interface StopTestAuthoringResult {
-    success: boolean;
-    message: string;
-    planGenerated?: boolean;
-    planPath?: string;
-  kotlinTestGenerated?: boolean;
+  success: boolean;
+  message: string;
+  planPath?: string;
   kotlinTestPath?: string;
 }
 

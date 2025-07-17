@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import { logger } from "./logger";
 import { SourceMapper } from "./sourceMapper";
-import { KotlinPoetBridge } from "./kotlinPoetBridge";
+import { KotlinTestAuthor } from "./kotlinTestAuthor";
 import {
   KotlinTestGenerationResult,
   TestGenerationOptions,
@@ -10,14 +10,14 @@ import {
 
 export class KotlinTestGenerator {
   private sourceMapper: SourceMapper;
-  private kotlinPoetVersion: string;
-  private kotlinPoetJarPath?: string;
+  private kotlinTestAuthorVersion: string;
+  private kotlinTestAuthorJarPath?: string;
   private static instance: KotlinTestGenerator;
 
   private constructor() {
     this.sourceMapper = SourceMapper.getInstance();
-    this.kotlinPoetVersion = process.env.KOTLINPOET_VERSION || "2.2.0";
-    this.kotlinPoetJarPath = process.env.KOTLINPOET_JAR_PATH;
+    this.kotlinTestAuthorVersion = process.env.KOTLINPOET_VERSION || "2.2.0";
+    this.kotlinTestAuthorJarPath = process.env.KOTLINPOET_JAR_PATH;
   }
 
   public static getInstance(): KotlinTestGenerator {
@@ -34,67 +34,53 @@ export class KotlinTestGenerator {
     planPath: string,
     options: TestGenerationOptions = {}
   ): Promise<KotlinTestGenerationResult> {
-    try {
-      logger.info(`Generating Kotlin test from plan: ${planPath}`);
+    logger.info(`Generating Kotlin test from plan: ${planPath}`);
 
-      // Load and parse the test plan
-      const plan = await this.loadTestPlan(planPath);
-      if (!plan) {
-        return {
-          success: false,
-          message: "Failed to load test plan"
-        };
-      }
-
-      // Create a new KotlinPoetBridge instance for this generation
-      const kotlinPoetBridge = new KotlinPoetBridge(this.kotlinPoetVersion, this.kotlinPoetJarPath);
-
-      // Use native KotlinPoet for generation
-      logger.info("Using native KotlinPoet for test generation");
-      const result = await kotlinPoetBridge.generateTest(planPath, options, plan);
-
-      if (!result.success) {
-        logger.error(`KotlinPoet generation failed: ${result.message}`);
-      }
-
-      return result;
-
-    } catch (error) {
-      logger.error(`Failed to generate Kotlin test: ${error}`);
+    // Load and parse the test plan
+    const plan = await this.loadTestPlan(planPath);
+    if (!plan) {
       return {
         success: false,
-        message: `Failed to generate Kotlin test: ${error}`
+        message: "Failed to load test plan"
       };
     }
+
+    // Get an instance of KotlinTestAuthor
+    // generate the Kotlin JVM JUnitTest
+
+    return {
+      success: false,
+      message: "Not yet implemented"
+    };
   }
 
   /**
    * Check if native KotlinPoet is available
    */
-  public async isKotlinPoetAvailable(): Promise<boolean> {
-    const kotlinPoetBridge = new KotlinPoetBridge(this.kotlinPoetVersion, this.kotlinPoetJarPath);
-    return await kotlinPoetBridge.isAvailable();
+  public async isKotlinTestAuthorAvailable(): Promise<boolean> {
+    const kotlinTestAuthor = new KotlinTestAuthor(this.kotlinTestAuthorVersion, this.kotlinTestAuthorJarPath);
+    return await kotlinTestAuthor.isAvailable();
   }
 
   /**
    * Set custom KotlinPoet JAR path
    */
-  public setKotlinPoetJarPath(jarPath: string): void {
-    this.kotlinPoetJarPath = jarPath;
+  public setKotlinTestAuthorJarPath(jarPath: string): void {
+    this.kotlinTestAuthorJarPath = jarPath;
   }
 
   /**
    * Set KotlinPoet version
    */
-  public setKotlinPoetVersion(version: string): void {
-    this.kotlinPoetVersion = version;
+  public setKotlinTestAuthorVersion(version: string): void {
+    this.kotlinTestAuthorVersion = version;
   }
 
   /**
    * Get current KotlinPoet version
    */
-  public getKotlinPoetVersion(): string {
-    return this.kotlinPoetVersion;
+  public getKotlinTestAuthorVersion(): string {
+    return this.kotlinTestAuthorVersion;
   }
 
   /**
