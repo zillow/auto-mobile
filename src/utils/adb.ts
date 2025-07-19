@@ -28,6 +28,7 @@ export class AdbUtils {
   // Static cache for device list
   private static deviceListCache: { devices: string[], timestamp: number } | null = null;
   private static readonly DEVICE_LIST_CACHE_TTL = 5000; // 5 seconds
+  private static readonly MAX_ADB_RETRIES = 3;
 
   /**
    * Create an AdbUtils instance
@@ -89,7 +90,7 @@ export class AdbUtils {
    * @param maxBuffer - Optional maximum buffer size for command output
    * @returns Promise with command output
    */
-  private async executeCommandImpl(command: string, timeoutMs?: number, maxBuffer?: number): Promise<ExecResult> {
+  private async executeCommandImpl(command: string, timeoutMs?: number, maxBuffer?: number, attempt: number = 0): Promise<ExecResult> {
     const fullCommand = `${this.getBaseCommand()} ${command}`;
     const startTime = Date.now();
 
@@ -127,9 +128,13 @@ export class AdbUtils {
       logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
       return result;
     } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.warn(`[ADB] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
-      throw error;
+      if (attempt < AdbUtils.MAX_ADB_RETRIES) {
+        return this.executeCommandImpl(command, timeoutMs, maxBuffer, attempt + 1);
+      } else {
+        const duration = Date.now() - startTime;
+        logger.warn(`[ADB] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
+        throw error;
+      }
     }
   }
 
