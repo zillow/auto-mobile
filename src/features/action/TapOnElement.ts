@@ -39,7 +39,7 @@ export class TapOnElement extends BaseVisualChange {
 
   async handleElementResult(element: Element | null, options: TapOnElementOptions, attempt: number): Promise<Element> {
     if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
-      const delayNextAttempt = Math.pow(100, attempt);
+      const delayNextAttempt = 100 * Math.pow(2, attempt);
       await new Promise(resolve => setTimeout(resolve, delayNextAttempt));
       const latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy();
       if (latestViewHierarchy) {
