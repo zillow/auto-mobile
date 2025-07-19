@@ -13,8 +13,8 @@ export const packageNameSchema = z.object({
 
 export const launchAppSchema = z.object({
   appId: z.string().describe("App package ID of the app"),
-  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default true"),
-  clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false")
+  clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false"),
+  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default true")
 });
 
 export const installAppSchema = z.object({
@@ -28,8 +28,8 @@ export interface AppActionArgs {
 
 export interface LaunchAppActionArgs {
   appId: string;
-  coldBoot?: boolean;
   clearAppData?: boolean;
+  coldBoot?: boolean;
 }
 
 export interface InstallAppArgs {
@@ -45,8 +45,8 @@ export function registerAppTools(
       const launchApp = new LaunchApp(deviceId);
       const result = await launchApp.execute(
         args.appId,
-        args.coldBoot || true,
         args.clearAppData || false,
+        args.coldBoot || true,
         undefined
       );
 
