@@ -463,14 +463,14 @@ export class ElementUtils {
    * @param partialMatch - Whether to allow partial ID matching
    * @returns Array of matching elements
    */
-  findElementsByResourceId(
+  findElementByResourceId(
     viewHierarchy: ViewHierarchyResult,
     resourceId: string,
     containerElementId: string | null = null,
     partialMatch: boolean = false
-  ): Element[] {
+  ): Element | null {
     if (!viewHierarchy || !resourceId) {
-      return [];
+      return null;
     }
 
     const rootNodes = this.extractRootNodes(viewHierarchy);
@@ -499,7 +499,7 @@ export class ElementUtils {
 
       if (!containerNode) {
         // Container not found, return empty list
-        return [];
+        return null;
       }
     }
 
@@ -519,7 +519,16 @@ export class ElementUtils {
       });
     }
 
-    return matches;
+    if (matches.length > 0) {
+      matches.sort((a, b) => {
+        const aArea = (a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top);
+        const bArea = (b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top);
+        return aArea - bArea;
+      });
+      return matches[0];
+    }
+
+    return null;
   }
 
   /**

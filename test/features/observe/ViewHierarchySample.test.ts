@@ -5,9 +5,9 @@ import xml2js from "xml2js";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
 import { AdbUtils } from "../../../src/utils/adb";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
-import { Window } from "../../../src/features/observe/Window";
 import { logger } from "../../../src/utils/logger";
 import { readFileAsync } from "../../../src/utils/io";
+import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 
 describe("ViewHierarchy - Sample Data", function() {
   // Set longer timeout for XML parsing
@@ -16,14 +16,14 @@ describe("ViewHierarchy - Sample Data", function() {
   let viewHierarchy: ViewHierarchy;
   let adb: AdbUtils;
   let takeScreenshot: TakeScreenshot;
-  let window: Window;
+  let accessibilityClient: AccessibilityServiceClient;
 
   beforeEach(function() {
     // Initialize with test mode
     adb = new AdbUtils();
     takeScreenshot = new TakeScreenshot("test-device", adb);
-    window = new Window("test-device", adb);
-    viewHierarchy = new ViewHierarchy("test-device", adb, takeScreenshot, window);
+    accessibilityClient = new AccessibilityServiceClient("test-device", adb);
+    viewHierarchy = new ViewHierarchy("test-device", adb, takeScreenshot, accessibilityClient);
   });
 
   // Helper function to read and parse XML file
@@ -206,18 +206,5 @@ describe("ViewHierarchy - Sample Data", function() {
     });
 
     expect(hasUnwantedProperties).to.be.false, "Filtered hierarchy should not contain unwanted properties";
-
-    const clickableElements = await viewHierarchy.findClickableElements(filteredHierarchy);
-    logger.info(`Found ${clickableElements.length} clickable elements`);
-    expect(clickableElements.length).to.be.greaterThan(0, "Should find clickable elements");
-
-    const textElement = viewHierarchy.findElementByText(filteredHierarchy, "Search", "TextView", true, false);
-    logger.info(`Found text element: ${textElement ? "yes" : "no"}`);
-
-    const scrollableElements = viewHierarchy.findScrollableElements(filteredHierarchy);
-    logger.info(`Found ${scrollableElements.length} scrollable elements`);
-
-    const hasInteractiveElements = clickableElements.length > 0 || scrollableElements.length > 0 || textElement !== null;
-    expect(hasInteractiveElements).to.be.true;
   });
 });

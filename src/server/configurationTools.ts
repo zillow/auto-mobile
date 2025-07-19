@@ -15,6 +15,7 @@ export interface DeviceSessionArgs {
 
 export interface TestAuthoringArgs {
   appId: string;
+  description: string;
   persist: "never" | "devicePresent" | "always";
 }
 
@@ -23,7 +24,7 @@ export interface ExplorationArgs {
 }
 
 export interface AppSourceArgs {
-  projectPath: string;
+  sourceDir: string;
   appId: string;
   platform: "android" | "ios";
 }
@@ -34,17 +35,18 @@ const ConfigSchema = z.object({
     deepLinkSkipping: z.boolean()
   }).optional(),
   testAuthoring: z.object({
-    appId: z.string(),
-    persist: z.enum(["exploration", "testAuthoring"]),
+    appId: z.string().describe("App ID to be used for test authoring."),
+    description: z.string().describe("Rough description of the test to be authored."),
+    persist: z.enum(["never", "devicePresent", "always"]).describe("What conditions to stay in test authoring mode. Default devicePresent"),
   }).optional(),
-  deviceId: z.string()
+  deviceId: z.string().describe("Device ID for which these settings will apply.")
 });
 
 // Schema for config tool
 const AppSourceSchema = z.object({
-  projectPath: z.string(),
-  appId: z.string(),
-  platform: z.string(),
+  sourceDir: z.string().describe("App source code directory."),
+  appId: z.string().describe("App ID to persist these settings for."),
+  platform: z.enum(["android", "ios"]).describe("Platform the app is built for."),
 });
 
 export function registerConfigurationTools(): void {
@@ -91,7 +93,7 @@ export function registerConfigurationTools(): void {
         // Update configuration with provided parameters
         await ConfigurationManager.getInstance().setAppSource(
           args.appId,
-          args.projectPath,
+          args.sourceDir,
           args.platform,
           false
         );

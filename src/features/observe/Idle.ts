@@ -381,9 +381,9 @@ export class Idle {
     const isStable = deltas.missedVsyncDelta === 0 &&
       deltas.slowUiThreadDelta === 0 &&
       deltas.frameDeadlineMissedDelta === 0 &&
-      p50Int < 200 &&
-      p90Int < 200 &&
-      p95Int < 400;
+      p50Int < 100 &&
+      p90Int < 100 &&
+      p95Int < 200;
 
     if (isStable) {
       logger.info("[AwaitIdle] UI appears stable (criteria met)");

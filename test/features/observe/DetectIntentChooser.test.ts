@@ -4,7 +4,7 @@ import { DeepLinkManager } from "../../../src/utils/deepLinkManager";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { Window } from "../../../src/features/observe/Window";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
-import {ObserveResult, ViewHierarchyResult} from "../../../src/models";
+import { ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import sinon from "sinon";
 
 describe("DetectIntentChooser", () => {

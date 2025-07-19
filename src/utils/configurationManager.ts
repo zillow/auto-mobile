@@ -158,6 +158,7 @@ export class ConfigurationManager {
         deviceId: args.deviceId,
         testAuthoring: {
           appId: args.testAuthoring.appId,
+          description: args.testAuthoring.description,
           persist: args.testAuthoring.persist
         },
       };

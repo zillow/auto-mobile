@@ -50,15 +50,21 @@ const checkAndRotateLog = async (): Promise<void> => {
         const timestamp = new Date().toISOString().replace(/:/g, "-");
         const backupPath = path.join(logsDir, `server-${timestamp}.log`);
 
-        // Rename current log file to backup
-        await renameAsync(logFilePath, backupPath);
+        // Check if file still exists right before rename to avoid race condition
+        if (fs.existsSync(logFilePath)) {
+          // Rename current log file to backup
+          await renameAsync(logFilePath, backupPath);
+        }
 
-        // Create a new log stream
+        // Always create a new log stream after rotation attempt
         logStream = fs.createWriteStream(logFilePath, { flags: "a" });
       }
     }
   } catch (err) {
-    // If rotation fails, just log to console and continue with existing stream
+    // If rotation fails, ensure we have a valid log stream
+    if (logStream.destroyed || !logStream.writable) {
+      logStream = fs.createWriteStream(logFilePath, { flags: "a" });
+    }
     console.error("Log rotation failed:", err);
   }
 };

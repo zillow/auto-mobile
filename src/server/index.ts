@@ -126,12 +126,15 @@ export const createMcpServer = (): McpServer => {
     // Start test authoring session if enabled and not already active
     if (ConfigurationManager.getInstance().isTestAuthoringEnabled(deviceId) && !testAuthoringManager.isActive()) {
       const deviceConfig = ConfigurationManager.getInstance().getConfigForDevice(deviceId);
-      if (deviceConfig && deviceConfig.testAuthoring && deviceConfig.testAuthoring.appId) {
+      if (deviceConfig && deviceConfig.testAuthoring) {
         const appId = deviceConfig.testAuthoring.appId;
         const appConfig = ConfigurationManager.getInstance().getConfigForApp(appId);
         if (appConfig && appConfig.appId) {
-          await testAuthoringManager.startAuthoringSession(deviceId, appConfig.appId);
-
+          await testAuthoringManager.startAuthoringSession(
+            deviceId,
+            appConfig.appId,
+            deviceConfig.testAuthoring.description
+          );
         }
       }
     }

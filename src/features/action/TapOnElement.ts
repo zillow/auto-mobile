@@ -1,22 +1,23 @@
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { ActionableError, Element, ObserveResult, TapOnElementResult, ViewHierarchyResult } from "../../models";
 import { AdbUtils } from "../../utils/adb";
 import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
 import { logger } from "../../utils/logger";
+import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 
 /**
  * Command to tap on UI element containing specified text
  */
 export class TapOnElement extends BaseVisualChange {
-  private viewHierarchy: ViewHierarchy;
   private elementUtils: ElementUtils;
+  private accessibilityService: AccessibilityServiceClient;
+  private static readonly MAX_ATTEMPTS = 5;
 
   constructor(deviceId: string, adb: AdbUtils | null = null) {
     super(deviceId, adb);
-    this.viewHierarchy = new ViewHierarchy(deviceId, this.adb);
     this.elementUtils = new ElementUtils();
+    this.accessibilityService = new AccessibilityServiceClient(deviceId, this.adb);
   }
 
   /**
@@ -36,7 +37,33 @@ export class TapOnElement extends BaseVisualChange {
     };
   }
 
-  findElementToTap(options: TapOnElementOptions, viewHierarchy: ViewHierarchyResult): Element {
+  async handleElementResult(element: Element | null, options: TapOnElementOptions, attempt: number): Promise<Element> {
+    if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
+      const delayNextAttempt = Math.pow(100, attempt);
+      await new Promise(resolve => setTimeout(resolve, delayNextAttempt));
+      const latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy();
+      if (latestViewHierarchy) {
+        logger.info("Retrying to find element");
+        return await this.findElementToTap(
+          options,
+          latestViewHierarchy,
+          attempt + 1
+        );
+      }
+    }
+
+    if (!element) {
+      if (options.text) {
+        throw new ActionableError(`Element not found with provided text '${options.text}'`);
+      } else {
+        throw new ActionableError(`Element not found with provided elementId '${options.elementId}'`);
+      }
+    }
+
+    return element;
+  }
+
+  async findElementToTap(options: TapOnElementOptions, viewHierarchy: ViewHierarchyResult, attempt: number = 0): Promise<Element> {
     if (options.text) {
       // Find the UI element that contains the text
       const element = this.elementUtils.findElementByText(
@@ -47,24 +74,16 @@ export class TapOnElement extends BaseVisualChange {
         false,
       );
 
-      if (!element) {
-        throw new ActionableError(`Element not found with provided text`);
-      }
-
-      return element;
+      return await this.handleElementResult(element, options, attempt);
     } else if (options.elementId) {
       // Find the UI element that matches the id
-      const elements = this.elementUtils.findElementsByResourceId(
+      const element = this.elementUtils.findElementByResourceId(
         viewHierarchy,
         options.elementId,
         options.containerElementId,
       );
 
-      if (!elements) {
-        throw new ActionableError(`Element not found with provided resourceId`);
-      }
-
-      return elements[0];
+      return await this.handleElementResult(element, options, attempt);
     } else {
       throw new ActionableError(`tapOn requires non-blank text or elementId to interact with`);
     }
@@ -91,7 +110,7 @@ export class TapOnElement extends BaseVisualChange {
             return { success: false, error: "Unable to get view hierarchy, cannot tap on element" };
           }
 
-          const element = this.findElementToTap(options, viewHierarchy);
+          const element = await this.findElementToTap(options, viewHierarchy);
           const tapPoint = this.elementUtils.getElementCenter(element);
 
           if (options.action === "focus") {

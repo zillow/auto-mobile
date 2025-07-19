@@ -172,7 +172,11 @@ export class AwaitIdle {
 
     try {
       while (true) {
-        const timeoutCheck = this.checkUiStabilityTimeout(state.lastNonIdleTime, state.startTime, timeoutMs);
+        const timeoutCheck = this.checkUiStabilityTimeout(
+          state.lastNonIdleTime,
+          state.startTime,
+          timeoutMs,
+        );
 
         logger.info(`[AwaitIdle] Checking stability: ${timeoutCheck.elapsedTime}ms elapsed of ${timeoutMs}ms timeout`);
 

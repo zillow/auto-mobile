@@ -41,7 +41,7 @@ export class TestAuthoringManager {
   /**
    * Start a test authoring session
    */
-  public async startAuthoringSession(deviceId: string, appId: string): Promise<StartTestAuthoringResult> {
+  public async startAuthoringSession(deviceId: string, appId: string, description: string): Promise<StartTestAuthoringResult> {
     try {
       if (this.currentSession?.isActive) {
         logger.warn("Test authoring session is already active");
@@ -58,6 +58,7 @@ export class TestAuthoringManager {
         startTime: new Date(),
         deviceId,
         appId,
+        description,
         toolCalls: [],
         analysis: [],
         isActive: true
@@ -369,7 +370,7 @@ export class TestAuthoringManager {
    */
   private generatePlanName(session: TestAuthoringSession): string {
     const timestamp = session.startTime.toISOString().slice(0, 16).replace(/[:.]/g, "-");
-    const appName = session.appId ? session.appId.split(".").pop() : "unknown-app";
+    const appName = session.appId ? session.appId : "unknown-app";
     return `auto-generated-${appName}-${timestamp}`;
   }
 
@@ -412,12 +413,10 @@ export class TestAuthoringManager {
   private createTestPlanFromSession(session: TestAuthoringSession, planName: string): TestPlan {
     const plan: TestPlan = {
       name: planName,
-      description: `Automatically generated test plan for ${session.appId || "unknown app"}`,
+      description: session.description || `Automatically generated test plan for ${session.appId || "unknown app"}`,
       generated: session.startTime.toISOString(),
       appId: session.appId,
       metadata: {
-        sessionId: session.sessionId,
-        toolCallCount: session.toolCalls.length,
         duration: session.endTime ? session.endTime.getTime() - session.startTime.getTime() : 0
       },
       steps: []
@@ -430,7 +429,6 @@ export class TestAuthoringManager {
         plan.steps.push({
           tool: toolCall.toolName,
           params: toolCall.parameters,
-          description: `${toolCall.toolName} executed at ${toolCall.timestamp.toISOString()}`
         });
       }
     }
@@ -463,10 +461,6 @@ export class TestAuthoringManager {
     if (plan.description) {
       yaml += `description: "${plan.description}"\n`;
     }
-    yaml += `generated: "${plan.generated}"\n`;
-    if (plan.appId) {
-      yaml += `appId: "${plan.appId}"\n`;
-    }
 
     if (plan.metadata) {
       yaml += "metadata:\n";
@@ -478,12 +472,8 @@ export class TestAuthoringManager {
     yaml += "steps:\n";
     for (const step of plan.steps) {
       yaml += `  - tool: "${step.tool}"\n`;
-      yaml += "    params:\n";
       for (const [key, value] of Object.entries(step.params)) {
-        yaml += `      ${key}: ${JSON.stringify(value)}\n`;
-      }
-      if (step.description) {
-        yaml += `    description: "${step.description}"\n`;
+        yaml += `    ${key}: ${JSON.stringify(value)}\n`;
       }
     }
 

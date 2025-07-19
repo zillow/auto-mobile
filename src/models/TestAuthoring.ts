@@ -17,6 +17,7 @@ export interface TestAuthoringSession {
     endTime?: Date;
     deviceId: string;
     appId: string;
+    description: string;
     toolCalls: LoggedToolCall[];
     analysis: ViewHierarchyAnalysis[];
     isActive: boolean;

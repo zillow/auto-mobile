@@ -5,7 +5,8 @@ export interface DeviceConfig {
     deepLinkSkipping: boolean,
   },
   testAuthoring?: {
-    appId?: string
+    appId: string
+    description: string,
     persist: "never" | "devicePresent" | "always"
   },
   activeMode: "exploration" | "testAuthoring";

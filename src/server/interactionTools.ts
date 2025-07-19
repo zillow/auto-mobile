@@ -290,16 +290,12 @@ export function registerInteractionTools() {
         throw new ActionableError("Could not get view hierarchy to find element for swipe.");
       }
 
-      let element = null;
-      const elements = elementUtils.findElementsByResourceId(
+      const element = elementUtils.findElementByResourceId(
         observeResult.viewHierarchy,
         elementId,
         args.containerElementId, // Search within the specific container
         true // partial match
       );
-      if (elements.length > 0) {
-        element = elements[0];
-      }
 
       if (!element) {
         // Provide helpful suggestions
@@ -402,18 +398,18 @@ export function registerInteractionTools() {
     }
 
     // Find the element by resource ID
-    const elements = elementUtils.findElementsByResourceId(
+    const element = elementUtils.findElementByResourceId(
       observeResult.viewHierarchy,
       args.containerElementId,
       args.containerElementId,
       true // partial match
     );
 
-    if (elements.length === 0) {
+    if (!element) {
       throw new ActionableError(`Container element not found with ID: ${args.containerElementId}`);
     }
 
-    const containerElement = elements[0];
+    const containerElement = element;
 
     if (!args.lookFor) {
       const duration = elementUtils.getSwipeDurationFromSpeed(args.speed);
@@ -465,13 +461,12 @@ export function registerInteractionTools() {
             false // case-sensitive
           );
         } else if (args.lookFor.elementId) {
-          const elements = elementUtils.findElementsByResourceId(
+          foundElement = elementUtils.findElementByResourceId(
             lastObservation.viewHierarchy,
             args.lookFor.elementId,
             args.containerElementId, // Search within the specific container
             true // partial match
           );
-          foundElement = elements.length > 0 ? elements[0] : null;
         }
 
         if (foundElement) {
