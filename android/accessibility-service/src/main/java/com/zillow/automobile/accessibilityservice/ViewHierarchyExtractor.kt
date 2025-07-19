@@ -25,7 +25,7 @@ class ViewHierarchyExtractor {
   companion object {
     private const val TAG = "ViewHierarchyExtractor"
     private const val MAX_DEPTH = 100 // Prevent infinite recursion
-    private const val MAX_CHILDREN = 256 // Limit children to prevent memory issues
+    private const val MAX_CHILDREN = 512 // Limit children to prevent memory issues
 
     private val GENERIC_CLASS_NAMES =
         setOf(

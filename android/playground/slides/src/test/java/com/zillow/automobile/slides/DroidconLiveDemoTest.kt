@@ -46,6 +46,13 @@ class DroidconLiveDemoTest {
   }
 
   @Test
+  @AutoMobileTest(plan = "test-plans/zillow-full-feature.yaml")
+  fun `Zillow full feature test`() {
+    // Traditional annotation-based approach
+    // AI assistance disabled for this test
+  }
+
+  @Test
   fun `AutoMobile playground`() {
 
     val result =
