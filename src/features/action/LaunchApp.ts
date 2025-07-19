@@ -88,16 +88,20 @@ export class LaunchApp extends BaseVisualChange {
       }
 
       // Check if app is in foreground
-      const currentAppCmd = `shell "dumpsys window windows | grep '${packageName}'"`;
-      const currentAppOutput = await this.adb.executeCommand(currentAppCmd);
+      let isForeground: boolean;
+      try {
+        const currentAppCmd = `shell "dumpsys window windows | grep '${packageName}'"`;
+        const currentAppOutput = await this.adb.executeCommand(currentAppCmd);
+        // App is in foreground if it's either the top app or an IME target
+        const isTopApp = currentAppOutput.includes(`topApp=ActivityRecord{`) &&
+          currentAppOutput.includes(`${packageName}`);
+        const isImeTarget = currentAppOutput.includes(`imeLayeringTarget`) &&
+          currentAppOutput.includes(`${packageName}`);
 
-      // App is in foreground if it's either the top app or an IME target
-      const isTopApp = currentAppOutput.includes(`topApp=ActivityRecord{`) &&
-        currentAppOutput.includes(`${packageName}`);
-      const isImeTarget = currentAppOutput.includes(`imeLayeringTarget`) &&
-        currentAppOutput.includes(`${packageName}`);
-
-      const isForeground = isTopApp || isImeTarget;
+        isForeground = isTopApp || isImeTarget;
+      } catch (error) {
+        isForeground = false;
+      }
 
       if (isForeground) {
         return {
@@ -129,9 +133,6 @@ export class LaunchApp extends BaseVisualChange {
           // Fallback to default launcher intent
           throw new ActionableError("No launcher activity found");
         }
-
-        // Wait for app to become stable - reduced timeout to prevent client timeouts
-        await this.awaitIdle.waitForUiStability(packageName, 3000);
 
         return {
           success: true,
