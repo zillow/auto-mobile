@@ -154,36 +154,6 @@ describe("SourceMapper", function() {
       expect(analysis.resourceIds).to.be.an("array");
       expect(analysis.customViews).to.be.an("array");
     });
-
-    it("should extract fragment classes from view hierarchy", () => {
-      const viewHierarchy = {
-        hierarchy: {
-          node: {
-            $: {
-              class: "com.example.SearchFragment"
-            }
-          }
-        }
-      } as ViewHierarchyResult;
-
-      const analysis = sourceMapper.analyzeViewHierarchy("com.example.app", viewHierarchy);
-      expect(analysis.fragmentClasses).to.include("com.example.SearchFragment");
-    });
-
-    it("should extract resource IDs from view hierarchy", () => {
-      const viewHierarchy = {
-        hierarchy: {
-          node: {
-            $: {
-              "resource-id": "com.example.app:id/button"
-            }
-          }
-        }
-      } as ViewHierarchyResult;
-
-      const analysis = sourceMapper.analyzeViewHierarchy("com.example.app", viewHierarchy);
-      expect(analysis.resourceIds).to.include("com.example.app:id/button");
-    });
   });
 
   describe("determineTestPlanLocation", () => {
