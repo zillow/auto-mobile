@@ -72,12 +72,16 @@ class AutoMobileRunnerTest {
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
 
     val command = runner.invokeBuildAutoMobileCommand("/path/to/plan.yaml", annotation)
+    val commandStr = command.joinToString(" ")
 
-    assertTrue("Command should contain 'auto-mobile'", command.contains("auto-mobile"))
-    assertTrue("Command should contain 'test'", command.contains("test"))
-    assertTrue("Command should contain 'run'", command.contains("run"))
-    assertTrue("Command should contain plan path", command.contains("/path/to/plan.yaml"))
-    assertFalse("Command should NOT contain 'npx' when disabled", command.contains("npx"))
+    assertTrue(
+        "Command $commandStr should contain 'auto-mobile'", commandStr.contains("auto-mobile"))
+    assertTrue("Command $commandStr should contain 'test'", commandStr.contains("test"))
+    assertTrue("Command $commandStr should contain 'run'", commandStr.contains("run"))
+    assertTrue(
+        "Command $commandStr should contain plan path", commandStr.contains("/path/to/plan.yaml"))
+    assertFalse(
+        "Command $commandStr should NOT contain 'npx' when disabled", commandStr.contains("npx"))
   }
 
   @Test

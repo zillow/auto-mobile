@@ -140,7 +140,7 @@ internal object AutoMobilePlanExecutor {
       planContent: String,
       options: AutoMobilePlanExecutionOptions
   ): List<String> {
-    val command = mutableListOf("npx", "auto-mobile", "--cli")
+    val command = mutableListOf("npx", "auto-mobile@latest", "--cli")
 
     command.add("executePlan")
     command.addAll(listOf("--planContent", planContent))

@@ -168,7 +168,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       planContent: String,
       annotation: AutoMobileTest
   ): List<String> {
-    val command = mutableListOf("npx", "auto-mobile", "--cli")
+    val command = mutableListOf("npx", "auto-mobile@latest", "--cli")
 
     // Read system properties dynamically to allow test configuration
     val debugMode = System.getProperty("automobile.debug", "false").toBoolean()
@@ -251,9 +251,9 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     val useNpx = System.getProperty("automobile.use.npx", "true").toBoolean()
 
     if (useNpx) {
-      command.addAll(listOf("npx", "auto-mobile", "--cli"))
+      command.addAll(listOf("npx", "auto-mobile@latest", "--cli"))
     } else {
-      command.addAll(listOf("auto-mobile", "--cli"))
+      command.addAll(listOf("auto-mobile@latest", "--cli"))
     }
 
     command.addAll(listOf("test", "run", planPath))
