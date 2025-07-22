@@ -232,7 +232,8 @@ export class IdbPython {
    */
   async listApps(): Promise<ExecResult> {
     logger.debug("[iOS] Listing installed apps");
-    return await this.executeCommand("list-apps");
+    const { stdout } = await this.executeCommand("list-apps --json");
+    return JSON.parse(stdout);
   }
 
   /**
@@ -241,7 +242,8 @@ export class IdbPython {
    */
   async installApp(appPath: string): Promise<ExecResult> {
     logger.debug(`[iOS] Installing app from ${appPath}`);
-    return await this.executeCommand(`install "${appPath}"`);
+    const { stdout } = await this.executeCommand(`install "${appPath}" --json`);
+    return JSON.parse(stdout);
   }
 
   /**
@@ -257,7 +259,7 @@ export class IdbPython {
       waitFor?: boolean;
     }
   ): Promise<ExecResult> {
-    let command = `launch ${bundleId}`;
+    let command = `launch ${bundleId} --json`;
 
     if (options?.args) {
       for (const [key, value] of Object.entries(options.args)) {
@@ -274,7 +276,8 @@ export class IdbPython {
     }
 
     logger.debug(`[iOS] Launching app ${bundleId}${options ? " with options" : ""}`);
-    return await this.executeCommand(command);
+    const { stdout } = await this.executeCommand(command);
+    return JSON.parse(stdout);
   }
 
   /**
@@ -283,7 +286,8 @@ export class IdbPython {
    */
   async terminateApp(bundleId: string): Promise<ExecResult> {
     logger.debug(`[iOS] Terminating app ${bundleId}`);
-    return await this.executeCommand(`terminate ${bundleId}`);
+    const { stdout } = await this.executeCommand(`terminate ${bundleId} --json`);
+    return JSON.parse(stdout);
   }
 
   /**
@@ -292,7 +296,8 @@ export class IdbPython {
    */
   async uninstallApp(bundleId: string): Promise<ExecResult> {
     logger.debug(`[iOS] Uninstalling app ${bundleId}`);
-    return await this.executeCommand(`uninstall ${bundleId}`);
+    const { stdout } = await this.executeCommand(`uninstall ${bundleId} --json`);
+    return JSON.parse(stdout);
   }
 
   // ============

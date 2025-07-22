@@ -1,12 +1,15 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { UninstallAppResult } from "../../models/UninstallAppResult";
 import { BootedDevice } from "../../models";
+import { CheckAppStatus } from "./CheckAppStatus";
 
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
+  private device: BootedDevice;
   private adb: AdbUtils;
 
   constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.device = device;
     this.adb = adb || new AdbUtils(device);
   }
 
@@ -26,10 +29,11 @@ export class UninstallApp {
     }
 
     try {
-      // Check if app is installed
-      const isInstalledCmd = `shell pm list packages -f ${packageName} | grep -c ${packageName}`;
-      const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd);
-      const isInstalled = parseInt(isInstalledOutput.trim(), 10) > 0;
+      // Check if app is running and terminate if needed
+      const appStatus = new CheckAppStatus(this.device);
+      const statusResult = await appStatus.execute(packageName);
+      const isRunning = statusResult.success && statusResult.isRunning;
+      const isInstalled = statusResult.success && statusResult.isInstalled;
 
       if (!isInstalled) {
         return {
@@ -39,11 +43,6 @@ export class UninstallApp {
           keepData
         };
       }
-
-      // Check if app is running and terminate if needed
-      const isRunningCmd = `shell ps | grep ${packageName} | grep -v grep | wc -l`;
-      const isRunningOutput = await this.adb.executeCommand(isRunningCmd);
-      const isRunning = parseInt(isRunningOutput.trim(), 10) > 0;
 
       if (isRunning) {
         await this.adb.executeCommand(`shell am force-stop ${packageName}`);
@@ -56,9 +55,9 @@ export class UninstallApp {
       await this.adb.executeCommand(cmd);
 
       // Check if the package is still installed after uninstallation
-      const isStillInstalledCmd = `shell pm list packages -f ${packageName} | grep -c ${packageName}`;
-      const isStillInstalledOutput = await this.adb.executeCommand(isStillInstalledCmd);
-      const isStillInstalled = parseInt(isStillInstalledOutput.trim(), 10) > 0;
+      const postUninstallAppStatus = new CheckAppStatus(this.device);
+      const postUninstallStatusResult = await postUninstallAppStatus.execute(packageName);
+      const isStillInstalled = postUninstallStatusResult.success && postUninstallStatusResult.isInstalled;
 
       if (isStillInstalled) {
         return {
