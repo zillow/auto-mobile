@@ -97,7 +97,7 @@ jobs:
         if: always()
         with:
           check_name: "JUnit Runner Test Report"
-          report_paths: 'junit-runner/build/test-results/**/*.xml'
+          report_paths: '**/build/test-results/**/*.xml'
 
   kotlin-test-author-unit-tests:
     name: "Run Kotlin Test Author Unit Tests"
@@ -121,7 +121,7 @@ jobs:
         if: always()
         with:
           check_name: "Kotlin Test Author Test Report"
-          report_paths: 'kotlin-test-author/build/test-results/**/*.xml'
+          report_paths: '**/build/test-results/**/*.xml'
 
   android-accessibility-service-unit-tests:
     name: "Run Accessibility Service Unit Tests"
