@@ -6,7 +6,7 @@ steps:
     orientation: portrait
     label: Orient device to portrait mode
 
-  - tool: stopApp
+  - tool: terminateApp
     appId: com.zillow.automobile.playground
     label: Stop the AutoMobile playground app
 
@@ -14,18 +14,22 @@ steps:
     url: "automobile://playground/discover"
 
   - tool: tapOn
+    action: "tap"
     text: "Tap"
     label: Make sure we're on the tap screen
 
   - tool: tapOn
+    action: "tap"
     text: "Button"
     label: Tap basic button on Tap screen
 
   - tool: tapOn
+    action: "tap"
     text: "Elevated"
     label: Tap elevated button on Tap screen
 
   - tool: tapOn
+    action: "tap"
     text: "Swipe"
     label: Navigate to Swipe screen
 
@@ -36,12 +40,13 @@ steps:
     label: Perform left swipe gesture
 
   - tool: tapOn
+    action: "tap"
     text: "Media"
     label: Navigate to Media screen
 
   - tool: tapOn
-    x: 504
-    y: 778
+    action: "tap"
+    text: "Video"
     label: Play AutoMobile Promo video
 
   - tool: pressButton
@@ -49,10 +54,12 @@ steps:
     label: Return from video player
 
   - tool: tapOn
+    action: "tap"
     text: "Text"
     label: Navigate to Text screen
 
   - tool: tapOn
+    action: "tap"
     text: "Basic Text Field"
     label: Focus on basic text field
 
@@ -61,6 +68,7 @@ steps:
     label: Enter playful robot message in basic text field
 
   - tool: tapOn
+    action: "tap"
     text: "Email"
     label: Focus on email field
 
@@ -68,6 +76,7 @@ steps:
     text: "robot@example.com"
 
   - tool: tapOn
+    action: "tap"
     text: "Comments"
     label: Focus on multiline comments field
 
@@ -76,10 +85,12 @@ steps:
     label: Enter enthusiastic robot circus message
 
   - tool: tapOn
+    action: "tap"
     text: "Chat"
     label: Navigate to Chat screen
 
   - tool: tapOn
+    action: "tap"
     text: "What do you want to say?"
     label: Focus on chat input field
 
@@ -88,8 +99,8 @@ steps:
     label: Enter robot circus chat message
 
   - tool: tapOn
-    x: 909
-    y: 1706
+    action: "tap"
+    text: "Send"
     label: Send chat message
 
   - tool: inputText
@@ -97,11 +108,11 @@ steps:
     label: Enter robot circus chat message with heart emoji
 
   - tool: tapOn
-    x: 909
-    y: 1706
+    action: "tap"
+    text: "Send"
     label: Send chat message
 
-  - tool: stopApp
+  - tool: terminateApp
     appId: com.zillow.automobile.playground
     label: Stop the AutoMobile playground app
 
