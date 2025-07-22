@@ -12,7 +12,7 @@ The first platform supported is Android with plans to extend to iOS.
 - 🔧 **[Powerful MCP Server](docs/features/mcp-server/index.md)**: AutoMobile provides comprehensive [actions](docs/features/mcp-server/actions.md) through MCP
   tool calls with a fast [observations](docs/features/mcp-server/observation.md) to drive the
   [interaction loop](docs/features/mcp-server/interaction-loop.md).
-- 🗺️ **Source Mappping**: Combining project path config with deep view hierarchy analysis we know exactly what code is being rendered.
+- 🗺️ **Source Mapping**: Combining project path config with deep view hierarchy analysis we know exactly what code is being rendered.
 - ✍️ **[Automated Test Authoring](docs/features/test-authoring/index.md)**: When used in test authoring mode AutoMobile will write tests for you. It is the only way it writes tests.
 - 🧪 **[Test Execution](docs/features/test-execution/index.md)** - Run tests locally or on CI without extra infrastructure.
 - 📱 **Device Management**: Multi-device support with emulator control and app lifecycle management.
