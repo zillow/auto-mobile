@@ -1,12 +1,12 @@
 import { logger } from "../../utils/logger";
-import { ExecResult, ObserveResult } from "../../models";
+import { BootedDevice, ExecResult, ObserveResult } from "../../models";
 import { GetScreenSize } from "./GetScreenSize";
 import { GetSystemInsets } from "./GetSystemInsets";
 import { ViewHierarchy } from "./ViewHierarchy";
 import { Window } from "./Window";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { GetDumpsysWindow } from "./GetDumpsysWindow";
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { DeepLinkManager } from "../../utils/deepLinkManager";
 import fs from "fs-extra";
 import path from "path";
@@ -25,7 +25,7 @@ interface ObserveResultCache {
  * Observe command class that combines screen details, view hierarchy and screenshot
  */
 export class ObserveScreen {
-  private deviceId: string;
+  private device: BootedDevice;
   private screenSize: GetScreenSize;
   private systemInsets: GetSystemInsets;
   private viewHierarchy: ViewHierarchy;
@@ -40,16 +40,16 @@ export class ObserveScreen {
   private static observeResultCacheDir: string = path.join("/tmp/auto-mobile", "observe_results");
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.deviceId = deviceId;
-    this.adb = adb || new AdbUtils(deviceId);
-    this.screenSize = new GetScreenSize(deviceId, this.adb);
-    this.systemInsets = new GetSystemInsets(deviceId, this.adb);
-    this.viewHierarchy = new ViewHierarchy(deviceId, this.adb);
-    this.window = new Window(deviceId, this.adb);
-    this.screenshotUtil = new TakeScreenshot(deviceId, this.adb);
-    this.dumpsysWindow = new GetDumpsysWindow(deviceId, this.adb);
-    this.deepLinkManager = new DeepLinkManager(deviceId);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.device = device;
+    this.adb = adb || new AdbUtils(device);
+    this.screenSize = new GetScreenSize(device, this.adb);
+    this.systemInsets = new GetSystemInsets(device, this.adb);
+    this.viewHierarchy = new ViewHierarchy(device, this.adb);
+    this.window = new Window(device, this.adb);
+    this.screenshotUtil = new TakeScreenshot(device, this.adb);
+    this.dumpsysWindow = new GetDumpsysWindow(device, this.adb);
+    this.deepLinkManager = new DeepLinkManager(device);
 
     // Ensure observe result cache directory exists
     if (!fs.existsSync(ObserveScreen.observeResultCacheDir)) {
@@ -133,7 +133,7 @@ export class ObserveScreen {
       logger.warn("Failed to get view hierarchy:", error);
 
       // Clear cache on failure
-      AccessibilityServiceManager.getInstance(this.deviceId, this.adb).clearAvailabilityCache();
+      AccessibilityServiceManager.getInstance(this.device, this.adb).clearAvailabilityCache();
 
       // Check if the error is due to screen being off
       const errorStr = String(error);

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { describe, it, beforeEach, afterEach } from "mocha";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { ViewHierarchyResult } from "../../../src/models/ViewHierarchyResult";
 import { Window } from "../../../src/features/observe/Window";

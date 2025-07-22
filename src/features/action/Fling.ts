@@ -1,7 +1,8 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { GestureOptions } from "../../models/GestureOptions";
 import { ExecuteGesture } from "./ExecuteGesture";
+import { BootedDevice } from "../../models";
 
 /**
  * Executes a fling gesture with high velocity
@@ -9,9 +10,9 @@ import { ExecuteGesture } from "./ExecuteGesture";
 export class Fling extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
-    this.executeGesture = new ExecuteGesture(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
+    this.executeGesture = new ExecuteGesture(device, adb);
   }
 
   /**

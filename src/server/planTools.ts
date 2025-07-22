@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
-import { ExecutePlanResult } from "../models";
+import { BootedDevice, ExecutePlanResult } from "../models";
 import { importPlanFromYaml, executePlan } from "../utils/planUtils";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { Platform } from "../utils/deviceSessionManager";
+import { Platform } from "../models";
 
 // Execute plan tool schema
 const executePlanSchema = z.object({
@@ -14,7 +14,7 @@ const executePlanSchema = z.object({
 });
 
 // Execute plan from YAML file or content
-const executePlanTool = async (deviceId: string, platform: Platform, params: {
+const executePlanTool = async (device: BootedDevice, params: {
   planContent: string;
   startStep: number;
   platform: Platform
@@ -29,7 +29,7 @@ const executePlanTool = async (deviceId: string, platform: Platform, params: {
     const plan = importPlanFromYaml(yamlContent);
     logger.info("=== Plan parsed successfully ===");
 
-    logger.info(`Executing plan '${plan.name}' with ${plan.steps.length} steps on ${platform} platform`);
+    logger.info(`Executing plan '${plan.name}' with ${plan.steps.length} steps on ${device.platform} platform`);
 
     // Execute the plan
     logger.info("=== Starting plan execution ===");
@@ -42,7 +42,7 @@ const executePlanTool = async (deviceId: string, platform: Platform, params: {
       totalSteps: result.totalSteps,
       failedStep: result.failedStep,
       error: result.failedStep ? result.failedStep.error : undefined,
-      platform: platform
+      platform: device.platform
     };
 
     logger.info("=== Creating JSON response ===");
@@ -56,7 +56,7 @@ const executePlanTool = async (deviceId: string, platform: Platform, params: {
       executedSteps: 0,
       totalSteps: 0,
       error: `${error}`,
-      platform: platform
+      platform: device.platform
     };
     const jsonResponse = createJSONToolResponse(response);
     logger.info("=== Returning error from executePlanTool ===");

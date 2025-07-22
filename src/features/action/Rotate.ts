@@ -1,15 +1,15 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { RotateResult } from "../../models";
+import { BootedDevice, RotateResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { ProgressCallback } from "./BaseVisualChange";
 
 export class Rotate extends BaseVisualChange {
   constructor(
-    deviceId: string,
+    device: BootedDevice,
     adb: AdbUtils | null = null
   ) {
-    super(deviceId, adb);
+    super(device, adb);
   }
 
   /**

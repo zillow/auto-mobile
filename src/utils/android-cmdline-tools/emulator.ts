@@ -1,7 +1,7 @@
 import { ChildProcess, exec, spawn } from "child_process";
 import { promisify } from "util";
-import { logger } from "./logger";
-import { ExecResult, EmulatorInfo } from "../models";
+import { logger } from "../logger";
+import { BootedDevice, DeviceInfo, ExecResult } from "../../models";
 import { AdbUtils } from "./adb";
 
 const execAsync = async (command: string): Promise<ExecResult> => {
@@ -26,7 +26,7 @@ const execAsync = async (command: string): Promise<ExecResult> => {
   return enhancedResult;
 };
 
-export class EmulatorUtils {
+export class AndroidEmulator {
   private execAsync: (command: string) => Promise<ExecResult>;
   private spawnFn: typeof spawn;
   private emulatorPath: string;
@@ -92,13 +92,14 @@ export class EmulatorUtils {
    * List all available AVDs
    * @returns Promise with array of AVD names
    */
-  async listAvds(): Promise<string[]> {
+  async listAvds(): Promise<DeviceInfo[]> {
     try {
       const result = await this.executeCommand("-list-avds");
       return result.stdout
         .split("\n")
         .map(line => line.trim())
-        .filter(line => line.length > 0);
+        .filter(line => line.length > 0)
+        .map(name => ({ name, platform: "android", isRunning: false, source: "local" } as DeviceInfo));
     } catch (error) {
       logger.error("Failed to list AVDs:", error);
       throw new Error(`Failed to list AVDs: ${error}`);
@@ -111,7 +112,7 @@ export class EmulatorUtils {
    * @returns Promise with boolean indicating if the AVD is running
    */
   async isAvdRunning(avdName: string): Promise<boolean> {
-    const runningEmulators = await this.getRunningEmulators();
+    const runningEmulators = await this.getBootedEmulators();
     return runningEmulators.some(emulator => emulator.name === avdName);
   }
 
@@ -119,19 +120,20 @@ export class EmulatorUtils {
    * Check if any emulator is currently running
    * @returns Promise with array of running emulator info
    */
-  async getRunningEmulators(): Promise<EmulatorInfo[]> {
+  async getBootedEmulators(): Promise<BootedDevice[]> {
     try {
       const adb = new AdbUtils();
-      const devices = await adb.getDevices();
-      const runningEmulators: EmulatorInfo[] = [];
+      const devices = await adb.getBootedEmulators();
+      const runningEmulators: BootedDevice[] = [];
 
       // Add local emulator devices
-      const emulatorDevices = devices.filter(device => device.startsWith("emulator-"));
+      const emulatorDevices = devices.filter(device => device.name.startsWith("emulator-"));
 
-      for (const deviceId of emulatorDevices) {
+      for (const device of emulatorDevices) {
+        const deviceId = device.deviceId;
         try {
           // Try to get the AVD name from the running emulator
-          const adbWithDevice = new AdbUtils(deviceId);
+          const adbWithDevice = new AdbUtils(device);
           const result = await adbWithDevice.executeCommand("emu avd name");
           const avdName = result.stdout.trim().replace(/\r?\n.*$/, ""); // Remove any trailing newlines and additional text
 
@@ -139,7 +141,7 @@ export class EmulatorUtils {
 
           runningEmulators.push({
             name: avdName || `Unknown (${deviceId})`,
-            isRunning: true,
+            platform: "android",
             deviceId: deviceId,
             source: "local"
           });
@@ -148,7 +150,7 @@ export class EmulatorUtils {
           logger.info(`Failed to get AVD name for ${deviceId}: ${error}`);
           runningEmulators.push({
             name: `Unknown (${deviceId})`,
-            isRunning: true,
+            platform: "android",
             deviceId: deviceId,
             source: "local"
           });
@@ -165,76 +167,64 @@ export class EmulatorUtils {
   /**
    * Start an emulator with the specified AVD
    * @param avdName - The AVD name to start
-   * @param additionalArgs - Additional arguments to pass to the emulator
    * @returns Promise with the spawned child process
    */
   async startEmulator(
     avdName: string,
-    additionalArgs: string[] = []
   ): Promise<ChildProcess> {
-    try {
-      logger.info(`Using local emulator for AVD: ${avdName}`);
+    logger.info(`Using local emulator for AVD: ${avdName}`);
 
-      // Check if the AVD exists
-      const availableAvds = await this.listAvds();
-      if (!availableAvds.includes(avdName)) {
-        throw new Error(`AVD '${avdName}' not found. Available AVDs: ${availableAvds.join(", ")}`);
-      }
-
-      // Check if already running
-      if (await this.isAvdRunning(avdName)) {
-        throw new Error(`AVD '${avdName}' is already running`);
-      }
-
-      const args = ["-avd", avdName, ...additionalArgs];
-      logger.info(`Starting emulator with AVD: ${avdName}`);
-      logger.debug(`Emulator command: ${this.emulatorPath} ${args.join(" ")}`);
-
-      const child = this.spawnFn(this.emulatorPath, args);
-
-      // Log emulator output for debugging
-      child.stdout?.on("data", data => {
-        logger.debug(`Emulator stdout: ${data}`);
-      });
-
-      child.stderr?.on("data", data => {
-        logger.debug(`Emulator stderr: ${data}`);
-      });
-
-      child.on("exit", code => {
-        logger.info(`Emulator process exited with code: ${code}`);
-      });
-
-      return child;
-    } catch (error) {
-      logger.error("Failed to start emulator:", error);
-      throw error;
+    // Check if the AVD exists
+    const availableAvds = await this.listAvds();
+    if (!availableAvds.find(emu => emu.name === avdName)) {
+      throw new Error(`AVD '${avdName}' not found. Available AVDs: ${availableAvds.join(", ")}`);
     }
+
+    // Check if already running
+    if (await this.isAvdRunning(avdName)) {
+      throw new Error(`AVD '${avdName}' is already running`);
+    }
+
+    const args = ["-avd", avdName];
+    logger.info(`Starting emulator with AVD: ${avdName}`);
+    logger.debug(`Emulator command: ${this.emulatorPath} ${args.join(" ")}`);
+
+    const child = this.spawnFn(this.emulatorPath, args);
+
+    // Log emulator output for debugging
+    child.stdout?.on("data", data => {
+      logger.debug(`Emulator stdout: ${data}`);
+    });
+
+    child.stderr?.on("data", data => {
+      logger.debug(`Emulator stderr: ${data}`);
+    });
+
+    child.on("exit", code => {
+      logger.info(`Emulator process exited with code: ${code}`);
+    });
+
+    return child;
   }
 
   /**
    * Kill a running emulator
-   * @param avdName - The AVD name to kill
+   * @param device - The device to kill
    * @returns Promise that resolves when emulator is stopped
    */
-  async killEmulator(avdName: string): Promise<void> {
-    try {
-      const runningEmulators = await this.getRunningEmulators();
-      const emulator = runningEmulators.find(emu => emu.name === avdName);
+  async killEmulator(device: BootedDevice): Promise<void> {
+    const runningEmulators = await this.getBootedEmulators();
+    const emulator = runningEmulators.find(emu => emu.deviceId === device.deviceId);
 
-      if (!emulator || !emulator.deviceId) {
-        throw new Error(`Emulator '${avdName}' is not running`);
-      }
-
-      // Use ADB to stop the emulator
-      const adb = new AdbUtils(emulator.deviceId);
-      await adb.executeCommand("emu kill");
-
-      logger.info(`Killed emulator '${avdName}'`);
-    } catch (error) {
-      logger.error("Failed to kill emulator:", error);
-      throw error;
+    if (!emulator || !emulator.deviceId) {
+      throw new Error(`Emulator '${device.name}' is not running`);
     }
+
+    // Use ADB to stop the emulator
+    const adb = new AdbUtils(emulator);
+    await adb.executeCommand("emu kill");
+
+    logger.info(`Killed emulator '${device.name}'`);
   }
 
   /**
@@ -243,7 +233,7 @@ export class EmulatorUtils {
    * @param timeoutMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
    * @returns Promise that resolves with device ID when emulator is ready
    */
-  async waitForEmulatorReady(avdName: string, timeoutMs: number = 120000): Promise<string> {
+  async waitForEmulatorReady(avdName: string, timeoutMs: number = 120000): Promise<BootedDevice> {
     const startTime = Date.now();
 
     // Read polling interval from environment variable (default: 0 = continuous polling)
@@ -253,16 +243,15 @@ export class EmulatorUtils {
     // Start background polling immediately with configurable intervals
     let pollingActive = true;
     let foundDeviceId: string | null = null;
-    const readinessError: Error | null = null;
 
     const backgroundPoller = async () => {
-      while (pollingActive && !foundDeviceId && !readinessError) {
+      while (pollingActive && !foundDeviceId) {
         try {
           logger.info(`Background polling iteration - checking for emulator '${avdName}'...`);
 
           // For local emulators, check for running devices
           logger.info(`Checking for running local emulators...`);
-          const runningEmulators = await this.getRunningEmulators();
+          const runningEmulators = await this.getBootedEmulators();
           logger.info(`Device scan complete - found ${runningEmulators.length} running emulators`);
 
           if (runningEmulators.length > 0) {
@@ -288,7 +277,7 @@ export class EmulatorUtils {
               // Check if the device is online and ready
               // Run device state and package manager checks in parallel for faster detection
               logger.info(`[PARALLEL] Running device state and package manager checks for ${emulator.deviceId}...`);
-              const adb = new AdbUtils(emulator.deviceId);
+              const adb = new AdbUtils(emulator);
               try {
                 const [deviceStateResult, packageManagerResult] = await Promise.allSettled([
                   adb.executeCommand("get-state"),
@@ -333,11 +322,11 @@ export class EmulatorUtils {
           logger.info(`Background polling cycle complete - sleeping ${pollingIntervalMs}ms before next check`);
           await this.sleep(pollingIntervalMs);
         } else {
-          // Continuous polling - just yield to event loop briefly to prevent blocking
+          // Continuous polling - just yield to the event loop briefly to prevent blocking
           await new Promise(resolve => setImmediate(resolve));
         }
       }
-      logger.info(`Background polling stopped - pollingActive: ${pollingActive}, foundDeviceId: ${foundDeviceId}, readinessError: ${readinessError}`);
+      logger.info(`Background polling stopped - pollingActive: ${pollingActive}, foundDeviceId: ${foundDeviceId}`);
     };
 
     // Start background polling immediately
@@ -348,12 +337,7 @@ export class EmulatorUtils {
       if (foundDeviceId) {
         pollingActive = false;
         logger.info(`Emulator '${avdName}' is ready! Device ID: ${foundDeviceId}`);
-        return foundDeviceId;
-      }
-
-      if (readinessError) {
-        pollingActive = false;
-        throw readinessError;
+        return { name: avdName, platform: "android", deviceId: foundDeviceId } as BootedDevice;
       }
 
       // Check less frequently in main loop since background polling is doing the work
@@ -366,7 +350,7 @@ export class EmulatorUtils {
 
     if (foundDeviceId) {
       logger.info(`Emulator '${avdName}' is ready! Device ID: ${foundDeviceId}`);
-      return foundDeviceId;
+      return { name: avdName, platform: "android", deviceId: foundDeviceId } as BootedDevice;
     }
 
     throw new Error(`Emulator '${avdName}' failed to become ready within ${timeoutMs}ms`);

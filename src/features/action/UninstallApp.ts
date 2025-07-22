@@ -1,12 +1,13 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { UninstallAppResult } from "../../models/UninstallAppResult";
+import { BootedDevice } from "../../models";
 
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
   private adb: AdbUtils;
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(deviceId);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.adb = adb || new AdbUtils(device);
   }
 
   async execute(

@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ListInstalledApps } from "../../../src/features/observe/ListInstalledApps";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { ExecResult } from "../../../src/models/ExecResult";
 
 describe("ListInstalledApps", function() {

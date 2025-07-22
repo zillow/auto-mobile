@@ -1,18 +1,24 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { GetScreenSize } from "../../../src/features/observe/GetScreenSize";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
+import { BootedDevice } from "../../../src/models";
+import { DeviceUtils } from "../../../src/utils/deviceUtils";
 
 describe("GetScreenSize", function() {
   describe("Unit Tests for Extracted Methods", function() {
     let getScreenSize: GetScreenSize;
     let mockAdb: AdbUtils;
+    let mockDevice: BootedDevice;
 
     beforeEach(function() {
       mockAdb = {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
-      getScreenSize = new GetScreenSize(null, mockAdb);
+      mockDevice = {
+        deviceId: "test-device"
+      } as BootedDevice;
+      getScreenSize = new GetScreenSize(mockDevice, mockAdb);
     });
 
     it("should parse physical dimensions correctly", function() {
@@ -125,21 +131,24 @@ describe("GetScreenSize", function() {
 
     let getScreenSize: GetScreenSize;
     let adb: AdbUtils;
+    let device: BootedDevice;
 
     beforeEach(async function() {
       adb = new AdbUtils();
-      getScreenSize = new GetScreenSize("test-device", adb);
+      const deviceUtils = new DeviceUtils();
 
       // Check if any devices are connected
       try {
-        const devices = await adb.executeCommand("devices");
-        const deviceLines = devices.stdout.split("\n").filter(line => line.trim() && !line.includes("List of devices"));
-        if (deviceLines.length === 0) {
+        const devices = await deviceUtils.getBootedDevices("android");
+        if (devices.length === 0) {
           this.skip(); // Skip tests if no devices are connected
           return;
         }
+        // Use the first available device
+        device = devices[0];
+        getScreenSize = new GetScreenSize(device, adb);
       } catch (error) {
-        this.skip(); // Skip tests if ADB command fails
+        this.skip(); // Skip tests if getting devices fails
         return;
       }
     });

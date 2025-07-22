@@ -3,50 +3,43 @@ import { ToolRegistry } from "./toolRegistry";
 import { GetDeepLinks } from "../features/utility/GetDeepLinks";
 import { DetectIntentChooser } from "../features/observe/DetectIntentChooser";
 import { HandleIntentChooser } from "../features/action/HandleIntentChooser";
-import { ActionableError } from "../models";
+import { ActionableError, BootedDevice } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
-import { Platform } from "../utils/deviceSessionManager";
 
 // Schema definitions for tool arguments
 export const getDeepLinksSchema = z.object({
   appId: z.string().describe("Android app package ID to query for deep links"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const detectIntentChooserSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const handleIntentChooserSchema = z.object({
   preference: z.enum(["always", "just_once", "custom"]).optional().describe("Preference for handling intent chooser (default: 'just_once')"),
   customAppPackage: z.string().optional().describe("Specific app package to select when preference is 'custom'"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 // Type definitions for better TypeScript support
 export interface GetDeepLinksArgs {
     appId: string;
-  platform: "android" | "ios";
 }
 
 export interface DetectIntentChooserArgs {
-    platform: "android" | "ios";
 }
 
 export interface HandleIntentChooserArgs {
     preference?: "always" | "just_once" | "custom";
     customAppPackage?: string;
-    platform: "android" | "ios";
 }
 
 // Register tools
 export function registerDeepLinkTools() {
 
   // Get deep links handler
-  const getDeepLinksHandler = async (deviceId: string, platform: Platform, args: GetDeepLinksArgs) => {
+  const getDeepLinksHandler = async (device: BootedDevice, args: GetDeepLinksArgs) => {
     try {
-      const getDeepLinks = new GetDeepLinks(deviceId);
+      const getDeepLinks = new GetDeepLinks(device);
       const result = await getDeepLinks.execute(args.appId);
 
       return createJSONToolResponse({
@@ -67,9 +60,9 @@ export function registerDeepLinkTools() {
   };
 
   // Detect intent chooser handler
-  const detectIntentChooserHandler = async (deviceId: string, platform: Platform, args: DetectIntentChooserArgs) => {
+  const detectIntentChooserHandler = async (device: BootedDevice, args: DetectIntentChooserArgs) => {
     try {
-      const detectIntentChooser = new DetectIntentChooser(deviceId);
+      const detectIntentChooser = new DetectIntentChooser(device);
       const result = await detectIntentChooser.execute();
 
       return createJSONToolResponse({
@@ -86,9 +79,9 @@ export function registerDeepLinkTools() {
   };
 
   // Handle intent chooser handler
-  const handleIntentChooserHandler = async (deviceId: string, platform: Platform, args: HandleIntentChooserArgs) => {
+  const handleIntentChooserHandler = async (device: BootedDevice, args: HandleIntentChooserArgs) => {
     try {
-      const handleIntentChooser = new HandleIntentChooser(deviceId);
+      const handleIntentChooser = new HandleIntentChooser(device);
       const result = await handleIntentChooser.execute(
         args.preference || "just_once",
         args.customAppPackage,

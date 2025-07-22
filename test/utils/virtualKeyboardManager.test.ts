@@ -1,6 +1,6 @@
 import { assert } from "chai";
 import { VirtualKeyboardManager } from "../../src/utils/virtualKeyboardManager";
-import { AdbUtils } from "../../src/utils/adb";
+import { AdbUtils } from "../../src/utils/android-cmdline-tools/adb";
 import { ExecResult } from "../../src/models/ExecResult";
 import sinon from "sinon";
 

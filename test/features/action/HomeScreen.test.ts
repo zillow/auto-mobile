@@ -1,6 +1,6 @@
 import { assert } from "chai";
 import { HomeScreen } from "../../../src/features/action/HomeScreen";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { Window } from "../../../src/features/observe/Window";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";

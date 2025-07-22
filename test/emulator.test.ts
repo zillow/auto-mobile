@@ -1,5 +1,5 @@
 // import { expect } from "chai";
-// import { EmulatorUtils } from "../src/utils/emulator";
+// import { EmulatorUtils } from "../src/utils/deviceUtils";
 //
 // describe("EmulatorUtils", function() {
 //   let emulatorUtils: EmulatorUtils;
@@ -12,9 +12,9 @@
 //     testAvdName = "Medium_Phone_API_35"; // Use the known test AVD
 //   });
 //
-//   describe("listAvds", () => {
+//   describe("listDeviceImages", () => {
 //     it("should list available AVDs", async () => {
-//       const avds = await emulatorUtils.listAvds();
+//       const avds = await emulatorUtils.listDeviceImages();
 //       expect(avds).to.be.an("array");
 //       // We know there's at least one AVD from our earlier testing
 //       expect(avds.length).to.be.greaterThan(0);
@@ -60,10 +60,10 @@
 //     });
 //   });
 //
-//   describe("startEmulator", () => {
+//   describe("startDevice", () => {
 //     it("should fail to start non-existent AVD", async () => {
 //       try {
-//         await emulatorUtils.startEmulator("NonExistentAVD");
+//         await emulatorUtils.startDevice("NonExistentAVD");
 //         expect.fail("Should have thrown an error for non-existent AVD");
 //       } catch (error) {
 //         expect(error).to.be.an("error");
@@ -78,7 +78,7 @@
 //       if (runningEmulators.length > 0) {
 //         const runningAvd = runningEmulators[0].name;
 //         try {
-//           await emulatorUtils.startEmulator(runningAvd);
+//           await emulatorUtils.startDevice(runningAvd);
 //           expect.fail("Should have thrown an error for already running AVD");
 //         } catch (error) {
 //           expect(error).to.be.an("error");
@@ -99,7 +99,7 @@
 //         return;
 //       }
 //
-//       const childProcess = await emulatorUtils.startEmulator(testAvdName);
+//       const childProcess = await emulatorUtils.startDevice(testAvdName);
 //       expect(childProcess).to.exist;
 //       expect(childProcess.pid).to.be.a("number");
 //
@@ -123,8 +123,8 @@
 //
 //       if (!isRunning) {
 //         // Start the emulator and wait for it to be ready
-//         await emulatorUtils.startEmulator(testAvdName);
-//         await emulatorUtils.waitForEmulatorReady(testAvdName);
+//         await emulatorUtils.startDevice(testAvdName);
+//         await emulatorUtils.waitForDeviceReady(testAvdName);
 //       }
 //
 //       await emulatorUtils.killEmulator(testAvdName);
@@ -136,10 +136,10 @@
 //     });
 //   });
 //
-//   describe("waitForEmulatorReady", () => {
+//   describe("waitForDeviceReady", () => {
 //     it("should timeout when waiting for non-existent emulator", async () => {
 //       try {
-//         await emulatorUtils.waitForEmulatorReady("NonExistentAVD", 5000); // 5 second timeout
+//         await emulatorUtils.waitForDeviceReady("NonExistentAVD", 5000); // 5 second timeout
 //         expect.fail("Should have thrown a timeout error");
 //       } catch (error) {
 //         expect(error).to.be.an("error");
@@ -155,7 +155,7 @@
 //         const runningAvd = runningEmulators[0];
 //
 //         // Should immediately return the device ID since it's already ready
-//         const deviceId = await emulatorUtils.waitForEmulatorReady(runningAvd.name, 10000);
+//         const deviceId = await emulatorUtils.waitForDeviceReady(runningAvd.name, 10000);
 //         expect(deviceId).to.be.a("string");
 //         expect(deviceId).to.equal(runningAvd.deviceId);
 //       } else {

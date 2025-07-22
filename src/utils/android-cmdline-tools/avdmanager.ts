@@ -270,7 +270,7 @@ export async function installSystemImage(packageName: string, acceptLicense = tr
 /**
  * List available AVDs
  */
-export async function listAvds(dependencies = createDefaultDependencies()): Promise<AvdInfo[]> {
+export async function listDeviceImages(dependencies = createDefaultDependencies()): Promise<AvdInfo[]> {
   try {
     const location = await ensureToolsAvailable(dependencies);
     const avdmanagerPath = getAvdManagerPath(location, dependencies);

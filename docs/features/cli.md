@@ -17,7 +17,7 @@ Examples:
 auto-mobile --cli listDevices
 auto-mobile --cli observe
 auto-mobile --cli tapOn --text "Submit"
-auto-mobile --cli startEmulator --avdName "pixel_7_api_34"
+auto-mobile --cli startDevice --avdName "pixel_7_api_34"
 
 Options:
 help [tool-name]    Show help for a specific tool
@@ -69,9 +69,9 @@ setActiveDevice           - Set the active device ID for subsequent operations
 enableDemoMode            - Enable demo mode with consistent status bar indicators for screenshots
 disableDemoMode           - Disable demo mode and return to normal status bar behavior
 listDevices               - List all connected devices (both physical devices and emulators)
-listAvds                  - List all available Android Virtual Devices (AVDs)
+listDeviceImages                  - List all available Android Virtual Devices (AVDs)
 checkRunningEmulators     - Check which emulators are currently running
-startEmulator             - Start an Android emulator with the specified AVD
+startDevice             - Start an Android emulator with the specified AVD
 killEmulator              - Kill a running Android emulator
 
 Source Mapping:

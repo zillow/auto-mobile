@@ -1,10 +1,11 @@
 import { EventEmitter } from "events";
-import { AdbUtils } from "./adb";
+import { AdbUtils } from "./android-cmdline-tools/adb";
 import { logger } from "./logger";
+import { BootedDevice } from "../models";
 
 export interface AppLifecycleEvent {
     type: "launch" | "terminate" | "background" | "foreground" | "crash";
-    deviceId: string;
+    device: BootedDevice;
     appId: string;
     timestamp: Date;
     previousApp?: string;
@@ -34,19 +35,19 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Add a package to track for lifecycle events
    */
-  public async trackPackage(deviceId: string, packageName: string) {
+  public async trackPackage(device: BootedDevice, packageName: string) {
     this.trackedPackages.add(packageName);
-    await this.checkForChanges(deviceId);
+    await this.checkForChanges(device);
     logger.info(`Now tracking package: ${packageName}`);
   }
 
   /**
    * Remove a package from tracking
    */
-  public async untrackPackage(deviceId: string, packageName: string) {
+  public async untrackPackage(device: BootedDevice, packageName: string) {
     this.trackedPackages.delete(packageName);
     this.runningPackages.delete(packageName);
-    await this.checkForChanges(deviceId);
+    await this.checkForChanges(device);
     logger.info(`Stopped tracking package: ${packageName}`);
   }
 
@@ -60,9 +61,9 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Check if a specific package is currently running
    */
-  public async isPackageRunning(deviceId: string, packageName: string): Promise<boolean> {
+  public async isPackageRunning(device: BootedDevice, packageName: string): Promise<boolean> {
     try {
-      const adbUtils = new AdbUtils(deviceId);
+      const adbUtils = new AdbUtils(device);
       const result = await adbUtils.executeCommand(`shell pidof ${packageName}`);
 
       // pidof returns empty stdout if package is not running
@@ -96,22 +97,22 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Poll for app state changes
    */
-  public async checkForChanges(deviceId: string): Promise<void> {
+  public async checkForChanges(device: BootedDevice): Promise<void> {
 
     const previousRunning = new Set(this.runningPackages);
-    await this.updateRunningPackages(deviceId);
+    await this.updateRunningPackages(device);
 
     // Check for newly launched packages
     for (const packageName of this.runningPackages) {
       if (!previousRunning.has(packageName)) {
-        await this.handlePackageLaunched(deviceId, packageName);
+        await this.handlePackageLaunched(device, packageName);
       }
     }
 
     // Check for terminated packages
     for (const packageName of previousRunning) {
       if (!this.runningPackages.has(packageName)) {
-        await this.handlePackageTerminated(deviceId, packageName);
+        await this.handlePackageTerminated(device, packageName);
       }
     }
   }
@@ -119,9 +120,9 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Update the set of currently running tracked packages
    */
-  private async updateRunningPackages(deviceId: string) {
+  private async updateRunningPackages(device: BootedDevice) {
     for (const packageName of this.trackedPackages) {
-      if (await this.isPackageRunning(deviceId, packageName)) {
+      if (await this.isPackageRunning(device, packageName)) {
         this.runningPackages.add(packageName);
       } else {
         this.runningPackages.delete(packageName);
@@ -132,10 +133,10 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Handle package launch event
    */
-  private async handlePackageLaunched(deviceId: string, packageName: string): Promise<void> {
+  private async handlePackageLaunched(device: BootedDevice, packageName: string): Promise<void> {
     const event: AppLifecycleEvent = {
       type: "launch",
-      deviceId: deviceId,
+      device: device,
       appId: packageName,
       timestamp: new Date(),
       metadata: {
@@ -150,10 +151,10 @@ export class AppLifecycleMonitor extends EventEmitter {
   /**
    * Handle package termination event
    */
-  private async handlePackageTerminated(deviceId: string, packageName: string): Promise<void> {
+  private async handlePackageTerminated(device: BootedDevice, packageName: string): Promise<void> {
     const event: AppLifecycleEvent = {
       type: "terminate",
-      deviceId: deviceId,
+      device: device,
       appId: packageName,
       timestamp: new Date(),
       metadata: {

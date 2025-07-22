@@ -8,9 +8,9 @@ import { ActionableError } from "../models";
 
 // Tools that should be omitted from plans
 const OMITTED_TOOLS = new Set([
-  "startEmulator",
+  "startDevice",
   "killEmulator",
-  "listAvds",
+  "listDeviceImages",
   "checkRunningEmulators",
   "listDevices",
   "setActiveDevice"

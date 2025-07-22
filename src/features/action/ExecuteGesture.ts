@@ -1,5 +1,5 @@
-import { AdbUtils } from "../../utils/adb";
-import { Point } from "../../models";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { BootedDevice, Point } from "../../models";
 import { FingerPath } from "../../models";
 import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
@@ -9,8 +9,8 @@ import { SwipeResult } from "../../models";
  * Executes gestures using adb input commands (no sendevent)
  */
 export class ExecuteGesture extends BaseVisualChange {
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
   }
 
   /**

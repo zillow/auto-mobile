@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { DeepLinkManager } from "../../src/utils/deepLinkManager";
-import { AdbUtils } from "../../src/utils/adb";
+import { AdbUtils } from "../../src/utils/android-cmdline-tools/adb";
 import { ElementUtils } from "../../src/features/utility/ElementUtils";
 import { ExecResult, ViewHierarchyResult } from "../../src/models";
 

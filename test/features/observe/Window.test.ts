@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { Window } from "../../../src/features/observe/Window";
 import sinon from "sinon";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { ExecResult } from "../../../src/models/ExecResult";
 import fs from "fs";
 import path from "path";

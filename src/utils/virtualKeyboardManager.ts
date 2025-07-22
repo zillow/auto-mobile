@@ -1,9 +1,10 @@
-import { AdbUtils } from "./adb";
+import { AdbUtils } from "./android-cmdline-tools/adb";
 import { logger } from "./logger";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { BootedDevice } from "../models";
 
 const execAsync = promisify(exec);
 
@@ -13,8 +14,8 @@ export class VirtualKeyboardManager {
   private static readonly ADB_KEYBOARD_PACKAGE = "com.android.adbkeyboard";
   private static readonly APK_URL = "https://github.com/senzhk/ADBKeyBoard/blob/8dd0b6924e45ac5565f77f13cf8e8eaf47dbb1b0/ADBKeyboard.apk";
 
-  constructor(deviceId: string | null = null) {
-    this.adb = new AdbUtils(deviceId);
+  constructor(device: BootedDevice | null = null) {
+    this.adb = new AdbUtils(device);
   }
 
   /**

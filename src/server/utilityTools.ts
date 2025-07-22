@@ -4,7 +4,8 @@ import { ActionableError } from "../models/ActionableError";
 import { DemoMode } from "../features/utility/DemoMode";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { DeviceSessionManager, Platform } from "../utils/deviceSessionManager";
+import { DeviceSessionManager } from "../utils/deviceSessionManager";
+import { BootedDevice, Platform } from "../models";
 
 // Schema definitions
 export const enableDemoModeSchema = z.object({
@@ -47,9 +48,9 @@ export interface SetActiveDeviceArgs {
 // Register tools
 export function registerUtilityTools() {
   // Enable demo mode handler
-  const enableDemoModeHandler = async (deviceId: string, platform: Platform, args: EnableDemoModeArgs) => {
+  const enableDemoModeHandler = async (device: BootedDevice, args: EnableDemoModeArgs) => {
     try {
-      const demoMode = new DemoMode(deviceId);
+      const demoMode = new DemoMode(device);
       const result = await demoMode.execute(args);
 
       return createJSONToolResponse({
@@ -65,9 +66,9 @@ export function registerUtilityTools() {
   };
 
   // Disable demo mode handler
-  const disableDemoModeHandler = async (deviceId: string, platform: Platform) => {
+  const disableDemoModeHandler = async (device: BootedDevice) => {
     try {
-      const demoMode = new DemoMode(deviceId);
+      const demoMode = new DemoMode(device);
       const result = await demoMode.exitDemoMode();
 
       return createJSONToolResponse({

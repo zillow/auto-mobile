@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { describe, it, beforeEach, afterEach } from "mocha";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { ObserveResult } from "../../../src/models/ObserveResult";
 import { logger } from "../../../src/utils/logger";

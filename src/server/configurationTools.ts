@@ -4,7 +4,7 @@ import { ConfigurationManager } from "../utils/configurationManager";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
-import { Platform } from "../utils/deviceSessionManager";
+import { BootedDevice } from "../models";
 // import { SourceMapper } from "../utils/sourceMapper";
 
 export interface DeviceSessionArgs {
@@ -82,13 +82,13 @@ export function registerConfigurationTools(): void {
     "setAppSource",
     "For a given appId, set the source code path and platform.",
     AppSourceSchema,
-    async (deviceId: string, platform: Platform, args: AppSourceArgs): Promise<any> => {
+    async (device: BootedDevice, args: AppSourceArgs): Promise<any> => {
       try {
-        const apps = await new ListInstalledApps(deviceId).execute();
+        const apps = await new ListInstalledApps(device).execute();
         if (apps.find(app => app === args.appId) === undefined) {
           return createJSONToolResponse({
             success: false,
-            message: `App ${args.appId} is not installed on device ${deviceId}, use listApps and try again.`
+            message: `App ${args.appId} is not installed on device ${device.deviceId}, use listApps and try again.`
           });
         }
 

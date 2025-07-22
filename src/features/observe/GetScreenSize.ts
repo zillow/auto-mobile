@@ -1,24 +1,24 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
-import { ExecResult, ScreenSize } from "../../models";
+import { BootedDevice, ExecResult, ScreenSize } from "../../models";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 
 export class GetScreenSize {
   private adb: AdbUtils;
-  private readonly deviceId: string;
+  private readonly device: BootedDevice;
   private static memoryCache = new Map<string, ScreenSize>();
   private static cacheDir = path.join(process.cwd(), ".cache", "screen-size");
 
   /**
    * Create a Window instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.deviceId = deviceId;
-    this.adb = adb || new AdbUtils(deviceId);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.device = device;
+    this.adb = adb || new AdbUtils(device);
   }
 
   /**
@@ -142,11 +142,11 @@ export class GetScreenSize {
    * @returns Promise with width and height
    */
   async execute(dumpsysResult?: ExecResult): Promise<ScreenSize> {
-    const cacheKey = this.generateCacheKey(this.deviceId);
+    const cacheKey = this.generateCacheKey(this.device.deviceId);
 
     // Check memory cache first
     if (GetScreenSize.memoryCache.has(cacheKey)) {
-      logger.debug(`Screen size retrieved from memory cache for device: ${this.deviceId}`);
+      logger.debug(`Screen size retrieved from memory cache for device: ${this.device.deviceId}`);
       return GetScreenSize.memoryCache.get(cacheKey)!;
     }
 
@@ -180,7 +180,7 @@ export class GetScreenSize {
       GetScreenSize.memoryCache.set(cacheKey, screenSize);
       this.saveToDiskCache(cacheKey, screenSize);
 
-      logger.debug(`Screen size computed and cached for device: ${this.deviceId}`);
+      logger.debug(`Screen size computed and cached for device: ${this.device.deviceId}`);
       return screenSize;
     } catch (err) {
       throw new Error(`Failed to get screen size: ${err instanceof Error ? err.message : String(err)}`);

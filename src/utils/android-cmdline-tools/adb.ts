@@ -1,7 +1,7 @@
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
-import { logger } from "./logger";
-import { ExecResult } from "../models/ExecResult";
+import { logger } from "../logger";
+import { BootedDevice, ExecResult } from "../../models";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
@@ -21,27 +21,27 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
 };
 
 export class AdbUtils {
-  deviceId: string | null;
+  device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
   spawnFn: typeof spawn;
 
   // Static cache for device list
-  private static deviceListCache: { devices: string[], timestamp: number } | null = null;
+  private static deviceListCache: { devices: BootedDevice[], timestamp: number } | null = null;
   private static readonly DEVICE_LIST_CACHE_TTL = 5000; // 5 seconds
   private static readonly MAX_ADB_RETRIES = 3;
 
   /**
    * Create an AdbUtils instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
    */
   constructor(
-    deviceId: string | null = null,
+    device: BootedDevice | null = null,
     execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null,
     spawnFn: typeof spawn | null = null
   ) {
-    this.deviceId = deviceId;
+    this.device = device;
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
   }
@@ -50,8 +50,8 @@ export class AdbUtils {
    * Set the target device ID
    * @param deviceId - Device identifier
    */
-  setDeviceId(deviceId: string): void {
-    this.deviceId = deviceId;
+  setDevice(device: BootedDevice): void {
+    this.device = device;
   }
 
   /**
@@ -59,7 +59,8 @@ export class AdbUtils {
    * @returns The base ADB command
    */
   getBaseCommand(): string {
-    return this.deviceId ? `$ANDROID_HOME/platform-tools/adb -s ${this.deviceId}` : "$ANDROID_HOME/platform-tools/adb";
+    const deviceId = this.device?.deviceId;
+    return deviceId ? `$ANDROID_HOME/platform-tools/adb -s ${deviceId}` : "$ANDROID_HOME/platform-tools/adb";
   }
 
   /**
@@ -88,6 +89,7 @@ export class AdbUtils {
    * @param command - The ADB command to execute
    * @param timeoutMs - Optional timeout in milliseconds
    * @param maxBuffer - Optional maximum buffer size for command output
+   * @param attempt - Current attempt number at executing this command
    * @returns Promise with command output
    */
   private async executeCommandImpl(command: string, timeoutMs?: number, maxBuffer?: number, attempt: number = 0): Promise<ExecResult> {
@@ -142,7 +144,7 @@ export class AdbUtils {
    * Get the list of connected devices
    * @returns Promise with an array of device IDs
    */
-  async getDevices(): Promise<string[]> {
+  async getBootedEmulators(): Promise<BootedDevice[]> {
     // Check cache first
     if (AdbUtils.deviceListCache) {
       const cacheAge = Date.now() - AdbUtils.deviceListCache.timestamp;
@@ -161,7 +163,7 @@ export class AdbUtils {
       .filter(line => line.trim().length > 0)
       .map(line => {
         const parts = line.split("\t");
-        return parts[0];
+        return { name: parts[0], platform: "android", deviceId: parts[0] } as BootedDevice;
       });
 
     // Cache the result
