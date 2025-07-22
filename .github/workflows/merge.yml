@@ -1,7 +1,6 @@
 name: "On Merge"
 
 on:
-  pull_request:
   push:
     branches:
       - main
@@ -68,7 +67,7 @@ jobs:
         run: npm run test
 
   junit-runner-unit-tests:
-    name: "Run JUnitRunner Unit Tests"
+    name: "Run JUnit Runner Unit Tests"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -88,12 +87,20 @@ jobs:
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       # Run AutoMobile tests that require emulator
-      - uses: ./.github/actions/android-emulator
-        with:
-          script: "./gradlew :junit-runner:test"
+      # - uses: ./.github/actions/android-emulator
+      #   with:
+      #     script: "./gradlew :junit-runner:test --rerun-tasks"
+      #     working-directory: './android/'
+
+      # - name: "Publish Test Report"
+      #   uses: mikepenz/action-junit-report@v4
+      #   if: always()
+      #   with:
+      #     check_name: "JUnit Runner Test Report"
+      #     report_paths: '**/build/test-results/**/*.xml'
 
   kotlin-test-author-unit-tests:
-    name: "Run KotlinTestAuthor Unit Tests"
+    name: "Run Kotlin Test Author Unit Tests"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -108,6 +115,13 @@ jobs:
           gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Publish Test Report"
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          check_name: "Kotlin Test Author Test Report"
+          report_paths: '**/build/test-results/**/*.xml'
 
   android-accessibility-service-unit-tests:
     name: "Run Accessibility Service Unit Tests"

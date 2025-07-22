@@ -16,7 +16,7 @@ export class AccessibilityServiceManager {
   private adb: AdbUtils;
   public static readonly PACKAGE = "com.zillow.automobile.accessibilityservice";
   public static readonly ACTIVITY = "com.zillow.automobile.accessibilityservice.MainActivity";
-  private static readonly APK_URL = "https://github.com/zillow/auto-mobile/releases/download/0.0.4/accessibility-service-debug.apk";
+  private static readonly APK_URL = "https://github.com/zillow/auto-mobile/releases/download/0.0.5/accessibility-service-debug.apk";
 
   // Static cache for service availability
   private cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;

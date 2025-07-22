@@ -13,20 +13,19 @@ permissions:
   packages: write
 
 jobs:
-  # TODO: Fix Node tests on view hierachy sample dumps
-  #  validate-xml:
-  #    name: "Validate XML"
-  #    runs-on: ubuntu-latest
-  #    steps:
-  #      - name: "Git Checkout"
-  #        uses: actions/checkout@v4
-  #
-  #      - name: "Run XMLStarlet"
-  #        shell: "bash"
-  #        run: |
-  #          sudo apt-get update
-  #          sudo apt-get install xmlstarlet
-  #          scripts/xml/validate_xml.sh
+  validate-xml:
+    name: "Validate XML"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Run XMLStarlet"
+        shell: "bash"
+        run: |
+          sudo apt-get update
+          sudo apt-get install xmlstarlet
+          scripts/xml/validate_xml.sh
 
   ktfmt:
     name: "ktfmt"
@@ -68,7 +67,7 @@ jobs:
         run: npm run test
 
   junit-runner-unit-tests:
-    name: "Run JUnitRunner Unit Tests"
+    name: "Run JUnit Runner Unit Tests"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -79,14 +78,29 @@ jobs:
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
+      # Only run unit tests without Emulator
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":junit-runner:test"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
+      # Run AutoMobile tests that require emulator
+      # - uses: ./.github/actions/android-emulator
+      #   with:
+      #     script: "./gradlew :junit-runner:test --rerun-tasks"
+      #     working-directory: './android/'
+
+      # - name: "Publish Test Report"
+      #   uses: mikepenz/action-junit-report@v4
+      #   if: always()
+      #   with:
+      #     check_name: "JUnit Runner Test Report"
+      #     report_paths: '**/build/test-results/**/*.xml'
+
   kotlin-test-author-unit-tests:
-    name: "Run KotlinTestAuthor Unit Tests"
+    name: "Run Kotlin Test Author Unit Tests"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -98,11 +112,19 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":kotlinTestAuthor:test"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
+      - name: "Publish Test Report"
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          check_name: "Kotlin Test Author Test Report"
+          report_paths: '**/build/test-results/**/*.xml'
+
   android-accessibility-service-unit-tests:
-    name: "Run KotlinTestAuthor Unit Tests"
+    name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -114,6 +136,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":accessibility-service:testDebugUnitTest"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -132,6 +155,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":junitRunner:assemble"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -154,6 +178,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":kotlinTestAuthor:assembleDist"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -164,7 +189,7 @@ jobs:
           path: core/build/outputs/aar/core-debug.aar
 
   build-android-accessibility-service:
-    name: "Run KotlinTestAuthor Unit Tests"
+    name: "Build Accessibility Service"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -176,6 +201,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":accessibility-service:assembleDebug"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -194,6 +220,7 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":playground:app:assembleDebug"
+          gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 

@@ -9,7 +9,7 @@ accurate and precise exploration that gets better as more capabilities and heuri
 interaction added to the [AutoMobile Playground app](https://github.com/zillow/auto-mobile/blob/main/android/playground/README.md)
 is tested with AutoMobile in order to keep improving.
 
-#### Source Mappping
+#### Source Mapping
 
 We combine project path config with deep view hierarchy analysis to determine the code is being rendered. This opens a
 lot of possibilities so we're looking for ways to improve indexing performance and accuracy.
