@@ -13,9 +13,9 @@ export class ListInstalledApps {
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils, idb: IdbPython) {
-    this.adb = adb;
-    this.idb = idb;
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    this.adb = adb || new AdbUtils(device);
+    this.idb = idb || new IdbPython(device);
     this.device = device;
   }
 
