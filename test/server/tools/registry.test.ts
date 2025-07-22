@@ -82,7 +82,7 @@ describe("MCP Tools Registry", () => {
       utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog", "enableDemoMode", "disableDemoMode"],
 
       // Emulator tools (AVD management)
-      emulator: ["listAvds", "listDevices", "checkRunningEmulators", "startEmulator", "killEmulator"]
+      emulator: ["listDeviceImages", "listDevices", "checkRunningEmulators", "startDevice", "killEmulator"]
     };
 
     // Check that each category has at least one tool registered

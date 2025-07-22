@@ -379,7 +379,7 @@ Available Packages:
     });
   });
 
-  describe("listAvds", () => {
+  describe("listDeviceImages", () => {
     it("should parse AVD list correctly", async () => {
       const mockChild = {
         stdout: { on: sandbox.stub() },
@@ -423,7 +423,7 @@ Available Android Virtual Devices:
         callback(0);
       });
 
-      const result = await avdmanager.listAvds(mockDeps);
+      const result = await avdmanager.listDeviceImages(mockDeps);
 
       expect(result).to.have.lengthOf(3);
 

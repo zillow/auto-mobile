@@ -176,7 +176,7 @@ Examples:
   auto-mobile --cli listDevices
   auto-mobile --cli observe
   auto-mobile --cli tapOn --text "Submit"
-  auto-mobile --cli startEmulator --avdName "pixel_7_api_34"
+  auto-mobile --cli startDevice --avdName "pixel_7_api_34"
 
 Options:
   help [tool-name]    Show help for a specific tool
@@ -196,9 +196,9 @@ Parameters:
     "setActiveDevice",
     "enableDemoMode",
     "disableDemoMode",
-    "listAvds",
+    "listDeviceImages",
     "listDevices",
-    "startEmulator",
+    "startDevice",
     "killEmulator",
     "checkRunningEmulators"
   ];

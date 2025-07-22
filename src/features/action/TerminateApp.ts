@@ -1,15 +1,15 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { TerminateAppResult } from "../../models";
+import { BootedDevice, TerminateAppResult } from "../../models";
 
 export class TerminateApp extends BaseVisualChange {
   /**
    * Create an TerminateApp instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
   }
 
   /**

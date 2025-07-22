@@ -1,6 +1,6 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { HomeScreenResult } from "../../models";
+import { BootedDevice, HomeScreenResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
@@ -12,20 +12,20 @@ interface NavigationCache {
 }
 
 export class HomeScreen extends BaseVisualChange {
+  private device: BootedDevice;
   private static navigationCache = new Map<string, NavigationCache>();
   private static readonly CACHE_DURATION_MS = 300000; // 5 minutes
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
+    this.device = device;
     this.elementUtils = new ElementUtils();
   }
 
   async execute(progress?: ProgressCallback): Promise<HomeScreenResult> {
-    const deviceId = this.adb.deviceId || "default";
-
     // Check cache first
-    const cachedMethod = this.getCachedNavigationMethod(deviceId);
+    const cachedMethod = this.getCachedNavigationMethod(this.device);
     if (cachedMethod) {
       logger.info(`[HomeScreen] Using cached navigation method: ${cachedMethod}`);
       // Only try the cached method, if it fails, surface the error to the caller.
@@ -36,30 +36,30 @@ export class HomeScreen extends BaseVisualChange {
     const detectedMethod = await this.detectNavigationStyle(progress);
 
     // Cache the detected method (without getting device props again)
-    this.cacheNavigationMethodSimple(deviceId, detectedMethod);
+    this.cacheNavigationMethodSimple(this.device, detectedMethod);
 
     return await this.executeNavigationMethod(detectedMethod, progress);
   }
 
-  private getCachedNavigationMethod(deviceId: string): "gesture" | "hardware" | "element" | null {
-    const cached = HomeScreen.navigationCache.get(deviceId);
+  private getCachedNavigationMethod(device: BootedDevice): "gesture" | "hardware" | "element" | null {
+    const cached = HomeScreen.navigationCache.get(device.deviceId);
     if (!cached) {return null;}
 
     const now = Date.now();
     if (now - cached.timestamp > HomeScreen.CACHE_DURATION_MS) {
-      HomeScreen.navigationCache.delete(deviceId);
+      HomeScreen.navigationCache.delete(device.deviceId);
       return null;
     }
 
     return cached.method;
   }
 
-  private cacheNavigationMethodSimple(deviceId: string, method: "gesture" | "hardware" | "element"): void {
-    HomeScreen.navigationCache.set(deviceId, {
+  private cacheNavigationMethodSimple(device: BootedDevice, method: "gesture" | "hardware" | "element"): void {
+    HomeScreen.navigationCache.set(device.deviceId, {
       method,
       timestamp: Date.now()
     });
-    logger.info(`[HomeScreen] Cached navigation method: ${method} for device: ${deviceId}`);
+    logger.info(`[HomeScreen] Cached navigation method: ${method} for device: ${device.deviceId}`);
   }
 
   private async detectNavigationStyle(progress?: ProgressCallback): Promise<"gesture" | "hardware" | "element"> {

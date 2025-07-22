@@ -1,15 +1,15 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { SendTextResult } from "../../models";
+import { BootedDevice, SendTextResult } from "../../models";
 import { VirtualKeyboardManager } from "../../utils/virtualKeyboardManager";
 import { logger } from "../../utils/logger";
 
 export class InputText extends BaseVisualChange {
   private virtualKeyboardManager: VirtualKeyboardManager;
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
-    this.virtualKeyboardManager = new VirtualKeyboardManager(deviceId);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
+    this.virtualKeyboardManager = new VirtualKeyboardManager(device);
   }
 
   async execute(

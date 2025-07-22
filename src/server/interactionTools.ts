@@ -15,35 +15,43 @@ import { Rotate } from "../features/action/Rotate";
 import { ElementUtils } from "../features/utility/ElementUtils";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { OpenURL } from "../features/action/OpenURL";
-import { ActionableError } from "../models";
+import { ActionableError, BootedDevice } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
+import { Platform } from "../models";
 
 // Type definitions for better TypeScript support
 export interface ClearTextArgs {
+  platform: Platform;
 }
 
 export interface SelectAllTextArgs {
+  platform: Platform;
 }
 
 export interface PressButtonArgs {
   button: "home" | "back" | "menu" | "power" | "volume_up" | "volume_down" | "recent";
+  platform: Platform;
 }
 
 export interface OpenSystemTrayArgs {
+  platform: Platform;
 }
 
 export interface PressKeyArgs {
   key: "home" | "back" | "menu" | "power" | "volume_up" | "volume_down" | "recent";
+  platform: Platform;
 }
 
 export interface InputTextArgs {
   text: string;
   imeAction?: "done" | "next" | "search" | "send" | "go" | "previous";
+  platform: Platform;
 }
 
 export interface OpenLinkArgs {
   url: string;
+  platform: Platform;
 }
 
 export interface TapOnArgs {
@@ -51,12 +59,14 @@ export interface TapOnArgs {
   text?: string;
   id?: string;
   action: "tap" | "doubleTap" | "longPress" | "focus";
+  platform: Platform;
 }
 
 export interface SwipeOnScreenArgs {
   direction: "up" | "down" | "left" | "right";
   includeSystemInsets: boolean;
   duration: number;
+  platform: Platform;
 }
 
 export interface SwipeOnElementArgs {
@@ -64,6 +74,7 @@ export interface SwipeOnElementArgs {
   elementId: string;
   direction: "up" | "down" | "left" | "right";
   duration: number;
+  platform: Platform;
 }
 
 export interface ScrollArgs {
@@ -71,6 +82,7 @@ export interface ScrollArgs {
   direction: "up" | "down" | "left" | "right";
   lookFor?: ScrollLookForArgs;
   speed?: "slow" | "normal" | "fast";
+  platform: Platform;
 }
 
 export interface ScrollLookForArgs {
@@ -82,43 +94,51 @@ export interface ScrollLookForArgs {
 export interface ShakeArgs {
   duration?: number;
   intensity?: number;
+  platform: Platform;
 }
 
 export interface ImeActionArgs {
   action: "done" | "next" | "search" | "send" | "go" | "previous";
+  platform: Platform;
 }
 
 export interface RecentAppsArgs {
+  platform: Platform;
 }
 
 export interface RotateArgs {
   orientation: "portrait" | "landscape";
+  platform: Platform;
 }
 
 // Schema definitions for tool arguments
 export const shakeSchema = z.object({
   duration: z.number().optional().describe("Duration of the shake in milliseconds (default: 1000)"),
-  intensity: z.number().optional().describe("Intensity of the shake acceleration (default: 100)")
+  intensity: z.number().optional().describe("Intensity of the shake acceleration (default: 100)"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const tapOnSchema = z.object({
   containerElementId: z.string().optional().describe("Container element ID to restrict the search within"),
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action to perform on the element"),
   text: z.string().optional().describe("Text to tap on"),
-  id: z.string().optional().describe("Element ID to tap on")
+  id: z.string().optional().describe("Element ID to tap on"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const swipeOnElementSchema = z.object({
   containerElementId: z.string().optional().describe("Container element ID to restrict the search within"),
   elementId: z.string().describe("ID of the element to swipe on"),
   direction: z.enum(["up", "down", "left", "right"]).describe("Direction to swipe"),
-  duration: z.number().describe("Duration of the swipe in milliseconds")
+  duration: z.number().describe("Duration of the swipe in milliseconds"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const swipeOnScreenSchema = z.object({
   direction: z.enum(["up", "down", "left", "right"]).describe("Direction to swipe"),
   includeSystemInsets: z.boolean().describe("Whether to include system inset areas in the swipe"),
-  duration: z.number().describe("Duration of the swipe in milliseconds")
+  duration: z.number().describe("Duration of the swipe in milliseconds"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const dragAndDropSchema = z.object({
@@ -130,7 +150,8 @@ export const dragAndDropSchema = z.object({
     index: z.number().describe("Index of the destination element to drop to"),
     text: z.string().optional().describe("Optional text for validation and debugging")
   }).describe("Destination element to drop to"),
-  duration: z.number().optional().describe("Duration of the drag in milliseconds (default: 500)")
+  duration: z.number().optional().describe("Duration of the drag in milliseconds (default: 500)"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const scrollSchema = z.object({
@@ -141,54 +162,73 @@ export const scrollSchema = z.object({
     text: z.string().optional().describe("Optional text to look for while scrolling"),
     maxTime: z.number().optional().describe("Maximum amount of time to spend scrolling, (default 10 seconds)")
   }).optional().describe("What we're searching for while scrolling"),
-  speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed")
+  speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
-export const clearTextSchema = z.object({});
+export const clearTextSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+});
 
-export const selectAllTextSchema = z.object({});
+export const selectAllTextSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+});
 
 export const pressButtonSchema = z.object({
   button: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
-    .describe("The button to press")
+    .describe("The button to press"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
-export const openSystemTraySchema = z.object({});
+export const openSystemTraySchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+});
 
 export const pressKeySchema = z.object({
   key: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
-    .describe("The key to press")
+    .describe("The key to press"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const stopAppSchema = z.object({
-  appId: z.string().describe("App package ID to stop")
+  appId: z.string().describe("App package ID to stop"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const clearStateSchema = z.object({
   appId: z.string().describe("App package ID to clear state for"),
-  clearKeychain: z.boolean().optional().describe("Also clear iOS keychain (iOS only)")
+  clearKeychain: z.boolean().optional().describe("Also clear iOS keychain (iOS only)"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const inputTextSchema = z.object({
   text: z.string().describe("Text to input to the device"),
   imeAction: z.enum(["done", "next", "search", "send", "go", "previous"]).optional()
-    .describe("Optional IME action to perform after text input")
+    .describe("Optional IME action to perform after text input"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const openLinkSchema = z.object({
-  url: z.string().describe("URL to open in the default browser")
+  url: z.string().describe("URL to open in the default browser"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 export const imeActionSchema = z.object({
-  action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action to perform")
+  action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action to perform"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
-export const recentAppsSchema = z.object({});
+export const recentAppsSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+});
 
-export const homeScreenSchema = z.object({});
+export const homeScreenSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+});
 
 export const rotateSchema = z.object({
-  orientation: z.enum(["portrait", "landscape"]).describe("The orientation to set")
+  orientation: z.enum(["portrait", "landscape"]).describe("The orientation to set"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
 // Register tools
@@ -196,8 +236,8 @@ export function registerInteractionTools() {
   const elementUtils = new ElementUtils();
 
   // Tap on handler
-  const tapOnHandler = async (deviceId: string, args: TapOnArgs, progress?: ProgressCallback) => {
-    const tapOnTextCommand = new TapOnElement(deviceId);
+  const tapOnHandler = async (device: BootedDevice, args: TapOnArgs, progress?: ProgressCallback) => {
+    const tapOnTextCommand = new TapOnElement(device);
     const result = await tapOnTextCommand.execute({
       containerElementId: args.containerElementId,
       text: args.text,
@@ -213,9 +253,9 @@ export function registerInteractionTools() {
   };
 
   // Clear text handler
-  const clearTextHandler = async (deviceId: string, args: ClearTextArgs, progress?: ProgressCallback) => {
+  const clearTextHandler = async (device: BootedDevice, args: ClearTextArgs, progress?: ProgressCallback) => {
     try {
-      const clearText = new ClearText(deviceId);
+      const clearText = new ClearText(device);
       const result = await clearText.execute(progress);
 
       return createJSONToolResponse({
@@ -229,9 +269,9 @@ export function registerInteractionTools() {
   };
 
   // Select all text handler
-  const selectAllTextHandler = async (deviceId: string, args: SelectAllTextArgs, progress?: ProgressCallback) => {
+  const selectAllTextHandler = async (device: BootedDevice, args: SelectAllTextArgs, progress?: ProgressCallback) => {
     try {
-      const selectAllText = new SelectAllText(deviceId);
+      const selectAllText = new SelectAllText(device);
       const result = await selectAllText.execute(progress);
 
       return createJSONToolResponse({
@@ -245,9 +285,9 @@ export function registerInteractionTools() {
   };
 
   // Press button handler
-  const pressButtonHandler = async (deviceId: string, args: PressButtonArgs, progress?: ProgressCallback) => {
+  const pressButtonHandler = async (device: BootedDevice, args: PressButtonArgs, progress?: ProgressCallback) => {
     try {
-      const pressButton = new PressButton(deviceId);
+      const pressButton = new PressButton(device);
       const result = await pressButton.execute(args.button, progress); // observe = true
 
       return createJSONToolResponse({
@@ -261,7 +301,7 @@ export function registerInteractionTools() {
   };
 
   // Swipe on element handler
-  const swipeOnElementHandler = async (deviceId: string, args: SwipeOnElementArgs, progress?: ProgressCallback) => {
+  const swipeOnElementHandler = async (device: BootedDevice, args: SwipeOnElementArgs, progress?: ProgressCallback) => {
     try {
       // Validate element ID format
       const elementId = args.elementId;
@@ -281,8 +321,8 @@ export function registerInteractionTools() {
         throw new ActionableError("Element ID cannot be empty. Please provide a valid Android resource ID.");
       }
 
-      const observeScreen = new ObserveScreen(deviceId);
-      const swipeOnElement = new SwipeOnElement(deviceId);
+      const observeScreen = new ObserveScreen(device);
+      const swipeOnElement = new SwipeOnElement(device);
 
       // First observe to find the element
       const observeResult = await observeScreen.execute();
@@ -339,9 +379,9 @@ export function registerInteractionTools() {
   };
 
   // Swipe on screen handler
-  const swipeOnScreenHandler = async (deviceId: string, args: SwipeOnScreenArgs, progress?: ProgressCallback) => {
+  const swipeOnScreenHandler = async (device: BootedDevice, args: SwipeOnScreenArgs, progress?: ProgressCallback) => {
     try {
-      const swipeOnScreen = new SwipeOnScreen(deviceId);
+      const swipeOnScreen = new SwipeOnScreen(device);
 
       const result = await swipeOnScreen.execute(
         args.direction,
@@ -363,9 +403,9 @@ export function registerInteractionTools() {
   };
 
   // Open system tray handler
-  const openSystemTrayHandler = async (deviceId: string, args: OpenSystemTrayArgs, progress?: ProgressCallback) => {
+  const openSystemTrayHandler = async (device: BootedDevice, args: OpenSystemTrayArgs, progress?: ProgressCallback) => {
     try {
-      const swipeOnScreen = new SwipeOnScreen(deviceId);
+      const swipeOnScreen = new SwipeOnScreen(device);
 
       const result = await swipeOnScreen.execute(
         "down",
@@ -387,10 +427,10 @@ export function registerInteractionTools() {
   };
 
   // Scroll handler
-  const scrollHandler = async (deviceId: string, args: ScrollArgs, progress?: ProgressCallback) => {
+  const scrollHandler = async (device: BootedDevice, args: ScrollArgs, progress?: ProgressCallback) => {
     // Element-specific scrolling
-    const observeScreen = new ObserveScreen(deviceId);
-    const swipe = new SwipeOnElement(deviceId);
+    const observeScreen = new ObserveScreen(device);
+    const swipe = new SwipeOnElement(device);
     const observeResult = await observeScreen.execute();
 
     if (!observeResult.viewHierarchy) {
@@ -505,8 +545,8 @@ export function registerInteractionTools() {
   };
 
   // Press key handler
-  const pressKeyHandler = async (deviceId: string, args: PressKeyArgs, progress?: ProgressCallback) => {
-    const pressButton = new PressButton(deviceId);
+  const pressKeyHandler = async (device: BootedDevice, args: PressKeyArgs, progress?: ProgressCallback) => {
+    const pressButton = new PressButton(device);
     const result = await pressButton.execute(args.key, progress);
 
     return createJSONToolResponse({
@@ -517,8 +557,8 @@ export function registerInteractionTools() {
   };
 
   // Input text handler
-  const inputTextHandler = async (deviceId: string, args: InputTextArgs) => {
-    const inputText = new InputText(deviceId);
+  const inputTextHandler = async (device: BootedDevice, args: InputTextArgs) => {
+    const inputText = new InputText(device);
     const result = await inputText.execute(args.text, args.imeAction);
     return createJSONToolResponse({
       message: `Input text`,
@@ -528,8 +568,8 @@ export function registerInteractionTools() {
   };
 
   // Open link handler
-  const openLinkHandler = async (deviceId: string, args: OpenLinkArgs) => {
-    const openUrl = new OpenURL(deviceId);
+  const openLinkHandler = async (device: BootedDevice, args: OpenLinkArgs) => {
+    const openUrl = new OpenURL(device);
     const result = await openUrl.execute(args.url);
 
     return createJSONToolResponse({
@@ -540,9 +580,9 @@ export function registerInteractionTools() {
   };
 
   // Shake handler
-  const shakeHandler = async (deviceId: string, args: ShakeArgs, progress?: ProgressCallback) => {
+  const shakeHandler = async (device: BootedDevice, args: ShakeArgs, progress?: ProgressCallback) => {
     try {
-      const shake = new Shake(deviceId);
+      const shake = new Shake(device);
       const result = await shake.execute({
         duration: args.duration ?? 1000,
         intensity: args.intensity ?? 100
@@ -559,9 +599,9 @@ export function registerInteractionTools() {
   };
 
   // IME action handler
-  const imeActionHandler = async (deviceId: string, args: ImeActionArgs, progress?: ProgressCallback) => {
+  const imeActionHandler = async (device: BootedDevice, args: ImeActionArgs, progress?: ProgressCallback) => {
     try {
-      const imeAction = new ImeAction(deviceId);
+      const imeAction = new ImeAction(device);
       const result = await imeAction.execute(args.action, progress);
 
       return createJSONToolResponse({
@@ -575,9 +615,9 @@ export function registerInteractionTools() {
   };
 
   // Recent Apps handler
-  const recentAppsHandler = async (deviceId: string, args: RecentAppsArgs, progress?: ProgressCallback) => {
+  const recentAppsHandler = async (device: BootedDevice, args: RecentAppsArgs, progress?: ProgressCallback) => {
     try {
-      const recentApps = new RecentApps(deviceId);
+      const recentApps = new RecentApps(device);
       const result = await recentApps.execute(progress);
 
       return createJSONToolResponse({
@@ -591,9 +631,9 @@ export function registerInteractionTools() {
   };
 
   // Home Screen handler
-  const homeScreenHandler = async (deviceId: string, args: any, progress?: ProgressCallback) => {
+  const homeScreenHandler = async (device: BootedDevice, args: any, progress?: ProgressCallback) => {
     try {
-      const homeScreen = new HomeScreen(deviceId);
+      const homeScreen = new HomeScreen(device);
       const result = await homeScreen.execute(progress);
 
       return createJSONToolResponse({
@@ -607,9 +647,9 @@ export function registerInteractionTools() {
   };
 
   // Rotate handler
-  const rotateHandler = async (deviceId: string, args: RotateArgs, progress?: ProgressCallback) => {
+  const rotateHandler = async (device: BootedDevice, args: RotateArgs, progress?: ProgressCallback) => {
     try {
-      const rotate = new Rotate(deviceId);
+      const rotate = new Rotate(device);
       const result = await rotate.execute(args.orientation, progress);
 
       return createJSONToolResponse({

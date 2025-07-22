@@ -3,7 +3,7 @@ import { describe, it } from "mocha";
 import path from "path";
 import xml2js from "xml2js";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { logger } from "../../../src/utils/logger";
 import { readFileAsync } from "../../../src/utils/io";

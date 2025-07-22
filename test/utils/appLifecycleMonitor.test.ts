@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import sinon from "sinon";
 import { AppLifecycleMonitor, AppLifecycleEvent } from "../../src/utils/appLifecycleMonitor";
-import { AdbUtils } from "../../src/utils/adb";
+import { AdbUtils } from "../../src/utils/android-cmdline-tools/adb";
 import { ExecResult } from "../../src/models";
 
 describe("AppLifecycleMonitor", () => {

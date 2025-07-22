@@ -1,6 +1,6 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
-import { SystemInsets } from "../../models";
+import { BootedDevice, SystemInsets } from "../../models";
 import { ExecResult } from "../../models";
 
 export class GetSystemInsets {
@@ -8,11 +8,11 @@ export class GetSystemInsets {
 
   /**
    * Create a Window instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(deviceId);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.adb = adb || new AdbUtils(device);
   }
 
   /**

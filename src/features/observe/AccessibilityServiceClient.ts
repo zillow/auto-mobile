@@ -1,6 +1,6 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
-import { ViewHierarchyResult } from "../../models";
+import { BootedDevice, ViewHierarchyResult } from "../../models";
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
 
 /**
@@ -45,15 +45,15 @@ interface AccessibilityHierarchy {
  * Client for interacting with the AutoMobile Accessibility Service
  */
 export class AccessibilityServiceClient {
-  private deviceId: string;
+  private device: BootedDevice;
   private adb: AdbUtils;
   private static readonly PACKAGE_NAME = "com.zillow.automobile.accessibilityservice";
   private static readonly HIERARCHY_FILE_PATH = "files/latest_hierarchy.json";
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.deviceId = deviceId;
-    this.adb = adb || new AdbUtils(deviceId);
-    AccessibilityServiceManager.getInstance(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.device = device;
+    this.adb = adb || new AdbUtils(device);
+    AccessibilityServiceManager.getInstance(device, adb);
   }
 
   /**
@@ -216,7 +216,7 @@ export class AccessibilityServiceClient {
     try {
       // Check if service is available
 
-      const available = await AccessibilityServiceManager.getInstance(this.deviceId, this.adb).isAvailable();
+      const available = await AccessibilityServiceManager.getInstance(this.device, this.adb).isAvailable();
       if (!available) {
         logger.info("[ACCESSIBILITY_SERVICE] Service not available, will use fallback");
         return null;

@@ -72,7 +72,7 @@ describe("MCP Tools Schema", () => {
       })).optional()
     }).passthrough();
 
-    // Test listAvds tool which requires emulator CLI
+    // Test listDeviceImages tool which requires emulator CLI
     const emulatorAvailable = await checkEmulatorAvailable();
     if (!emulatorAvailable) {
       this.skip(); // Skip test if emulator CLI is not available
@@ -81,7 +81,7 @@ describe("MCP Tools Schema", () => {
     const result = await client.request({
       method: "tools/call",
       params: {
-        name: "listAvds",
+        name: "listDeviceImages",
         arguments: {}
       }
     }, toolResponseSchema);
@@ -102,7 +102,7 @@ describe("MCP Tools Schema", () => {
       })).optional()
     }).passthrough();
 
-    // Test listAvds without optional parameters (listAvds has no required params)
+    // Test listDeviceImages without optional parameters (listDeviceImages has no required params)
     const emulatorAvailable = await checkEmulatorAvailable();
     if (!emulatorAvailable) {
       this.skip(); // Skip test if emulator CLI is not available
@@ -111,9 +111,9 @@ describe("MCP Tools Schema", () => {
     const result = await client.request({
       method: "tools/call",
       params: {
-        name: "listAvds",
+        name: "listDeviceImages",
         arguments: {
-          // No parameters needed for listAvds
+          // No parameters needed for listDeviceImages
         }
       }
     }, toolResponseSchema);
@@ -126,7 +126,7 @@ describe("MCP Tools Schema", () => {
 
     const { client } = fixture.getContext();
 
-    // Test with listAvds and unknown parameter to avoid device dependency
+    // Test with listDeviceImages and unknown parameter to avoid device dependency
     const emulatorAvailable = await checkEmulatorAvailable();
     if (!emulatorAvailable) {
       this.skip(); // Skip test if emulator CLI is not available
@@ -137,7 +137,7 @@ describe("MCP Tools Schema", () => {
       const result = await client.request({
         method: "tools/call",
         params: {
-          name: "listAvds",
+          name: "listDeviceImages",
           arguments: {
             unknownField: "should not be allowed"
           }

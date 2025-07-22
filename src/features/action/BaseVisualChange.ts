@@ -1,10 +1,10 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { AwaitIdle } from "../observe/AwaitIdle";
 import { ObserveScreen } from "../observe/ObserveScreen";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ActionableError, ActiveWindowInfo, ObserveResult } from "../../models";
+import { ActionableError, ActiveWindowInfo, BootedDevice, ObserveResult } from "../../models";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -26,14 +26,14 @@ export class BaseVisualChange {
 
   /**
    * Create an BaseVisualChange instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(deviceId);
-    this.awaitIdle = new AwaitIdle(deviceId, this.adb);
-    this.observeScreen = new ObserveScreen(deviceId, this.adb);
-    this.window = new Window(deviceId, this.adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.adb = adb || new AdbUtils(device);
+    this.awaitIdle = new AwaitIdle(device, this.adb);
+    this.observeScreen = new ObserveScreen(device, this.adb);
+    this.window = new Window(device, this.adb);
   }
 
   /**

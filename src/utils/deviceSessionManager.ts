@@ -1,23 +1,31 @@
-import { ActionableError } from "../models";
-import { EmulatorUtils } from "./emulator";
-import { AdbUtils } from "./adb";
+import { ActionableError, BootedDevice, Platform } from "../models";
+import { DeviceUtils } from "./deviceUtils";
+import { AdbUtils } from "./android-cmdline-tools/adb";
+import { SimCtl } from "./ios-cmdline-tools/simctl";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
-import { TestAuthoringManager } from "./testAuthoringManager";
 import { AccessibilityServiceManager } from "./accessibilityServiceManager";
+import { AndroidEmulator } from "./android-cmdline-tools/emulator";
 
 export class DeviceSessionManager {
-  private currentDeviceId: string | undefined;
+  private currentDevice: BootedDevice | undefined;
+  private currentPlatform: Platform | undefined;
   private static instance: DeviceSessionManager;
-  private adbUtils: AdbUtils;
-  private emulatorUtils: EmulatorUtils;
+  private adb: AdbUtils;
+  private simCtl: SimCtl;
+  private androidEmulator: AndroidEmulator;
+  private deviceUtils: DeviceUtils;
   private window: Window | undefined;
-  private testAuthoringManager: TestAuthoringManager;
 
   private constructor() {
-    this.adbUtils = new AdbUtils(null);
-    this.emulatorUtils = new EmulatorUtils();
-    this.testAuthoringManager = TestAuthoringManager.getInstance();
+    this.adb = new AdbUtils(null);
+    this.simCtl = new SimCtl();
+    this.androidEmulator = new AndroidEmulator();
+    this.deviceUtils = new DeviceUtils(
+      this.adb,
+      this.simCtl,
+      this.androidEmulator
+    );
   }
 
   public static getInstance(): DeviceSessionManager {
@@ -30,102 +38,180 @@ export class DeviceSessionManager {
   /**
    * Get the current device ID
    */
-  public getCurrentDeviceId(): string | undefined {
-    return this.currentDeviceId;
+  public getCurrentDevice(): BootedDevice | undefined {
+    return this.currentDevice;
   }
 
   /**
-     * Set the current device ID
-     */
-  public setCurrentDeviceId(deviceId: string): void {
-    this.currentDeviceId = deviceId;
-    // Update AdbUtils with new device ID
-    this.adbUtils = new AdbUtils(deviceId);
+   * Get the current platform
+   */
+  public getCurrentPlatform(): Platform | undefined {
+    return this.currentPlatform;
+  }
+
+  /**
+   * Set the current device ID and platform
+   */
+  public setCurrentDevice(device: BootedDevice, platform: Platform): void {
+    this.currentDevice = device;
+    this.currentPlatform = platform;
+
+    if (platform === "android") {
+      // Update AdbUtils with new device ID
+      this.adb = new AdbUtils(device);
+    }
+
     // Reset window when device changes
     this.window = undefined;
   }
 
   /**
-     * Ensure a device is ready and return its ID
-     * If no device is currently set and none is provided, it will:
-     * 1. Check for connected devices
-     * 2. Start an emulator if no devices are found
-     * 3. Use the first available device
-     */
-  public async ensureDeviceReady(providedDeviceId?: string, failIfNoDevice: boolean = false): Promise<string> {
-    // If a specific device is provided, use it
-    if (providedDeviceId) {
-      await this.verifyDevice(providedDeviceId);
-      this.setCurrentDeviceId(providedDeviceId);
-      return providedDeviceId;
+   * Detect the platform of connected devices
+   */
+  private async detectConnectedPlatforms(): Promise<BootedDevice[]> {
+    const devices: BootedDevice[] = [];
+
+    try {
+      // Check for Android devices via ADB
+      const androidDevices = await this.adb.getBootedEmulators();
+      devices.push(...androidDevices);
+    } catch (error) {
+      logger.warn(`Failed to detect Android devices: ${error}`);
     }
 
-    // If we have a current device, verify it's still ready
-    if (this.currentDeviceId) {
+    try {
+      // Check for iOS devices/simulators via xcrun simctl
+      const iosDevices = await this.simCtl.getBootedSimulators();
+      devices.push(...iosDevices);
+    } catch (error) {
+      logger.warn(`Failed to detect iOS devices: ${error}`);
+    }
+
+    return devices;
+  }
+
+  /**
+   * Ensure a device is ready for the specified platform and return its ID
+   * Throws an error if both Android and iOS devices are connected
+   */
+  public async ensureDeviceReady(platform: Platform, providedDeviceId?: string, failIfNoDevice: boolean = false): Promise<BootedDevice> {
+    // Detect all connected devices
+    const connectedPlatforms = await this.detectConnectedPlatforms();
+    const androidDevices = connectedPlatforms.filter(device => device.platform === "android");
+    const iosDevices = connectedPlatforms.filter(device => device.platform === "ios");
+
+    // Check if both platforms have devices - this is not allowed
+    if (androidDevices.length > 0 && iosDevices.length > 0) {
+      throw new ActionableError(
+        "Both Android and iOS devices are connected. Please disconnect devices from one platform to continue."
+      );
+    }
+
+    // Get devices for the requested platform
+    let platformDevices: BootedDevice[] = [];
+    switch (platform) {
+      case "android":
+        platformDevices = androidDevices;
+        break;
+      case "ios":
+        platformDevices = iosDevices;
+        break;
+    }
+
+    // If a specific device is provided, verify it exists on the correct platform
+    if (providedDeviceId) {
+      const providedDevice = platformDevices.find(device => device.deviceId === providedDeviceId);
+      if (!providedDevice) {
+        throw new ActionableError(
+          `Device ${providedDeviceId} not found on ${platform} platform. ` +
+          `Available ${platform} devices: ${platformDevices.join(", ") || "none"}`
+        );
+      }
+
+      await this.verifyDevice(providedDeviceId, platform);
+      this.setCurrentDevice(providedDevice, platform);
+      return providedDevice;
+    }
+
+    // If we have a current device for the requested platform, verify it's still ready
+    if (this.currentDevice && this.currentPlatform === platform) {
       try {
-        await this.verifyDevice(this.currentDeviceId);
-        return this.currentDeviceId;
+        await this.verifyDevice(this.currentDevice.deviceId, platform);
+        return this.currentDevice;
       } catch (error) {
-        logger.warn(`Current device ${this.currentDeviceId} is no longer ready: ${error}`);
-        this.currentDeviceId = undefined;
+        logger.warn(`Current device ${this.currentDevice} is no longer ready: ${error}`);
+        this.currentDevice = undefined;
+        this.currentPlatform = undefined;
       }
     }
 
     if (failIfNoDevice) {
-      throw new ActionableError("No device is currently set and none was provided.");
+      throw new ActionableError(`No device is currently set and none was provided for platform: ${platform}.`);
     }
 
-    // No device set - find or start one
-    const deviceId = await this.findOrStartDevice();
-    this.setCurrentDeviceId(deviceId);
-    return deviceId;
+    // No device set - find or start one for the requested platform
+    const device = await this.findOrStartDevice(platform);
+    this.setCurrentDevice(device, platform);
+    return device;
   }
 
   /**
-     * Verify a specific device is connected and ready
-     */
-  private async verifyDevice(deviceId: string): Promise<void> {
-    const allDevices = await this.adbUtils.getDevices();
+   * Verify a specific device is connected and ready for the given platform
+   */
+  private async verifyDevice(deviceId: string, platform: Platform): Promise<void> {
+    if (platform === "android") {
+      await this.verifyAndroidDevice(deviceId);
+    } else {
+      await this.verifyIosDevice(deviceId);
+    }
+  }
 
-    if (!allDevices.includes(deviceId)) {
+  /**
+   * Verify an Android device is connected and ready
+   */
+  private async verifyAndroidDevice(deviceId: string): Promise<void> {
+    const allDevices = await this.adb.getBootedEmulators();
+    const device = allDevices.find(device => device.name === deviceId);
+
+    if (!device) {
       throw new ActionableError(
-        `Device ${deviceId} is not connected. Available devices: ${allDevices.join(", ") || "none"}`
+        `Android device ${deviceId} is not connected. Available devices: ${allDevices.join(", ") || "none"}`
       );
     }
 
     // Check if we can get an active window from the device
     try {
-      logger.info(`[DeviceSessionManager] Verifying device ${deviceId} readiness`);
+      logger.info(`[DeviceSessionManager] Verifying Android device ${deviceId} readiness`);
 
       if (!this.window || this.window.getDeviceId() !== deviceId) {
-        this.window = new Window(deviceId);
+        this.window = new Window(device);
       }
 
       let activeWindow = await this.window.getActive();
       if (!activeWindow || !activeWindow.appId || !activeWindow.activityName) {
         activeWindow = await this.window.getActive(true);
         if (!activeWindow || !activeWindow.appId || !activeWindow.activityName) {
-          logger.warn(`[DeviceSessionManager] Device ${deviceId} is not fully ready`);
+          logger.warn(`[DeviceSessionManager] Android device ${deviceId} is not fully ready`);
           if (activeWindow) {
             logger.warn(`[DeviceSessionManager] activeWindow.appId: ${activeWindow.appId} | activeWindow.activityName: ${activeWindow.activityName}`);
           } else {
             logger.warn(`[DeviceSessionManager] activeWindow: ${activeWindow}`);
           }
           throw new ActionableError(
-            `Cannot get active window information from device ${deviceId}. The device may not be fully booted or is in an unusual state.`
+            `Cannot get active window information from Android device ${deviceId}. The device may not be fully booted or is in an unusual state.`
           );
         }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new ActionableError(
-        `Failed to verify device ${deviceId} readiness: ${errorMessage}`
+        `Failed to verify Android device ${deviceId} readiness: ${errorMessage}`
       );
     }
 
     try {
-      await AccessibilityServiceManager.getInstance(deviceId).setup();
-    }  catch (error) {
+      await AccessibilityServiceManager.getInstance(device).setup();
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`[DeviceSessionManager] Failed to setup accessibility service: ${errorMessage}`);
       // Rethrow ActionableErrors to preserve their specific error messages
@@ -136,42 +222,111 @@ export class DeviceSessionManager {
   }
 
   /**
-     * Find an available device or start an emulator
-     */
-  private async findOrStartDevice(): Promise<string> {
-    const allDevices = await this.adbUtils.getDevices();
+   * Verify an iOS device is connected and ready
+   */
+  private async verifyIosDevice(deviceId: string): Promise<void> {
+    const deviceInfo = await this.simCtl.getDeviceInfo(deviceId);
+
+    if (!deviceInfo) {
+      throw new ActionableError(
+        `iOS simulator ${deviceId} is not available. Please check if it exists and is available.`
+      );
+    }
+
+    if (!deviceInfo.isAvailable) {
+      throw new ActionableError(
+        `iOS simulator ${deviceId} is not available (state: ${deviceInfo.state}). Please check simulator availability.`
+      );
+    }
+
+    // If simulator is not booted, we could boot it, but for now we'll just check
+    if (deviceInfo.state !== "Booted") {
+      logger.info(`iOS simulator ${deviceId} is not booted (state: ${deviceInfo.state})`);
+      // Note: We could auto-boot here if desired, but keeping consistent with current behavior
+    }
+  }
+
+  /**
+   * Find an available device or start an emulator for the specified platform
+   */
+  private async findOrStartDevice(platform: Platform): Promise<BootedDevice> {
+    if (platform === "android") {
+      return await this.findOrStartAndroidDevice();
+    } else {
+      return await this.findOrStartIosDevice();
+    }
+  }
+
+  /**
+   * Find an available Android device or start an emulator
+   */
+  private async findOrStartAndroidDevice(): Promise<BootedDevice> {
+    const allDevices = await this.deviceUtils.getBootedDevices("android");
 
     if (allDevices.length > 0) {
       // Use the first available device
-      const deviceId = allDevices[0];
-      await this.verifyDevice(deviceId);
-      return deviceId;
+      const device = allDevices[0];
+      const deviceId = device.deviceId!;
+      await this.verifyAndroidDevice(deviceId);
+      return device;
     }
 
-    // No devices - try to start an emulator
-    const availableAvds = await this.emulatorUtils.listAvds();
+    // No devices - try to start a device from an image
+    const availableImages = await this.deviceUtils.listDeviceImages("android");
 
-    if (availableAvds.length === 0) {
+    if (availableImages.length === 0) {
       throw new ActionableError(
-        "No devices are connected and no Android Virtual Devices (AVDs) are available. Please connect a physical device or create an AVD first."
+        "No devices are connected and no device images are available. Please connect a physical device or create a device image first."
       );
     }
 
     // Start the first available AVD
-    const avdName = availableAvds[0];
-    logger.info(`Starting emulator ${avdName}...`);
-    await this.emulatorUtils.startEmulator(avdName, []);
+    const deviceImage = availableImages[0];
+    logger.info(`Starting Android emulator ${deviceImage}...`);
+    await this.deviceUtils.startDevice(deviceImage);
 
     // Wait for the emulator to fully boot and get its device ID
-    const newDeviceId = await this.emulatorUtils.waitForEmulatorReady(avdName);
+    const newDevice = await this.deviceUtils.waitForDeviceReady(deviceImage);
 
-    if (!newDeviceId) {
+    if (!newDevice) {
       throw new ActionableError(
-        `Failed to start emulator ${avdName}.`
+        `Failed to start Android emulator ${deviceImage}.`
       );
     }
 
-    await this.verifyDevice(newDeviceId);
-    return newDeviceId;
+    await this.verifyAndroidDevice(newDevice.deviceId!);
+    return newDevice;
+  }
+
+  /**
+   * Find an available iOS device or start a simulator
+   */
+  private async findOrStartIosDevice(): Promise<BootedDevice> {
+    const allDevices = await this.simCtl.listSimulatorImages();
+
+    if (allDevices.length === 0) {
+      throw new ActionableError(
+        "No iOS simulators are available. Please create an iOS simulator using Xcode or the Simulator app."
+      );
+    }
+
+    // Check for already booted simulators first
+    const bootedDevices = await this.simCtl.getBootedSimulators();
+
+    if (bootedDevices.length > 0) {
+      // Use the first booted device
+      const device = bootedDevices[0];
+      await this.verifyIosDevice(device.deviceId!);
+      return device;
+    }
+
+    // No booted devices - boot the first available simulator
+    const device = allDevices[0];
+    const deviceId = device.deviceId!;
+    logger.info(`Booting iOS simulator ${device}...`);
+
+    const bootedDevice = await this.simCtl.bootSimulator(deviceId);
+    await this.verifyIosDevice(deviceId);
+    return bootedDevice;
   }
 }

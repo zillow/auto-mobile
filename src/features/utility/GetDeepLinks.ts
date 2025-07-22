@@ -1,12 +1,12 @@
 import { logger } from "../../utils/logger";
 import { DeepLinkManager } from "../../utils/deepLinkManager";
-import { DeepLinkResult } from "../../models";
+import { BootedDevice, DeepLinkResult } from "../../models";
 
 export class GetDeepLinks {
   private deepLinkManager: DeepLinkManager;
 
-  constructor(deviceId: string | null = null) {
-    this.deepLinkManager = new DeepLinkManager(deviceId);
+  constructor(device: BootedDevice | null = null) {
+    this.deepLinkManager = new DeepLinkManager(device);
   }
 
   /**

@@ -3,13 +3,13 @@ import { ToolRegistry } from "./toolRegistry";
 import { GetDeepLinks } from "../features/utility/GetDeepLinks";
 import { DetectIntentChooser } from "../features/observe/DetectIntentChooser";
 import { HandleIntentChooser } from "../features/action/HandleIntentChooser";
-import { ActionableError } from "../models";
+import { ActionableError, BootedDevice } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
 
 // Schema definitions for tool arguments
 export const getDeepLinksSchema = z.object({
-  appId: z.string().describe("Android app package ID to query for deep links")
+  appId: z.string().describe("Android app package ID to query for deep links"),
 });
 
 export const detectIntentChooserSchema = z.object({
@@ -37,9 +37,9 @@ export interface HandleIntentChooserArgs {
 export function registerDeepLinkTools() {
 
   // Get deep links handler
-  const getDeepLinksHandler = async (deviceId: string, args: GetDeepLinksArgs) => {
+  const getDeepLinksHandler = async (device: BootedDevice, args: GetDeepLinksArgs) => {
     try {
-      const getDeepLinks = new GetDeepLinks(deviceId);
+      const getDeepLinks = new GetDeepLinks(device);
       const result = await getDeepLinks.execute(args.appId);
 
       return createJSONToolResponse({
@@ -60,9 +60,9 @@ export function registerDeepLinkTools() {
   };
 
   // Detect intent chooser handler
-  const detectIntentChooserHandler = async (deviceId: string, args: DetectIntentChooserArgs) => {
+  const detectIntentChooserHandler = async (device: BootedDevice, args: DetectIntentChooserArgs) => {
     try {
-      const detectIntentChooser = new DetectIntentChooser(deviceId);
+      const detectIntentChooser = new DetectIntentChooser(device);
       const result = await detectIntentChooser.execute();
 
       return createJSONToolResponse({
@@ -79,9 +79,9 @@ export function registerDeepLinkTools() {
   };
 
   // Handle intent chooser handler
-  const handleIntentChooserHandler = async (deviceId: string, args: HandleIntentChooserArgs) => {
+  const handleIntentChooserHandler = async (device: BootedDevice, args: HandleIntentChooserArgs) => {
     try {
-      const handleIntentChooser = new HandleIntentChooser(deviceId);
+      const handleIntentChooser = new HandleIntentChooser(device);
       const result = await handleIntentChooser.execute(
         args.preference || "just_once",
         args.customAppPackage,

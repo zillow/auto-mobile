@@ -1,6 +1,13 @@
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { ActionableError, Element, ObserveResult, TapOnElementResult, ViewHierarchyResult } from "../../models";
-import { AdbUtils } from "../../utils/adb";
+import {
+  ActionableError,
+  BootedDevice,
+  Element,
+  ObserveResult,
+  TapOnElementResult,
+  ViewHierarchyResult
+} from "../../models";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
 import { logger } from "../../utils/logger";
@@ -14,10 +21,10 @@ export class TapOnElement extends BaseVisualChange {
   private accessibilityService: AccessibilityServiceClient;
   private static readonly MAX_ATTEMPTS = 5;
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
     this.elementUtils = new ElementUtils();
-    this.accessibilityService = new AccessibilityServiceClient(deviceId, this.adb);
+    this.accessibilityService = new AccessibilityServiceClient(device, this.adb);
   }
 
   /**

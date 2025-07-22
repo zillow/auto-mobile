@@ -1,12 +1,12 @@
-import { AdbUtils } from "../../utils/adb";
-import { ExecResult } from "../../models";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { BootedDevice, ExecResult } from "../../models";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 
 export class GetDumpsysWindow {
   private adb: AdbUtils;
-  private readonly deviceId: string;
+  private readonly device: BootedDevice;
   private static memoryCache = new Map<string, { data: ExecResult; timestamp: number }>();
   private static readonly CACHE_TTL_MS = 30000; // 30 seconds
   private readonly cacheDir: string;
@@ -14,14 +14,14 @@ export class GetDumpsysWindow {
 
   /**
    * Create a GetDumpsysWindow instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.deviceId = deviceId;
-    this.adb = adb || new AdbUtils(deviceId);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.device = device;
+    this.adb = adb || new AdbUtils(device);
     this.cacheDir = path.join(os.tmpdir(), "auto-mobile-cache");
-    this.cacheFilePath = path.join(this.cacheDir, `dumpsys-window-${deviceId}.json`);
+    this.cacheFilePath = path.join(this.cacheDir, `dumpsys-window-${device.deviceId}.json`);
   }
 
   /**
@@ -30,7 +30,7 @@ export class GetDumpsysWindow {
    */
   public async execute(): Promise<ExecResult> {
     // Check memory cache first
-    const memoryCached = GetDumpsysWindow.memoryCache.get(this.deviceId);
+    const memoryCached = GetDumpsysWindow.memoryCache.get(this.device.deviceId);
     if (memoryCached && this.isCacheValid(memoryCached.timestamp)) {
       return memoryCached.data;
     }
@@ -40,7 +40,7 @@ export class GetDumpsysWindow {
       const diskCached = await this.loadFromDiskCache();
       if (diskCached && this.isCacheValid(diskCached.timestamp)) {
         // Update memory cache with disk data
-        GetDumpsysWindow.memoryCache.set(this.deviceId, diskCached);
+        GetDumpsysWindow.memoryCache.set(this.device.deviceId, diskCached);
         return diskCached.data;
       }
     } catch (error) {
@@ -61,14 +61,14 @@ export class GetDumpsysWindow {
     const cacheEntry = { data: result, timestamp };
 
     // Update memory cache
-    GetDumpsysWindow.memoryCache.set(this.deviceId, cacheEntry);
+    GetDumpsysWindow.memoryCache.set(this.device.deviceId, cacheEntry);
 
     // Update disk cache
     try {
       await this.saveToDiskCache(cacheEntry);
     } catch (error) {
       // Disk cache write failed, but we still return the result
-      console.warn(`Failed to write disk cache for device ${this.deviceId}:`, error);
+      console.warn(`Failed to write disk cache for device ${this.device.deviceId}:`, error);
     }
 
     return result;

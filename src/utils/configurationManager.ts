@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { logger } from "./logger";
-import { ActionableError, AppConfig, DeviceConfig } from "../models";
+import { ActionableError, AppConfig, BootedDevice, DeviceConfig } from "../models";
 import { DeviceSessionArgs } from "../server/configurationTools";
 
 export class ConfigurationManager {
@@ -187,15 +187,15 @@ export class ConfigurationManager {
     return Array.from(this.deviceSessionConfigs.values());
   }
 
-  public getConfigForDevice(deviceId: string): DeviceConfig | undefined {
-    return this.deviceSessionConfigs.get(deviceId);
+  public getConfigForDevice(device: BootedDevice): DeviceConfig | undefined {
+    return this.deviceSessionConfigs.get(device.deviceId);
   }
 
   /**
      * Check if test authoring is enabled
      */
-  public isTestAuthoringEnabled(deviceId: string): boolean {
-    return this.getConfigForDevice(deviceId)?.activeMode === "testAuthoring";
+  public isTestAuthoringEnabled(device: BootedDevice): boolean {
+    return this.getConfigForDevice(device)?.activeMode === "testAuthoring";
   }
 
   /**

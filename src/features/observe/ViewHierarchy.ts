@@ -1,10 +1,10 @@
 import fs from "fs-extra";
 import path from "path";
 import xml2js from "xml2js";
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { CryptoUtils } from "../../utils/crypto";
-import { ViewHierarchyCache } from "../../models";
+import { BootedDevice, ViewHierarchyCache } from "../../models";
 import { Element } from "../../models";
 import { ViewHierarchyResult } from "../../models";
 import { TakeScreenshot } from "./TakeScreenshot";
@@ -72,22 +72,22 @@ export class ViewHierarchy {
 
   /**
    * Create a ViewHierarchy instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    * @param takeScreenshot - Optional TakeScreenshot instance for testing
    * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
    */
   constructor(
-    deviceId: string,
+    device: BootedDevice,
     adb: AdbUtils | null = null,
     takeScreenshot: TakeScreenshot | null = null,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
-    this.adb = adb || new AdbUtils(deviceId);
-    this.takeScreenshot = takeScreenshot || new TakeScreenshot(deviceId, this.adb);
+    this.adb = adb || new AdbUtils(device);
+    this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
     this.elementUtils = new ElementUtils();
     this.sourceMapper = SourceMapper.getInstance();
-    this.accessibilityServiceClient = accessibilityServiceClient || new AccessibilityServiceClient(deviceId, this.adb);
+    this.accessibilityServiceClient = accessibilityServiceClient || new AccessibilityServiceClient(device, this.adb);
 
     // Ensure cache directories exist
     if (!fs.existsSync(ViewHierarchy.cacheDir)) {

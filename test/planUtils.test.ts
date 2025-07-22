@@ -66,7 +66,7 @@ describe("Plan Utils", () => {
       const logEntries = [
         {
           timestamp: "2023-01-01T10:00:00.000Z",
-          tool: "startEmulator",
+          tool: "startDevice",
           params: { avdName: "test" },
           result: { success: true }
         },
@@ -87,7 +87,7 @@ describe("Plan Utils", () => {
 
       expect(result.success).to.be.true;
       expect(result.stepCount).to.equal(1); // Only launchApp
-      expect(result.planContent).to.not.include("startEmulator");
+      expect(result.planContent).to.not.include("startDevice");
       expect(result.planContent).to.include("launchApp");
     });
 

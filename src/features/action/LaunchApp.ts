@@ -1,20 +1,20 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { LaunchAppResult } from "../../models";
+import { BootedDevice, LaunchAppResult } from "../../models";
 import { ActionableError } from "../../models";
 import { TerminateApp } from "./TerminateApp";
 import { ClearAppData } from "./ClearAppData";
 
 export class LaunchApp extends BaseVisualChange {
-  private deviceId: string;
+  private device: BootedDevice;
   /**
    * Create an LaunchApp instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
-    this.deviceId = deviceId;
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
+    this.device = device;
   }
 
   /**
@@ -82,9 +82,9 @@ export class LaunchApp extends BaseVisualChange {
     if (isRunning) {
 
       if (clearAppData) {
-        await new ClearAppData(this.deviceId, this.adb).execute(packageName);
+        await new ClearAppData(this.device, this.adb).execute(packageName);
       } else if (coldBoot) {
-        await new TerminateApp(this.deviceId, this.adb).execute(packageName);
+        await new TerminateApp(this.device, this.adb).execute(packageName);
       }
 
       // Check if app is in foreground
