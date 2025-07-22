@@ -1,27 +1,27 @@
 import { ChildProcess } from "child_process";
 import { DeviceInfo, ActionableError, SomePlatform, BootedDevice } from "../models";
 import { AdbUtils } from "./android-cmdline-tools/adb";
-import { SimCtl } from "./ios-cmdline-tools/idb";
+import { IdbUtils } from "./ios-cmdline-tools/idb";
 import { AndroidEmulator } from "./android-cmdline-tools/emulator";
 
 export class DeviceUtils {
   private adb: AdbUtils;
   private emulator: AndroidEmulator;
-  private simctl: SimCtl;
+  private idb: IdbUtils;
 
   /**
    * Create an EmulatorUtils instance
    * @param adb - An instance of AdbUtils for interacting with Android Debug Bridge
-   * @param simctl - An instance of SimCtl for interacting with iOS simulator controls
+   * @param idb - An instance of IdbUtils for interacting with iOS simulator controls
    * @param emulator - An instance of AndroidEmulator for interacting with iOS simulator controls
    */
   constructor(
     adb: AdbUtils | null = null,
-    simctl: SimCtl | null = null,
+    idb: IdbUtils | null = null,
     emulator: AndroidEmulator | null = null,
   ) {
     this.adb = adb || new AdbUtils();
-    this.simctl = simctl || new SimCtl();
+    this.idb = idb || new IdbUtils();
     this.emulator = emulator || new AndroidEmulator();
   }
 
@@ -34,10 +34,10 @@ export class DeviceUtils {
       case "android":
         return this.emulator.listAvds();
       case "ios":
-        return this.simctl.listSimulatorImages();
+        return this.idb.listSimulatorImages();
       case "either":
         const emulators = await this.emulator.listAvds();
-        const simulators = await this.simctl.listSimulatorImages();
+        const simulators = await this.idb.listSimulatorImages();
         return [...emulators, ...simulators];
     }
   }
@@ -52,7 +52,7 @@ export class DeviceUtils {
       case "android":
         return this.emulator.isAvdRunning(device.name);
       case "ios":
-        return this.simctl.isSimulatorRunning(device.name);
+        return this.idb.isSimulatorRunning(device.name);
     }
   }
 
@@ -65,10 +65,10 @@ export class DeviceUtils {
       case "android":
         return this.emulator.getBootedEmulators();
       case "ios":
-        return this.simctl.getBootedSimulators();
+        return this.idb.getBootedSimulators();
       case "either":
         const emulators = await this.emulator.getBootedEmulators();
-        const simulators = await this.simctl.getBootedSimulators();
+        const simulators = await this.idb.getBootedSimulators();
         return [...emulators, ...simulators];
     }
   }
@@ -85,7 +85,7 @@ export class DeviceUtils {
       case "android":
         return this.emulator.startEmulator(device.name);
       case "ios":
-        return this.simctl.startSimulator(device.name);
+        return this.idb.startSimulator(device.name);
       default:
         throw new ActionableError("Unknown platform");
     }
@@ -103,7 +103,7 @@ export class DeviceUtils {
       case "android":
         return this.emulator.killEmulator(device);
       case "ios":
-        return this.simctl.killSimulator(device);
+        return this.idb.killSimulator(device);
     }
   }
 
@@ -121,7 +121,7 @@ export class DeviceUtils {
       case "android":
         return this.emulator.waitForEmulatorReady(device.name, timeoutMs);
       case "ios":
-        return this.simctl.waitForSimulatorReady(device.name);
+        return this.idb.waitForSimulatorReady(device.name);
       default:
         throw new ActionableError("Unknown platform");
     }

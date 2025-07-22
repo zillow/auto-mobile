@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { ActionableError } from "../models/ActionableError";
 import { SimulatorUtils } from "../utils/simulator";
-import { IdbUtils } from "../utils/idb";
+import { IdbUtils } from "../utils/ios-cmdline-tools/idb";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
 

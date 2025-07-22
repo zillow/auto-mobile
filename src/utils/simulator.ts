@@ -2,7 +2,7 @@ import { ChildProcess, exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "./logger";
 import { ExecResult } from "../models";
-import { IdbUtils } from "./idb";
+import { IdbUtils } from "./ios-cmdline-tools/idb";
 
 const execAsync = async (command: string): Promise<ExecResult> => {
   const result = await promisify(exec)(command);
