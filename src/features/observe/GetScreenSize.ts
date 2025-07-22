@@ -288,19 +288,9 @@ export class GetScreenSize {
         // iOS device - use idb to get screen size
         return await this.getiOSScreenSize(dumpsysResult);
       } else {
-        // Get dumpsys result if not provided
-        const dumpsysOutput = await this.adb.executeCommand("shell dumpsys window");
-        rotation = await this.detectDeviceRotation(dumpsysOutput);
+        // Android device - use adb to get screen size
+        return await this.getAndroidScreenSize(dumpsysResult);
       }
-
-      const screenSize = this.adjustDimensionsForRotation(physicalWidth, physicalHeight, rotation);
-
-      // Cache the result in both memory and disk
-      GetScreenSize.memoryCache.set(cacheKey, screenSize);
-      this.saveToDiskCache(cacheKey, screenSize);
-
-      logger.debug(`Screen size computed and cached for device: ${this.device.deviceId}`);
-      return screenSize;
     } catch (err) {
       throw new Error(`Failed to get screen size: ${err instanceof Error ? err.message : String(err)}`);
     }
