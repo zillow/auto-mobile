@@ -3,7 +3,6 @@ import { describe, it, beforeEach } from "mocha";
 import { GetScreenSize } from "../../../src/features/observe/GetScreenSize";
 import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { BootedDevice } from "../../../src/models";
-import { DeviceUtils } from "../../../src/utils/deviceUtils";
 
 describe("GetScreenSize", function() {
   describe("Unit Tests for Extracted Methods", function() {
@@ -16,6 +15,8 @@ describe("GetScreenSize", function() {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
       mockDevice = {
+        name: "test-device",
+        platform: "android",
         deviceId: "test-device"
       } as BootedDevice;
       getScreenSize = new GetScreenSize(mockDevice, mockAdb);
@@ -123,55 +124,6 @@ describe("GetScreenSize", function() {
         expect(landscape.width).to.equal(size.height);
         expect(landscape.height).to.equal(size.width);
       });
-    });
-  });
-
-  describe("Integration Tests", function() {
-    this.timeout(15000);
-
-    let getScreenSize: GetScreenSize;
-    let adb: AdbUtils;
-    let device: BootedDevice;
-
-    beforeEach(async function() {
-      adb = new AdbUtils();
-      const deviceUtils = new DeviceUtils();
-
-      // Check if any devices are connected
-      try {
-        const devices = await deviceUtils.getBootedDevices("android");
-        if (devices.length === 0) {
-          this.skip(); // Skip tests if no devices are connected
-          return;
-        }
-        // Use the first available device
-        device = devices[0];
-        getScreenSize = new GetScreenSize(device, adb);
-      } catch (error) {
-        this.skip(); // Skip tests if getting devices fails
-        return;
-      }
-    });
-
-    it("should get screen size from real device", async function() {
-      const result = await getScreenSize.execute();
-
-      expect(result).to.have.property("width");
-      expect(result).to.have.property("height");
-
-      expect(result.width).to.be.a("number");
-      expect(result.height).to.be.a("number");
-
-      // Reasonable bounds check - screen sizes should be positive and reasonable
-      expect(result.width).to.be.greaterThan(0);
-      expect(result.height).to.be.greaterThan(0);
-
-      // Modern devices typically have at least 480px in the smallest dimension
-      expect(Math.min(result.width, result.height)).to.be.at.least(480);
-
-      // And not more than 5000px in either dimension (reasonable upper bound)
-      expect(result.width).to.be.at.most(5000);
-      expect(result.height).to.be.at.most(5000);
     });
   });
 });

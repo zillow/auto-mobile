@@ -4,18 +4,25 @@ import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { ObserveResult } from "../../../src/models/ObserveResult";
+import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { logger } from "../../../src/utils/logger";
 
 describe("ObserveScreen", function() {
   describe("Unit Tests for Extracted Methods", function() {
     let observeScreen: ObserveScreen;
     let mockAdb: AdbUtils;
+    let mockDevice: BootedDevice;
 
     beforeEach(function() {
+      mockDevice = {
+        deviceId: "test-device",
+        name: "Test Device",
+        platform: "android"
+      };
       mockAdb = {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
-      observeScreen = new ObserveScreen(null, mockAdb);
+      observeScreen = new ObserveScreen(mockDevice, mockAdb);
     });
 
     it("should create base result with correct structure", function() {
@@ -105,12 +112,18 @@ describe("ObserveScreen", function() {
 
   describe("Unit Tests for Focused Element Functionality", function() {
     let viewHierarchy: any;
+    let mockDevice: BootedDevice;
 
     beforeEach(function() {
+      mockDevice = {
+        deviceId: "test-device",
+        name: "Test Device",
+        platform: "android"
+      };
       const mockAdb = {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
-      const observeScreen = new ObserveScreen(null, mockAdb);
+      const observeScreen = new ObserveScreen(mockDevice, mockAdb);
       viewHierarchy = (observeScreen as any).viewHierarchy;
     });
 
@@ -274,13 +287,19 @@ describe("ObserveScreen", function() {
     let observeScreen: ObserveScreen;
     let adb: AdbUtils;
     let awaitIdle: AwaitIdle;
+    let mockDevice: BootedDevice;
     const CLOCK_PACKAGE = "com.google.android.deskclock";
 
     beforeEach(async function() {
+      mockDevice = {
+        deviceId: "test-device",
+        name: "Test Device",
+        platform: "android"
+      };
       // Initialize with real ADB connection
       adb = new AdbUtils();
-      observeScreen = new ObserveScreen("test-device", adb);
-      awaitIdle = new AwaitIdle("test-device", adb);
+      observeScreen = new ObserveScreen(mockDevice, adb);
+      awaitIdle = new AwaitIdle(mockDevice, adb);
 
       // Check if any devices are connected
       try {
@@ -455,7 +474,12 @@ describe("ObserveScreen", function() {
       }
 
       // Create a new ObserveScreen with an invalid device ID
-      const invalidObserveScreen = new ObserveScreen("invalid-device-id");
+      const invalidDevice: BootedDevice = {
+        deviceId: "invalid-device-id",
+        name: "Invalid Device",
+        platform: "android"
+      };
+      const invalidObserveScreen = new ObserveScreen(invalidDevice);
 
       // Should still return a result object with error info
       const result = await invalidObserveScreen.execute();
