@@ -18,10 +18,13 @@ struct InputsView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header
-                Text("SwiftUI Text Input Views")
+                Text("Text Input Views")
                     .font(.title)
                     .fontWeight(.bold)
                     .padding(.top)
+                Text("Comprehensive list of text input views")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
                 
                 // Basic TextField
                 VStack(alignment: .leading, spacing: 8) {
