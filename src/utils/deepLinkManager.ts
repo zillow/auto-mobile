@@ -1,14 +1,21 @@
 import { logger } from "./logger";
-import { AdbUtils } from "./adb";
-import { DeepLinkResult, IntentFilter, DeepLinkInfo, IntentChooserResult, ViewHierarchyResult } from "../models";
+import { AdbUtils } from "./android-cmdline-tools/adb";
+import {
+  DeepLinkResult,
+  IntentFilter,
+  DeepLinkInfo,
+  IntentChooserResult,
+  ViewHierarchyResult,
+  BootedDevice
+} from "../models";
 import { ElementUtils } from "../features/utility/ElementUtils";
 
 export class DeepLinkManager {
   private adbUtils: AdbUtils;
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string | null = null) {
-    this.adbUtils = new AdbUtils(deviceId);
+  constructor(device: BootedDevice | null = null) {
+    this.adbUtils = new AdbUtils(device);
     this.elementUtils = new ElementUtils();
   }
 
@@ -16,8 +23,8 @@ export class DeepLinkManager {
      * Set the target device ID
      * @param deviceId - Device identifier
      */
-  setDeviceId(deviceId: string): void {
-    this.adbUtils.setDeviceId(deviceId);
+  setDeviceId(device: BootedDevice): void {
+    this.adbUtils.setDevice(device);
   }
 
   /**

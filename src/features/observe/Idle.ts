@@ -1,17 +1,17 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
-import { UiStabilityResult, TouchIdleResult, RotationCheckResult } from "../../models";
+import { UiStabilityResult, TouchIdleResult, RotationCheckResult, BootedDevice } from "../../models";
 
 export class Idle {
   private adb: AdbUtils;
 
   /**
    * Create an Idle instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device ID
    * @param adb
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(deviceId);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.adb = adb || new AdbUtils(device);
   }
 
   /**

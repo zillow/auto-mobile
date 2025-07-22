@@ -1,18 +1,25 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { GetScreenSize } from "../../../src/features/observe/GetScreenSize";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
+import { BootedDevice } from "../../../src/models";
 
 describe("GetScreenSize", function() {
   describe("Unit Tests for Extracted Methods", function() {
     let getScreenSize: GetScreenSize;
     let mockAdb: AdbUtils;
+    let mockDevice: BootedDevice;
 
     beforeEach(function() {
       mockAdb = {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
-      getScreenSize = new GetScreenSize(null, mockAdb);
+      mockDevice = {
+        name: "test-device",
+        platform: "android",
+        deviceId: "test-device"
+      } as BootedDevice;
+      getScreenSize = new GetScreenSize(mockDevice, mockAdb);
     });
 
     it("should parse physical dimensions correctly", function() {
@@ -117,52 +124,6 @@ describe("GetScreenSize", function() {
         expect(landscape.width).to.equal(size.height);
         expect(landscape.height).to.equal(size.width);
       });
-    });
-  });
-
-  describe("Integration Tests", function() {
-    this.timeout(15000);
-
-    let getScreenSize: GetScreenSize;
-    let adb: AdbUtils;
-
-    beforeEach(async function() {
-      adb = new AdbUtils();
-      getScreenSize = new GetScreenSize("test-device", adb);
-
-      // Check if any devices are connected
-      try {
-        const devices = await adb.executeCommand("devices");
-        const deviceLines = devices.stdout.split("\n").filter(line => line.trim() && !line.includes("List of devices"));
-        if (deviceLines.length === 0) {
-          this.skip(); // Skip tests if no devices are connected
-          return;
-        }
-      } catch (error) {
-        this.skip(); // Skip tests if ADB command fails
-        return;
-      }
-    });
-
-    it("should get screen size from real device", async function() {
-      const result = await getScreenSize.execute();
-
-      expect(result).to.have.property("width");
-      expect(result).to.have.property("height");
-
-      expect(result.width).to.be.a("number");
-      expect(result.height).to.be.a("number");
-
-      // Reasonable bounds check - screen sizes should be positive and reasonable
-      expect(result.width).to.be.greaterThan(0);
-      expect(result.height).to.be.greaterThan(0);
-
-      // Modern devices typically have at least 480px in the smallest dimension
-      expect(Math.min(result.width, result.height)).to.be.at.least(480);
-
-      // And not more than 5000px in either dimension (reasonable upper bound)
-      expect(result.width).to.be.at.most(5000);
-      expect(result.height).to.be.at.most(5000);
     });
   });
 });

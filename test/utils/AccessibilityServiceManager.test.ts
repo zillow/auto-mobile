@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { AccessibilityServiceManager } from "../../src/utils/accessibilityServiceManager";
-import { AdbUtils } from "../../src/utils/adb";
+import { AdbUtils } from "../../src/utils/android-cmdline-tools/adb";
 
 describe("AccessibilityServiceManager", function() {
   let accessibilityServiceClient: AccessibilityServiceManager;

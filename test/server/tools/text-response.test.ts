@@ -31,11 +31,11 @@ describe("MCP Tools Text Response", () => {
       isError: z.boolean().optional()
     }).passthrough();
 
-    // Test listAvds tool which should return text response without device dependency
+    // Test listDeviceImages tool which should return text response without device dependency
     const result = await client.request({
       method: "tools/call",
       params: {
-        name: "listAvds",
+        name: "listDeviceImages",
         arguments: {}
       }
     }, toolResponseSchema);

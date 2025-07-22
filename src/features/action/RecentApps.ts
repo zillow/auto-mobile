@@ -1,6 +1,6 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { RecentAppsResult, ViewHierarchyResult } from "../../models";
+import { BootedDevice, RecentAppsResult, ViewHierarchyResult } from "../../models";
 import { SwipeOnScreen } from "./SwipeOnScreen";
 import { PressButton } from "./PressButton";
 import { ElementUtils } from "../utility/ElementUtils";
@@ -14,10 +14,10 @@ export class RecentApps extends BaseVisualChange {
   private pressButton: PressButton;
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
-    this.swipeOnScreen = new SwipeOnScreen(deviceId, adb);
-    this.pressButton = new PressButton(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
+    this.swipeOnScreen = new SwipeOnScreen(device, adb);
+    this.pressButton = new PressButton(device, adb);
     this.elementUtils = new ElementUtils();
   }
 

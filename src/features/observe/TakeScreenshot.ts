@@ -1,10 +1,11 @@
 import fs from "fs-extra";
 import path from "path";
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { Window } from "./Window";
 import { logger } from "../../utils/logger";
 import { ScreenshotResult } from "../../models/ScreenshotResult";
 import { Image } from "../../utils/image-utils";
+import { BootedDevice } from "../../models";
 
 export interface ScreenshotOptions {
   format?: "png" | "webp";
@@ -20,15 +21,15 @@ export class TakeScreenshot {
 
   /**
    * Create a TakeScreenshot instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
   constructor(
-    deviceId: string,
+    device: BootedDevice,
     adb: AdbUtils | null = null
   ) {
-    this.adb = adb || new AdbUtils(deviceId);
-    this.window = new Window(deviceId, this.adb);
+    this.adb = adb || new AdbUtils(device);
+    this.window = new Window(device, this.adb);
 
     // Ensure cache directory exists
     if (!fs.existsSync(TakeScreenshot.cacheDir)) {

@@ -1,10 +1,10 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { OpenURLResult } from "../../models";
+import { BootedDevice, OpenURLResult } from "../../models";
 
 export class OpenURL extends BaseVisualChange {
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
   }
 
   async execute(

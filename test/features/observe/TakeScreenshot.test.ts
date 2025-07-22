@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { describe, it, beforeEach, afterEach } from "mocha";
 import fs from "fs-extra";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { Image } from "../../../src/utils/image-utils";
 import { logger } from "../../../src/utils/logger";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";

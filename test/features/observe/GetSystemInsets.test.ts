@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { GetSystemInsets } from "../../../src/features/observe/GetSystemInsets";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { ExecResult } from "../../../src/models";
 
 describe("GetSystemInsets", function() {

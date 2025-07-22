@@ -12,7 +12,7 @@ import {
   TestPlan,
   StartTestAuthoringResult,
   StopTestAuthoringResult,
-  TestGenerationOptions, AppConfig
+  TestGenerationOptions, AppConfig, BootedDevice
 } from "../models";
 
 export class TestAuthoringManager {
@@ -41,7 +41,7 @@ export class TestAuthoringManager {
   /**
    * Start a test authoring session
    */
-  public async startAuthoringSession(deviceId: string, appId: string, description: string): Promise<StartTestAuthoringResult> {
+  public async startAuthoringSession(device: BootedDevice, appId: string, description: string): Promise<StartTestAuthoringResult> {
     try {
       if (this.currentSession?.isActive) {
         logger.warn("Test authoring session is already active");
@@ -56,7 +56,7 @@ export class TestAuthoringManager {
       this.currentSession = {
         sessionId,
         startTime: new Date(),
-        deviceId,
+        deviceId: device.deviceId,
         appId,
         description,
         toolCalls: [],
@@ -65,7 +65,7 @@ export class TestAuthoringManager {
       };
 
       // Track the specific app if provided
-      this.appMonitor.trackPackage(deviceId, appId);
+      this.appMonitor.trackPackage(device, appId);
       logger.info(`[TEST-AUTHORING] Now tracking package for lifecycle events: ${appId}`);
 
       logger.info(`[TEST-AUTHORING] Test authoring session started: ${sessionId}`);
@@ -91,7 +91,7 @@ export class TestAuthoringManager {
   /**
    * Stop the current test authoring session
    */
-  public async stopAuthoringSession(deviceId: string): Promise<StopTestAuthoringResult> {
+  public async stopAuthoringSession(device: BootedDevice): Promise<StopTestAuthoringResult> {
     if (!this.currentSession || !this.currentSession.isActive) {
       logger.warn("No active test authoring session to stop");
       return {
@@ -113,7 +113,7 @@ export class TestAuthoringManager {
 
     // Stop tracking the app if we were tracking one
     if (session.appId) {
-      await this.appMonitor.untrackPackage(deviceId, session.appId);
+      await this.appMonitor.untrackPackage(device, session.appId);
       logger.info(`[TEST-AUTHORING] Stopped tracking package: ${session.appId}`);
     }
 
@@ -140,7 +140,7 @@ export class TestAuthoringManager {
   /**
    * Log a tool call to the current session
    */
-  public async logToolCall(deviceId: string, toolName: string, parameters: any, result: any): Promise<void> {
+  public async logToolCall(device: BootedDevice, toolName: string, parameters: any, result: any): Promise<void> {
     if (!this.currentSession || !this.currentSession.isActive) {
       return;
     }
@@ -158,12 +158,12 @@ export class TestAuthoringManager {
     logger.info(`[TEST-AUTHORING] Logged tool call: ${toolName}`);
 
     // Check for app lifecycle changes after logging the tool call
-    await this.appMonitor.checkForChanges(deviceId);
+    await this.appMonitor.checkForChanges(device);
 
     // Handle special tool calls
     if (toolName === "launchApp" && parameters.appId) {
       // Start tracking the app that was launched
-      await this.appMonitor.trackPackage(deviceId, parameters.appId);
+      await this.appMonitor.trackPackage(device, parameters.appId);
       logger.info(`[TEST-AUTHORING] Now tracking launched app: ${parameters.appId}`);
     }
 
@@ -173,7 +173,7 @@ export class TestAuthoringManager {
 
     logger.info("Using cached observe result for intelligent test plan placement");
 
-    const observeScreen = new ObserveScreen(deviceId);
+    const observeScreen = new ObserveScreen(device);
     const cachedResult = await observeScreen.getMostRecentCachedObserveResult();
 
     if (cachedResult && cachedResult.activeWindow && cachedResult.activeWindow.appId && cachedResult.viewHierarchy && !cachedResult.error) {
@@ -194,7 +194,7 @@ export class TestAuthoringManager {
   /**
    * Handle app termination for automatic plan generation
    */
-  public async onAppTerminated(deviceId: string, appId: string): Promise<void> {
+  public async onAppTerminated(device: BootedDevice, appId: string): Promise<void> {
     if (!this.currentSession || !this.currentSession.isActive) {
       return;
     }
@@ -207,7 +207,7 @@ export class TestAuthoringManager {
     logger.info(`[TEST-AUTHORING] App terminated during test authoring: ${appId}`);
 
     // Automatically stop the session and generate plan
-    await this.stopAuthoringSession(deviceId);
+    await this.stopAuthoringSession(device);
   }
 
   /**
@@ -324,7 +324,7 @@ export class TestAuthoringManager {
    */
   private setupAppLifecycleHandlers(): void {
     this.appMonitor.addEventListener("terminate", async (event: AppLifecycleEvent) => {
-      await this.onAppTerminated(event.deviceId, event.appId);
+      await this.onAppTerminated(event.device, event.appId);
     });
 
     this.appMonitor.addEventListener("launch", async (event: AppLifecycleEvent) => {

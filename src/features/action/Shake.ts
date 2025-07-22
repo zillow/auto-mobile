@@ -1,11 +1,11 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { ShakeOptions, ShakeResult } from "../../models";
+import { BootedDevice, ShakeOptions, ShakeResult } from "../../models";
 import { logger } from "../../utils/logger";
 
 export class Shake extends BaseVisualChange {
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
   }
 
   async execute(

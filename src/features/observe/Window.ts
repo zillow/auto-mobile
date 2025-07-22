@@ -1,36 +1,37 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { ActiveWindowInfo } from "../../models/ActiveWindowInfo";
 import { logger } from "../../utils/logger";
 import { CryptoUtils } from "../../utils/crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { BootedDevice } from "../../models";
 
 export class Window {
   private adb: AdbUtils;
   private cachedActiveWindow: ActiveWindowInfo | null = null;
-  private readonly deviceId: string;
+  private readonly device: BootedDevice;
   private cacheDir: string = "/tmp/auto-mobile/window";
 
   /**
    * Create a Window instance
-   * @param deviceId - Optional device ID
+   * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(deviceId);
-    this.deviceId = deviceId;
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.adb = adb || new AdbUtils(device);
+    this.device = device;
   }
 
   /**
    * Get the cache file path based on device ID
    */
   private getCacheFilePath(): string {
-    const deviceHash = CryptoUtils.generateCacheKey(this.deviceId);
+    const deviceHash = CryptoUtils.generateCacheKey(this.device.deviceId);
     return path.join(this.cacheDir, deviceHash);
   }
 
   public getDeviceId(): string {
-    return this.deviceId;
+    return this.device.deviceId;
   }
 
   /**

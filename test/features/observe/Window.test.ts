@@ -2,32 +2,48 @@ import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { Window } from "../../../src/features/observe/Window";
 import sinon from "sinon";
-import { AdbUtils } from "../../../src/utils/adb";
+import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { ExecResult } from "../../../src/models/ExecResult";
+import { BootedDevice } from "../../../src/models/DeviceInfo";
 import fs from "fs";
 import path from "path";
 
 describe("Window", () => {
   let window: Window;
   let adbStub: sinon.SinonStubbedInstance<AdbUtils>;
+  let mockDevice: BootedDevice;
 
   beforeEach(() => {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
     adbStub = sinon.createStubInstance(AdbUtils);
-    window = new Window("test-device", adbStub as unknown as AdbUtils);
+    window = new Window(mockDevice, adbStub as unknown as AdbUtils);
     // Clear cache before each test to prevent stale results
     window.clearCache();
   });
 
   describe("constructor", () => {
     it("should create instance with provided deviceId and adb", () => {
-      const deviceId = "test-device";
+      const mockDevice: BootedDevice = {
+        deviceId: "test-device",
+        name: "Test Device",
+        platform: "android"
+      };
       const customAdb = sinon.createStubInstance(AdbUtils);
-      const windowInstance = new Window(deviceId, customAdb as unknown as AdbUtils);
+      const windowInstance = new Window(mockDevice, customAdb as unknown as AdbUtils);
       expect(windowInstance).to.be.instanceOf(Window);
     });
 
     it("should create instance with default values when no parameters provided", () => {
-      const windowInstance = new Window("default-device");
+      const mockDevice: BootedDevice = {
+        deviceId: "default-device",
+        name: "Default Device",
+        platform: "android"
+      };
+      const windowInstance = new Window(mockDevice);
       expect(windowInstance).to.be.instanceOf(Window);
     });
   });

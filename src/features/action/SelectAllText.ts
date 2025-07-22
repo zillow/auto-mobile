@@ -1,14 +1,14 @@
-import { AdbUtils } from "../../utils/adb";
+import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
-import { SelectAllTextResult } from "../../models";
+import { BootedDevice, SelectAllTextResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ActionableError, ObserveResult } from "../../models";
 
 export class SelectAllText extends BaseVisualChange {
   private elementUtils: ElementUtils;
 
-  constructor(deviceId: string, adb: AdbUtils | null = null) {
-    super(deviceId, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    super(device, adb);
     this.elementUtils = new ElementUtils();
   }
 

@@ -121,17 +121,20 @@ export const createMcpServer = (): McpServer => {
     // If there wasn't a deviceId on this session already, lets find one
     // try to use something like request.params.headerNameToString("X-Device-Id")
     const deviceSessionManager = DeviceSessionManager.getInstance();
-    const deviceId = await deviceSessionManager.ensureDeviceReady();
+
+    // Extract platform from parsed parameters, defaulting to "android" for backward compatibility
+    const platform = parsedParams.platform || "android";
+    const device = await deviceSessionManager.ensureDeviceReady(platform);
 
     // Start test authoring session if enabled and not already active
-    if (ConfigurationManager.getInstance().isTestAuthoringEnabled(deviceId) && !testAuthoringManager.isActive()) {
-      const deviceConfig = ConfigurationManager.getInstance().getConfigForDevice(deviceId);
+    if (ConfigurationManager.getInstance().isTestAuthoringEnabled(device) && !testAuthoringManager.isActive()) {
+      const deviceConfig = ConfigurationManager.getInstance().getConfigForDevice(device);
       if (deviceConfig && deviceConfig.testAuthoring) {
         const appId = deviceConfig.testAuthoring.appId;
         const appConfig = ConfigurationManager.getInstance().getConfigForApp(appId);
         if (appConfig && appConfig.appId) {
           await testAuthoringManager.startAuthoringSession(
-            deviceId,
+            device,
             appConfig.appId,
             deviceConfig.testAuthoring.description
           );
@@ -162,9 +165,9 @@ export const createMcpServer = (): McpServer => {
     try {
       // Execute the handler with optional progress callback
       const deviceSessionManager = DeviceSessionManager.getInstance();
-      const deviceId = await deviceSessionManager.ensureDeviceReady();
+      const device = await deviceSessionManager.ensureDeviceReady(platform);
       let response: any | undefined;
-      if (deviceId === undefined) {
+      if (device === undefined) {
         throw new ActionableError("No device available");
       } else {
         response = await tool.handler(parsedParams, progressCallback);
@@ -172,7 +175,7 @@ export const createMcpServer = (): McpServer => {
 
       // Log tool call to test authoring session if active
       if (testAuthoringManager.isActive()) {
-        await testAuthoringManager.logToolCall(deviceId, name, parsedParams, {
+        await testAuthoringManager.logToolCall(device, name, parsedParams, {
           success: true,
           data: response
         });
@@ -182,7 +185,7 @@ export const createMcpServer = (): McpServer => {
     } catch (error) {
       // Log failed tool call to test authoring session if active
       if (testAuthoringManager.isActive()) {
-        await testAuthoringManager.logToolCall(deviceId, name, parsedParams, {
+        await testAuthoringManager.logToolCall(device, name, parsedParams, {
           success: false,
           error: error instanceof ActionableError ? error.message : `${error}`
         });

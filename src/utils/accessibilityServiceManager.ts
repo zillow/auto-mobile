@@ -1,4 +1,4 @@
-import { AdbUtils } from "./adb";
+import { AdbUtils } from "./android-cmdline-tools/adb";
 import { logger } from "./logger";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -8,11 +8,12 @@ import { LaunchApp } from "../features/action/LaunchApp";
 import { TapOnElement } from "../features/action/TapOnElement";
 import { PressButton } from "../features/action/PressButton";
 import { TerminateApp } from "../features/action/TerminateApp";
+import { BootedDevice } from "../models";
 
 const execAsync = promisify(exec);
 
 export class AccessibilityServiceManager {
-  private readonly deviceId: string;
+  private readonly device: BootedDevice;
   private adb: AdbUtils;
   public static readonly PACKAGE = "com.zillow.automobile.accessibilityservice";
   public static readonly ACTIVITY = "com.zillow.automobile.accessibilityservice.MainActivity";
@@ -30,24 +31,24 @@ export class AccessibilityServiceManager {
   private attemptedAutomatedSetup: boolean = false;
   private static instances: Map<string, AccessibilityServiceManager> = new Map();
 
-  private constructor(deviceId: string, adb: AdbUtils) {
+  private constructor(device: BootedDevice, adb: AdbUtils) {
     // home should either be process.env.HOME or bash resolution of home for current user
     const homeDir = process.env.HOME || require("os").homedir();
     if (!homeDir) {
       throw new Error("Home directory for current user not found");
     }
-    this.deviceId = deviceId;
-    this.adb = adb || new AdbUtils(this.deviceId);
+    this.device = device;
+    this.adb = adb || new AdbUtils(this.device);
   }
 
-  public static getInstance(deviceId: string, adb: AdbUtils | null = null): AccessibilityServiceManager {
-    if (!AccessibilityServiceManager.instances.has(deviceId)) {
-      AccessibilityServiceManager.instances.set(deviceId, new AccessibilityServiceManager(
-        deviceId,
-        adb || new AdbUtils(deviceId)
+  public static getInstance(device: BootedDevice, adb: AdbUtils | null = null): AccessibilityServiceManager {
+    if (!AccessibilityServiceManager.instances.has(device.deviceId)) {
+      AccessibilityServiceManager.instances.set(device.deviceId, new AccessibilityServiceManager(
+        device,
+        adb || new AdbUtils(device)
       ));
     }
-    return AccessibilityServiceManager.instances.get(deviceId)!;
+    return AccessibilityServiceManager.instances.get(device.deviceId)!;
   }
 
   /**
@@ -269,38 +270,38 @@ export class AccessibilityServiceManager {
     try {
       logger.info("Enabling Accessibility Service input method");
 
-      await new TerminateApp(this.deviceId).execute(AccessibilityServiceManager.PACKAGE);
+      await new TerminateApp(this.device).execute(AccessibilityServiceManager.PACKAGE);
 
-      await new LaunchApp(this.deviceId).execute(
+      await new LaunchApp(this.device).execute(
         AccessibilityServiceManager.PACKAGE,
         false,
         false,
         AccessibilityServiceManager.ACTIVITY
       );
 
-      await new TapOnElement(this.deviceId).execute({
+      await new TapOnElement(this.device).execute({
         text: "Open Accessibility Settings",
         action: "tap"
       });
 
-      await new TapOnElement(this.deviceId).execute({
+      await new TapOnElement(this.device).execute({
         text: "AutoMobile A11Y Service",
         action: "tap"
       });
 
-      await new TapOnElement(this.deviceId).execute({
+      await new TapOnElement(this.device).execute({
         text: "Use AutoMobile A11Y Service",
         action: "tap"
       });
 
-      await new TapOnElement(this.deviceId).execute({
+      await new TapOnElement(this.device).execute({
         elementId: "android:id/accessibility_permission_enable_allow_button",
         action: "tap"
       });
 
-      await new PressButton(this.deviceId).execute("back");
-      await new PressButton(this.deviceId).execute("back");
-      await new PressButton(this.deviceId).execute("back");
+      await new PressButton(this.device).execute("back");
+      await new PressButton(this.device).execute("back");
+      await new PressButton(this.device).execute("back");
 
       logger.info("Accessibility Service enabled successfully");
     } catch (error) {
