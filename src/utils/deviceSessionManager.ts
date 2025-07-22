@@ -1,7 +1,7 @@
 import { ActionableError, BootedDevice, Platform } from "../models";
 import { DeviceUtils } from "./deviceUtils";
 import { AdbUtils } from "./android-cmdline-tools/adb";
-import { SimCtl } from "./ios-cmdline-tools/simctl";
+import { IdbUtils } from "./ios-cmdline-tools/idb";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
 import { AccessibilityServiceManager } from "./accessibilityServiceManager";
@@ -12,18 +12,18 @@ export class DeviceSessionManager {
   private currentPlatform: Platform | undefined;
   private static instance: DeviceSessionManager;
   private adb: AdbUtils;
-  private simCtl: SimCtl;
+  private idb: IdbUtils;
   private androidEmulator: AndroidEmulator;
   private deviceUtils: DeviceUtils;
   private window: Window | undefined;
 
   private constructor() {
     this.adb = new AdbUtils(null);
-    this.simCtl = new SimCtl();
+    this.idb = new IdbUtils(null);
     this.androidEmulator = new AndroidEmulator();
     this.deviceUtils = new DeviceUtils(
       this.adb,
-      this.simCtl,
+      this.idb,
       this.androidEmulator
     );
   }
@@ -81,7 +81,7 @@ export class DeviceSessionManager {
 
     try {
       // Check for iOS devices/simulators via xcrun simctl
-      const iosDevices = await this.simCtl.getBootedSimulators();
+      const iosDevices = await this.idb.getBootedSimulators();
       devices.push(...iosDevices);
     } catch (error) {
       logger.warn(`Failed to detect iOS devices: ${error}`);
@@ -225,7 +225,7 @@ export class DeviceSessionManager {
    * Verify an iOS device is connected and ready
    */
   private async verifyIosDevice(deviceId: string): Promise<void> {
-    const deviceInfo = await this.simCtl.getDeviceInfo(deviceId);
+    const deviceInfo = await this.idb.getDeviceInfo(deviceId);
 
     if (!deviceInfo) {
       throw new ActionableError(
@@ -302,7 +302,7 @@ export class DeviceSessionManager {
    * Find an available iOS device or start a simulator
    */
   private async findOrStartIosDevice(): Promise<BootedDevice> {
-    const allDevices = await this.simCtl.listSimulatorImages();
+    const allDevices = await this.idb.listSimulatorImages();
 
     if (allDevices.length === 0) {
       throw new ActionableError(
@@ -311,7 +311,7 @@ export class DeviceSessionManager {
     }
 
     // Check for already booted simulators first
-    const bootedDevices = await this.simCtl.getBootedSimulators();
+    const bootedDevices = await this.idb.getBootedSimulators();
 
     if (bootedDevices.length > 0) {
       // Use the first booted device
@@ -325,7 +325,7 @@ export class DeviceSessionManager {
     const deviceId = device.deviceId!;
     logger.info(`Booting iOS simulator ${device}...`);
 
-    const bootedDevice = await this.simCtl.bootSimulator(deviceId);
+    const bootedDevice = await this.idb.bootSimulator(deviceId);
     await this.verifyIosDevice(deviceId);
     return bootedDevice;
   }

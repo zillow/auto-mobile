@@ -61,7 +61,8 @@ export interface SimulatorList {
     devicetypes: AppleDeviceType[];
 }
 
-export class SimCtl {
+export class IdbUtils {
+  device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
 
   // Static cache for device list
@@ -70,12 +71,23 @@ export class SimCtl {
 
   /**
      * Create an IosUtils instance
+     * @param device - Optional device
      * @param execAsyncFn - promisified exec function (for testing)
      */
   constructor(
+    device: BootedDevice | null = null,
     execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null
   ) {
+    this.device = device;
     this.execAsync = execAsyncFn || execAsync;
+  }
+
+  /**
+   * Set the target device ID
+   * @param deviceId - Device identifier
+   */
+  setDevice(device: BootedDevice): void {
+    this.device = device;
   }
 
   /**
@@ -187,11 +199,11 @@ export class SimCtl {
      */
   async listSimulatorImages(): Promise<DeviceInfo[]> {
     // Check cache first
-    if (SimCtl.deviceListCache) {
-      const cacheAge = Date.now() - SimCtl.deviceListCache.timestamp;
-      if (cacheAge < SimCtl.DEVICE_LIST_CACHE_TTL) {
+    if (IdbUtils.deviceListCache) {
+      const cacheAge = Date.now() - IdbUtils.deviceListCache.timestamp;
+      if (cacheAge < IdbUtils.DEVICE_LIST_CACHE_TTL) {
         logger.info(`Getting list of iOS simulators (cached, age: ${cacheAge}ms)`);
-        return SimCtl.deviceListCache.devices;
+        return IdbUtils.deviceListCache.devices;
       }
     }
 
@@ -211,7 +223,7 @@ export class SimCtl {
       }
 
       // Cache the result
-      SimCtl.deviceListCache = {
+      IdbUtils.deviceListCache = {
         devices,
         timestamp: Date.now()
       };
