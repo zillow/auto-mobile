@@ -1,5 +1,5 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
-import { IdbUtils } from "../../utils/ios-cmdline-tools/idb";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 import { DeviceDetection } from "../../utils/deviceDetection";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ScreenSize } from "../../models";
@@ -9,7 +9,7 @@ import * as crypto from "crypto";
 
 export class GetScreenSize {
   private adb: AdbUtils;
-  private idb: IdbUtils;
+  private idb: IdbPython;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, ScreenSize>();
   private static cacheDir = path.join(process.cwd(), ".cache", "screen-size");
@@ -20,10 +20,10 @@ export class GetScreenSize {
    * @param adb - Optional AdbUtils instance for testing
    * @param idb - Optional IdbUtils instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbUtils | null = null) {
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
     this.device = device;
     this.adb = adb || new AdbUtils(device);
-    this.idb = idb || new IdbUtils(device);
+    this.idb = idb || new IdbPython(device);
   }
 
   /**
