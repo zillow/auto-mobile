@@ -1,27 +1,27 @@
 import { ChildProcess } from "child_process";
 import { DeviceInfo, ActionableError, SomePlatform, BootedDevice } from "../models";
 import { AdbUtils } from "./android-cmdline-tools/adb";
-import { IdbUtils } from "./ios-cmdline-tools/idb";
+import { IdbCompanion } from "./ios-cmdline-tools/idbCompanion";
 import { AndroidEmulator } from "./android-cmdline-tools/emulator";
 
 export class DeviceUtils {
   private adb: AdbUtils;
   private emulator: AndroidEmulator;
-  private idb: IdbUtils;
+  private idb: IdbCompanion;
 
   /**
    * Create an EmulatorUtils instance
    * @param adb - An instance of AdbUtils for interacting with Android Debug Bridge
-   * @param idb - An instance of IdbUtils for interacting with iOS simulator controls
+   * @param idb - An instance of IdbCompanion for interacting with iOS simulator controls
    * @param emulator - An instance of AndroidEmulator for interacting with iOS simulator controls
    */
   constructor(
     adb: AdbUtils | null = null,
-    idb: IdbUtils | null = null,
+    idb: IdbCompanion | null = null,
     emulator: AndroidEmulator | null = null,
   ) {
     this.adb = adb || new AdbUtils();
-    this.idb = idb || new IdbUtils();
+    this.idb = idb || new IdbCompanion();
     this.emulator = emulator || new AndroidEmulator();
   }
 

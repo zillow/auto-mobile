@@ -1,7 +1,7 @@
 import { ActionableError, BootedDevice, Platform, SomePlatform } from "../models";
 import { DeviceUtils } from "./deviceUtils";
 import { AdbUtils } from "./android-cmdline-tools/adb";
-import { IdbUtils } from "./ios-cmdline-tools/idb";
+import { IdbCompanion } from "./ios-cmdline-tools/idbCompanion";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
 import { AccessibilityServiceManager } from "./accessibilityServiceManager";
@@ -12,14 +12,14 @@ export class DeviceSessionManager {
   private currentPlatform: Platform | undefined;
   private static instance: DeviceSessionManager;
   private adb: AdbUtils;
-  private idb: IdbUtils;
+  private idb: IdbCompanion;
   private androidEmulator: AndroidEmulator;
   private deviceUtils: DeviceUtils;
   private window: Window | undefined;
 
   private constructor() {
     this.adb = new AdbUtils(null);
-    this.idb = new IdbUtils(null);
+    this.idb = new IdbCompanion(null);
     this.androidEmulator = new AndroidEmulator();
     this.deviceUtils = new DeviceUtils(
       this.adb,
