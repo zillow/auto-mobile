@@ -5,42 +5,49 @@ import { LaunchApp } from "../features/action/LaunchApp";
 import { TerminateApp } from "../features/action/TerminateApp";
 import { InstallApp } from "../features/action/InstallApp";
 import { createJSONToolResponse } from "../utils/toolUtils";
+import { Platform } from "../utils/deviceSessionManager";
 
 // Schema definitions
 export const packageNameSchema = z.object({
-  appId: z.string().describe("App package ID of the app")
+  appId: z.string().describe("App package ID of the app"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const launchAppSchema = z.object({
   appId: z.string().describe("App package ID of the app"),
   clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false"),
-  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default true")
+  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default true"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const installAppSchema = z.object({
-  apkPath: z.string().describe("Path to the APK file to install")
+  apkPath: z.string().describe("Path to the APK file to install"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 // Export interfaces for type safety
 export interface AppActionArgs {
   appId: string;
+  platform: Platform;
 }
 
 export interface LaunchAppActionArgs {
   appId: string;
   clearAppData?: boolean;
   coldBoot?: boolean;
+  platform: Platform;
 }
 
 export interface InstallAppArgs {
   apkPath: string;
+  platform: Platform;
 }
 
 // Register tools
 export function registerAppTools(
 ) {
   // Launch app handler
-  const launchAppHandler = async (deviceId: string, args: LaunchAppActionArgs) => {
+  const launchAppHandler = async (deviceId: string, platform: Platform, args: LaunchAppActionArgs) => {
     try {
       const launchApp = new LaunchApp(deviceId);
       const result = await launchApp.execute(
@@ -61,7 +68,7 @@ export function registerAppTools(
   };
 
   // Terminate app handler
-  const terminateAppHandler = async (deviceId: string, args: AppActionArgs) => {
+  const terminateAppHandler = async (deviceId: string, platform: Platform, args: AppActionArgs) => {
     try {
       const terminateApp = new TerminateApp(deviceId);
       const result = await terminateApp.execute(args.appId); // observe = true
@@ -77,7 +84,7 @@ export function registerAppTools(
   };
 
   // Install app handler
-  const installAppHandler = async (deviceId: string, args: InstallAppArgs) => {
+  const installAppHandler = async (deviceId: string, platform: Platform, args: InstallAppArgs) => {
     try {
       const installApp = new InstallApp(deviceId);
       const result = await installApp.execute(args.apkPath);

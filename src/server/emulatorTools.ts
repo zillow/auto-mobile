@@ -5,48 +5,68 @@ import { EmulatorUtils } from "../utils/emulator";
 import { AdbUtils } from "../utils/adb";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
+import { Platform } from "../utils/deviceSessionManager";
 
 // Schema definitions
 export const listAvdsSchema = z.object({
-  // No parameters needed for listing AVDs
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const listDevicesSchema = z.object({
-  // No parameters needed for listing devices
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const startEmulatorSchema = z.object({
   avdName: z.string().describe("The AVD name to start"),
-  timeoutMs: z.number().optional().default(120000).describe("Maximum time to wait for emulator to be ready in milliseconds")
+  timeoutMs: z.number().optional().default(120000).describe("Maximum time to wait for emulator to be ready in milliseconds"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const killEmulatorSchema = z.object({
-  avdName: z.string().describe("The AVD name to kill")
+  avdName: z.string().describe("The AVD name to kill"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const checkEmulatorSchema = z.object({
-  avdName: z.string().optional().describe("Specific AVD name to check (if not provided, checks all running emulators)")
+  avdName: z.string().optional().describe("Specific AVD name to check (if not provided, checks all running emulators)"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 // Export interfaces for type safety
 export interface StartEmulatorArgs {
   avdName: string;
   timeoutMs?: number;
+  platform: Platform;
 }
 
 export interface KillEmulatorArgs {
   avdName: string;
+  platform: Platform;
 }
 
 export interface CheckEmulatorArgs {
   avdName?: string;
+  platform: Platform;
+}
+
+export interface ListDevicesArgs {
+  platform: Platform;
+}
+
+export interface ListAvdsArgs {
+  platform: Platform;
 }
 
 // Register emulator tools
 export function registerEmulatorTools() {
   // List all connected devices (physical and emulators) handler
-  const listDevicesHandler = async () => {
+  const listDevicesHandler = async (deviceId: string, platform: Platform, args: ListDevicesArgs) => {
     try {
+      if (args.platform === "ios") {
+        // TODO: Implement iOS device listing using xcrun simctl
+        throw new ActionableError("iOS device listing not yet implemented");
+      }
+
       const adb = new AdbUtils();
       const allDevices = await adb.getDevices();
 
@@ -67,36 +87,48 @@ export function registerEmulatorTools() {
       });
 
       return createJSONToolResponse({
-        message: `Found ${devices.length} connected devices`,
+        message: `Found ${devices.length} connected ${args.platform} devices`,
         devices: devices,
         totalCount: devices.length,
         emulatorCount: devices.filter(d => d.type === "emulator").length,
-        physicalCount: devices.filter(d => d.type === "physical").length
+        physicalCount: devices.filter(d => d.type === "physical").length,
+        platform: args.platform
       });
     } catch (error) {
-      throw new ActionableError(`Failed to list devices: ${error}`);
+      throw new ActionableError(`Failed to list ${args.platform} devices: ${error}`);
     }
   };
 
   // List AVDs handler
-  const listAvdsHandler = async () => {
+  const listAvdsHandler = async (deviceId: string, platform: Platform, args: ListAvdsArgs) => {
     try {
+      if (args.platform === "ios") {
+        // TODO: Implement iOS simulator listing using xcrun simctl list devices --json
+        throw new ActionableError("iOS simulator listing not yet implemented");
+      }
+
       const emulatorUtils = new EmulatorUtils();
       const avds = await emulatorUtils.listAvds();
 
       return createJSONToolResponse({
-        message: `Found ${avds.length} available AVDs`,
+        message: `Found ${avds.length} available ${args.platform} AVDs`,
         avds: avds,
-        count: avds.length
+        count: avds.length,
+        platform: args.platform
       });
     } catch (error) {
-      throw new ActionableError(`Failed to list AVDs: ${error}`);
+      throw new ActionableError(`Failed to list ${args.platform} AVDs: ${error}`);
     }
   };
 
   // Check running emulators handler
-  const checkRunningEmulatorsHandler = async (args: CheckEmulatorArgs) => {
+  const checkRunningEmulatorsHandler = async (deviceId: string, platform: Platform, args: CheckEmulatorArgs) => {
     try {
+      if (args.platform === "ios") {
+        // TODO: Implement iOS simulator status checking using xcrun simctl
+        throw new ActionableError("iOS simulator status checking not yet implemented");
+      }
+
       const emulatorUtils = new EmulatorUtils();
 
       if (args.avdName) {
@@ -106,10 +138,11 @@ export function registerEmulatorTools() {
         const emulator = runningEmulators.find(emu => emu.name === args.avdName);
 
         return createJSONToolResponse({
-          message: `AVD '${args.avdName}' is ${isRunning ? "running" : "not running"}`,
+          message: `${args.platform} AVD '${args.avdName}' is ${isRunning ? "running" : "not running"}`,
           avdName: args.avdName,
           isRunning: isRunning,
-          deviceId: emulator?.deviceId || null
+          deviceId: emulator?.deviceId || null,
+          platform: args.platform
         });
       } else {
         // Check all running emulators and include physical devices
@@ -120,22 +153,28 @@ export function registerEmulatorTools() {
         const physicalDevices = allDevices.filter(device => !device.startsWith("emulator-"));
 
         return createJSONToolResponse({
-          message: `Found ${runningEmulators.length} running emulators and ${physicalDevices.length} physical devices`,
+          message: `Found ${runningEmulators.length} running ${args.platform} emulators and ${physicalDevices.length} physical devices`,
           runningEmulators: runningEmulators,
           physicalDevices: physicalDevices.map(deviceId => ({ deviceId, type: "physical" })),
           emulatorCount: runningEmulators.length,
           physicalCount: physicalDevices.length,
-          totalDevices: allDevices.length
+          totalDevices: allDevices.length,
+          platform: args.platform
         });
       }
     } catch (error) {
-      throw new ActionableError(`Failed to check running emulators: ${error}`);
+      throw new ActionableError(`Failed to check running ${args.platform} emulators: ${error}`);
     }
   };
 
   // Start emulator handler
-  const startEmulatorHandler = async (args: StartEmulatorArgs, progress?: ProgressCallback) => {
+  const startEmulatorHandler = async (deviceId: string, platform: Platform, args: StartEmulatorArgs, progress?: ProgressCallback) => {
     try {
+      if (platform === "ios") {
+        // TODO: Implement iOS simulator start using xcrun simctl
+        throw new ActionableError("iOS simulator start not yet implemented");
+      }
+
       const emulatorUtils = new EmulatorUtils();
 
       // Report initial progress
@@ -156,12 +195,13 @@ export function registerEmulatorTools() {
         const emulator = runningEmulators.find(emu => emu.name === args.avdName);
 
         return createJSONToolResponse({
-          message: `Emulator '${args.avdName}' is already running`,
+          message: `${platform} emulator '${args.avdName}' is already running`,
           avdName: args.avdName,
           processId: null,
           isReady: true,
           deviceId: emulator?.deviceId || null,
-          source: "local"
+          source: "local",
+          platform: platform
         });
       }
 
@@ -208,67 +248,75 @@ export function registerEmulatorTools() {
         // If waiting fails, the emulator might still be starting
         // Don't kill it, just report the issue
         return createJSONToolResponse({
-          message: `Emulator '${args.avdName}' started but failed to become ready within timeout`,
+          message: `${platform} emulator '${args.avdName}' started but failed to become ready within timeout`,
           avdName: args.avdName,
           processId: childProcess.pid,
           isReady: false,
           deviceId: null,
           source: "local",
+          platform: platform,
           warning: `Failed to wait for readiness: ${waitError}`
         });
       }
 
       return createJSONToolResponse({
-        message: `Emulator '${args.avdName}' started and is ready`,
+        message: `${platform} emulator '${args.avdName}' started and is ready`,
         avdName: args.avdName,
         processId: childProcess.pid,
         isReady: true,
         deviceId: deviceId,
-        source: "local"
+        source: "local",
+        platform: platform
       });
     } catch (error) {
-      throw new ActionableError(`Failed to start emulator: ${error}`);
+      throw new ActionableError(`Failed to start ${platform} emulator: ${error}`);
     }
   };
 
   // Kill emulator handler
-  const killEmulatorHandler = async (args: KillEmulatorArgs) => {
+  const killEmulatorHandler = async (deviceId: string, platform: Platform, args: KillEmulatorArgs) => {
     try {
+      if (platform === "ios") {
+        // TODO: Implement iOS simulator kill using xcrun simctl
+        throw new ActionableError("iOS simulator kill not yet implemented");
+      }
+
       const emulatorUtils = new EmulatorUtils();
       await emulatorUtils.killEmulator(args.avdName);
 
       return createJSONToolResponse({
-        message: `Emulator '${args.avdName}' killed successfully`,
-        avdName: args.avdName
+        message: `${platform} emulator '${args.avdName}' killed successfully`,
+        avdName: args.avdName,
+        platform: platform
       });
     } catch (error) {
-      throw new ActionableError(`Failed to kill emulator: ${error}`);
+      throw new ActionableError(`Failed to kill ${platform} emulator: ${error}`);
     }
   };
 
   // Register with the tool registry
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "listDevices",
     "List all connected devices (both physical devices and emulators)",
     listDevicesSchema,
     listDevicesHandler
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "listAvds",
     "List all available Android Virtual Devices (AVDs)",
     listAvdsSchema,
     listAvdsHandler
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "checkRunningEmulators",
     "Check which emulators are currently running",
     checkEmulatorSchema,
     checkRunningEmulatorsHandler
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "startEmulator",
     "Start an Android emulator with the specified AVD",
     startEmulatorSchema,
@@ -276,7 +324,7 @@ export function registerEmulatorTools() {
     true // Supports progress notifications
   );
 
-  ToolRegistry.register(
+  ToolRegistry.registerDeviceAware(
     "killEmulator",
     "Kill a running Android emulator",
     killEmulatorSchema,

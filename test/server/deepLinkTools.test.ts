@@ -112,10 +112,10 @@ describe("Deep Link Tools Registration", function() {
       expect(tool!.supportsProgress).to.be.false;
 
       // Test schema validation
-      const validArgs = { appId: "com.example.app" };
+      const validArgs = { appId: "com.example.app", platform: "android" };
       expect(() => tool!.schema.parse(validArgs)).to.not.throw();
 
-      const invalidArgs = { appId: 123 };
+      const invalidArgs = { appId: 123, platform: "android" };
       expect(() => tool!.schema.parse(invalidArgs)).to.throw();
     });
 
@@ -128,11 +128,11 @@ describe("Deep Link Tools Registration", function() {
       expect(tool!.supportsProgress).to.be.false;
 
       // Test schema validation
-      const validArgs = { viewHierarchy: "<hierarchy></hierarchy>" };
+      const validArgs = { platform: "android" };
       expect(() => tool!.schema.parse(validArgs)).to.not.throw();
 
-      const validArgsEmpty = {};
-      expect(() => tool!.schema.parse(validArgsEmpty)).to.not.throw();
+      const validArgsIos = { platform: "ios" };
+      expect(() => tool!.schema.parse(validArgsIos)).to.not.throw();
     });
 
     it("should register handleIntentChooser tool with correct schema", () => {
@@ -147,14 +147,14 @@ describe("Deep Link Tools Registration", function() {
       const validArgs = {
         preference: "always",
         customAppPackage: "com.example.app",
-        viewHierarchy: "<hierarchy></hierarchy>"
+        platform: "android"
       };
       expect(() => tool!.schema.parse(validArgs)).to.not.throw();
 
-      const validArgsMinimal = {};
+      const validArgsMinimal = { platform: "android" };
       expect(() => tool!.schema.parse(validArgsMinimal)).to.not.throw();
 
-      const invalidArgs = { preference: "invalid" };
+      const invalidArgs = { preference: "invalid", platform: "android" };
       expect(() => tool!.schema.parse(invalidArgs)).to.throw();
     });
   });
@@ -175,7 +175,7 @@ describe("Deep Link Tools Registration", function() {
 
         try {
           // This will fail because we don't have a real device, but it should validate the args
-          await tool!.handler({ appId: "com.example.app" });
+          await tool!.handler({ appId: "com.example.app", platform: "android" });
         } catch (error) {
           // Expected to fail due to device verification
           expect(String(error)).to.include("device");
@@ -187,7 +187,7 @@ describe("Deep Link Tools Registration", function() {
         expect(tool).to.not.be.undefined;
 
         // Should throw on invalid schema
-        expect(() => tool!.schema.parse({ appId: null })).to.throw();
+        expect(() => tool!.schema.parse({ appId: null, platform: "android" })).to.throw();
         expect(() => tool!.schema.parse({})).to.throw();
       });
     });
@@ -202,7 +202,7 @@ describe("Deep Link Tools Registration", function() {
         expect(tool).to.not.be.undefined;
 
         try {
-          await tool!.handler({});
+          await tool!.handler({ platform: "android" });
         } catch (error) {
           // Expected to fail due to device verification
           expect(String(error)).to.include("device");
@@ -218,7 +218,7 @@ describe("Deep Link Tools Registration", function() {
         expect(tool).to.not.be.undefined;
 
         try {
-          await tool!.handler({ viewHierarchy: "<hierarchy></hierarchy>" });
+          await tool!.handler({ viewHierarchy: "<hierarchy></hierarchy>", platform: "android" });
         } catch (error) {
           // Expected to fail due to device verification
           expect(String(error)).to.include("device");
@@ -239,7 +239,7 @@ describe("Deep Link Tools Registration", function() {
 
         for (const preference of preferences) {
           try {
-            await tool!.handler({ preference });
+            await tool!.handler({ preference, platform: "android" });
           } catch (error) {
             // Expected to fail due to device verification
             expect(String(error)).to.include("device");
@@ -258,7 +258,8 @@ describe("Deep Link Tools Registration", function() {
         try {
           await tool!.handler({
             preference: "custom",
-            customAppPackage: "com.example.app"
+            customAppPackage: "com.example.app",
+            platform: "android"
           });
         } catch (error) {
           // Expected to fail due to device verification
@@ -271,12 +272,12 @@ describe("Deep Link Tools Registration", function() {
         expect(tool).to.not.be.undefined;
 
         // Valid preferences should pass
-        expect(() => tool!.schema.parse({ preference: "always" })).to.not.throw();
-        expect(() => tool!.schema.parse({ preference: "just_once" })).to.not.throw();
-        expect(() => tool!.schema.parse({ preference: "custom" })).to.not.throw();
+        expect(() => tool!.schema.parse({ preference: "always", platform: "android" })).to.not.throw();
+        expect(() => tool!.schema.parse({ preference: "just_once", platform: "android" })).to.not.throw();
+        expect(() => tool!.schema.parse({ preference: "custom", platform: "android" })).to.not.throw();
 
         // Invalid preference should fail
-        expect(() => tool!.schema.parse({ preference: "invalid" })).to.throw();
+        expect(() => tool!.schema.parse({ preference: "invalid", platform: "android" })).to.throw();
       });
     });
   });
@@ -295,7 +296,7 @@ describe("Deep Link Tools Registration", function() {
       expect(tool).to.not.be.undefined;
 
       try {
-        await tool!.handler({ appId: "com.example.app" });
+        await tool!.handler({ appId: "com.example.app", platform: "android" });
         expect.fail("Should have thrown error for missing device");
       } catch (error) {
         expect(String(error)).to.include("device");

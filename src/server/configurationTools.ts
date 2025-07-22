@@ -4,13 +4,14 @@ import { ConfigurationManager } from "../utils/configurationManager";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
+import { Platform } from "../utils/deviceSessionManager";
 // import { SourceMapper } from "../utils/sourceMapper";
-
 
 export interface DeviceSessionArgs {
   exploration?: ExplorationArgs;
   testAuthoring?: TestAuthoringArgs;
   deviceId: string;
+    platform: "android" | "ios";
 }
 
 export interface TestAuthoringArgs {
@@ -39,7 +40,8 @@ const ConfigSchema = z.object({
     description: z.string().describe("Rough description of the test to be authored."),
     persist: z.enum(["never", "devicePresent", "always"]).describe("What conditions to stay in test authoring mode. Default devicePresent"),
   }).optional(),
-  deviceId: z.string().describe("Device ID for which these settings will apply.")
+  deviceId: z.string().describe("Device ID for which these settings will apply."),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 // Schema for config tool
@@ -59,7 +61,7 @@ export function registerConfigurationTools(): void {
     async (args: DeviceSessionArgs): Promise<any> => {
       try {
         // Update configuration with provided parameters
-        await ConfigurationManager.getInstance().updateDeviceSession(args, "android");
+        await ConfigurationManager.getInstance().updateDeviceSession(args, args.platform);
 
         return createJSONToolResponse({
           success: true,
@@ -80,7 +82,7 @@ export function registerConfigurationTools(): void {
     "setAppSource",
     "For a given appId, set the source code path and platform.",
     AppSourceSchema,
-    async (deviceId: string, args: AppSourceArgs): Promise<any> => {
+    async (deviceId: string, platform: Platform, args: AppSourceArgs): Promise<any> => {
       try {
         const apps = await new ListInstalledApps(deviceId).execute();
         if (apps.find(app => app === args.appId) === undefined) {

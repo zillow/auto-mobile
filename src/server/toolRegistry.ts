@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { DeviceSessionManager } from "../utils/deviceSessionManager";
+import { DeviceSessionManager, Platform } from "../utils/deviceSessionManager";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -14,7 +14,7 @@ export interface ToolHandler<T = any> {
 
 // Interface for device-aware tool handlers
 export interface DeviceAwareToolHandler<T = any> {
-    (deviceId: string, args: T, progress?: ProgressCallback): Promise<any>;
+    (deviceId: string, platform: Platform, args: T, progress?: ProgressCallback): Promise<any>;
 }
 
 // Interface for a registered tool
@@ -60,12 +60,14 @@ class ToolRegistryClass {
     const wrappedHandler: ToolHandler = async (args: any, progress?: ProgressCallback) => {
       // Check if args contains a deviceId
       const providedDeviceId = args.deviceId;
+      // Extract platform from args, default to "android" for backward compatibility
+      const platform: Platform = args.platform || "android";
 
       // Ensure device is ready and get the device ID
-      const deviceId = await this.deviceSessionManager.ensureDeviceReady(providedDeviceId);
+      const deviceId = await this.deviceSessionManager.ensureDeviceReady(platform, providedDeviceId);
 
-      // Call the original handler with the device ID
-      return await handler(deviceId, args, progress);
+      // Call the original handler with the device ID and platform
+      return await handler(deviceId, platform, args, progress);
     };
 
     this.tools.set(name, {

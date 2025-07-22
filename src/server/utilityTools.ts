@@ -4,7 +4,7 @@ import { ActionableError } from "../models/ActionableError";
 import { DemoMode } from "../features/utility/DemoMode";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { DeviceSessionManager } from "../utils/deviceSessionManager";
+import { DeviceSessionManager, Platform } from "../utils/deviceSessionManager";
 
 // Schema definitions
 export const enableDemoModeSchema = z.object({
@@ -14,13 +14,17 @@ export const enableDemoModeSchema = z.object({
   wifiLevel: z.number().min(0).max(4).optional().describe("WiFi signal strength (0-4)"),
   mobileDataType: z.enum(["4g", "5g", "lte", "3g", "edge", "none"]).optional().describe("Mobile data type to display"),
   mobileSignalLevel: z.number().min(0).max(4).optional().describe("Mobile signal strength (0-4)"),
-  hideNotifications: z.boolean().optional().describe("Whether to hide notification icons")
+  hideNotifications: z.boolean().optional().describe("Whether to hide notification icons"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
-export const disableDemoModeSchema = z.object({});
+export const disableDemoModeSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+});
 
 export const setActiveDeviceSchema = z.object({
-  deviceId: z.string().describe("The device ID to set as active")
+  deviceId: z.string().describe("The device ID to set as active"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 // Export interfaces for type safety
@@ -32,16 +36,18 @@ export interface EnableDemoModeArgs {
   mobileDataType?: "4g" | "5g" | "lte" | "3g" | "edge" | "none";
   mobileSignalLevel?: number;
   hideNotifications?: boolean;
+    platform: Platform;
 }
 
 export interface SetActiveDeviceArgs {
   deviceId: string;
+    platform: Platform;
 }
 
 // Register tools
 export function registerUtilityTools() {
   // Enable demo mode handler
-  const enableDemoModeHandler = async (deviceId: string, args: EnableDemoModeArgs) => {
+  const enableDemoModeHandler = async (deviceId: string, platform: Platform, args: EnableDemoModeArgs) => {
     try {
       const demoMode = new DemoMode(deviceId);
       const result = await demoMode.execute(args);
@@ -59,7 +65,7 @@ export function registerUtilityTools() {
   };
 
   // Disable demo mode handler
-  const disableDemoModeHandler = async (deviceId: string) => {
+  const disableDemoModeHandler = async (deviceId: string, platform: Platform) => {
     try {
       const demoMode = new DemoMode(deviceId);
       const result = await demoMode.exitDemoMode();
@@ -79,7 +85,7 @@ export function registerUtilityTools() {
   // Set active device handler
   const setActiveDeviceHandler = async (args: SetActiveDeviceArgs) => {
     try {
-      await DeviceSessionManager.getInstance().ensureDeviceReady(args.deviceId, true);
+      await DeviceSessionManager.getInstance().ensureDeviceReady(args.platform, args.deviceId, true);
 
       return createJSONToolResponse({
         message: `Active device set to '${args.deviceId}'`,

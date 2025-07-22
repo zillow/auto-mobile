@@ -8,4 +8,5 @@ export interface ExecutePlanResult {
     error: string;
   };
   error?: string;
+  platform?: "android" | "ios";
 }

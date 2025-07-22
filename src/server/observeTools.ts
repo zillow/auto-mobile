@@ -4,16 +4,21 @@ import { ActionableError } from "../models/ActionableError";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse } from "../utils/toolUtils";
+import { Platform } from "../utils/deviceSessionManager";
 
 // Schema definitions
-export const observeSchema = z.object({});
+export const observeSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+});
 
-export const listAppsSchema = z.object({});
+export const listAppsSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+});
 
 // Register tools (this will be called when this file is imported)
 export function registerObserveTools() {
   // Observe handler
-  const observeHandler = async (deviceId: string) => {
+  const observeHandler = async (deviceId: string, platform: Platform) => {
     try {
       const observeScreen = new ObserveScreen(deviceId);
       const result = await observeScreen.execute();
@@ -24,7 +29,7 @@ export function registerObserveTools() {
   };
 
   // List Apps handler
-  const listAppsHandler = async (deviceId: string) => {
+  const listAppsHandler = async (deviceId: string, platform: Platform) => {
     try {
       const listInstalledApps = new ListInstalledApps(deviceId);
       const apps = await listInstalledApps.execute();

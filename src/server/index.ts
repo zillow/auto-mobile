@@ -121,7 +121,10 @@ export const createMcpServer = (): McpServer => {
     // If there wasn't a deviceId on this session already, lets find one
     // try to use something like request.params.headerNameToString("X-Device-Id")
     const deviceSessionManager = DeviceSessionManager.getInstance();
-    const deviceId = await deviceSessionManager.ensureDeviceReady();
+
+    // Extract platform from parsed parameters, defaulting to "android" for backward compatibility
+    const platform = parsedParams.platform || "android";
+    const deviceId = await deviceSessionManager.ensureDeviceReady(platform);
 
     // Start test authoring session if enabled and not already active
     if (ConfigurationManager.getInstance().isTestAuthoringEnabled(deviceId) && !testAuthoringManager.isActive()) {
@@ -162,7 +165,7 @@ export const createMcpServer = (): McpServer => {
     try {
       // Execute the handler with optional progress callback
       const deviceSessionManager = DeviceSessionManager.getInstance();
-      const deviceId = await deviceSessionManager.ensureDeviceReady();
+      const deviceId = await deviceSessionManager.ensureDeviceReady(platform);
       let response: any | undefined;
       if (deviceId === undefined) {
         throw new ActionableError("No device available");
