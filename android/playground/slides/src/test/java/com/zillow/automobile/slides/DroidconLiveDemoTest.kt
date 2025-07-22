@@ -4,23 +4,11 @@ import com.zillow.automobile.junit.AutoMobilePlan
 import com.zillow.automobile.junit.AutoMobileRunner
 import com.zillow.automobile.junit.AutoMobileTest
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AutoMobileRunner::class)
 class DroidconLiveDemoTest {
-
-  @Before
-  fun setup() {
-
-    // ab test or
-    val result =
-        AutoMobilePlan("test-plans/clock-set-alarm.yaml", { "username" to "jason@zillow.com" })
-            .execute()
-
-    assertTrue(result.success)
-  }
 
   @Test
   fun `Given we have a Clock app we should be able to set an alarm`() {

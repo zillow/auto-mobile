@@ -217,7 +217,10 @@ fun TapScreen() {
                     horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                       Switch(
                           checked = switchChecked,
-                          onCheckedChange = { switchChecked = it },
+                          onCheckedChange = {
+                            switchChecked = it
+                            trackTap()
+                          },
                           modifier =
                               Modifier.semantics {
                                 testTag = "switch_control"
@@ -234,7 +237,10 @@ fun TapScreen() {
                     horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                       Checkbox(
                           checked = checkboxChecked,
-                          onCheckedChange = { checkboxChecked = it },
+                          onCheckedChange = {
+                            checkboxChecked = it
+                            trackTap()
+                          },
                           modifier =
                               Modifier.semantics {
                                 testTag = "checkbox_control"
@@ -252,7 +258,10 @@ fun TapScreen() {
                     horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                       RadioButton(
                           selected = radioSelected,
-                          onClick = { radioSelected = !radioSelected },
+                          onClick = {
+                            radioSelected = !radioSelected
+                            trackTap()
+                          },
                           modifier =
                               Modifier.semantics {
                                 testTag = "radio_button_control"
