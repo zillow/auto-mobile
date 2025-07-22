@@ -1,5 +1,5 @@
 import { logger } from "./logger";
-import { DeviceDetection, DevicePlatform } from "./deviceDetection";
+import { DevicePlatform } from "./deviceDetection";
 
 export interface AvailableDevice {
   deviceId: string;
