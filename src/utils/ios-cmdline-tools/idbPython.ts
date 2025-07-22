@@ -12,14 +12,13 @@ import {
 } from "../../models";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
-const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
-  const options = maxBuffer ? { maxBuffer } : undefined;
-  const result = await promisify(exec)(command, options);
+const execAsync = async (command: string): Promise<ExecResult> => {
+  const result = await promisify(exec)(command);
 
   // Add the required string methods
   const enhancedResult: ExecResult = {
-    stdout: typeof result.stdout === "string" ? result.stdout : result.stdout.toString(),
-    stderr: typeof result.stderr === "string" ? result.stderr : result.stderr.toString(),
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
     toString() {
       return this.stdout;
     },
@@ -55,18 +54,6 @@ export interface IdbTargetInfo {
   companionInfo?: any;
 }
 
-export interface IdbTestBundle {
-  bundleId: string;
-  name: string;
-  testMethods: string[];
-}
-
-export interface IdbCrashLog {
-  name: string;
-  date: string;
-  bundleId?: string;
-}
-
 export interface IdbAccessibilityElement {
   AXFrame: string;
   AXUniqueId: string | null;
@@ -91,7 +78,7 @@ export interface IdbAccessibilityElement {
 
 export class IdbPython {
   device: BootedDevice | null;
-  execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
+  execAsync: (command: string) => Promise<ExecResult>;
 
   // Static cache for device list
   private static deviceListCache: { devices: DeviceInfo[], timestamp: number } | null = null;
@@ -104,7 +91,7 @@ export class IdbPython {
    */
   constructor(
     device: BootedDevice | null = null,
-    execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null
+    execAsyncFn: ((command: string) => Promise<ExecResult>) | null = null
   ) {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;

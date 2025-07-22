@@ -4,17 +4,21 @@ import { BootedDevice, LaunchAppResult } from "../../models";
 import { ActionableError } from "../../models";
 import { TerminateApp } from "./TerminateApp";
 import { ClearAppData } from "./ClearAppData";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { DeviceDetection } from "../../utils/deviceDetection";
 
 export class LaunchApp extends BaseVisualChange {
   private device: BootedDevice;
+  private idb: IdbPython;
   /**
    * Create an LaunchApp instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
     super(device, adb);
     this.device = device;
+    this.idb = idb || new IdbPython(device);
   }
 
   /**
@@ -47,11 +51,11 @@ export class LaunchApp extends BaseVisualChange {
   }
 
   /**
-   * Launch an app by package name
+   * Launch an app by package name - routes to platform-specific implementation
    * @param packageName - The package name to launch
    * @param clearAppData - Whether clear app data before launch
    * @param coldBoot - Whether to cold boot the app or resume if already running
-   * @param activityName - Optional activity name to launch
+   * @param activityName - Optional activity name to launch (Android only)
    */
   async execute(
     packageName: string,
@@ -59,7 +63,80 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean,
     activityName?: string
   ): Promise<LaunchAppResult> {
+    const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
 
+    if (isiOSDevice) {
+      return this.executeiOS(packageName, clearAppData, coldBoot);
+    } else {
+      return this.executeAndroid(packageName, clearAppData, coldBoot, activityName);
+    }
+  }
+
+  /**
+   * Launch an iOS app by bundle identifier
+   * @param bundleId - The bundle identifier to launch
+   * @param clearAppData - Whether clear app data before launch
+   * @param coldBoot - Whether to cold boot the app or resume if already running
+   */
+  private async executeiOS(
+    bundleId: string,
+    clearAppData: boolean,
+    coldBoot: boolean
+  ): Promise<LaunchAppResult> {
+    try {
+      // Check if app is installed using idb
+      const installedAppsResult = await this.idb.listApps();
+      const isInstalled = installedAppsResult.stdout.includes(bundleId);
+
+      if (!isInstalled) {
+        return {
+          success: false,
+          packageName: bundleId,
+          error: "App is not installed"
+        };
+      }
+
+      // For iOS, we'll handle coldBoot and clearAppData by terminating first if requested
+      if (clearAppData || coldBoot) {
+        try {
+          // Attempt to terminate the app if it's running
+          await this.idb.terminateApp(bundleId);
+          // Note: iOS doesn't have direct app data clearing like Android
+          // This would require uninstall/reinstall or app-specific reset
+        } catch (error) {
+          // App might not be running, continue with launch
+        }
+      }
+
+      // Launch the app
+      await this.idb.launchApp(bundleId, { foregroundIfRunning: true });
+
+      return {
+        success: true,
+        packageName: bundleId
+      };
+    } catch (error) {
+      return {
+        success: false,
+        packageName: bundleId,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
+   * Launch an Android app by package name
+   * @param packageName - The package name to launch
+   * @param clearAppData - Whether clear app data before launch
+   * @param coldBoot - Whether to cold boot the app or resume if already running
+   * @param activityName - Optional activity name to launch
+   */
+  private async executeAndroid(
+    packageName: string,
+    clearAppData: boolean,
+    coldBoot: boolean,
+    activityName?: string
+  ): Promise<LaunchAppResult> {
     // Check if app is installed
     const isInstalledCmd = `shell pm list packages -f ${packageName} | grep -c ${packageName}`;
     const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd);
@@ -80,7 +157,6 @@ export class LaunchApp extends BaseVisualChange {
     const isRunning = parseInt(isRunningOutput.trim(), 10) > 0;
 
     if (isRunning) {
-
       if (clearAppData) {
         await new ClearAppData(this.device, this.adb).execute(packageName);
       } else if (coldBoot) {

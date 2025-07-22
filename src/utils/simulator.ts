@@ -284,4 +284,48 @@ export class SimulatorUtils {
       return false;
     }
   }
+
+  /**
+   * List installed apps on a simulator
+   * @param udid - Simulator UDID
+   * @returns Promise with array of installed app identifiers
+   */
+  async listInstalledApps(udid: string): Promise<string[]> {
+    try {
+      logger.info(`Listing installed apps for simulator ${udid}`);
+      const result = await this.execAsync(`xcrun simctl listapps ${udid}`);
+      
+      // Parse the output to extract app identifiers
+      // The output format is typically JSON with app bundle identifiers
+      try {
+        const apps = JSON.parse(result.stdout);
+        return Object.keys(apps);
+      } catch {
+        // If JSON parsing fails, try to extract app identifiers from text output
+        const lines = result.stdout.split('\n');
+        return lines
+          .filter(line => line.trim().length > 0)
+          .map(line => line.trim());
+      }
+    } catch (error) {
+      logger.error("Failed to list installed apps:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Launch an app on a simulator
+   * @param udid - Simulator UDID
+   * @param appBundleId - App bundle identifier
+   * @returns Promise that resolves when app launch is initiated
+   */
+  async launchApp(udid: string, appBundleId: string): Promise<void> {
+    try {
+      logger.info(`Launching app ${appBundleId} on simulator ${udid}`);
+      await this.execAsync(`xcrun simctl launch ${udid} ${appBundleId}`);
+    } catch (error) {
+      logger.error(`Failed to launch app ${appBundleId}:`, error);
+      throw error;
+    }
+  }
 }
