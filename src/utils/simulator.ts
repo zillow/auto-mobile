@@ -58,7 +58,7 @@ export class SimulatorUtils {
     try {
       logger.info("Listing available iOS simulators");
       const result = await this.execAsync("xcrun simctl list devices --json");
-      
+
       const data = JSON.parse(result.stdout);
       const simulators: string[] = [];
 
@@ -140,10 +140,10 @@ export class SimulatorUtils {
   }> {
     try {
       logger.info(`Starting iOS simulator: ${simulatorName}`);
-      
+
       // Find the simulator by name
       const simulators = await this.getSimulatorInfo();
-      const simulator = simulators.find(sim => 
+      const simulator = simulators.find(sim =>
         sim.name === simulatorName && sim.isAvailable
       );
 
@@ -167,10 +167,10 @@ export class SimulatorUtils {
 
       // Start the simulator
       await this.execAsync(`xcrun simctl boot ${simulator.udid}`);
-      
+
       // Wait for simulator to boot
       const bootResult = await this.waitForSimulatorBoot(simulator.udid, timeoutMs);
-      
+
       if (bootResult) {
         return {
           success: true,
@@ -206,7 +206,7 @@ export class SimulatorUtils {
   }> {
     try {
       logger.info(`Shutting down iOS simulator: ${simulatorName}`);
-      
+
       // Find the simulator by name
       const simulators = await this.getSimulatorInfo();
       const simulator = simulators.find(sim => sim.name === simulatorName);
@@ -221,7 +221,7 @@ export class SimulatorUtils {
 
       // Shut down the simulator
       await this.execAsync(`xcrun simctl shutdown ${simulator.udid}`);
-      
+
       return {
         success: true,
         simulatorName
@@ -244,12 +244,12 @@ export class SimulatorUtils {
    */
   private async waitForSimulatorBoot(udid: string, timeoutMs: number): Promise<boolean> {
     const startTime = Date.now();
-    
+
     while (Date.now() - startTime < timeoutMs) {
       try {
         const result = await this.execAsync(`xcrun simctl list devices --json`);
         const data = JSON.parse(result.stdout);
-        
+
         // Find the simulator and check its state
         for (const runtime of Object.keys(data.devices)) {
           const device = data.devices[runtime].find((d: any) => d.udid === udid);
@@ -258,14 +258,14 @@ export class SimulatorUtils {
             return true;
           }
         }
-        
+
         // Wait before checking again
         await new Promise(resolve => setTimeout(resolve, 2000));
       } catch (error) {
         logger.warn(`Error checking simulator boot status: ${error}`);
       }
     }
-    
+
     logger.warn(`iOS simulator ${udid} failed to boot within ${timeoutMs}ms`);
     return false;
   }
@@ -284,4 +284,4 @@ export class SimulatorUtils {
       return false;
     }
   }
-} 
+}

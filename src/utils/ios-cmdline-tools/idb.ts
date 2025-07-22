@@ -27,38 +27,52 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
 };
 
 export interface AppleDevice {
-    udid: string;
-    name: string;
-    state: string;
-    isAvailable: boolean;
-    deviceTypeIdentifier?: string;
-    runtime?: string;
+  udid: string;
+  name: string;
+  state: string;
+  isAvailable: boolean;
+  deviceTypeIdentifier?: string;
+  runtime?: string;
+  model?: string;
+  os_version?: string;
+  architecture?: string;
+  type?: string;
 }
 
 export interface AppleDeviceRuntime {
-    bundlePath: string;
-    buildversion: string;
-    runtimeRoot: string;
-    identifier: string;
-    version: string;
-    isAvailable: boolean;
-    name: string;
+  bundlePath: string;
+  buildversion: string;
+  runtimeRoot: string;
+  identifier: string;
+  version: string;
+  isAvailable: boolean;
+  name: string;
 }
 
 export interface AppleDeviceType {
-    minRuntimeVersion: number;
-    bundlePath: string;
-    maxRuntimeVersion: number;
-    name: string;
-    identifier: string;
-    productFamily: string;
+  minRuntimeVersion: number;
+  bundlePath: string;
+  maxRuntimeVersion: number;
+  name: string;
+  identifier: string;
+  productFamily: string;
 }
 
 export interface SimulatorList {
-    devices: { [runtimeId: string]: AppleDevice[] };
-    pairs: any;
-    runtimes: AppleDeviceRuntime[];
-    devicetypes: AppleDeviceType[];
+  devices: { [runtimeId: string]: AppleDevice[] };
+  pairs: any;
+  runtimes: AppleDeviceRuntime[];
+  devicetypes: AppleDeviceType[];
+}
+
+export interface IdbDevice {
+  model: string;
+  os_version: string;
+  udid: string;
+  architecture: string;
+  type: string;
+  name: string;
+  state: string;
 }
 
 export class IdbUtils {
@@ -70,10 +84,10 @@ export class IdbUtils {
   private static readonly DEVICE_LIST_CACHE_TTL = 5000; // 5 seconds
 
   /**
-     * Create an IosUtils instance
-     * @param device - Optional device
-     * @param execAsyncFn - promisified exec function (for testing)
-     */
+   * Create an IosUtils instance
+   * @param device - Optional device
+   * @param execAsyncFn - promisified exec function (for testing)
+   */
   constructor(
     device: BootedDevice | null = null,
     execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null
@@ -84,20 +98,25 @@ export class IdbUtils {
 
   /**
    * Set the target device ID
-   * @param deviceId - Device identifier
+   * @param device - Device identifier
    */
   setDevice(device: BootedDevice): void {
     this.device = device;
   }
 
   /**
-     * Execute an xcrun simctl command
-     * @param command - The simctl command to execute
-     * @param timeoutMs - Optional timeout in milliseconds
-     * @returns Promise with command output
-     */
+   * Execute an idb command
+   * @param command - The simctl command to execute
+   * @param timeoutMs - Optional timeout in milliseconds
+   * @returns Promise with command output
+   */
   async executeCommand(command: string, timeoutMs?: number): Promise<ExecResult> {
-    const fullCommand = `xcrun simctl ${command}`;
+
+    if (!(await this.isIDBAvailable())) {
+      throw new ActionableError("idb_companion is not available. Please install Facebook's idb CLI to continue.");
+    }
+
+    const fullCommand = `idb_companion ${command}`;
     const startTime = Date.now();
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
@@ -141,35 +160,70 @@ export class IdbUtils {
   }
 
   /**
-     * Check if xcrun and simctl are available
-     * @returns Promise with boolean indicating availability
-     */
-  async isXcrunAvailable(): Promise<boolean> {
+   * Check if idb is available
+   * @returns Promise with boolean indicating availability
+   */
+  async isIDBAvailable(): Promise<boolean> {
     try {
-      await this.execAsync("xcrun --version");
+      await this.execAsync("idb_companion --version");
       return true;
     } catch (error) {
-      logger.warn("xcrun is not available - iOS functionality requires Xcode Command Line Tools");
+      logger.warn("idb is not available - iOS functionality requires Facebook's idb CLI tool to be installed and on PATH.");
       return false;
     }
   }
 
   /**
-     * Get the list of all simulators and devices
-     * @returns Promise with simulator list data
-     */
+   * Get the list of all simulators and devices
+   * @returns Promise with simulator list data
+   */
   private async listSimulators(): Promise<SimulatorList> {
-    if (!(await this.isXcrunAvailable())) {
-      throw new ActionableError("xcrun is not available. Please install Xcode Command Line Tools to use iOS functionality.");
-    }
 
-    const result = await this.executeCommand("list devices --json");
+    const result = await this.executeCommand("--list 1");
 
     try {
-      return JSON.parse(result.stdout);
+      const devices: AppleDevice[] = [];
+      const lines = result.stdout.split("\n");
+
+      // Parse each line that looks like JSON
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine.startsWith("{") && trimmedLine.endsWith("}")) {
+          try {
+            const idbDevice = JSON.parse(trimmedLine) as IdbDevice;
+            // Convert idb device format to AppleDevice format
+            const appleDevice: AppleDevice = {
+              udid: idbDevice.udid,
+              name: idbDevice.name,
+              state: idbDevice.state,
+              isAvailable: true, // idb only returns available devices
+              model: idbDevice.model,
+              os_version: idbDevice.os_version,
+              architecture: idbDevice.architecture,
+              type: idbDevice.type
+            };
+            devices.push(appleDevice);
+          } catch (parseError) {
+            logger.debug(`Failed to parse device JSON line: ${trimmedLine} - ${parseError}`);
+            continue;
+          }
+        }
+      }
+
+      // Return a SimulatorList structure with devices grouped by runtime
+      // For idb, we'll group all devices under a generic runtime key since
+      // the runtime info is embedded in the device's os_version field
+      const simulatorList: SimulatorList = {
+        devices: { "idb_devices": devices },
+        pairs: {},
+        runtimes: [],
+        devicetypes: []
+      };
+
+      return simulatorList;
     } catch (error) {
-      logger.error(`Failed to parse simulator list JSON: ${error}`);
-      throw new ActionableError(`Failed to parse iOS simulator list: ${(error as Error).message}`);
+      logger.error(`Failed to parse idb device list: ${error}`);
+      throw new ActionableError(`Failed to parse iOS device list: ${(error as Error).message}`);
     }
   }
 
@@ -177,26 +231,52 @@ export class IdbUtils {
     return (await this.getBootedSimulators()).find(simulator => simulator.name === name) !== undefined;
   }
 
-  async startSimulator(name: string): Promise<ChildProcess> {
-    // TODO
-    throw new Error("Method not implemented.");
+  async startSimulator(udid: string): Promise<ChildProcess> {
+    logger.debug(`Starting iOS simulator ${udid}`);
+    await this.executeCommand(`--boot ${udid}`);
+
+    // idb boot is synchronous, so we return a mock ChildProcess
+    // This interface might need revision as idb doesn't return a long-running process
+    const mockProcess = {
+      pid: Date.now(), // Use timestamp as mock PID
+      kill: () => false,
+      killed: false,
+      connected: false,
+      exitCode: 0,
+      signalCode: null
+    } as any as ChildProcess;
+
+    return mockProcess;
   }
 
   async killSimulator(device: BootedDevice): Promise<void> {
-    // TODO
-    throw new Error("Method not implemented.");
+    logger.debug(`Killing iOS simulator ${device.deviceId}`);
+    await this.executeCommand(`--shutdown ${device.deviceId}`);
   }
 
-  async waitForSimulatorReady(name: string): Promise<BootedDevice> {
-    throw new Error("Method not implemented, need to query for deviceId");
-    // TODO: const deviceId = throw new Error("Method not implemented.");
-    // return { name: name, platform: "ios", deviceId: deviceId } as BootedDevice;
+  async waitForSimulatorReady(udid: string): Promise<BootedDevice> {
+    const simulator = (await this.listSimulatorImages())
+      .find(device => device.deviceId === udid);
+
+    if (!simulator) {
+      throw new ActionableError(`Simulator with UDID ${udid} not found`);
+    }
+
+    if (!simulator.isRunning) {
+      throw new ActionableError(`Simulator with UDID ${udid} is not running`);
+    }
+
+    return {
+      name: simulator.name,
+      platform: simulator.platform,
+      deviceId: simulator.deviceId
+    } as BootedDevice;
   }
 
   /**
-     * Get the list of available (booted and shutdown) simulator UDIDs
-     * @returns Promise with an array of device UDIDs
-     */
+   * Get the list of available (booted and shutdown) simulator UDIDs
+   * @returns Promise with an array of device UDIDs
+   */
   async listSimulatorImages(): Promise<DeviceInfo[]> {
     // Check cache first
     if (IdbUtils.deviceListCache) {
@@ -237,9 +317,9 @@ export class IdbUtils {
   }
 
   /**
-     * Get the list of booted simulator UDIDs
-     * @returns Promise with an array of booted device UDIDs
-     */
+   * Get the list of booted simulator UDIDs
+   * @returns Promise with an array of booted device UDIDs
+   */
   async getBootedSimulators(): Promise<BootedDevice[]> {
     try {
       const simulatorList = await this.listSimulators();
@@ -263,10 +343,10 @@ export class IdbUtils {
   }
 
   /**
-     * Get device information by UDID
-     * @param udid - Device UDID
-     * @returns Promise with device information or null if not found
-     */
+   * Get device information by UDID
+   * @param udid - Device UDID
+   * @returns Promise with device information or null if not found
+   */
   async getDeviceInfo(udid: string): Promise<AppleDevice | null> {
     try {
       const simulatorList = await this.listSimulators();
@@ -287,10 +367,10 @@ export class IdbUtils {
   }
 
   /**
-     * Boot a simulator by UDID
-     * @param udid - Device UDID to boot
-     * @returns Promise that resolves when boot is initiated
-     */
+   * Boot a simulator by UDID
+   * @param udid - Device UDID to boot
+   * @returns Promise that resolves when boot is initiated
+   */
   async bootSimulator(udid: string): Promise<BootedDevice> {
     logger.debug(`Booting iOS simulator ${udid}`);
     await this.executeCommand(`boot ${udid}`);
@@ -303,58 +383,48 @@ export class IdbUtils {
   }
 
   /**
-     * Shutdown a simulator by UDID
-     * @param udid - Device UDID to shut down
-     * @returns Promise that resolves when shutdown is initiated
-     */
-  async shutdownSimulator(udid: string): Promise<void> {
-    logger.debug(`Shutting down iOS simulator ${udid}`);
-    await this.executeCommand(`shutdown ${udid}`);
-  }
-
-  /**
-     * Get available device types (iPhone models, iPad models, etc.)
-     * @returns Promise with array of device types
-     */
+   * Get available device types (iPhone models, iPad models, etc.)
+   * @returns Promise with array of device types
+   */
   async getDeviceTypes(): Promise<AppleDeviceType[]> {
     const simulatorList = await this.listSimulators();
     return simulatorList.devicetypes;
   }
 
   /**
-     * Get available iOS runtimes
-     * @returns Promise with array of runtimes
-     */
+   * Get available iOS runtimes
+   * @returns Promise with array of runtimes
+   */
   async getRuntimes(): Promise<AppleDeviceRuntime[]> {
     const simulatorList = await this.listSimulators();
     return simulatorList.runtimes.filter(runtime => runtime.isAvailable);
   }
 
   /**
-     * Create a new simulator
-     * @param name - Name for the new simulator
-     * @param deviceType - Device type identifier (e.g., "iPhone 15")
-     * @param runtime - Runtime identifier (e.g., "iOS 17.0")
-     * @returns Promise with the UDID of the created simulator
-     */
+   * Create a new simulator
+   * @param name - Name for the new simulator
+   * @param deviceType - Device type identifier (e.g., "iPhone 15")
+   * @param runtime - Runtime identifier (e.g., "iOS 17.0")
+   * @returns Promise with the UDID of the created simulator
+   */
   async createSimulator(name: string, deviceType: string, runtime: string): Promise<string> {
     logger.debug(`Creating iOS simulator: ${name} (${deviceType}, ${runtime})`);
     const result = await this.executeCommand(`create "${name}" "${deviceType}" "${runtime}"`);
-    const udid = result.stdout.trim();
+    const simulatorUdid = result.stdout.trim();
 
-    if (!udid) {
+    if (!simulatorUdid) {
       throw new ActionableError(`Failed to create iOS simulator ${name}`);
     }
 
-    logger.debug(`Created iOS simulator ${name} with UDID: ${udid}`);
-    return udid;
+    logger.debug(`Created iOS simulator ${name} with UDID: ${simulatorUdid}`);
+    return simulatorUdid;
   }
 
   /**
-     * Delete a simulator by UDID
-     * @param udid - Device UDID to delete
-     * @returns Promise that resolves when deletion is complete
-     */
+   * Delete a simulator by UDID
+   * @param udid - Device UDID to delete
+   * @returns Promise that resolves when deletion is complete
+   */
   async deleteSimulator(udid: string): Promise<void> {
     logger.debug(`Deleting iOS simulator ${udid}`);
     await this.executeCommand(`delete ${udid}`);
