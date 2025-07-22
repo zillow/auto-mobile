@@ -92,6 +92,13 @@ jobs:
           script: "./gradlew :junit-runner:test --rerun-tasks"
           working-directory: './android/'
 
+      - name: "Publish Test Report"
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          check_name: "JUnit Runner Test Report"
+          report_paths: 'junit-runner/build/test-results/**/*.xml'
+
   kotlin-test-author-unit-tests:
     name: "Run KotlinTestAuthor Unit Tests"
     runs-on: ubuntu-latest
