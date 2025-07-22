@@ -1,0 +1,15 @@
+{
+  "rules": [
+    "",
+    "Speed is one of the highest priorities of this project",
+    "Whenever terminal output isn't showing, write output to a file in the scratch directory",
+    {
+      "filePathMatches": "*",
+      "rulesPaths": [
+        "README.md",
+        "docs/ai/validation.md",
+        "roadmap/README.md"
+      ]
+    }
+  ]
+}
