@@ -21,24 +21,24 @@ export class DeviceDetection {
     // iOS devices typically use UUIDs like: 569C0F94-5D53-40D2-AF8F-F4AA5BAA7D5E
     // iOS simulators also use similar UUID patterns
     const iosPattern = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;
-    
+
     // Android device patterns
     // Emulators: emulator-5554, emulator-5556, etc.
     // Physical devices: various patterns like serial numbers
     const androidEmulatorPattern = /^emulator-\d+$/;
-    
+
     // Check for iOS UUID pattern first
     if (iosPattern.test(deviceId)) {
       logger.info(`[DeviceDetection] Detected iOS device: ${deviceId}`);
       return "ios";
     }
-    
+
     // Check for Android emulator pattern
     if (androidEmulatorPattern.test(deviceId)) {
       logger.info(`[DeviceDetection] Detected Android emulator: ${deviceId}`);
       return "android";
     }
-    
+
     // For other patterns, we'll need additional logic or default to Android
     // Android physical devices can have various ID formats
     // Most non-UUID device IDs are likely Android
@@ -63,4 +63,4 @@ export class DeviceDetection {
   static isAndroidDevice(deviceId: string): boolean {
     return DeviceDetection.detectPlatform(deviceId) === "android";
   }
-} 
+}

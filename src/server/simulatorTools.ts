@@ -171,4 +171,4 @@ export function registerSimulatorTools() {
   );
 
   logger.info("iOS simulator tools registered successfully");
-} 
+}

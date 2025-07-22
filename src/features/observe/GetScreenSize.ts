@@ -182,10 +182,10 @@ export class GetScreenSize {
     try {
       // For iOS, we try to get device info which includes screen dimensions
       const { stdout } = await this.idb.executeCommand("describe");
-      
+
       // Parse the iOS device description for screen size
       const screenSize = this.parseiOSScreenInfo(stdout);
-      
+
       if (screenSize) {
         // Cache the result in both memory and disk
         const cacheKey = this.generateCacheKey(this.device.deviceId);
@@ -213,7 +213,7 @@ export class GetScreenSize {
     try {
       // Try to parse JSON output first
       const deviceInfo = JSON.parse(stdout);
-      
+
       // Look for screen dimensions in various possible fields
       if (deviceInfo.screen_dimensions) {
         return {
@@ -221,7 +221,7 @@ export class GetScreenSize {
           height: deviceInfo.screen_dimensions.height
         };
       }
-      
+
       if (deviceInfo.screen && deviceInfo.screen.width && deviceInfo.screen.height) {
         return {
           width: deviceInfo.screen.width,
@@ -283,7 +283,7 @@ export class GetScreenSize {
     // Execute actual command if not cached
     try {
       const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
-      
+
       if (isiOSDevice) {
         // iOS device - use idb to get screen size
         return await this.getiOSScreenSize(dumpsysResult);
