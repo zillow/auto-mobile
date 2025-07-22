@@ -3,6 +3,16 @@
 Whether you want to contribute to AutoMobile or just want to run the MCP directly from source, this guide will set you
 up for the development environment maintainers use.
 
+## Build from Source
+
+If you're about to build AutoMobile from source for the very first time after cloning you should do the following:
+
+```shell
+npm install
+npm run build
+npm install -g
+```
+
 ## Hot Reload
 
 AutoMobile supports multiple transport modes but the only supported use case right now is streamable transport over the
