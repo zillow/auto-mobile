@@ -89,7 +89,7 @@ jobs:
       # Run AutoMobile tests that require emulator
       - uses: ./.github/actions/android-emulator
         with:
-          script: "./gradlew :junit-runner:test"
+          script: "./gradlew :junit-runner:test --rerun-tasks"
           working-directory: './android/'
 
   kotlin-test-author-unit-tests:
