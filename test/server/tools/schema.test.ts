@@ -82,7 +82,9 @@ describe("MCP Tools Schema", () => {
       method: "tools/call",
       params: {
         name: "listDeviceImages",
-        arguments: {}
+        arguments: {
+          platform: "android"
+        }
       }
     }, toolResponseSchema);
 
@@ -113,7 +115,7 @@ describe("MCP Tools Schema", () => {
       params: {
         name: "listDeviceImages",
         arguments: {
-          // No parameters needed for listDeviceImages
+          platform: "android"
         }
       }
     }, toolResponseSchema);
@@ -139,6 +141,7 @@ describe("MCP Tools Schema", () => {
         params: {
           name: "listDeviceImages",
           arguments: {
+            platform: "android",
             unknownField: "should not be allowed"
           }
         }

@@ -1,7 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DeviceSessionManager } from "../utils/deviceSessionManager";
-import { BootedDevice, Platform } from "../models";
+import { ActionableError, BootedDevice, SomePlatform } from "../models";
+import { ConfigurationManager } from "../utils/configurationManager";
+import { TestAuthoringManager } from "../utils/testAuthoringManager";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -62,13 +64,57 @@ class ToolRegistryClass {
       // Check if args contains a deviceId
       const providedDeviceId = args.deviceId;
       // Extract platform from args, default to "android" for backward compatibility
-      const platform: Platform = args.platform || "android";
+      const platform: SomePlatform = args.platform || "either";
 
       // Ensure device is ready and get the device ID
       const device = await this.deviceSessionManager.ensureDeviceReady(platform, providedDeviceId);
 
-      // Call the original handler with the device ID and platform
-      return await handler(device, args, progress);
+      const testAuthoringManager = TestAuthoringManager.getInstance();
+
+      // Start test authoring session if enabled and not already active
+      if (ConfigurationManager.getInstance().isTestAuthoringEnabled(device) && !testAuthoringManager.isActive()) {
+        const deviceConfig = ConfigurationManager.getInstance().getConfigForDevice(device);
+        if (deviceConfig && deviceConfig.testAuthoring) {
+          const appId = deviceConfig.testAuthoring.appId;
+          const appConfig = ConfigurationManager.getInstance().getConfigForApp(appId);
+          if (appConfig && appConfig.appId) {
+            await testAuthoringManager.startAuthoringSession(
+              device,
+              appConfig.appId,
+              deviceConfig.testAuthoring.description
+            );
+          }
+        }
+      }
+      try {
+        let response: any | undefined;
+        if (device !== undefined) {
+          response = await handler(device, args, progress);
+        }
+
+        // Log tool call to test authoring session if active
+        if (testAuthoringManager.isActive()) {
+          await testAuthoringManager.logToolCall(device, name, args, {
+            success: true,
+            data: response
+          });
+        }
+
+        return response;
+      } catch (error) {
+        // Log failed tool call to test authoring session if active
+        if (testAuthoringManager.isActive()) {
+          await testAuthoringManager.logToolCall(device, name, args, {
+            success: false,
+            error: error instanceof ActionableError ? error.message : `${error}`
+          });
+        }
+
+        if (error instanceof ActionableError) {
+          throw error;
+        }
+        throw new ActionableError(`Failed to execute tool ${name}: ${error}`);
+      }
     };
 
     this.tools.set(name, {

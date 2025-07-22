@@ -164,6 +164,7 @@ export class IdbUtils {
     }
 
     const result = await this.executeCommand("list devices --json");
+    logger.info(`Found simulator stdout: ${result.stdout}`);
 
     try {
       return JSON.parse(result.stdout);
@@ -211,12 +212,14 @@ export class IdbUtils {
 
     try {
       const simulatorList = await this.listSimulators();
+      logger.info(`Found simulator list: ${simulatorList}`);
       const devices: DeviceInfo[] = [];
 
       // Extract all devices from all runtime versions
       for (const runtimeDevices of Object.values(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable) {
+            logger.info(`Found ios simulator: ${device.name}`);
             devices.push({ name: device.udid, platform: "ios", isRunning: device.state === "Booted" } as DeviceInfo);
           }
         }
@@ -242,12 +245,14 @@ export class IdbUtils {
   async getBootedSimulators(): Promise<BootedDevice[]> {
     try {
       const simulatorList = await this.listSimulators();
+      logger.info(`Found simulator list: ${simulatorList}`);
       const bootedDevices: BootedDevice[] = [];
 
       // Extract booted devices from all runtime versions
       for (const runtimeDevices of Object.values(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable && device.state === "Booted") {
+            logger.info(`Found booted iOS simulator: ${device.name} (${device.udid})`);
             bootedDevices.push({ name: device.name, platform: "ios", deviceId: device.udid } as BootedDevice);
           }
         }
