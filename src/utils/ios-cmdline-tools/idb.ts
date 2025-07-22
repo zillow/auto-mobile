@@ -164,7 +164,6 @@ export class IdbUtils {
     }
 
     const result = await this.executeCommand("list devices --json");
-    logger.info(`Found simulator stdout: ${result.stdout}`);
 
     try {
       return JSON.parse(result.stdout);
@@ -212,7 +211,6 @@ export class IdbUtils {
 
     try {
       const simulatorList = await this.listSimulators();
-      logger.info(`Found simulator list: ${simulatorList}`);
       const devices: DeviceInfo[] = [];
 
       // Extract all devices from all runtime versions
@@ -252,7 +250,6 @@ export class IdbUtils {
       for (const runtimeDevices of Object.values(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable && device.state === "Booted") {
-            logger.info(`Found booted iOS simulator: ${device.name} (${device.udid})`);
             bootedDevices.push({ name: device.name, platform: "ios", deviceId: device.udid } as BootedDevice);
           }
         }
