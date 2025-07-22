@@ -8,17 +8,24 @@
 import SwiftUI
 
 struct ContentView: View {
+  
+    @State private var viewModel = ViewModel()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+      NavigationSplitView {
+        List(SampleItem.samples, selection: $viewModel.selectedItem) { item in
+          NavigationLink(value: item) {
+            Label(item.name, systemImage: item.icon)
+          }
         }
-        .padding()
+        .navigationTitle("Samples")
+      } detail: {
+          if let selectedItem = viewModel.selectedItem {
+                Text("Selected item: \(selectedItem.name)")
+            } else {
+                Text("Select an item")
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
-}
-
-#Preview {
-    ContentView()
 }
