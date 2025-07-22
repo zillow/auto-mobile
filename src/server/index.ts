@@ -6,9 +6,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
-import { ConfigurationManager } from "../utils/configurationManager";
-import { TestAuthoringManager } from "../utils/testAuthoringManager";
-import { DeviceSessionManager } from "../utils/deviceSessionManager";
 
 // Import the tool registry
 import { ToolRegistry } from "./toolRegistry";
@@ -25,7 +22,6 @@ import { registerDeepLinkTools } from "./deepLinkTools";
 
 export const createMcpServer = (): McpServer => {
   // Get configuration, device session, and test authoring managers
-  const testAuthoringManager = TestAuthoringManager.getInstance();
 
   // Register all tool categories
   registerObserveTools();
@@ -120,30 +116,6 @@ export const createMcpServer = (): McpServer => {
       throw new ActionableError(`Invalid parameters for tool ${name}: ${error}`);
     }
 
-    // If there wasn't a deviceId on this session already, lets find one
-    // try to use something like request.params.headerNameToString("X-Device-Id")
-    const deviceSessionManager = DeviceSessionManager.getInstance();
-
-    // Extract platform from parsed parameters, defaulting to "android" for backward compatibility
-    const platform = parsedParams.platform || "android";
-    const device = await deviceSessionManager.ensureDeviceReady(platform);
-
-    // Start test authoring session if enabled and not already active
-    if (ConfigurationManager.getInstance().isTestAuthoringEnabled(device) && !testAuthoringManager.isActive()) {
-      const deviceConfig = ConfigurationManager.getInstance().getConfigForDevice(device);
-      if (deviceConfig && deviceConfig.testAuthoring) {
-        const appId = deviceConfig.testAuthoring.appId;
-        const appConfig = ConfigurationManager.getInstance().getConfigForApp(appId);
-        if (appConfig && appConfig.appId) {
-          await testAuthoringManager.startAuthoringSession(
-            device,
-            appConfig.appId,
-            deviceConfig.testAuthoring.description
-          );
-        }
-      }
-    }
-
     // Create progress callback if tool supports progress
     const progressCallback = tool.supportsProgress
       ? async (progress: number, total?: number, message?: string) => {
@@ -164,40 +136,7 @@ export const createMcpServer = (): McpServer => {
       }
       : undefined;
 
-    try {
-      // Execute the handler with optional progress callback
-      const deviceSessionManager = DeviceSessionManager.getInstance();
-      const device = await deviceSessionManager.ensureDeviceReady(platform);
-      let response: any | undefined;
-      if (device === undefined) {
-        throw new ActionableError("No device available");
-      } else {
-        response = await tool.handler(parsedParams, progressCallback);
-      }
-
-      // Log tool call to test authoring session if active
-      if (testAuthoringManager.isActive()) {
-        await testAuthoringManager.logToolCall(device, name, parsedParams, {
-          success: true,
-          data: response
-        });
-      }
-
-      return response;
-    } catch (error) {
-      // Log failed tool call to test authoring session if active
-      if (testAuthoringManager.isActive()) {
-        await testAuthoringManager.logToolCall(device, name, parsedParams, {
-          success: false,
-          error: error instanceof ActionableError ? error.message : `${error}`
-        });
-      }
-
-      if (error instanceof ActionableError) {
-        throw error;
-      }
-      throw new ActionableError(`Failed to execute tool ${name}: ${error}`);
-    }
+    return await tool.handler(parsedParams, progressCallback);
   });
 
   return server;

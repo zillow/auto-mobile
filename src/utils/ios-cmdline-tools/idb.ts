@@ -100,7 +100,7 @@ export class IdbUtils {
     const fullCommand = `xcrun simctl ${command}`;
     const startTime = Date.now();
 
-    logger.info(`[iOS] Executing command: ${fullCommand}`);
+    logger.debug(`[iOS] Executing command: ${fullCommand}`);
 
     // Use Promise.race to implement timeout if specified
     if (timeoutMs) {
@@ -116,7 +116,7 @@ export class IdbUtils {
       try {
         const result = await Promise.race([this.execAsync(fullCommand), timeoutPromise]);
         const duration = Date.now() - startTime;
-        logger.info(`[iOS] Command completed in ${duration}ms: ${command}`);
+        logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
         return result;
       } catch (error) {
         const duration = Date.now() - startTime;
@@ -131,7 +131,7 @@ export class IdbUtils {
     try {
       const result = await this.execAsync(fullCommand);
       const duration = Date.now() - startTime;
-      logger.info(`[iOS] Command completed in ${duration}ms: ${command}`);
+      logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -207,7 +207,7 @@ export class IdbUtils {
       }
     }
 
-    logger.info("Getting list of iOS simulators");
+    logger.debug("Getting list of iOS simulators");
 
     try {
       const simulatorList = await this.listSimulators();
@@ -217,6 +217,7 @@ export class IdbUtils {
       for (const runtimeDevices of Object.values(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable) {
+            logger.debug(`Found ios simulator: ${device.name}`);
             devices.push({ name: device.udid, platform: "ios", isRunning: device.state === "Booted" } as DeviceInfo);
           }
         }
@@ -242,6 +243,7 @@ export class IdbUtils {
   async getBootedSimulators(): Promise<BootedDevice[]> {
     try {
       const simulatorList = await this.listSimulators();
+      logger.debug(`Found simulator list: ${simulatorList}`);
       const bootedDevices: BootedDevice[] = [];
 
       // Extract booted devices from all runtime versions
@@ -290,7 +292,7 @@ export class IdbUtils {
      * @returns Promise that resolves when boot is initiated
      */
   async bootSimulator(udid: string): Promise<BootedDevice> {
-    logger.info(`Booting iOS simulator ${udid}`);
+    logger.debug(`Booting iOS simulator ${udid}`);
     await this.executeCommand(`boot ${udid}`);
     const bootedSimulators = await this.getBootedSimulators();
     const bootedSimulator = bootedSimulators.find(device => device.deviceId === udid);
@@ -306,7 +308,7 @@ export class IdbUtils {
      * @returns Promise that resolves when shutdown is initiated
      */
   async shutdownSimulator(udid: string): Promise<void> {
-    logger.info(`Shutting down iOS simulator ${udid}`);
+    logger.debug(`Shutting down iOS simulator ${udid}`);
     await this.executeCommand(`shutdown ${udid}`);
   }
 
@@ -336,7 +338,7 @@ export class IdbUtils {
      * @returns Promise with the UDID of the created simulator
      */
   async createSimulator(name: string, deviceType: string, runtime: string): Promise<string> {
-    logger.info(`Creating iOS simulator: ${name} (${deviceType}, ${runtime})`);
+    logger.debug(`Creating iOS simulator: ${name} (${deviceType}, ${runtime})`);
     const result = await this.executeCommand(`create "${name}" "${deviceType}" "${runtime}"`);
     const udid = result.stdout.trim();
 
@@ -344,7 +346,7 @@ export class IdbUtils {
       throw new ActionableError(`Failed to create iOS simulator ${name}`);
     }
 
-    logger.info(`Created iOS simulator ${name} with UDID: ${udid}`);
+    logger.debug(`Created iOS simulator ${name} with UDID: ${udid}`);
     return udid;
   }
 
@@ -354,7 +356,7 @@ export class IdbUtils {
      * @returns Promise that resolves when deletion is complete
      */
   async deleteSimulator(udid: string): Promise<void> {
-    logger.info(`Deleting iOS simulator ${udid}`);
+    logger.debug(`Deleting iOS simulator ${udid}`);
     await this.executeCommand(`delete ${udid}`);
   }
 }

@@ -1,4 +1,4 @@
-import { ActionableError, BootedDevice, Platform } from "../models";
+import { ActionableError, BootedDevice, Platform, SomePlatform } from "../models";
 import { DeviceUtils } from "./deviceUtils";
 import { AdbUtils } from "./android-cmdline-tools/adb";
 import { IdbUtils } from "./ios-cmdline-tools/idb";
@@ -94,11 +94,14 @@ export class DeviceSessionManager {
    * Ensure a device is ready for the specified platform and return its ID
    * Throws an error if both Android and iOS devices are connected
    */
-  public async ensureDeviceReady(platform: Platform, providedDeviceId?: string, failIfNoDevice: boolean = false): Promise<BootedDevice> {
+  public async ensureDeviceReady(platform: SomePlatform, providedDeviceId?: string): Promise<BootedDevice> {
     // Detect all connected devices
     const connectedPlatforms = await this.detectConnectedPlatforms();
+    logger.info(`Found ${connectedPlatforms.length} connectedPlatform devices`);
     const androidDevices = connectedPlatforms.filter(device => device.platform === "android");
+    logger.info(`Found ${androidDevices.length} android devices`);
     const iosDevices = connectedPlatforms.filter(device => device.platform === "ios");
+    logger.info(`Found ${iosDevices.length} ios devices`);
 
     // Check if both platforms have devices - this is not allowed
     if (androidDevices.length > 0 && iosDevices.length > 0) {
@@ -109,17 +112,31 @@ export class DeviceSessionManager {
 
     // Get devices for the requested platform
     let platformDevices: BootedDevice[] = [];
+    let resolvedPlatform: Platform;
     switch (platform) {
       case "android":
         platformDevices = androidDevices;
+        resolvedPlatform = "android";
         break;
       case "ios":
         platformDevices = iosDevices;
+        resolvedPlatform = "ios";
         break;
+      default:
+        if (androidDevices.length > 0) {
+          platformDevices = androidDevices;
+          resolvedPlatform = "android";
+        } else if (iosDevices.length > 0) {
+          platformDevices = iosDevices;
+          resolvedPlatform = "ios";
+        } else {
+          platformDevices = [];
+          resolvedPlatform = "android";
+        }
     }
 
     // If a specific device is provided, verify it exists on the correct platform
-    if (providedDeviceId) {
+    if (providedDeviceId && resolvedPlatform) {
       const providedDevice = platformDevices.find(device => device.deviceId === providedDeviceId);
       if (!providedDevice) {
         throw new ActionableError(
@@ -128,8 +145,8 @@ export class DeviceSessionManager {
         );
       }
 
-      await this.verifyDevice(providedDeviceId, platform);
-      this.setCurrentDevice(providedDevice, platform);
+      await this.verifyDevice(providedDeviceId, resolvedPlatform);
+      this.setCurrentDevice(providedDevice, resolvedPlatform);
       return providedDevice;
     }
 
@@ -145,13 +162,9 @@ export class DeviceSessionManager {
       }
     }
 
-    if (failIfNoDevice) {
-      throw new ActionableError(`No device is currently set and none was provided for platform: ${platform}.`);
-    }
-
     // No device set - find or start one for the requested platform
-    const device = await this.findOrStartDevice(platform);
-    this.setCurrentDevice(device, platform);
+    const device = await this.findOrStartDevice(resolvedPlatform);
+    this.setCurrentDevice(device, resolvedPlatform);
     return device;
   }
 

@@ -58,17 +58,29 @@ export function registerEmulatorTools() {
       const deviceUtils = new DeviceUtils();
       const bootedDevices = await deviceUtils.getBootedDevices(args.platform);
 
-      // Categorize devices
+      // Categorize devices by type
       const devices = bootedDevices.map(device => {
-        return device.deviceId.startsWith("emulator-");
+        // For Android: emulator devices have deviceId starting with "emulator-"
+        // For iOS: simulator devices typically have deviceId as UUID format or contain "simulator"
+        const isEmulator = args.platform === "android"
+          ? device.deviceId.startsWith("emulator-")
+          : device.deviceId.includes("-") && device.deviceId.length > 30; // iOS simulators typically have long UUID-like IDs
+
+        return {
+          ...device,
+          isEmulator
+        };
       });
+
+      const emulatorCount = devices.filter(d => d.isEmulator).length;
+      const physicalCount = devices.filter(d => !d.isEmulator).length;
 
       return createJSONToolResponse({
         message: `Found ${devices.length} connected ${args.platform} devices`,
         devices: devices,
         totalCount: devices.length,
-        emulatorCount: devices.filter(d => d).length,
-        physicalCount: devices.filter(d => !d).length,
+        emulatorCount: emulatorCount,
+        physicalCount: physicalCount,
         platform: args.platform
       });
     } catch (error) {

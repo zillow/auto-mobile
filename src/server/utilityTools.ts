@@ -86,7 +86,7 @@ export function registerUtilityTools() {
   // Set active device handler
   const setActiveDeviceHandler = async (args: SetActiveDeviceArgs) => {
     try {
-      await DeviceSessionManager.getInstance().ensureDeviceReady(args.platform, args.deviceId, true);
+      await DeviceSessionManager.getInstance().ensureDeviceReady(args.platform, args.deviceId);
 
       return createJSONToolResponse({
         message: `Active device set to '${args.deviceId}'`,
