@@ -1,7 +1,7 @@
 import { ChildProcess } from "child_process";
 import { DeviceInfo, ActionableError, SomePlatform, BootedDevice } from "../models";
 import { AdbUtils } from "./android-cmdline-tools/adb";
-import { SimCtl } from "./ios-cmdline-tools/simctl";
+import { SimCtl } from "./ios-cmdline-tools/idb";
 import { AndroidEmulator } from "./android-cmdline-tools/emulator";
 
 export class DeviceUtils {

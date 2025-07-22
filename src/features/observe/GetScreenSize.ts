@@ -1,5 +1,5 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
-import { IdbUtils } from "../../utils/idb";
+import { IdbUtils } from "../../utils/ios-cmdline-tools/idb";
 import { DeviceDetection } from "../../utils/deviceDetection";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ScreenSize } from "../../models";
@@ -23,7 +23,7 @@ export class GetScreenSize {
   constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbUtils | null = null) {
     this.device = device;
     this.adb = adb || new AdbUtils(device);
-    this.idb = idb || new IdbUtils(deviceId);
+    this.idb = idb || new IdbUtils(device);
   }
 
   /**
@@ -165,11 +165,11 @@ export class GetScreenSize {
     const screenSize = this.adjustDimensionsForRotation(physicalWidth, physicalHeight, rotation);
 
     // Cache the result in both memory and disk
-    const cacheKey = this.generateCacheKey(this.deviceId);
+    const cacheKey = this.generateCacheKey(this.device.deviceId);
     GetScreenSize.memoryCache.set(cacheKey, screenSize);
     this.saveToDiskCache(cacheKey, screenSize);
 
-    logger.debug(`Android screen size computed and cached for device: ${this.deviceId}`);
+    logger.debug(`Android screen size computed and cached for device: ${this.device.deviceId}`);
     return screenSize;
   }
 
@@ -188,11 +188,11 @@ export class GetScreenSize {
       
       if (screenSize) {
         // Cache the result in both memory and disk
-        const cacheKey = this.generateCacheKey(this.deviceId);
+        const cacheKey = this.generateCacheKey(this.device.deviceId);
         GetScreenSize.memoryCache.set(cacheKey, screenSize);
         this.saveToDiskCache(cacheKey, screenSize);
 
-        logger.debug(`iOS screen size computed and cached for device: ${this.deviceId}`);
+        logger.debug(`iOS screen size computed and cached for device: ${this.device.deviceId}`);
         return screenSize;
       }
     } catch (error) {
@@ -282,7 +282,7 @@ export class GetScreenSize {
 
     // Execute actual command if not cached
     try {
-      const isiOSDevice = DeviceDetection.isiOSDevice(this.deviceId);
+      const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
       
       if (isiOSDevice) {
         // iOS device - use idb to get screen size

@@ -1,7 +1,7 @@
 import { ActionableError, BootedDevice, Platform } from "../models";
 import { DeviceUtils } from "./deviceUtils";
 import { AdbUtils } from "./android-cmdline-tools/adb";
-import { SimCtl } from "./ios-cmdline-tools/simctl";
+import { SimCtl } from "./ios-cmdline-tools/idb";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
 import { AccessibilityServiceManager } from "./accessibilityServiceManager";
