@@ -75,7 +75,7 @@ export interface IdbDevice {
   state: string;
 }
 
-export class IdbUtils {
+export class IdbCompanion {
   device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
 
@@ -112,7 +112,7 @@ export class IdbUtils {
    */
   async executeCommand(command: string, timeoutMs?: number): Promise<ExecResult> {
 
-    if (!(await this.isIDBAvailable())) {
+    if (!(await this.isAvailable())) {
       throw new ActionableError("idb_companion is not available. Please install Facebook's idb CLI to continue.");
     }
 
@@ -163,7 +163,7 @@ export class IdbUtils {
    * Check if idb is available
    * @returns Promise with boolean indicating availability
    */
-  async isIDBAvailable(): Promise<boolean> {
+  async isAvailable(): Promise<boolean> {
     try {
       await this.execAsync("idb_companion --version");
       return true;
@@ -279,11 +279,11 @@ export class IdbUtils {
    */
   async listSimulatorImages(): Promise<DeviceInfo[]> {
     // Check cache first
-    if (IdbUtils.deviceListCache) {
-      const cacheAge = Date.now() - IdbUtils.deviceListCache.timestamp;
-      if (cacheAge < IdbUtils.DEVICE_LIST_CACHE_TTL) {
+    if (IdbCompanion.deviceListCache) {
+      const cacheAge = Date.now() - IdbCompanion.deviceListCache.timestamp;
+      if (cacheAge < IdbCompanion.DEVICE_LIST_CACHE_TTL) {
         logger.info(`Getting list of iOS simulators (cached, age: ${cacheAge}ms)`);
-        return IdbUtils.deviceListCache.devices;
+        return IdbCompanion.deviceListCache.devices;
       }
     }
 
@@ -304,7 +304,7 @@ export class IdbUtils {
       }
 
       // Cache the result
-      IdbUtils.deviceListCache = {
+      IdbCompanion.deviceListCache = {
         devices,
         timestamp: Date.now()
       };
