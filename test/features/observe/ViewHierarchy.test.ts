@@ -56,7 +56,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
       setupReadFileMock();
     });
 
@@ -251,7 +251,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     it("should parse dumpsys activity top output for class overrides", function() {
@@ -428,7 +428,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     it("should return null from checkInMemoryCache when no cache exists", async function() {
@@ -581,7 +581,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     it("should process valid XML data correctly", async function() {
@@ -629,7 +629,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithMock = new ViewHierarchy("test-device", mockAdbWithOutput, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, mockAdbWithOutput, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       const result = await viewHierarchyWithMock.executeUiAutomatorDump();
       expect(result).to.equal(xmlContent);
@@ -638,6 +638,12 @@ describe("ViewHierarchy", function() {
 
   describe("Screenshot Buffer Management Tests", function() {
     it("should throw error when screenshot fails", async function() {
+      const mockDevice: BootedDevice = {
+        deviceId: "test-device",
+        name: "Test Device",
+        platform: "android"
+      };
+
       const mockAdb = {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
@@ -653,7 +659,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithMock = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshotFail, mockAccessibilityServiceClient);
+      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshotFail, mockAccessibilityServiceClient);
 
       try {
         await viewHierarchyWithMock.getOrCreateScreenshotBuffer(null);
@@ -702,7 +708,7 @@ describe("ViewHierarchy", function() {
     });
 
     it("should handle no active window gracefully", async function() {
-      const result = await viewHierarchy.getViewHierarchy();
+      const result = await viewHierarchy.getAndroidViewHierarchy();
 
       expect(result).to.exist;
       expect(result.hierarchy).to.exist;
@@ -720,9 +726,9 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithMocks = new ViewHierarchy("test-device", mockAdb, mockTakeScreenshotError, mockAccessibilityServiceClient);
+      const viewHierarchyWithMocks = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshotError, mockAccessibilityServiceClient);
 
-      const result = await viewHierarchyWithMocks.getViewHierarchy();
+      const result = await viewHierarchyWithMocks.getAndroidViewHierarchy();
 
       expect(result).to.exist;
       expect(result.hierarchy).to.exist;
@@ -742,7 +748,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbError, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       try {
         await viewHierarchyWithError.executeUiAutomatorDump();
@@ -766,7 +772,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbLockedError, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbLockedError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -790,7 +796,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbCatError, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbCatError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -814,7 +820,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbGenericError, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbGenericError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -830,6 +836,7 @@ describe("ViewHierarchy", function() {
     let mockAdb: AdbUtils;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
+    let mockDevice: BootedDevice;
 
     beforeEach(function() {
       mockDevice = {
@@ -1079,11 +1086,11 @@ describe("ViewHierarchy - Integration", function() {
       platform: "android"
     };
     // Initialize with real ADB connection
-    adb = new AdbUtils();
+    adb = new AdbUtils(mockDevice);
     takeScreenshot = new TakeScreenshot(mockDevice, adb);
     accessibilityServiceClient = new AccessibilityServiceClient(mockDevice, adb);
     awaitIdle = new AwaitIdle(mockDevice, adb);
-    viewHierarchy = new ViewHierarchy(mockDevice, adb, takeScreenshot, accessibilityServiceClient);
+    viewHierarchy = new ViewHierarchy(mockDevice, adb, null, takeScreenshot, accessibilityServiceClient);
 
     // Check if any devices are connected
     try {
@@ -1139,7 +1146,7 @@ describe("ViewHierarchy - Integration", function() {
 
   it("should retrieve the view hierarchy of the Clock app", async function() {
     // Get view hierarchy
-    const hierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
 
     // Verify it contains the required properties
     expect(hierarchy).to.have.property("hierarchy");
@@ -1157,12 +1164,12 @@ describe("ViewHierarchy - Integration", function() {
   it("should cache view hierarchy with the same hash", async function() {
     // Get view hierarchy first time
     const startTime = Date.now();
-    const firstHierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const firstHierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
     const firstFetchTime = Date.now() - startTime;
 
     // Get view hierarchy second time, should use cache
     const secondStartTime = Date.now();
-    const secondHierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const secondHierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
     const secondFetchTime = Date.now() - secondStartTime;
 
     // Second fetch should be faster if caching works (though not guaranteed in integration test)
@@ -1175,7 +1182,7 @@ describe("ViewHierarchy - Integration", function() {
 
   it("should find an element by text in the view hierarchy", async function() {
     // Get view hierarchy
-    const hierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
 
     // Debug: Log available texts to understand what's actually in the hierarchy
     const availableTexts = collectAllTexts(hierarchy.hierarchy);
@@ -1219,7 +1226,7 @@ describe("ViewHierarchy - Integration", function() {
 
   it("should find scrollable elements in the view hierarchy", async function() {
     // Get view hierarchy
-    const hierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
 
     // Find scrollable elements with a more robust search for filtered hierarchies
     const scrollableElements = findScrollableElementsInHierarchy(hierarchy.hierarchy);
@@ -1233,7 +1240,7 @@ describe("ViewHierarchy - Integration", function() {
 
   it("should find clickable elements in the view hierarchy", async function() {
     // Get view hierarchy
-    const hierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
 
     // Find clickable elements with a more robust search for filtered hierarchies
     const clickableElements = findClickableElementsInHierarchy(hierarchy.hierarchy);
@@ -1247,7 +1254,7 @@ describe("ViewHierarchy - Integration", function() {
 
   it("should calculate element center correctly", async function() {
     // Get view hierarchy
-    const hierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
 
     // For filtered hierarchies, find any element with bounds for testing
     const elements = findElementsWithBounds(hierarchy.hierarchy);
@@ -1288,7 +1295,7 @@ describe("ViewHierarchy - Integration", function() {
 
   it("should traverse view hierarchy", async function() {
     // Get view hierarchy
-    const hierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
 
     // Use a more robust traversal for filtered hierarchies
     let traversalCount = 0;
@@ -1303,7 +1310,7 @@ describe("ViewHierarchy - Integration", function() {
 
   it("should traverse view hierarchy asynchronously", async function() {
     // Get view hierarchy
-    const hierarchy = await viewHierarchy.getViewHierarchy() as unknown as ViewHierarchyResult;
+    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
 
     // Use a more robust async traversal for filtered hierarchies
     let traversalCount = 0;
@@ -1698,7 +1705,7 @@ describe("findFocusedElement", function() {
       getAccessibilityHierarchy: async () => null
     } as unknown as AccessibilityServiceClient;
 
-    viewHierarchy = new ViewHierarchy(mockDevice, null, null, mockAccessibilityServiceClient);
+    viewHierarchy = new ViewHierarchy(mockDevice, null, null, null, mockAccessibilityServiceClient);
   });
 
   it("should find focused element in simple hierarchy", function() {

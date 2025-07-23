@@ -2,17 +2,25 @@ import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { BootedDevice, SystemInsets } from "../../models";
 import { ExecResult } from "../../models";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class GetSystemInsets {
   private adb: AdbUtils;
+  private idb: IdbPython;
 
   /**
    * Create a Window instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
+   * @param idb - Optional IdbPython instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+  constructor(
+    device: BootedDevice,
+    adb: AdbUtils | null = null,
+    idb: IdbPython | null = null
+  ) {
     this.adb = adb || new AdbUtils(device);
+    this.idb = idb || new IdbPython(device);
   }
 
   /**
