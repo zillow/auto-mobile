@@ -4,13 +4,14 @@ import { FingerPath } from "../../models";
 import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 /**
  * Executes gestures using adb input commands (no sendevent)
  */
 export class ExecuteGesture extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
   }
 
   /**

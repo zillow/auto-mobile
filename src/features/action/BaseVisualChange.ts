@@ -5,6 +5,7 @@ import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ActionableError, ActiveWindowInfo, BootedDevice, ObserveResult } from "../../models";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -20,6 +21,7 @@ export interface ObservedChangeOptions {
 
 export class BaseVisualChange {
   adb: AdbUtils;
+  idb: IdbPython;
   awaitIdle: AwaitIdle;
   observeScreen: ObserveScreen;
   window: Window;
@@ -28,9 +30,15 @@ export class BaseVisualChange {
    * Create an BaseVisualChange instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
+   * @param idb - Optional IdbPython instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+  constructor(
+    device: BootedDevice,
+    adb: AdbUtils | null = null,
+    idb: IdbPython | null = null
+  ) {
     this.adb = adb || new AdbUtils(device);
+    this.idb = idb || new IdbPython(device);
     this.awaitIdle = new AwaitIdle(device, this.adb);
     this.observeScreen = new ObserveScreen(device, this.adb);
     this.window = new Window(device, this.adb);

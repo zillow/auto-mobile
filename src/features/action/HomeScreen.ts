@@ -4,6 +4,7 @@ import { BootedDevice, HomeScreenResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 interface NavigationCache {
     method: "gesture" | "hardware" | "element";
@@ -17,8 +18,8 @@ export class HomeScreen extends BaseVisualChange {
   private static readonly CACHE_DURATION_MS = 300000; // 5 minutes
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
     this.device = device;
     this.elementUtils = new ElementUtils();
   }

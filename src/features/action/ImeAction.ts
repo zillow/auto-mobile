@@ -2,10 +2,11 @@ import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ImeActionResult } from "../../models";
 import { logger } from "../../utils/logger";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class ImeAction extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
   }
 
   async execute(

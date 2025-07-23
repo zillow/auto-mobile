@@ -3,12 +3,13 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, SendTextResult } from "../../models";
 import { VirtualKeyboardManager } from "../../utils/virtualKeyboardManager";
 import { logger } from "../../utils/logger";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class InputText extends BaseVisualChange {
   private virtualKeyboardManager: VirtualKeyboardManager;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
     this.virtualKeyboardManager = new VirtualKeyboardManager(device);
   }
 

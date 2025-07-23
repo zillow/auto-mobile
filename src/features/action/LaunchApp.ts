@@ -11,16 +11,15 @@ import { ListInstalledApps } from "../observe/ListInstalledApps";
 
 export class LaunchApp extends BaseVisualChange {
   private device: BootedDevice;
-  private idb: IdbPython;
   /**
    * Create an LaunchApp instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
+   * @param idb - Optional IdbPython instance for testing
    */
   constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb);
+    super(device, adb, idb);
     this.device = device;
-    this.idb = idb || new IdbPython(device);
   }
 
   /**

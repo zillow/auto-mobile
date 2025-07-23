@@ -12,6 +12,7 @@ import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 /**
  * Command to tap on UI element containing specified text
@@ -21,8 +22,12 @@ export class TapOnElement extends BaseVisualChange {
   private accessibilityService: AccessibilityServiceClient;
   private static readonly MAX_ATTEMPTS = 5;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(
+    device: BootedDevice,
+    adb: AdbUtils | null = null,
+    idb: IdbPython | null = null
+  ) {
+    super(device, adb, idb);
     this.elementUtils = new ElementUtils();
     this.accessibilityService = new AccessibilityServiceClient(device, this.adb);
   }

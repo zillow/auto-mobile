@@ -5,6 +5,7 @@ import { Element } from "../../models";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { ElementUtils } from "../utility/ElementUtils";
 import { SwipeResult } from "../../models";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 /**
  * Executes swipe gestures on specific UI elements
@@ -13,8 +14,8 @@ export class SwipeOnElement extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
     this.executeGesture = new ExecuteGesture(device, adb);
     this.elementUtils = new ElementUtils();
   }
