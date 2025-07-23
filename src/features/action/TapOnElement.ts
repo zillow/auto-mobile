@@ -53,7 +53,21 @@ export class TapOnElement extends BaseVisualChange {
     if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
       const delayNextAttempt = 100 * Math.pow(2, attempt);
       await new Promise(resolve => setTimeout(resolve, delayNextAttempt));
-      const latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy();
+
+      let latestViewHierarchy: ViewHierarchyResult | null = null;
+
+      // Platform-specific view hierarchy retrieval
+      switch (this.device.platform) {
+        case "android":
+          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy();
+          break;
+        case "ios":
+          latestViewHierarchy = await this.idb.getViewHierarchy();
+          break;
+        default:
+          throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
+      }
+
       if (latestViewHierarchy) {
         logger.info("Retrying to find element");
         return await this.findElementToTap(
@@ -145,14 +159,16 @@ export class TapOnElement extends BaseVisualChange {
             options.action = "tap";
           }
 
-          if (options.action === "tap") {
-            await this.adb.executeCommand(`shell input tap ${tapPoint.x} ${tapPoint.y}`);
-          } else if (options.action === "longPress") {
-            await this.adb.executeCommand(`shell input swipe ${tapPoint.x} ${tapPoint.y} ${tapPoint.x} ${tapPoint.y} 1000`);
-          } else if (options.action === "doubleTap") {
-            await this.adb.executeCommand(`shell input tap ${tapPoint.x} ${tapPoint.y}`);
-            await new Promise(resolve => setTimeout(resolve, 200));
-            await this.adb.executeCommand(`shell input tap ${tapPoint.x} ${tapPoint.y}`);
+          // Platform-specific tap execution
+          switch (this.device.platform) {
+            case "android":
+              await this.executeAndroidTap(options.action, tapPoint.x, tapPoint.y);
+              break;
+            case "ios":
+              await this.executeiOSTap(options.action, tapPoint.x, tapPoint.y);
+              break;
+            default:
+              throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
           }
 
           return {
@@ -169,6 +185,44 @@ export class TapOnElement extends BaseVisualChange {
       );
     } catch (error) {
       throw new ActionableError(`Failed to perform tap on element: ${error}`);
+    }
+  }
+
+  /**
+   * Execute Android-specific tap operations
+   * @param action - The tap action to perform
+   * @param x - X coordinate
+   * @param y - Y coordinate
+   */
+  private async executeAndroidTap(action: string, x: number, y: number): Promise<void> {
+    if (action === "tap") {
+      await this.adb.executeCommand(`shell input tap ${x} ${y}`);
+    } else if (action === "longPress") {
+      await this.adb.executeCommand(`shell input swipe ${x} ${y} ${x} ${y} 1000`);
+    } else if (action === "doubleTap") {
+      await this.adb.executeCommand(`shell input tap ${x} ${y}`);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await this.adb.executeCommand(`shell input tap ${x} ${y}`);
+    }
+  }
+
+  /**
+   * Execute iOS-specific tap operations
+   * @param action - The tap action to perform
+   * @param x - X coordinate
+   * @param y - Y coordinate
+   */
+  private async executeiOSTap(action: string, x: number, y: number): Promise<void> {
+    if (action === "tap") {
+      await this.idb.tap(x, y);
+    } else if (action === "longPress") {
+      // iOS long press is implemented as a tap with longer duration
+      await this.idb.tap(x, y, 1000);
+    } else if (action === "doubleTap") {
+      // iOS double tap - perform two quick taps
+      await this.idb.tap(x, y);
+      await new Promise(resolve => setTimeout(resolve, 200));
+      await this.idb.tap(x, y);
     }
   }
 }

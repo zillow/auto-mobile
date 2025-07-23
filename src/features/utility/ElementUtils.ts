@@ -267,14 +267,24 @@ export class ElementUtils {
     const nodeProperties = this.extractNodeProperties(node);
     const parsedNode: ViewHierarchyNode = { ...nodeProperties };
 
-    // Parse bounds if they're in string format
-    if (typeof nodeProperties.bounds === "string") {
+    // For iOS elements, bounds might already be an object structure
+    if (node.bounds && typeof node.bounds === "object" &&
+      typeof node.bounds.left === "number" &&
+      typeof node.bounds.top === "number" &&
+      typeof node.bounds.right === "number" &&
+      typeof node.bounds.bottom === "number") {
+      // iOS element already has parsed bounds object
+      parsedNode.bounds = node.bounds;
+    } else if (typeof nodeProperties.bounds === "string") {
+      // Android element with string bounds format
       const parsedBounds = this.parseBounds(nodeProperties.bounds);
       if (!parsedBounds) {return null;}
-
       parsedNode.bounds = parsedBounds;
     } else if (!nodeProperties.bounds) {
       return null;
+    } else {
+      // Bounds exist but in unknown format, try to use as-is
+      parsedNode.bounds = nodeProperties.bounds;
     }
 
     return parsedNode as Element;
@@ -384,10 +394,14 @@ export class ElementUtils {
     for (const searchNode of searchNodes) {
       this.traverseNode(searchNode, (node: any) => {
         const nodeProperties = this.extractNodeProperties(node);
-        logger.info(`[Element] node: ${nodeProperties["text"]} ${nodeProperties["content-desc"]}`);
+        logger.info(`[Element] node: ${nodeProperties["text"]} ${nodeProperties["content-desc"]} ${nodeProperties["class"]}`);
 
         // Check text attribute
-        if (nodeProperties.text && typeof nodeProperties.text === "string" && matchesText(nodeProperties.text)) {
+        if (
+          nodeProperties.text &&
+          typeof nodeProperties.text === "string" &&
+          matchesText(nodeProperties.text)
+        ) {
           logger.info("[Element] Matches text property");
           const parsedNode = this.parseNodeBounds(node);
           if (parsedNode) {
@@ -397,9 +411,11 @@ export class ElementUtils {
               matches.push(parsedNode);
             }
           }
-        } else if (nodeProperties["content-desc"] &&
+        } else if (
+          nodeProperties["content-desc"] &&
           typeof nodeProperties["content-desc"] === "string" &&
-          matchesText(nodeProperties["content-desc"])) {
+          matchesText(nodeProperties["content-desc"])
+        ) {
           logger.info("[Element] Matches content-desc property");
           const parsedNode = this.parseNodeBounds(node);
           if (parsedNode) {
@@ -408,6 +424,35 @@ export class ElementUtils {
             } else {
               matches.push(parsedNode);
             }
+          }
+        } else if (
+          nodeProperties["ios-accessibility-label"] &&
+          typeof nodeProperties["ios-accessibility-label"] === "string" &&
+          matchesText(nodeProperties["ios-accessibility-label"])
+        ) {
+          logger.info("[Element] Matches ios-accessibility-label property");
+          const parsedNode = this.parseNodeBounds(node);
+          if (parsedNode) {
+            if (nodeProperties["ios-accessibility-label"] === text) {
+              exactMatches.push(parsedNode);
+            } else {
+              matches.push(parsedNode);
+            }
+          }
+        } else if (
+          matchesText(
+            nodeProperties.text || nodeProperties["content-desc"] || ""
+          ) &&
+          (
+            nodeProperties["ios-role"] === "AXButton" ||
+            nodeProperties.class === "Button" ||
+            nodeProperties.clickable === "true"
+          )
+        ) {
+          logger.info("[Element] Matches clickable element with text");
+          const parsedNode = this.parseNodeBounds(node);
+          if (parsedNode) {
+            matches.push(parsedNode);
           }
         } else {
           logger.info(`[Element] No match found in properties`);

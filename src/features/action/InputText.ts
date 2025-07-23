@@ -10,6 +10,7 @@ export class InputText extends BaseVisualChange {
 
   constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
     super(device, adb, idb);
+    this.device = device;
     this.virtualKeyboardManager = new VirtualKeyboardManager(device);
   }
 
@@ -26,43 +27,18 @@ export class InputText extends BaseVisualChange {
       };
     }
 
-    // Determine input method
-    const inputMethod = VirtualKeyboardManager.getInputMethod(text);
-
     return this.observedInteraction(
       async () => {
         try {
-          if (inputMethod === "virtual") {
-            // Automatically setup virtual keyboard for Unicode text
-            const setupResult = await this.virtualKeyboardManager.setupAdbKeyboard(false);
-
-            if (!setupResult.success) {
-              return {
-                success: false,
-                text,
-                error: `Failed to setup virtual keyboard for Unicode text: ${setupResult.error}`,
-                method: "virtual"
-              };
-            }
-
-            // Send text using virtual keyboard
-            await this.sendUnicodeTextViaVirtualKeyboard(text);
-          } else {
-            // Use native input for ASCII text
-            await this.sendAsciiText(text);
+          // Platform-specific text input execution
+          switch (this.device.platform) {
+            case "android":
+              return await this.executeAndroidTextInput(text, imeAction);
+            case "ios":
+              return await this.executeiOSTextInput(text, imeAction);
+            default:
+              throw new Error(`Unsupported platform: ${this.device.platform}`);
           }
-
-          // Handle IME action if specified
-          if (imeAction) {
-            await this.executeImeAction(imeAction);
-          }
-
-          return {
-            success: true,
-            text,
-            imeAction,
-            method: inputMethod
-          };
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -70,7 +46,7 @@ export class InputText extends BaseVisualChange {
             success: false,
             text,
             error: `Failed to send text input: ${errorMessage}`,
-            method: inputMethod
+            method: this.device.platform === "android" ? "native" : "native"
           };
         }
       },
@@ -80,6 +56,76 @@ export class InputText extends BaseVisualChange {
         timeoutMs: 5000 // Reduce timeout for faster execution
       }
     );
+  }
+
+  /**
+   * Execute Android-specific text input
+   * @param text - Text to input
+   * @param imeAction - Optional IME action
+   * @returns Result with method information
+   */
+  private async executeAndroidTextInput(
+    text: string,
+    imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
+  ): Promise<SendTextResult & { method?: "native" | "virtual" }> {
+    // Determine input method
+    const inputMethod = VirtualKeyboardManager.getInputMethod(text);
+
+    if (inputMethod === "virtual") {
+      // Automatically setup virtual keyboard for Unicode text
+      const setupResult = await this.virtualKeyboardManager.setupAdbKeyboard(false);
+
+      if (!setupResult.success) {
+        return {
+          success: false,
+          text,
+          error: `Failed to setup virtual keyboard for Unicode text: ${setupResult.error}`,
+          method: "virtual"
+        };
+      }
+
+      // Send text using virtual keyboard
+      await this.sendUnicodeTextViaVirtualKeyboard(text);
+    } else {
+      // Use native input for ASCII text
+      await this.sendAsciiText(text);
+    }
+
+    // Handle IME action if specified
+    if (imeAction) {
+      await this.executeImeAction(imeAction);
+    }
+
+    return {
+      success: true,
+      text,
+      imeAction,
+      method: inputMethod
+    };
+  }
+
+  /**
+   * Execute iOS-specific text input
+   * @param text - Text to input
+   * @param imeAction - Optional IME action (ignored on iOS)
+   * @returns Result with method information
+   */
+  private async executeiOSTextInput(
+    text: string,
+    imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
+  ): Promise<SendTextResult & { method?: "native" | "virtual" }> {
+    // iOS uses idb's inputText method which handles Unicode natively
+    await this.idb.inputText(text);
+
+    // Note: iOS IME actions are handled differently and imeAction parameter is ignored
+    // The iOS keyboard handles actions through its own UI
+
+    return {
+      success: true,
+      text,
+      imeAction: imeAction, // Preserved for API compatibility but not used on iOS
+      method: "native"
+    };
   }
 
   private async sendUnicodeTextViaVirtualKeyboard(text: string): Promise<void> {

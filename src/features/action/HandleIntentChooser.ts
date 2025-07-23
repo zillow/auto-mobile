@@ -5,7 +5,6 @@ import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class HandleIntentChooser extends BaseVisualChange {
-  private device: BootedDevice;
   private deepLinkManager: DeepLinkManager;
 
   /**

@@ -20,6 +20,7 @@ export interface ObservedChangeOptions {
 }
 
 export class BaseVisualChange {
+  device: BootedDevice;
   adb: AdbUtils;
   idb: IdbPython;
   awaitIdle: AwaitIdle;
@@ -37,6 +38,7 @@ export class BaseVisualChange {
     adb: AdbUtils | null = null,
     idb: IdbPython | null = null
   ) {
+    this.device = device;
     this.adb = adb || new AdbUtils(device);
     this.idb = idb || new IdbPython(device);
     this.awaitIdle = new AwaitIdle(device, this.adb);

@@ -4,7 +4,6 @@ import { BootedDevice, TerminateAppResult } from "../../models";
 import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class TerminateApp extends BaseVisualChange {
-  private device: BootedDevice;
 
   /**
    * Create an TerminateApp instance

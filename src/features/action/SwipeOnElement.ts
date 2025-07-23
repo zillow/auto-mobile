@@ -42,10 +42,10 @@ export class SwipeOnElement extends BaseVisualChange {
         );
 
         return this.executeGesture.swipe(
-          startX,
-          startY,
-          endX,
-          endY,
+          Math.floor(startX),
+          Math.floor(startY),
+          Math.floor(endX),
+          Math.floor(endY),
           options
         );
       },

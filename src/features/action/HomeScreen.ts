@@ -13,7 +13,6 @@ interface NavigationCache {
 }
 
 export class HomeScreen extends BaseVisualChange {
-  private device: BootedDevice;
   private static navigationCache = new Map<string, NavigationCache>();
   private static readonly CACHE_DURATION_MS = 300000; // 5 minutes
   private elementUtils: ElementUtils;
