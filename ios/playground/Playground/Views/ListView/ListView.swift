@@ -5,43 +5,39 @@ struct ListView: View {
     @State private var viewModel = ViewModel()
     
     var body: some View {
-        VStack {
-            List {
-                ForEach(viewModel.todoItems) { item in
-                    TodoRowView(
-                        item: item,
-                        onToggle: { viewModel.toggleItem(item.id) }
-                    )
-                }
-                .onMove(perform: viewModel.moveItems)
-                .onDelete(perform: viewModel.deleteItems)                    
-                if viewModel.isAddingNewItem {
-                    HStack {
-                        TextField("New todo item", text: $viewModel.newItemText)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
-                            .onSubmit {
-                                viewModel.addNewItem()
-                            }                            
-                        Button("Cancel") {
-                            viewModel.cancelAddingItem()
-                        }
-                        .foregroundColor(.red)
-                    }
-                    .padding(.vertical, 4)
-                }
+        List {
+            ForEach(viewModel.todoItems) { item in
+                TodoRowView(
+                    item: item,
+                    onToggle: { viewModel.toggleItem(item.id) }
+                )
             }
-            .navigationTitle("List")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    EditButton()                        
-                    Button(action: {
-                        viewModel.startAddingNewItem()
-                    }) {
-                        Image(systemName: "plus")
+            .onMove(perform: viewModel.moveItems)
+            .onDelete(perform: viewModel.deleteItems)                    
+            if viewModel.isAddingNewItem {
+                HStack {
+                    TextField("New todo item", text: $viewModel.newItemText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .onSubmit {
+                            viewModel.addNewItem()
+                        }                            
+                    Button("Cancel") {
+                        viewModel.cancelAddingItem()
                     }
-                    .disabled(viewModel.isAddingNewItem)
+                    .foregroundColor(.red)
                 }
+                .padding(.vertical, 4)
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                EditButton()                        
+                Button(action: {
+                    viewModel.startAddingNewItem()
+                }) {
+                    Image(systemName: "plus")
+                }
+                .disabled(viewModel.isAddingNewItem)
             }
         }
     }
