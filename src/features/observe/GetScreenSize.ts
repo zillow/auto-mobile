@@ -174,92 +174,6 @@ export class GetScreenSize {
   }
 
   /**
-   * Get screen size for iOS devices
-   * @param dumpsysResult - Optional dumpsys result (not used for iOS but kept for consistency)
-   * @returns Promise with screen size
-   */
-  private async getiOSScreenSize(dumpsysResult?: ExecResult): Promise<ScreenSize> {
-    try {
-      // For iOS, we try to get device info which includes screen dimensions
-      const { stdout } = await this.idb.executeCommand("describe");
-
-      // Parse the iOS device description for screen size
-      const screenSize = this.parseiOSScreenInfo(stdout);
-
-      if (screenSize) {
-        // Cache the result in both memory and disk
-        const cacheKey = this.generateCacheKey(this.device.deviceId);
-        GetScreenSize.memoryCache.set(cacheKey, screenSize);
-        this.saveToDiskCache(cacheKey, screenSize);
-
-        logger.debug(`iOS screen size computed and cached for device: ${this.device.deviceId}`);
-        return screenSize;
-      }
-    } catch (error) {
-      logger.warn(`Failed to get iOS screen size via idb describe: ${error}`);
-    }
-
-    // Fallback: use common iOS screen sizes based on device model
-    logger.info("Using fallback iOS screen size detection");
-    return this.getFallbackiOSScreenSize();
-  }
-
-  /**
-   * Parse iOS device screen information from idb describe output
-   * @param stdout - Output from idb describe command
-   * @returns Screen size if found, null otherwise
-   */
-  private parseiOSScreenInfo(stdout: string): ScreenSize | null {
-    try {
-      // Try to parse JSON output first
-      const deviceInfo = JSON.parse(stdout);
-
-      // Look for screen dimensions in various possible fields
-      if (deviceInfo.screen_dimensions) {
-        return {
-          width: deviceInfo.screen_dimensions.width,
-          height: deviceInfo.screen_dimensions.height
-        };
-      }
-
-      if (deviceInfo.screen && deviceInfo.screen.width && deviceInfo.screen.height) {
-        return {
-          width: deviceInfo.screen.width,
-          height: deviceInfo.screen.height
-        };
-      }
-    } catch (error) {
-      // If JSON parsing fails, try to extract dimensions from text output
-      logger.debug("Failed to parse JSON, trying text parsing");
-    }
-
-    // Text-based parsing as fallback
-    const dimensionMatch = stdout.match(/(\d+)\s*x\s*(\d+)/);
-    if (dimensionMatch) {
-      return {
-        width: parseInt(dimensionMatch[1], 10),
-        height: parseInt(dimensionMatch[2], 10)
-      };
-    }
-
-    return null;
-  }
-
-  /**
-   * Get fallback iOS screen size based on common device dimensions
-   * @returns Default iOS screen size
-   */
-  private getFallbackiOSScreenSize(): ScreenSize {
-    // Default to iPhone 14 dimensions (most common current device)
-    // In a real implementation, you might want to detect device model
-    logger.warn("Using fallback iOS screen size (iPhone 14 dimensions)");
-    return {
-      width: 390,
-      height: 844
-    };
-  }
-
-  /**
    * Get the screen size and resolution
    * @returns Promise with width and height
    */
@@ -286,7 +200,7 @@ export class GetScreenSize {
 
       if (isiOSDevice) {
         // iOS device - use idb to get screen size
-        return await this.getiOSScreenSize(dumpsysResult);
+        return await this.idb.getScreenSize();
       } else {
         // Android device - use adb to get screen size
         return await this.getAndroidScreenSize(dumpsysResult);

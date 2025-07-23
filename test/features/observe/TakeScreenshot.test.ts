@@ -6,6 +6,7 @@ import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { Image } from "../../../src/utils/image-utils";
 import { logger } from "../../../src/utils/logger";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
+import { BootedDevice } from "../../../src/models/DeviceInfo";
 import path from "path";
 import sinon from "sinon";
 
@@ -13,13 +14,21 @@ describe("TakeScreenshot", function() {
   describe("Unit Tests for Extracted Methods", function() {
     let takeScreenshot: TakeScreenshot;
     let mockAdb: AdbUtils;
+    let mockDevice: BootedDevice;
 
     beforeEach(function() {
+      mockDevice = {
+        name: "test-device",
+        platform: "android",
+        deviceId: "test-device-id",
+        source: "local"
+      };
+
       // Create a simple mock ADB for unit testing
       mockAdb = {
         executeCommand: async () => ({ stdout: "", stderr: "" })
       } as unknown as AdbUtils;
-      takeScreenshot = new TakeScreenshot(null, mockAdb);
+      takeScreenshot = new TakeScreenshot(mockDevice, mockAdb);
     });
 
     it("should generate correct screenshot path with png format", function() {
@@ -78,7 +87,7 @@ describe("TakeScreenshot", function() {
       const mockFsStat = sinon.stub(fs, "stat").resolves({ size: 0, mtime: new Date() } as any);
 
       try {
-        const takeScreenshot = new TakeScreenshot("test-device", mockAdb);
+        const takeScreenshot = new TakeScreenshot(mockDevice, mockAdb);
 
         // Mock the window dependency to avoid additional ADB calls
         const mockWindow = { getActiveHash: sinon.stub().resolves("mock-hash") };
@@ -113,13 +122,21 @@ describe("TakeScreenshot", function() {
     let takeScreenshot: TakeScreenshot;
     let adb: AdbUtils;
     let awaitIdle: AwaitIdle;
+    let testDevice: BootedDevice;
     const CLOCK_PACKAGE = "com.google.android.deskclock";
 
     beforeEach(async function() {
+      testDevice = {
+        name: "test-device",
+        platform: "android",
+        deviceId: "test-device-id",
+        source: "local"
+      };
+
       // Initialize with real ADB connection
-      adb = new AdbUtils();
-      takeScreenshot = new TakeScreenshot("test-device", adb);
-      awaitIdle = new AwaitIdle("test-device", adb);
+      adb = new AdbUtils(testDevice);
+      takeScreenshot = new TakeScreenshot(testDevice, adb);
+      awaitIdle = new AwaitIdle(testDevice, adb);
 
       // Check if any devices are connected
       try {
@@ -162,7 +179,7 @@ describe("TakeScreenshot", function() {
 
     it("should take a screenshot of the Clock app with optimized performance", async function() {
       const startTime = Date.now();
-      const result = await takeScreenshot.execute(null, { format: "png" });
+      const result = await takeScreenshot.execute({ format: "png" });
       const duration = Date.now() - startTime;
 
       expect(result.success).to.be.true;
@@ -194,12 +211,12 @@ describe("TakeScreenshot", function() {
     });
 
     it("should always create new screenshots with unique paths (no screenshot caching)", async function() {
-      const result1 = await takeScreenshot.execute(null, { format: "png" });
+      const result1 = await takeScreenshot.execute({ format: "png" });
       expect(result1.success).to.be.true;
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const result2 = await takeScreenshot.execute(null, { format: "png" });
+      const result2 = await takeScreenshot.execute({ format: "png" });
       expect(result2.success).to.be.true;
 
       // Screenshots are NOT cached - each call creates a new file
@@ -218,11 +235,11 @@ describe("TakeScreenshot", function() {
     });
 
     it("should convert format correctly when using webp", async function() {
-      const pngResult = await takeScreenshot.execute(null, { format: "png" });
+      const pngResult = await takeScreenshot.execute({ format: "png" });
       expect(pngResult.success).to.be.true;
       expect(pngResult.path!.endsWith(".png")).to.be.true;
 
-      const webpResult = await takeScreenshot.execute(null, { format: "webp", quality: 80 });
+      const webpResult = await takeScreenshot.execute({ format: "webp", quality: 80 });
       expect(webpResult.success).to.be.true;
       expect(webpResult.path!.endsWith(".webp")).to.be.true;
 
@@ -242,7 +259,7 @@ describe("TakeScreenshot", function() {
     });
 
     it("should handle webp lossless conversion correctly", async function() {
-      const webpResult = await takeScreenshot.execute(null, {
+      const webpResult = await takeScreenshot.execute({
         format: "webp",
         quality: 90,
         lossless: true
@@ -266,7 +283,7 @@ describe("TakeScreenshot", function() {
     it("should always create new screenshots with unique timestamps", async function() {
       const results = [];
       for (let i = 0; i < 3; i++) {
-        const result = await takeScreenshot.execute(null, { format: "png" });
+        const result = await takeScreenshot.execute({ format: "png" });
         expect(result.success).to.be.true;
         results.push(result);
 
@@ -293,8 +310,8 @@ describe("TakeScreenshot", function() {
         }
       } as unknown as AdbUtils;
 
-      const failingTakeScreenshot = new TakeScreenshot(null, failingAdb);
-      const result = await failingTakeScreenshot.execute(null, { format: "png" });
+      const failingTakeScreenshot = new TakeScreenshot(mockDevice, failingAdb);
+      const result = await failingTakeScreenshot.execute({ format: "png" });
 
       expect(result.success).to.be.false;
       expect(result.error).to.include("ADB command failed");

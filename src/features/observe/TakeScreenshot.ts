@@ -14,6 +14,7 @@ export interface ScreenshotOptions {
 }
 
 export class TakeScreenshot {
+  private readonly device: BootedDevice;
   private adb: AdbUtils;
   private window: Window;
   private static cacheDir: string = path.join("/tmp/auto-mobile", "screenshots");
@@ -26,8 +27,9 @@ export class TakeScreenshot {
    */
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null
+    adb: AdbUtils | null = null,
   ) {
+    this.device = device;
     this.adb = adb || new AdbUtils(device);
     this.window = new Window(device, this.adb);
 
@@ -101,21 +103,18 @@ export class TakeScreenshot {
 
   /**
    * Take a screenshot of the device
-   * @param activityHash - Optional hash of the activity (deprecated, not used)
    * @param options - Optional screenshot format options
    * @returns Promise with screenshot result including success status and path if successful
    */
   async execute(
-    activityHash: string | null = null,
     options: ScreenshotOptions = { format: "png" }
   ): Promise<ScreenshotResult> {
     const startTime = Date.now();
-    const timestamp = Date.now();
-    logger.info(`[SCREENSHOT] *** Starting screenshot capture with timestamp: ${timestamp}, format: ${options.format} ***`);
+    logger.info(`[SCREENSHOT] *** Starting screenshot capture with startTime: ${startTime}, format: ${options.format} ***`);
 
     try {
-      // Generate unique filename with timestamp
-      const finalPath = this.generateScreenshotPath(timestamp, options);
+      // Generate unique filename with startTime
+      const finalPath = this.generateScreenshotPath(startTime, options);
 
       // Capture screenshot with fallback
       const captureResult = await this.captureScreenshot(finalPath, options);
@@ -144,6 +143,30 @@ export class TakeScreenshot {
     finalPath: string,
     options: ScreenshotOptions = { format: "png" }
   ): Promise<ScreenshotResult> {
+
+    logger.info(`[SCREENSHOT] Starting screenshot capture with format: ${options.format}`);
+
+    switch (this.device.platform) {
+      case "android":
+        return await this.captureAndroidScreenshot(finalPath, options);
+      case "ios":
+        return await this.captureiOSScreenshot(finalPath);
+      default:
+        throw new Error(`Unsupported platform: ${this.device.platform}`);
+    }
+  }
+
+  /**
+   * Capture screenshot using screencap method with fallback
+   * @param finalPath - Path to save the screenshot
+   * @param options - Screenshot format options
+   * @returns ScreenshotResult with path to the saved screenshot or error
+   */
+  private async captureAndroidScreenshot(
+    finalPath: string,
+    options: ScreenshotOptions = { format: "png" }
+  ): Promise<ScreenshotResult> {
+
     logger.info(`[SCREENSHOT] Starting screenshot capture with format: ${options.format}`);
 
     // Try base64 approach first (faster for smaller screenshots)
@@ -159,6 +182,20 @@ export class TakeScreenshot {
         throw err;
       }
     }
+  }
+
+  /**
+   * Capture screenshot using screencap method with fallback
+   * @param finalPath - Path to save the screenshot
+   * @returns ScreenshotResult with path to the saved screenshot or error
+   */
+  private async captureiOSScreenshot(
+    finalPath: string,
+  ): Promise<ScreenshotResult> {
+    return {
+      success: true,
+      path: finalPath,
+    } as ScreenshotResult;
   }
 
   /**

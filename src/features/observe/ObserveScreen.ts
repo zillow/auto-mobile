@@ -12,6 +12,7 @@ import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 /**
  * Interface for cached observe result
@@ -33,6 +34,7 @@ export class ObserveScreen {
   private screenshotUtil: TakeScreenshot;
   private dumpsysWindow: GetDumpsysWindow;
   private adb: AdbUtils;
+  private idb: IdbPython;
   private deepLinkManager: DeepLinkManager;
 
   // Static cache for observe results
@@ -40,9 +42,10 @@ export class ObserveScreen {
   private static observeResultCacheDir: string = path.join("/tmp/auto-mobile", "observe_results");
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
     this.device = device;
     this.adb = adb || new AdbUtils(device);
+    this.idb = idb || new IdbPython(device);
     this.screenSize = new GetScreenSize(device, this.adb);
     this.systemInsets = new GetSystemInsets(device, this.adb);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);
@@ -222,28 +225,44 @@ export class ObserveScreen {
    * @param result - ObserveResult to update
    */
   public async collectAllData(result: ObserveResult): Promise<void> {
-    // Start dumpsys window fetch early since multiple operations need it
-    const dumpsysWindowPromise = this.dumpsysWindow.execute();
+    switch (this.device.platform) {
+      case "android":
+        // Start dumpsys window fetch early since multiple operations need it
+        const dumpsysWindowPromise = this.dumpsysWindow.execute();
 
-    // Start these operations in parallel while dumpsys is running
-    const parallelPromises: Promise<any>[] = [
-      dumpsysWindowPromise,
-      this.collectActiveWindow(result),
-      this.collectScreenshot(result),
-    ];
+        // Start these operations in parallel while dumpsys is running
+        const parallelPromises: Promise<any>[] = [
+          dumpsysWindowPromise,
+          this.collectActiveWindow(result),
+          this.collectScreenshot(result),
+        ];
 
-    const [dumpsysWindow] = await Promise.all(parallelPromises);
+        const [dumpsysWindow] = await Promise.all(parallelPromises);
 
-    // Now run the remaining operations in parallel using the shared dumpsys data
-    const finalPromises: Promise<void>[] = [
-      this.collectScreenSize(dumpsysWindow, result),
-      this.collectSystemInsets(dumpsysWindow, result),
-      this.collectRotationInfo(dumpsysWindow, result),
-      this.collectViewHierarchy(result),
-    ];
+        // Now run the remaining operations in parallel using the shared dumpsys data
+        const androidFinalPromises: Promise<void>[] = [
+          this.collectScreenSize(dumpsysWindow, result),
+          this.collectSystemInsets(dumpsysWindow, result),
+          this.collectRotationInfo(dumpsysWindow, result),
+          this.collectViewHierarchy(result),
+        ];
 
-    // Execute all remaining operations in parallel
-    await Promise.all(finalPromises);
+        // Execute all remaining operations in parallel
+        await Promise.all(androidFinalPromises);
+        break;
+      case "ios":
+        // iOS-specific data collection logic here
+
+        // Now run the remaining operations in parallel using the shared dumpsys data
+        const iosFinalPromises: Promise<void>[] = [
+          this.collectScreenSize({} as ExecResult, result),
+          this.collectViewHierarchy(result),
+        ];
+
+        // Execute all remaining operations in parallel
+        await Promise.all(iosFinalPromises);
+        break;
+    }
   }
 
   /**

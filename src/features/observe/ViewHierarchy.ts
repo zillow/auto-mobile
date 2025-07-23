@@ -15,6 +15,7 @@ import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { SourceMapper } from "../../utils/sourceMapper";
 import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 /**
  * Interface for activity top data
@@ -59,7 +60,9 @@ interface ExtendedViewHierarchyResult extends ViewHierarchyResult {
 }
 
 export class ViewHierarchy {
+  private device: BootedDevice;
   private readonly adb: AdbUtils;
+  private readonly idb: IdbPython;
   private takeScreenshot: TakeScreenshot;
   private elementUtils: ElementUtils;
   private sourceMapper: SourceMapper;
@@ -74,16 +77,20 @@ export class ViewHierarchy {
    * Create a ViewHierarchy instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
+   * @param idb - Optional IdbPython instance for testing
    * @param takeScreenshot - Optional TakeScreenshot instance for testing
    * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
    */
   constructor(
     device: BootedDevice,
     adb: AdbUtils | null = null,
+    idb: IdbPython | null = null,
     takeScreenshot: TakeScreenshot | null = null,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
+    this.device = device;
     this.adb = adb || new AdbUtils(device);
+    this.idb = idb || new IdbPython(device);
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
     this.elementUtils = new ElementUtils();
     this.sourceMapper = SourceMapper.getInstance();
@@ -500,6 +507,36 @@ export class ViewHierarchy {
    * @returns Promise with parsed XML view hierarchy
    */
   async getViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
+    switch (this.device.platform) {
+      case "ios":
+        return this.getiOSViewHierarchy(screenshotPath);
+      case "android":
+        return this.getAndroidViewHierarchy(screenshotPath);
+      default:
+        throw new Error("Unsupported platform");
+    }
+  }
+
+  /**
+   * Retrieve the view hierarchy of the current screen
+   * @param screenshotPath - Optional path to an existing screenshot to use for caching
+   * @returns Promise with parsed XML view hierarchy
+   */
+  async getiOSViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
+    const startTime = Date.now();
+    logger.debug(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
+    const viewHierarchy = await this.idb.getViewHierarchy();
+    const duration = Date.now() - startTime;
+    logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${duration}ms`);
+    return await this.augmentWithSourceIndexing(viewHierarchy as ExtendedViewHierarchyResult);
+  }
+
+  /**
+   * Retrieve the view hierarchy of the current screen
+   * @param screenshotPath - Optional path to an existing screenshot to use for caching
+   * @returns Promise with parsed XML view hierarchy
+   */
+  async getAndroidViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.debug(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
 

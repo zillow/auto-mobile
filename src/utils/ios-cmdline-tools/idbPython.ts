@@ -7,7 +7,7 @@ import {
   BootedDevice,
   ViewHierarchyResult,
   ViewHierarchyNode,
-  NodeAttributes
+  NodeAttributes, ScreenSize
 } from "../../models";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
@@ -31,6 +31,8 @@ const execAsync = async (command: string): Promise<ExecResult> => {
 
   return enhancedResult;
 };
+
+export type IdbButton = "APPLE_PAY" | "HOME" | "LOCK" | "SIDE_BUTTON" | "SIRI";
 
 export interface IdbAppInfo {
   bundleId: string;
@@ -73,6 +75,42 @@ export interface IdbAccessibilityElement {
   enabled: boolean;
   role: string;
   subrole: string | null;
+}
+
+export interface ScreenDimensions {
+  width: number;
+  height: number;
+  density: number;
+  width_points: number;
+  height_points: number;
+}
+
+export interface DomainSocketAddress {
+  path: string;
+}
+
+export interface CompanionInfo {
+  udid: string;
+  is_local: boolean;
+  pid: number | null;
+  address: DomainSocketAddress;
+  metadata: Record<string, any>;
+}
+
+export interface TargetDescription {
+  udid: string;
+  name: string;
+  target_type: "simulator" | "device";
+  state: string;
+  os_version: string;
+  architecture: string;
+  companion_info: CompanionInfo | null;
+  screen_dimensions: ScreenDimensions | null;
+  model: string | null;
+  device: string | null;
+  extended: Record<string, any>;
+  diagnostics: Record<string, any>;
+  metadata: Record<string, any>;
 }
 
 export class IdbPython {
@@ -119,6 +157,9 @@ export class IdbPython {
    */
   addDeviceToCommand(command: string): string {
     const deviceId = this.device?.deviceId;
+    if (command.includes("--udid")) {
+      return command;
+    }
     return deviceId ? `${command} --udid ${deviceId}` : command;
   }
 
@@ -134,40 +175,62 @@ export class IdbPython {
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
 
-    // Use Promise.race to implement timeout if specified
-    if (timeoutMs) {
-      let timeoutId: NodeJS.Timeout;
+    const executeWithTimeout = async (): Promise<ExecResult> => {
+      // Use Promise.race to implement timeout if specified
+      if (timeoutMs) {
+        let timeoutId: NodeJS.Timeout;
 
-      const timeoutPromise = new Promise<ExecResult>((_, reject) => {
-        timeoutId = setTimeout(
-          () => reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
-          timeoutMs
-        );
-      });
+        const timeoutPromise = new Promise<ExecResult>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
+            timeoutMs
+          );
+        });
 
-      try {
-        const result = await Promise.race([this.execAsync(fullCommand), timeoutPromise]);
-        const duration = Date.now() - startTime;
-        logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
-        return result;
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        logger.warn(`[iOS] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
-        throw error;
-      } finally {
-        clearTimeout(timeoutId!);
+        try {
+          const result = await Promise.race([this.execAsync(fullCommand), timeoutPromise]);
+          return result;
+        } finally {
+          clearTimeout(timeoutId!);
+        }
       }
-    }
 
-    // No timeout specified
+      // No timeout specified
+      return await this.execAsync(fullCommand);
+    };
+
     try {
-      const result = await this.execAsync(fullCommand);
+      const result = await executeWithTimeout();
       const duration = Date.now() - startTime;
       logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
       return result;
     } catch (error) {
+      const errorMessage = (error as Error).message;
+
+      // Handle "Mach port not connected" error by connecting and retrying
+      if (errorMessage.includes("Mach port not connected, device may not be ready yet") && this.device?.deviceId) {
+        logger.debug(`[iOS] Device not connected, attempting to connect to ${this.device.deviceId}`);
+
+        try {
+          // Run idb connect directly without using executeCommand to avoid recursion
+          const connectCommand = `${this.getBaseCommand()} connect ${this.device.deviceId} --json`;
+          logger.debug(`[iOS] Executing connect command: ${connectCommand}`);
+          await this.execAsync(connectCommand);
+
+          // Retry the original command
+          logger.debug(`[iOS] Retrying original command after connect: ${fullCommand}`);
+          const retryResult = await executeWithTimeout();
+          const duration = Date.now() - startTime;
+          logger.debug(`[iOS] Command completed after retry in ${duration}ms: ${command}`);
+          return retryResult;
+        } catch (connectError) {
+          logger.warn(`[iOS] Failed to connect device ${this.device.deviceId}: ${(connectError as Error).message}`);
+          // Fall through to original error handling
+        }
+      }
+
       const duration = Date.now() - startTime;
-      logger.warn(`[iOS] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);
+      logger.warn(`[iOS] Command failed after ${duration}ms: ${command} - ${errorMessage}`);
       throw error;
     }
   }
@@ -205,10 +268,10 @@ export class IdbPython {
    * Describe the current or specified target
    * @param udid - Optional target UDID
    */
-  async describe(udid?: string): Promise<ExecResult> {
-    const command = udid ? `describe --udid ${udid}` : "describe";
-    logger.debug(`[iOS] Describing target${udid ? ` ${udid}` : ""}`);
-    return await this.executeCommand(command);
+  async describe(): Promise<TargetDescription> {
+    logger.debug(`[iOS] Describing target`);
+    const result = await this.executeCommand(`describe --json`);
+    return JSON.parse(result.stdout) as TargetDescription;
   }
 
   /**
@@ -371,7 +434,7 @@ export class IdbPython {
    * Press a button
    * @param buttonType - Type of button to press
    */
-  async pressButton(buttonType: string): Promise<ExecResult> {
+  async pressButton(buttonType: IdbButton): Promise<ExecResult> {
     logger.debug(`[iOS] Pressing button ${buttonType}`);
     return await this.executeCommand(`ui button ${buttonType}`);
   }
@@ -388,6 +451,32 @@ export class IdbPython {
   // =============
   // ACCESSIBILITY
   // =============
+  async getScreenSize(): Promise<ScreenSize> {
+    try {
+      logger.debug("[iOS] Getting screen size");
+      const deviceInfo = await this.describe();
+
+      // Use the structured data from TargetDescription
+      if (deviceInfo.screen_dimensions) {
+        return {
+          width: deviceInfo.screen_dimensions.width,
+          height: deviceInfo.screen_dimensions.height
+        };
+      }
+
+      logger.warn("[iOS] Could not get screen dimensions from device info");
+      return {
+        width: 0,
+        height: 0
+      };
+    } catch (error) {
+      logger.warn(`[iOS] Failed to get screen size: ${error}`);
+      return {
+        width: 0,
+        height: 0
+      };
+    }
+  }
 
   /**
    * Describe the entire screen accessibility information
