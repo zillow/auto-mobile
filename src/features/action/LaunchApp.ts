@@ -5,8 +5,9 @@ import { ActionableError } from "../../models";
 import { TerminateApp } from "./TerminateApp";
 import { ClearAppData } from "./ClearAppData";
 
-import { CheckAppStatus } from "./CheckAppStatus";
 import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { logger } from "../../utils/logger";
+import { ListInstalledApps } from "../observe/ListInstalledApps";
 
 export class LaunchApp extends BaseVisualChange {
   private device: BootedDevice;
@@ -28,6 +29,7 @@ export class LaunchApp extends BaseVisualChange {
    * @returns Array of launcher activity names
    */
   private async extractLauncherActivities(packageName: string): Promise<string[]> {
+    logger.info("extractLauncherActivities");
     const activities: string[] = [];
 
     try {
@@ -64,6 +66,7 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean,
     activityName?: string
   ): Promise<LaunchAppResult> {
+    logger.info("execute");
     switch (this.device.platform) {
       case "ios":
         return this.executeiOS(packageName, clearAppData, coldBoot);
@@ -85,46 +88,38 @@ export class LaunchApp extends BaseVisualChange {
     clearAppData: boolean,
     coldBoot: boolean
   ): Promise<LaunchAppResult> {
-    try {
-      // Check if app is installed
-      const checkAppStatus = new CheckAppStatus(this.device);
-      const statusResult = await checkAppStatus.execute(bundleId);
-
-      if (!statusResult.success || !statusResult.isInstalled) {
-        return {
-          success: false,
-          packageName: bundleId,
-          error: statusResult.error || "App is not installed"
-        };
-      }
-
-      // For iOS, we'll handle coldBoot and clearAppData by terminating first if requested
-      if (clearAppData || coldBoot) {
-        try {
-          // Attempt to terminate the app if it's running
-          await this.idb.terminateApp(bundleId);
-          // Note: iOS doesn't have direct app data clearing like Android
-          // This would require uninstall/reinstall or app-specific reset
-        } catch (error) {
-          // TODO: We need to handle this error or figure out the best way to handle it
-          // App might not be running, continue with launch
-        }
-      }
-
-      // Launch the app
-      await this.idb.launchApp(bundleId, { foregroundIfRunning: true });
-
-      return {
-        success: true,
-        packageName: bundleId
-      };
-    } catch (error) {
+    logger.info(`executeiOS bundleId ${bundleId}`);
+    // Check if app is installed
+    const installedApps = await (new ListInstalledApps(this.device)).execute();
+    if (!installedApps.includes(bundleId)) {
+      logger.info("App is not installed?!?");
       return {
         success: false,
         packageName: bundleId,
-        error: error instanceof Error ? error.message : String(error)
+        error: "App is not installed"
       };
     }
+
+    // For iOS, we'll handle coldBoot and clearAppData by terminating first if requested
+    if (clearAppData || coldBoot) {
+      try {
+        // Attempt to terminate the app if it's running
+        await this.idb.terminateApp(bundleId);
+        // Note: iOS doesn't have direct app data clearing like Android
+        // This would require uninstall/reinstall or app-specific reset
+      } catch (error) {
+        // TODO: We need to handle this error or figure out the best way to handle it
+        // App might not be running, continue with launch
+      }
+    }
+
+    // Launch the app
+    await this.idb.launchApp(bundleId, { foregroundIfRunning: true });
+
+    return {
+      success: true,
+      packageName: bundleId
+    };
   }
 
   /**
@@ -140,21 +135,20 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean,
     activityName?: string
   ): Promise<LaunchAppResult> {
+    logger.info(`executeAndroid: ${packageName}`);
     // Check app status (installation and running)
-    const checkAppStatus = new CheckAppStatus(this.device);
-    const installationStatusResult = await checkAppStatus.execute(packageName);
-
-    if (!installationStatusResult.success || !installationStatusResult.isInstalled) {
+    const installedApps = await (new ListInstalledApps(this.device)).execute();
+    if (!installedApps.includes(packageName)) {
+      logger.info("App is not installed?!?");
       return {
         success: false,
-        packageName,
-        activityName,
-        error: installationStatusResult.error || "App is not installed"
+        packageName: packageName,
+        error: "App is not installed"
       };
     }
 
     // Use the installation status check which also includes running status
-    const isRunning = installationStatusResult.success && installationStatusResult.isRunning;
+    const isRunning = true; // TODO
 
     if (isRunning) {
       if (clearAppData) {
@@ -191,6 +185,7 @@ export class LaunchApp extends BaseVisualChange {
 
     return this.observedInteraction(
       async () => {
+        logger.info("(");
         let targetActivity = activityName;
 
         // If no specific activity provided, get launcher activities from pm dump

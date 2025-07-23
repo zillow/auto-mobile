@@ -1,8 +1,8 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { UninstallAppResult } from "../../models/UninstallAppResult";
 import { BootedDevice } from "../../models";
-import { CheckAppStatus } from "./CheckAppStatus";
 import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { ListInstalledApps } from "../observe/ListInstalledApps";
 
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
@@ -53,10 +53,11 @@ export class UninstallApp {
   private async executeiOS(bundleId: string): Promise<UninstallAppResult> {
     try {
       // Check if app is installed
-      const checkAppStatus = new CheckAppStatus(this.device);
-      const statusResult = await checkAppStatus.execute(bundleId);
+      const listApps = new ListInstalledApps(this.device);
 
-      if (!statusResult.success || !statusResult.isInstalled) {
+      const installed = (await listApps.execute()).find(app => app === bundleId) !== undefined;
+
+      if (!installed) {
         return {
           success: true,
           packageName: bundleId,
@@ -66,21 +67,14 @@ export class UninstallApp {
       }
 
       // Terminate app if it's running before uninstalling
-      if (statusResult.isRunning) {
-        try {
-          await this.idb.terminateApp(bundleId);
-        } catch (error) {
-          // App might not be running or already terminated, continue with uninstall
-        }
-      }
+      // TODO: query if the app was running
+      await this.idb.terminateApp(bundleId);
 
       // Uninstall the app
       await this.idb.uninstallApp(bundleId);
 
       // Verify the app was uninstalled
-      const postUninstallStatus = new CheckAppStatus(this.device);
-      const postUninstallResult = await postUninstallStatus.execute(bundleId);
-      const isStillInstalled = postUninstallResult.success && postUninstallResult.isInstalled;
+      const isStillInstalled = (await listApps.execute()).find(app => app === bundleId) !== undefined;
 
       if (isStillInstalled) {
         return {
@@ -117,12 +111,11 @@ export class UninstallApp {
   private async executeAndroid(packageName: string, keepData: boolean): Promise<UninstallAppResult> {
     try {
       // Check if app is running and terminate if needed
-      const appStatus = new CheckAppStatus(this.device);
-      const statusResult = await appStatus.execute(packageName);
-      const isRunning = statusResult.success && statusResult.isRunning;
-      const isInstalled = statusResult.success && statusResult.isInstalled;
+      const listApps = new ListInstalledApps(this.device);
 
-      if (!isInstalled) {
+      const installed = (await listApps.execute()).find(app => app === packageName) !== undefined;
+
+      if (!installed) {
         return {
           success: true,
           packageName,
@@ -131,9 +124,8 @@ export class UninstallApp {
         };
       }
 
-      if (isRunning) {
-        await this.adb.executeCommand(`shell am force-stop ${packageName}`);
-      }
+      // TODO: query if app was running and needed to be stopped
+      await this.adb.executeCommand(`shell am force-stop ${packageName}`);
 
       const cmd = keepData ?
         `shell pm uninstall -k ${packageName}` :
@@ -141,10 +133,8 @@ export class UninstallApp {
 
       await this.adb.executeCommand(cmd);
 
-      // Check if the package is still installed after uninstallation
-      const postUninstallAppStatus = new CheckAppStatus(this.device);
-      const postUninstallStatusResult = await postUninstallAppStatus.execute(packageName);
-      const isStillInstalled = postUninstallStatusResult.success && postUninstallStatusResult.isInstalled;
+      // Verify the app was uninstalled
+      const isStillInstalled = (await listApps.execute()).find(app => app === packageName) !== undefined;
 
       if (isStillInstalled) {
         return {

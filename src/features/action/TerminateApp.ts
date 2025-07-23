@@ -1,7 +1,6 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, TerminateAppResult } from "../../models";
-import { CheckAppStatus } from "./CheckAppStatus";
 
 export class TerminateApp extends BaseVisualChange {
   private device: BootedDevice;
@@ -45,9 +44,7 @@ export class TerminateApp extends BaseVisualChange {
         }
 
         // Check if app is running
-        const appStatus = new CheckAppStatus(this.device);
-        const statusResult = await appStatus.execute(packageName);
-        const isRunning = statusResult.success && statusResult.isRunning;
+        const isRunning = true;
 
         if (!isRunning) {
           return {
