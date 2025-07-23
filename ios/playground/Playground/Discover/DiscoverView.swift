@@ -20,7 +20,7 @@ struct DiscoverView: View {
         case 0:
           TapView()
         case 1:
-          ListView()
+          SwipeView()
         case 2:
           MediaView()
         case 3:
