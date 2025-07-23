@@ -36,7 +36,7 @@ export class CheckAppStatus {
     try {
       const installedAppsResult = await this.idb.listApps();
       const apps = Array.isArray(installedAppsResult) ? installedAppsResult : [];
-      
+
       // Find the app in the list and check both installation and running status
       const app = apps.find((app: any) => app.bundle_id === bundleId);
       const isInstalled = !!app;
@@ -94,4 +94,4 @@ export class CheckAppStatus {
       };
     }
   }
-} 
+}

@@ -7,7 +7,6 @@ import { ClearAppData } from "./ClearAppData";
 
 import { CheckAppStatus } from "./CheckAppStatus";
 import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
-import { DeviceDetection } from "../../utils/deviceDetection";
 
 export class LaunchApp extends BaseVisualChange {
   private device: BootedDevice;

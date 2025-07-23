@@ -294,7 +294,7 @@ export class SimulatorUtils {
     try {
       logger.info(`Listing installed apps for simulator ${udid}`);
       const result = await this.execAsync(`xcrun simctl listapps ${udid}`);
-      
+
       // Parse the output to extract app identifiers
       // The output format is typically JSON with app bundle identifiers
       try {
@@ -302,7 +302,7 @@ export class SimulatorUtils {
         return Object.keys(apps);
       } catch {
         // If JSON parsing fails, try to extract app identifiers from text output
-        const lines = result.stdout.split('\n');
+        const lines = result.stdout.split("\n");
         return lines
           .filter(line => line.trim().length > 0)
           .map(line => line.trim());

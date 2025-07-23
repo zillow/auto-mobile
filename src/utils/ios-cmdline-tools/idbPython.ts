@@ -3,7 +3,6 @@ import { promisify } from "util";
 import { logger } from "../logger";
 import {
   ExecResult,
-  ActionableError,
   DeviceInfo,
   BootedDevice,
   ViewHierarchyResult,
@@ -186,7 +185,7 @@ export class IdbPython {
     // The output is a sequence of JSON objects, one per line (not a JSON array).
     // We need to parse each line as JSON and map to IdbTargetInfo[].
     const lines = result.stdout
-      .split('\n')
+      .split("\n")
       .map(line => line.trim())
       .filter(line => line.length > 0);
 
@@ -243,7 +242,7 @@ export class IdbPython {
     // The output is a sequence of JSON objects, one per line (not a JSON array).
     // We need to parse each line as JSON and map to IdbAppInfo[].
     const lines = result.stdout
-      .split('\n')
+      .split("\n")
       .map(line => line.trim())
       .filter(line => line.length > 0);
 
@@ -642,5 +641,19 @@ export class IdbPython {
   async kill(): Promise<ExecResult> {
     logger.debug("[iOS] Killing idb and clearing companion information");
     return await this.executeCommand("kill");
+  }
+
+  /**
+   * Check if idb is available on the system
+   * @returns Promise<boolean> - Whether idb is available
+   */
+  async isAvailable(): Promise<boolean> {
+    try {
+      await this.execAsync("idb --version");
+      return true;
+    } catch (error) {
+      logger.debug("[iOS] idb not available:", error);
+      return false;
+    }
   }
 }

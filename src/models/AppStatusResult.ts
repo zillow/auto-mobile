@@ -10,4 +10,4 @@ export interface AppStatusResult {
   isRunning: boolean;
   observation?: ObserveResult;
   error?: string;
-} 
+}
