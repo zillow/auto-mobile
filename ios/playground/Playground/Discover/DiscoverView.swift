@@ -20,9 +20,9 @@ struct DiscoverView: View {
         case 0:
           TapView()
         case 1:
-          Text("Swipe")
+          ListView()
         case 2:
-          Text("Media")
+          MediaView()
         case 3:
           Text("Text")
         case 4:

@@ -18,13 +18,10 @@ struct InputsView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header
-                Text("Text Input Views")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .padding(.top)
                 Text("Comprehensive list of text input views")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                    .padding(.top)
                 
                 // Basic TextField
                 VStack(alignment: .leading, spacing: 8) {
