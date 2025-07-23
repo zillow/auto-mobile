@@ -102,14 +102,16 @@ export class BaseVisualChange {
       }));
     }
 
-    // Always start active window fetch to ensure we have the latest info
-    logger.info("[BaseVisualChange] Starting active window fetch in parallel");
-    parallelPromises.push(
-      this.window.getActive(true).catch(error => {
-        logger.debug(`[BaseVisualChange] Active window fetch failed: ${error}`);
-        return null;
-      })
-    );
+    if (this.device.platform === "android") {
+      // Always start active window fetch to ensure we have the latest info
+      logger.info("[BaseVisualChange] Starting active window fetch in parallel");
+      parallelPromises.push(
+        this.window.getActive(true).catch(error => {
+          logger.debug(`[BaseVisualChange] Active window fetch failed: ${error}`);
+          return null;
+        })
+      );
+    }
 
     // Execute all parallel operations
     const results = await Promise.all(parallelPromises);

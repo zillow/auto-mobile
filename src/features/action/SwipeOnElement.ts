@@ -6,6 +6,7 @@ import { ExecuteGesture } from "./ExecuteGesture";
 import { ElementUtils } from "../utility/ElementUtils";
 import { SwipeResult } from "../../models";
 import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { logger } from "../../utils/logger";
 
 /**
  * Executes swipe gestures on specific UI elements
@@ -34,20 +35,42 @@ export class SwipeOnElement extends BaseVisualChange {
     options: GestureOptions = {},
     progress?: ProgressCallback
   ): Promise<SwipeResult> {
+    logger.info(`[SwipeOnElement] Starting swipe: direction=${direction}, platform=${this.device.platform}`);
+    logger.info(`[SwipeOnElement] Element bounds: ${JSON.stringify(element.bounds)}`);
+    logger.info(`[SwipeOnElement] Options: ${JSON.stringify(options)}`);
+
     return this.observedInteraction(
       async () => {
+        logger.info(`[SwipeOnElement] In observedInteraction callback`);
+
         const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
           direction,
           element.bounds
         );
 
-        return this.executeGesture.swipe(
-          Math.floor(startX),
-          Math.floor(startY),
-          Math.floor(endX),
-          Math.floor(endY),
-          options
-        );
+        logger.info(`[SwipeOnElement] Raw swipe coordinates: start=(${startX}, ${startY}), end=(${endX}, ${endY})`);
+
+        const flooredStartX = Math.floor(startX);
+        const flooredStartY = Math.floor(startY);
+        const flooredEndX = Math.floor(endX);
+        const flooredEndY = Math.floor(endY);
+
+        logger.info(`[SwipeOnElement] Floored swipe coordinates: start=(${flooredStartX}, ${flooredStartY}), end=(${flooredEndX}, ${flooredEndY})`);
+
+        try {
+          const result = await this.executeGesture.swipe(
+            flooredStartX,
+            flooredStartY,
+            flooredEndX,
+            flooredEndY,
+            options
+          );
+          logger.info(`[SwipeOnElement] Swipe completed successfully: ${JSON.stringify(result)}`);
+          return result;
+        } catch (error) {
+          logger.error(`[SwipeOnElement] Swipe execution failed: ${error}`);
+          throw error;
+        }
       },
       {
         changeExpected: false,
