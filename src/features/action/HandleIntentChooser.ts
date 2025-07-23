@@ -2,18 +2,19 @@ import { DeepLinkManager } from "../../utils/deepLinkManager";
 import { BootedDevice, IntentChooserResult, ObserveResult } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class HandleIntentChooser extends BaseVisualChange {
-  private device: BootedDevice;
   private deepLinkManager: DeepLinkManager;
 
   /**
    * Create an TerminateApp instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
+   * @param idb - Optional IdbPython instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
     this.device = device;
     this.deepLinkManager = new DeepLinkManager(device);
   }

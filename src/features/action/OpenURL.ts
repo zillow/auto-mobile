@@ -1,10 +1,13 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, OpenURLResult } from "../../models";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class OpenURL extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
+    this.device = device;
   }
 
   async execute(
@@ -22,17 +25,20 @@ export class OpenURL extends BaseVisualChange {
     return this.observedInteraction(
       async () => {
         try {
-          await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${url}"`);
-
-          return {
-            success: true,
-            url
-          };
+          // Platform-specific URL opening execution
+          switch (this.device.platform) {
+            case "android":
+              return await this.executeAndroidOpenURL(url);
+            case "ios":
+              return await this.executeiOSOpenURL(url);
+            default:
+              throw new Error(`Unsupported platform: ${this.device.platform}`);
+          }
         } catch (error) {
           return {
             success: false,
             url,
-            error: "Failed to open URL"
+            error: `Failed to open URL: ${error instanceof Error ? error.message : String(error)}`
           };
         }
       },
@@ -41,5 +47,33 @@ export class OpenURL extends BaseVisualChange {
         timeoutMs: 12000
       }
     );
+  }
+
+  /**
+   * Execute Android-specific URL opening
+   * @param url - URL to open
+   * @returns Result of the URL opening operation
+   */
+  private async executeAndroidOpenURL(url: string): Promise<OpenURLResult> {
+    await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${url}"`);
+
+    return {
+      success: true,
+      url
+    };
+  }
+
+  /**
+   * Execute iOS-specific URL opening
+   * @param url - URL to open
+   * @returns Result of the URL opening operation
+   */
+  private async executeiOSOpenURL(url: string): Promise<OpenURLResult> {
+    await this.idb.openUrl(url);
+
+    return {
+      success: true,
+      url
+    };
   }
 }

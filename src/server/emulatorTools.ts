@@ -26,8 +26,8 @@ export const startDeviceSchema = z.object({
 
 export const killEmulatorSchema = z.object({
   device: z.object({
-    name: z.string().describe("The device name to kill"),
-    deviceId: z.string().describe("The device ID"),
+    name: z.string().describe("The device image name to kill"),
+    deviceId: z.string().describe("The device unique ID"),
     platform: z.enum(["android", "ios"]).describe("Target platform")
   })
 });
@@ -126,19 +126,18 @@ export function registerEmulatorTools() {
     }
   };
 
-  // Kill emulator handler
-  const killEmulatorHandler = async (device: BootedDevice, args: KillEmulatorArgs) => {
+  const killDeviceHandler = async (args: KillEmulatorArgs) => {
     try {
       const deviceUtils = new DeviceUtils();
-      await deviceUtils.killDevice(device);
+      await deviceUtils.killDevice(args.device);
       return createJSONToolResponse({
-        message: `${device.platform} '${device.name}' shutdown successfully`,
-        udid: device.name,
-        name: device.name,
-        platform: device.platform
+        message: `${args.device.platform} '${args.device.name}' shutdown successfully`,
+        udid: args.device.name,
+        name: args.device.name,
+        platform: args.device.platform
       });
     } catch (error) {
-      throw new ActionableError(`Failed to kill ${device.platform} emulator: ${error}`);
+      throw new ActionableError(`Failed to kill ${args.device.platform} emulator: ${error}`);
     }
   };
 
@@ -165,10 +164,10 @@ export function registerEmulatorTools() {
     true // Supports progress notifications
   );
 
-  ToolRegistry.registerDeviceAware(
+  ToolRegistry.register(
     "killEmulator",
-    "Kill a running Android emulator",
+    "Kill a running device",
     killEmulatorSchema,
-    killEmulatorHandler
+    killDeviceHandler
   );
 }

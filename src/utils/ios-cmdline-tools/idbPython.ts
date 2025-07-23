@@ -7,7 +7,7 @@ import {
   BootedDevice,
   ViewHierarchyResult,
   ViewHierarchyNode,
-  NodeAttributes, ScreenSize
+  NodeAttributes, ScreenSize, SwipeResult
 } from "../../models";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
@@ -521,13 +521,43 @@ export class IdbPython {
     endX: number,
     endY: number,
     stepSize?: number
-  ): Promise<ExecResult> {
+  ): Promise<SwipeResult> {
     let command = `ui swipe ${startX} ${startY} ${endX} ${endY}`;
     if (stepSize) {
       command += ` --delta ${stepSize}`;
     }
     logger.info(`[idb] Swiping from (${startX}, ${startY}) to (${endX}, ${endY})${stepSize ? ` with step size ${stepSize}` : ""}`);
-    return await this.executeCommand(command);
+
+    try {
+      await this.executeCommand(command);
+
+      // Calculate duration based on distance (rough estimate)
+      const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+      const estimatedDuration = Math.max(300, distance * 2); // Minimum 300ms, scaled by distance
+
+      return {
+        success: true,
+        x1: startX,
+        y1: startY,
+        x2: endX,
+        y2: endY,
+        duration: estimatedDuration,
+        easing: "linear"
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.warn(`[idb] Swipe failed: ${errorMessage}`);
+
+      return {
+        success: false,
+        x1: startX,
+        y1: startY,
+        x2: endX,
+        y2: endY,
+        duration: 0,
+        error: errorMessage
+      };
+    }
   }
 
   /**
@@ -558,6 +588,8 @@ export class IdbPython {
 
       // Use the structured data from TargetDescription
       if (deviceInfo.screen_dimensions) {
+        // For iOS, idb ui swipe expects pixel coordinates, not logical points
+        // Use the actual pixel dimensions (width/height) instead of points
         return {
           width: deviceInfo.screen_dimensions.width,
           height: deviceInfo.screen_dimensions.height

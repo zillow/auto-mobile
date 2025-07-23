@@ -3,6 +3,7 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { GestureOptions } from "../../models/GestureOptions";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { BootedDevice } from "../../models";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 /**
  * Executes a fling gesture with high velocity
@@ -10,8 +11,8 @@ import { BootedDevice } from "../../models";
 export class Fling extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
     this.executeGesture = new ExecuteGesture(device, adb);
   }
 

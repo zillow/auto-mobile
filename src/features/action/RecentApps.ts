@@ -5,6 +5,7 @@ import { SwipeOnScreen } from "./SwipeOnScreen";
 import { PressButton } from "./PressButton";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 /**
  * Opens the recent apps screen using intelligent navigation detection
@@ -14,8 +15,8 @@ export class RecentApps extends BaseVisualChange {
   private pressButton: PressButton;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    super(device, adb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+    super(device, adb, idb);
     this.swipeOnScreen = new SwipeOnScreen(device, adb);
     this.pressButton = new PressButton(device, adb);
     this.elementUtils = new ElementUtils();

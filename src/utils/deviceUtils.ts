@@ -101,7 +101,7 @@ export class DeviceUtils {
   ): Promise<void> {
     switch (device.platform) {
       case "android":
-        return this.emulator.killEmulator(device);
+        return this.emulator.killDevice(device);
       case "ios":
         return this.idb.killSimulator(device);
     }

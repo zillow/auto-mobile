@@ -212,7 +212,7 @@ export class AndroidEmulator {
    * @param device - The device to kill
    * @returns Promise that resolves when emulator is stopped
    */
-  async killEmulator(device: BootedDevice): Promise<void> {
+  async killDevice(device: BootedDevice): Promise<void> {
     const runningEmulators = await this.getBootedEmulators();
     const emulator = runningEmulators.find(emu => emu.deviceId === device.deviceId);
 

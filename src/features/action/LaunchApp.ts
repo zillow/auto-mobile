@@ -10,17 +10,15 @@ import { logger } from "../../utils/logger";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
 
 export class LaunchApp extends BaseVisualChange {
-  private device: BootedDevice;
-  private idb: IdbPython;
   /**
    * Create an LaunchApp instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
+   * @param idb - Optional IdbPython instance for testing
    */
   constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb);
+    super(device, adb, idb);
     this.device = device;
-    this.idb = idb || new IdbPython(device);
   }
 
   /**
@@ -80,7 +78,7 @@ export class LaunchApp extends BaseVisualChange {
   /**
    * Launch an iOS app by bundle identifier
    * @param bundleId - The bundle identifier to launch
-   * @param clearAppData - Whether clear app data before launch
+   * @param clearAppData - Whether clear app data before launch (not supported on iOS)
    * @param coldBoot - Whether to cold boot the app or resume if already running
    */
   private async executeiOS(
@@ -89,37 +87,56 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean
   ): Promise<LaunchAppResult> {
     logger.info(`executeiOS bundleId ${bundleId}`);
-    // Check if app is installed
-    const installedApps = await (new ListInstalledApps(this.device)).execute();
-    if (!installedApps.includes(bundleId)) {
-      logger.info("App is not installed?!?");
-      return {
-        success: false,
-        packageName: bundleId,
-        error: "App is not installed"
-      };
-    }
 
-    // For iOS, we'll handle coldBoot and clearAppData by terminating first if requested
-    if (clearAppData || coldBoot) {
-      try {
-        // Attempt to terminate the app if it's running
-        await this.idb.terminateApp(bundleId);
-        // Note: iOS doesn't have direct app data clearing like Android
-        // This would require uninstall/reinstall or app-specific reset
-      } catch (error) {
-        // TODO: We need to handle this error or figure out the best way to handle it
-        // App might not be running, continue with launch
+    return this.observedInteraction(
+      async () => {
+        // Check if app is installed
+        const installedApps = await (new ListInstalledApps(this.device)).execute();
+        if (!installedApps.includes(bundleId)) {
+          logger.info("App is not installed");
+          return {
+            success: false,
+            packageName: bundleId,
+            error: "App is not installed"
+          };
+        }
+
+        // For iOS, handle coldBoot by terminating first if requested
+        if (coldBoot) {
+          try {
+            // Attempt to terminate the app if it's running
+            await this.idb.terminateApp(bundleId);
+            // Note: iOS doesn't have direct app data clearing like Android
+            // clearAppData parameter is ignored on iOS
+          } catch (error) {
+            // App might not be running, continue with launch
+            logger.info("App was not running or failed to terminate, continuing with launch");
+          }
+        }
+
+        // Launch the app using idb
+        const launchResult = await this.idb.launchApp(bundleId, {
+          foregroundIfRunning: !coldBoot
+        });
+
+        if (launchResult.error) {
+          return {
+            success: false,
+            packageName: bundleId,
+            error: launchResult.error
+          };
+        }
+
+        return {
+          success: true,
+          packageName: bundleId,
+          pid: launchResult.pid
+        };
+      },
+      {
+        changeExpected: false
       }
-    }
-
-    // Launch the app
-    await this.idb.launchApp(bundleId, { foregroundIfRunning: true });
-
-    return {
-      success: true,
-      packageName: bundleId
-    };
+    );
   }
 
   /**

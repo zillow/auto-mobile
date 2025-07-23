@@ -3,13 +3,15 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, RotateResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { ProgressCallback } from "./BaseVisualChange";
+import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
 export class Rotate extends BaseVisualChange {
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null
+    adb: AdbUtils | null = null,
+    idb: IdbPython | null = null
   ) {
-    super(device, adb);
+    super(device, adb, idb);
   }
 
   /**
