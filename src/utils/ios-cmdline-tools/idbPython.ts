@@ -1,7 +1,15 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
-import { ExecResult, ActionableError, DeviceInfo, BootedDevice } from "../../models";
+import {
+  ExecResult,
+  ActionableError,
+  DeviceInfo,
+  BootedDevice,
+  ViewHierarchyResult,
+  ViewHierarchyNode,
+  NodeAttributes
+} from "../../models";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
@@ -57,6 +65,28 @@ export interface IdbCrashLog {
   name: string;
   date: string;
   bundleId?: string;
+}
+
+export interface IdbAccessibilityElement {
+  AXFrame: string;
+  AXUniqueId: string | null;
+  frame: {
+    y: number;
+    x: number;
+    width: number;
+    height: number;
+  };
+  role_description: string;
+  AXLabel: string;
+  content_required: boolean;
+  type: string;
+  title: string | null;
+  help: string | null;
+  custom_actions: string[];
+  AXValue: string | null;
+  enabled: boolean;
+  role: string;
+  subrole: string | null;
 }
 
 export class IdbPython {
@@ -360,6 +390,183 @@ export class IdbPython {
     return await this.executeCommand(`ui describe-point ${x} ${y}`);
   }
 
+  /**
+   * Parse iOS accessibility elements to ViewHierarchyResult format
+   * @param accessibilityElements - Array of iOS accessibility elements from idb ui describe-all
+   * @returns ViewHierarchyResult - Parsed hierarchy in the expected format
+   */
+  parseAccessibilityToViewHierarchy(accessibilityElements: IdbAccessibilityElement[]): ViewHierarchyResult {
+    const startTime = Date.now();
+
+    try {
+      logger.debug("[iOS] Converting iOS accessibility elements to ViewHierarchyResult format");
+
+      if (!accessibilityElements || accessibilityElements.length === 0) {
+        return {
+          hierarchy: {
+            error: "No accessibility elements provided"
+          }
+        };
+      }
+
+      // Find the root element (usually the Application element)
+      const rootElement = accessibilityElements.find(el => el.type === "Application") || accessibilityElements[0];
+      const childElements = accessibilityElements.filter(el => el !== rootElement);
+
+      // Convert root element to ViewHierarchyNode
+      const rootNode = this.convertAccessibilityElementToNode(rootElement);
+
+      // Add child elements as flat structure under root
+      if (childElements.length > 0) {
+        rootNode.node = childElements.map(el => this.convertAccessibilityElementToNode(el));
+      }
+
+      const result: ViewHierarchyResult = {
+        hierarchy: {
+          node: rootNode
+        }
+      };
+
+      const duration = Date.now() - startTime;
+      logger.debug(`[iOS] Accessibility conversion completed in ${duration}ms`);
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[iOS] Accessibility conversion failed after ${duration}ms: ${error}`);
+
+      return {
+        hierarchy: {
+          error: "Failed to convert iOS accessibility elements"
+        }
+      };
+    }
+  }
+
+  /**
+   * Convert individual iOS accessibility element to ViewHierarchyNode
+   * @param element - iOS accessibility element
+   * @returns ViewHierarchyNode - Converted node
+   */
+  private convertAccessibilityElementToNode(element: IdbAccessibilityElement): ViewHierarchyNode {
+    const attributes: NodeAttributes = {};
+
+    // Map iOS accessibility properties to Android-like attributes
+    if (element.AXLabel) {
+      attributes.text = element.AXLabel;
+      attributes["content-desc"] = element.AXLabel;
+    }
+
+    if (element.AXUniqueId) {
+      attributes["resource-id"] = element.AXUniqueId;
+    }
+
+    if (element.type) {
+      attributes.class = element.type;
+    }
+
+    if (element.role) {
+      attributes["ios-role"] = element.role;
+    }
+
+    if (element.subrole) {
+      attributes["ios-subrole"] = element.subrole;
+    }
+
+    if (element.role_description) {
+      attributes["ios-role-description"] = element.role_description;
+    }
+
+    if (element.AXValue) {
+      attributes["ios-value"] = element.AXValue;
+    }
+
+    if (element.help) {
+      attributes["ios-help"] = element.help;
+    }
+
+    // Map boolean properties
+    attributes.enabled = element.enabled.toString();
+    attributes.clickable = this.isClickableElement(element).toString();
+    attributes.focusable = this.isFocusableElement(element).toString();
+    attributes.scrollable = this.isScrollableElement(element).toString();
+
+    // Convert frame to bounds in Android format [left,top][right,bottom]
+    const bounds = `[${element.frame.x},${element.frame.y}][${element.frame.x + element.frame.width},${element.frame.y + element.frame.height}]`;
+    attributes.bounds = bounds;
+
+    return {
+      $: attributes,
+      bounds: {
+        left: element.frame.x,
+        top: element.frame.y,
+        right: element.frame.x + element.frame.width,
+        bottom: element.frame.y + element.frame.height
+      }
+    };
+  }
+
+  /**
+   * Determine if an iOS accessibility element is clickable
+   * @param element - iOS accessibility element
+   * @returns boolean - Whether the element is clickable
+   */
+  private isClickableElement(element: IdbAccessibilityElement): boolean {
+    const clickableTypes = ["Button", "StaticText"];
+    const clickableRoles = ["AXButton"];
+
+    return clickableTypes.includes(element.type) ||
+      clickableRoles.includes(element.role) ||
+      element.custom_actions.length > 0;
+  }
+
+  /**
+   * Determine if an iOS accessibility element is focusable
+   * @param element - iOS accessibility element
+   * @returns boolean - Whether the element is focusable
+   */
+  private isFocusableElement(element: IdbAccessibilityElement): boolean {
+    const focusableTypes = ["TextField", "Button"];
+    const focusableRoles = ["AXTextField", "AXButton"];
+
+    return focusableTypes.includes(element.type) ||
+      focusableRoles.includes(element.role);
+  }
+
+  /**
+   * Determine if an iOS accessibility element is scrollable
+   * @param element - iOS accessibility element
+   * @returns boolean - Whether the element is scrollable
+   */
+  private isScrollableElement(element: IdbAccessibilityElement): boolean {
+    const scrollableTypes = ["ScrollArea"];
+    const scrollableRoles = ["AXScrollArea"];
+
+    return scrollableTypes.includes(element.type) ||
+      scrollableRoles.includes(element.role) ||
+      element.custom_actions.some(action => action.toLowerCase().includes("scroll"));
+  }
+
+  /**
+   * Get accessibility hierarchy and parse to ViewHierarchyResult
+   * @returns Promise<ViewHierarchyResult> - Parsed view hierarchy
+   */
+  async getViewHierarchy(): Promise<ViewHierarchyResult> {
+    try {
+      const result = await this.describeAll();
+      const accessibilityElements: IdbAccessibilityElement[] = JSON.parse(result.stdout);
+
+      return this.parseAccessibilityToViewHierarchy(accessibilityElements);
+    } catch (error) {
+      logger.warn(`[iOS] Failed to get view hierarchy: ${error}`);
+
+      return {
+        hierarchy: {
+          error: "Failed to retrieve iOS view hierarchy"
+        }
+      };
+    }
+  }
 
   // ===================
   // MEDIA & PERMISSIONS
