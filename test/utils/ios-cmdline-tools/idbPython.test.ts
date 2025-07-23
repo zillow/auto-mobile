@@ -291,7 +291,8 @@ describe("IdbPython", function() {
       const childNodes = rootNode.node!;
       expect(childNodes).to.have.length(2);
 
-      expect(childNodes[0].$).to.have.property("clickable", "true"); // StaticText type
+      expect(childNodes[0].$).to.have.property("clickable", "true"); // StaticText is considered clickable
+
       expect(childNodes[1].$).to.have.property("clickable", "true"); // Has custom actions
     });
 
@@ -484,6 +485,37 @@ describe("IdbPython", function() {
             toString: () => JSON.stringify(mockAccessibilityData),
             trim: () => JSON.stringify(mockAccessibilityData),
             includes: (str: string) => JSON.stringify(mockAccessibilityData).includes(str)
+          };
+        }
+        if (command.includes("list-targets")) {
+          // Mock the list-targets command to return a connected device
+          const mockTarget = {
+            udid: "test-ios-device-id",
+            name: "Test iOS Device",
+            target_type: "simulator",
+            state: "Booted",
+            os_version: "17.0",
+            architecture: "x86_64",
+            companion_info: {
+              udid: "test-ios-device-id",
+              is_local: true,
+              pid: 12345,
+              address: { path: "/tmp/test" },
+              metadata: {}
+            },
+            screen_dimensions: null,
+            model: null,
+            device: null,
+            extended: {},
+            diagnostics: {},
+            metadata: {}
+          };
+          return {
+            stdout: JSON.stringify(mockTarget),
+            stderr: "",
+            toString: () => JSON.stringify(mockTarget),
+            trim: () => JSON.stringify(mockTarget),
+            includes: (str: string) => JSON.stringify(mockTarget).includes(str)
           };
         }
         return { stdout: "", stderr: "", toString: () => "", trim: () => "", includes: () => false };
