@@ -22,9 +22,9 @@ struct DiscoverView: View {
         case 1:
           SwipeView()
         case 2:
-          Text("Media")
+          MediaView()
         case 3:
-          Text("Text")
+          InputsView()
         case 4:
           Text("Chat")
         default:
