@@ -8,10 +8,32 @@
 import SwiftUI
 
 struct DiscoverView: View {
+  @State private var viewModel = ViewModel()
+  
   var body: some View {
-    NavigationStack {
-      Text("Discover view")
-        .navigationTitle(Text("Discover"))
+    NavigationSplitView {
+      // Sidebar
+      List(selection: $viewModel.selectedItem) {
+        ForEach(viewModel.items) { item in
+          NavigationLink(value: item.id) {
+            Label(item.name, systemImage: item.icon)
+          }
+        }
+      }
+      .navigationTitle("Discover")
+    } detail: {
+      // Detail view
+      if let selectedItemId = viewModel.selectedItem,
+         let selectedItem = viewModel.items.first(where: { $0.id == selectedItemId }) {
+        selectedItem.view
+          .navigationTitle(selectedItem.name)
+      } else {
+        ContentUnavailableView(
+          "Select an item",
+          systemImage: "sidebar.left",
+          description: Text("Choose an item from the sidebar to see its content")
+        )
+      }
     }
   }
 }
