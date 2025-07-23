@@ -193,7 +193,5 @@ struct InputsView: View {
             }
             .padding(.horizontal)
         }
-        .navigationTitle("Text Inputs")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
