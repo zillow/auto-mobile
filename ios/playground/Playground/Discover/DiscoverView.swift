@@ -24,7 +24,7 @@ struct DiscoverView: View {
         case 2:
           MediaView()
         case 3:
-          Text("Text")
+          InputsView()
         case 4:
           Text("Chat")
         default:
