@@ -65,12 +65,13 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean,
     activityName?: string
   ): Promise<LaunchAppResult> {
-    const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
-
-    if (isiOSDevice) {
-      return this.executeiOS(packageName, clearAppData, coldBoot);
-    } else {
-      return this.executeAndroid(packageName, clearAppData, coldBoot, activityName);
+    switch (this.device.platform) {
+      case "ios":
+        return this.executeiOS(packageName, clearAppData, coldBoot);
+      case "android":
+        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName);
+      default:
+        throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
     }
   }
 

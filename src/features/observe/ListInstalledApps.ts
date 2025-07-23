@@ -1,6 +1,6 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
-import { BootedDevice } from "../../models";
+import { ActionableError, BootedDevice } from "../../models";
 import { DeviceDetection } from "../../utils/deviceDetection";
 import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 
@@ -25,21 +25,20 @@ export class ListInstalledApps {
    */
   async execute(): Promise<string[]> {
     try {
-      const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
-
-      if (isiOSDevice) {
-        // iOS device - use idb to get installed apps
-        const { stdout } = await this.idb.executeCommand("list-apps --json");
-        const apps = JSON.parse(stdout);
-        return apps.map((app: any) => app.bundleId);
-      } else {
-        // Android device - use adb to get installed apps
-        const { stdout } = await this.adb.executeCommand("shell pm list packages");
-
-        return stdout
-          .split("\n")
-          .filter(line => line.startsWith("package:"))
-          .map(line => line.replace("package:", "").trim());
+      switch (this.device.platform) {
+        case "ios":
+          // iOS device - use idb to get installed apps
+          const apps = await this.idb.listApps();
+          return apps.map((app: any) => app.bundleId);
+        case "android":
+          // Android device - use adb to get installed apps
+          const { stdout } = await this.adb.executeCommand("shell pm list packages");
+          return stdout
+            .split("\n")
+            .filter(line => line.startsWith("package:"))
+            .map(line => line.replace("package:", "").trim());
+        default:
+          throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
       }
     } catch (error) {
       logger.warn("Failed to list installed apps:", error);
