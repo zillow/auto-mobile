@@ -26,7 +26,7 @@ struct DiscoverView: View {
         case 3:
           InputsView()
         case 4:
-          Text("Chat")
+          ChatView()
         default:
           EmptyView()
         }
