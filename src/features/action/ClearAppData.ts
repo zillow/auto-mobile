@@ -1,10 +1,13 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BootedDevice, ClearAppDataResult } from "../../models";
+import { CheckAppStatus } from "./CheckAppStatus";
 
 export class ClearAppData {
+  private device: BootedDevice;
   private adb: AdbUtils;
 
   constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+    this.device = device;
     this.adb = adb || new AdbUtils(device);
   }
 
@@ -13,15 +16,14 @@ export class ClearAppData {
   ): Promise<ClearAppDataResult> {
     try {
       // Check if app is installed
-      const isInstalledCmd = `shell pm list packages -f ${packageName} | grep -c ${packageName}`;
-      const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd);
-      const isInstalled = parseInt(isInstalledOutput.trim(), 10) > 0;
+      const checkAppStatus = new CheckAppStatus(this.device);
+      const statusResult = await checkAppStatus.execute(packageName);
 
-      if (!isInstalled) {
+      if (!statusResult.success || !statusResult.isInstalled) {
         return {
           success: false,
           packageName,
-          error: "Application not installed"
+          error: statusResult.error || "Application not installed"
         };
       }
 

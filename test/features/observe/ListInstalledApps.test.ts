@@ -1,11 +1,12 @@
 import { expect } from "chai";
 import { ListInstalledApps } from "../../../src/features/observe/ListInstalledApps";
 import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
-import { ExecResult } from "../../../src/models/ExecResult";
+import { ExecResult, BootedDevice } from "../../../src/models";
 
 describe("ListInstalledApps", function() {
   let listInstalledApps: ListInstalledApps;
   let mockAdb: Partial<AdbUtils>;
+  let mockDevice: BootedDevice;
 
   const createMockExecResult = (stdout: string, stderr = ""): ExecResult => ({
     stdout,
@@ -16,6 +17,11 @@ describe("ListInstalledApps", function() {
   });
 
   beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      platform: "android"
+    } as BootedDevice;
+
     mockAdb = {
       executeCommand: async (command: string) => {
         if (command === "shell pm list packages") {
@@ -25,7 +31,7 @@ describe("ListInstalledApps", function() {
       }
     };
 
-    listInstalledApps = new ListInstalledApps("test-device", mockAdb as AdbUtils);
+    listInstalledApps = new ListInstalledApps(mockDevice, mockAdb as AdbUtils);
   });
 
   describe("execute", function() {

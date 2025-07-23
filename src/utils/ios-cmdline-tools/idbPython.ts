@@ -3,7 +3,6 @@ import { promisify } from "util";
 import { logger } from "../logger";
 import {
   ExecResult,
-  ActionableError,
   DeviceInfo,
   BootedDevice,
   ViewHierarchyResult,
@@ -12,14 +11,13 @@ import {
 } from "../../models";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
-const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
-  const options = maxBuffer ? { maxBuffer } : undefined;
-  const result = await promisify(exec)(command, options);
+const execAsync = async (command: string): Promise<ExecResult> => {
+  const result = await promisify(exec)(command);
 
   // Add the required string methods
   const enhancedResult: ExecResult = {
-    stdout: typeof result.stdout === "string" ? result.stdout : result.stdout.toString(),
-    stderr: typeof result.stderr === "string" ? result.stderr : result.stderr.toString(),
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
     toString() {
       return this.stdout;
     },
@@ -55,18 +53,6 @@ export interface IdbTargetInfo {
   companionInfo?: any;
 }
 
-export interface IdbTestBundle {
-  bundleId: string;
-  name: string;
-  testMethods: string[];
-}
-
-export interface IdbCrashLog {
-  name: string;
-  date: string;
-  bundleId?: string;
-}
-
 export interface IdbAccessibilityElement {
   AXFrame: string;
   AXUniqueId: string | null;
@@ -91,7 +77,7 @@ export interface IdbAccessibilityElement {
 
 export class IdbPython {
   device: BootedDevice | null;
-  execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
+  execAsync: (command: string) => Promise<ExecResult>;
 
   // Static cache for device list
   private static deviceListCache: { devices: DeviceInfo[], timestamp: number } | null = null;
@@ -104,7 +90,7 @@ export class IdbPython {
    */
   constructor(
     device: BootedDevice | null = null,
-    execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null
+    execAsyncFn: ((command: string) => Promise<ExecResult>) | null = null
   ) {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;
@@ -123,8 +109,17 @@ export class IdbPython {
    * @returns The base ADB command
    */
   getBaseCommand(): string {
+    return "idb";
+  }
+
+  /**
+   * Add the device ID to the command if it exists
+   * @param command - The command to add the device ID to
+   * @returns The command with the device ID added
+   */
+  addDeviceToCommand(command: string): string {
     const deviceId = this.device?.deviceId;
-    return deviceId ? `idb --udid ${deviceId}` : "idb";
+    return deviceId ? `${command} --udid ${deviceId}` : command;
   }
 
   /**
@@ -134,12 +129,7 @@ export class IdbPython {
    * @returns Promise with command output
    */
   async executeCommand(command: string, timeoutMs?: number): Promise<ExecResult> {
-
-    if (!(await this.isAvailable())) {
-      throw new ActionableError("idb is not available. Please install Facebook's idb CLI to continue.");
-    }
-
-    const fullCommand = `${this.getBaseCommand()} ${command}`;
+    const fullCommand = this.addDeviceToCommand(`${this.getBaseCommand()} ${command}`);
     const startTime = Date.now();
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
@@ -182,30 +172,33 @@ export class IdbPython {
     }
   }
 
-  /**
-   * Check if idb is available
-   * @returns Promise with boolean indicating availability
-   */
-  async isAvailable(): Promise<boolean> {
-    try {
-      await this.execAsync("idb --version");
-      return true;
-    } catch (error) {
-      logger.warn("idb is not available - iOS functionality requires Facebook's idb CLI tool to be installed and on PATH.");
-      return false;
-    }
-  }
-
   // =================
   // TARGET MANAGEMENT
   // =================
 
   /**
-   * List all connected targets
+   * List all connected targets and parse the output as IdbTargetInfo[]
    */
-  async listTargets(): Promise<ExecResult> {
+  async listTargets(): Promise<IdbTargetInfo[]> {
     logger.debug("[iOS] Listing connected targets");
-    return await this.executeCommand("list-targets");
+    const result = await this.executeCommand("list-targets --json");
+    // The output is a sequence of JSON objects, one per line (not a JSON array).
+    // We need to parse each line as JSON and map to IdbTargetInfo[].
+    const lines = result.stdout
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    const targets: IdbTargetInfo[] = lines.map(line => {
+      try {
+        return JSON.parse(line) as IdbTargetInfo;
+      } catch (err) {
+        logger.warn(`[iOS] Failed to parse target line: ${line}`);
+        throw err;
+      }
+    });
+
+    return targets;
   }
 
   /**
@@ -243,9 +236,29 @@ export class IdbPython {
   /**
    * List installed apps
    */
-  async listApps(): Promise<ExecResult> {
+  async listApps(): Promise<IdbAppInfo[]> {
     logger.debug("[iOS] Listing installed apps");
-    return await this.executeCommand("list-apps");
+    const result = await this.executeCommand("list-apps --json");
+    // The output is a sequence of JSON objects, one per line (not a JSON array).
+    // We need to parse each line as JSON and map to IdbAppInfo[].
+    const lines = result.stdout
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+
+    const apps: IdbAppInfo[] = lines.map(line => {
+      const obj = JSON.parse(line);
+      // Map fields from idb output to our IdbAppInfo interface
+      return {
+        bundleId: obj.bundle_id,
+        name: obj.name,
+        installType: obj.install_type,
+        architectures: obj.architectures,
+        isRunning: obj.process_state === "Running",
+        isDebuggable: obj.debuggable,
+      } as IdbAppInfo;
+    });
+    return apps;
   }
 
   /**
@@ -254,7 +267,8 @@ export class IdbPython {
    */
   async installApp(appPath: string): Promise<ExecResult> {
     logger.debug(`[iOS] Installing app from ${appPath}`);
-    return await this.executeCommand(`install "${appPath}"`);
+    const { stdout } = await this.executeCommand(`install "${appPath}" --json`);
+    return JSON.parse(stdout);
   }
 
   /**
@@ -270,7 +284,7 @@ export class IdbPython {
       waitFor?: boolean;
     }
   ): Promise<ExecResult> {
-    let command = `launch ${bundleId}`;
+    let command = `launch ${bundleId} --json`;
 
     if (options?.args) {
       for (const [key, value] of Object.entries(options.args)) {
@@ -287,7 +301,8 @@ export class IdbPython {
     }
 
     logger.debug(`[iOS] Launching app ${bundleId}${options ? " with options" : ""}`);
-    return await this.executeCommand(command);
+    const { stdout } = await this.executeCommand(command);
+    return JSON.parse(stdout);
   }
 
   /**
@@ -296,7 +311,8 @@ export class IdbPython {
    */
   async terminateApp(bundleId: string): Promise<ExecResult> {
     logger.debug(`[iOS] Terminating app ${bundleId}`);
-    return await this.executeCommand(`terminate ${bundleId}`);
+    const { stdout } = await this.executeCommand(`terminate ${bundleId} --json`);
+    return JSON.parse(stdout);
   }
 
   /**
@@ -305,7 +321,8 @@ export class IdbPython {
    */
   async uninstallApp(bundleId: string): Promise<ExecResult> {
     logger.debug(`[iOS] Uninstalling app ${bundleId}`);
-    return await this.executeCommand(`uninstall ${bundleId}`);
+    const { stdout } = await this.executeCommand(`uninstall ${bundleId} --json`);
+    return JSON.parse(stdout);
   }
 
   // ============
@@ -624,5 +641,19 @@ export class IdbPython {
   async kill(): Promise<ExecResult> {
     logger.debug("[iOS] Killing idb and clearing companion information");
     return await this.executeCommand("kill");
+  }
+
+  /**
+   * Check if idb is available on the system
+   * @returns Promise<boolean> - Whether idb is available
+   */
+  async isAvailable(): Promise<boolean> {
+    try {
+      await this.execAsync("idb --version");
+      return true;
+    } catch (error) {
+      logger.debug("[iOS] idb not available:", error);
+      return false;
+    }
   }
 }

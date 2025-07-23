@@ -1,5 +1,6 @@
 export * from "./ActionableError";
 export * from "./ActiveWindowInfo";
+export * from "./AppStatusResult";
 export * from "./ClearAppDataResult";
 export * from "./ClearTextResult";
 export * from "./DeepLinkResult";
