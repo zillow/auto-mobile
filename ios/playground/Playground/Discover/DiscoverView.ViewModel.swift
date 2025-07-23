@@ -45,7 +45,7 @@ extension DiscoverView {
 
     static let samples = [
       ViewItems(name: "Inputs", icon: "keyboard", view: AnyView(InputsView())),
-      ViewItems(name: "Lists", icon: "list.bullet", view: AnyView(Text("Lists View Coming Soon!"))),
+      ViewItems(name: "Lists", icon: "list.bullet", view: AnyView(ListView())),
     ]
   }
 }
