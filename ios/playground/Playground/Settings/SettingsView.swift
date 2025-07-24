@@ -8,10 +8,25 @@
 import SwiftUI
 
 struct SettingsView: View {
+  @AppStorage("onboardingCompelte") private var onboardingCompelte = false
+  
   var body: some View {
     NavigationStack {
-      Text("Settings view")
-        .navigationTitle(Text("Settings"))
+      ScrollView {
+        VStack {
+          
+          Button(role: .destructive) {
+            onboardingCompelte = false
+          } label: {
+            Label("Reset Onboarding State", systemImage: "trash")
+          }.buttonStyle(.borderedProminent)
+          .frame(maxWidth: .infinity)
+        }.padding()
+      }.navigationTitle(Text("Settings"))
     }
   }
+}
+
+#Preview {
+  SettingsView()
 }
