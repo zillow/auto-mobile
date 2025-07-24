@@ -39,7 +39,7 @@ struct OnboardingPage: Identifiable {
     
     static let openSource = OnboardingPage(resource: .emoji("❤️"),
                                            title: "Open Source",
-                                           description: "Built by Zillow and hosted on [GitHub](https://www.genome.gov/)")
+                                           description: "Built by Zillow and hosted on [GitHub](https://github.com/zillow/auto-mobile)")
   }
 }
 
