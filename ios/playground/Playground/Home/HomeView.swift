@@ -7,8 +7,7 @@
 
 import SwiftUI
 
-struct HomeView: View {
-  
+struct HomeView: View {  
   var body: some View {
     TabView {
       Tab("Discover", systemImage: "magnifyingglass") {

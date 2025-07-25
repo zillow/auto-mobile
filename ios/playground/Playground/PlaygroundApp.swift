@@ -9,9 +9,26 @@ import SwiftUI
 
 @main
 struct PlaygroundApp: App {
+  @AppStorage("onboardingCompelte") var onboardingCompelte = false
+  @AppStorage("didLogIn") var loggedInUser: Bool = false
+
+  @State private var showingOnboarding = false
+  
     var body: some Scene {
         WindowGroup {
-            HomeView()
+          Group {
+            if loggedInUser {
+              HomeView()
+            } else {
+              LoginView()
+            }
+          }
+          .fullScreenCover(isPresented: $showingOnboarding) {
+            OnboardingView()
+          }
+          .onAppear {
+            showingOnboarding = !onboardingCompelte
+          }
         }
     }
 }
