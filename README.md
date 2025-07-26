@@ -2,6 +2,10 @@
 
 ![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
+<a href="https://glama.ai/mcp/servers/@zillow/auto-mobile">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@zillow/auto-mobile/badge" alt="AutoMobile MCP server" />
+</a>
+
 AutoMobile is a set of tools for mobile automation. You can use it for UI testing or as a development workflow
 assistant.
 
