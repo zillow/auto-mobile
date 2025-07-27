@@ -175,7 +175,7 @@ export class Axe {
     const fullCommand = `${this.getBaseCommand()} ${command} ${udidParam}`.trim();
     const startTime = Date.now();
 
-    logger.debug(`[axe] Executing command: ${fullCommand}`);
+    logger.info(`[axe] Executing command: ${fullCommand}`);
 
     const executeWithTimeout = async (): Promise<ExecResult> => {
       // Use Promise.race to implement timeout if specified
@@ -307,27 +307,24 @@ export class Axe {
    * @param startY - Start Y coordinate
    * @param endX - End X coordinate
    * @param endY - End Y coordinate
-   * @param stepSize - Optional step size (delta in axe terminology)
+   * @param stepSize - Optional step size (delta in axe terminology) - not used, kept for compatibility
+   * @param duration - Optional swipe duration in seconds - not used, hardcoded to 0.3
    */
   async swipe(
     startX: number,
     startY: number,
     endX: number,
     endY: number,
-    stepSize?: number
+    stepSize?: number,
+    duration?: number
   ): Promise<SwipeResult> {
-    let command = `swipe --start-x ${startX} --start-y ${startY} --end-x ${endX} --end-y ${endY}`;
-    if (stepSize) {
-      command += ` --delta ${stepSize}`;
-    }
-    logger.debug(`[axe] Swiping from (${startX}, ${startY}) to (${endX}, ${endY})${stepSize ? ` with delta ${stepSize}` : ""}`);
+    // Hard code duration to 0.3 as requested
+    const command = `swipe --start-x ${startX} --end-x ${endX} --start-y ${startY} --end-y ${endY} --duration 0.3`;
+
+    logger.info(`[axe] Swiping from (${startX}, ${startY}) to (${endX}, ${endY}) with duration 0.3s`);
 
     try {
       await this.executeCommand(command);
-
-      // Calculate duration based on distance (rough estimate)
-      const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-      const estimatedDuration = Math.max(300, distance * 2); // Minimum 300ms, scaled by distance
 
       return {
         success: true,
@@ -335,7 +332,7 @@ export class Axe {
         y1: startY,
         x2: endX,
         y2: endY,
-        duration: estimatedDuration,
+        duration: 300, // Return duration in milliseconds
         easing: "linear"
       };
     } catch (error) {

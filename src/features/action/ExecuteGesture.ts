@@ -96,12 +96,10 @@ export class ExecuteGesture extends BaseVisualChange {
     y2: number,
     options: GestureOptions = {}
   ): Promise<SwipeResult> {
-    // iOS idb swipe method has stepSize parameter instead of duration
-    // We use a default step size for iOS
-    const stepSize = 10; // Default step size for iOS
-    const duration = options.duration || 300; // Default duration for result
+    // Duration is hardcoded to 0.3 in axe.swipe
+    const duration = 300; // Return duration in milliseconds
 
-    await this.axe.swipe(x1, y1, x2, y2, stepSize);
+    await this.axe.swipe(x1, y1, x2, y2);
 
     return {
       success: true,
@@ -188,7 +186,7 @@ export class ExecuteGesture extends BaseVisualChange {
           const end = points[points.length - 1];
 
           // Use default step size for iOS swipe
-          await this.axe.swipe(start.x, start.y, end.x, end.y, 10);
+          await this.axe.swipe(start.x, start.y, end.x, end.y);
         }
       }
     }

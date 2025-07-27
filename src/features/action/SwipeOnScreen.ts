@@ -147,23 +147,20 @@ export class SwipeOnScreen extends BaseVisualChange {
 
     logger.info(`[SwipeOnScreen] Raw swipe coordinates: start=(${startX}, ${startY}), end=(${endX}, ${endY})`);
 
-    // iOS coordinate scaling - idb ui swipe needs much larger coordinates than logical screen size
-    // Based on testing, coordinates need to be scaled up significantly
-    const iOS_COORDINATE_SCALE = 3.5; // Adjust this value based on testing results
+    // Ensure coordinates are bounded by screen size and always positive
+    const boundedStartX = Math.max(0, Math.min(Math.floor(startX), screenWidth - 1));
+    const boundedStartY = Math.max(0, Math.min(Math.floor(startY), screenHeight - 1));
+    const boundedEndX = Math.max(0, Math.min(Math.floor(endX), screenWidth - 1));
+    const boundedEndY = Math.max(0, Math.min(Math.floor(endY), screenHeight - 1));
 
-    const scaledStartX = Math.floor(startX * iOS_COORDINATE_SCALE);
-    const scaledStartY = Math.floor(startY * iOS_COORDINATE_SCALE);
-    const scaledEndX = Math.floor(endX * iOS_COORDINATE_SCALE);
-    const scaledEndY = Math.floor(endY * iOS_COORDINATE_SCALE);
-
-    logger.info(`[SwipeOnScreen] Scaled swipe coordinates: start=(${scaledStartX}, ${scaledStartY}), end=(${scaledEndX}, ${scaledEndY})`);
+    logger.info(`[SwipeOnScreen] Bounded swipe coordinates: start=(${boundedStartX}, ${boundedStartY}), end=(${boundedEndX}, ${boundedEndY})`);
 
     try {
       const result = await this.axe.swipe(
-        scaledStartX,
-        scaledStartY,
-        scaledEndX,
-        scaledEndY
+        boundedStartX,
+        boundedStartY,
+        boundedEndX,
+        boundedEndY
       );
       logger.info(`[SwipeOnScreen] Swipe completed successfully: ${JSON.stringify(result)}`);
       return result;

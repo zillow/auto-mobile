@@ -62,7 +62,7 @@ export class WebDriverAgent {
     this.wdaOptions = {
       wdaHost: "http://localhost",
       wdaPort: 8100,
-      connectionTimeout: 5000,
+      connectionTimeout: 10000,
       launchTimeout: 60000
     };
   }
@@ -371,13 +371,20 @@ export class WebDriverAgent {
       logger.info("[WebDriverAgent] Getting view hierarchy");
 
       // Ensure WebDriverAgent is running
-      await this.ensureRunning();
+      try {
+        await this.ensureRunning();
+        logger.debug("[WebDriverAgent] WebDriverAgent confirmed running");
+      } catch (error) {
+        logger.error(`[WebDriverAgent] Failed to ensure WebDriverAgent is running: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
 
       // First ensure we have an active session
       let sessionId: string;
 
       try {
         // Try to get existing sessions
+        logger.debug("[WebDriverAgent] Attempting to get existing sessions");
         const sessions = await this.makeRequest("GET", "/sessions");
         logger.info(`[WebDriverAgent] Sessions response: ${JSON.stringify(sessions)}`);
         if (sessions && sessions.value && sessions.value.length > 0) {
@@ -385,7 +392,7 @@ export class WebDriverAgent {
           logger.info(`[WebDriverAgent] Using existing session: ${sessionId}`);
         } else {
           // Create a new session
-          logger.info("[WebDriverAgent] Creating new session");
+          logger.info("[WebDriverAgent] Creating new session - no existing sessions found");
           const sessionResponse = await this.createSession({
             platformName: "iOS",
             udid: device.deviceId
@@ -393,25 +400,41 @@ export class WebDriverAgent {
           logger.info(`[WebDriverAgent] Session creation response: ${JSON.stringify(sessionResponse)}`);
           sessionId = sessionResponse.sessionId || sessionResponse.value?.sessionId;
         }
-      } catch (error) {
+      } catch (sessionError) {
+        logger.warn(`[WebDriverAgent] Error getting existing sessions: ${sessionError instanceof Error ? sessionError.message : String(sessionError)}`);
         // Create a new session if we can't get existing ones
-        logger.info("[WebDriverAgent] Creating new session due to error getting existing sessions");
-        const sessionResponse = await this.createSession({
-          platformName: "iOS",
-          udid: device.deviceId
-        });
-        logger.info(`[WebDriverAgent] Session creation response (fallback): ${JSON.stringify(sessionResponse)}`);
-        sessionId = sessionResponse.sessionId || sessionResponse.value?.sessionId;
+        try {
+          logger.info("[WebDriverAgent] Creating new session due to error getting existing sessions");
+          const sessionResponse = await this.createSession({
+            platformName: "iOS",
+            udid: device.deviceId
+          });
+          logger.info(`[WebDriverAgent] Session creation response (fallback): ${JSON.stringify(sessionResponse)}`);
+          sessionId = sessionResponse.sessionId || sessionResponse.value?.sessionId;
+        } catch (createError) {
+          logger.error(`[WebDriverAgent] Failed to create new session: ${createError instanceof Error ? createError.message : String(createError)}`);
+          throw createError;
+        }
       }
 
       if (!sessionId) {
-        throw new ActionableError("Failed to create or retrieve WebDriverAgent session");
+        const errorMsg = "Failed to create or retrieve WebDriverAgent session";
+        logger.error(`[WebDriverAgent] ${errorMsg}`);
+        throw new ActionableError(errorMsg);
       }
 
       logger.info(`[WebDriverAgent] Getting page source for session: ${sessionId}`);
 
       // Get page source (view hierarchy)
-      const sourceResponse = await this.makeRequest("GET", `/session/${sessionId}/source`);
+      let sourceResponse;
+      try {
+        sourceResponse = await this.makeRequest("GET", `/session/${sessionId}/source`);
+        logger.debug(`[WebDriverAgent] Successfully received source response from WebDriverAgent`);
+      } catch (sourceError) {
+        logger.error(`[WebDriverAgent] Failed to get page source from session ${sessionId}: ${sourceError instanceof Error ? sourceError.message : String(sourceError)}`);
+        throw sourceError;
+      }
+
       logger.info(`[WebDriverAgent] Raw source response type: ${typeof sourceResponse}`);
       logger.info(`[WebDriverAgent] Raw source response keys: ${Object.keys(sourceResponse || {})}`);
       logger.info(`[WebDriverAgent] Full source response: ${JSON.stringify(sourceResponse).substring(0, 500)}...`);
@@ -425,14 +448,23 @@ export class WebDriverAgent {
       }
 
       if (!sourceXml || typeof sourceXml !== "string") {
-        throw new ActionableError("Invalid view hierarchy response from WebDriverAgent");
+        const errorMsg = "Invalid view hierarchy response from WebDriverAgent";
+        logger.error(`[WebDriverAgent] ${errorMsg} - sourceXml type: ${typeof sourceXml}, value: ${sourceXml}`);
+        throw new ActionableError(errorMsg);
       }
 
       logger.info(`[WebDriverAgent] Successfully retrieved view hierarchy XML (${sourceXml.length} characters)`);
 
       // Parse the iOS XML using iOS-specific parser
       logger.info("[WebDriverAgent] Parsing iOS XML using iOS-specific parser");
-      const parsedHierarchy = await this.parseIOSXmlToViewHierarchy(sourceXml);
+      let parsedHierarchy;
+      try {
+        parsedHierarchy = await this.parseIOSXmlToViewHierarchy(sourceXml);
+        logger.debug("[WebDriverAgent] Successfully parsed iOS XML to view hierarchy");
+      } catch (parseError) {
+        logger.error(`[WebDriverAgent] Failed to parse iOS XML: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        throw parseError;
+      }
 
       logger.info(`[WebDriverAgent] Parsed hierarchy keys: ${Object.keys(parsedHierarchy || {})}`);
       logger.info(`[WebDriverAgent] Parsed hierarchy.hierarchy type: ${typeof parsedHierarchy?.hierarchy}`);
@@ -445,7 +477,8 @@ export class WebDriverAgent {
       };
 
     } catch (error) {
-      logger.error(`[WebDriverAgent] Failed to get view hierarchy: ${error}`);
+      logger.error(`[WebDriverAgent] Failed to get view hierarchy: ${error instanceof Error ? error.message : String(error)}`);
+      logger.error(`[WebDriverAgent] Error stack trace: ${error instanceof Error ? error.stack : "No stack trace available"}`);
 
       // Return an error hierarchy instead of throwing
       return {
@@ -661,7 +694,9 @@ export class WebDriverAgent {
   private async makeRequest(method: string, path: string, data?: any, extendedTimeout = false): Promise<any> {
     return new Promise((resolve, reject) => {
       const url = new URL(path, `${this.wdaOptions.wdaHost}:${this.wdaOptions.wdaPort}`);
-      const timeout = extendedTimeout ? 15000 : this.wdaOptions.connectionTimeout; // 15s for startup, 5s for normal ops
+      const timeout = extendedTimeout ? 15000 : this.wdaOptions.connectionTimeout; // 15s for startup, 10s for normal ops
+
+      logger.debug(`[WebDriverAgent] Making ${method} request to ${url.toString()} with timeout ${timeout}ms`);
 
       const options: http.RequestOptions = {
         hostname: url.hostname,
@@ -683,6 +718,8 @@ export class WebDriverAgent {
         });
 
         res.on("end", () => {
+          logger.debug(`[WebDriverAgent] Received response with status ${res.statusCode}, data length: ${responseData.length}`);
+
           try {
             let parsedData;
             if (responseData) {
@@ -692,12 +729,15 @@ export class WebDriverAgent {
             }
 
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              logger.debug(`[WebDriverAgent] Request successful: ${method} ${path}`);
               resolve(parsedData);
             } else {
               const errorMsg = parsedData.value?.message || parsedData.error?.message || responseData || `HTTP ${res.statusCode}`;
+              logger.error(`[WebDriverAgent] HTTP error ${res.statusCode} for ${method} ${path}: ${errorMsg}`);
               reject(new Error(`HTTP ${res.statusCode}: ${errorMsg}`));
             }
           } catch (parseError) {
+            logger.error(`[WebDriverAgent] Failed to parse response JSON for ${method} ${path}: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
             if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               resolve(responseData);
             } else {
@@ -708,6 +748,7 @@ export class WebDriverAgent {
       });
 
       req.on("timeout", () => {
+        logger.error(`[WebDriverAgent] Request timeout after ${timeout}ms for ${method} ${path}. WebDriverAgent may not be running or responding slowly.`);
         req.destroy();
         reject(new Error(`Request timeout after ${timeout}ms. WebDriverAgent may not be running.`));
       });
@@ -715,15 +756,21 @@ export class WebDriverAgent {
       req.on("error", error => {
         // Provide more helpful error messages for common connection issues
         if (error.message.includes("ECONNREFUSED")) {
-          reject(new Error(`Connection refused to WebDriverAgent at ${this.wdaOptions.wdaHost}:${this.wdaOptions.wdaPort}. Make sure WebDriverAgent is running.`));
+          const errorMsg = `Connection refused to WebDriverAgent at ${this.wdaOptions.wdaHost}:${this.wdaOptions.wdaPort}. Make sure WebDriverAgent is running.`;
+          logger.error(`[WebDriverAgent] ${errorMsg}`);
+          reject(new Error(errorMsg));
         } else if (error.message.includes("ENOTFOUND")) {
-          reject(new Error(`Cannot resolve host ${url.hostname}. Check WebDriverAgent configuration.`));
+          const errorMsg = `Cannot resolve host ${url.hostname}. Check WebDriverAgent configuration.`;
+          logger.error(`[WebDriverAgent] ${errorMsg}`);
+          reject(new Error(errorMsg));
         } else {
+          logger.error(`[WebDriverAgent] Connection error for ${method} ${path}: ${error.message}`);
           reject(new Error(`Connection error: ${error.message}`));
         }
       });
 
       if (data) {
+        logger.debug(`[WebDriverAgent] Sending request data: ${JSON.stringify(data).substring(0, 200)}...`);
         req.write(JSON.stringify(data));
       }
 
