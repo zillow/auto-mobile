@@ -1,20 +1,21 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { ActionableError, BootedDevice } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
 
 export class ListInstalledApps {
   private adb: AdbUtils;
-  private idb: IdbPython;
+  private simctl: Simctl;
   private device: BootedDevice;
   /**
    * Create an ListInstalledApps instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
+   * @param simctl - Optional Axe instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, simctl: Simctl | null = null) {
     this.adb = adb || new AdbUtils(device);
-    this.idb = idb || new IdbPython(device);
+    this.simctl = simctl || new Simctl(device);
     this.device = device;
   }
 
@@ -27,7 +28,7 @@ export class ListInstalledApps {
       switch (this.device.platform) {
         case "ios":
           // iOS device - use idb to get installed apps
-          const apps = await this.idb.listApps();
+          const apps = await this.simctl.listApps();
           return apps.map((app: any) => app.bundleId);
         case "android":
           // Android device - use adb to get installed apps

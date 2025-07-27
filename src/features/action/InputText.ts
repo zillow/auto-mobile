@@ -3,13 +3,13 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, SendTextResult } from "../../models";
 import { VirtualKeyboardManager } from "../../utils/virtualKeyboardManager";
 import { logger } from "../../utils/logger";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 
 export class InputText extends BaseVisualChange {
   private virtualKeyboardManager: VirtualKeyboardManager;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.device = device;
     this.virtualKeyboardManager = new VirtualKeyboardManager(device);
   }
@@ -115,7 +115,7 @@ export class InputText extends BaseVisualChange {
     imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
   ): Promise<SendTextResult & { method?: "native" | "virtual" }> {
     // iOS uses idb's inputText method which handles Unicode natively
-    await this.idb.inputText(text);
+    await this.axe.inputText(text);
 
     // Note: iOS IME actions are handled differently and imeAction parameter is ignored
     // The iOS keyboard handles actions through its own UI

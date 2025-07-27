@@ -8,7 +8,6 @@ import { registerInteractionTools } from "../server/interactionTools";
 import { registerAppTools } from "../server/appTools";
 import { registerUtilityTools } from "../server/utilityTools";
 import { registerEmulatorTools } from "../server/emulatorTools";
-import { registerSimulatorTools } from "../server/simulatorTools";
 import { registerPlanTools } from "../server/planTools";
 
 // Initialize tool registry for CLI mode
@@ -20,7 +19,6 @@ export function initializeCliTools(): void {
   registerAppTools();
   registerUtilityTools();
   registerEmulatorTools();
-  registerSimulatorTools();
   registerPlanTools();
 }
 

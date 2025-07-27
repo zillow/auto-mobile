@@ -4,15 +4,15 @@ import { FingerPath } from "../../models";
 import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 
 /**
  * Executes gestures using platform-specific commands
  */
 export class ExecuteGesture extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.device = device;
   }
 
@@ -101,7 +101,7 @@ export class ExecuteGesture extends BaseVisualChange {
     const stepSize = 10; // Default step size for iOS
     const duration = options.duration || 300; // Default duration for result
 
-    await this.idb.swipe(x1, y1, x2, y2, stepSize);
+    await this.axe.swipe(x1, y1, x2, y2, stepSize);
 
     return {
       success: true,
@@ -188,7 +188,7 @@ export class ExecuteGesture extends BaseVisualChange {
           const end = points[points.length - 1];
 
           // Use default step size for iOS swipe
-          await this.idb.swipe(start.x, start.y, end.x, end.y, 10);
+          await this.axe.swipe(start.x, start.y, end.x, end.y, 10);
         }
       }
     }

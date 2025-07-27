@@ -12,12 +12,14 @@ import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
 
 /**
  * Command to tap on UI element containing specified text
  */
 export class TapOnElement extends BaseVisualChange {
+  private webdriver: WebDriverAgent;
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
   private static readonly MAX_ATTEMPTS = 5;
@@ -25,11 +27,13 @@ export class TapOnElement extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbUtils | null = null,
-    idb: IdbPython | null = null
+    axe: Axe | null = null,
+    webdriver: WebDriverAgent | null = null
   ) {
-    super(device, adb, idb);
+    super(device, adb, axe);
     this.elementUtils = new ElementUtils();
     this.accessibilityService = new AccessibilityServiceClient(device, this.adb);
+    this.webdriver = webdriver || new WebDriverAgent(device);
   }
 
   /**
@@ -62,7 +66,7 @@ export class TapOnElement extends BaseVisualChange {
           latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy();
           break;
         case "ios":
-          latestViewHierarchy = await this.idb.getViewHierarchy();
+          latestViewHierarchy = await this.webdriver.getViewHierarchy(this.device);
           break;
         default:
           throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
@@ -214,15 +218,15 @@ export class TapOnElement extends BaseVisualChange {
    */
   private async executeiOSTap(action: string, x: number, y: number): Promise<void> {
     if (action === "tap") {
-      await this.idb.tap(x, y);
+      await this.axe.tap(x, y);
     } else if (action === "longPress") {
       // iOS long press is implemented as a tap with longer duration
-      await this.idb.tap(x, y, 1000);
+      await this.axe.tap(x, y, 1000);
     } else if (action === "doubleTap") {
       // iOS double tap - perform two quick taps
-      await this.idb.tap(x, y);
+      await this.axe.tap(x, y);
       await new Promise(resolve => setTimeout(resolve, 200));
-      await this.idb.tap(x, y);
+      await this.axe.tap(x, y);
     }
   }
 }

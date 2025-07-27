@@ -5,7 +5,7 @@ import { ExecuteGesture } from "./ExecuteGesture";
 import { SwipeResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ActionableError, ObserveResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
 
 /**
@@ -15,8 +15,8 @@ export class SwipeOnScreen extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.executeGesture = new ExecuteGesture(device, adb);
     this.elementUtils = new ElementUtils();
   }
@@ -159,7 +159,7 @@ export class SwipeOnScreen extends BaseVisualChange {
     logger.info(`[SwipeOnScreen] Scaled swipe coordinates: start=(${scaledStartX}, ${scaledStartY}), end=(${scaledEndX}, ${scaledEndY})`);
 
     try {
-      const result = await this.idb.swipe(
+      const result = await this.axe.swipe(
         scaledStartX,
         scaledStartY,
         scaledEndX,

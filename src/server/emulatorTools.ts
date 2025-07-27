@@ -24,7 +24,7 @@ export const startDeviceSchema = z.object({
   timeoutMs: z.number().optional().default(120000).describe("Maximum time to wait for emulator to be ready in milliseconds"),
 });
 
-export const killEmulatorSchema = z.object({
+export const killDeviceSchema = z.object({
   device: z.object({
     name: z.string().describe("The device image name to kill"),
     deviceId: z.string().describe("The device unique ID"),
@@ -165,9 +165,9 @@ export function registerEmulatorTools() {
   );
 
   ToolRegistry.register(
-    "killEmulator",
+    "killDevice",
     "Kill a running device",
-    killEmulatorSchema,
+    killDeviceSchema,
     killDeviceHandler
   );
 }

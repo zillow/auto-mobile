@@ -3,13 +3,13 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ClearTextResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 
 export class ClearText extends BaseVisualChange {
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.elementUtils = new ElementUtils();
   }
 

@@ -1,12 +1,12 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, OpenURLResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 
 export class OpenURL extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.device = device;
   }
 
@@ -69,7 +69,7 @@ export class OpenURL extends BaseVisualChange {
    * @returns Result of the URL opening operation
    */
   private async executeiOSOpenURL(url: string): Promise<OpenURLResult> {
-    await this.idb.openUrl(url);
+    await this.axe.openUrl(url);
 
     return {
       success: true,

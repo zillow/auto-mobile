@@ -7,7 +7,7 @@
     "test:coverage": "nyc mocha --require esbuild-register test/**/*.ts",
     "lint": "eslint . --fix",
     "watch": "tsc --watch",
-    "build": "tsc && chmod +x dist/src/index.js",
+    "build": "tsc && node scripts/build-ios-assets.js && chmod +x dist/src/index.js",
     "clean": "rm -rf dist",
     "start": "npx tsx src/index.ts --transport streamable",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",

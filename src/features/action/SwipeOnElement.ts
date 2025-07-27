@@ -5,7 +5,7 @@ import { Element } from "../../models";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { ElementUtils } from "../utility/ElementUtils";
 import { SwipeResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
 
 /**
@@ -15,8 +15,8 @@ export class SwipeOnElement extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.executeGesture = new ExecuteGesture(device, adb);
     this.elementUtils = new ElementUtils();
   }
