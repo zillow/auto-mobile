@@ -1,11 +1,11 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe, AxeButton } from "../../utils/ios-cmdline-tools/axe";
 
 export class PressButton extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.device = device;
   }
 
@@ -83,27 +83,14 @@ export class PressButton extends BaseVisualChange {
    * @returns Result of the button press operation
    */
   private async executeiOSButtonPress(button: string): Promise<PressButtonResult> {
-    // Map common button names to iOS IdbButton types
-    const iOSButtonMap: Record<string, string> = {
-      "home": "HOME",
-      "power": "LOCK",
-      "lock": "LOCK",
-      "side_button": "SIDE_BUTTON",
-      "siri": "SIRI",
-      "apple_pay": "APPLE_PAY"
-    };
 
-    const iOSButton = iOSButtonMap[button.toLowerCase()];
-    if (!iOSButton) {
-      return {
-        success: false,
-        button,
-        keyCode: -1,
-        error: `Unsupported iOS button: ${button}. Supported buttons: ${Object.keys(iOSButtonMap).join(", ")}`
-      };
+    const axeButton: AxeButton = "home";
+    const supportedButtons = ["apple_pay", "home", "lock", "side_button", "siri"];
+    if (!supportedButtons.includes(button.toLowerCase())) {
+      throw new Error(`Unsupported iOS button: ${button}. Supported buttons: ${supportedButtons.join(", ")}`);
     }
 
-    await this.idb.pressButton(iOSButton as any);
+    await this.axe.pressButton(axeButton);
 
     return {
       success: true,

@@ -12,7 +12,8 @@ import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
 
 /**
  * Interface for cached observe result
@@ -34,7 +35,8 @@ export class ObserveScreen {
   private screenshotUtil: TakeScreenshot;
   private dumpsysWindow: GetDumpsysWindow;
   private adb: AdbUtils;
-  private idb: IdbPython;
+  private axe: Axe;
+  private webdriver: WebDriverAgent;
   private deepLinkManager: DeepLinkManager;
 
   // Static cache for observe results
@@ -42,10 +44,11 @@ export class ObserveScreen {
   private static observeResultCacheDir: string = path.join("/tmp/auto-mobile", "observe_results");
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null, webdriver: WebDriverAgent | null = null) {
     this.device = device;
     this.adb = adb || new AdbUtils(device);
-    this.idb = idb || new IdbPython(device);
+    this.axe = axe || new Axe(device);
+    this.webdriver = webdriver || new WebDriverAgent(device);
     this.screenSize = new GetScreenSize(device, this.adb);
     this.systemInsets = new GetSystemInsets(device, this.adb);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);

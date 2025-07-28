@@ -58,11 +58,11 @@ describe("MCP Tools Text Response", () => {
       });
     }
 
-    // Test checkRunningEmulators which also doesn't require device connectivity
+    // Test checkRunningDevices which also doesn't require device connectivity
     const emulatorResult = await client.request({
       method: "tools/call",
       params: {
-        name: "checkRunningEmulators",
+        name: "checkRunningDevices",
         arguments: {}
       }
     }, toolResponseSchema);

@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { ToolRegistry, ProgressCallback } from "./toolRegistry";
-import { ActionableError } from "../models/ActionableError";
 import { DeviceUtils } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { BootedDevice, DeviceInfo, SomePlatform } from "../models";
+import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
@@ -21,10 +20,10 @@ export const startDeviceSchema = z.object({
     source: z.string().describe("The source of the device (e.g., 'local', 'remote', etc.')"),
     platform: z.enum(["android", "ios"]).describe("Target platform")
   }),
-  timeoutMs: z.number().optional().default(120000).describe("Maximum time to wait for emulator to be ready in milliseconds"),
+  timeoutMs: z.number().optional().default(120000).describe("Maximum time to wait for device to be ready in milliseconds"),
 });
 
-export const killEmulatorSchema = z.object({
+export const killDeviceSchema = z.object({
   device: z.object({
     name: z.string().describe("The device image name to kill"),
     deviceId: z.string().describe("The device unique ID"),
@@ -38,7 +37,7 @@ export interface startDeviceArgs {
   timeoutMs?: number;
 }
 
-export interface KillEmulatorArgs {
+export interface KillDeviceArgs {
   device: BootedDevice;
 }
 
@@ -50,8 +49,7 @@ export interface listDeviceImagesArgs {
   platform: SomePlatform;
 }
 
-// Register emulator tools
-export function registerEmulatorTools() {
+export function registerDeviceTools() {
   // List all connected devices (physical and emulators) handler
   const listBootedDevicesHandler = async (args: ListDevicesArgs) => {
     try {
@@ -62,24 +60,24 @@ export function registerEmulatorTools() {
       const devices = bootedDevices.map(device => {
         // For Android: emulator devices have deviceId starting with "emulator-"
         // For iOS: simulator devices typically have deviceId as UUID format or contain "simulator"
-        const isEmulator = args.platform === "android"
+        const isVirtual = args.platform === "android"
           ? device.deviceId.startsWith("emulator-")
           : device.deviceId.includes("-") && device.deviceId.length > 30; // iOS simulators typically have long UUID-like IDs
 
         return {
           ...device,
-          isEmulator
+          isVirtual
         };
       });
 
-      const emulatorCount = devices.filter(d => d.isEmulator).length;
-      const physicalCount = devices.filter(d => !d.isEmulator).length;
+      const virtualCount = devices.filter(d => d.isVirtual).length;
+      const physicalCount = devices.filter(d => !d.isVirtual).length;
 
       return createJSONToolResponse({
         message: `Found ${devices.length} connected ${args.platform} devices`,
         devices: devices,
         totalCount: devices.length,
-        emulatorCount: emulatorCount,
+        virtualCount: virtualCount,
         physicalCount: physicalCount,
         platform: args.platform
       });
@@ -126,7 +124,7 @@ export function registerEmulatorTools() {
     }
   };
 
-  const killDeviceHandler = async (args: KillEmulatorArgs) => {
+  const killDeviceHandler = async (args: KillDeviceArgs) => {
     try {
       const deviceUtils = new DeviceUtils();
       await deviceUtils.killDevice(args.device);
@@ -137,37 +135,37 @@ export function registerEmulatorTools() {
         platform: args.device.platform
       });
     } catch (error) {
-      throw new ActionableError(`Failed to kill ${args.device.platform} emulator: ${error}`);
+      throw new ActionableError(`Failed to kill ${args.device.platform} device: ${error}`);
     }
   };
 
   // Register with the tool registry
   ToolRegistry.register(
     "listDevices",
-    "List all connected devices (both physical devices and emulators)",
+    "List all connected devices (both physical and virtual devices)",
     listDevicesSchema,
     listBootedDevicesHandler
   );
 
   ToolRegistry.register(
     "listDeviceImages",
-    "List all available Android Virtual Devices (AVDs)",
+    "List all available device images for the specified platform",
     listDeviceImagesSchema,
     listDeviceImagesHandler
   );
 
   ToolRegistry.register(
     "startDevice",
-    "Start an Android emulator with the specified AVD",
+    "Start a device with the specified device image",
     startDeviceSchema,
     startDeviceHandler,
     true // Supports progress notifications
   );
 
   ToolRegistry.register(
-    "killEmulator",
+    "killDevice",
     "Kill a running device",
-    killEmulatorSchema,
+    killDeviceSchema,
     killDeviceHandler
   );
 }

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { registerDeepLinkTools } from "../../src/server/deepLinkTools";
 import { ToolRegistry } from "../../src/server/toolRegistry";
-import { EmulatorUtils } from "../../src/utils/deviceUtils";
+import { DeviceUtils } from "../../src/utils/deviceUtils";
 import { ObserveScreen } from "../../src/features/observe/ObserveScreen";
 import { Window } from "../../src/features/observe/Window";
 import { AwaitIdle } from "../../src/features/observe/AwaitIdle";
@@ -12,8 +12,8 @@ import sinon from "sinon";
 // Helper function to check if AVDs are available
 async function checkAvdAvailability(): Promise<boolean> {
   try {
-    const emulatorUtils = new EmulatorUtils();
-    const avds = await emulatorUtils.listDeviceImages();
+    const deviceUtils = new DeviceUtils();
+    const avds = await deviceUtils.listDeviceImages();
     return avds.length > 0;
   } catch (error) {
     // If we can't list AVDs (e.g., Android SDK not available), return false

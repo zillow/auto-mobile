@@ -5,20 +5,29 @@ import { ActionableError } from "../../models";
 import { TerminateApp } from "./TerminateApp";
 import { ClearAppData } from "./ClearAppData";
 
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
+import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
 
 export class LaunchApp extends BaseVisualChange {
+
+  private simctl: Simctl;
   /**
    * Create an LaunchApp instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
-   * @param idb - Optional IdbPython instance for testing
+   * @param axe - Optional Axe instance for testing
+   * @param simctl - Optional Simctl instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(
+    device: BootedDevice,
+    adb: AdbUtils | null = null,
+    axe: Axe | null = null,
+    simctl: Simctl | null = null) {
+    super(device, adb, axe);
     this.device = device;
+    this.simctl = simctl || new Simctl(this.device);
   }
 
   /**
@@ -105,7 +114,7 @@ export class LaunchApp extends BaseVisualChange {
         if (coldBoot) {
           try {
             // Attempt to terminate the app if it's running
-            await this.idb.terminateApp(bundleId);
+            await this.simctl.terminateApp(bundleId);
             // Note: iOS doesn't have direct app data clearing like Android
             // clearAppData parameter is ignored on iOS
           } catch (error) {
@@ -114,8 +123,8 @@ export class LaunchApp extends BaseVisualChange {
           }
         }
 
-        // Launch the app using idb
-        const launchResult = await this.idb.launchApp(bundleId, {
+        // Launch the app using axe
+        const launchResult = await this.simctl.launchApp(bundleId, {
           foregroundIfRunning: !coldBoot
         });
 

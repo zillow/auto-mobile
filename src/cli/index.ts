@@ -7,8 +7,7 @@ import { registerObserveTools } from "../server/observeTools";
 import { registerInteractionTools } from "../server/interactionTools";
 import { registerAppTools } from "../server/appTools";
 import { registerUtilityTools } from "../server/utilityTools";
-import { registerEmulatorTools } from "../server/emulatorTools";
-import { registerSimulatorTools } from "../server/simulatorTools";
+import { registerDeviceTools } from "../server/deviceTools";
 import { registerPlanTools } from "../server/planTools";
 
 // Initialize tool registry for CLI mode
@@ -19,8 +18,7 @@ export function initializeCliTools(): void {
   registerInteractionTools();
   registerAppTools();
   registerUtilityTools();
-  registerEmulatorTools();
-  registerSimulatorTools();
+  registerDeviceTools();
   registerPlanTools();
 }
 
@@ -192,15 +190,15 @@ Parameters:
   // Show categorized tools
   const categories = new Map<string, typeof tools>();
 
-  const emulatorTools = [
+  const deviceTools = [
     "setActiveDevice",
     "enableDemoMode",
     "disableDemoMode",
     "listDeviceImages",
     "listDevices",
     "startDevice",
-    "killEmulator",
-    "checkRunningEmulators"
+    "killDevice",
+    "checkRunningDevices"
   ];
 
   const sourceMapTools = [
@@ -216,8 +214,8 @@ Parameters:
   tools.forEach(tool => {
     let category = "General";
 
-    if (emulatorTools.includes(tool.name)) {
-      category = "Emulator Management";
+    if (deviceTools.includes(tool.name)) {
+      category = "Device Management";
     } else if (sourceMapTools.includes(tool.name)) {
       category = "Source Mapping";
     } else if (tool.name.includes("App") || tool.name.includes("app")) {

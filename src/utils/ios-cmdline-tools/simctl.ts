@@ -1,7 +1,7 @@
 import { ChildProcess, exec } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
-import { ExecResult, ActionableError, DeviceInfo, BootedDevice } from "../../models";
+import { ExecResult, ActionableError, DeviceInfo, BootedDevice, ScreenSize } from "../../models";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
@@ -25,6 +25,11 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
 
   return enhancedResult;
 };
+
+/**
+ * This file provides an interface to interact with iOS simulators using simctl.
+ * It allows you to list, create, boot, and delete simulators.
+ */
 
 export interface AppleDevice {
   udid: string;
@@ -65,17 +70,7 @@ export interface SimulatorList {
   devicetypes: AppleDeviceType[];
 }
 
-export interface IdbDevice {
-  model: string;
-  os_version: string;
-  udid: string;
-  architecture: string;
-  type: string;
-  name: string;
-  state: string;
-}
-
-export class IdbCompanion {
+export class Simctl {
   device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
 
@@ -105,7 +100,7 @@ export class IdbCompanion {
   }
 
   /**
-   * Execute an idb command
+   * Execute an simctl command
    * @param command - The simctl command to execute
    * @param timeoutMs - Optional timeout in milliseconds
    * @returns Promise with command output
@@ -113,10 +108,10 @@ export class IdbCompanion {
   async executeCommand(command: string, timeoutMs?: number): Promise<ExecResult> {
 
     if (!(await this.isAvailable())) {
-      throw new ActionableError("idb_companion is not available. Please install Facebook's idb CLI to continue.");
+      throw new ActionableError("simctl is not available. Please install Xcode command line tools to continue.");
     }
 
-    const fullCommand = `idb_companion ${command}`;
+    const fullCommand = `xcrun simctl ${command}`;
     const startTime = Date.now();
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
@@ -160,15 +155,15 @@ export class IdbCompanion {
   }
 
   /**
-   * Check if idb is available
+   * Check if simctl is available
    * @returns Promise with boolean indicating availability
    */
   async isAvailable(): Promise<boolean> {
     try {
-      await this.execAsync("idb_companion --version");
+      await this.execAsync("xcrun simctl --version");
       return true;
     } catch (error) {
-      logger.warn("idb is not available - iOS functionality requires Facebook's idb CLI tool to be installed and on PATH.");
+      logger.warn("simctl is not available - iOS functionality requires Xcode command line tools to be installed.");
       return false;
     }
   }
@@ -178,51 +173,13 @@ export class IdbCompanion {
    * @returns Promise with simulator list data
    */
   private async listSimulators(): Promise<SimulatorList> {
-
-    const result = await this.executeCommand("--list 1");
+    const result = await this.executeCommand("list devices --json");
 
     try {
-      const devices: AppleDevice[] = [];
-      const lines = result.stdout.split("\n");
-
-      // Parse each line that looks like JSON
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (trimmedLine.startsWith("{") && trimmedLine.endsWith("}")) {
-          try {
-            const idbDevice = JSON.parse(trimmedLine) as IdbDevice;
-            // Convert idb device format to AppleDevice format
-            const appleDevice: AppleDevice = {
-              udid: idbDevice.udid,
-              name: idbDevice.name,
-              state: idbDevice.state,
-              isAvailable: true, // idb only returns available devices
-              model: idbDevice.model,
-              os_version: idbDevice.os_version,
-              architecture: idbDevice.architecture,
-              type: idbDevice.type
-            };
-            devices.push(appleDevice);
-          } catch (parseError) {
-            logger.debug(`Failed to parse device JSON line: ${trimmedLine} - ${parseError}`);
-            continue;
-          }
-        }
-      }
-
-      // Return a SimulatorList structure with devices grouped by runtime
-      // For idb, we'll group all devices under a generic runtime key since
-      // the runtime info is embedded in the device's os_version field
-      const simulatorList: SimulatorList = {
-        devices: { "idb_devices": devices },
-        pairs: {},
-        runtimes: [],
-        devicetypes: []
-      };
-
-      return simulatorList;
+      const simulatorData = JSON.parse(result.stdout);
+      return simulatorData as SimulatorList;
     } catch (error) {
-      logger.error(`Failed to parse idb device list: ${error}`);
+      logger.error(`Failed to parse simctl device list: ${error}`);
       throw new ActionableError(`Failed to parse iOS device list: ${(error as Error).message}`);
     }
   }
@@ -233,10 +190,9 @@ export class IdbCompanion {
 
   async startSimulator(udid: string): Promise<ChildProcess> {
     logger.debug(`Starting iOS simulator ${udid}`);
-    await this.executeCommand(`--boot ${udid}`);
+    await this.executeCommand(`boot ${udid}`);
 
-    // idb boot is synchronous, so we return a mock ChildProcess
-    // This interface might need revision as idb doesn't return a long-running process
+    // simctl boot is synchronous, so we return a mock ChildProcess
     const mockProcess = {
       pid: Date.now(), // Use timestamp as mock PID
       kill: () => false,
@@ -251,7 +207,7 @@ export class IdbCompanion {
 
   async killSimulator(device: BootedDevice): Promise<void> {
     logger.debug(`Killing iOS simulator ${device.deviceId}`);
-    await this.executeCommand(`--shutdown ${device.deviceId}`);
+    await this.executeCommand(`shutdown ${device.deviceId}`);
   }
 
   async waitForSimulatorReady(udid: string): Promise<BootedDevice> {
@@ -279,11 +235,11 @@ export class IdbCompanion {
    */
   async listSimulatorImages(): Promise<DeviceInfo[]> {
     // Check cache first
-    if (IdbCompanion.deviceListCache) {
-      const cacheAge = Date.now() - IdbCompanion.deviceListCache.timestamp;
-      if (cacheAge < IdbCompanion.DEVICE_LIST_CACHE_TTL) {
+    if (Simctl.deviceListCache) {
+      const cacheAge = Date.now() - Simctl.deviceListCache.timestamp;
+      if (cacheAge < Simctl.DEVICE_LIST_CACHE_TTL) {
         logger.info(`Getting list of iOS simulators (cached, age: ${cacheAge}ms)`);
-        return IdbCompanion.deviceListCache.devices;
+        return Simctl.deviceListCache.devices;
       }
     }
 
@@ -297,14 +253,19 @@ export class IdbCompanion {
       for (const runtimeDevices of Object.values(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable) {
-            logger.debug(`Found ios simulator: ${device.name}`);
-            devices.push({ name: device.udid, platform: "ios", isRunning: device.state === "Booted" } as DeviceInfo);
+            logger.debug(`Found iOS simulator: ${device.name} (${device.udid})`);
+            devices.push({
+              name: device.name,
+              platform: "ios",
+              deviceId: device.udid,
+              isRunning: device.state === "Booted"
+            } as DeviceInfo);
           }
         }
       }
 
       // Cache the result
-      IdbCompanion.deviceListCache = {
+      Simctl.deviceListCache = {
         devices,
         timestamp: Date.now()
       };
@@ -374,6 +335,10 @@ export class IdbCompanion {
   async bootSimulator(udid: string): Promise<BootedDevice> {
     logger.debug(`Booting iOS simulator ${udid}`);
     await this.executeCommand(`boot ${udid}`);
+
+    // Wait a moment for the simulator to register as booted
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     const bootedSimulators = await this.getBootedSimulators();
     const bootedSimulator = bootedSimulators.find(device => device.deviceId === udid);
     if (!bootedSimulator) {
@@ -428,5 +393,147 @@ export class IdbCompanion {
   async deleteSimulator(udid: string): Promise<void> {
     logger.debug(`Deleting iOS simulator ${udid}`);
     await this.executeCommand(`delete ${udid}`);
+  }
+
+  /**
+   * List all installed apps on the simulator
+   * @param deviceId - Optional device ID (defaults to "booted" for current booted simulator)
+   * @returns Promise with array of app objects containing bundle identifiers and other metadata
+   */
+  async listApps(deviceId?: string): Promise<any[]> {
+    const targetDevice = deviceId || (this.device?.deviceId) || "booted";
+    logger.debug(`Listing installed apps on iOS simulator ${targetDevice}`);
+
+    try {
+      const result = await this.executeCommand(`listapps ${targetDevice}`);
+      const appsData = JSON.parse(result.stdout);
+
+      // Convert the apps object to an array
+      const apps = Object.values(appsData);
+      return apps;
+    } catch (error) {
+      logger.warn(`Failed to list iOS apps: ${error}`);
+      return [];
+    }
+  }
+
+  /**
+   * Launch an app on the simulator
+   * @param bundleId - The bundle identifier of the app to launch
+   * @param options - Launch options
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   * @returns Promise with launch result containing success status and optional PID
+   */
+  async launchApp(bundleId: string, options?: { foregroundIfRunning?: boolean }, deviceId?: string): Promise<{
+    success: boolean;
+    pid?: number;
+    error?: string
+  }> {
+    const targetDevice = deviceId || (this.device?.deviceId) || "booted";
+    logger.debug(`Launching app ${bundleId} on iOS simulator ${targetDevice}`);
+
+    try {
+      const result = await this.executeCommand(`launch ${targetDevice} ${bundleId}`);
+
+      // Parse the output to extract PID if available
+      // Example output: "com.example.app: 12345"
+      const pidMatch = result.stdout.match(/:\s*(\d+)/);
+      const pid = pidMatch ? parseInt(pidMatch[1], 10) : undefined;
+
+      return {
+        success: true,
+        pid
+      };
+    } catch (error) {
+      logger.warn(`Failed to launch iOS app ${bundleId}: ${error}`);
+      return {
+        success: false,
+        error: (error as Error).message
+      };
+    }
+  }
+
+  /**
+   * Terminate an app on the simulator
+   * @param bundleId - The bundle identifier of the app to terminate
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   * @returns Promise that resolves when termination is complete
+   */
+  async terminateApp(bundleId: string, deviceId?: string): Promise<void> {
+    const targetDevice = deviceId || (this.device?.deviceId) || "booted";
+    logger.debug(`Terminating app ${bundleId} on iOS simulator ${targetDevice}`);
+
+    try {
+      await this.executeCommand(`terminate ${targetDevice} ${bundleId}`);
+    } catch (error) {
+      logger.warn(`Failed to terminate iOS app ${bundleId}: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the screen size of the simulator
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   * @returns Promise with screen dimensions
+   */
+  async getScreenSize(deviceId?: string): Promise<ScreenSize> {
+    const targetDevice = deviceId || (this.device?.deviceId) || "booted";
+
+    logger.info(`[iOS] Getting screen size for simulator ${targetDevice}`);
+
+    // Use simctl io enumerate to get display information
+    const result = await this.executeCommand(`io ${targetDevice} enumerate`);
+
+    // Parse the text output to find LCD screen information
+    const lines = result.stdout.split("\n");
+    let inLCDScreen = false;
+    let width = 0;
+    let height = 0;
+    let uiScale = 1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Look for LCD screen section
+      if (line.includes("LCD:") || line.includes("Screen Type: Integrated")) {
+        inLCDScreen = true;
+        continue;
+      }
+
+      // If we're in the LCD screen section, look for Pixel Size and UI Scale
+      if (inLCDScreen) {
+        if (line.includes("Pixel Size:")) {
+          // Extract dimensions from format "Pixel Size: {1179, 2556}"
+          const pixelSizeMatch = line.match(/Pixel Size:\s*\{(\d+),\s*(\d+)\}/);
+          if (pixelSizeMatch) {
+            width = parseInt(pixelSizeMatch[1], 10);
+            height = parseInt(pixelSizeMatch[2], 10);
+          }
+        }
+
+        if (line.includes("Preferred UI Scale:")) {
+          // Extract UI scale from format "Preferred UI Scale: 3"
+          const uiScaleMatch = line.match(/Preferred UI Scale:\s*(\d+(?:\.\d+)?)/);
+          if (uiScaleMatch) {
+            uiScale = parseFloat(uiScaleMatch[1]);
+          }
+        }
+      }
+
+      // Reset flag if we encounter a new port section
+      if (line.startsWith("Port:") && inLCDScreen) {
+        inLCDScreen = false;
+      }
+    }
+
+    // If we found valid dimensions, apply UI scale and return logical size
+    if (width > 0 && height > 0 && uiScale > 0) {
+      return {
+        width: Math.round(width / uiScale),
+        height: Math.round(height / uiScale)
+      } as ScreenSize;
+    }
+
+    throw new ActionableError("Unable to determine screen size from provided data.");
   }
 }

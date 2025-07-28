@@ -32,7 +32,7 @@ export class AndroidEmulator {
   private emulatorPath: string;
 
   /**
-   * Create an EmulatorUtils instance
+   * Create an DeviceUtils instance
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
    */

@@ -1,5 +1,5 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { DeviceDetection } from "../../utils/deviceDetection";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ScreenSize } from "../../models";
@@ -9,7 +9,7 @@ import * as crypto from "crypto";
 
 export class GetScreenSize {
   private adb: AdbUtils;
-  private idb: IdbPython;
+  private axe: Axe;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, ScreenSize>();
   private static cacheDir = path.join(process.cwd(), ".cache", "screen-size");
@@ -18,12 +18,12 @@ export class GetScreenSize {
    * Create a Window instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
-   * @param idb - Optional IdbUtils instance for testing
+   * @param axe - Optional IdbUtils instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
     this.device = device;
     this.adb = adb || new AdbUtils(device);
-    this.idb = idb || new IdbPython(device);
+    this.axe = axe || new Axe(device);
   }
 
   /**
@@ -199,8 +199,8 @@ export class GetScreenSize {
       const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
 
       if (isiOSDevice) {
-        // iOS device - use idb to get screen size
-        return await this.idb.getScreenSize();
+        // iOS device - use axe to get screen size
+        return await this.axe.getScreenSize();
       } else {
         // Android device - use adb to get screen size
         return await this.getAndroidScreenSize(dumpsysResult);

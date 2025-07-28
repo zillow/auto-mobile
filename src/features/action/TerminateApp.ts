@@ -1,7 +1,7 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, TerminateAppResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 
 export class TerminateApp extends BaseVisualChange {
 
@@ -9,10 +9,10 @@ export class TerminateApp extends BaseVisualChange {
    * Create an TerminateApp instance
    * @param device - Optional device
    * @param adb - Optional AdbUtils instance for testing
-   * @param idb - Optional IdbPython instance for testing
+   * @param axe - Optional Axe instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.device = device;
   }
 

@@ -5,7 +5,7 @@ import { ExecuteGesture } from "./ExecuteGesture";
 import { SwipeResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ActionableError, ObserveResult } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
 
 /**
@@ -15,8 +15,8 @@ export class SwipeOnScreen extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
-    super(device, adb, idb);
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+    super(device, adb, axe);
     this.executeGesture = new ExecuteGesture(device, adb);
     this.elementUtils = new ElementUtils();
   }
@@ -147,23 +147,20 @@ export class SwipeOnScreen extends BaseVisualChange {
 
     logger.info(`[SwipeOnScreen] Raw swipe coordinates: start=(${startX}, ${startY}), end=(${endX}, ${endY})`);
 
-    // iOS coordinate scaling - idb ui swipe needs much larger coordinates than logical screen size
-    // Based on testing, coordinates need to be scaled up significantly
-    const iOS_COORDINATE_SCALE = 3.5; // Adjust this value based on testing results
+    // Ensure coordinates are bounded by screen size and always positive
+    const boundedStartX = Math.max(0, Math.min(Math.floor(startX), screenWidth - 1));
+    const boundedStartY = Math.max(0, Math.min(Math.floor(startY), screenHeight - 1));
+    const boundedEndX = Math.max(0, Math.min(Math.floor(endX), screenWidth - 1));
+    const boundedEndY = Math.max(0, Math.min(Math.floor(endY), screenHeight - 1));
 
-    const scaledStartX = Math.floor(startX * iOS_COORDINATE_SCALE);
-    const scaledStartY = Math.floor(startY * iOS_COORDINATE_SCALE);
-    const scaledEndX = Math.floor(endX * iOS_COORDINATE_SCALE);
-    const scaledEndY = Math.floor(endY * iOS_COORDINATE_SCALE);
-
-    logger.info(`[SwipeOnScreen] Scaled swipe coordinates: start=(${scaledStartX}, ${scaledStartY}), end=(${scaledEndX}, ${scaledEndY})`);
+    logger.info(`[SwipeOnScreen] Bounded swipe coordinates: start=(${boundedStartX}, ${boundedStartY}), end=(${boundedEndX}, ${boundedEndY})`);
 
     try {
-      const result = await this.idb.swipe(
-        scaledStartX,
-        scaledStartY,
-        scaledEndX,
-        scaledEndY
+      const result = await this.axe.swipe(
+        boundedStartX,
+        boundedStartY,
+        boundedEndX,
+        boundedEndY
       );
       logger.info(`[SwipeOnScreen] Swipe completed successfully: ${JSON.stringify(result)}`);
       return result;

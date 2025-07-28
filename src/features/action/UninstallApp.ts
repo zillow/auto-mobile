@@ -1,19 +1,19 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { UninstallAppResult } from "../../models/UninstallAppResult";
 import { BootedDevice } from "../../models";
-import { IdbPython } from "../../utils/ios-cmdline-tools/idbPython";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
+import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
 
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
   private device: BootedDevice;
   private adb: AdbUtils;
-  private idb: IdbPython;
+  private simctl: Simctl;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, idb: IdbPython | null = null) {
+  constructor(device: BootedDevice, adb: AdbUtils | null = null, simctl: Simctl | null = null) {
     this.device = device;
     this.adb = adb || new AdbUtils(device);
-    this.idb = idb || new IdbPython(device);
+    this.simctl = simctl || new Simctl(device);
   }
 
   /**
@@ -68,10 +68,10 @@ export class UninstallApp {
 
       // Terminate app if it's running before uninstalling
       // TODO: query if the app was running
-      await this.idb.terminateApp(bundleId);
+      await this.simctl.killSimulator(this.device);
 
       // Uninstall the app
-      await this.idb.uninstallApp(bundleId);
+      await this.simctl.killSimulator(this.device);
 
       // Verify the app was uninstalled
       const isStillInstalled = (await listApps.execute()).find(app => app === bundleId) !== undefined;
