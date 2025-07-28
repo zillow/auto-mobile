@@ -10,7 +10,7 @@ export class DeviceUtils {
   private simctl: Simctl;
 
   /**
-   * Create an EmulatorUtils instance
+   * Create an DeviceUtils instance
    * @param adb - An instance of AdbUtils for interacting with Android Debug Bridge
    * @param idb - An instance of IdbCompanion for interacting with iOS simulator controls
    * @param emulator - An instance of AndroidEmulator for interacting with iOS simulator controls
