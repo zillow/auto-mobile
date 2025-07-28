@@ -51,10 +51,12 @@ export class WebDriverAgent {
   /**
    * Create a WebDriverAgent instance
    * @param device - Optional device
+   * @param wdaOptions - WebDriverAgent options
    * @param execAsyncFn - promisified exec function (for testing)
    */
   constructor(
     device: BootedDevice | null = null,
+    wdaOptions: WebDriverAgentOptions = {},
     execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null
   ) {
     this.device = device;
@@ -63,7 +65,8 @@ export class WebDriverAgent {
       wdaHost: "http://localhost",
       wdaPort: 8100,
       connectionTimeout: 10000,
-      launchTimeout: 60000
+      launchTimeout: 60000,
+      ...wdaOptions
     };
   }
 

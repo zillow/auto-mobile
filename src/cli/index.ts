@@ -198,7 +198,7 @@ Parameters:
     "listDevices",
     "startDevice",
     "killEmulator",
-    "checkRunningEmulators"
+    "checkRunningDevices"
   ];
 
   const sourceMapTools = [

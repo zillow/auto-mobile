@@ -69,10 +69,10 @@ setActiveDevice           - Set the active device ID for subsequent operations
 enableDemoMode            - Enable demo mode with consistent status bar indicators for screenshots
 disableDemoMode           - Disable demo mode and return to normal status bar behavior
 listDevices               - List all connected devices (both physical devices and emulators)
-listDeviceImages                  - List all available Android Virtual Devices (AVDs)
-checkRunningEmulators     - Check which emulators are currently running
-startDevice             - Start an Android emulator with the specified AVD
-killEmulator              - Kill a running Android emulator
+listDeviceImages          - List all available device images
+checkRunningDevices       - Check which devices are currently running
+startDevice               - Start a device with the specified device image
+killEmulator              - Kill a running device
 
 Source Mapping:
 addAppConfig              - Add Android app source configuration for indexing activities and fragments

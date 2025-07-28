@@ -11,7 +11,7 @@ const OMITTED_TOOLS = new Set([
   "startDevice",
   "killDevice",
   "listDeviceImages",
-  "checkRunningEmulators",
+  "checkRunningDevices",
   "listDevices",
   "setActiveDevice"
 ]);

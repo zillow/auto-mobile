@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import { WebDriverAgent } from "../../../src/utils/ios-cmdline-tools/webdriver";
 import { BootedDevice, ExecResult } from "../../../src/models";
+import * as sinon from "sinon";
 
 describe("WebDriverAgent", function() {
   let webDriverAgent: WebDriverAgent;
@@ -82,7 +83,10 @@ describe("WebDriverAgent", function() {
     });
 
     it("should handle HTTP commands differently", async function() {
-      // Mock makeRequest for HTTP commands
+      // Mock the private makeRequest method
+      const makeRequestStub = sinon.stub(webDriverAgent as any, "makeRequest");
+      makeRequestStub.resolves({ message: "status response" });
+
       const result = await webDriverAgent.executeCommand("/status");
 
       // Should return a valid ExecResult structure
@@ -91,6 +95,12 @@ describe("WebDriverAgent", function() {
       expect(result).to.have.property("toString");
       expect(result).to.have.property("trim");
       expect(result).to.have.property("includes");
+
+      // Verify makeRequest was called
+      expect(makeRequestStub.calledOnce).to.be.true;
+      expect(makeRequestStub.calledWith("GET", "/status")).to.be.true;
+
+      makeRequestStub.restore();
     });
   });
 
