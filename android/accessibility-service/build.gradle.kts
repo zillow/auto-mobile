@@ -60,6 +60,5 @@ dependencies {
   testImplementation(libs.robolectric)
 
   // Compose test dependencies
-  androidTestImplementation(libs.bundles.compose.ui.espresso.test)
   debugImplementation(libs.bundles.compose.ui.debug)
 }

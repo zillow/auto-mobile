@@ -7,14 +7,14 @@
 build-android-buildTools = "35.0.0"        # Used in playground Android modules
 build-android-compileSdk = "36"            # Used in playground Android modules
 build-android-minSdk = "27"                # Used in playground Android modules
-build-android-targetSdk = "35"             # Used in playground Android modules
-build-android-agp = "8.9.2"
+build-android-targetSdk = "36"             # Used in playground Android modules
+build-android-agp = "8.11.1"
 
 # Kotlin versions
-build-kotlin = "2.1.21"
+build-kotlin = "2.2.0"
 build-kotlin-language = "2.0"              # Used in all Kotlin modules
 build-kotlin-coroutines = "1.10.2"
-build-kotlin-datetime = "0.6.2"
+build-kotlin-datetime = "0.7.1"
 
 # Java versions
 build-java-target = "22"                   # Used in root build.gradle.kts and playground
@@ -26,41 +26,41 @@ build-gradle-sortDependencies = "0.14"
 # AndroidX versions
 androidx-core = "1.16.0"
 androidx-activity-compose = "1.10.1"
-androidx-compose-bom = "2025.05.00"
-androidx-lifecycle = "2.9.1"
+androidx-compose-bom = "2025.07.00"
+androidx-lifecycle = "2.9.2"
 androidx-startup = "1.2.0"
 
 # Media library versions
-coil = "3.2.0"
-core-splashscreen = "1.2.0-beta02"
+coil = "3.3.0"
+core-splashscreen = "1.2.0-rc01"
 kotlinx-coroutines-test = "1.10.2"
 media3 = "1.7.1"
 
 # Library versions
 clikt = "5.0.3"
-junit-jupiter-api = "5.11.4"
-junit-vintage-engine = "5.11.4"
-koog-agents = "0.2.1"
-mockk = "1.14.4"
+junit-jupiter-api = "5.13.4"
+junit-vintage-engine = "5.13.4"
+koog-agents = "0.3.0"
+mockk = "1.14.5"
 mockk-android = "1.14.4"
-robolectric = "4.14.1"
-snakeyaml = "2.3"
+robolectric = "4.15.1"
+snakeyaml = "2.4"
 test-junit = "4.13.2"
 test-androidx-junit = "1.2.1"
 test-androidx-espresso = "3.6.1"
 
 # Navigation versions
-navigation3 = "1.0.0-alpha04"              # Used in playground app
+navigation3 = "1.0.0-alpha05"              # Used in playground app
 
 # Kotlin ecosystem
-kotlinx-serialization-json = "1.7.3"
+kotlinx-serialization-json = "1.9.0"
 kotlin-poet = "2.2.0"
 appcompat = "1.7.1"
 material = "1.12.0"
-lifecycleViewmodelNavigation3Android = "1.0.0-alpha02"
+lifecycleViewmodelNavigation3Android = "1.0.0-alpha03"
 
 # Publishing
-mavenpublish = "0.33.0"
+mavenpublish = "0.34.0"
 
 [plugins]
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "build-kotlin" }
