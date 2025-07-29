@@ -18,7 +18,7 @@ class AutoMobileAgentTest {
   private lateinit var mockAiAgentFactory: AutoMobileAgent.AIAgentFactory
   private lateinit var mockTimeProvider: AutoMobileAgent.TimeProvider
   private lateinit var mockMcpClient: AutoMobileAgent.MCPClient
-  private lateinit var mockAIAgent: AIAgent
+  private lateinit var mockAIAgent: AIAgent<String, String>
   private lateinit var autoMobileAgent: AutoMobileAgent
 
   @TempDir lateinit var tempDir: File
@@ -70,7 +70,7 @@ class AutoMobileAgentTest {
     every { mockConfigProvider.isDebugMode() } returns false
     every { mockFileSystemOperations.writeTextToFile(planFile, any()) } just runs
 
-    coEvery { mockAIAgent.runAndGetResult(any()) } returns
+    coEvery { mockAIAgent.run(any()) } returns
         """
             ```yaml
             $expectedYamlContent
@@ -86,7 +86,7 @@ class AutoMobileAgentTest {
     verify { mockFileSystemOperations.createDirectories(generatedPlansDir) }
     verify { mockFileSystemOperations.fileExists(planFile) }
     verify { mockFileSystemOperations.writeTextToFile(planFile, any()) }
-    coVerify { mockAIAgent.runAndGetResult(any()) }
+    coVerify { mockAIAgent.run(any()) }
   }
 
   @Test
@@ -116,7 +116,7 @@ class AutoMobileAgentTest {
     verify { mockFileSystemOperations.createDirectories(generatedPlansDir) }
     verify { mockFileSystemOperations.fileExists(planFile) }
     verify(exactly = 0) { mockFileSystemOperations.writeTextToFile(any(), any()) }
-    coVerify(exactly = 0) { mockAIAgent.runAndGetResult(any()) }
+    coVerify(exactly = 0) { mockAIAgent.run(any()) }
   }
 
   @Test
@@ -143,14 +143,14 @@ class AutoMobileAgentTest {
     every { mockConfigProvider.isDebugMode() } returns false
     every { mockFileSystemOperations.writeTextToFile(planFile, any()) } just runs
 
-    coEvery { mockAIAgent.runAndGetResult(any()) } returns "```yaml\n$yamlContent\n```"
+    coEvery { mockAIAgent.run(any()) } returns "```yaml\n$yamlContent\n```"
 
     // Act
     autoMobileAgent.generatePlanFromPrompt(prompt, className, methodName, tempDir)
 
     // Assert
     verify { mockFileSystemOperations.writeTextToFile(planFile, yamlContent) }
-    coVerify { mockAIAgent.runAndGetResult(any()) }
+    coVerify { mockAIAgent.run(any()) }
   }
 
   @Test
@@ -168,7 +168,7 @@ class AutoMobileAgentTest {
     every { mockConfigProvider.getModelConfig() } returns modelConfig
     every { mockAiAgentFactory.createAIAgent(modelConfig) } returns mockAIAgent
 
-    coEvery { mockAIAgent.runAndGetResult(any()) } throws RuntimeException("AI agent failed")
+    coEvery { mockAIAgent.run(any()) } throws RuntimeException("AI agent failed")
 
     // Act & Assert
     val exception =
@@ -198,7 +198,7 @@ class AutoMobileAgentTest {
     every { mockAiAgentFactory.createAIAgentWithMCPTools(modelConfig, mockMcpClient) } returns
         mockAIAgent
 
-    coEvery { mockAIAgent.runAndGetResult(any()) } returns recoveryResponse
+    coEvery { mockAIAgent.run(any()) } returns recoveryResponse
 
     // Act
     val result = autoMobileAgent.attemptAiRecovery(failureOutput, errorOutput)
@@ -206,7 +206,7 @@ class AutoMobileAgentTest {
     // Assert
     assertTrue(result.success)
     assertEquals(1000L, result.recoveryTimeMs)
-    coVerify(exactly = 1) { mockAIAgent.runAndGetResult(any()) }
+    coVerify(exactly = 1) { mockAIAgent.run(any()) }
   }
 
   @Test
@@ -228,7 +228,7 @@ class AutoMobileAgentTest {
     every { mockAiAgentFactory.createAIAgentWithMCPTools(modelConfig, mockMcpClient) } returns
         mockAIAgent
 
-    coEvery { mockAIAgent.runAndGetResult(any()) } returns poorResponse
+    coEvery { mockAIAgent.run(any()) } returns poorResponse
 
     // Act
     val result = autoMobileAgent.attemptAiRecovery(failureOutput, errorOutput)
@@ -236,7 +236,7 @@ class AutoMobileAgentTest {
     // Assert
     assertFalse(result.success)
     assertEquals(1000L, result.recoveryTimeMs)
-    coVerify(exactly = 1) { mockAIAgent.runAndGetResult(any()) }
+    coVerify(exactly = 1) { mockAIAgent.run(any()) }
   }
 
   @Test
@@ -257,7 +257,7 @@ class AutoMobileAgentTest {
     every { mockAiAgentFactory.createAIAgentWithMCPTools(modelConfig, mockMcpClient) } returns
         mockAIAgent
 
-    coEvery { mockAIAgent.runAndGetResult(any()) } throws RuntimeException("AI failed")
+    coEvery { mockAIAgent.run(any()) } throws RuntimeException("AI failed")
 
     // Act
     val result = autoMobileAgent.attemptAiRecovery(failureOutput, errorOutput)

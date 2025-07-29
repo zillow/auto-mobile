@@ -20,7 +20,7 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -147,7 +147,7 @@ class AutoMobileAgent(
         try {
           println("Starting AI recovery with AutoMobile MCP tools...")
 
-          val response = aiAgent.runAndGetResult(recoveryPrompt) ?: ""
+          val response = aiAgent.run(recoveryPrompt) ?: ""
 
           println("AI recovery completed")
           println("Recovery response: $response")
@@ -232,7 +232,7 @@ class AutoMobileAgent(
 
       return runBlocking {
         try {
-          val response = aiAgent.runAndGetResult(planGenerationPrompt)
+          val response = aiAgent.run(planGenerationPrompt)
 
           // Extract YAML content from the response
           val yamlContent = extractYamlFromResponse(response)
@@ -336,12 +336,22 @@ class AutoMobileAgent(
       val url = serverUrl ?: throw RuntimeException("MCP client not connected")
 
       try {
-        // Create the JSON request manually since we're dealing with Map<String, Any>
-        val paramsJson =
-            koogJson.encodeToString(
-                kotlinx.serialization.serializer<Map<String, Any>>(), parameters)
+        // Create the JSON request manually by building the JSON string
+        val paramsJsonBuilder = StringBuilder("{")
+        parameters.entries.forEachIndexed { index, (key, value) ->
+          if (index > 0) paramsJsonBuilder.append(", ")
+          paramsJsonBuilder.append("\"$key\": ")
+          when (value) {
+            is String -> paramsJsonBuilder.append("\"$value\"")
+            is Number -> paramsJsonBuilder.append(value.toString())
+            is Boolean -> paramsJsonBuilder.append(value.toString())
+            else -> paramsJsonBuilder.append("\"$value\"")
+          }
+        }
+        paramsJsonBuilder.append("}")
+
         val requestJson =
-            """{"method":"tools/call","params":{"name":"$toolName","arguments":$paramsJson}}"""
+            """{"method":"tools/call","params":{"name":"$toolName","arguments":${paramsJsonBuilder}}}"""
 
         val request =
             HttpRequest.newBuilder()
@@ -643,9 +653,12 @@ class AutoMobileAgent(
   }
 
   interface AIAgentFactory {
-    fun createAIAgent(config: ModelConfig): AIAgent
+    fun createAIAgent(config: ModelConfig): AIAgent<String, String>
 
-    fun createAIAgentWithMCPTools(config: ModelConfig, mcpClient: MCPClient): AIAgent
+    fun createAIAgentWithMCPTools(
+        config: ModelConfig,
+        mcpClient: MCPClient
+    ): AIAgent<String, String>
   }
 
   interface TimeProvider {
@@ -721,7 +734,7 @@ class AutoMobileAgent(
   }
 
   class DefaultAIAgentFactory : AIAgentFactory {
-    override fun createAIAgent(config: ModelConfig): AIAgent {
+    override fun createAIAgent(config: ModelConfig): AIAgent<String, String> {
       val executor =
           when (config.provider) {
             ModelProvider.OPENAI -> simpleOpenAIExecutor(config.apiKey)
@@ -733,7 +746,7 @@ class AutoMobileAgent(
           when (config.provider) {
             ModelProvider.OPENAI -> OpenAIModels.Chat.GPT4o
             ModelProvider.ANTHROPIC -> AnthropicModels.Sonnet_4
-            ModelProvider.GOOGLE -> GoogleModels.Gemini2_5ProPreview0506
+            ModelProvider.GOOGLE -> GoogleModels.Gemini2_5Pro
           }
 
       val systemPrompt =
@@ -759,7 +772,10 @@ class AutoMobileAgent(
           systemPrompt = systemPrompt)
     }
 
-    override fun createAIAgentWithMCPTools(config: ModelConfig, mcpClient: MCPClient): AIAgent {
+    override fun createAIAgentWithMCPTools(
+        config: ModelConfig,
+        mcpClient: MCPClient
+    ): AIAgent<String, String> {
       val executor =
           when (config.provider) {
             ModelProvider.OPENAI -> simpleOpenAIExecutor(config.apiKey)
@@ -771,7 +787,7 @@ class AutoMobileAgent(
           when (config.provider) {
             ModelProvider.OPENAI -> OpenAIModels.Chat.GPT4o
             ModelProvider.ANTHROPIC -> AnthropicModels.Sonnet_4
-            ModelProvider.GOOGLE -> GoogleModels.Gemini2_5ProPreview0506
+            ModelProvider.GOOGLE -> GoogleModels.Gemini2_5Pro
           }
 
       // Create AutoMobile MCP tools using ToolSet pattern
