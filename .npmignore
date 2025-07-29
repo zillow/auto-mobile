@@ -40,7 +40,6 @@ venv/
 # Config files
 .auto-mobile-config.json
 .gitlab-ci-local
-lerna.json
 mkdocs.yml
 firebender.json
 

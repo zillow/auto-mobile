@@ -94,7 +94,6 @@
     "eslint-plugin": "^1.0.1",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-notice": "^1.0.0",
-    "lerna": "^8.2.2",
     "mocha": "^11.1.0",
     "nyc": "^17.1.0",
     "proxyquire": "^2.1.3",
