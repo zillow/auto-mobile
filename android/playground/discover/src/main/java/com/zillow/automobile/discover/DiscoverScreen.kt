@@ -25,7 +25,10 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiscoverVideoScreen(onNavigateToVideoPlayer: (String) -> Unit) {
+fun DiscoverVideoScreen(
+    onNavigateToVideoPlayer: (String) -> Unit,
+    initialSelectedSubTab: Int? = null
+) {
   val tabs: Map<String, @Composable () -> Unit> =
       mapOf(
           "Tap" to { TapScreen() },
@@ -37,7 +40,8 @@ fun DiscoverVideoScreen(onNavigateToVideoPlayer: (String) -> Unit) {
   val tabPageMap: Map<Int, @Composable () -> Unit> =
       tabs.map { it.value }.mapIndexed { index, entry -> index to entry }.toMap()
   val tabTitles = tabs.keys
-  val pagerState = rememberPagerState(pageCount = { tabTitles.size })
+  val initialPage = initialSelectedSubTab?.coerceIn(0, tabTitles.size - 1) ?: 0
+  val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { tabTitles.size })
   val coroutineScope = rememberCoroutineScope()
 
   Scaffold(
@@ -79,5 +83,7 @@ fun PreviewDiscoverVideoScreen() {
         else -> false
       }
 
-  AutoMobileTheme(darkTheme = isDarkMode) { DiscoverVideoScreen(onNavigateToVideoPlayer = {}) }
+  AutoMobileTheme(darkTheme = isDarkMode) {
+    DiscoverVideoScreen(onNavigateToVideoPlayer = {}, initialSelectedSubTab = 0)
+  }
 }

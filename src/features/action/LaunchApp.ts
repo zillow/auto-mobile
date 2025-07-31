@@ -4,9 +4,8 @@ import { BootedDevice, LaunchAppResult } from "../../models";
 import { ActionableError } from "../../models";
 import { TerminateApp } from "./TerminateApp";
 import { ClearAppData } from "./ClearAppData";
-
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
+import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
 import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
 
@@ -40,23 +39,99 @@ export class LaunchApp extends BaseVisualChange {
     const activities: string[] = [];
 
     try {
-      const cmd = `shell pm dump ${packageName} | grep "${packageName}" -A 1 | grep 'Action: "android.intent.action.MAIN"' -B 1 | head -n 1`;
-      const result = await this.adb.executeCommand(cmd);
+      logger.info(`[LaunchApp] Extracting launcher activities for ${packageName}`);
 
-      if (result.stdout.trim()) {
-        // Extract activity name from lines like:
-        // "2a4a30f com.example.app/com.example.WowActivity filter 6622f9c"
-        const match = result.stdout.match(new RegExp(`${packageName}/([^\\s]+)`));
-        if (match) {
-          const activityName = match[1];
-          activities.push(activityName);
+      // Try multiple approaches to find the main activity
+      const approaches = [
+        // Approach 1: Direct pm dump with specific grep
+        `shell pm dump ${packageName} | grep -A 5 -B 5 "android.intent.action.MAIN"`,
+        // Approach 2: Query resolver activities
+        `shell cmd package query-activities --brief android.intent.action.MAIN android.intent.category.LAUNCHER | grep ${packageName}`,
+        // Approach 3: Direct pm list activities
+        `shell pm list packages -f ${packageName} && pm dump ${packageName} | grep -A 10 "Activity filter"`
+      ];
+
+      for (let i = 0; i < approaches.length; i++) {
+        try {
+          logger.info(`[LaunchApp] Trying approach ${i + 1}: ${approaches[i]}`);
+          const result = await this.adb.executeCommand(approaches[i]);
+          logger.info(`[LaunchApp] Approach ${i + 1} result: ${result.stdout.length} chars of output`);
+
+          if (result.stdout.trim()) {
+            // Extract activity name from various patterns
+            const patterns = [
+              // Pattern 1: "packageName/activityName"
+              new RegExp(`${packageName}/([^\\s]+)`, "g"),
+              // Pattern 2: Activity class names
+              new RegExp(`${packageName}\\.[^\\s]*Activity[^\\s]*`, "g"),
+              // Pattern 3: Full class names in the package
+              new RegExp(`${packageName}\\.[^\\s]+`, "g")
+            ];
+
+            for (const pattern of patterns) {
+              const matches = result.stdout.match(pattern);
+              if (matches) {
+                logger.info(`[LaunchApp] Found ${matches.length} potential activities with pattern: ${pattern}`);
+                for (const match of matches) {
+                  if (match.includes("/")) {
+                    const activityName = match.split("/")[1];
+                    if (activityName && !activities.includes(activityName)) {
+                      activities.push(activityName);
+                      logger.info(`[LaunchApp] Added activity: ${activityName}`);
+                    }
+                  } else if (match.startsWith(packageName + ".")) {
+                    const activityName = match;
+                    if (!activities.includes(activityName)) {
+                      activities.push(activityName);
+                      logger.info(`[LaunchApp] Added full activity name: ${activityName}`);
+                    }
+                  }
+                }
+              }
+            }
+
+            if (activities.length > 0) {
+              logger.info(`[LaunchApp] Successfully found ${activities.length} activities using approach ${i + 1}`);
+              break;
+            }
+          }
+        } catch (error) {
+          logger.warn(`[LaunchApp] Approach ${i + 1} failed:`, error);
         }
       }
+
+      // If no activities found, try a simpler approach
+      if (activities.length === 0) {
+        logger.info(`[LaunchApp] No activities found, trying fallback approach`);
+        try {
+          const simpleResult = await this.adb.executeCommand(`shell pm dump ${packageName}`);
+          const lines = simpleResult.stdout.split("\n");
+
+          for (const line of lines) {
+            if (line.includes("android.intent.action.MAIN") || line.includes("MainActivity") || line.includes(".Main")) {
+              logger.info(`[LaunchApp] Found potential main activity line: ${line.trim()}`);
+              // Look for activity names in surrounding lines
+              const activityMatch = line.match(new RegExp(`${packageName}[^\\s]*`, "g"));
+              if (activityMatch) {
+                for (const match of activityMatch) {
+                  if (!activities.includes(match)) {
+                    activities.push(match);
+                    logger.info(`[LaunchApp] Added fallback activity: ${match}`);
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn(`[LaunchApp] Fallback approach failed:`, error);
+        }
+      }
+
     } catch (error) {
-      // If grep command fails, return empty array
-      console.warn(`Failed to extract launcher activities for ${packageName}:`, error);
+      logger.warn(`[LaunchApp] Failed to extract launcher activities for ${packageName}:`, error);
     }
 
+    logger.info(`[LaunchApp] Final activities list: [${activities.join(", ")}]`);
     return activities;
   }
 
@@ -165,7 +240,7 @@ export class LaunchApp extends BaseVisualChange {
     // Check app status (installation and running)
     const installedApps = await (new ListInstalledApps(this.device)).execute();
     if (!installedApps.includes(packageName)) {
-      logger.info("App is not installed?!?");
+      logger.error(`[LaunchApp] App ${packageName} is not installed`);
       return {
         success: false,
         packageName: packageName,
@@ -173,8 +248,12 @@ export class LaunchApp extends BaseVisualChange {
       };
     }
 
-    // Use the installation status check which also includes running status
-    const isRunning = true; // TODO
+    // Check if app is running
+    const isRunningCmd = `shell ps | grep ${packageName} | grep -v grep | wc -l`;
+    logger.info(`[LaunchApp] Checking if app is running: ${isRunningCmd}`);
+    const isRunningOutput = await this.adb.executeCommand(isRunningCmd);
+    const isRunning = parseInt(isRunningOutput.trim(), 10) > 0;
+    logger.info(`[LaunchApp] App running: ${isRunning} (output: "${isRunningOutput.trim()}")`);
 
     if (isRunning) {
       if (clearAppData) {
@@ -183,23 +262,46 @@ export class LaunchApp extends BaseVisualChange {
         await new TerminateApp(this.device).execute(packageName);
       }
 
-      // Check if app is in foreground
-      let isForeground: boolean;
+      // Check if app is in foreground - use a more reliable approach
+      let isForeground: boolean = false;
       try {
-        const currentAppCmd = `shell "dumpsys window windows | grep '${packageName}'"`;
-        const currentAppOutput = await this.adb.executeCommand(currentAppCmd);
-        // App is in foreground if it's either the top app or an IME target
-        const isTopApp = currentAppOutput.includes(`topApp=ActivityRecord{`) &&
-          currentAppOutput.includes(`${packageName}`);
-        const isImeTarget = currentAppOutput.includes(`imeLayeringTarget`) &&
-          currentAppOutput.includes(`${packageName}`);
+        logger.info(`[LaunchApp] Checking if app is in foreground`);
 
-        isForeground = isTopApp || isImeTarget;
-      } catch (error) {
+        // Revised, more robust foreground detection
+        const foregroundChecks = [
+          // Approach 1: Check for resumed activity
+          `shell dumpsys activity activities | grep "mResumedActivity" | grep "${packageName}"`,
+          // Approach 2: Check top activity with new activity command
+          `shell dumpsys activity | grep "ResumedActivity.*${packageName}"`,
+          // Approach 3: Check running processes (fallback)
+          `shell dumpsys window | grep "Window #" | grep "${packageName}"`
+        ];
+
+        for (let i = 0; i < foregroundChecks.length; i++) {
+          try {
+            logger.info(`[LaunchApp] Foreground check ${i + 1}: ${foregroundChecks[i]}`);
+            const checkResult = await this.adb.executeCommand(foregroundChecks[i]);
+            const output = (checkResult && checkResult.stdout ? checkResult.stdout : "").trim();
+            logger.info(`[LaunchApp] Foreground check ${i + 1} output: "${output}" (${output.length} chars)`);
+
+            if (output.length > 0) {
+              isForeground = true;
+              logger.info(`[LaunchApp] App is in foreground (detected by check ${i + 1})`);
+              break;
+            }
+          } catch (error) {
+            logger.warn(`[LaunchApp] Foreground check ${i + 1} failed:`, error);
+          }
+        }
+      } catch (outerError) {
+        logger.warn(`[LaunchApp] All foreground checks failed:`, outerError);
         isForeground = false;
       }
 
+      logger.info(`[LaunchApp] Final foreground status: ${isForeground}`);
+
       if (isForeground) {
+        logger.info(`[LaunchApp] App ${packageName} is already in foreground`);
         return {
           success: true,
           packageName,
@@ -209,6 +311,8 @@ export class LaunchApp extends BaseVisualChange {
       }
     }
 
+    logger.info(`[LaunchApp] Proceeding with app launch`);
+
     return this.observedInteraction(
       async () => {
         logger.info("(");
@@ -216,21 +320,63 @@ export class LaunchApp extends BaseVisualChange {
 
         // If no specific activity provided, get launcher activities from pm dump
         if (!targetActivity) {
+          logger.info(`[LaunchApp] No activity specified, extracting launcher activities`);
           const launcherActivities = await this.extractLauncherActivities(packageName);
 
           if (launcherActivities.length > 0) {
             targetActivity = launcherActivities[0];
+            logger.info(`[LaunchApp] Using first found activity: ${targetActivity}`);
+          } else {
+            logger.info(`[LaunchApp] No launcher activities found, trying common patterns`);
+            // Try common activity name patterns
+            const commonPatterns = [
+              `${packageName}.MainActivity`,
+              `${packageName}.ui.MainActivity`,
+              `${packageName}.main.MainActivity`,
+              `${packageName}.activity.MainActivity`,
+              `${packageName}.LauncherActivity`,
+              `${packageName}.MainLauncherActivity`
+            ];
+
+            for (const pattern of commonPatterns) {
+              try {
+                logger.info(`[LaunchApp] Trying common pattern: ${pattern}`);
+                await this.adb.executeCommand(`shell am start -n ${packageName}/${pattern}`);
+                logger.info(`[LaunchApp] Successfully launched with pattern: ${pattern}`);
+                return {
+                  success: true,
+                  packageName,
+                  activityName: pattern
+                };
+              } catch (error) {
+                logger.info(`[LaunchApp] Pattern ${pattern} failed: ${error}`);
+              }
+            }
           }
         }
 
         // Launch with specific activity if found, otherwise use default method
         if (targetActivity) {
-          await this.adb.executeCommand(`shell am start -n ${packageName}/${targetActivity}`);
+          logger.info(`[LaunchApp] Launching with activity: ${targetActivity}`);
+          const launchCmd = `shell am start -n ${packageName}/${targetActivity}`;
+          logger.info(`[LaunchApp] Launch command: ${launchCmd}`);
+          await this.adb.executeCommand(launchCmd);
+          logger.info(`[LaunchApp] Launch command completed successfully`);
         } else {
-          // Fallback to default launcher intent
-          throw new ActionableError("No launcher activity found");
+          // Fallback to launcher intent
+          logger.info(`[LaunchApp] No activity found, trying launcher intent`);
+          try {
+            const launcherCmd = `shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
+            logger.info(`[LaunchApp] Launcher intent command: ${launcherCmd}`);
+            await this.adb.executeCommand(launcherCmd);
+            logger.info(`[LaunchApp] Launcher intent completed successfully`);
+          } catch (error) {
+            logger.error(`[LaunchApp] Launcher intent failed: ${error}`);
+            throw new ActionableError("No launcher activity found and launcher intent failed");
+          }
         }
 
+        logger.info(`[LaunchApp] Launch completed successfully`);
         return {
           success: true,
           packageName,

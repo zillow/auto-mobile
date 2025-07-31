@@ -10,7 +10,13 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object LoginDestination : AppDestination
 
-@Serializable data object HomeDestination : AppDestination
+@Serializable data object SettingsDestination : AppDestination
+
+@Serializable
+data class HomeDestination(
+    val selectedTab: Int = 0,
+    val selectedSubTab: Int? = null // For sub-tabs within a main tab (e.g., Discover sub-tabs)
+) : AppDestination
 
 @Serializable data class SlidesDestination(val slideIndex: Int = 0) : AppDestination
 

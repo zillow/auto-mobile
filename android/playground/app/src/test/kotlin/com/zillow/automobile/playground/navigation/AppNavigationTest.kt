@@ -30,6 +30,6 @@ class AppNavigationTest {
   fun `determineStartDestination returns home when user has completed onboarding and is authenticated`() {
     val result = determineStartDestination(hasCompletedOnboarding = true, isAuthenticated = true)
 
-    assertEquals(HomeDestination, result)
+    assertEquals(HomeDestination(), result)
   }
 }
