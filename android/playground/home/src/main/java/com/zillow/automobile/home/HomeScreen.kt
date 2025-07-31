@@ -37,16 +37,19 @@ data class BottomNavItem(val label: String, val icon: ImageVector, val route: St
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    initialSelectedTab: Int = 0,
+    initialSelectedSubTab: Int? = null,
     onNavigateToVideoPlayer: (String) -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
     onLogout: () -> Unit = {},
     onGuestModeNavigateToLogin: () -> Unit = {}
 ) {
-  var bottomNavSelection by remember { mutableIntStateOf(0) }
+  var bottomNavSelection by remember { mutableIntStateOf(initialSelectedTab) }
   HomeScreenCore(
       modifier = modifier,
       bottomNavSelected = bottomNavSelection,
       setBottomNavSelection = { bottomNavSelection = it },
+      initialSelectedSubTab = initialSelectedSubTab,
       onNavigateToVideoPlayer = onNavigateToVideoPlayer,
       onNavigateToSlides = onNavigateToSlides,
       onLogout = onLogout,
@@ -58,6 +61,7 @@ fun HomeScreenCore(
     bottomNavSelected: Int,
     modifier: Modifier = Modifier,
     setBottomNavSelection: (Int) -> Unit = {},
+    initialSelectedSubTab: Int? = null,
     onNavigateToVideoPlayer: (String) -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
     onLogout: () -> Unit = {},
@@ -102,7 +106,10 @@ fun HomeScreenCore(
       modifier = modifier) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
           when (bottomNavSelected) {
-            0 -> DiscoverVideoScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer)
+            0 ->
+                DiscoverVideoScreen(
+                    onNavigateToVideoPlayer = onNavigateToVideoPlayer,
+                    initialSelectedSubTab = initialSelectedSubTab)
             1 -> {
               // Slides handled by navigation - this case shouldn't be reached
               // since we navigate away when slides is selected
