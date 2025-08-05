@@ -1,8 +1,9 @@
 import { ChildProcess, exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
-import { BootedDevice, DeviceInfo, ExecResult } from "../../models";
+import { BootedDevice, DeviceInfo, ExecResult, ActionableError } from "../../models";
 import { AdbUtils } from "./adb";
+import { arch } from "os";
 
 const execAsync = async (command: string): Promise<ExecResult> => {
   const result = await promisify(exec)(command);
@@ -58,6 +59,112 @@ export class AndroidEmulator {
   }
 
   /**
+   * Get the host architecture
+   * @returns The host architecture string
+   */
+  private getHostArchitecture(): string {
+    return arch();
+  }
+
+  /**
+   * Check if an AVD architecture is compatible with the host
+   * @param avdName - The AVD name to check
+   * @returns Promise with compatibility result
+   */
+  private async checkArchitectureCompatibility(avdName: string): Promise<{
+    compatible: boolean;
+    hostArch: string;
+    avdArch?: string;
+    reason?: string
+  }> {
+    const hostArch = this.getHostArchitecture();
+
+    try {
+      // Get AVD config to determine its architecture
+      const result = await this.executeCommand(`-avd ${avdName} -verbose`, 3000);
+      const output = result.stdout + result.stderr;
+
+      // Look for architecture information in the output
+      let avdArch: string | undefined;
+
+      // Check for target architecture in verbose output
+      const archMatch = output.match(/Found AVD target architecture: (\w+)/);
+      if (archMatch) {
+        avdArch = archMatch[1];
+      }
+
+      // If we couldn't determine from verbose output, try to infer from common patterns
+      if (!avdArch) {
+        // This is a fallback - we'll let the actual emulator start attempt reveal the issue
+        return { compatible: true, hostArch, reason: "Could not determine AVD architecture, allowing attempt" };
+      }
+
+      // Check compatibility
+      const compatible = this.isArchitectureCompatible(hostArch, avdArch);
+      const reason = compatible ? undefined : `Host architecture '${hostArch}' cannot run AVD with architecture '${avdArch}'`;
+
+      return { compatible, hostArch, avdArch, reason };
+    } catch (error) {
+      // If we can't check, we'll let the emulator start attempt proceed and catch errors there
+      logger.debug(`Could not check architecture compatibility for ${avdName}: ${error}`);
+      return { compatible: true, hostArch, reason: "Could not verify compatibility, allowing attempt" };
+    }
+  }
+
+  /**
+   * Check if host architecture can run AVD architecture
+   * @param hostArch - Host architecture
+   * @param avdArch - AVD architecture
+   * @returns Boolean indicating compatibility
+   */
+  private isArchitectureCompatible(hostArch: string, avdArch: string): boolean {
+    // ARM64 hosts (Apple Silicon) cannot run x86/x86_64 AVDs
+    if ((hostArch === "arm64" || hostArch === "aarch64") && (avdArch === "x86" || avdArch === "x86_64")) {
+      return false;
+    }
+
+    // x86_64 hosts can generally run both x86 and ARM (with performance impact)
+    // ARM hosts can run ARM AVDs
+    return true;
+  }
+
+  /**
+   * Detect if emulator output contains architecture-related PANIC errors
+   * @param output - Emulator output to check
+   * @returns Error details if PANIC detected, null otherwise
+   */
+  private detectArchitecturePanic(output: string): {
+    isPanic: boolean;
+    message?: string;
+    hostArch?: string;
+    avdArch?: string
+  } {
+    // Look for the specific PANIC message about architecture compatibility
+    const panicMatch = output.match(/PANIC: Avd's CPU Architecture '(\w+)' is not supported by the QEMU2 emulator on (\w+) host/);
+
+    if (panicMatch) {
+      const avdArch = panicMatch[1];
+      const hostArch = panicMatch[2];
+      return {
+        isPanic: true,
+        message: `AVD architecture '${avdArch}' is not supported on ${hostArch} host`,
+        hostArch,
+        avdArch
+      };
+    }
+
+    // Check for other PANIC messages that might be architecture-related
+    if (output.includes("PANIC:") && (output.includes("architecture") || output.includes("CPU") || output.includes("QEMU"))) {
+      return {
+        isPanic: true,
+        message: "Emulator PANIC detected (possibly architecture-related)",
+      };
+    }
+
+    return { isPanic: false };
+  }
+
+  /**
    * Execute an emulator command
    * @param command - The command to execute
    * @param timeoutMs - Optional timeout in milliseconds
@@ -73,7 +180,7 @@ export class AndroidEmulator {
 
       const timeoutPromise = new Promise<ExecResult>((_, reject) => {
         timeoutId = setTimeout(() =>
-          reject(new Error(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
+          reject(new ActionableError(`Command timed out after ${timeoutMs}ms: ${fullCommand}`)),
                                timeoutMs
         );
       });
@@ -102,7 +209,7 @@ export class AndroidEmulator {
         .map(name => ({ name, platform: "android", isRunning: false, source: "local" } as DeviceInfo));
     } catch (error) {
       logger.error("Failed to list AVDs:", error);
-      throw new Error(`Failed to list AVDs: ${error}`);
+      throw new ActionableError(`Failed to list AVDs: ${error}`);
     }
   }
 
@@ -177,34 +284,139 @@ export class AndroidEmulator {
     // Check if the AVD exists
     const availableAvds = await this.listAvds();
     if (!availableAvds.find(emu => emu.name === avdName)) {
-      throw new Error(`AVD '${avdName}' not found. Available AVDs: ${availableAvds.join(", ")}`);
+      throw new ActionableError(`AVD '${avdName}' not found. Available AVDs: ${availableAvds.join(", ")}`);
     }
 
     // Check if already running
     if (await this.isAvdRunning(avdName)) {
-      throw new Error(`AVD '${avdName}' is already running`);
+      throw new ActionableError(`AVD '${avdName}' is already running`);
+    }
+
+    // Check architecture compatibility before attempting to start
+    const compatibility = await this.checkArchitectureCompatibility(avdName);
+    if (!compatibility.compatible && compatibility.reason) {
+      logger.error(`Architecture compatibility check failed: ${compatibility.reason}`);
+      throw new ActionableError(`Cannot start AVD '${avdName}': ${compatibility.reason}. On ${compatibility.hostArch} hosts, use AVDs with compatible architectures (e.g., arm64-v8a for Apple Silicon Macs).`);
     }
 
     const args = ["-avd", avdName];
     logger.info(`Starting emulator with AVD: ${avdName}`);
     logger.debug(`Emulator command: ${this.emulatorPath} ${args.join(" ")}`);
 
-    const child = this.spawnFn(this.emulatorPath, args);
+    return new Promise((resolve, reject) => {
+      const child = this.spawnFn(this.emulatorPath, args);
 
-    // Log emulator output for debugging
-    child.stdout?.on("data", data => {
-      logger.debug(`Emulator stdout: ${data}`);
+      // Buffer to collect initial output for PANIC detection
+      let initialOutput = "";
+      const outputBuffer: string[] = [];
+      const maxBufferLines = 50; // Keep last 50 lines for error analysis
+      let startupValidationComplete = false;
+
+      // Monitor emulator output for PANIC errors
+      const monitorOutput = (data: any) => {
+        const output = data.toString();
+        initialOutput += output;
+
+        // Keep a rolling buffer of recent output
+        const lines = output.split("\n");
+        outputBuffer.push(...lines);
+        if (outputBuffer.length > maxBufferLines) {
+          outputBuffer.splice(0, outputBuffer.length - maxBufferLines);
+        }
+
+        // Check for PANIC in the output
+        const panicResult = this.detectArchitecturePanic(initialOutput);
+        if (panicResult.isPanic) {
+          logger.error(`Emulator PANIC detected: ${panicResult.message}`);
+
+          // Create a more helpful error message
+          let errorMessage = `Emulator failed to start: ${panicResult.message}`;
+          if (panicResult.hostArch && panicResult.avdArch) {
+            errorMessage += `\n\nSuggestion: On ${panicResult.hostArch} hosts, create AVDs with compatible architectures:`;
+            if (panicResult.hostArch === "aarch64" || panicResult.hostArch === "arm64") {
+              errorMessage += `\n- Use ARM64 system images (arm64-v8a) instead of x86/x86_64`;
+              errorMessage += `\n- Example: avdmanager create avd -n MyAVD -k "system-images;android-35;google_apis;arm64-v8a"`;
+            } else if (panicResult.hostArch === "x86" || panicResult.hostArch === "x86_64") {
+              errorMessage += `\n- Use x86/x86_64 system images instead of ARM64`;
+              errorMessage += `\n- Example: avdmanager create avd -n MyAVD -k "system-images;android-35;google_apis;x86_64"`;
+            }
+          }
+
+          // Kill the process if it's still running
+          if (!child.killed) {
+            child.kill();
+          }
+
+          // Reject the promise instead of just emitting error
+          if (!startupValidationComplete) {
+            startupValidationComplete = true;
+            reject(new ActionableError(errorMessage));
+          }
+          return;
+        }
+
+        // Check for successful startup indicators
+        if (output.includes("INFO         | emuDirName:") ||
+          output.includes("Hax is enabled") ||
+          output.includes("Detected GPU type")) {
+          // Emulator has started successfully, resolve with the child process
+          if (!startupValidationComplete) {
+            startupValidationComplete = true;
+            resolve(child);
+          }
+        }
+      };
+
+      // Set a timeout for startup validation (5 seconds should be enough to detect PANIC)
+      const startupTimeout = setTimeout(() => {
+        if (!startupValidationComplete) {
+          startupValidationComplete = true;
+          // If no PANIC detected and no clear success indicators, assume success
+          resolve(child);
+        }
+      }, 5000);
+
+      // Log emulator output for debugging and monitor for PANIC
+      child.stdout?.on("data", data => {
+        logger.debug(`Emulator stdout: ${data}`);
+        monitorOutput(data);
+      });
+
+      child.stderr?.on("data", data => {
+        logger.debug(`Emulator stderr: ${data}`);
+        monitorOutput(data);
+      });
+
+      child.on("exit", code => {
+        clearTimeout(startupTimeout);
+        if (code !== 0) {
+          logger.error(`Emulator process exited with code: ${code}`);
+
+          // Check if exit was due to PANIC
+          const panicResult = this.detectArchitecturePanic(initialOutput);
+          if (panicResult.isPanic) {
+            logger.error(`Exit was due to PANIC: ${panicResult.message}`);
+            if (!startupValidationComplete) {
+              startupValidationComplete = true;
+              reject(new ActionableError(`Emulator failed to start: ${panicResult.message}`));
+            }
+          } else if (!startupValidationComplete) {
+            startupValidationComplete = true;
+            reject(new ActionableError(`Emulator process exited with code: ${code}`));
+          }
+        } else {
+          logger.info(`Emulator process exited with code: ${code}`);
+        }
+      });
+
+      child.on("error", error => {
+        clearTimeout(startupTimeout);
+        if (!startupValidationComplete) {
+          startupValidationComplete = true;
+          reject(new ActionableError(`Emulator failed to start: ${error.message}`));
+        }
+      });
     });
-
-    child.stderr?.on("data", data => {
-      logger.debug(`Emulator stderr: ${data}`);
-    });
-
-    child.on("exit", code => {
-      logger.info(`Emulator process exited with code: ${code}`);
-    });
-
-    return child;
   }
 
   /**
@@ -217,7 +429,7 @@ export class AndroidEmulator {
     const emulator = runningEmulators.find(emu => emu.deviceId === device.deviceId);
 
     if (!emulator || !emulator.deviceId) {
-      throw new Error(`Emulator '${device.name}' is not running`);
+      throw new ActionableError(`Emulator '${device.name}' is not running`);
     }
 
     // Use ADB to stop the emulator
@@ -353,7 +565,7 @@ export class AndroidEmulator {
       return { name: avdName, platform: "android", deviceId: foundDeviceId } as BootedDevice;
     }
 
-    throw new Error(`Emulator '${avdName}' failed to become ready within ${timeoutMs}ms`);
+    throw new ActionableError(`Emulator '${avdName}' failed to become ready within ${timeoutMs}ms`);
   }
 
   /**
