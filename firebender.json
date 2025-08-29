@@ -1,4 +1,14 @@
 {
+  "backgroundAgent": {
+    "start": "npm run lint; npm run build",
+    "copyFiles": [
+      "roadmap/README.md",
+      "roadmap/bugs/TEMPLATE.md",
+      "roadmap/features/TEMPLATE.md",
+      "roadmap/features/README.md"
+    ],
+    "install": "npm install"
+  },
   "rules": [
     "This is a Node TypeScript MCP server that uses https://github.com/modelcontextprotocol/typescript-sdk to serve tool calls.",
     "The goal of the project is to provide Android Debug Bridge (ADB) capabilities through MCP tool calls for Android device automation.,",
@@ -7,7 +17,11 @@
       "filePathMatches": "*",
       "rulesPaths": [
         "README.md",
-        "docs/ai/validation.md"
+        "docs/ai/validation.md",
+        "roadmap/README.md",
+        "roadmap/bugs/TEMPLATE.md",
+        "roadmap/features/TEMPLATE.md",
+        "roadmap/features/README.md"
       ]
     }
   ],
