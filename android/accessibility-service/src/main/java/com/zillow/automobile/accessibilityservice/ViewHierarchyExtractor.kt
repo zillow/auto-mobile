@@ -38,14 +38,17 @@ class ViewHierarchyExtractor {
   private val json = Json { ignoreUnknownKeys = true }
 
   /** Extracts view hierarchy from the active window */
-  fun extractFromActiveWindow(rootNode: AccessibilityNodeInfo?): ViewHierarchy? {
+  fun extractFromActiveWindow(
+      rootNode: AccessibilityNodeInfo?,
+      textFilter: String? = null
+  ): ViewHierarchy? {
     if (rootNode == null) {
       Log.w(TAG, "Root node is null")
       return ViewHierarchy(error = "Root node is null")
     }
 
     return try {
-      val rootElement = extractNodeInfo(rootNode, 0)
+      val rootElement = extractNodeInfo(rootNode, 0, textFilter)
       val processedElement = rootElement?.let { processForAccessibility(it) }
 
       ViewHierarchy(packageName = rootNode.packageName?.toString(), hierarchy = processedElement)
@@ -56,7 +59,11 @@ class ViewHierarchyExtractor {
   }
 
   /** Recursively extracts node information with depth limiting */
-  private fun extractNodeInfo(node: AccessibilityNodeInfo, depth: Int): UIElementInfo? {
+  private fun extractNodeInfo(
+      node: AccessibilityNodeInfo,
+      depth: Int,
+      textFilter: String? = null
+  ): UIElementInfo? {
     if (depth > MAX_DEPTH) {
       return null
     }
@@ -71,7 +78,7 @@ class ViewHierarchyExtractor {
       for (i in 0 until childCount) {
         val child = node.getChild(i)
         if (child != null) {
-          val childInfo = extractNodeInfo(child, depth + 1)
+          val childInfo = extractNodeInfo(child, depth + 1, textFilter)
           if (childInfo != null) {
             children.add(childInfo)
           }
@@ -246,7 +253,7 @@ class ViewHierarchyExtractor {
               actions = actions,
           )
 
-      if (childCount == 0 && !meetsFilterCriteria(elementInfo)) {
+      if (childCount == 0 && !meetsFilterCriteria(elementInfo, textFilter)) {
         null
       } else {
         elementInfo
@@ -401,7 +408,7 @@ class ViewHierarchyExtractor {
   }
 
   /** Check if element meets filter criteria (matches test expectations) */
-  private fun meetsFilterCriteria(element: UIElementInfo): Boolean {
+  private fun meetsFilterCriteria(element: UIElementInfo, textFilter: String? = null): Boolean {
     // String filter criteria
     val hasStringCriteria =
         !element.text.isNullOrBlank() ||
@@ -436,6 +443,10 @@ class ViewHierarchyExtractor {
             !element.actions.isNullOrEmpty() ||
             !element.extras.isNullOrEmpty()
 
-    return hasStringCriteria || hasBooleanCriteria || hasAccessibilityFeatures
+    // Apply text filter if provided
+    val meetsTextFilter =
+        textFilter?.let { filter -> element.text?.contains(filter, true) ?: false } ?: true
+
+    return (hasStringCriteria || hasBooleanCriteria || hasAccessibilityFeatures) && meetsTextFilter
   }
 }
