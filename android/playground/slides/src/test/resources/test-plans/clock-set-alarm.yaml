@@ -12,6 +12,8 @@ steps:
   - tool: launchApp
     appId: com.google.android.deskclock
     label: Launch Clock application
+    clearAppData: true
+    coldBoot: true
 
   - tool: tapOn
     text: "Alarm"
