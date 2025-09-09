@@ -7,10 +7,10 @@ import { readFileAsync, readdirAsync } from "./io";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "./constants";
 import { CryptoUtils } from "./crypto";
 
-// Add dynamic import function for pixelmatch
-async function getPixelmatch() {
-  const { default: pixelmatch } = await import("pixelmatch");
-  return pixelmatch;
+// Add dynamic import function for blazediff
+async function getBlazediff() {
+  const { default: blazediff } = await import("@blazediff/core");
+  return blazediff;
 }
 
 export interface ScreenshotComparisonResult {
@@ -231,7 +231,7 @@ export class ScreenshotUtils {
    * Compare two image buffers and return detailed comparison result
    * @param buffer1 First image buffer
    * @param buffer2 Second image buffer
-   * @param threshold Pixelmatch threshold (0-1, default 0.1)
+   * @param threshold BlazeDiff threshold (0-1, default 0.1)
    * @param fastMode Enable fast mode for bulk comparisons (lower quality but faster)
    * @returns Promise with comparison result
    */
@@ -283,8 +283,8 @@ export class ScreenshotUtils {
 
       // Perform pixel comparison with adjusted threshold for fast mode
       const adjustedThreshold = fastMode ? Math.min(threshold * 1.5, 0.2) : threshold;
-      const pixelmatch = await getPixelmatch();
-      const pixelDifference = pixelmatch(
+      const blazediff = await getBlazediff();
+      const pixelDifference = blazediff(
         img1.data,
         img2.data,
         undefined, // No diff output needed
