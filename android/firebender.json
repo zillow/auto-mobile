@@ -1,4 +1,11 @@
 {
+  "backgroundAgent": {
+    "copyFiles": [
+      "roadmap/README.md",
+      "roadmap/bugs/TEMPLATE.md",
+      "roadmap/features/TEMPLATE.md"
+    ]
+  },
   "rules": [
     "This is a JUnitRunner for the AutoMobile CLI.",
     "Overall the purpose is to run Android UI tests as a full replacement for Espresso and other frameworks.",
@@ -10,7 +17,9 @@
       "rulesPaths": [
         "README.md",
         "docs/ai/validation.md",
-        "roadmap/README.md"
+        "roadmap/README.md",
+        "roadmap/bugs/TEMPLATE.md",
+        "roadmap/features/TEMPLATE.md"
       ]
     }
   ]
