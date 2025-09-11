@@ -3,7 +3,6 @@ import { expect } from "chai";
 import {
   ListResourcesRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { createMcpServer } from "../../../src/server/index";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 
 describe("MCP Resources List", () => {

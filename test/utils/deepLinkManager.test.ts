@@ -2,12 +2,15 @@ import { expect } from "chai";
 import { DeepLinkManager } from "../../src/utils/deepLinkManager";
 import { AdbUtils } from "../../src/utils/android-cmdline-tools/adb";
 import { ElementUtils } from "../../src/features/utility/ElementUtils";
-import { ExecResult, ViewHierarchyResult } from "../../src/models";
+import { ExecResult, ViewHierarchyResult, BootedDevice } from "../../src/models";
+import sinon from "sinon";
 
 describe("DeepLinkManager", () => {
   let deepLinkManager: DeepLinkManager;
-  let mockAdbUtils: AdbUtils;
+  let mockAdbUtils: any;
   let mockElementUtils: ElementUtils;
+  let testDevice: BootedDevice;
+  let adbStub: sinon.SinonStub;
 
   // Mock ADB execute function
   const mockExecuteCommand = async (command: string): Promise<ExecResult> => {
@@ -44,7 +47,7 @@ describe("DeepLinkManager", () => {
   install permissions:
     android.permission.INTERNET: granted=true
     android.permission.ACCESS_NETWORK_STATE: granted=true
-  User 0: ceDataInode=123456 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+  User 0: ceDataInode=123456 installed=true hidden=false suspended=false stopped=false notLaunched=false enabled=0 instant=false virtual=false
 
   Schemes:
       https:
@@ -98,11 +101,28 @@ Receiver Resolver Table:
   };
 
   beforeEach(() => {
-    // Create mock ADB utils
-    mockAdbUtils = new AdbUtils("test-device", mockExecuteCommand);
+    // Create a proper BootedDevice object
+    testDevice = {
+      name: "test-device",
+      platform: "android",
+      deviceId: "test-device-id"
+    };
 
-    // Create deep link manager with mock
-    deepLinkManager = new DeepLinkManager("test-device");
+    // Create a mock ADB utils object that doesn't require real initialization
+    mockAdbUtils = {
+      device: testDevice,
+      setDevice: sinon.stub(),
+      executeCommand: sinon.stub().callsFake(mockExecuteCommand),
+      getBootedEmulators: sinon.stub().resolves([testDevice])
+    };
+
+    // Stub the AdbUtils constructor to prevent real async operations
+    adbStub = sinon.stub(AdbUtils.prototype as any, "constructor").returns(undefined);
+
+    // Create deep link manager with null device to avoid AdbUtils initialization
+    deepLinkManager = new DeepLinkManager(null);
+
+    // Replace the adbUtils with our mock
     (deepLinkManager as any).adbUtils = mockAdbUtils;
 
     // Create mock element utils
@@ -110,9 +130,29 @@ Receiver Resolver Table:
     (deepLinkManager as any).elementUtils = mockElementUtils;
   });
 
+  afterEach(() => {
+    // Clean up stubs
+    if (adbStub) {
+      adbStub.restore();
+    }
+    sinon.restore();
+  });
+
   describe("constructor", () => {
     it("should create DeepLinkManager with device ID", () => {
-      const manager = new DeepLinkManager("test-device");
+      // Temporarily restore the constructor for this test
+      adbStub.restore();
+
+      // Create another stub that allows construction but mocks async operations
+      const mockAdbExecute = sinon.stub().callsFake(mockExecuteCommand);
+      const mockAdb = new AdbUtils(testDevice, mockAdbExecute);
+      sinon.stub(mockAdb, "executeCommand").callsFake(mockExecuteCommand);
+
+      adbStub = sinon.stub(AdbUtils.prototype as any, "constructor").returns(undefined);
+
+      const manager = new DeepLinkManager(testDevice);
+      (manager as any).adbUtils = mockAdb;
+
       expect(manager).to.be.instanceOf(DeepLinkManager);
     });
 
@@ -124,9 +164,15 @@ Receiver Resolver Table:
 
   describe("setDeviceId", () => {
     it("should set device ID", () => {
-      deepLinkManager.setDeviceId("new-device");
-      // Verify the device ID was set (we can't directly access it, but the test passes if no error)
-      expect(true).to.be.true;
+      const newDevice: BootedDevice = {
+        name: "new-device",
+        platform: "android",
+        deviceId: "new-device-id"
+      };
+      deepLinkManager.setDeviceId(newDevice);
+
+      // Verify the setDevice was called on the mock
+      expect(mockAdbUtils.setDevice.calledWith(newDevice)).to.be.true;
     });
   });
 
@@ -144,13 +190,8 @@ Receiver Resolver Table:
     });
 
     it("should handle ADB command failures", async () => {
-      // Create a failing mock
-      const failingMock = async (): Promise<ExecResult> => {
-        throw new Error("ADB command failed");
-      };
-
-      const failingAdb = new AdbUtils("test-device", failingMock);
-      (deepLinkManager as any).adbUtils = failingAdb;
+      // Make the mock throw an error
+      mockAdbUtils.executeCommand = sinon.stub().rejects(new Error("ADB command failed"));
 
       const result = await deepLinkManager.getDeepLinks("com.example.app");
 
@@ -485,8 +526,8 @@ Receiver Resolver Table:
         return mockExecuteCommand(command);
       };
 
-      const failingAdb = new AdbUtils("test-device", failingMock);
-      (deepLinkManager as any).adbUtils = failingAdb;
+      // Replace the mock's executeCommand with the failing one
+      mockAdbUtils.executeCommand = sinon.stub().callsFake(failingMock);
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "always");
 
