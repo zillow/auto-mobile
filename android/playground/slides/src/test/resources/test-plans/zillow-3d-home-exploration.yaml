@@ -2,6 +2,11 @@
 name: zillow-3d-home-exploration
 description: Automated exploration of Zillow app 3D home tours, including bypassing login, searching for 3D tour homes in NYC, and navigating through different rooms using navigation buttons
 steps:
+  # Install Zillow app
+  - tool: installApp
+    apkPath: com.zillow.android.zillowmap
+    force: false
+
   # Launch Zillow app
   - tool: launchApp
     appId: com.zillow.android.zillowmap
@@ -61,11 +66,11 @@ steps:
     action: "tap"
 
   - tool: "tapOn"
-    text: "Jun 26"
+    text: "{book-date-1}"
     action: "tap"
 
   - tool: "tapOn"
-    text: "Jun 27"
+    text: "{book-date-2}"
     action: "tap"
 
   - tool: "tapOn"
