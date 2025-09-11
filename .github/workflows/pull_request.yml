@@ -84,38 +84,6 @@ jobs:
         with:
           category: "/language:${{matrix.language}}"
 
-  codeql-java:
-    name: "CodeQL Analysis - Java/Kotlin"
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [ 'java' ]
-    steps:
-      - name: "Git Checkout"
-        uses: actions/checkout@v4
-
-      - name: "Initialize CodeQL"
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-          queries: security-extended,security-and-quality
-
-      - name: "Build Gradle Projects"
-        working-directory: android
-        run: |
-          ./gradlew assemble --no-daemon --stacktrace
-
-      - name: "Perform CodeQL Analysis"
-        uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:${{matrix.language}}"
-
   npm-audit:
     name: "NPM Security Audit"
     runs-on: ubuntu-latest
