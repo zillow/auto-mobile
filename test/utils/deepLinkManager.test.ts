@@ -2,12 +2,13 @@ import { expect } from "chai";
 import { DeepLinkManager } from "../../src/utils/deepLinkManager";
 import { AdbUtils } from "../../src/utils/android-cmdline-tools/adb";
 import { ElementUtils } from "../../src/features/utility/ElementUtils";
-import { ExecResult, ViewHierarchyResult } from "../../src/models";
+import { ExecResult, ViewHierarchyResult, BootedDevice } from "../../src/models";
 
 describe("DeepLinkManager", () => {
   let deepLinkManager: DeepLinkManager;
   let mockAdbUtils: AdbUtils;
   let mockElementUtils: ElementUtils;
+  let testDevice: BootedDevice;
 
   // Mock ADB execute function
   const mockExecuteCommand = async (command: string): Promise<ExecResult> => {
@@ -44,7 +45,7 @@ describe("DeepLinkManager", () => {
   install permissions:
     android.permission.INTERNET: granted=true
     android.permission.ACCESS_NETWORK_STATE: granted=true
-  User 0: ceDataInode=123456 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+  User 0: ceDataInode=123456 installed=true hidden=false suspended=false stopped=false notLaunched=false enabled=0 instant=false virtual=false
 
   Schemes:
       https:
@@ -98,11 +99,18 @@ Receiver Resolver Table:
   };
 
   beforeEach(() => {
-    // Create mock ADB utils
-    mockAdbUtils = new AdbUtils("test-device", mockExecuteCommand);
+    // Create a proper BootedDevice object
+    testDevice = {
+      name: "test-device",
+      platform: "android",
+      deviceId: "test-device-id"
+    };
 
-    // Create deep link manager with mock
-    deepLinkManager = new DeepLinkManager("test-device");
+    // Create mock ADB utils with proper parameters
+    mockAdbUtils = new AdbUtils(testDevice, mockExecuteCommand);
+
+    // Create deep link manager with mock device
+    deepLinkManager = new DeepLinkManager(testDevice);
     (deepLinkManager as any).adbUtils = mockAdbUtils;
 
     // Create mock element utils
@@ -112,7 +120,7 @@ Receiver Resolver Table:
 
   describe("constructor", () => {
     it("should create DeepLinkManager with device ID", () => {
-      const manager = new DeepLinkManager("test-device");
+      const manager = new DeepLinkManager(testDevice);
       expect(manager).to.be.instanceOf(DeepLinkManager);
     });
 
@@ -124,7 +132,12 @@ Receiver Resolver Table:
 
   describe("setDeviceId", () => {
     it("should set device ID", () => {
-      deepLinkManager.setDeviceId("new-device");
+      const newDevice: BootedDevice = {
+        name: "new-device",
+        platform: "android",
+        deviceId: "new-device-id"
+      };
+      deepLinkManager.setDeviceId(newDevice);
       // Verify the device ID was set (we can't directly access it, but the test passes if no error)
       expect(true).to.be.true;
     });
@@ -149,7 +162,7 @@ Receiver Resolver Table:
         throw new Error("ADB command failed");
       };
 
-      const failingAdb = new AdbUtils("test-device", failingMock);
+      const failingAdb = new AdbUtils(testDevice, failingMock);
       (deepLinkManager as any).adbUtils = failingAdb;
 
       const result = await deepLinkManager.getDeepLinks("com.example.app");
@@ -485,7 +498,7 @@ Receiver Resolver Table:
         return mockExecuteCommand(command);
       };
 
-      const failingAdb = new AdbUtils("test-device", failingMock);
+      const failingAdb = new AdbUtils(testDevice, failingMock);
       (deepLinkManager as any).adbUtils = failingAdb;
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "always");
