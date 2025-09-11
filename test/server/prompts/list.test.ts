@@ -55,7 +55,7 @@ describe("MCP Prompts List", () => {
     // Since the current server doesn't have prompt registration functionality,
     // we'll mock the server's response handler to return a test prompt
 
-    const server = createMcpServer();
+    const { server, client } = fixture.getContext();
 
     // Override the prompts list handler to return a test prompt
     const testPrompt = {
@@ -75,18 +75,13 @@ describe("MCP Prompts List", () => {
       ]
     };
 
-    // Mock the handler to return our test prompt
+    // Mock the handler to return our test prompt on the existing server
     server.server.setRequestHandler(
       require("@modelcontextprotocol/sdk/types.js").ListPromptsRequestSchema,
       async () => ({
         prompts: [testPrompt]
       })
     );
-
-    const { serverTransport, client } = fixture.getContext();
-
-    // Connect our mocked server to the same transport
-    await server.connect(serverTransport);
 
     // Send prompts/list request
     const { z } = await import("zod");

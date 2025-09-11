@@ -55,7 +55,7 @@ describe("MCP Resources List", () => {
     // Since the current server doesn't have resource registration functionality,
     // we'll mock the server's response handler to return a test resource
 
-    const server = createMcpServer();
+    const { server, client } = fixture.getContext();
 
     // Override the resources list handler to return a test resource
     const testResource = {
@@ -65,18 +65,13 @@ describe("MCP Resources List", () => {
       mimeType: "text/plain"
     };
 
-    // Mock the handler to return our test resource
+    // Mock the handler to return our test resource on the existing server
     server.server.setRequestHandler(
       ListResourcesRequestSchema,
       async () => ({
         resources: [testResource]
       })
     );
-
-    const { serverTransport, client } = fixture.getContext();
-
-    // Connect our mocked server to the same transport
-    await server.connect(serverTransport);
 
     // Send resources/list request
     const { z } = await import("zod");

@@ -55,7 +55,7 @@ describe("MCP Templates List", () => {
     // Since the current server doesn't have template registration functionality,
     // we'll mock the server's response handler to return a test template
 
-    const server = createMcpServer();
+    const { server, client } = fixture.getContext();
 
     // Override the resource templates list handler to return a test template
     const testTemplate = {
@@ -65,18 +65,13 @@ describe("MCP Templates List", () => {
       mimeType: "text/plain"
     };
 
-    // Mock the handler to return our test template
+    // Mock the handler to return our test template on the existing server
     server.server.setRequestHandler(
       ListResourceTemplatesRequestSchema,
       async () => ({
         resourceTemplates: [testTemplate]
       })
     );
-
-    const { serverTransport, client } = fixture.getContext();
-
-    // Connect our mocked server to the same transport
-    await server.connect(serverTransport);
 
     // Send resources/templates/list request
     const { z } = await import("zod");
