@@ -1,6 +1,5 @@
 import { describe, it, beforeEach, afterEach } from "mocha";
 import { expect } from "chai";
-import { createMcpServer } from "../../../src/server/index";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 
 describe("MCP Prompts List", () => {
