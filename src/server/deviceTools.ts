@@ -3,6 +3,15 @@ import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { DeviceUtils } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
+import {
+  listSystemImages,
+  installSystemImage,
+  createAvd,
+  COMMON_SYSTEM_IMAGES,
+  COMMON_DEVICES,
+  CreateAvdParams
+} from "../utils/android-cmdline-tools/avdmanager";
+import { logger } from "../utils/logger";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
@@ -14,13 +23,11 @@ export const listDevicesSchema = z.object({
 });
 
 export const startDeviceSchema = z.object({
-  device: z.object({
+  localDevice: z.object({
     name: z.string().describe("The device name to start"),
-    deviceId: z.string().optional().describe("The device ID"),
-    source: z.string().describe("The source of the device (e.g., 'local', 'remote', etc.')"),
-    platform: z.enum(["android", "ios"]).describe("Target platform")
+    deviceId: z.string().optional().describe("The device ID")
   }),
-  timeoutMs: z.number().optional().default(120000).describe("Maximum time to wait for device to be ready in milliseconds"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
 });
 
 export const killDeviceSchema = z.object({
@@ -110,12 +117,23 @@ export function registerDeviceTools() {
       const deviceUtils = new DeviceUtils();
       const childProcess = await deviceUtils.startDevice(args.device);
 
+      if (progress) {
+        await progress(60, 100, "Device started, waiting for readiness...");
+      }
+
+      // Wait for device to be ready
+      const readyDevice = await deviceUtils.waitForDeviceReady(args.device, args.timeoutMs);
+
+      if (progress) {
+        await progress(100, 100, "Device is ready for use");
+      }
+
       return createJSONToolResponse({
         message: `${args.device.platform} '${args.device.name}' started and is ready`,
-        name: args.device.name,
+        name: readyDevice.name,
         processId: childProcess.pid,
         isReady: true,
-        deviceId: args.device.deviceId,
+        deviceId: readyDevice.deviceId,
         source: args.device.source,
         platform: args.device.platform
       });
@@ -168,4 +186,124 @@ export function registerDeviceTools() {
     killDeviceSchema,
     killDeviceHandler
   );
+}
+
+/**
+ * Create an AVD with automatic system image downloading
+ */
+async function createAvdWithSystemImageDownload(
+  avdName: string,
+  progress?: ProgressCallback
+): Promise<{ success: boolean; message: string }> {
+  try {
+    if (progress) {
+      await progress(20, 100, "Checking available system images...");
+    }
+
+    // List available system images
+    const availableImages = await listSystemImages();
+    logger.info(`Found ${availableImages.length} available system images`);
+
+    // Try to find a suitable system image (prefer latest API with Google APIs)
+    const preferredImages = [
+      COMMON_SYSTEM_IMAGES.API_35.GOOGLE_APIS_ARM64, // For Apple Silicon Macs
+      COMMON_SYSTEM_IMAGES.API_35.GOOGLE_APIS_X86_64, // For Intel Macs
+      COMMON_SYSTEM_IMAGES.API_34.GOOGLE_APIS_ARM64,
+      COMMON_SYSTEM_IMAGES.API_34.GOOGLE_APIS_X86_64,
+    ];
+
+    let selectedImage: string | null = null;
+    let isImageAvailable = false;
+
+    // Check if any preferred image is already available
+    for (const imagePackage of preferredImages) {
+      const isAvailable = availableImages.some(img => img.packageName === imagePackage);
+      if (isAvailable) {
+        selectedImage = imagePackage;
+        isImageAvailable = true;
+        logger.info(`Found available system image: ${imagePackage}`);
+        break;
+      }
+    }
+
+    // If no preferred image is available, download the first one
+    if (!isImageAvailable && selectedImage === null) {
+      selectedImage = preferredImages[0]; // Default to ARM64 API 35
+
+      if (progress) {
+        await progress(30, 100, `Downloading system image: ${selectedImage}...`);
+      }
+
+      logger.info(`Downloading system image: ${selectedImage}`);
+      const downloadResult = await installSystemImage(selectedImage, true);
+
+      if (!downloadResult.success) {
+        // Try the next preferred image
+        selectedImage = preferredImages[1]; // Try x86_64
+
+        if (progress) {
+          await progress(35, 100, `Downloading alternative system image: ${selectedImage}...`);
+        }
+
+        logger.info(`First download failed, trying alternative: ${selectedImage}`);
+        const altDownloadResult = await installSystemImage(selectedImage, true);
+
+        if (!altDownloadResult.success) {
+          return {
+            success: false,
+            message: `Failed to download any suitable system image. Last error: ${altDownloadResult.message}`
+          };
+        }
+      }
+
+      if (progress) {
+        await progress(70, 100, "System image downloaded successfully");
+      }
+    }
+
+    if (!selectedImage) {
+      return {
+        success: false,
+        message: "No suitable system image found or could be downloaded"
+      };
+    }
+
+    if (progress) {
+      await progress(80, 100, `Creating AVD '${avdName}' with system image...`);
+    }
+
+    // Create the AVD with the selected system image
+    const createParams: CreateAvdParams = {
+      name: avdName,
+      package: selectedImage,
+      device: COMMON_DEVICES.PIXEL_7, // Use a modern device profile
+      force: true // Overwrite if exists
+    };
+
+    const createResult = await createAvd(createParams);
+
+    if (progress) {
+      await progress(95, 100, "AVD creation completed");
+    }
+
+    if (createResult.success) {
+      logger.info(`Successfully created AVD '${avdName}' with system image '${selectedImage}'`);
+      return {
+        success: true,
+        message: `AVD '${avdName}' created with system image '${selectedImage}'`
+      };
+    } else {
+      return {
+        success: false,
+        message: `Failed to create AVD: ${createResult.message}`
+      };
+    }
+
+  } catch (error) {
+    logger.error(`Failed to create AVD with system image download: ${error}`);
+    return {
+      success: false,
+      message: `Failed to create AVD with system image download: ${error}`
+    };
+  }
 }

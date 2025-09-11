@@ -2,6 +2,7 @@ import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
 import { BootedDevice, ExecResult } from "../../models";
+import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
@@ -24,6 +25,7 @@ export class AdbUtils {
   device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
   spawnFn: typeof spawn;
+  private adbPath: string;
 
   // Static cache for device list
   private static deviceListCache: { devices: BootedDevice[], timestamp: number } | null = null;
@@ -44,6 +46,70 @@ export class AdbUtils {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
+    // Initialize with fallback, will be updated lazily
+    this.adbPath = this.getFallbackAdbPath();
+  }
+
+  /**
+   * Get fallback ADB path using environment variables and PATH
+   */
+  private getFallbackAdbPath(): string {
+    // Try environment variables
+    const androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || process.env.ANDROID_SDK_HOME;
+    if (androidHome) {
+      return `${androidHome}/platform-tools/adb`;
+    }
+
+    // Final fallback to PATH
+    return "adb";
+  }
+
+  /**
+   * Get the ADB path asynchronously via detection
+   */
+  private async getAdbPath(): Promise<string> {
+    // Try to find via Android command line tools detection
+    try {
+      const locations = await detectAndroidCommandLineTools();
+      const bestLocation = getBestAndroidToolsLocation(locations);
+
+      if (bestLocation) {
+        // For Homebrew installations, the platform-tools are in the SDK root directory
+        if (bestLocation.source === "homebrew") {
+          // /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest -> /opt/homebrew/share/android-commandlinetools
+          const sdkRoot = bestLocation.path.replace("/cmdline-tools/latest", "");
+          return `${sdkRoot}/platform-tools/adb`;
+        }
+
+        // For standard installations, look in the parent SDK directory
+        const sdkRoot = bestLocation.path.replace("/cmdline-tools/latest", "");
+        return `${sdkRoot}/platform-tools/adb`;
+      }
+    } catch (error) {
+      logger.debug(`Failed to detect ADB path via Android tools detection: ${error}`);
+    }
+
+    return this.getFallbackAdbPath();
+  }
+
+  /**
+   * Ensure ADB path is properly detected and cached
+   */
+  private async ensureAdbPath(): Promise<string> {
+    // Update cached path if needed
+    const detectedPath = await this.getAdbPath();
+    this.adbPath = detectedPath;
+    return this.adbPath;
+  }
+
+  /**
+   * Get the base ADB command with optional device ID
+   * @returns The base ADB command
+   */
+  async getBaseCommand(): Promise<string> {
+    const deviceId = this.device?.deviceId;
+    const adbPath = await this.ensureAdbPath();
+    return deviceId ? `${adbPath} -s ${deviceId}` : adbPath;
   }
 
   /**
@@ -52,15 +118,6 @@ export class AdbUtils {
    */
   setDevice(device: BootedDevice): void {
     this.device = device;
-  }
-
-  /**
-   * Get the base ADB command with optional device ID
-   * @returns The base ADB command
-   */
-  getBaseCommand(): string {
-    const deviceId = this.device?.deviceId;
-    return deviceId ? `$ANDROID_HOME/platform-tools/adb -s ${deviceId}` : "$ANDROID_HOME/platform-tools/adb";
   }
 
   /**
@@ -93,7 +150,8 @@ export class AdbUtils {
    * @returns Promise with command output
    */
   private async executeCommandImpl(command: string, timeoutMs?: number, maxBuffer?: number, attempt: number = 0): Promise<ExecResult> {
-    const fullCommand = `${this.getBaseCommand()} ${command}`;
+    const baseCommand = await this.getBaseCommand();
+    const fullCommand = `${baseCommand} ${command}`;
     const startTime = Date.now();
 
     logger.info(`[ADB] Executing command: ${fullCommand}`);
@@ -156,7 +214,8 @@ export class AdbUtils {
 
     logger.info("Getting list of connected devices");
     // Use raw ADB command without device ID since we're listing devices
-    const result = await this.execAsync("$ANDROID_HOME/platform-tools/adb devices");
+    const baseCommand = await this.getBaseCommand();
+    const result = await this.execAsync(`${baseCommand} devices`);
     const lines = result.stdout.split("\n").slice(1); // Skip the first line which is the header
 
     const devices = lines

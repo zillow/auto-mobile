@@ -141,6 +141,7 @@ export function getHomebrewAndroidToolsPath(dependencies = createDefaultDependen
     return null;
   }
 
+  // Actual Homebrew structure is /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest
   const homebrewPath = "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest";
   return dependencies.existsSync(homebrewPath) ? homebrewPath : null;
 }

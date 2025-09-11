@@ -4,6 +4,7 @@ import { logger } from "../logger";
 import { BootedDevice, DeviceInfo, ExecResult, ActionableError } from "../../models";
 import { AdbUtils } from "./adb";
 import { arch } from "os";
+import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
 
 const execAsync = async (command: string): Promise<ExecResult> => {
   const result = await promisify(exec)(command);
@@ -43,19 +44,61 @@ export class AndroidEmulator {
   ) {
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
-    this.emulatorPath = this.getEmulatorPath();
+    // Only set a fallback emulator path here; proper detection happens lazily
+    this.emulatorPath = this.getFallbackEmulatorPath();
   }
 
   /**
-   * Get the path to the emulator executable
+   * Get the path to the emulator executable.
+   * This function tries the best available path synchronously, falling back to env/PATH.
+   * Actual async detection is performed when needed by ensureEmulatorPath().
    * @returns The path to the emulator
    */
-  private getEmulatorPath(): string {
+  private getFallbackEmulatorPath(): string {
     const androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || process.env.ANDROID_SDK_HOME;
     if (androidHome) {
       return `${androidHome}/emulator/emulator`;
     }
-    return "emulator"; // Fallback to PATH
+    return "emulator";
+  }
+
+  /**
+   * Gets the emulator path asynchronously via detection.
+   * @returns Promise<string>
+   */
+  private async getEmulatorPath(): Promise<string> {
+    // Try to find via Android command line tools detection
+    try {
+      const locations = await detectAndroidCommandLineTools();
+      const bestLocation = getBestAndroidToolsLocation(locations);
+
+      if (bestLocation) {
+        // For Homebrew installations, the emulator is in the SDK root directory
+        if (bestLocation.source === "homebrew") {
+          // /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest -> /opt/homebrew/share/android-commandlinetools
+          const sdkRoot = bestLocation.path.replace("/cmdline-tools/latest", "");
+          return `${sdkRoot}/emulator/emulator`;
+        }
+        // For standard installations, look in the parent SDK directory
+        const sdkRoot = bestLocation.path.replace("/cmdline-tools/latest", "");
+        return `${sdkRoot}/emulator/emulator`;
+      }
+    } catch (error) {
+      logger.debug(`Failed to detect emulator path via Android tools detection: ${error}`);
+    }
+
+    // Fall back to default
+    return this.getFallbackEmulatorPath();
+  }
+
+  /**
+   * Ensure emulator path is properly detected and cached
+   */
+  private async ensureEmulatorPath(): Promise<string> {
+    // Update cached path if needed
+    const detectedPath = await this.getEmulatorPath();
+    this.emulatorPath = detectedPath;
+    return this.emulatorPath;
   }
 
   /**
@@ -171,6 +214,7 @@ export class AndroidEmulator {
    * @returns Promise with stdout and stderr
    */
   async executeCommand(command: string, timeoutMs?: number): Promise<ExecResult> {
+    await this.ensureEmulatorPath();
     const fullCommand = `${this.emulatorPath} ${command}`;
     logger.debug(`Executing emulator command: ${fullCommand}`);
 
@@ -448,8 +492,8 @@ export class AndroidEmulator {
   async waitForEmulatorReady(avdName: string, timeoutMs: number = 120000): Promise<BootedDevice> {
     const startTime = Date.now();
 
-    // Read polling interval from environment variable (default: 0 = continuous polling)
-    const pollingIntervalMs = parseInt(process.env.EMULATOR_POLLING_INTERVAL_MS || "0", 10);
+    // Read polling interval from environment variable (default: 500ms, minimum: 100ms)
+    const pollingIntervalMs = Math.max(parseInt(process.env.EMULATOR_POLLING_INTERVAL_MS || "500", 10), 100);
     logger.info(`Waiting for emulator '${avdName}' to be ready... (polling interval: ${pollingIntervalMs}ms)`);
 
     // Start background polling immediately with configurable intervals
@@ -529,14 +573,9 @@ export class AndroidEmulator {
           logger.info(`Background polling error (will continue): ${error}`);
         }
 
-        // Configurable polling interval - 0 means continuous (no delay)
-        if (pollingIntervalMs > 0) {
-          logger.info(`Background polling cycle complete - sleeping ${pollingIntervalMs}ms before next check`);
-          await this.sleep(pollingIntervalMs);
-        } else {
-          // Continuous polling - just yield to the event loop briefly to prevent blocking
-          await new Promise(resolve => setImmediate(resolve));
-        }
+        // Always wait at least the minimum polling interval
+        logger.info(`Background polling cycle complete - sleeping ${pollingIntervalMs}ms before next check`);
+        await this.sleep(pollingIntervalMs);
       }
       logger.info(`Background polling stopped - pollingActive: ${pollingActive}, foundDeviceId: ${foundDeviceId}`);
     };

@@ -311,13 +311,30 @@ export async function installViaSdkManager(location: AndroidToolsLocation, tools
     // Install additional packages if needed
     const packagesToInstall = [
       "platform-tools",
-      "build-tools;34.0.0",
-      "platforms;android-34"
+      "emulator",
+      // Android SDK Platforms (current and recent versions)
+      "platforms;android-36",
+      "sources;android-36",
+      "platforms;android-35",
+      "sources;android-35",
+      // Build Tools (current and recent versions)
+      "build-tools;36.0.0",
+      "build-tools;35.0.0",
+      // System Images for common emulator configurations
+      "system-images;android-36;google_apis;arm64-v8a",
+      "system-images;android-36;google_apis;x86_64",
+      "system-images;android-35;google_apis;arm64-v8a",
+      "system-images;android-35;google_apis;x86_64",
     ];
 
     for (const pkg of packagesToInstall) {
       logger.info(`Installing package: ${pkg}`);
-      await spawnCommand(command, [pkg]);
+      try {
+        await spawnCommand(command, [pkg], { input: "y\n".repeat(5) });
+      } catch (error) {
+        logger.warn(`Failed to install ${pkg}: ${error}`);
+        // Continue with other packages even if one fails
+      }
     }
 
     return { success: true, message: "Successfully updated Android SDK tools" };
@@ -330,7 +347,301 @@ export async function installViaSdkManager(location: AndroidToolsLocation, tools
 }
 
 /**
- * Android command line tools download information
+ * Check if Java is installed and get version
+ */
+export async function checkJavaInstallation(): Promise<{
+  installed: boolean;
+  version?: string;
+  javaHome?: string;
+}> {
+  try {
+    const result = await execAsync("java -version");
+    const versionMatch = result.stderr.match(/version "([^"]+)"/);
+    const version = versionMatch ? versionMatch[1] : "unknown";
+
+    const javaHome = process.env.JAVA_HOME;
+
+    return {
+      installed: true,
+      version,
+      javaHome
+    };
+  } catch {
+    return { installed: false };
+  }
+}
+
+/**
+ * Install Java via Homebrew (macOS only) - only if no Java is available
+ */
+export async function installJavaViaHomebrew(version: string = "21"): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  if (platform() !== "darwin") {
+    return { success: false, message: "Java installation via Homebrew only supported on macOS" };
+  }
+
+  try {
+    const homebrewAvailable = await isHomebrewAvailable();
+    if (!homebrewAvailable) {
+      return { success: false, message: "Homebrew not available" };
+    }
+
+    // Check if Java is already available
+    const javaCheck = await checkJavaInstallation();
+    if (javaCheck.installed) {
+      return { success: true, message: `Java ${javaCheck.version} already available` };
+    }
+
+    logger.info(`Installing Java ${version} via Homebrew...`);
+    await spawnCommand("brew", ["install", `openjdk@${version}`]);
+
+    // Create system symlink
+    logger.info("Creating system symlink for Java...");
+    const symlinkCommand = `sudo ln -sfn "/opt/homebrew/opt/openjdk@${version}/libexec/openjdk.jdk" "/Library/Java/JavaVirtualMachines/openjdk-${version}.jdk"`;
+    await execAsync(symlinkCommand);
+
+    return { success: true, message: `Successfully installed Java ${version}` };
+  } catch (error) {
+    const errorMessage = `Failed to install Java: ${(error as Error).message}`;
+    logger.error(errorMessage);
+    return { success: false, message: errorMessage };
+  }
+}
+
+/**
+ * Setup environment variables for Android development
+ */
+export async function setupAndroidEnvironmentVariables(androidHome?: string): Promise<{
+  success: boolean;
+  message: string;
+  variables: Record<string, string>;
+}> {
+  const variables: Record<string, string> = {};
+
+  try {
+    // Determine ANDROID_HOME - should point to SDK root, not command line tools
+    let finalAndroidHome: string;
+    if (androidHome) {
+      // If androidHome is the command line tools path, get the SDK root
+      if (androidHome.includes("cmdline-tools")) {
+        // For Homebrew: /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest -> /opt/homebrew/share/android-commandlinetools
+        finalAndroidHome = androidHome.replace("/cmdline-tools/latest", "");
+      } else {
+        finalAndroidHome = androidHome;
+      }
+    } else {
+      finalAndroidHome = getDefaultInstallPath();
+    }
+
+    // Set environment variables
+    variables.ANDROID_HOME = finalAndroidHome;
+
+    // Add Android tools to PATH
+    const pathAdditions = [
+      join(finalAndroidHome, "platform-tools"),
+      join(finalAndroidHome, "emulator")
+    ];
+
+    // Add command line tools path based on installation type
+    if (finalAndroidHome.includes("/opt/homebrew/share/android-commandlinetools")) {
+      // Homebrew installation
+      pathAdditions.push(join(finalAndroidHome, "cmdline-tools", "latest", "bin"));
+    } else {
+      // Standard installation
+      pathAdditions.push(
+        join(finalAndroidHome, "cmdline-tools", "latest", "bin"),
+        join(finalAndroidHome, "tools"),
+        join(finalAndroidHome, "tools", "bin")
+      );
+    }
+
+    variables.PATH_ADDITIONS = pathAdditions.join(":");
+
+    // Use existing JAVA_HOME if set, otherwise try to find Java
+    if (process.env.JAVA_HOME) {
+      variables.JAVA_HOME = process.env.JAVA_HOME;
+    } else {
+      try {
+        const javaHomeResult = await execAsync("/usr/libexec/java_home");
+        variables.JAVA_HOME = javaHomeResult.stdout.trim();
+      } catch {
+        // Fallback to brew java if available
+        if (platform() === "darwin") {
+          variables.JAVA_HOME = "/opt/homebrew/opt/openjdk@21";
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: "Environment variables configured",
+      variables
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Failed to setup environment variables: ${error}`,
+      variables
+    };
+  }
+}
+
+/**
+ * Install Xcode Command Line Tools (macOS only)
+ */
+export async function installXcodeCommandLineTools(): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  if (platform() !== "darwin") {
+    return { success: false, message: "Xcode Command Line Tools only available on macOS" };
+  }
+
+  try {
+    logger.info("Installing Xcode Command Line Tools...");
+    await execAsync("xcode-select --install");
+    return { success: true, message: "Xcode Command Line Tools installation initiated" };
+  } catch (error) {
+    // xcode-select --install returns non-zero if tools are already installed
+    if ((error as Error).message.includes("already installed")) {
+      return { success: true, message: "Xcode Command Line Tools already installed" };
+    }
+    return { success: false, message: `Failed to install Xcode Command Line Tools: ${error}` };
+  }
+}
+
+/**
+ * Comprehensive Android development environment setup
+ */
+export async function setupCompleteAndroidEnvironment(params: CompleteSetupParams = {}): Promise<CompleteSetupResult> {
+  const {
+    installJava = true,
+    installXcodeTools = platform() === "darwin",
+    javaVersion = "21",
+    force = false
+  } = params;
+
+  const results: CompleteSetupResult = {
+    success: true,
+    steps: [],
+    environmentVariables: {},
+    recommendations: []
+  };
+
+  try {
+    // Step 1: Install/Update Homebrew (macOS only)
+    if (platform() === "darwin") {
+      logger.info("Checking Homebrew installation...");
+      const homebrewAvailable = await isHomebrewAvailable();
+      if (!homebrewAvailable) {
+        results.steps.push({
+          name: "Install Homebrew",
+          success: false,
+          message: "Homebrew not available - please install manually: /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        });
+        results.recommendations.push("Install Homebrew first for easier dependency management");
+      } else {
+        results.steps.push({
+          name: "Homebrew Check",
+          success: true,
+          message: "Homebrew is available"
+        });
+      }
+    }
+
+    // Step 2: Install Xcode Command Line Tools (macOS only)
+    if (installXcodeTools && platform() === "darwin") {
+      const xcodeResult = await installXcodeCommandLineTools();
+      results.steps.push({
+        name: "Xcode Command Line Tools",
+        success: xcodeResult.success,
+        message: xcodeResult.message
+      });
+    }
+
+    // Step 3: Install Java if requested
+    if (installJava) {
+      const javaCheck = await checkJavaInstallation();
+      if (!javaCheck.installed || force) {
+        if (platform() === "darwin") {
+          const javaResult = await installJavaViaHomebrew(javaVersion);
+          results.steps.push({
+            name: "Java Installation",
+            success: javaResult.success,
+            message: javaResult.message
+          });
+        } else {
+          results.steps.push({
+            name: "Java Installation",
+            success: false,
+            message: "Java installation only automated on macOS. Please install manually."
+          });
+          results.recommendations.push("Install Java manually for Android development");
+        }
+      } else {
+        results.steps.push({
+          name: "Java Check",
+          success: true,
+          message: `Java ${javaCheck.version} already installed`
+        });
+      }
+    }
+
+    // Step 4: Install Android SDK Tools
+    const androidToolsResult = await installAndroidTools({
+      method: "auto",
+      force
+    });
+    results.steps.push({
+      name: "Android SDK Tools",
+      success: androidToolsResult.success,
+      message: androidToolsResult.message
+    });
+
+    // Step 5: Setup Environment Variables
+    const envResult = await setupAndroidEnvironmentVariables(androidToolsResult.installation_path);
+    results.steps.push({
+      name: "Environment Variables",
+      success: envResult.success,
+      message: envResult.message
+    });
+    results.environmentVariables = envResult.variables;
+
+    // Overall success determination
+    results.success = results.steps.every(step => step.success);
+
+    // Add recommendations based on results
+    if (results.success) {
+      results.recommendations.push("Complete Android development environment is ready!");
+      results.recommendations.push("Add the following to your shell profile (.zshrc/.bashrc):");
+      Object.entries(results.environmentVariables).forEach(([key, value]) => {
+        if (key === "PATH_ADDITIONS") {
+          results.recommendations.push(`export PATH="${value}:$PATH"`);
+        } else {
+          results.recommendations.push(`export ${key}="${value}"`);
+        }
+      });
+    } else {
+      results.recommendations.push("Some steps failed. Check individual step messages for details.");
+    }
+
+    return results;
+
+  } catch (error) {
+    results.success = false;
+    results.steps.push({
+      name: "Complete Setup",
+      success: false,
+      message: `Setup failed: ${error}`
+    });
+    return results;
+  }
+}
+
+/**
+ * Android command line tools download information - Updated to latest version
  */
 export const CMDLINE_TOOLS_DOWNLOAD = {
   version: "13114758",
@@ -352,7 +663,36 @@ export const CMDLINE_TOOLS_DOWNLOAD = {
 };
 
 /**
- * Default high-priority tools for AutoMobile MCP
+ * Comprehensive Android SDK packages for complete development environment
+ */
+export const COMPREHENSIVE_ANDROID_PACKAGES = [
+  // Essential tools
+  "platform-tools",
+  "emulator",
+
+  // Current and recent Android SDK platforms with sources
+  "platforms;android-36",
+  "sources;android-36",
+  "platforms;android-35",
+  "sources;android-35",
+
+  // Build tools (current and recent versions)
+  "build-tools;36.0.0",
+  "build-tools;35.0.0",
+
+  // System images for emulators (ARM64 and x86_64 for both Intel and Apple Silicon Macs)
+  "system-images;android-36;google_apis;arm64-v8a",
+  "system-images;android-36;google_apis;x86_64",
+  "system-images;android-35;google_apis;arm64-v8a",
+  "system-images;android-35;google_apis;x86_64",
+
+  // Google Play system images for testing
+  "system-images;android-36;google_apis_playstore;arm64-v8a",
+  "system-images;android-36;google_apis_playstore;x86_64"
+];
+
+/**
+ * Default high-priority tools for AutoMobile MCP - Enhanced
  */
 export const DEFAULT_REQUIRED_TOOLS = [
   "apkanalyzer",
@@ -439,6 +779,10 @@ export async function installAndroidTools(params: InstallAndroidToolsParams = {}
     switch (installMethod) {
       case "homebrew":
         installResult = await installViaHomebrew();
+        // Homebrew installs Android command line tools here:
+        // /opt/homebrew/share/android-commandlinetools/cmdline-tools/<version>
+        // and symlinks "latest" directory there for latest version.
+        // Source: brew info android-commandlinetools and brew's cask definition
         finalPath = "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest";
         installationSource = "homebrew";
         break;
@@ -586,4 +930,25 @@ export interface InstallationResult {
   installation_method: AndroidToolsSource;
   message: string;
   existing_location?: AndroidToolsLocation;
+}
+
+// New interfaces for complete setup
+export interface CompleteSetupParams {
+  installJava?: boolean;
+  installXcodeTools?: boolean;
+  javaVersion?: string;
+  force?: boolean;
+}
+
+export interface SetupStep {
+  name: string;
+  success: boolean;
+  message: string;
+}
+
+export interface CompleteSetupResult {
+  success: boolean;
+  steps: SetupStep[];
+  environmentVariables: Record<string, string>;
+  recommendations: string[];
 }
