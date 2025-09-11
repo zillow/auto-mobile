@@ -63,7 +63,7 @@
     "pngjs": "^7.0.0",
     "sharp": "^0.34.3",
     "xml2js": "^0.6.2",
-    "zod": "^3.25.76",
+    "zod": "^4.1.8",
     "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
