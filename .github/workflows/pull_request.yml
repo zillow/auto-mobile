@@ -6,6 +6,7 @@ on:
       - "**"
 
 permissions:
+  actions: read
   checks: write
   security-events: write
   pull-requests: write
@@ -50,6 +51,59 @@ jobs:
         shell: "bash"
         run: |
           scripts/shellcheck/validate_shell_scripts.sh
+
+  codeql-node:
+    name: "CodeQL Analysis - Node.js/TypeScript"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'typescript' ]
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Initialize CodeQL"
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Build TypeScript"
+        run: npm run build
+
+      - name: "Perform CodeQL Analysis"
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  npm-audit:
+    name: "NPM Security Audit"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Run NPM Audit"
+        run: |
+          npm audit --audit-level=moderate --json > npm-audit-results.json || true
+        continue-on-error: true
+
+      - name: "Upload NPM Audit Results"
+        uses: actions/upload-artifact@v4.4.0
+        if: always()
+        with:
+          name: npm-audit-results
+          path: npm-audit-results.json
 
   mcp-build-and-test:
     name: "Node TypeScript Build and Test"
