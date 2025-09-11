@@ -161,7 +161,7 @@ describe("GetSystemInsets", function() {
       };
 
       // Stub the AdbUtils constructor to prevent real async operations
-      adbStub = sinon.stub(AdbUtils.prototype as any, 'constructor').returns(undefined);
+      adbStub = sinon.stub(AdbUtils.prototype as any, "constructor").returns(undefined);
 
       // Create GetSystemInsets with mocked dependencies
       getSystemInsets = new GetSystemInsets(testDevice);
