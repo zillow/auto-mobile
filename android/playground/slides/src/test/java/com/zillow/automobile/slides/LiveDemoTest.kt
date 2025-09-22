@@ -8,7 +8,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AutoMobileRunner::class)
-class DroidconLiveDemoTest {
+class LiveDemoTest {
 
   @Test
   fun `Given we have a Clock app we should be able to set an alarm`() {
