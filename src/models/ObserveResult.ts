@@ -26,9 +26,6 @@ export interface ObserveResult {
   /** View hierarchy data */
   viewHierarchy?: ViewHierarchyResult;
 
-  /** Path to screenshot file if taken */
-  screenshotPath?: string;
-
   /** Active window information */
   activeWindow?: ActiveWindowInfo;
 

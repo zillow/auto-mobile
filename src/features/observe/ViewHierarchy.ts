@@ -503,16 +503,15 @@ export class ViewHierarchy {
 
   /**
    * Retrieve the view hierarchy of the current screen
-   * @param screenshotPath - Optional path to an existing screenshot to use for caching
    * @param queryOptions - Optional query options for targeted element retrieval
    * @returns Promise with parsed XML view hierarchy
    */
-  async getViewHierarchy(screenshotPath: string | null = null, queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
+  async getViewHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
     switch (this.device.platform) {
       case "ios":
-        return this.getiOSViewHierarchy(screenshotPath);
+        return this.getiOSViewHierarchy();
       case "android":
-        return this.getAndroidViewHierarchy(screenshotPath, queryOptions);
+        return this.getAndroidViewHierarchy(queryOptions);
       default:
         throw new Error("Unsupported platform");
     }
@@ -520,12 +519,11 @@ export class ViewHierarchy {
 
   /**
    * Retrieve the view hierarchy of the current screen
-   * @param screenshotPath - Optional path to an existing screenshot to use for caching
    * @returns Promise with parsed XML view hierarchy
    */
-  async getiOSViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
+  async getiOSViewHierarchy(): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
-    logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
+    logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy for iOS`);
     const viewHierarchy = await this.webdriver.getViewHierarchy(this.device);
     const duration = Date.now() - startTime;
     logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${duration}ms`);
@@ -534,13 +532,12 @@ export class ViewHierarchy {
 
   /**
    * Retrieve the view hierarchy of the current screen
-   * @param screenshotPath - Optional path to an existing screenshot to use for caching
    * @param queryOptions - Optional query options for targeted element retrieval
    * @returns Promise with parsed XML view hierarchy
    */
-  async getAndroidViewHierarchy(screenshotPath: string | null = null, queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
+  async getAndroidViewHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
-    logger.debug(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
+    logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy`);
 
     // First try accessibility service if available and not skipped
     try {
@@ -555,33 +552,6 @@ export class ViewHierarchy {
     }
 
     try {
-      // Run screenshot capture and fallback activity hash lookup in parallel
-      const parallelOperationsStartTime = Date.now();
-      const screenshotBufferResult = await this.getOrCreateScreenshotBuffer(screenshotPath);
-      const parallelOperationsDuration = Date.now() - parallelOperationsStartTime;
-      logger.debug(`[VIEW_HIERARCHY] Screenshot + activity hash obtained in parallel in ${parallelOperationsDuration}ms`);
-
-      const { buffer: screenshotBuffer } = screenshotBufferResult;
-      logger.debug(`[VIEW_HIERARCHY] Screenshot buffer size: ${screenshotBuffer.length} bytes`);
-
-      // Scan backwards through up to 200 recent screenshots to find one that actually has cached view hierarchy data
-      logger.debug("[VIEW_HIERARCHY] Scanning recent screenshots for fuzzy matches with cached view hierarchy");
-      const fuzzyStartTime = Date.now();
-      const cachedResult = await this.findFuzzyMatchWithCache(screenshotBuffer, 200);
-      const fuzzyDuration = Date.now() - fuzzyStartTime;
-
-      if (cachedResult) {
-        const totalDuration = Date.now() - startTime;
-        logger.debug(`[VIEW_HIERARCHY] *** CACHE HIT: Found cached view hierarchy using fuzzy matching in ${fuzzyDuration}ms, total getViewHierarchy time: ${totalDuration}ms ***`);
-
-        // Try to augment with source indexing if not already present
-        return await this.augmentWithSourceIndexing(cachedResult as ExtendedViewHierarchyResult);
-      }
-
-      logger.debug(`[VIEW_HIERARCHY] No fuzzy match found after ${fuzzyDuration}ms`);
-
-      logger.debug("[VIEW_HIERARCHY] *** CACHE MISS: No cached view hierarchy found, fetching new hierarchy ***");
-
       // Get fresh view hierarchy
       const freshStartTime = Date.now();
       const viewHierarchy = await this._getViewHierarchyWithoutCache();
@@ -601,12 +571,6 @@ export class ViewHierarchy {
       await this.cacheViewHierarchy(timestamp, extendedViewHierarchy);
       const cacheDuration = Date.now() - cacheStartTime;
       logger.debug(`[VIEW_HIERARCHY] Caching completed in ${cacheDuration}ms`);
-
-      // Save the screenshot with the same timestamp for future fuzzy matching
-      const saveScreenshotStartTime = Date.now();
-      await this.saveScreenshotForFuzzyMatching(screenshotBuffer, timestamp.toString());
-      const saveScreenshotDuration = Date.now() - saveScreenshotStartTime;
-      logger.debug(`[VIEW_HIERARCHY] Screenshot save for fuzzy matching took ${saveScreenshotDuration}ms`);
 
       const totalDuration = Date.now() - startTime;
       logger.debug(`[VIEW_HIERARCHY] *** FRESH HIERARCHY: getViewHierarchy completed in ${totalDuration}ms (fresh hierarchy) ***`);
