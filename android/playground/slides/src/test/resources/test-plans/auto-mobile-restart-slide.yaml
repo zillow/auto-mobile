@@ -5,7 +5,7 @@ parameters:
   slide: ${slide}
 
 steps:
-  - tool: stopApp
+  - tool: terminateApp
     appId: com.zillow.automobile.playground
     label: Stop the AutoMobile playground app
 

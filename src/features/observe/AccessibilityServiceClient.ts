@@ -72,27 +72,55 @@ export class AccessibilityServiceClient {
 
       // Prepare broadcast command with query parameters
       const broadcastCommand = this.buildBroadcastCommand(queryId, queryOptions);
-
-      // Send broadcast to accessibility service
-      logger.debug(`[ACCESSIBILITY_SERVICE] Executing broadcast command: ${broadcastCommand}`);
-      await this.adb.executeCommand(broadcastCommand);
-
-      // Wait for the service to process and generate the response
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Read the generated hierarchy file with UUID
       const hierarchyFileName = `hierarchy_${queryId}.json`;
-      const result = await this.adb.executeCommand(
-        `shell run-as ${AccessibilityServiceClient.PACKAGE_NAME} cat files/${hierarchyFileName}`
-      );
 
-      if (!result.stdout || result.stdout.trim() === "") {
+      // Run broadcast and polling in parallel
+      const broadcastPromise = this.adb.executeCommand(broadcastCommand);
+
+      // Start polling after 100ms delay to give the service time to write the file
+      const pollingPromise = (async () => {
+        // Initial delay to let the service process the broadcast
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const maxDelay = 500;
+        let delay = 50; // Start with 50ms since we already waited 100ms
+        let result;
+
+        while (delay <= maxDelay) {
+          try {
+            result = await this.adb.executeCommand(
+              `shell run-as ${AccessibilityServiceClient.PACKAGE_NAME} cat files/${hierarchyFileName}`
+            );
+
+            if (result.stdout && result.stdout.trim() !== "") {
+              return result;
+            }
+          } catch (err) {
+            // Ignore errors and continue polling
+            logger.debug(`[ACCESSIBILITY_SERVICE] Error while reading hierarchy file (retrying in ${delay}ms): ${err}`);
+          }
+
+          // Wait for the current delay period
+          await new Promise(resolve => setTimeout(resolve, delay));
+
+          // Double the delay for the next iteration (exponential backoff)
+          delay *= 2;
+        }
+
+        return null;
+      })();
+
+      // Wait for both broadcast and polling to complete
+      const [, pollingResult] = await Promise.all([broadcastPromise, pollingPromise]);
+
+      // If result is still not available after maximum retries
+      if (!pollingResult || !pollingResult.stdout || pollingResult.stdout.trim() === "") {
         logger.warn(`[ACCESSIBILITY_SERVICE] No hierarchy data received for query ID: ${queryId}`);
         return null;
       }
 
       // Parse the JSON response
-      const hierarchyData: AccessibilityHierarchy = JSON.parse(result.stdout);
+      const hierarchyData: AccessibilityHierarchy = JSON.parse(pollingResult.stdout);
 
       const duration = Date.now() - startTime;
       logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved targeted hierarchy in ${duration}ms (query: ${queryId})`);
@@ -143,9 +171,9 @@ export class AccessibilityServiceClient {
       logger.info("[ACCESSIBILITY_SERVICE] Querying latest view hierarchy from accessibility service");
 
       // If query options are provided, use targeted hierarchy retrieval
-      if (queryOptions) {
-        return await this.getTargetedHierarchy(queryOptions);
-      }
+      // if (queryOptions) {
+      //   return await this.getTargetedHierarchy(queryOptions);
+      // }
 
       // Otherwise, get the standard latest hierarchy
       const result = await this.adb.executeCommand(

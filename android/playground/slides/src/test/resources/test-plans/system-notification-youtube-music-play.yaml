@@ -16,8 +16,9 @@ steps:
 
   - tool: "tapOn"
     id: "com.android.systemui:id/actionPlayPause"
+    action: "tap"
 
-  - tool: stopApp
+  - tool: terminateApp
     appId: com.zillow.automobile.playground
     label: Stop the AutoMobile playground app
 

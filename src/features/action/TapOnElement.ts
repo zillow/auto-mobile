@@ -55,7 +55,7 @@ export class TapOnElement extends BaseVisualChange {
 
   async handleElementResult(element: Element | null, options: TapOnElementOptions, attempt: number): Promise<Element> {
     if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
-      const delayNextAttempt = 100 * Math.pow(2, attempt);
+      const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
       await new Promise(resolve => setTimeout(resolve, delayNextAttempt));
 
       let latestViewHierarchy: ViewHierarchyResult | null = null;
@@ -77,7 +77,7 @@ export class TapOnElement extends BaseVisualChange {
       }
 
       if (latestViewHierarchy) {
-        logger.info("Retrying to find element");
+        logger.info(`Retrying to find element after ${delayNextAttempt}ms delay`);
         return await this.findElementToTap(
           options,
           latestViewHierarchy,
@@ -192,7 +192,7 @@ export class TapOnElement extends BaseVisualChange {
             containerElementId: options.containerElementId
           },
           changeExpected: false,
-          timeoutMs: 3000, // Reduce timeout for faster execution
+          timeoutMs: 800, // Reduce timeout for faster execution
           progress
         }
       );

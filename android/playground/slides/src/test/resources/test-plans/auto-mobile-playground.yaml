@@ -75,6 +75,9 @@ steps:
   - tool: inputText
     text: "robot@example.com"
 
+  - tool: scroll
+    direction: down
+
   - tool: tapOn
     action: "tap"
     text: "Comments"

@@ -309,6 +309,10 @@ export class LaunchApp extends BaseVisualChange {
           error: "App is already in foreground"
         };
       }
+    } else {
+      if (clearAppData) {
+        await new ClearAppData(this.device).execute(packageName);
+      }
     }
 
     logger.info(`[LaunchApp] Proceeding with app launch`);
