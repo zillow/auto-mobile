@@ -8,11 +8,11 @@
 
   <!-- Onboarding Pages -->
   <string name="onboarding_welcome_title">Welcome to AutoMobile</string>
-  <string name="onboarding_welcome_description">Experience the future of Android UI automation with intelligent source mapping and self-healing tests.</string>
+  <string name="onboarding_welcome_description">Experience the future of mobile device automation with intelligent source mapping and self-healing tests.</string>
   <string name="onboarding_welcome_emoji">🚗</string>
 
   <string name="onboarding_source_intelligence_title">Source Code Intelligence</string>
-  <string name="onboarding_source_intelligence_description">Inspect your project source code directly through the view hierarchy using advanced code heuristics and source mapping.</string>
+  <string name="onboarding_source_intelligence_description">Leverage your project source code mapped to what is displayed</string>
   <string name="onboarding_source_intelligence_emoji">🔍</string>
 
   <string name="onboarding_gestures_title">Smart Gestures &amp; Input</string>
@@ -24,7 +24,7 @@
   <string name="onboarding_automation_emoji">🤖</string>
 
   <string name="onboarding_opensource_title">Open Source</string>
-  <string name="onboarding_opensource_description">Built by Zillow and hosted on GitHub. Join our community and start automating your Android tests today!</string>
+  <string name="onboarding_opensource_description">Built by Zillow and hosted on GitHub</string>
   <string name="onboarding_opensource_description_part1">Built by Zillow and hosted on </string>
   <string name="onboarding_opensource_description_part2">GitHub</string>
   <string name="onboarding_opensource_emoji">❤️</string>
