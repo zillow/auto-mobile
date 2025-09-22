@@ -52,6 +52,7 @@ export * from "./TouchIdleResult";
 export * from "./UiStabilityResult";
 export * from "./UninstallAppResult";
 export * from "./ViewHierarchyCache";
+export * from "./ViewHierarchyQueryOptions";
 export * from "./ViewHierarchyResult";
 export * from "./Plan";
 export * from "./ExportPlanResult";

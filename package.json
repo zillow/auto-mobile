@@ -55,6 +55,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.0",
     "@types/js-yaml": "^4.0.9",
+    "@types/uuid": "^10.0.0",
     "fs-extra": "^11.3.1",
     "glob": "^11.0.3",
     "jimp": "^1.6.0",
@@ -62,6 +63,7 @@
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "sharp": "^0.34.3",
+    "uuid": "^13.0.0",
     "xml2js": "^0.6.2",
     "zod": "^3.25.76",
     "zod-to-json-schema": "^3.24.6"

@@ -6,6 +6,7 @@ import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ActionableError, ActiveWindowInfo, BootedDevice, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -17,6 +18,7 @@ export interface ObservedChangeOptions {
   packageName?: string;
   progress?: ProgressCallback;
   tolerancePercent?: number;
+  queryOptions?: ViewHierarchyQueryOptions;
 }
 
 export class BaseVisualChange {
@@ -71,10 +73,10 @@ export class BaseVisualChange {
       }
       previousObserveResult = await this.observeScreen.getMostRecentCachedObserveResult();
       if (!previousObserveResult?.viewHierarchy || !previousObserveResult.viewHierarchy || previousObserveResult.viewHierarchy.hierarchy.error) {
-        previousObserveResult = await this.observeScreen.execute();
+        previousObserveResult = await this.observeScreen.execute(options.queryOptions);
       }
     } catch (error) {
-      previousObserveResult = await this.observeScreen.execute();
+      previousObserveResult = await this.observeScreen.execute(options.queryOptions);
     }
 
     if (!previousObserveResult) {
@@ -146,16 +148,17 @@ export class BaseVisualChange {
 
     return await this.takeObservation(blockResult, previousObserveResult, {
       changeExpected: options.changeExpected,
-      tolerancePercent: options.tolerancePercent ?? DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT
+      tolerancePercent: options.tolerancePercent ?? DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
+      queryOptions: options.queryOptions
     });
   }
 
   private async takeObservation(
     blockResult: any,
     previousObserveResult: ObserveResult | null,
-    options: { changeExpected: boolean; tolerancePercent?: number; }
+    options: { changeExpected: boolean; tolerancePercent?: number; queryOptions?: ViewHierarchyQueryOptions }
   ): Promise<any> {
-    const latestObservation = await this.observeScreen.execute();
+    const latestObservation = await this.observeScreen.execute(options.queryOptions);
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {
       blockResult.success = latestObservation.viewHierarchy !== previousObserveResult.viewHierarchy;

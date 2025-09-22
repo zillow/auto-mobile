@@ -1,5 +1,6 @@
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ObserveResult } from "../../models";
+import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { GetScreenSize } from "./GetScreenSize";
 import { GetSystemInsets } from "./GetSystemInsets";
 import { ViewHierarchy } from "./ViewHierarchy";
@@ -117,11 +118,12 @@ export class ObserveScreen {
   /**
    * Collect view hierarchy and handle errors with accessibility service caching
    * @param result - ObserveResult to update
+   * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
    */
-  public async collectViewHierarchy(result: ObserveResult): Promise<void> {
+  public async collectViewHierarchy(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
     try {
       const viewHierarchyStart = Date.now();
-      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(result.screenshotPath);
+      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(result.screenshotPath, queryOptions);
       logger.debug("Accessibility service availability cached as: true");
 
       if (viewHierarchy) {
@@ -226,8 +228,9 @@ export class ObserveScreen {
   /**
    * Collect all observation data with parallelization
    * @param result - ObserveResult to update
+   * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
    */
-  public async collectAllData(result: ObserveResult): Promise<void> {
+  public async collectAllData(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
     switch (this.device.platform) {
       case "android":
         // Start dumpsys window fetch early since multiple operations need it
@@ -247,7 +250,7 @@ export class ObserveScreen {
           this.collectScreenSize(dumpsysWindow, result),
           this.collectSystemInsets(dumpsysWindow, result),
           this.collectRotationInfo(dumpsysWindow, result),
-          this.collectViewHierarchy(result),
+          this.collectViewHierarchy(result, queryOptions),
         ];
 
         // Execute all remaining operations in parallel
@@ -259,7 +262,7 @@ export class ObserveScreen {
         // Now run the remaining operations in parallel using the shared dumpsys data
         const iosFinalPromises: Promise<void>[] = [
           this.collectScreenSize({} as ExecResult, result),
-          this.collectViewHierarchy(result),
+          this.collectViewHierarchy(result, queryOptions),
         ];
 
         // Execute all remaining operations in parallel
@@ -498,10 +501,10 @@ export class ObserveScreen {
 
   /**
    * Execute the observe command
-   * @param options - Command options
+   * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
    * @returns The observation result
    */
-  async execute(): Promise<ObserveResult> {
+  async execute(queryOptions?: ViewHierarchyQueryOptions): Promise<ObserveResult> {
     try {
       logger.debug("Executing observe command");
       const startTime = Date.now();
@@ -510,7 +513,7 @@ export class ObserveScreen {
       const result = this.createBaseResult();
 
       // Collect all data components with parallelization
-      await this.collectAllData(result);
+      await this.collectAllData(result, queryOptions);
 
       // Cache the result for future use
       await this.cacheObserveResult(result);

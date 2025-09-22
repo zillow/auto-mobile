@@ -281,6 +281,7 @@ export async function detectHomebrewAndroidTools(dependencies = createDefaultDep
  */
 export async function detectAndroidSdkTools(dependencies = createDefaultDependencies()): Promise<AndroidToolsLocation[]> {
   const locations: AndroidToolsLocation[] = [];
+  logger.info("Looking for for Android SDK tools");
 
   // Check environment variables
   const sdkPath = getAndroidSdkFromEnvironment(dependencies);
@@ -304,6 +305,7 @@ export async function detectAndroidSdkTools(dependencies = createDefaultDependen
   // Check typical installation paths
   const typicalPaths = getTypicalAndroidSdkPaths(dependencies);
   for (const sdkPath of typicalPaths) {
+    logger.info(`Checking typical path for Android SDK: ${sdkPath}`);
     // Skip if we already found this path from environment
     if (process.env.ANDROID_HOME === sdkPath || process.env.ANDROID_SDK_ROOT === sdkPath) {
       continue;
@@ -333,12 +335,14 @@ export async function detectAndroidSdkTools(dependencies = createDefaultDependen
 export async function detectAndroidToolsInPath(dependencies = createDefaultDependencies()): Promise<AndroidToolsLocation | null> {
   const availableTools: string[] = [];
   const toolPaths: Record<string, string> = {};
+  logger.info("Looking for for Android SDK tools in PATH");
 
   // Check each tool individually
   for (const toolName of Object.keys(ANDROID_TOOLS)) {
     if (await isToolInPath(toolName, dependencies)) {
       const toolPath = await getToolPathFromPath(toolName, dependencies);
       if (toolPath) {
+        logger.info(`Tool ${toolName} was in PATH`);
         availableTools.push(toolName);
         toolPaths[toolName] = toolPath;
       }
@@ -374,6 +378,7 @@ export async function detectAndroidToolsInPath(dependencies = createDefaultDepen
  */
 export async function detectAndroidCommandLineTools(dependencies = createDefaultDependencies()): Promise<AndroidToolsLocation[]> {
   if (cachedAndroidToolsLocations !== undefined) {
+    logger.info("Already cached Android tools locations. Returning cached result.");
     return cachedAndroidToolsLocations;
   }
 

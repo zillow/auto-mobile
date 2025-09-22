@@ -152,7 +152,7 @@ const languageOptions = {
 
 export default [
 	{
-    ignores: ["ios/WebDriverAgent/**/*"],
+    ignores: ["ios/**/*", "android/**/*"],
   },
   {
 		files: ["**/*.ts"],

@@ -73,7 +73,7 @@ export class DeviceSessionManager {
 
     try {
       // Check for Android devices via ADB
-      const androidDevices = await this.adb.getBootedEmulators();
+      const androidDevices = await this.adb.getBootedAndroidDevices();
       devices.push(...androidDevices);
     } catch (error) {
       logger.warn(`Failed to detect Android devices: ${error}`);
@@ -183,7 +183,7 @@ export class DeviceSessionManager {
    * Verify an Android device is connected and ready
    */
   private async verifyAndroidDevice(deviceId: string): Promise<void> {
-    const allDevices = await this.adb.getBootedEmulators();
+    const allDevices = await this.adb.getBootedAndroidDevices();
     const device = allDevices.find(device => device.name === deviceId);
 
     if (!device) {
