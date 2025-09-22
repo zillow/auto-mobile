@@ -63,7 +63,11 @@ export class TapOnElement extends BaseVisualChange {
       // Platform-specific view hierarchy retrieval
       switch (this.device.platform) {
         case "android":
-          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy();
+          const queryOptions = {
+            query: options.text || options.elementId || "",
+            containerElementId: options.containerElementId
+          };
+          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(queryOptions);
           break;
         case "ios":
           latestViewHierarchy = await this.webdriver.getViewHierarchy(this.device);
@@ -182,6 +186,11 @@ export class TapOnElement extends BaseVisualChange {
           };
         },
         {
+          queryOptions: {
+            text: options.text,
+            elementId: options.elementId,
+            containerElementId: options.containerElementId
+          },
           changeExpected: false,
           timeoutMs: 3000, // Reduce timeout for faster execution
           progress

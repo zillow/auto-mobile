@@ -13,7 +13,7 @@ import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../ut
 import { ScreenshotUtils } from "../../utils/screenshot-utils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { SourceMapper } from "../../utils/sourceMapper";
-import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo } from "../../models";
+import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
 
@@ -504,14 +504,15 @@ export class ViewHierarchy {
   /**
    * Retrieve the view hierarchy of the current screen
    * @param screenshotPath - Optional path to an existing screenshot to use for caching
+   * @param queryOptions - Optional query options for targeted element retrieval
    * @returns Promise with parsed XML view hierarchy
    */
-  async getViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
+  async getViewHierarchy(screenshotPath: string | null = null, queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
     switch (this.device.platform) {
       case "ios":
         return this.getiOSViewHierarchy(screenshotPath);
       case "android":
-        return this.getAndroidViewHierarchy(screenshotPath);
+        return this.getAndroidViewHierarchy(screenshotPath, queryOptions);
       default:
         throw new Error("Unsupported platform");
     }
@@ -534,15 +535,16 @@ export class ViewHierarchy {
   /**
    * Retrieve the view hierarchy of the current screen
    * @param screenshotPath - Optional path to an existing screenshot to use for caching
+   * @param queryOptions - Optional query options for targeted element retrieval
    * @returns Promise with parsed XML view hierarchy
    */
-  async getAndroidViewHierarchy(screenshotPath: string | null = null): Promise<ViewHierarchyResult> {
+  async getAndroidViewHierarchy(screenshotPath: string | null = null, queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.debug(`[VIEW_HIERARCHY] Starting getViewHierarchy (screenshotPath: ${screenshotPath ? "provided" : "none"})`);
 
     // First try accessibility service if available and not skipped
     try {
-      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy();
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions);
       if (accessibilityHierarchy) {
         const accessibilityDuration = Date.now() - startTime;
         logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
