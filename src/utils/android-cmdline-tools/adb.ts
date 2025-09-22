@@ -125,11 +125,12 @@ export class AdbUtils {
    * @param command - The ADB command to execute
    * @param timeoutMs - Optional timeout in milliseconds
    * @param maxBuffer - Optional maximum buffer size for command output
+   * @param noRetry - Optional flag to disable retry logic for commands expected to fail
    * @returns Promise with command output
    */
-  async executeCommand(command: string, timeoutMs?: number, maxBuffer?: number): Promise<ExecResult> {
+  async executeCommand(command: string, timeoutMs?: number, maxBuffer?: number, noRetry?: boolean): Promise<ExecResult> {
     const startTime = Date.now();
-    const result = await this.executeCommandImpl(command, timeoutMs, maxBuffer);
+    const result = await this.executeCommandImpl(command, timeoutMs, maxBuffer, 0, noRetry);
     const duration = Date.now() - startTime;
 
     // Only log longer commands or ones that take significant time
@@ -147,9 +148,10 @@ export class AdbUtils {
    * @param timeoutMs - Optional timeout in milliseconds
    * @param maxBuffer - Optional maximum buffer size for command output
    * @param attempt - Current attempt number at executing this command
+   * @param noRetry - Optional flag to disable retry logic for commands expected to fail
    * @returns Promise with command output
    */
-  private async executeCommandImpl(command: string, timeoutMs?: number, maxBuffer?: number, attempt: number = 0): Promise<ExecResult> {
+  private async executeCommandImpl(command: string, timeoutMs?: number, maxBuffer?: number, attempt: number = 0, noRetry?: boolean): Promise<ExecResult> {
     const baseCommand = await this.getBaseCommand();
     const fullCommand = `${baseCommand} ${command}`;
     const startTime = Date.now();
@@ -188,8 +190,8 @@ export class AdbUtils {
       logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
       return result;
     } catch (error) {
-      if (attempt < AdbUtils.MAX_ADB_RETRIES) {
-        return this.executeCommandImpl(command, timeoutMs, maxBuffer, attempt + 1);
+      if (!noRetry && attempt < AdbUtils.MAX_ADB_RETRIES) {
+        return this.executeCommandImpl(command, timeoutMs, maxBuffer, attempt + 1, noRetry);
       } else {
         const duration = Date.now() - startTime;
         logger.warn(`[ADB] Command failed after ${duration}ms: ${command} - ${(error as Error).message}`);

@@ -455,7 +455,7 @@ export class ElementUtils {
             matches.push(parsedNode);
           }
         } else {
-          logger.info(`[Element] No match found in properties`);
+          logger.debug(`[Element] No match found in properties`);
         }
       });
     }

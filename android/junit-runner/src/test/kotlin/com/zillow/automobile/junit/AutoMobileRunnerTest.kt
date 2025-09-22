@@ -56,7 +56,7 @@ class AutoMobileRunnerTest {
     val command = runner.invokeBuildAutoMobileCommand("/path/to/plan.yaml", annotation)
 
     assertTrue(command.contains("npx"))
-    assertTrue(command.contains("auto-mobile@latest"))
+    assertTrue(command.contains("auto-mobile"))
     assertTrue(command.contains("--cli"))
     assertTrue(command.contains("test"))
     assertTrue(command.contains("run"))

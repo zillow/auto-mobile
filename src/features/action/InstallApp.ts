@@ -29,7 +29,7 @@ export class InstallApp {
 
     // Check if app is already installed
     const isInstalledCmd = `shell pm list packages -f ${packageName.trim()} | grep -c ${packageName.trim()}`;
-    const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd);
+    const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd, undefined, undefined, true);
     const isInstalled = parseInt(isInstalledOutput.trim(), 10) > 0;
 
     const installOutput = await this.adb.executeCommand(`install -r "${apkPath}"`);

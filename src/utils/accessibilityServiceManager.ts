@@ -85,7 +85,7 @@ export class AccessibilityServiceManager {
 
     try {
       logger.info("[ACCESSIBILITY_SERVICE] Checking if accessibility service is installed");
-      const result = await this.adb.executeCommand(`shell pm list packages | grep ${AccessibilityServiceManager.PACKAGE}`);
+      const result = await this.adb.executeCommand(`shell pm list packages | grep ${AccessibilityServiceManager.PACKAGE}`, undefined, undefined, true);
       const isInstalled = result.stdout.includes(AccessibilityServiceManager.PACKAGE);
 
       // Cache the result

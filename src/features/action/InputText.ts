@@ -85,7 +85,16 @@ export class InputText extends BaseVisualChange {
       }
 
       // Send text using virtual keyboard
-      await this.sendUnicodeTextViaVirtualKeyboard(text);
+      try {
+        await this.sendUnicodeTextViaVirtualKeyboard(text);
+      } catch (error) {
+        return {
+          success: false,
+          text,
+          error: `Failed to send Unicode text: ${error instanceof Error ? error.message : String(error)}`,
+          method: "virtual"
+        };
+      }
     } else {
       // Use native input for ASCII text
       await this.sendAsciiText(text);

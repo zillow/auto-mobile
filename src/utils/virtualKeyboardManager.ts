@@ -12,7 +12,7 @@ export class VirtualKeyboardManager {
   private adb: AdbUtils;
   private static readonly ADB_KEYBOARD_ID = "com.android.adbkeyboard/.AdbIME";
   private static readonly ADB_KEYBOARD_PACKAGE = "com.android.adbkeyboard";
-  private static readonly APK_URL = "https://github.com/senzhk/ADBKeyBoard/blob/8dd0b6924e45ac5565f77f13cf8e8eaf47dbb1b0/ADBKeyboard.apk";
+  private static readonly APK_URL = "https://github.com/senzhk/ADBKeyBoard/raw/8dd0b6924e45ac5565f77f13cf8e8eaf47dbb1b0/ADBKeyboard.apk";
 
   constructor(device: BootedDevice | null = null) {
     this.adb = new AdbUtils(device);
@@ -40,7 +40,7 @@ export class VirtualKeyboardManager {
    */
   async isAdbKeyboardInstalled(): Promise<boolean> {
     try {
-      const result = await this.adb.executeCommand("shell pm list packages | grep com.android.adbkeyboard");
+      const result = await this.adb.executeCommand("shell pm list packages | grep com.android.adbkeyboard", undefined, undefined, true);
       return result.includes(VirtualKeyboardManager.ADB_KEYBOARD_PACKAGE);
     } catch (error) {
       logger.warn("Failed to check ADBKeyboard installation", { error: error instanceof Error ? error.message : String(error) });
@@ -107,12 +107,18 @@ export class VirtualKeyboardManager {
 
       // Verify the file exists and has reasonable size (should be > 10KB)
       const stats = await fs.stat(apkPath);
-      if (stats.size < 10000) {
+      if (stats && stats.size < 10000) {
         throw new Error(`Downloaded APK is too small (${stats.size} bytes), likely invalid`);
       }
 
+      logger.info(`APK stats: ${stats}`);
+
+      logger.info(`Checking checksum...`);
+      const shaCommand = `sha256sum "${apkPath}"`;
+      logger.info(`shaCommand: ${shaCommand}`);
+
       // Perform checksum verification
-      const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
+      const { stdout: sha256sum } = await execAsync(shaCommand);
       const actualChecksum = sha256sum.split(" ")[0];
 
       // Expected checksum for the ADBKeyboard APK

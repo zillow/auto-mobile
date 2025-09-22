@@ -31,7 +31,7 @@ export class TerminateApp extends BaseVisualChange {
 
         // Check if app is installed
         const isInstalledCmd = `shell pm list packages -f ${packageName} | grep -c ${packageName}`;
-        const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd);
+        const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd, undefined, undefined, true);
         const isInstalled = parseInt(isInstalledOutput.trim(), 10) > 0;
 
         if (!isInstalled) {
