@@ -426,7 +426,8 @@ export class ObserveScreen {
             mostRecentFile = { path: filePath, mtime: stats.mtime.getTime() };
           }
         } else {
-          logger.info(`[OBSERVE_CACHE] Disk cache file expired: ${file} (age: ${age}ms > TTL: ${ttl}ms)`);
+          // TODO: Remove old file
+          logger.debug(`[OBSERVE_CACHE] Disk cache file expired: ${file} (age: ${age}ms > TTL: ${ttl}ms)`);
         }
       }
 
