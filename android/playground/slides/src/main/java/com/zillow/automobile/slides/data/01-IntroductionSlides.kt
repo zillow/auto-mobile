@@ -8,7 +8,7 @@ import com.zillow.automobile.slides.model.SlideContent
 fun getIntroductionSlides(): List<SlideContent> =
     listOf(
         SlideContent.LargeText(title = "AutoMobile", subtitle = "Jason Pearson @ Zillow"),
-        SlideContent.Emoji(emoji = PresentationEmoji.THINKING, caption = "Who am I?"),
+        SlideContent.Emoji(emoji = PresentationEmoji.PROGRAMMER, caption = "Who am I?"),
 
         // Swipe screen to show promo video
 
@@ -39,8 +39,7 @@ fun getIntroductionSlides(): List<SlideContent> =
                 listOf(
                     BulletPoint(text = "Works on any Android debug or production build"),
                     BulletPoint(text = "Directly detects and uses Android platform tools"),
-                    BulletPoint(text = "Runs as a simple JVM test"),
                     BulletPoint(text = "Indexes and understands your project source code"),
-                    BulletPoint(text = "Can write tests for you"),
+                    BulletPoint(text = "Can write tests for you, which are simple JVM unit tests"),
                 )),
     )

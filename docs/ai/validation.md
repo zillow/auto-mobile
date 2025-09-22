@@ -17,4 +17,6 @@ npm run test
 # Run specific tests
 npm run test -- --grep "Name of the test suite or test case"
 
+# Reinstall MCP server
+npm install
 ```

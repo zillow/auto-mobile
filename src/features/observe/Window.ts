@@ -201,6 +201,18 @@ export class Window {
             }
           }
         }
+
+        // If still no match, look for the first visible application window that's on screen
+        if (!packageName || !activityName) {
+          // Look for windows with isOnScreen=true and isVisible=true and ty=BASE_APPLICATION
+          const visibleAppRegex = /Window #\d+ Window\{[^}]+ u0 ([\w\.]+)\/([\w\.]+)\}:[\s\S]*?ty=BASE_APPLICATION[\s\S]*?isOnScreen=true[\s\S]*?isVisible=true/gs;
+          const visibleMatch = visibleAppRegex.exec(stdout);
+
+          if (visibleMatch && visibleMatch.length >= 3) {
+            packageName = visibleMatch[1];
+            activityName = visibleMatch[2];
+          }
+        }
       }
 
       // Extract layout sequence sum from all windows

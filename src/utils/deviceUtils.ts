@@ -63,11 +63,11 @@ export class DeviceUtils {
   async getBootedDevices(platform: SomePlatform): Promise<BootedDevice[]> {
     switch (platform) {
       case "android":
-        return this.emulator.getBootedEmulators();
+        return this.emulator.getBootedDevices();
       case "ios":
         return this.simctl.getBootedSimulators();
       case "either":
-        const emulators = await this.emulator.getBootedEmulators();
+        const emulators = await this.emulator.getBootedDevices();
         const simulators = await this.simctl.getBootedSimulators();
         return [...emulators, ...simulators];
     }

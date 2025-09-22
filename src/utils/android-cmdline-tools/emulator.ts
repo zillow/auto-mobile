@@ -263,7 +263,7 @@ export class AndroidEmulator {
    * @returns Promise with boolean indicating if the AVD is running
    */
   async isAvdRunning(avdName: string): Promise<boolean> {
-    const runningEmulators = await this.getBootedEmulators();
+    const runningEmulators = await this.getBootedDevices();
     return runningEmulators.some(emulator => emulator.name === avdName);
   }
 
@@ -271,14 +271,15 @@ export class AndroidEmulator {
    * Check if any emulator is currently running
    * @returns Promise with array of running emulator info
    */
-  async getBootedEmulators(): Promise<BootedDevice[]> {
+  async getBootedDevices(onlyEmulators: boolean = false): Promise<BootedDevice[]> {
     try {
       const adb = new AdbUtils();
-      const devices = await adb.getBootedEmulators();
-      const runningEmulators: BootedDevice[] = [];
+      const devices = await adb.getBootedAndroidDevices();
+      const runningDevices: BootedDevice[] = [];
 
       // Add local emulator devices
-      const emulatorDevices = devices.filter(device => device.name.startsWith("emulator-"));
+      const emulatorDevices = devices.filter(device => device.deviceId.startsWith("emulator-"));
+      const physicalDevices = devices.filter(device => !device.deviceId.startsWith("emulator-"));
 
       for (const device of emulatorDevices) {
         const deviceId = device.deviceId;
@@ -290,7 +291,7 @@ export class AndroidEmulator {
 
           logger.info(`AVD name detection for ${deviceId}: raw="${result.stdout}" (${result.stdout.length} chars), cleaned="${avdName}"`);
 
-          runningEmulators.push({
+          runningDevices.push({
             name: avdName || `Unknown (${deviceId})`,
             platform: "android",
             deviceId: deviceId,
@@ -299,7 +300,7 @@ export class AndroidEmulator {
         } catch (error) {
           // If we can't get the AVD name, just use the device ID
           logger.info(`Failed to get AVD name for ${deviceId}: ${error}`);
-          runningEmulators.push({
+          runningDevices.push({
             name: `Unknown (${deviceId})`,
             platform: "android",
             deviceId: deviceId,
@@ -308,7 +309,34 @@ export class AndroidEmulator {
         }
       }
 
-      return runningEmulators;
+      for (const device of physicalDevices) {
+        let deviceName = device.deviceId; // Default fallback
+
+        try {
+          // Try to get the actual device model name
+          const adbWithDevice = new AdbUtils(device);
+          const result = await adbWithDevice.executeCommand("shell getprop ro.product.model");
+          const modelName = result.stdout.trim();
+
+          if (modelName && modelName !== "unknown" && modelName.length > 0) {
+            deviceName = modelName;
+            logger.info(`Got model name for ${device.deviceId}: "${modelName}"`);
+          } else {
+            logger.info(`No model name found for ${device.deviceId}, using device ID`);
+          }
+        } catch (error) {
+          logger.info(`Failed to get model name for ${device.deviceId}: ${error}`);
+        }
+
+        runningDevices.push({
+          name: deviceName,
+          platform: "android",
+          deviceId: device.deviceId,
+          source: "local"
+        });
+      }
+
+      return runningDevices;
     } catch (error) {
       logger.error("Failed to get running emulators:", error);
       return [];
@@ -469,7 +497,7 @@ export class AndroidEmulator {
    * @returns Promise that resolves when emulator is stopped
    */
   async killDevice(device: BootedDevice): Promise<void> {
-    const runningEmulators = await this.getBootedEmulators();
+    const runningEmulators = await this.getBootedDevices();
     const emulator = runningEmulators.find(emu => emu.deviceId === device.deviceId);
 
     if (!emulator || !emulator.deviceId) {
@@ -507,7 +535,7 @@ export class AndroidEmulator {
 
           // For local emulators, check for running devices
           logger.info(`Checking for running local emulators...`);
-          const runningEmulators = await this.getBootedEmulators();
+          const runningEmulators = await this.getBootedDevices();
           logger.info(`Device scan complete - found ${runningEmulators.length} running emulators`);
 
           if (runningEmulators.length > 0) {

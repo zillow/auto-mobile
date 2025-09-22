@@ -202,7 +202,7 @@ export class AdbUtils {
    * Get the list of connected devices
    * @returns Promise with an array of device IDs
    */
-  async getBootedEmulators(): Promise<BootedDevice[]> {
+  async getBootedAndroidDevices(): Promise<BootedDevice[]> {
     // Check cache first
     if (AdbUtils.deviceListCache) {
       const cacheAge = Date.now() - AdbUtils.deviceListCache.timestamp;

@@ -62,26 +62,7 @@ fun getOriginSlides(): List<SlideContent> =
             code =
                 """
       sequenceDiagram
-          participant Agent as AI Agent
-          participant MCP as MCP Server
-          participant Device as Android Device
 
-          Agent->>MCP: Observation Request
-          MCP->>Device: Execute UI Dump/Query
-          Device-->>MCP: UI State/Data
-          MCP-->>Agent: Observation Response
-
-          Agent->>MCP: Interaction Command
-          MCP->>Device: Execute Action (tap/swipe/input)
-          Device-->>MCP: Action Result
-          MCP-->>Agent: Interaction Response
-
-          Agent->>MCP: Verification Request
-          MCP->>Device: Query UI State
-          Device-->>MCP: Updated UI State
-          MCP-->>Agent: Verification Response
-
-          Note over Agent: Verify Success & Plan Next Action
       """
                     .trimIndent()),
         SlideContent.Emoji(
