@@ -318,6 +318,24 @@ export class LaunchApp extends BaseVisualChange {
         logger.info("(");
         let targetActivity = activityName;
 
+        // Try monkey launch first (ultra-fast approach)
+        if (!targetActivity) {
+          logger.info(`[LaunchApp] Trying monkey launch (ultra-fast approach)`);
+          try {
+            const monkeyCmd = `shell monkey -p ${packageName} 1`;
+            logger.info(`[LaunchApp] Monkey command: ${monkeyCmd}`);
+            await this.adb.executeCommand(monkeyCmd);
+            logger.info(`[LaunchApp] Monkey launch completed successfully`);
+            return {
+              success: true,
+              packageName,
+              activityName: "monkey_launch"
+            };
+          } catch (error) {
+            logger.info(`[LaunchApp] Monkey launch failed: ${error}, falling back to activity discovery`);
+          }
+        }
+
         // If no specific activity provided, get launcher activities from pm dump
         if (!targetActivity) {
           logger.info(`[LaunchApp] No activity specified, extracting launcher activities`);
