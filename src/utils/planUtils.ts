@@ -221,7 +221,7 @@ export const importPlanFromYaml = (yamlContent: string): Plan => {
 };
 
 // Execute a plan
-export const executePlan = async (plan: Plan, startStep: number): Promise<PlanExecutionResult> => {
+export const executePlan = async (plan: Plan, startStep: number, platform?: string): Promise<PlanExecutionResult> => {
   let executedSteps = 0;
 
   try {
@@ -265,8 +265,15 @@ export const executePlan = async (plan: Plan, startStep: number): Promise<PlanEx
       }
 
       try {
+        // Inject platform parameter into tool call params if the tool requires a device and platform is provided
+        const enhancedParams = { ...step.params };
+
+        if (tool.requiresDevice && platform && !enhancedParams.platform) {
+          enhancedParams.platform = platform;
+        }
+
         // Parse and validate the parameters
-        const parsedParams = tool.schema.parse(step.params);
+        const parsedParams = tool.schema.parse(enhancedParams);
 
         // Execute the tool
         const response = await tool.handler(parsedParams);

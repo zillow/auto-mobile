@@ -33,7 +33,7 @@ const executePlanTool = async (device: BootedDevice, params: {
 
     // Execute the plan
     logger.info("=== Starting plan execution ===");
-    const result = await executePlan(plan, startStep);
+    const result = await executePlan(plan, startStep, params.platform);
     logger.info("=== Plan execution completed ===");
 
     const response: ExecutePlanResult = {

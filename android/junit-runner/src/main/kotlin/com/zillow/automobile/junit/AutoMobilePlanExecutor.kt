@@ -144,6 +144,7 @@ internal object AutoMobilePlanExecutor {
 
     command.add("executePlan")
     command.addAll(listOf("--planContent", planContent))
+    command.addAll(listOf("--platform", "android"))
 
     if (options.device != "auto") {
       command.addAll(listOf("--device", options.device))

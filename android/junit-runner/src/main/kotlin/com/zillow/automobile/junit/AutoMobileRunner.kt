@@ -175,6 +175,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
     command.add("executePlan")
     command.addAll(listOf("--planContent", planContent))
+    command.addAll(listOf("--platform", "android"))
 
     if (annotation.device != "auto") {
       command.addAll(listOf("--device", annotation.device))
