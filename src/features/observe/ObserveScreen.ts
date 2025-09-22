@@ -123,7 +123,7 @@ export class ObserveScreen {
   public async collectViewHierarchy(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
     try {
       const viewHierarchyStart = Date.now();
-      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(result.screenshotPath, queryOptions);
+      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions);
       logger.debug("Accessibility service availability cached as: true");
 
       if (viewHierarchy) {
@@ -204,28 +204,6 @@ export class ObserveScreen {
   }
 
   /**
-   * Collect screenshot and handle errors
-   * @param result - ObserveResult to update
-   */
-  public async collectScreenshot(result: ObserveResult): Promise<void> {
-    try {
-      const screenshotStart = Date.now();
-      const screenshotResult = await this.screenshotUtil.execute();
-
-      if (screenshotResult.success && screenshotResult.path) {
-        result.screenshotPath = screenshotResult.path;
-        logger.debug(`Screenshot capture took ${Date.now() - screenshotStart}ms`);
-      } else {
-        logger.warn("Failed to take screenshot:", screenshotResult.error);
-        this.appendError(result, "Failed to take screenshot");
-      }
-    } catch (error) {
-      logger.warn("Failed to take screenshot:", error);
-      this.appendError(result, "Failed to take screenshot");
-    }
-  }
-
-  /**
    * Collect all observation data with parallelization
    * @param result - ObserveResult to update
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
@@ -240,7 +218,6 @@ export class ObserveScreen {
         const parallelPromises: Promise<any>[] = [
           dumpsysWindowPromise,
           this.collectActiveWindow(result),
-          this.collectScreenshot(result),
         ];
 
         const [dumpsysWindow] = await Promise.all(parallelPromises);
