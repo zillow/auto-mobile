@@ -37,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -139,6 +141,7 @@ fun SlidesScreen(
                 Modifier.width((configuration.screenWidthDp * 0.3f).dp)
                     .fillMaxHeight()
                     .align(Alignment.CenterStart)
+                    .semantics { contentDescription = "Previous" }
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null) {
@@ -155,6 +158,7 @@ fun SlidesScreen(
                 Modifier.width((configuration.screenWidthDp * 0.3f).dp)
                     .fillMaxHeight()
                     .align(Alignment.CenterEnd)
+                    .semantics { contentDescription = "Next" }
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null) {
