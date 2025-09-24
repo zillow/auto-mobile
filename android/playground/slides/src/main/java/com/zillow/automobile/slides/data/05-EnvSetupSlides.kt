@@ -3,7 +3,7 @@ package com.zillow.automobile.slides.data
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
-fun getEnvSetupSlides(): List<SlideContent> =
+fun getMcpLearningsSlides(): List<SlideContent> =
     listOf(
         SlideContent.LargeText(title = "MCP Learnings"),
 

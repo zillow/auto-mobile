@@ -12,7 +12,7 @@ fun getAllSlides(): List<SlideContent> =
         getEarlySuccessSlides() +
         listOf(SlideContent.LargeText(title = "Optimizations & Automations")) +
         getViewHierarchyCacheSlides() +
-        getEnvSetupSlides() +
+        getMcpLearningsSlides() +
         getSourceMappingSlides() +
         getTestAuthoringExecutionSlides() +
         getAutomaticTestAuthoringSlides() +
