@@ -145,4 +145,7 @@ enum class PresentationEmoji(val unicode: String, val description: String) {
   SECURE("🔐", "Secure/Safe"),
   ENGINE("⚙️", "Engine/Mechanism"),
   TOOLS("🛠️", "Tools/Equipment"),
+  RUST("🦀", "Rust/Programming"),
+  NEW_EMPLOYEE("👋", "New Employee/Welcome"),
+  DATA_TRANSFER("📡", "Data Transfer/Restore")
 }

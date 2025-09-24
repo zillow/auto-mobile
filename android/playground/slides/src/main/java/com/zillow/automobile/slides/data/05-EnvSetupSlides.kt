@@ -1,12 +1,11 @@
 package com.zillow.automobile.slides.data
 
-import com.zillow.automobile.slides.model.BulletPoint
 import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
 fun getEnvSetupSlides(): List<SlideContent> =
     listOf(
-        SlideContent.LargeText(title = "Automatic Env Setup"),
+        SlideContent.LargeText(title = "MCP Learnings"),
 
         // request action
         // action attempts to find current device session
@@ -38,13 +37,10 @@ fun getEnvSetupSlides(): List<SlideContent> =
             emoji = PresentationEmoji.LAPTOP,
             caption = "Automatic Android Platform Tool Installation"),
         SlideContent.Emoji(
+            emoji = PresentationEmoji.TOOLS,
+            caption = "The mere presence of tools suggests agents should invoke them"),
+        SlideContent.Emoji(
             emoji = PresentationEmoji.GLOBE,
-            caption = "Automatic Android Cmdline Tool Installation"),
-        SlideContent.BulletPoints(
-            title = "Did I get carried away?",
-            points =
-                listOf(
-                    BulletPoint(text = "Yes"),
-                    BulletPoint(text = "But now anyone can use it"),
-                )),
+            caption =
+                "The emergent behavior of the workflow is more important than providing a complete solution"),
     )

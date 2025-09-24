@@ -4,11 +4,7 @@ steps:
   - tool: "launchApp"
     appId: "com.zillow.android.zillowmap"
     coldBoot: false
-    clearAppData: true
-  - tool: "pressButton"
-    button: "back"
-  - tool: "pressButton"
-    button: "back"
+    clearAppData: false
   - tool: "tapOn"
     text: "Home features, school, location"
     action: "tap"
@@ -16,15 +12,12 @@ steps:
     text: "Seattle, WA"
     action: "tap"
   - tool: "tapOn"
-    text: "Seattle WA Homes"
+    text: "Seattle WA homes"
     action: "tap"
   - tool: "swipeOnScreen"
     direction: "up"
     includeSystemInsets: false
     duration: 300
-  - tool: "tapOn"
-    text: "Got it"
-    action: "tap"
   - tool: "tapOn"
     text: "Home Loans"
     action: "tap"

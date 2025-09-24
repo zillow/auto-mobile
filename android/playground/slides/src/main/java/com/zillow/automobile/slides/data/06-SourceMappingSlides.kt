@@ -44,7 +44,6 @@ fun getSourceMappingSlides(): List<SlideContent> =
             language = "shell"),
         SlideContent.LargeText(title = "Find the activity with exact package"),
         SlideContent.LargeText(title = "Find the fragment, approximate package"),
-        // TODO: Check this actually works today in view hierarchy somewhere
-        SlideContent.LargeText(title = "Find the Composables"),
-        SlideContent.LargeText(title = "Root common module of plurality of Composable (default)"),
+        SlideContent.LargeText(title = "Find the Composables via string associations"),
+        SlideContent.Emoji(emoji = PresentationEmoji.RUST, caption = "ripgrep is our friend"),
     )

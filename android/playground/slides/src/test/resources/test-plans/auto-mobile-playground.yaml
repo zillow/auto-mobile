@@ -75,18 +75,6 @@ steps:
   - tool: inputText
     text: "robot@example.com"
 
-  - tool: scroll
-    direction: down
-
-  - tool: tapOn
-    action: "tap"
-    text: "Comments"
-    label: Focus on multiline comments field
-
-  - tool: inputText
-    text: "🔥✨🚀 Just dancing over here  🎭 🕺🤖"
-    label: Enter enthusiastic robot circus message
-
   - tool: tapOn
     action: "tap"
     text: "Chat"

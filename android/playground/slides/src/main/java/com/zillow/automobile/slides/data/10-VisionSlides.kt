@@ -15,10 +15,12 @@ fun getVisionSlides(): List<SlideContent> =
             emoji = PresentationEmoji.SECURE, caption = "Security and Privacy Testing"),
         SlideContent.Emoji(emoji = PresentationEmoji.FAST, caption = "Performance Testing"),
         SlideContent.Emoji(
+            emoji = PresentationEmoji.DATA_TRANSFER, caption = "State Capture and Restoration"),
+        SlideContent.Emoji(
             emoji = PresentationEmoji.TOOLBOX, caption = "We can build a better toolbox"),
         SlideContent.LargeText(title = "Project Status"),
         SlideContent.LargeText(title = "Works on all Android apps today"),
-        SlideContent.LargeText(title = "iOS support on the roadmap"),
+        SlideContent.LargeText(title = "iOS support prototyped"),
         SlideContent.BulletPoints(
             title = "Parameterization of everything",
             points =
@@ -37,8 +39,6 @@ fun getVisionSlides(): List<SlideContent> =
                     BulletPoint(text = "Resources: App Resources, Filesystem"),
                     BulletPoint(text = "https://github.com/kaeawc/android-mcp-sdk"),
                 )),
-        SlideContent.LargeText(title = "And now so is AutoMobile"),
-        SlideContent.Emoji(emoji = PresentationEmoji.ROCKET, caption = "Launching"),
         SlideContent.Screenshot(
-            lightScreenshot = R.drawable.auto_mobile_qr_code, caption = "Questions?"),
+            lightScreenshot = R.drawable.auto_mobile_holo, caption = "Questions?"),
     )

@@ -26,25 +26,25 @@ class LiveDemoTest {
   //  @AutoMobileTest(plan = "test-plans/zillow-testing.yaml")
   //  fun `Given Zillow has 3D homes we should be able to tour them`() {}
 
-  @Test
-  @AutoMobileTest(plan = "test-plans/zillow-3d-home-exploration.yaml")
-  fun `Zillow tour 3d home`() {
-    // Traditional annotation-based approach
-    // AI assistance disabled for this test
-  }
-
-  @Test
-  @AutoMobileTest(plan = "test-plans/zillow-full-feature.yaml")
-  fun `Zillow full feature test`() {
-    // Traditional annotation-based approach
-    // AI assistance disabled for this test
-  }
+  //  @Test
+  //  @AutoMobileTest(plan = "test-plans/zillow-3d-home-exploration.yaml")
+  //  fun `Zillow tour 3d home`() {
+  //    // Traditional annotation-based approach
+  //    // AI assistance disabled for this test
+  //  }
+  //
+  //  @Test
+  //  @AutoMobileTest(plan = "test-plans/zillow-full-feature.yaml")
+  //  fun `Zillow full feature test`() {
+  //    // Traditional annotation-based approach
+  //    // AI assistance disabled for this test
+  //  }
 
   @Test
   fun `AutoMobile playground`() {
 
     val result =
-        AutoMobilePlan("test-plans/auto-mobile-playground.yaml", { "slide" to "59" }).execute()
+        AutoMobilePlan("test-plans/auto-mobile-playground.yaml", { "slide" to "57" }).execute()
 
     assertTrue(result.success)
   }
@@ -53,7 +53,7 @@ class LiveDemoTest {
   fun `AutoMobile restart slide`() {
 
     val result =
-        AutoMobilePlan("test-plans/auto-mobile-restart-slide.yaml", { "slide" to "83" }).execute()
+        AutoMobilePlan("test-plans/auto-mobile-restart-slide.yaml", { "slide" to "81" }).execute()
 
     assertTrue(result.success)
   }

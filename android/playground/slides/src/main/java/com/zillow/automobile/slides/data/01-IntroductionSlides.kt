@@ -37,9 +37,9 @@ fun getIntroductionSlides(): List<SlideContent> =
             title = "How does it work?",
             points =
                 listOf(
-                    BulletPoint(text = "Works on any Android debug or production build"),
-                    BulletPoint(text = "Directly detects and uses Android platform tools"),
-                    BulletPoint(text = "Indexes and understands your project source code"),
-                    BulletPoint(text = "Can write tests for you, which are simple JVM unit tests"),
+                    BulletPoint(text = "Works on any Android debug or prod app"),
+                    BulletPoint(text = "Directly uses Android platform tools"),
+                    BulletPoint(text = "Indexes your project source code"),
+                    BulletPoint(text = "Can write tests for you"),
                 )),
     )

@@ -14,7 +14,7 @@ fun getAllSlides(): List<SlideContent> =
         getViewHierarchyCacheSlides() +
         getEnvSetupSlides() +
         getSourceMappingSlides() +
-        getHotReloadingSlides() +
         getTestAuthoringExecutionSlides() +
         getAutomaticTestAuthoringSlides() +
+        getDevWorkflowAssistSlides() +
         getVisionSlides()
