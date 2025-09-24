@@ -1,6 +1,7 @@
 package com.zillow.automobile.slides.data
 
 import com.zillow.automobile.slides.model.BulletPoint
+import com.zillow.automobile.slides.model.PresentationEmoji
 import com.zillow.automobile.slides.model.SlideContent
 
 /** Slides for Introduction to AutoMobile? */
@@ -60,57 +61,8 @@ steps:
                     // TODO: Update when koog lands
                     BulletPoint(text = "koog integration for self healing (untested)"),
                 )),
-        SlideContent.LargeText(title = "Live demo running Playground test"),
-        SlideContent.BulletPoints(
-            title = "Test Authoring Capabilities",
-            points =
-                listOf(
-                    BulletPoint(text = "User credential handling"),
-                    BulletPoint(text = "Experiment + Treatment support"),
-                    BulletPoint(text = "Basic Kotlin DSL, high flexibility"))),
-        SlideContent.CodeSample(
-            title = "Environment Credentials Example",
-            code =
-                """
-      @Test
-      fun `given valid credentials, login should succeed`() {
-          val result = AutoMobilePlan("test-plans/login.yaml", {
-            "username" to "jason@zillow.com"
-            "password" to "hunter2"
-          }).execute()
-          assertTrue(result.status)
-      }
-    """
-                    .trimIndent(),
-            language = "kotlin"),
-        SlideContent.CodeSample(
-            title = "Experiment Configuration Example",
-            code =
-                """
-  @Test
-  fun `given an excited audience, start the party`() {
-    val result =
-        AutoMobilePlan("test-plans/excited-audience.yaml") {
-              Experiments.Mood.id to Experiments.Mood.Treatments.Party
-            }
-            .execute()
-
-    assertTrue("Party mode is active", result.success)
-  }
-    """
-                    .trimIndent(),
-            language = "kotlin"),
-
-        //  ---
-        // name: complete-onboarding
-        // description: Complete fake onboarding flow with experiment-specific behavior
-        // parameters:
-        //  experiment: ${experiment}
-        //  environment: ${environment}
-        //  user_email: ${user_email}
-        //  skip_intro: ${skip_intro}
-        //
-        // steps:
-        //  - tool: observe
-        //    label: "Observe initial app state with ${experiment}"
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.PLAYGROUND,
+            caption = "Demo: AutoMobile Playground",
+        ),
     )

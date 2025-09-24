@@ -42,8 +42,12 @@ fun getSourceMappingSlides(): List<SlideContent> =
  """
                     .trimIndent(),
             language = "shell"),
-        SlideContent.LargeText(title = "Find the activity with exact package"),
-        SlideContent.LargeText(title = "Find the fragment, approximate package"),
-        SlideContent.LargeText(title = "Find the Composables via string associations"),
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.ONE, caption = "Find the activity with exact package"),
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.TWO, caption = "Find the fragment, approximate package"),
+        SlideContent.Emoji(
+            emoji = PresentationEmoji.THREE,
+            caption = "Find the Composables via string associations"),
         SlideContent.Emoji(emoji = PresentationEmoji.RUST, caption = "ripgrep is our friend"),
     )

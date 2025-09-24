@@ -20,8 +20,7 @@ fun getIntroductionSlides(): List<SlideContent> =
                     BulletPoint(text = "Automated"),
                 )),
         SlideContent.LargeText(
-            title =
-                "AutoMobile is a set of tools for automating the authoring and execution of UI testing"),
+            title = "AutoMobile is a set of tools for automating mobile engineering"),
         SlideContent.BulletPoints(
             title = "AutoMobile includes:",
             points =

@@ -23,8 +23,9 @@ fun getOriginSlides(): List<SlideContent> =
         // text field
         //        - Mermaid diagram showing system design of automatic observation on interaction
         SlideContent.LargeText(title = "Origin Story"),
-        SlideContent.Emoji(
-            emoji = PresentationEmoji.DOLPHIN, caption = "Flipper got deprecated in 2024"),
+        //        SlideContent.Emoji(
+        //            emoji = PresentationEmoji.DOLPHIN, caption = "Flipper got deprecated in
+        // 2024"),
         SlideContent.Emoji(
             emoji = PresentationEmoji.PROGRAMMER,
             caption = "I got tasked with looking at OSS AI tools for UI testing"),
@@ -50,10 +51,11 @@ fun getOriginSlides(): List<SlideContent> =
         SlideContent.LargeText(
             title = "Looking at notifications",
             subtitle = "Swipe down on system bar, scroll to find relevant icon/text"),
-        SlideContent.LargeText(
-            title = "Selecting text",
-            subtitle =
-                "Double tap on text, tap \"Select All\", tap \"Cut\" or press Delete key to clear text field"),
+        //        SlideContent.LargeText(
+        //            title = "Selecting text",
+        //            subtitle =
+        //                "Double tap on text, tap \"Select All\", tap \"Cut\" or press Delete key
+        // to clear text field"),
         SlideContent.Emoji(
             emoji = PresentationEmoji.THINKING,
             caption = "What if I provided the AI agent with the exact relevant context it needs?"),

@@ -16,6 +16,21 @@ fun getAutomaticTestAuthoringSlides(): List<SlideContent> =
                             "Writes Kotlin test files with KotlinPoet + public modifier scrubbing"),
                     BulletPoint(text = "Highly configurable to put tests in the right place"),
                 )),
+        SlideContent.CodeSample(
+            title = "Environment Credentials Example",
+            code =
+                """
+      @Test
+      fun `given valid credentials, login should succeed`() {
+          val result = AutoMobilePlan("test-plans/login.yaml", {
+            "username" to "jason@zillow.com"
+            "password" to "hunter2"
+          }).execute()
+          assertTrue(result.status)
+      }
+    """
+                    .trimIndent(),
+            language = "kotlin"),
         SlideContent.Emoji(emoji = PresentationEmoji.THINKING, caption = "Why is this important?"),
         SlideContent.Emoji(emoji = PresentationEmoji.EASY, caption = "Allows for easier adoption"),
         SlideContent.Emoji(

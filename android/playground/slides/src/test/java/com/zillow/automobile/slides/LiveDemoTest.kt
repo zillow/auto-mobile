@@ -44,7 +44,7 @@ class LiveDemoTest {
   fun `AutoMobile playground`() {
 
     val result =
-        AutoMobilePlan("test-plans/auto-mobile-playground.yaml", { "slide" to "57" }).execute()
+        AutoMobilePlan("test-plans/auto-mobile-playground.yaml", { "slide" to "46" }).execute()
 
     assertTrue(result.success)
   }

@@ -17,11 +17,9 @@ fun getEarlySuccessSlides(): List<SlideContent> =
                 listOf(
                     BulletPoint(text = "Tons of different form fields and UX patterns"),
                     BulletPoint(text = "Edge cases in parsing active windows"),
-                    BulletPoint(text = "Still need WebView support"),
                 )),
 
         // TODO: demo slide, run Zillow test that returns to automobile
-        SlideContent.Emoji(
-            emoji = PresentationEmoji.HOME, caption = "Zillow 3D home navigation demo"),
+        SlideContent.Emoji(emoji = PresentationEmoji.HOME, caption = "Zillow full feature demo"),
         SlideContent.Emoji(emoji = PresentationEmoji.GLOBE, caption = "Decided to pursue OSS"),
     )

@@ -49,24 +49,4 @@ class D,E,H logic;
 class B,C,F decision;
         """
                     .trimIndent()),
-        SlideContent.MermaidDiagram(
-            title = "View Hierarchy Cache System",
-            code =
-                """
-flowchart LR
-A["Observe()"] --> B{"installed?"};
-B -->|"✅"| C{"running?"};
-B -->|"❌"| E["caching system"];
-C -->|"✅"| D["cat vh.json"];
-C -->|"❌"| E["uiautomator dump"];
-D --> I["Return"]
-E --> I;
-classDef decision fill:#FF3300,stroke-width:0px,color:white;
-classDef logic fill:#525FE1,stroke-width:0px,color:white;
-classDef result stroke-width:0px;
-class A,G,I result;
-class D,E,H logic;
-class B,C,F decision;
-        """
-                    .trimIndent()),
     )
