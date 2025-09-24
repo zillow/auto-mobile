@@ -40,5 +40,5 @@ fun getVisionSlides(): List<SlideContent> =
                     BulletPoint(text = "https://github.com/kaeawc/android-mcp-sdk"),
                 )),
         SlideContent.Screenshot(
-            lightScreenshot = R.drawable.auto_mobile_holo, caption = "Questions?"),
+            lightScreenshot = R.drawable.auto_mobile_qr_code, caption = "Questions?"),
     )
