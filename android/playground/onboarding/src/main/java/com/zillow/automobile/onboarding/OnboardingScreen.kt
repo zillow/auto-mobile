@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -84,11 +85,16 @@ fun OnboardingScreen(onFinish: () -> Unit) {
   val coroutineScope = rememberCoroutineScope()
 
   Column(
-      modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+    modifier = Modifier
+      .fillMaxSize()
+      .background(MaterialTheme.colorScheme.background)
+      .safeDrawingPadding()
   ) {
     // Skip button
     Row(
-        modifier = Modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(16.dp),
         horizontalArrangement = Arrangement.End) {
           if (pagerState.currentPage < pages.size - 1) {
             TextButton(onClick = onFinish) { Text(stringResource(id = R.string.onboarding_skip)) }
@@ -277,14 +283,16 @@ fun PageIndicators(pageCount: Int, currentPage: Int, modifier: Modifier = Modifi
     repeat(pageCount) { index ->
       Box(
           modifier =
-              Modifier.size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
-                  .clip(RoundedCornerShape(4.dp))
-                  .background(
-                      if (index == currentPage) {
-                        MaterialTheme.colorScheme.primary
-                      } else {
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                      }))
+              Modifier
+                .size(width = if (index == currentPage) 24.dp else 8.dp, height = 8.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(
+                  if (index == currentPage) {
+                    MaterialTheme.colorScheme.primary
+                  } else {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                  }
+                ))
     }
   }
 }
