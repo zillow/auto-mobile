@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -186,13 +187,27 @@ fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit 
                           containerColor = MaterialTheme.colorScheme.errorContainer)) {
                     Column(
                         modifier = Modifier.padding(20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
                           Text(
                               text = "Account Actions",
                               fontSize = 18.sp,
                               fontWeight = FontWeight.Bold,
                               color = MaterialTheme.colorScheme.onErrorContainer,
                               modifier = Modifier.padding(bottom = 12.dp))
+
+                          Button(
+                              onClick = { viewModel.resetOnboarding() },
+                              modifier = Modifier.fillMaxWidth(),
+                              colors =
+                                  ButtonDefaults.buttonColors(
+                                      containerColor = MaterialTheme.colorScheme.secondary)) {
+                                Icon(
+                                    imageVector = Icons.Filled.Refresh,
+                                    contentDescription = "Reset Onboarding",
+                                    modifier = Modifier.padding(end = 8.dp))
+                                Text("Reset Onboarding")
+                              }
 
                           Button(
                               onClick = onLogout,

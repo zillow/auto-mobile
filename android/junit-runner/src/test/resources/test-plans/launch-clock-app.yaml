@@ -5,6 +5,8 @@ steps:
   - tool: launchApp
     appId: com.google.android.deskclock
     label: Launch Clock application
+    clearAppData: true
+    coldBoot: true
 
   - tool: terminateApp
     appId: com.google.android.deskclock

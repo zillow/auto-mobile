@@ -7,6 +7,7 @@ import com.zillow.automobile.experimentation.Experiment
 import com.zillow.automobile.experimentation.ExperimentRepository
 import com.zillow.automobile.experimentation.Treatment
 import com.zillow.automobile.storage.AnalyticsRepository
+import com.zillow.automobile.storage.OnboardingRepository
 import com.zillow.automobile.storage.UserProfile
 import com.zillow.automobile.storage.UserRepository
 import com.zillow.automobile.storage.UserStats
@@ -17,7 +18,8 @@ import kotlinx.coroutines.flow.asStateFlow
 class SettingsViewModel(
     private val experimentRepository: ExperimentRepository,
     private val userRepository: UserRepository,
-    private val analyticsRepository: AnalyticsRepository
+    private val analyticsRepository: AnalyticsRepository,
+    private val onboardingRepository: OnboardingRepository
 ) : ViewModel() {
 
   private val _experiments = MutableStateFlow<List<Experiment<*>>>(emptyList())
@@ -117,6 +119,10 @@ class SettingsViewModel(
   fun resetStats() {
     analyticsRepository.resetStats()
   }
+
+  fun resetOnboarding() {
+    onboardingRepository.resetOnboarding()
+  }
 }
 
 class SettingsViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
@@ -124,7 +130,10 @@ class SettingsViewModelFactory(private val context: Context) : ViewModelProvider
     if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
       @Suppress("UNCHECKED_CAST")
       return SettingsViewModel(
-          ExperimentRepository(context), UserRepository(context), AnalyticsRepository(context))
+          ExperimentRepository(context),
+          UserRepository(context),
+          AnalyticsRepository(context),
+          OnboardingRepository(context))
           as T
     }
     throw IllegalArgumentException("Unknown ViewModel class")
