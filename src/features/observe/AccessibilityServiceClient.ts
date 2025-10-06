@@ -1,7 +1,7 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ViewHierarchyResult } from "../../models";
-import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
+import { ViewHierarchyQueryOptions, ViewHierarchyTimestampContext } from "../../models/ViewHierarchyQueryOptions";
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
 import { v4 as uuidv4 } from "uuid";
 
@@ -160,11 +160,109 @@ export class AccessibilityServiceClient {
   }
 
   /**
+   * Parse ls -l --full-time output to get modification timestamp in milliseconds
+   * @param lsOutput - Output from: adb shell "run-as ... ls -l --full-time files/latest_hierarchy.json"
+   * @returns Timestamp in milliseconds since epoch, or null if parsing fails
+   */
+  private parseFileTimestamp(lsOutput: string): number | null {
+    try {
+      // Example output:
+      // -rw-rw---- 1 u0_a385 u0_a385 17562 2025-10-01 09:11:00.875765737 -0500 files/latest_hierarchy.json
+
+      const parts = lsOutput.trim().split(/\s+/);
+
+      // Date is at index 5, time at index 6, timezone at index 7
+      const datePart = parts[5];      // 2025-10-01
+      const timePart = parts[6];      // 09:11:00.875765737
+      const timezonePart = parts[7];  // -0500
+
+      // Split time into seconds and nanoseconds
+      const [timeBase, nanoseconds] = timePart.split(".");
+
+      // Extract milliseconds from nanoseconds (first 3 digits)
+      const milliseconds = nanoseconds.substring(0, 3);
+
+      // Construct ISO 8601 timestamp with milliseconds
+      // Convert timezone format from -0500 to -05:00
+      const timezoneFormatted = timezonePart.slice(0, 3) + ":" + timezonePart.slice(3);
+      const isoTimestamp = `${datePart}T${timeBase}.${milliseconds}${timezoneFormatted}`;
+
+      // Parse to Date and get milliseconds since epoch
+      const timestamp = new Date(isoTimestamp).getTime();
+
+      return isNaN(timestamp) ? null : timestamp;
+    } catch (error) {
+      logger.warn(`Failed to parse file timestamp from ls output: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Get file modification timestamp using ls -l --full-time
+   * @returns Timestamp in milliseconds since epoch, or null if fails
+   */
+  private async getFileTimestamp(): Promise<number | null> {
+    try {
+      const result = await this.adb.executeCommand(
+        `shell run-as ${AccessibilityServiceClient.PACKAGE_NAME} ls -l --full-time ${AccessibilityServiceClient.HIERARCHY_FILE_PATH}`
+      );
+      return this.parseFileTimestamp(result.stdout);
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to get file timestamp: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Validate that the view hierarchy file timestamp meets requirements
+   * @param fileTimestamp - File modification timestamp in milliseconds
+   * @param context - Timestamp context with action and stability timing
+   * @returns True if timestamp is valid, false otherwise
+   */
+  private validateHierarchyTimestamp(
+    fileTimestamp: number | null,
+    context: ViewHierarchyTimestampContext
+  ): boolean {
+    if (!fileTimestamp) {
+      logger.error("[ACCESSIBILITY_SERVICE] Could not determine file timestamp, failing validation");
+      return false;
+    }
+
+    // File must be newer than action start
+    if (fileTimestamp < context.actionStartTime) {
+      logger.warn(
+        `[ACCESSIBILITY_SERVICE] File timestamp ${fileTimestamp} is older than action start ${context.actionStartTime} ` +
+        `(age: ${context.actionStartTime - fileTimestamp}ms)`
+      );
+      return false;
+    }
+
+    // If UI settling occurred, file must be at least as new as stability window start
+    if (context.stabilityStartTime && fileTimestamp < context.stabilityStartTime) {
+      logger.warn(
+        `[ACCESSIBILITY_SERVICE] File timestamp ${fileTimestamp} is older than stability start ${context.stabilityStartTime} ` +
+        `(age: ${context.stabilityStartTime - fileTimestamp}ms)`
+      );
+      return false;
+    }
+
+    logger.info(
+      `[ACCESSIBILITY_SERVICE] View hierarchy file timestamp validated: ${fileTimestamp} >= ${context.minRequiredTimestamp} ` +
+      `(file is ${fileTimestamp - context.minRequiredTimestamp}ms newer)`
+    );
+    return true;
+  }
+
+  /**
      * Query the accessibility service for the latest view hierarchy
    * @param queryOptions - Options to filter the view hierarchy
+   * @param timestampContext - Optional timestamp context for validation
      * @returns Promise<AccessibilityHierarchy | null> - The hierarchy data or null if unavailable
      */
-  async getLatestHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<AccessibilityHierarchy | null> {
+  async getLatestHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    timestampContext?: ViewHierarchyTimestampContext
+  ): Promise<AccessibilityHierarchy | null> {
     const startTime = Date.now();
 
     try {
@@ -174,6 +272,16 @@ export class AccessibilityServiceClient {
       // if (queryOptions) {
       //   return await this.getTargetedHierarchy(queryOptions);
       // }
+
+      // Validate timestamp if context provided
+      if (timestampContext) {
+        const fileTimestamp = await this.getFileTimestamp();
+
+        if (!this.validateHierarchyTimestamp(fileTimestamp, timestampContext)) {
+          logger.warn("[ACCESSIBILITY_SERVICE] Hierarchy file timestamp validation failed");
+          return null;
+        }
+      }
 
       // Otherwise, get the standard latest hierarchy
       const result = await this.adb.executeCommand(
@@ -319,9 +427,13 @@ export class AccessibilityServiceClient {
      * Get view hierarchy from accessibility service
      * This is the main entry point for getting hierarchy data from the accessibility service
    * @param queryOptions - Options to filter the view hierarchy
+   * @param timestampContext - Optional timestamp context for validation
      * @returns Promise<ViewHierarchyResult | null> - The hierarchy or null if service unavailable
      */
-  async getAccessibilityHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult | null> {
+  async getAccessibilityHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    timestampContext?: ViewHierarchyTimestampContext
+  ): Promise<ViewHierarchyResult | null> {
     const startTime = Date.now();
 
     try {
@@ -334,7 +446,7 @@ export class AccessibilityServiceClient {
       }
 
       // Get hierarchy from service
-      const accessibilityHierarchy = await this.getLatestHierarchy(queryOptions);
+      const accessibilityHierarchy = await this.getLatestHierarchy(queryOptions, timestampContext);
       if (!accessibilityHierarchy) {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to get hierarchy from service, will use fallback");
         return null;

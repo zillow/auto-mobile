@@ -12,3 +12,20 @@ export interface ViewHierarchyQueryOptions {
   // XPath to restrict search
   xpath?: string;
 }
+
+/**
+ * Context for validating view hierarchy file timestamps
+ */
+export interface ViewHierarchyTimestampContext {
+  /** When action execution began */
+  actionStartTime: number;
+
+  /** When stability window began (if UI settling occurred) */
+  stabilityStartTime?: number;
+
+  /** When UI became stable */
+  stabilityEndTime?: number;
+
+  /** Minimum acceptable file timestamp */
+  minRequiredTimestamp: number;
+}

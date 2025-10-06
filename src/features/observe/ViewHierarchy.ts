@@ -13,7 +13,7 @@ import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../ut
 import { ScreenshotUtils } from "../../utils/screenshot-utils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { SourceMapper } from "../../utils/sourceMapper";
-import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions } from "../../models";
+import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions, ViewHierarchyTimestampContext } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
 
@@ -504,14 +504,18 @@ export class ViewHierarchy {
   /**
    * Retrieve the view hierarchy of the current screen
    * @param queryOptions - Optional query options for targeted element retrieval
+   * @param timestampContext - Optional timestamp context for validation
    * @returns Promise with parsed XML view hierarchy
    */
-  async getViewHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
+  async getViewHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    timestampContext?: ViewHierarchyTimestampContext
+  ): Promise<ViewHierarchyResult> {
     switch (this.device.platform) {
       case "ios":
         return this.getiOSViewHierarchy();
       case "android":
-        return this.getAndroidViewHierarchy(queryOptions);
+        return this.getAndroidViewHierarchy(queryOptions, timestampContext);
       default:
         throw new Error("Unsupported platform");
     }
@@ -533,15 +537,22 @@ export class ViewHierarchy {
   /**
    * Retrieve the view hierarchy of the current screen
    * @param queryOptions - Optional query options for targeted element retrieval
+   * @param timestampContext - Optional timestamp context for validation
    * @returns Promise with parsed XML view hierarchy
    */
-  async getAndroidViewHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
+  async getAndroidViewHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    timestampContext?: ViewHierarchyTimestampContext
+  ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy`);
 
     // First try accessibility service if available and not skipped
     try {
-      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions);
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(
+        queryOptions,
+        timestampContext
+      );
       if (accessibilityHierarchy) {
         const accessibilityDuration = Date.now() - startTime;
         logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);

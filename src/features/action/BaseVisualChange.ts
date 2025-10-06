@@ -6,7 +6,7 @@ import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ActionableError, ActiveWindowInfo, BootedDevice, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
-import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
+import { ViewHierarchyQueryOptions, ViewHierarchyTimestampContext } from "../../models/ViewHierarchyQueryOptions";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -82,11 +82,19 @@ export class BaseVisualChange {
     if (!previousObserveResult) {
       throw new ActionableError("Cannot perform action without view hierarchy");
     }
+
+    // Capture action start time for timestamp validation
+    const actionStartTime = Date.now();
+
     const blockResult = await block(previousObserveResult);
 
     // Get package name for UI stability waiting
     let packageName = options.packageName;
     const cachedPackageName = (await this.window.getCachedActiveWindow())?.appId;
+
+    // Track stability timing for timestamp validation
+    let stabilityStartTime: number | undefined;
+    let stabilityEndTime: number | undefined;
 
     // Start all parallel operations immediately
     const parallelPromises: Promise<any>[] = [];
@@ -95,6 +103,7 @@ export class BaseVisualChange {
     if (!packageName && cachedPackageName) {
       packageName = cachedPackageName;
       logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: ${packageName}`);
+      stabilityStartTime = Date.now();
       parallelPromises.push(this.awaitIdle.initializeUiStabilityTracking(
         packageName,
         timeoutMs
@@ -139,26 +148,41 @@ export class BaseVisualChange {
 
     // Execute UI stability waiting with appropriate state
     if (packageName && packageName.trim() !== "") {
+      if (!stabilityStartTime) {
+        stabilityStartTime = Date.now();
+      }
+
       if (initState !== null) {
         await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState);
       } else {
         await this.awaitIdle.waitForUiStability(packageName, timeoutMs);
       }
+
+      stabilityEndTime = Date.now();
     }
+
+    // Create timestamp context for observation
+    const timestampContext: ViewHierarchyTimestampContext = {
+      actionStartTime,
+      stabilityStartTime,
+      stabilityEndTime,
+      minRequiredTimestamp: stabilityStartTime || actionStartTime
+    };
 
     return await this.takeObservation(blockResult, previousObserveResult, {
       changeExpected: options.changeExpected,
       tolerancePercent: options.tolerancePercent ?? DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
-      queryOptions: options.queryOptions
+      queryOptions: options.queryOptions,
+      timestampContext
     });
   }
 
   private async takeObservation(
     blockResult: any,
     previousObserveResult: ObserveResult | null,
-    options: { changeExpected: boolean; tolerancePercent?: number; queryOptions?: ViewHierarchyQueryOptions }
+    options: { changeExpected: boolean; tolerancePercent?: number; queryOptions?: ViewHierarchyQueryOptions; timestampContext?: ViewHierarchyTimestampContext }
   ): Promise<any> {
-    const latestObservation = await this.observeScreen.execute(options.queryOptions);
+    const latestObservation = await this.observeScreen.execute(options.queryOptions, options.timestampContext);
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {
       blockResult.success = latestObservation.viewHierarchy !== previousObserveResult.viewHierarchy;

@@ -1,6 +1,6 @@
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ObserveResult } from "../../models";
-import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
+import { ViewHierarchyQueryOptions, ViewHierarchyTimestampContext } from "../../models/ViewHierarchyQueryOptions";
 import { GetScreenSize } from "./GetScreenSize";
 import { GetSystemInsets } from "./GetSystemInsets";
 import { ViewHierarchy } from "./ViewHierarchy";
@@ -119,11 +119,16 @@ export class ObserveScreen {
    * Collect view hierarchy and handle errors with accessibility service caching
    * @param result - ObserveResult to update
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param timestampContext - Optional timestamp context for validation
    */
-  public async collectViewHierarchy(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
+  public async collectViewHierarchy(
+    result: ObserveResult,
+    queryOptions?: ViewHierarchyQueryOptions,
+    timestampContext?: ViewHierarchyTimestampContext
+  ): Promise<void> {
     try {
       const viewHierarchyStart = Date.now();
-      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions);
+      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, timestampContext);
       logger.debug("Accessibility service availability cached as: true");
 
       if (viewHierarchy) {
@@ -207,8 +212,13 @@ export class ObserveScreen {
    * Collect all observation data with parallelization
    * @param result - ObserveResult to update
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param timestampContext - Optional timestamp context for validation
    */
-  public async collectAllData(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
+  public async collectAllData(
+    result: ObserveResult,
+    queryOptions?: ViewHierarchyQueryOptions,
+    timestampContext?: ViewHierarchyTimestampContext
+  ): Promise<void> {
     switch (this.device.platform) {
       case "android":
         // Start dumpsys window fetch early since multiple operations need it
@@ -227,7 +237,7 @@ export class ObserveScreen {
           this.collectScreenSize(dumpsysWindow, result),
           this.collectSystemInsets(dumpsysWindow, result),
           this.collectRotationInfo(dumpsysWindow, result),
-          this.collectViewHierarchy(result, queryOptions),
+          this.collectViewHierarchy(result, queryOptions, timestampContext),
         ];
 
         // Execute all remaining operations in parallel
@@ -239,7 +249,7 @@ export class ObserveScreen {
         // Now run the remaining operations in parallel using the shared dumpsys data
         const iosFinalPromises: Promise<void>[] = [
           this.collectScreenSize({} as ExecResult, result),
-          this.collectViewHierarchy(result, queryOptions),
+          this.collectViewHierarchy(result, queryOptions, timestampContext),
         ];
 
         // Execute all remaining operations in parallel
@@ -480,9 +490,13 @@ export class ObserveScreen {
   /**
    * Execute the observe command
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param timestampContext - Optional timestamp context for validation
    * @returns The observation result
    */
-  async execute(queryOptions?: ViewHierarchyQueryOptions): Promise<ObserveResult> {
+  async execute(
+    queryOptions?: ViewHierarchyQueryOptions,
+    timestampContext?: ViewHierarchyTimestampContext
+  ): Promise<ObserveResult> {
     try {
       logger.debug("Executing observe command");
       const startTime = Date.now();
@@ -491,7 +505,7 @@ export class ObserveScreen {
       const result = this.createBaseResult();
 
       // Collect all data components with parallelization
-      await this.collectAllData(result, queryOptions);
+      await this.collectAllData(result, queryOptions, timestampContext);
 
       // Cache the result for future use
       await this.cacheObserveResult(result);
