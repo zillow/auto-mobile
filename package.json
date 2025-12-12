@@ -57,7 +57,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/uuid": "^11.0.0",
     "fs-extra": "^11.3.2",
-    "glob": "^11.0.3",
+    "glob": "^11.1.0",
     "jimp": "^1.6.0",
     "js-yaml": "^4.1.0",
     "pixelmatch": "^7.1.0",
