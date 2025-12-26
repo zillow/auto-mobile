@@ -39,12 +39,9 @@ export const createMcpServer = (): McpServer => {
     version: "0.0.1"
   }, {
     capabilities: {
-      resources: {
-        templates: {}
-      },
+      resources: {},
       tools: {},
-      prompts: {},
-      sampling: {}
+      prompts: {}
     }
   });
 

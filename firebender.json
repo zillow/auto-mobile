@@ -17,11 +17,7 @@
       "filePathMatches": "*",
       "rulesPaths": [
         "README.md",
-        "docs/ai/validation.md",
-        "roadmap/README.md",
-        "roadmap/bugs/TEMPLATE.md",
-        "roadmap/features/TEMPLATE.md",
-        "roadmap/features/README.md"
+        "docs/ai/validation.md"
       ]
     }
   ],

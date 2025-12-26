@@ -23,9 +23,7 @@ describe("MCP Server Initialization", () => {
     const { z } = await import("zod");
     const initializeResponseSchema = z.object({
       capabilities: z.object({
-        resources: z.object({
-          templates: z.object({})
-        }),
+        resources: z.object({}),
         tools: z.object({})
       }),
       serverInfo: z.object({
@@ -57,7 +55,6 @@ describe("MCP Server Initialization", () => {
     // Verify capabilities structure
     expect(result.capabilities).to.have.property("resources");
     expect(result.capabilities).to.have.property("tools");
-    expect(result.capabilities.resources).to.have.property("templates");
 
     // Verify server info
     expect(result.serverInfo).to.have.property("name", "AutoMobile");
