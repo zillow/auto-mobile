@@ -21,34 +21,34 @@ the file:
 
 ```bash
 # Step 1: Trigger hierarchy extraction to file
-adb shell am broadcast -a com.zillow.automobile.GET_HIERARCHY_SYNC
+adb shell am broadcast -a dev.jasonpearson.automobile.GET_HIERARCHY_SYNC
 
 # Step 2: Read the result file
-adb shell run-as com.zillow.automobile.accessibilityservice cat files/latest_hierarchy.json
+adb shell run-as dev.jasonpearson.automobile.accessibilityservice cat files/latest_hierarchy.json
 ```
 
 **One-liner for convenience:**
 ```bash
-adb shell "am broadcast -a com.zillow.automobile.GET_HIERARCHY_SYNC && sleep 0.5 && run-as com.zillow.automobile.accessibilityservice cat files/latest_hierarchy.json"
+adb shell "am broadcast -a dev.jasonpearson.automobile.GET_HIERARCHY_SYNC && sleep 0.5 && run-as dev.jasonpearson.automobile.accessibilityservice cat files/latest_hierarchy.json"
 ```
 
 **Debugging commands if the above doesn't work:**
 
 ```bash
 # Check if the app is installed
-adb shell pm list packages | grep com.zillow.automobile.accessibilityservice
+adb shell pm list packages | grep dev.jasonpearson.automobile.accessibilityservice
 
 # Check if the accessibility service is running
 adb shell settings get secure enabled_accessibility_services
 
 # Check if the file exists in app storage
-adb shell run-as com.zillow.automobile.accessibilityservice ls -la files/
+adb shell run-as dev.jasonpearson.automobile.accessibilityservice ls -la files/
 
 # Check recent logs for both receiver and service
 adb logcat -s AccessibilityCommandReceiver AutoMobileAccessibilityService
 
 # Trigger broadcast and check logs in real-time
-adb shell am broadcast -a com.zillow.automobile.GET_HIERARCHY_SYNC && adb logcat -s AccessibilityCommandReceiver AutoMobileAccessibilityService
+adb shell am broadcast -a dev.jasonpearson.automobile.GET_HIERARCHY_SYNC && adb logcat -s AccessibilityCommandReceiver AutoMobileAccessibilityService
 ```
 
 **Benefits:**
@@ -65,10 +65,10 @@ For applications that prefer broadcast-based communication:
 
 ```bash
 # Request latest view hierarchy
-adb shell am broadcast -a com.zillow.automobile.GET_LATEST_HIERARCHY
+adb shell am broadcast -a dev.jasonpearson.automobile.GET_LATEST_HIERARCHY
 
 # Response will be sent via broadcast:
-# Action: com.zillow.automobile.HIERARCHY_RESPONSE
+# Action: dev.jasonpearson.automobile.HIERARCHY_RESPONSE
 # Extras: 
 #   - json_data (string): JSON-encoded view hierarchy
 #   - success (boolean): Whether operation was successful
@@ -115,7 +115,7 @@ For errors (via broadcasts):
 ```bash
 #!/bin/bash
 # Get view hierarchy synchronously
-HIERARCHY=$(adb shell "am broadcast -a com.zillow.automobile.GET_HIERARCHY_SYNC && sleep 0.5 && run-as com.zillow.automobile.accessibilityservice cat files/latest_hierarchy.json")
+HIERARCHY=$(adb shell "am broadcast -a dev.jasonpearson.automobile.GET_HIERARCHY_SYNC && sleep 0.5 && run-as dev.jasonpearson.automobile.accessibilityservice cat files/latest_hierarchy.json")
 echo "Current screen hierarchy: $HIERARCHY"
 ```
 
@@ -127,14 +127,14 @@ import time
 
 def get_view_hierarchy():
     # Trigger extraction
-    subprocess.run(['adb', 'shell', 'am', 'broadcast', '-a', 'com.zillow.automobile.GET_HIERARCHY_SYNC'])
+    subprocess.run(['adb', 'shell', 'am', 'broadcast', '-a', 'dev.jasonpearson.automobile.GET_HIERARCHY_SYNC'])
     
     # Wait briefly for file write
     time.sleep(0.5)
     
     # Read the result
     result = subprocess.run([
-        'adb', 'shell', 'run-as', 'com.zillow.automobile.accessibilityservice', 
+        'adb', 'shell', 'run-as', 'dev.jasonpearson.automobile.accessibilityservice', 
         'cat', 'files/latest_hierarchy.json'
     ], capture_output=True, text=True)
     
@@ -162,15 +162,15 @@ val receiver = object : BroadcastReceiver() {
 }
 
 // Register for hierarchy responses
-val filter = IntentFilter("com.zillow.automobile.HIERARCHY_RESPONSE")
+val filter = IntentFilter("dev.jasonpearson.automobile.HIERARCHY_RESPONSE")
 context.registerReceiver(receiver, filter)
 ```
 
 ## App Package Information
 
-- **Package Name**: `com.zillow.automobile.accessibilityservice`
+- **Package Name**: `dev.jasonpearson.automobile.accessibilityservice`
 - **Hierarchy File Location**: `files/latest_hierarchy.json` (within app's private directory)
-- **ADB Access**: Use `run-as com.zillow.automobile.accessibilityservice` to access app-scoped files
+- **ADB Access**: Use `run-as dev.jasonpearson.automobile.accessibilityservice` to access app-scoped files
 
 ## How It Works
 

@@ -47,6 +47,8 @@ allprojects {
       jvmTarget.set(JvmTarget.valueOf("JVM_${libs.versions.build.java.target.get()}"))
       freeCompilerArgs.addAll(
           listOf(
+              "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+              "-opt-in=androidx.media3.common.util.UnstableApi",
               "-opt-in=kotlin.time.ExperimentalTime,kotlin.RequiresOptIn",
               "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
               "-opt-in=kotlin.ExperimentalUnsignedTypes",

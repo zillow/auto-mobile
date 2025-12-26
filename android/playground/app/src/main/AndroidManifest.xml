@@ -45,12 +45,12 @@
 
       <!-- Coil Initializer -->
       <meta-data
-        android:name="com.zillow.automobile.playground.initializers.CoilInitializer"
+        android:name="dev.jasonpearson.automobile.playground.initializers.CoilInitializer"
         android:value="androidx.startup" />
 
       <!-- ExoPlayer Initializer -->
       <meta-data
-        android:name="com.zillow.automobile.playground.initializers.ExoPlayerInitializer"
+        android:name="dev.jasonpearson.automobile.playground.initializers.ExoPlayerInitializer"
         android:value="androidx.startup" />
     </provider>
 

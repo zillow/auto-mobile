@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-  namespace = "com.zillow.automobile.discover"
+  namespace = "dev.jasonpearson.automobile.discover"
   compileSdk = libs.versions.build.android.compileSdk.get().toInt()
   buildToolsVersion = libs.versions.build.android.buildTools.get()
 
@@ -26,12 +26,24 @@ android {
     sourceCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
     targetCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
   }
-  kotlinOptions {
-    jvmTarget = libs.versions.build.java.target.get()
-    languageVersion = libs.versions.build.kotlin.language.get()
-    freeCompilerArgs += "-opt-in=androidx.media3.common.util.UnstableApi"
-  }
   buildFeatures { compose = true }
+}
+
+kotlin {
+  compilerOptions {
+    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get()))
+    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(libs.versions.build.kotlin.language.get()))
+    freeCompilerArgs = listOf(
+      "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+      "-opt-in=androidx.media3.common.util.UnstableApi",
+      "-opt-in=kotlin.time.ExperimentalTime,kotlin.RequiresOptIn",
+      "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+      "-opt-in=kotlin.ExperimentalUnsignedTypes",
+      "-opt-in=kotlin.time.ExperimentalTime",
+      "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+      "-opt-in=kotlinx.coroutines.FlowPreview"
+    )
+  }
 }
 
 dependencies {

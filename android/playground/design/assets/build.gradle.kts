@@ -1,7 +1,7 @@
 plugins { alias(libs.plugins.android.library) }
 
 android {
-  namespace = "com.zillow.automobile.design.assets"
+  namespace = "dev.jasonpearson.automobile.design.assets"
   compileSdk = libs.versions.build.android.compileSdk.get().toInt()
   buildToolsVersion = libs.versions.build.android.buildTools.get()
 

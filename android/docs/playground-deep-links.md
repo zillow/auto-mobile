@@ -41,16 +41,16 @@ You can test deep links using ADB commands:
 
 ```bash
 # Navigate to onboarding
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/onboarding" com.zillow.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile://playground/onboarding" dev.jasonpearson.automobile.playground
 
 # Navigate to login
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/login" com.zillow.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile://playground/login" dev.jasonpearson.automobile.playground
 
 # Navigate to home
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/home" com.zillow.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile://playground/home" dev.jasonpearson.automobile.playground
 
 # Navigate to video player
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/video_player/test123" com.zillow.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile://playground/video_player/test123" dev.jasonpearson.automobile.playground
 ```
 
 ## AutoMobile Test Integration

@@ -1272,7 +1272,7 @@ export class ViewHierarchy {
       // Parse View Hierarchy for class names that don't match standard Android patterns
       if (inViewHierarchy) {
         // Look for lines with class definitions like:
-        // com.zillow.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
+        // dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
         const classMatch = line.match(/^\s*([a-zA-Z][a-zA-Z0-9._$]*)\{[^}]+\}/);
         if (classMatch) {
           const className = classMatch[1];

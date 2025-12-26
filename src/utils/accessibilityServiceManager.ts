@@ -15,9 +15,11 @@ const execAsync = promisify(exec);
 export class AccessibilityServiceManager {
   private readonly device: BootedDevice;
   private adb: AdbUtils;
-  public static readonly PACKAGE = "com.zillow.automobile.accessibilityservice";
-  public static readonly ACTIVITY = "com.zillow.automobile.accessibilityservice.MainActivity";
-  private static readonly APK_URL = "https://github.com/zillow/auto-mobile/releases/download/0.0.5/accessibility-service-debug.apk";
+  public static readonly PACKAGE = "dev.jasonpearson.automobile.accessibilityservice";
+  public static readonly ACTIVITY = "dev.jasonpearson.automobile.accessibilityservice.MainActivity";
+
+  // TODO: Instead of downloading an APK we should bundle it with the npm package
+  private static readonly APK_URL = "https://github.com/kaeawc/auto-mobile/releases/download/0.0.6/accessibility-service-debug.apk";
 
   // Static cache for service availability
   private cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;

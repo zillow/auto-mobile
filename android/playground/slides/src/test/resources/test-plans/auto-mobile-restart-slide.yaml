@@ -6,7 +6,7 @@ parameters:
 
 steps:
   - tool: terminateApp
-    appId: com.zillow.automobile.playground
+    appId: dev.jasonpearson.automobile.playground
     label: Stop the AutoMobile playground app
 
   - tool: openLink

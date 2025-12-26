@@ -9,7 +9,7 @@ steps:
     label: Orient device to portrait mode
 
   - tool: stopApp
-    appId: com.zillow.automobile.playground
+    appId: dev.jasonpearson.automobile.playground
     label: Stop the AutoMobile playground app
 
   # Launch Bluesky app
@@ -22,7 +22,7 @@ steps:
 
   # Enter the main post text
   - tool: "inputText"
-    text: "AutoMobile is OSS on GitHub! Come check it out at https://zillow.github.io/auto-mobile #LiveDemo #AndroidDev #dcnyc25"
+    text: "AutoMobile is OSS on GitHub! Come check it out at https://kaeawc.github.io/auto-mobile #LiveDemo #AndroidDev #dcnyc25"
 
   # Add video to the post
   - tool: "tapOn"
@@ -92,7 +92,7 @@ steps:
     id: "composerPublishBtn"
 
   - tool: stopApp
-    appId: com.zillow.automobile.playground
+    appId: dev.jasonpearson.automobile.playground
     label: Stop the AutoMobile playground app
 
   - tool: openLink

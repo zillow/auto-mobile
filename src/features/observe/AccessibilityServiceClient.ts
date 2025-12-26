@@ -1,9 +1,9 @@
+import WebSocket from "ws";
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ViewHierarchyResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
-import { v4 as uuidv4 } from "uuid";
 
 /**
  * Interface for accessibility service node format
@@ -44,13 +44,48 @@ interface AccessibilityHierarchy {
 }
 
 /**
- * Client for interacting with the AutoMobile Accessibility Service
+ * Interface for WebSocket message from accessibility service
+ */
+interface WebSocketMessage {
+  type: string;
+  timestamp?: number;
+  data?: AccessibilityHierarchy;
+}
+
+/**
+ * Interface for cached hierarchy with metadata
+ */
+interface CachedHierarchy {
+  hierarchy: AccessibilityHierarchy;
+  receivedAt: number;
+  fresh: boolean;
+}
+
+/**
+ * Interface for hierarchy response with freshness indicator
+ */
+export interface AccessibilityHierarchyResponse {
+  hierarchy: AccessibilityHierarchy | null;
+  fresh: boolean;
+  updatedAt: number;
+}
+
+/**
+ * Client for interacting with the AutoMobile Accessibility Service via WebSocket
  */
 export class AccessibilityServiceClient {
   private device: BootedDevice;
   private adb: AdbUtils;
-  private static readonly PACKAGE_NAME = "com.zillow.automobile.accessibilityservice";
-  private static readonly HIERARCHY_FILE_PATH = "files/latest_hierarchy.json";
+  private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
+  private static readonly WEBSOCKET_PORT = 8765;
+  private static readonly WEBSOCKET_URL = `ws://localhost:${AccessibilityServiceClient.WEBSOCKET_PORT}/ws`;
+
+  private ws: WebSocket | null = null;
+  private cachedHierarchy: CachedHierarchy | null = null;
+  private isConnecting: boolean = false;
+  private connectionAttempts: number = 0;
+  private readonly maxConnectionAttempts: number = 3;
+  private portForwardingSetup: boolean = false;
 
   constructor(device: BootedDevice, adb: AdbUtils | null = null) {
     this.device = device;
@@ -59,144 +94,252 @@ export class AccessibilityServiceClient {
   }
 
   /**
-   * Query the accessibility service for targeted view hierarchy using broadcast receiver
-   * @param queryOptions - Options to filter the view hierarchy
-   * @returns Promise<AccessibilityHierarchy | null> - The hierarchy data or null if unavailable
+   * Setup ADB port forwarding for WebSocket connection
    */
-  async getTargetedHierarchy(queryOptions: ViewHierarchyQueryOptions): Promise<AccessibilityHierarchy | null> {
-    const startTime = Date.now();
-    const queryId = uuidv4();
+  private async setupPortForwarding(): Promise<void> {
+    if (this.portForwardingSetup) {
+      return;
+    }
 
     try {
-      logger.info(`[ACCESSIBILITY_SERVICE] Sending targeted hierarchy request with UUID: ${queryId}`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Setting up port forwarding for WebSocket: localhost:${AccessibilityServiceClient.WEBSOCKET_PORT} → device:${AccessibilityServiceClient.WEBSOCKET_PORT}`);
 
-      // Prepare broadcast command with query parameters
-      const broadcastCommand = this.buildBroadcastCommand(queryId, queryOptions);
-      const hierarchyFileName = `hierarchy_${queryId}.json`;
+      // Clear any existing forwarding for this port
+      await this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+        // Ignore errors if no forwarding exists
+      });
 
-      // Run broadcast and polling in parallel
-      const broadcastPromise = this.adb.executeCommand(broadcastCommand);
+      // Setup new forwarding
+      await this.adb.executeCommand(`forward tcp:${AccessibilityServiceClient.WEBSOCKET_PORT} tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`);
 
-      // Start polling after 100ms delay to give the service time to write the file
-      const pollingPromise = (async () => {
-        // Initial delay to let the service process the broadcast
-        await new Promise(resolve => setTimeout(resolve, 100));
+      this.portForwardingSetup = true;
+      logger.info("[ACCESSIBILITY_SERVICE] Port forwarding setup complete");
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to setup port forwarding: ${error}`);
+      throw error;
+    }
+  }
 
-        const maxDelay = 500;
-        let delay = 50; // Start with 50ms since we already waited 100ms
-        let result;
+  /**
+   * Connect to the WebSocket server
+   */
+  private async connectWebSocket(): Promise<boolean> {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      return true;
+    }
 
-        while (delay <= maxDelay) {
-          try {
-            result = await this.adb.executeCommand(
-              `shell run-as ${AccessibilityServiceClient.PACKAGE_NAME} cat files/${hierarchyFileName}`
-            );
-
-            if (result.stdout && result.stdout.trim() !== "") {
-              return result;
-            }
-          } catch (err) {
-            // Ignore errors and continue polling
-            logger.debug(`[ACCESSIBILITY_SERVICE] Error while reading hierarchy file (retrying in ${delay}ms): ${err}`);
+    if (this.isConnecting) {
+      logger.debug("[ACCESSIBILITY_SERVICE] Connection already in progress, waiting...");
+      // Wait for ongoing connection attempt
+      return new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+          if (!this.isConnecting) {
+            clearInterval(checkInterval);
+            resolve(this.ws?.readyState === WebSocket.OPEN);
           }
+        }, 100);
+      });
+    }
 
-          // Wait for the current delay period
-          await new Promise(resolve => setTimeout(resolve, delay));
+    if (this.connectionAttempts >= this.maxConnectionAttempts) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Max connection attempts (${this.maxConnectionAttempts}) reached`);
+      return false;
+    }
 
-          // Double the delay for the next iteration (exponential backoff)
-          delay *= 2;
+    this.isConnecting = true;
+    this.connectionAttempts++;
+
+    try {
+      // Ensure port forwarding is setup
+      await this.setupPortForwarding();
+
+      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${AccessibilityServiceClient.WEBSOCKET_URL} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts})`);
+
+      return await new Promise((resolve, reject) => {
+        const ws = new WebSocket(AccessibilityServiceClient.WEBSOCKET_URL);
+        const connectionTimeout = setTimeout(() => {
+          ws.close();
+          reject(new Error("WebSocket connection timeout"));
+        }, 5000);
+
+        ws.on("open", () => {
+          clearTimeout(connectionTimeout);
+          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connected successfully");
+          this.ws = ws;
+          this.isConnecting = false;
+          this.connectionAttempts = 0; // Reset on successful connection
+          resolve(true);
+        });
+
+        ws.on("message", (data: WebSocket.Data) => {
+          this.handleWebSocketMessage(data);
+        });
+
+        ws.on("error", error => {
+          clearTimeout(connectionTimeout);
+          logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket error: ${error.message}`);
+          this.isConnecting = false;
+          reject(error);
+        });
+
+        ws.on("close", () => {
+          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connection closed");
+          this.ws = null;
+          this.isConnecting = false;
+        });
+      });
+    } catch (error) {
+      this.isConnecting = false;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to connect to WebSocket: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Handle incoming WebSocket message
+   */
+  private handleWebSocketMessage(data: WebSocket.Data): void {
+    try {
+      const message: WebSocketMessage = JSON.parse(data.toString());
+
+      if (message.type === "connected") {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Received connection confirmation`);
+        return;
+      }
+
+      if (message.type === "hierarchy_update" && message.data) {
+        const now = Date.now();
+        logger.debug(`[ACCESSIBILITY_SERVICE] Received hierarchy update (timestamp: ${message.data.timestamp})`);
+
+        // Mark previous cache as stale
+        if (this.cachedHierarchy) {
+          this.cachedHierarchy.fresh = false;
         }
 
-        return null;
-      })();
+        // Update cache with fresh data
+        this.cachedHierarchy = {
+          hierarchy: message.data,
+          receivedAt: now,
+          fresh: true
+        };
 
-      // Wait for both broadcast and polling to complete
-      const [, pollingResult] = await Promise.all([broadcastPromise, pollingPromise]);
-
-      // If result is still not available after maximum retries
-      if (!pollingResult || !pollingResult.stdout || pollingResult.stdout.trim() === "") {
-        logger.warn(`[ACCESSIBILITY_SERVICE] No hierarchy data received for query ID: ${queryId}`);
-        return null;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.timestamp})`);
       }
-
-      // Parse the JSON response
-      const hierarchyData: AccessibilityHierarchy = JSON.parse(pollingResult.stdout);
-
-      const duration = Date.now() - startTime;
-      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved targeted hierarchy in ${duration}ms (query: ${queryId})`);
-
-      return hierarchyData;
     } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to get targeted hierarchy after ${duration}ms: ${error}`);
-      return null;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Error handling WebSocket message: ${error}`);
     }
   }
 
   /**
-   * Build broadcast command for accessibility service
-   * @param uuid - Unique identifier for the request
-   * @param queryOptions - Query options for filtering
-   * @returns Complete broadcast command string
+   * Get the latest hierarchy from cache or wait for fresh data
+   * @param waitForFresh - If true, wait up to timeout for fresh data
+   * @param timeout - Maximum time to wait for fresh data in milliseconds
+   * @returns Promise<AccessibilityHierarchyResponse>
    */
-  private buildBroadcastCommand(uuid: string, queryOptions: ViewHierarchyQueryOptions): string {
-    const baseCommand = `shell am broadcast -a com.zillow.automobile.EXTRACT_HIERARCHY`;
-    const extras: string[] = [`--es uuid "${uuid}"`];
-
-    if (queryOptions.text) {
-      extras.push(`--es text "${queryOptions.text}"`);
-    }
-    if (queryOptions.elementId) {
-      extras.push(`--es elementId "${queryOptions.elementId}"`);
-    }
-    if (queryOptions.containerElementId) {
-      extras.push(`--es containerElementId "${queryOptions.containerElementId}"`);
-    }
-    if (queryOptions.xpath) {
-      extras.push(`--es xpath "${queryOptions.xpath}"`);
-    }
-
-    return `${baseCommand} ${extras.join(" ")}`;
-  }
-
-  /**
-     * Query the accessibility service for the latest view hierarchy
-   * @param queryOptions - Options to filter the view hierarchy
-     * @returns Promise<AccessibilityHierarchy | null> - The hierarchy data or null if unavailable
-     */
-  async getLatestHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<AccessibilityHierarchy | null> {
+  async getLatestHierarchy(
+    waitForFresh: boolean = false,
+    timeout: number = 1000
+  ): Promise<AccessibilityHierarchyResponse> {
     const startTime = Date.now();
 
     try {
-      logger.info("[ACCESSIBILITY_SERVICE] Querying latest view hierarchy from accessibility service");
-
-      // If query options are provided, use targeted hierarchy retrieval
-      // if (queryOptions) {
-      //   return await this.getTargetedHierarchy(queryOptions);
-      // }
-
-      // Otherwise, get the standard latest hierarchy
-      const result = await this.adb.executeCommand(
-        `shell run-as ${AccessibilityServiceClient.PACKAGE_NAME} cat ${AccessibilityServiceClient.HIERARCHY_FILE_PATH}`
-      );
-
-      if (!result.stdout || result.stdout.trim() === "") {
-        logger.warn("[ACCESSIBILITY_SERVICE] No hierarchy data received from accessibility service");
-        return null;
+      // Ensure WebSocket connection is established
+      const connected = await this.connectWebSocket();
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection");
+        return {
+          hierarchy: null,
+          fresh: false,
+          updatedAt: Date.now()
+        };
       }
 
-      // Parse the JSON response
-      const hierarchyData: AccessibilityHierarchy = JSON.parse(result.stdout);
+      // If we have cached data and not waiting for fresh, return immediately
+      if (this.cachedHierarchy && !waitForFresh) {
+        const duration = Date.now() - startTime;
+        logger.info(`[ACCESSIBILITY_SERVICE] Returning cached hierarchy in ${duration}ms (fresh: ${this.cachedHierarchy.fresh}, updatedAt: ${this.cachedHierarchy.hierarchy.timestamp})`);
 
-      const duration = Date.now() - startTime;
-      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved hierarchy in ${duration}ms (timestamp: ${hierarchyData.timestamp})`);
+        return {
+          hierarchy: this.cachedHierarchy.hierarchy,
+          fresh: this.cachedHierarchy.fresh,
+          updatedAt: this.cachedHierarchy.hierarchy.timestamp
+        };
+      }
 
-      return hierarchyData;
+      // Wait for fresh data if requested
+      if (waitForFresh) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Waiting up to ${timeout}ms for fresh hierarchy data`);
+
+        // Mark current cache as stale to detect new data
+        if (this.cachedHierarchy) {
+          this.cachedHierarchy.fresh = false;
+        }
+
+        const freshData = await this.waitForFreshData(timeout);
+        const duration = Date.now() - startTime;
+
+        if (freshData) {
+          logger.info(`[ACCESSIBILITY_SERVICE] Received fresh hierarchy in ${duration}ms (updatedAt: ${freshData.hierarchy.timestamp})`);
+          return {
+            hierarchy: freshData.hierarchy,
+            fresh: true,
+            updatedAt: freshData.hierarchy.timestamp
+          };
+        } else {
+          logger.warn(`[ACCESSIBILITY_SERVICE] Timeout waiting for fresh data after ${duration}ms`);
+
+          // Return cached data if available, even if stale
+          if (this.cachedHierarchy) {
+            return {
+              hierarchy: this.cachedHierarchy.hierarchy,
+              fresh: false,
+              updatedAt: this.cachedHierarchy.hierarchy.timestamp
+            };
+          }
+        }
+      }
+
+      return {
+        hierarchy: null,
+        fresh: false,
+        updatedAt: Date.now()
+      };
     } catch (error) {
       const duration = Date.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to get hierarchy after ${duration}ms: ${error}`);
-      return null;
+      return {
+        hierarchy: null,
+        fresh: false,
+        updatedAt: Date.now()
+      };
     }
+  }
+
+  /**
+   * Wait for fresh data to arrive via WebSocket
+   */
+  private async waitForFreshData(timeout: number): Promise<CachedHierarchy | null> {
+    return new Promise(resolve => {
+      const startTime = Date.now();
+      const checkInterval = 50; // Check every 50ms
+
+      const intervalId = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+
+        // Check if we received fresh data
+        if (this.cachedHierarchy && this.cachedHierarchy.fresh) {
+          clearInterval(intervalId);
+          resolve(this.cachedHierarchy);
+          return;
+        }
+
+        // Check if timeout exceeded
+        if (elapsed >= timeout) {
+          clearInterval(intervalId);
+          resolve(null);
+        }
+      }, checkInterval);
+    });
   }
 
   /**
@@ -326,31 +469,55 @@ export class AccessibilityServiceClient {
 
     try {
       // Check if service is available
-
       const available = await AccessibilityServiceManager.getInstance(this.device, this.adb).isAvailable();
       if (!available) {
         logger.info("[ACCESSIBILITY_SERVICE] Service not available, will use fallback");
         return null;
       }
 
-      // Get hierarchy from service
-      const accessibilityHierarchy = await this.getLatestHierarchy(queryOptions);
-      if (!accessibilityHierarchy) {
+      // Get hierarchy from WebSocket service (wait for fresh data on first request)
+      const waitForFresh = this.cachedHierarchy === null;
+      const response = await this.getLatestHierarchy(waitForFresh, 1000);
+
+      if (!response.hierarchy) {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to get hierarchy from service, will use fallback");
         return null;
       }
 
       // Convert to expected format
-      const convertedHierarchy = this.convertToViewHierarchyResult(accessibilityHierarchy);
+      const convertedHierarchy = this.convertToViewHierarchyResult(response.hierarchy);
 
       const duration = Date.now() - startTime;
-      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved and converted hierarchy in ${duration}ms`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved and converted hierarchy in ${duration}ms (fresh: ${response.fresh}, updatedAt: ${response.updatedAt})`);
 
       return convertedHierarchy;
     } catch (error) {
       const duration = Date.now() - startTime;
-      logger.warn(`[ACCESSIBILITY_SERVICE] getViewHierarchyWithFallback failed after ${duration}ms: ${error}`);
+      logger.warn(`[ACCESSIBILITY_SERVICE] getAccessibilityHierarchy failed after ${duration}ms: ${error}`);
       return null;
+    }
+  }
+
+  /**
+   * Close WebSocket connection and cleanup
+   */
+  async close(): Promise<void> {
+    try {
+      if (this.ws) {
+        logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
+        this.ws.close();
+        this.ws = null;
+      }
+
+      // Optionally remove port forwarding
+      if (this.portForwardingSetup) {
+        await this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+          // Ignore errors
+        });
+        this.portForwardingSetup = false;
+      }
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Error during cleanup: ${error}`);
     }
   }
 }

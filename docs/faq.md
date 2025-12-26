@@ -138,7 +138,7 @@ how it gets used. If there are components worth extracting we'll extract them.
 
 ### How do I report bugs or request features?
 
-- [File issues on the GitHub repository](https://github.com/zillow/auto-mobile/issues)
+- [File issues on the GitHub repository](https://github.com/kaeawc/auto-mobile/issues)
 - Include device information, logs, and reproduction steps. For bonus points include an AutoMobile plan. It would be best
   if reproductions could point at publicly available apps that have been released. I've done my testing against Zillow,
   Slack, Google Keep, YouTube Music, Bluesky, Google Calendar, and more.  
@@ -157,7 +157,7 @@ appropriate permissions. If you grant those, then it can access that sensitive i
 
 ### What do we do with androidTest now?
 
-[`rm -rf`](https://www.github.com/zillow/auto-mobile/blob/main/scripts/delete_androidTest.sh)
+[`rm -rf`](https://www.github.com/kaeawc/auto-mobile/blob/main/scripts/delete_androidTest.sh)
 
 No seriously, once you're fully on AutoMobile you should just delete them. Use the above script, by default it will perform
 a dry-run to tell you explicitly what its about to delete. Only do this after you've fully migrated your project to not
@@ -166,7 +166,7 @@ need them anymore.
 ```shell
 ../scripts/delete_androidTest.sh --execute
 🧹 Cleaning up androidTest sources and dependencies...
-📍 Working in: ~/zillow/auto-mobile/junitrunner
+📍 Working in: ~/kaeawc/auto-mobile/junitrunner
 🗂️ [DRY RUN] Removing androidTest source directories...
 📝 [DRY RUN] Removing androidTestImplementation dependencies...
 🧽 [DRY RUN] Cleaning up empty test directories...

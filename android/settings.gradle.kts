@@ -32,8 +32,6 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":accessibility-service")
 
-include(":kotlin-test-author")
-
 include(":junit-runner")
 
 include(":playground:analytics")

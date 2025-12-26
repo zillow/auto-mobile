@@ -24,11 +24,11 @@
   <string name="onboarding_automation_emoji">🤖</string>
 
   <string name="onboarding_opensource_title">Open Source</string>
-  <string name="onboarding_opensource_description">Built by Zillow and hosted on GitHub</string>
-  <string name="onboarding_opensource_description_part1">Built by Zillow and hosted on </string>
+  <string name="onboarding_opensource_description">Hosted on GitHub</string>
+  <string name="onboarding_opensource_description_part1">Hosted on </string>
   <string name="onboarding_opensource_description_part2">GitHub</string>
   <string name="onboarding_opensource_emoji">❤️</string>
 
   <!-- GitHub URL -->
-  <string name="github_url">https://github.com/Zillow/auto-mobile</string>
+  <string name="github_url">https://github.com/kaeawc/auto-mobile</string>
 </resources>

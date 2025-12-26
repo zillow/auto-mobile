@@ -259,7 +259,7 @@ describe("ViewHierarchy", function() {
     View Hierarchy:
       com.android.internal.policy.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 aid=0}[]
         android.widget.LinearLayout{d76e313 V.E...... ......ID 0,0-1080,2400}
-          com.zillow.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
+          dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
             android.widget.LinearLayout{a9c5a77 V.E...... ........ 0,51-0,122}
               com.google.android.material.textview.MaterialTextView{bace2c3 V.ED..... ......ID 0,0-0,71 #7f0a087c app:id/toolbar_title aid=1073742019}
               android.widget.RelativeLayout{5d91052 G.E...... ......I. 0,0-0,0 #7f0a0133 app:id/beta_tag aid=1073742018}
@@ -308,21 +308,21 @@ describe("ViewHierarchy", function() {
     it("should augment view hierarchy with class and fragment information", function() {
       const mockActivityTopData = {
         classOverrides: new Map([
-          ["com.zillow.android.zillowmap:id/search_toolbar", "com.zillow.android.ui.base.ZillowToolbar"],
-          ["0,0-1080,173", "com.zillow.android.ui.base.ZillowToolbar"]
+          ["dev.jasonpearson.android.zillowmap:id/search_toolbar", "dev.jasonpearson.android.ui.base.ZillowToolbar"],
+          ["0,0-1080,173", "dev.jasonpearson.android.ui.base.ZillowToolbar"]
         ]),
         fragmentData: new Map([
           ["0x7f0a012b", "SearchTabContainerFragment"],
           ["0x7f0a0774", "RealEstateMapFragment"]
         ]),
         viewData: new Map([
-          ["com.zillow.android.zillowmap:id/custom_view", "com.zillow.android.ui.base.CustomView"]
+          ["dev.jasonpearson.android.zillowmap:id/custom_view", "dev.jasonpearson.android.ui.base.CustomView"]
         ])
       };
 
       const mockViewHierarchy: any = {
         hierarchy: {
-          "resource-id": "com.zillow.android.zillowmap:id/search_toolbar",
+          "resource-id": "dev.jasonpearson.android.zillowmap:id/search_toolbar",
           "class": "android.view.ViewGroup",
           "bounds": "[0,0][1080,173]",
           "node": {
@@ -335,7 +335,7 @@ describe("ViewHierarchy", function() {
       (viewHierarchy as any).augmentViewHierarchyWithClassAndFragment(mockViewHierarchy, mockActivityTopData);
 
       // Check that class was overridden
-      expect(mockViewHierarchy.hierarchy.class).to.equal("com.zillow.android.ui.base.ZillowToolbar");
+      expect(mockViewHierarchy.hierarchy.class).to.equal("dev.jasonpearson.android.ui.base.ZillowToolbar");
 
       // Check that fragment was added
       expect((mockViewHierarchy.hierarchy.node as any).fragment).to.equal("SearchTabContainerFragment");
@@ -367,7 +367,7 @@ describe("ViewHierarchy", function() {
       const dumpsysWithoutActiveFragments = `
         View Hierarchy:
           com.android.internal.policy.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 aid=0}[]
-            com.zillow.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar}
+            dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar}
         Looper (main, tid 2) {2b059f8}
       `;
 
@@ -383,7 +383,7 @@ describe("ViewHierarchy", function() {
           android.widget.LinearLayout{d76e313 V.E...... ......ID 0,0-1080,2400 #7f0a01ff app:id/android_layout}
           com.android.internal.widget.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 #7f0a01fe app:id/decor_view}
           androidx.appcompat.widget.Toolbar{a9c5a77 V.E...... ........ 0,51-0,122 #7f0a01fd app:id/androidx_toolbar}
-          com.zillow.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/zillow_toolbar}
+          dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/zillow_toolbar}
         Looper (main, tid 2) {2b059f8}
       `;
 
@@ -392,7 +392,7 @@ describe("ViewHierarchy", function() {
       // Should only have the Zillow class, not Android/androidx classes
       expect(result.classOverrides.size).to.equal(1);
       expect(result.classOverrides.has("7f0a078a")).to.be.true;
-      expect(result.classOverrides.get("7f0a078a")).to.equal("com.zillow.android.ui.base.ZillowToolbar");
+      expect(result.classOverrides.get("7f0a078a")).to.equal("dev.jasonpearson.android.ui.base.ZillowToolbar");
       expect(result.classOverrides.has("7f0a01ff")).to.be.false;
       expect(result.classOverrides.has("7f0a01fe")).to.be.false;
       expect(result.classOverrides.has("7f0a01fd")).to.be.false;
