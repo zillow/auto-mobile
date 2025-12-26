@@ -52,13 +52,13 @@ mavenPublishing {
   publishToMavenCentral()
   signAllPublications()
 
-  coordinates("com.zillow.automobile", "junit-runner", project.version.toString())
+  coordinates("dev.jasonpearson.automobile", "junit-runner", project.version.toString())
 
   pom {
     name.set("AutoMobile JUnit Runner")
     description.set("Runs AutoMobile JUnit tests with AutoMobile CLI.")
     inceptionYear.set("2025")
-    url.set("https://zillow.github.io/auto-mobile/")
+    url.set("https://kaeawc.github.io/auto-mobile/")
     licenses {
       license {
         name.set("The Apache Software License, Version 2.0")
@@ -68,16 +68,16 @@ mavenPublishing {
     }
     developers {
       developer {
-        id.set("Zillow")
-        name.set("Zillow OSS")
-        url.set("https://github.com/Zillow/")
-        email.set("oss@zillowgroup.com")
+        id.set("Jason Pearson")
+        name.set("Jason Pearson")
+        url.set("https://github.com/kaeawc/")
+        email.set("jason.d.pearson@gmail.com")
       }
     }
     scm {
-      url.set("https://github.com/zillow/auto-mobile/")
-      connection.set("scm:git:git://github.com/zillow/auto-mobile.git")
-      developerConnection.set("scm:git:ssh://git@github.com/zillow/auto-mobile.git")
+      url.set("https://github.com/kaeawc/auto-mobile/")
+      connection.set("scm:git:git://github.com/kaeawc/auto-mobile.git")
+      developerConnection.set("scm:git:ssh://git@github.com/kaeawc/auto-mobile.git")
     }
   }
 }

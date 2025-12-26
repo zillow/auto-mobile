@@ -153,30 +153,6 @@ jobs:
       #     check_name: "JUnit Runner Test Report"
       #     report_paths: '**/build/test-results/**/*.xml'
 
-  kotlin-test-author-unit-tests:
-    name: "Run Kotlin Test Author Unit Tests"
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android
-    steps:
-      - name: "Git Checkout"
-        uses: actions/checkout@v4
-
-      - uses: ./.github/actions/gradle-task-run
-        with:
-          gradle-tasks: ":kotlinTestAuthor:test"
-          gradle-project-directory: "android"
-          reuse-configuration-cache: true
-          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-
-      - name: "Publish Test Report"
-        uses: mikepenz/action-junit-report@v4
-        if: always()
-        with:
-          check_name: "Kotlin Test Author Test Report"
-          report_paths: '**/build/test-results/**/*.xml'
-
   android-accessibility-service-unit-tests:
     name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest
@@ -209,29 +185,6 @@ jobs:
       - uses: ./.github/actions/gradle-task-run
         with:
           gradle-tasks: ":junitRunner:assemble"
-          gradle-project-directory: "android"
-          reuse-configuration-cache: true
-          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-
-      - name: "Store AAR"
-        uses: actions/upload-artifact@v4.4.0
-        with:
-          name: aar
-          path: core/build/outputs/aar/core-debug.aar
-
-  build-kotlin-test-author-clikt-app:
-    name: "Build Kotlin Test Author Clikt App"
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android
-    steps:
-      - name: "Git Checkout"
-        uses: actions/checkout@v4
-
-      - uses: ./.github/actions/gradle-task-run
-        with:
-          gradle-tasks: ":kotlinTestAuthor:assembleDist"
           gradle-project-directory: "android"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}

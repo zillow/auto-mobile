@@ -12,7 +12,7 @@ if ! [[ ${local} ]]; then
   set -ex
 
   export GIT_CLONE_PROTECTION_ACTIVE=false
-  REPO="git@github.com:zillow/auto-mobile.git"
+  REPO="git@github.com:kaeawc/auto-mobile.git"
   DIR=temp-clone
 
   # Delete any existing temporary website clone

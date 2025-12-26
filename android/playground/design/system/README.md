@@ -130,8 +130,8 @@ fun MyApp() {
 Import and use components directly:
 
 ```kotlin
-import com.zillow.automobile.design.system.components.*
-import com.zillow.automobile.design.system.theme.*
+import dev.jasonpearson.automobile.design.system.components.*
+import dev.jasonpearson.automobile.design.system.theme.*
 
 @Composable
 fun MyScreen() {

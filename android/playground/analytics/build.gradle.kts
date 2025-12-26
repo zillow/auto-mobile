@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-  namespace = "com.zillow.automobile.analytics"
+  namespace = "dev.jasonpearson.automobile.analytics"
   compileSdk = 36
 
   defaultConfig {
@@ -21,10 +21,15 @@ android {
     }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_22
-    targetCompatibility = JavaVersion.VERSION_22
+    sourceCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
+    targetCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
   }
-  kotlinOptions { jvmTarget = "22" }
+}
+
+kotlin {
+  compilerOptions {
+    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get()))
+  }
 }
 
 dependencies {
