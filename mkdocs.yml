@@ -4,13 +4,13 @@
 
 site_name: AutoMobile
 repo_name: AutoMobile
-repo_url: https://github.com/zillow/auto-mobile
+repo_url: https://github.com/kaeawc/auto-mobile
 site_description: "Mobile interaction automation"
-site_author: Zillow
+site_author: Jason Pearson
 remote_branch: gh-pages
 use_directory_urls: true
 
-copyright: 'Copyright &copy; 2025 Zillow Group'
+copyright: 'Copyright &copy; 2025-2026 Jason Pearson'
 
 plugins:
   - search
@@ -98,7 +98,7 @@ nav:
   - 'Contributing':
       - 'How': contributing/index.md
       - 'Local Development': contributing/local-development.md
-      - 'GitHub Discussions': https://github.com/zillow/auto-mobile/discussions
+      - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md
   - 'Security': security.md
   - 'Change Log': changelog.md

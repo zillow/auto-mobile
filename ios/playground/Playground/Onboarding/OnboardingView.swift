@@ -13,33 +13,33 @@ struct OnboardingPage: Identifiable {
     case systemImage(String)
     case emoji(String)
   }
-  
+
   var resource: OnboardingPage.Image
   var title: String
   var description: String
-  
+
   var id: String { "\(title).\(resource)"}
-  
+
   enum Pages {
     static let welcome = OnboardingPage(resource: .resource(.autoMobile),
                                         title: "Welcome to AutoMobile",
                                         description: "Experience the future of iOS UI Test Automation with intelligent source mapping and self-healing tests.")
-    
+
     static let sourceCodeIntelligence = OnboardingPage(resource: .emoji("🔍"),
                                                        title: "Source Code Intelligence",
                                                        description: "Inspect your project source code directly through the view hierarchy using advanced code heuristics and source mapping.")
-    
+
     static let smartGesturesAndInput = OnboardingPage(resource: .emoji("🦾"),
                                                       title: "Smart Gestures & Input",
                                                       description: "Precise gestures with window inset awareness and Unicode text input via virtual keyboards for comprehensive testing.")
-    
+
     static let automaticTestGeneration = OnboardingPage(resource: .emoji("🤖"),
                                                         title: "Automated Test Generation",
                                                         description: "Automatically write tests with configurable credentials and experiment settings. Get highly actionable errors and self-healing capabilities.")
-    
+
     static let openSource = OnboardingPage(resource: .emoji("❤️"),
                                            title: "Open Source",
-                                           description: "Built by Zillow and hosted on [GitHub](https://github.com/zillow/auto-mobile)")
+                                           description: "Hosted on [GitHub](https://github.com/kaeawc/auto-mobile)")
   }
 }
 
@@ -67,7 +67,7 @@ struct OnboardingPageView: View {
           Text(symbol)
             .font(.system(size: 100))
         }
-          
+
         Text(page.title)
           .font(.title)
           .fontWeight(.bold)
@@ -82,7 +82,7 @@ struct OnboardingPageView: View {
             .foregroundColor(.secondary)
             .multilineTextAlignment(.center)
         }
-        
+
       }.padding()
     }
 }
@@ -111,7 +111,7 @@ struct OnboardingView: View {
       }
       .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
       .indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-                      
+
       HStack {
         Button {
           if viewmodel.currentPage > 0 {
@@ -126,7 +126,7 @@ struct OnboardingView: View {
         .buttonStyle(.bordered)
         .buttonBorderShape(.capsule)
         .disabled(viewmodel.currentPage == 0)
-        
+
         Spacer()
 
         Button {
@@ -138,7 +138,7 @@ struct OnboardingView: View {
             onboardingCompelte = true
             dismiss()
           }
-            
+
         } label: {
           if viewmodel.currentPage == viewmodel.pages.count - 1 {
             Text("Get started")

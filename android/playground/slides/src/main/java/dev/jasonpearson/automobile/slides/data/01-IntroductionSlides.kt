@@ -1,0 +1,44 @@
+package dev.jasonpearson.automobile.slides.data
+
+import dev.jasonpearson.automobile.slides.model.BulletPoint
+import dev.jasonpearson.automobile.slides.model.PresentationEmoji
+import dev.jasonpearson.automobile.slides.model.SlideContent
+
+/** Slides for Introduction to AutoMobile? */
+fun getIntroductionSlides(): List<SlideContent> =
+    listOf(
+        SlideContent.LargeText(title = "AutoMobile", subtitle = "Jason Pearson"),
+        SlideContent.Emoji(emoji = PresentationEmoji.PROGRAMMER, caption = "Who am I?"),
+
+        // Swipe screen to show promo video
+
+        SlideContent.BulletPoints(
+            title = "UI testing up until now",
+            points =
+                listOf(
+                    BulletPoint(text = "Manual"),
+                    BulletPoint(text = "Automated"),
+                )),
+        SlideContent.LargeText(
+            title = "AutoMobile is a set of tools for automating mobile engineering"),
+        SlideContent.BulletPoints(
+            title = "AutoMobile includes:",
+            points =
+                listOf(
+                    BulletPoint("MCP server that doubles as a CLI tool"),
+                    BulletPoint("A Kotlin test authoring Clikt app"),
+                    BulletPoint("A custom JUnitRunner"),
+                    BulletPoint("Accessibility service to expose data quickly"),
+                    // TODO: Uncomment if koog lands BulletPoint("An agentic loop for intelligently
+                    // self-healing tests")
+                )),
+        SlideContent.BulletPoints(
+            title = "How does it work?",
+            points =
+                listOf(
+                    BulletPoint(text = "Works on any Android debug or prod app"),
+                    BulletPoint(text = "Directly uses Android platform tools"),
+                    BulletPoint(text = "Indexes your project source code"),
+                    BulletPoint(text = "Can write tests for you"),
+                )),
+    )

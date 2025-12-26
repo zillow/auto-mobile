@@ -6,7 +6,7 @@ AutoMobile's main usage is driven through its Model Context Protocol ([MCP](http
 server. It has [observation](mcp-server/observation.md) built into its [interaction loop](mcp-server/interaction-loop.md)
 that is fast. This is supported with performant frame rate observation to determine UI idling. Together, that allows for
 accurate and precise exploration that gets better as more capabilities and heuristics are added. Every widget and
-interaction added to the [AutoMobile Playground app](https://github.com/zillow/auto-mobile/blob/main/android/playground/README.md)
+interaction added to the [AutoMobile Playground app](https://github.com/kaeawc/auto-mobile/blob/main/android/playground/README.md)
 is tested with AutoMobile in order to keep improving.
 
 #### Source Mapping

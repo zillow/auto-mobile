@@ -3,8 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const GITHUB_REPO = 'https://github.com/zillow/auto-mobile/blob/main';
-const GITHUB_RAW = 'https://github.com/zillow/auto-mobile/raw/main';
+const GITHUB_REPO = 'https://github.com/kaeawc/auto-mobile/blob/main';
+const GITHUB_RAW = 'https://github.com/kaeawc/auto-mobile/raw/main';
 
 function transformReadme() {
   const readmePath = path.join(__dirname, '../..', 'README.md');

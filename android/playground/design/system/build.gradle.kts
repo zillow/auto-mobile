@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-  namespace = "com.zillow.automobile.design.system"
+  namespace = "dev.jasonpearson.automobile.design.system"
   compileSdk = libs.versions.build.android.compileSdk.get().toInt()
   buildToolsVersion = libs.versions.build.android.buildTools.get()
 
@@ -25,11 +25,14 @@ android {
     sourceCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
     targetCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
   }
-  kotlinOptions {
-    jvmTarget = libs.versions.build.java.target.get()
-    languageVersion = libs.versions.build.kotlin.language.get()
-  }
   buildFeatures { compose = true }
+}
+
+kotlin {
+  compilerOptions {
+    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get()))
+    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(libs.versions.build.kotlin.language.get()))
+  }
 }
 
 dependencies {

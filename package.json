@@ -1,6 +1,6 @@
 {
   "name": "auto-mobile",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Mobile device interaction automation via MCP",
   "scripts": {
     "test": "mocha --require esbuild-register test/**/*.ts",
@@ -45,10 +45,10 @@
   "contributors": [
     {
       "name": "Jason Pearson",
-      "email": "jasonpe@zillowgroup.com"
+      "email": "jason.d.pearson@gmail.com"
     }
   ],
-  "homepage": "https://zillow.github.io/auto-mobile/",
+  "homepage": "https://kaeawc.github.io/auto-mobile/",
   "publishConfig": {
     "access": "public"
   },
