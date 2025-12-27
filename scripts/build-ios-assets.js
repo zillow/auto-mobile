@@ -31,7 +31,8 @@ async function copyIOSAssets() {
 }
 
 if (require.main === module) {
-  copyIOSAssets();
+  // TODO: Enable once we resume iOS development
+  // copyIOSAssets();
 }
 
 module.exports = {copyIOSAssets};

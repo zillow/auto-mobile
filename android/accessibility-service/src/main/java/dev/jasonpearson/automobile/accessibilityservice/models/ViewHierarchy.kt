@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class ViewHierarchy(
-    val timestamp: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
     val packageName: String? = null,
     val hierarchy: UIElementInfo? = null,
     val windowInfo: WindowInfo? = null,

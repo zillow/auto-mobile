@@ -38,7 +38,7 @@ interface AccessibilityNode {
  * Interface for accessibility service hierarchy format
  */
 interface AccessibilityHierarchy {
-  timestamp: number;
+  updatedAt: number;
   packageName: string;
   hierarchy: AccessibilityNode;
 }
@@ -209,7 +209,7 @@ export class AccessibilityServiceClient {
 
       if (message.type === "hierarchy_update" && message.data) {
         const now = Date.now();
-        logger.debug(`[ACCESSIBILITY_SERVICE] Received hierarchy update (timestamp: ${message.data.timestamp})`);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Received hierarchy update (updatedAt: ${message.data.updatedAt})`);
 
         // Mark previous cache as stale
         if (this.cachedHierarchy) {
@@ -223,7 +223,7 @@ export class AccessibilityServiceClient {
           fresh: true
         };
 
-        logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.timestamp})`);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.updatedAt})`);
       }
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error handling WebSocket message: ${error}`);
@@ -257,12 +257,12 @@ export class AccessibilityServiceClient {
       // If we have cached data and not waiting for fresh, return immediately
       if (this.cachedHierarchy && !waitForFresh) {
         const duration = Date.now() - startTime;
-        logger.info(`[ACCESSIBILITY_SERVICE] Returning cached hierarchy in ${duration}ms (fresh: ${this.cachedHierarchy.fresh}, updatedAt: ${this.cachedHierarchy.hierarchy.timestamp})`);
+        logger.info(`[ACCESSIBILITY_SERVICE] Returning cached hierarchy in ${duration}ms (fresh: ${this.cachedHierarchy.fresh}, updatedAt: ${this.cachedHierarchy.hierarchy.updatedAt})`);
 
         return {
           hierarchy: this.cachedHierarchy.hierarchy,
           fresh: this.cachedHierarchy.fresh,
-          updatedAt: this.cachedHierarchy.hierarchy.timestamp
+          updatedAt: this.cachedHierarchy.hierarchy.updatedAt
         };
       }
 
@@ -279,11 +279,11 @@ export class AccessibilityServiceClient {
         const duration = Date.now() - startTime;
 
         if (freshData) {
-          logger.info(`[ACCESSIBILITY_SERVICE] Received fresh hierarchy in ${duration}ms (updatedAt: ${freshData.hierarchy.timestamp})`);
+          logger.info(`[ACCESSIBILITY_SERVICE] Received fresh hierarchy in ${duration}ms (updatedAt: ${freshData.hierarchy.updatedAt})`);
           return {
             hierarchy: freshData.hierarchy,
             fresh: true,
-            updatedAt: freshData.hierarchy.timestamp
+            updatedAt: freshData.hierarchy.updatedAt
           };
         } else {
           logger.warn(`[ACCESSIBILITY_SERVICE] Timeout waiting for fresh data after ${duration}ms`);
@@ -293,7 +293,7 @@ export class AccessibilityServiceClient {
             return {
               hierarchy: this.cachedHierarchy.hierarchy,
               fresh: false,
-              updatedAt: this.cachedHierarchy.hierarchy.timestamp
+              updatedAt: this.cachedHierarchy.hierarchy.updatedAt
             };
           }
         }
@@ -486,6 +486,11 @@ export class AccessibilityServiceClient {
 
       // Convert to expected format
       const convertedHierarchy = this.convertToViewHierarchyResult(response.hierarchy);
+
+      // Add the device timestamp to the result
+      if (response.updatedAt) {
+        convertedHierarchy.updatedAt = response.updatedAt;
+      }
 
       const duration = Date.now() - startTime;
       logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved and converted hierarchy in ${duration}ms (fresh: ${response.fresh}, updatedAt: ${response.updatedAt})`);

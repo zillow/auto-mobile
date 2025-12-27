@@ -69,7 +69,7 @@ describe("AccessibilityServiceClient", function() {
       this.timeout(5000);
 
       const mockHierarchyData = {
-        timestamp: 1750934583218,
+        updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
         hierarchy: {
           "text": "6:43 AM",
@@ -103,7 +103,7 @@ describe("AccessibilityServiceClient", function() {
       expect(result.hierarchy).to.not.be.null;
       expect(result.fresh).to.be.true;
       expect(result.updatedAt).to.equal(1750934583218);
-      expect(result.hierarchy!.timestamp).to.equal(1750934583218);
+      expect(result.hierarchy!.updatedAt).to.equal(1750934583218);
       expect(result.hierarchy!.packageName).to.equal("com.google.android.deskclock");
       expect(result.hierarchy!.hierarchy.text).to.equal("6:43 AM");
     });
@@ -112,7 +112,7 @@ describe("AccessibilityServiceClient", function() {
       this.timeout(5000);
 
       const mockHierarchyData = {
-        timestamp: 1750934583218,
+        updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
         hierarchy: {
           text: "Cached Data",
@@ -173,7 +173,7 @@ describe("AccessibilityServiceClient", function() {
   describe("convertToViewHierarchyResult", function() {
     it("should convert accessibility hierarchy to ViewHierarchyResult format", function() {
       const accessibilityHierarchy = {
-        timestamp: 1750934583218,
+        updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
         hierarchy: {
           "text": "6:43 AM",
@@ -221,7 +221,7 @@ describe("AccessibilityServiceClient", function() {
 
     it("should handle single child node correctly", function() {
       const accessibilityHierarchy = {
-        timestamp: 1750934583218,
+        updatedAt: 1750934583218,
         packageName: "com.test.app",
         hierarchy: {
           text: "Parent",
@@ -244,7 +244,7 @@ describe("AccessibilityServiceClient", function() {
     it("should handle conversion errors gracefully", function() {
       // Create a hierarchy that will cause conversion issues
       const problematicHierarchy = {
-        timestamp: 1750934583218,
+        updatedAt: 1750934583218,
         packageName: "com.test.app",
         hierarchy: null as any
       };
@@ -277,7 +277,7 @@ describe("AccessibilityServiceClient", function() {
       this.timeout(5000);
 
       const mockHierarchyData = {
-        timestamp: 1750934583218,
+        updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
         hierarchy: {
           text: "Test Text",

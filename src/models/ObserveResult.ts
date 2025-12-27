@@ -9,10 +9,11 @@ import { ViewHierarchyResult } from "./ViewHierarchyResult";
  */
 export interface ObserveResult {
   /**
-   * Timestamp when observation was made
-   * Can be a number (milliseconds) or ISO string depending on context
+   * Timestamp when the screen state was captured on the device (milliseconds since epoch)
+   * This comes from the AccessibilityService on Android or equivalent on iOS
+   * Falls back to server timestamp if device timestamp is unavailable
    */
-  timestamp: string | number;
+  updatedAt: string | number;
 
   /** Screen dimensions */
   screenSize: ScreenSize;

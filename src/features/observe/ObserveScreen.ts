@@ -128,6 +128,13 @@ export class ObserveScreen {
 
       if (viewHierarchy) {
         result.viewHierarchy = viewHierarchy;
+
+        // Use the updatedAt from the view hierarchy if available (from accessibility service)
+        if (viewHierarchy.updatedAt) {
+          result.updatedAt = viewHierarchy.updatedAt;
+          logger.debug(`Using updatedAt from view hierarchy: ${viewHierarchy.updatedAt}`);
+        }
+
         const focusedElement = this.viewHierarchy.findFocusedElement(viewHierarchy);
         if (focusedElement) {
           result.focusedElement = focusedElement;
@@ -263,11 +270,11 @@ export class ObserveScreen {
 
   /**
    * Create base observe result object
-   * @returns Base ObserveResult with timestamp and default values
+   * @returns Base ObserveResult with updatedAt and default values
    */
   createBaseResult(): ObserveResult {
     return {
-      timestamp: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       screenSize: { width: 0, height: 0 },
       systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
     };
@@ -304,7 +311,7 @@ export class ObserveScreen {
       logger.info(`[OBSERVE_CACHE] No cached observe result available (${duration}ms)`);
 
       return {
-        timestamp: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
         error: "No cached observe result available"
@@ -314,7 +321,7 @@ export class ObserveScreen {
       logger.warn(`[OBSERVE_CACHE] Error getting cached observe result after ${duration}ms: ${error}`);
 
       return {
-        timestamp: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
         error: "Failed to retrieve cached observe result"
@@ -502,7 +509,7 @@ export class ObserveScreen {
     } catch (err) {
       logger.error("Critical error in observe command:", err);
       return {
-        timestamp: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
         error: "Observation failed due to device access error"

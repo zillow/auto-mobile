@@ -5,6 +5,8 @@ import { ElementBounds } from "./ElementBounds";
  */
 export interface ViewHierarchyResult {
   hierarchy: Hierarchy;
+  /** Timestamp from the device when the hierarchy was captured (milliseconds since epoch) */
+  updatedAt?: number;
 }
 
 export interface Hierarchy {

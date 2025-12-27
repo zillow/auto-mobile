@@ -124,21 +124,21 @@ export class ResultFaker {
   static observeResult(overrides: Partial<ObserveResult> = {}): ObserveResult {
     const screenSize = overrides.screenSize ?? this.screenSize();
     const systemInsets = overrides.systemInsets ?? this.systemInsets();
-    const timestamp = overrides.timestamp ?? Date.now();
+    const updatedAt = overrides.updatedAt ?? Date.now();
 
     // Create some fake elements
     const elementCount = faker.number.int({ min: 5, max: 20 });
     const elements = Array.from({ length: elementCount }, () => this.element());
 
     return {
-      timestamp,
+      updatedAt,
       screenSize,
       systemInsets,
       viewHierarchy: overrides.viewHierarchy ?? {
         version: "1.0",
         nodes: elements.map(e => ({ ...e, children: [] }))
       },
-      screenshotPath: overrides.screenshotPath ?? faker.helpers.maybe(() => `screenshots/screen_${timestamp}.png`),
+      screenshotPath: overrides.screenshotPath ?? faker.helpers.maybe(() => `screenshots/screen_${updatedAt}.png`),
       activeWindow: overrides.activeWindow ?? faker.helpers.maybe(() => this.activeWindowInfo()),
       elements: overrides.elements ?? {
         clickable: elements.filter(e => e.clickable),
