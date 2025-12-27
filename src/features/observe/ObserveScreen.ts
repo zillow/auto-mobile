@@ -15,6 +15,7 @@ import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../ut
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Interface for cached observe result
@@ -214,43 +215,47 @@ export class ObserveScreen {
    * Collect all observation data with parallelization
    * @param result - ObserveResult to update
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param perf - Performance tracker for timing data
    */
-  public async collectAllData(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
+  public async collectAllData(
+    result: ObserveResult,
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<void> {
     switch (this.device.platform) {
       case "android":
-        // Start dumpsys window fetch early since multiple operations need it
-        const dumpsysWindowPromise = this.dumpsysWindow.execute();
+        // Phase 1: Parallel - dumpsys window fetch + active window
+        perf.parallel("phase1_initial");
 
-        // Start these operations in parallel while dumpsys is running
-        const parallelPromises: Promise<any>[] = [
-          dumpsysWindowPromise,
-          this.collectActiveWindow(result),
-        ];
+        const dumpsysWindowPromise = perf.track("dumpsysWindow", () => this.dumpsysWindow.execute());
+        const activeWindowPromise = perf.track("activeWindow", () => this.collectActiveWindow(result));
 
-        const [dumpsysWindow] = await Promise.all(parallelPromises);
+        const [dumpsysWindow] = await Promise.all([dumpsysWindowPromise, activeWindowPromise]);
+        perf.end();
 
-        // Now run the remaining operations in parallel using the shared dumpsys data
-        const androidFinalPromises: Promise<void>[] = [
-          this.collectScreenSize(dumpsysWindow, result),
-          this.collectSystemInsets(dumpsysWindow, result),
-          this.collectRotationInfo(dumpsysWindow, result),
-          this.collectViewHierarchy(result, queryOptions),
-        ];
+        // Phase 2: Parallel - operations using shared dumpsys data
+        perf.parallel("phase2_collect");
 
-        // Execute all remaining operations in parallel
-        await Promise.all(androidFinalPromises);
+        await Promise.all([
+          perf.track("screenSize", () => this.collectScreenSize(dumpsysWindow, result)),
+          perf.track("systemInsets", () => this.collectSystemInsets(dumpsysWindow, result)),
+          perf.track("rotation", () => this.collectRotationInfo(dumpsysWindow, result)),
+          perf.track("viewHierarchy", () => this.collectViewHierarchy(result, queryOptions)),
+        ]);
+
+        perf.end();
         break;
+
       case "ios":
         // iOS-specific data collection logic here
+        perf.parallel("ios_collect");
 
-        // Now run the remaining operations in parallel using the shared dumpsys data
-        const iosFinalPromises: Promise<void>[] = [
-          this.collectScreenSize({} as ExecResult, result),
-          this.collectViewHierarchy(result, queryOptions),
-        ];
+        await Promise.all([
+          perf.track("screenSize", () => this.collectScreenSize({} as ExecResult, result)),
+          perf.track("viewHierarchy", () => this.collectViewHierarchy(result, queryOptions)),
+        ]);
 
-        // Execute all remaining operations in parallel
-        await Promise.all(iosFinalPromises);
+        perf.end();
         break;
     }
   }
@@ -487,9 +492,13 @@ export class ObserveScreen {
   /**
    * Execute the observe command
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param perf - Performance tracker for timing data
    * @returns The observation result
    */
-  async execute(queryOptions?: ViewHierarchyQueryOptions): Promise<ObserveResult> {
+  async execute(
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ObserveResult> {
     try {
       logger.debug("Executing observe command");
       const startTime = Date.now();
@@ -497,11 +506,22 @@ export class ObserveScreen {
       // Create base result object with timestamp
       const result = this.createBaseResult();
 
+      // Wrap entire observation in serial tracking
+      perf.serial("observe");
+
       // Collect all data components with parallelization
-      await this.collectAllData(result, queryOptions);
+      await perf.track("collectAllData", () => this.collectAllData(result, queryOptions, perf));
 
       // Cache the result for future use
-      await this.cacheObserveResult(result);
+      await perf.track("cacheResult", () => this.cacheObserveResult(result));
+
+      perf.end();
+
+      // Attach performance timing if enabled
+      const timings = perf.getTimings();
+      if (timings) {
+        result.perfTiming = timings;
+      }
 
       logger.debug("Observe command completed");
       logger.debug(`Total observe command execution took ${Date.now() - startTime}ms`);

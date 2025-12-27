@@ -3,6 +3,7 @@ import { ScreenSize } from "./ScreenSize";
 import { SystemInsets } from "./SystemInsets";
 import { ActiveWindowInfo } from "./ActiveWindowInfo";
 import { ViewHierarchyResult } from "./ViewHierarchyResult";
+import { TimingData } from "../utils/PerformanceTracker";
 
 /**
  * Represents the result of observing the device state
@@ -50,4 +51,7 @@ export interface ObserveResult {
 
   /** Error message if observation failed partially or completely */
   error?: string;
+
+  /** Performance timing data (only present when --debug-perf is enabled) */
+  perfTiming?: TimingData;
 }
