@@ -1,3 +1,0 @@
-[submodule "ios/WebDriverAgent"]
-	path = ios/WebDriverAgent
-	url = git@github.com:appium/WebDriverAgent.git
