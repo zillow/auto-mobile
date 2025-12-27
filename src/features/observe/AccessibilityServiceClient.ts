@@ -67,7 +67,7 @@ interface CachedHierarchy {
 export interface AccessibilityHierarchyResponse {
   hierarchy: AccessibilityHierarchy | null;
   fresh: boolean;
-  updatedAt: number;
+  updatedAt?: number; // Timestamp from device (only present when hierarchy data exists)
 }
 
 /**
@@ -249,8 +249,8 @@ export class AccessibilityServiceClient {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection");
         return {
           hierarchy: null,
-          fresh: false,
-          updatedAt: Date.now()
+          fresh: false
+          // updatedAt not included - no device data available
         };
       }
 
@@ -301,16 +301,16 @@ export class AccessibilityServiceClient {
 
       return {
         hierarchy: null,
-        fresh: false,
-        updatedAt: Date.now()
+        fresh: false
+        // updatedAt not included - no device data available
       };
     } catch (error) {
       const duration = Date.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to get hierarchy after ${duration}ms: ${error}`);
       return {
         hierarchy: null,
-        fresh: false,
-        updatedAt: Date.now()
+        fresh: false
+        // updatedAt not included - no device data available
       };
     }
   }
