@@ -1,10 +1,20 @@
 import WebSocket from "ws";
+import { randomBytes } from "crypto";
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ViewHierarchyResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
 import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+
+/**
+ * Generate a cryptographically secure random suffix for request IDs.
+ * Uses crypto.randomBytes which is much more secure than Math.random().
+ * @returns 8-character hex string
+ */
+function generateSecureId(): string {
+  return randomBytes(4).toString("hex");
+}
 
 /**
  * Interface for accessibility service node format
@@ -989,7 +999,7 @@ export class AccessibilityServiceClient {
     }
 
     try {
-      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const requestId = `req_${Date.now()}_${generateSecureId()}`;
       const message = JSON.stringify({ type: "request_hierarchy", requestId });
       this.ws.send(message);
       logger.debug(`[ACCESSIBILITY_SERVICE] Sent hierarchy request via WebSocket (requestId: ${requestId})`);
@@ -1014,7 +1024,7 @@ export class AccessibilityServiceClient {
     }
 
     try {
-      const requestId = `stale_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const requestId = `stale_${Date.now()}_${generateSecureId()}`;
       const message = JSON.stringify({
         type: "request_hierarchy_if_stale",
         requestId,
@@ -1052,7 +1062,7 @@ export class AccessibilityServiceClient {
       // Fall back to ADB broadcast if WebSocket failed
       if (!sentViaWebSocket) {
         logger.info("[ACCESSIBILITY_SERVICE] Falling back to ADB broadcast");
-        const uuid = `sync_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        const uuid = `sync_${Date.now()}_${generateSecureId()}`;
         await perf.track("sendBroadcast", async () => {
           await this.adb.executeCommand(
             `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid}"`
@@ -1132,7 +1142,7 @@ export class AccessibilityServiceClient {
       }
 
       // Send screenshot request
-      const requestId = `screenshot_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const requestId = `screenshot_${Date.now()}_${generateSecureId()}`;
       this.pendingScreenshotRequestId = requestId;
 
       // Create promise that will be resolved when we receive the screenshot
@@ -1220,7 +1230,7 @@ export class AccessibilityServiceClient {
       }
 
       // Send swipe request
-      const requestId = `swipe_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const requestId = `swipe_${Date.now()}_${generateSecureId()}`;
       this.pendingSwipeRequestId = requestId;
 
       // Create promise that will be resolved when we receive the swipe result
@@ -1314,7 +1324,7 @@ export class AccessibilityServiceClient {
       }
 
       // Send set text request
-      const requestId = `setText_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const requestId = `setText_${Date.now()}_${generateSecureId()}`;
       this.pendingSetTextRequestId = requestId;
 
       // Create promise that will be resolved when we receive the set text result
@@ -1425,7 +1435,7 @@ export class AccessibilityServiceClient {
       }
 
       // Send IME action request
-      const requestId = `imeAction_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const requestId = `imeAction_${Date.now()}_${generateSecureId()}`;
       this.pendingImeActionRequestId = requestId;
 
       // Create promise that will be resolved when we receive the IME action result
@@ -1512,7 +1522,7 @@ export class AccessibilityServiceClient {
       }
 
       // Send select all request
-      const requestId = `selectAll_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const requestId = `selectAll_${Date.now()}_${generateSecureId()}`;
       this.pendingSelectAllRequestId = requestId;
 
       // Create promise that will be resolved when we receive the select all result
