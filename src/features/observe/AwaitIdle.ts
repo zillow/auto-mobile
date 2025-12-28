@@ -74,8 +74,8 @@ export class AwaitIdle {
       // Continue anyway - some packages might not support gfxinfo
     }
 
-    // Give a moment for frame data to accumulate
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // No delay needed after reset - stability is determined by polling for zero deltas
+    // The first poll after reset will establish the baseline
 
     return {
       startTime,

@@ -4,7 +4,7 @@ import { ObserveScreen } from "../observe/ObserveScreen";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ActionableError, ActiveWindowInfo, BootedDevice, GfxMetrics, ObserveResult } from "../../models";
+import { ActionableError, BootedDevice, GfxMetrics, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -104,60 +104,37 @@ export class BaseVisualChange {
     });
 
     // Get package name for UI stability waiting
+    // Priority: options > previousObserveResult.viewHierarchy.packageName > cached
     let packageName = options.packageName;
-    const cachedPackageName = (await this.window.getCachedActiveWindow())?.appId;
 
-    // Start all parallel operations immediately
-    const parallelPromises: Promise<any>[] = [];
+    // Try to get packageName from the observe result's view hierarchy (from accessibility service)
+    if (!packageName && previousObserveResult?.viewHierarchy?.packageName) {
+      packageName = previousObserveResult.viewHierarchy.packageName;
+      logger.info(`[BaseVisualChange] Using packageName from view hierarchy: ${packageName}`);
+    }
 
-    // Always start UI stability tracking if we have a cached package name
-    if (!packageName && cachedPackageName) {
-      packageName = cachedPackageName;
-      logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: ${packageName}`);
-      parallelPromises.push(perf.track("initUiStabilityOptimistic", async () => {
+    // Fall back to cached active window if no packageName from hierarchy
+    if (!packageName) {
+      const cachedPackageName = (await this.window.getCachedActiveWindow())?.appId;
+      if (cachedPackageName) {
+        packageName = cachedPackageName;
+        logger.info(`[BaseVisualChange] Using cached packageName: ${packageName}`);
+      }
+    }
+
+    // Start UI stability tracking if we have a package name
+    let initState: any = null;
+    if (packageName) {
+      logger.info(`[BaseVisualChange] Starting UI stability initialization with package: ${packageName}`);
+      initState = await perf.track("initUiStability", async () => {
         return this.awaitIdle.initializeUiStabilityTracking(
           packageName!,
           timeoutMs
         );
       }).catch(error => {
-        logger.debug(`[BaseVisualChange] Optimistic initialization failed: ${error}`);
+        logger.debug(`[BaseVisualChange] UI stability initialization failed: ${error}`);
         return null;
-      }));
-    }
-
-    if (this.device.platform === "android") {
-      // Always start active window fetch to ensure we have the latest info
-      logger.info("[BaseVisualChange] Starting active window fetch in parallel");
-      parallelPromises.push(
-        perf.track("getActiveWindow", async () => {
-          return this.window.getActive(true);
-        }).catch(error => {
-          logger.debug(`[BaseVisualChange] Active window fetch failed: ${error}`);
-          return null;
-        })
-      );
-    }
-
-    // Execute all parallel operations
-    const results = await Promise.all(parallelPromises);
-
-    // Process results
-    let initState: any = null;
-    let activeWindowResult: ActiveWindowInfo | undefined = undefined;
-
-    if (results.length === 2) {
-      // Both UI stability and active window promises were created
-      initState = results[0];
-      activeWindowResult = results[1] as ActiveWindowInfo;
-    } else if (results.length === 1) {
-      // Only active window promise was created
-      activeWindowResult = results[0] as ActiveWindowInfo;
-    }
-
-    // Update package name from active window result if needed
-    if (activeWindowResult && activeWindowResult.appId) {
-      packageName = activeWindowResult.appId;
-      logger.info(`[BaseVisualChange] Updated package name from active window: ${packageName}`);
+      });
     }
 
     // Execute UI stability waiting with appropriate state

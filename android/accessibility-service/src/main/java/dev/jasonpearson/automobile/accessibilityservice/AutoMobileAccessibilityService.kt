@@ -33,7 +33,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     private const val HIERARCHY_FILE_NAME = "latest_hierarchy.json"
 
     // Debounce delay for accessibility events (ms)
-    private const val HIERARCHY_DEBOUNCE_MS = 200L
+    private const val HIERARCHY_DEBOUNCE_MS = 50L
 
     // Broadcast actions
     const val ACTION_EXTRACT_HIERARCHY = "dev.jasonpearson.automobile.EXTRACT_HIERARCHY"

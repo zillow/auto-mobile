@@ -237,13 +237,11 @@ export class ObserveScreen {
   ): Promise<void> {
     switch (this.device.platform) {
       case "android":
-        // Phase 1: Parallel - dumpsys window fetch + active window
-        perf.parallel("phase1_initial");
+        // Phase 1: Get dumpsys window data for screen info
+        // Note: We no longer call collectActiveWindow here - packageName comes from accessibility service
+        perf.serial("phase1_initial");
 
-        const dumpsysWindowPromise = perf.track("dumpsysWindow", () => this.dumpsysWindow.execute());
-        const activeWindowPromise = perf.track("activeWindow", () => this.collectActiveWindow(result));
-
-        const [dumpsysWindow] = await Promise.all([dumpsysWindowPromise, activeWindowPromise]);
+        const dumpsysWindow = await perf.track("dumpsysWindow", () => this.dumpsysWindow.execute());
         perf.end();
 
         // Phase 2: Parallel - quick operations using shared dumpsys data

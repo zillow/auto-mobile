@@ -497,7 +497,8 @@ export class AccessibilityServiceClient {
       const convertedHierarchy = this.convertAccessibilityNode(accessibilityHierarchy.hierarchy);
 
       const result: ViewHierarchyResult = {
-        hierarchy: convertedHierarchy
+        hierarchy: convertedHierarchy,
+        packageName: accessibilityHierarchy.packageName
       };
 
       const duration = Date.now() - startTime;
