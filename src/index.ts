@@ -23,6 +23,7 @@ function parseArgs(): {
   cliArgs: string[];
   transport: TransportConfig;
   debugPerf: boolean;
+  debug: boolean;
   } {
   const args = process.argv.slice(2);
 
@@ -38,6 +39,9 @@ function parseArgs(): {
 
   // Detect debug-perf mode for performance timing output
   const debugPerf = args.includes("--debug-perf");
+
+  // Detect debug mode to enable debug tools (rawViewHierarchy, debugSearch, bugReport)
+  const debug = args.includes("--debug");
 
   // Extract CLI-specific arguments (everything after --cli)
   const cliIndex = args.indexOf("--cli");
@@ -82,11 +86,11 @@ function parseArgs(): {
     }
   }
 
-  return { cliMode, cliArgs, transport, debugPerf };
+  return { cliMode, cliArgs, transport, debugPerf, debug };
 }
 
 // Create and start Streamable HTTP server
-async function startStreamableServer(transport: TransportConfig): Promise<void> {
+async function startStreamableServer(transport: TransportConfig, debug: boolean): Promise<void> {
   const server = createHttpServer();
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
@@ -148,7 +152,7 @@ async function startStreamableServer(transport: TransportConfig): Promise<void> 
         });
 
         // Create and connect MCP server
-        const mcpServer = createMcpServer();
+        const mcpServer = createMcpServer({ debug });
 
         // Setup cleanup handlers
         streamableTransport.onclose = () => {
@@ -215,7 +219,7 @@ async function startStreamableServer(transport: TransportConfig): Promise<void> 
 }
 
 // Create and start SSE server
-async function startSSEServer(transport: TransportConfig): Promise<void> {
+async function startSSEServer(transport: TransportConfig, debug: boolean): Promise<void> {
   const server = createHttpServer();
   const sessions = new Map<string, SSEServerTransport>();
 
@@ -242,7 +246,7 @@ async function startSSEServer(transport: TransportConfig): Promise<void> {
       sessions.set(sessionId, sseTransport);
 
       // Create MCP server instance for this session
-      const mcpServer = createMcpServer();
+      const mcpServer = createMcpServer({ debug });
 
       // Handle cleanup when connection closes
       sseTransport.onclose = () => {
@@ -356,12 +360,17 @@ async function main() {
     await configurationManager.loadFromDisk();
 
     // Parse command line arguments
-    const { cliMode, cliArgs, transport, debugPerf } = parseArgs();
+    const { cliMode, cliArgs, transport, debugPerf, debug } = parseArgs();
 
     // Enable performance tracking if --debug-perf flag is set
     if (debugPerf) {
       setDebugPerfEnabled(true);
       logger.info("Performance timing enabled (--debug-perf)");
+    }
+
+    // Log when debug mode is enabled
+    if (debug) {
+      logger.info("Debug tools enabled (--debug)");
     }
 
     if (cliMode) {
@@ -373,16 +382,16 @@ async function main() {
       // Run as Streamable HTTP server
       logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
       logger.enableStdoutLogging();
-      await startStreamableServer(transport);
+      await startStreamableServer(transport, debug);
     } else if (transport.type === "sse") {
       // Run as SSE server (deprecated)
       logger.info(`Starting SSE transport on ${transport.host}:${transport.port} (deprecated - consider using streamable)`);
       logger.enableStdoutLogging();
-      await startSSEServer(transport);
+      await startSSEServer(transport, debug);
     } else {
       // Run as MCP server with STDIO transport (default)
       const stdioTransport = new StdioServerTransport();
-      const server = createMcpServer();
+      const server = createMcpServer({ debug });
       await server.connect(stdioTransport);
       logger.info("AutoMobile MCP server running on stdio");
     }

@@ -1,4 +1,5 @@
 import fs from "fs-extra";
+import os from "os";
 import path from "path";
 import { randomBytes } from "crypto";
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
@@ -40,7 +41,7 @@ export interface BugReportOptions {
   saveToFile?: boolean;
 
   /**
-   * Directory to save report to (default: /tmp/auto-mobile/bug-reports)
+   * Directory to save report to (default: secure temp directory via fs.mkdtemp)
    */
   saveDir?: string;
 }
@@ -53,7 +54,6 @@ export class BugReport {
   private readonly adb: AdbUtils;
   private viewHierarchy: ViewHierarchy;
   private takeScreenshot: TakeScreenshot;
-  private static readonly DEFAULT_SAVE_DIR = "/tmp/auto-mobile/bug-reports";
 
   constructor(
     device: BootedDevice,
@@ -126,7 +126,7 @@ export class BugReport {
 
     // Save to file if requested
     if (options.saveToFile) {
-      const saveDir = options.saveDir || BugReport.DEFAULT_SAVE_DIR;
+      const saveDir = options.saveDir || await this.createSecureTempDir();
       await this.saveReport(result, saveDir);
     }
 
@@ -396,11 +396,21 @@ export class BugReport {
     try {
       await fs.ensureDir(saveDir);
       const filePath = path.join(saveDir, `${result.reportId}.json`);
-      await fs.writeJson(filePath, result, { spaces: 2 });
       result.savedTo = filePath;
+      result.savedToInstructions = `To file a bug report:\n1. Attach this JSON file to your GitHub issue at https://github.com/kaeawc/auto-mobile/issues\n2. Describe what you were trying to do and what went wrong\n3. Include any relevant steps to reproduce the issue`;
+      await fs.writeJson(filePath, result, { spaces: 2 });
       logger.info(`[BugReport] Saved report to ${filePath}`);
     } catch (error) {
       result.errors?.push(`Failed to save report: ${error}`);
     }
+  }
+
+  /**
+   * Create a secure temporary directory using fs.mkdtemp
+   * This creates an unpredictable directory name under the OS temp directory
+   */
+  private async createSecureTempDir(): Promise<string> {
+    const prefix = path.join(os.tmpdir(), "auto-mobile-bug-reports-");
+    return await fs.mkdtemp(prefix);
   }
 }

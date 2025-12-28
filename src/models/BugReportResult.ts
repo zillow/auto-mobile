@@ -121,6 +121,11 @@ export interface BugReportResult {
   savedTo?: string;
 
   /**
+   * Instructions for how to use the saved bug report
+   */
+  savedToInstructions?: string;
+
+  /**
    * Any errors that occurred during report generation
    */
   errors?: string[];
