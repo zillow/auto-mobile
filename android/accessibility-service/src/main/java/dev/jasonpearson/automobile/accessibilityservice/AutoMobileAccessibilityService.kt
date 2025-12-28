@@ -135,6 +135,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           port = 8765,
           scope = serviceScope,
           onRequestHierarchy = { extractHierarchyNow() },
+          onRequestHierarchyIfStale = { sinceTimestamp ->
+            hierarchyDebouncer.extractIfStale(sinceTimestamp)
+          },
           onRequestScreenshot = { requestId -> broadcastScreenshot(requestId) },
           onRequestSwipe = { requestId, x1, y1, x2, y2, duration ->
             performSwipe(requestId, x1, y1, x2, y2, duration)
@@ -144,6 +147,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           },
           onRequestImeAction = { requestId, action ->
             performImeAction(requestId, action)
+          },
+          onRequestSelectAll = { requestId ->
+            performSelectAll(requestId)
           }
       )
       webSocketServer.start()
@@ -214,14 +220,25 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   /**
    * Direct hierarchy extraction without debouncing.
    * Used by the HierarchyDebouncer.
+   * Extracts from all visible windows to capture popups, toolbars, etc.
    */
   private fun extractHierarchyDirect(): ViewHierarchy? {
+    // Get all windows to capture popups, toolbars, and other floating windows
+    val allWindows = windows
     val rootNode = rootInActiveWindow
-    if (rootNode == null) {
-      Log.w(TAG, "No root node available for extraction")
+
+    if (allWindows.isNullOrEmpty() && rootNode == null) {
+      Log.w(TAG, "No windows or root node available for extraction")
       return null
     }
-    return viewHierarchyExtractor.extractFromActiveWindow(rootNode)
+
+    // Use multi-window extraction if windows are available, otherwise fall back to single window
+    return if (!allWindows.isNullOrEmpty()) {
+      Log.d(TAG, "Extracting from ${allWindows.size} windows")
+      viewHierarchyExtractor.extractFromAllWindows(allWindows, rootNode)
+    } else {
+      viewHierarchyExtractor.extractFromActiveWindow(rootNode)
+    }
   }
 
   /**
@@ -287,8 +304,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   private fun extractHierarchy(textFilter: String? = null): ViewHierarchy? {
-    val rootNode = rootInActiveWindow ?: return null
-    return viewHierarchyExtractor.extractFromActiveWindow(rootNode, textFilter)
+    val allWindows = windows
+    val rootNode = rootInActiveWindow
+
+    if (allWindows.isNullOrEmpty() && rootNode == null) {
+      return null
+    }
+
+    return if (!allWindows.isNullOrEmpty()) {
+      viewHierarchyExtractor.extractFromAllWindows(allWindows, rootNode, textFilter)
+    } else {
+      viewHierarchyExtractor.extractFromActiveWindow(rootNode, textFilter)
+    }
   }
 
   private fun sendResult(success: Boolean, data: String? = null, error: String? = null) {
@@ -720,6 +747,71 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
+   * Perform select all text using AccessibilityService's ACTION_SET_SELECTION.
+   * This is significantly faster than using ADB double-tap gestures.
+   */
+  private fun performSelectAll(requestId: String?) {
+    val startTime = System.currentTimeMillis()
+    Log.d(TAG, "performSelectAll")
+    perfProvider.serial("performSelectAll")
+
+    try {
+      perfProvider.startOperation("findFocusedNode")
+      val focusedNode = findFocusedEditableNode(rootInActiveWindow)
+      perfProvider.endOperation("findFocusedNode")
+
+      if (focusedNode == null) {
+        perfProvider.end()
+        val errorTime = System.currentTimeMillis()
+        val error = "No focused editable node found"
+        Log.w(TAG, error)
+        kotlinx.coroutines.runBlocking {
+          broadcastSelectAllResult(requestId, false, error, errorTime - startTime)
+        }
+        return
+      }
+
+      perfProvider.startOperation("setSelection")
+      // Get the text length to set selection from 0 to end
+      val text = focusedNode.text
+      val textLength = text?.length ?: 0
+
+      val success = if (textLength > 0) {
+        // Use ACTION_SET_SELECTION with start=0 and end=textLength to select all
+        val arguments = android.os.Bundle().apply {
+          putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+          putInt(android.view.accessibility.AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, textLength)
+        }
+        focusedNode.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SET_SELECTION, arguments)
+      } else {
+        // No text to select
+        Log.d(TAG, "No text in focused node to select")
+        true // Consider it a success - nothing to select
+      }
+
+      focusedNode.recycle()
+      perfProvider.endOperation("setSelection")
+      perfProvider.end()
+
+      Log.d(TAG, "Select all completed: success=$success, textLength=$textLength")
+
+      val totalTime = System.currentTimeMillis() - startTime
+      Log.d(TAG, "Select all total time: ${totalTime}ms")
+
+      kotlinx.coroutines.runBlocking {
+        broadcastSelectAllResult(requestId, success, if (success) null else "performAction returned false", totalTime)
+      }
+    } catch (e: Exception) {
+      perfProvider.end()
+      val errorTime = System.currentTimeMillis()
+      Log.e(TAG, "Error performing select all", e)
+      kotlinx.coroutines.runBlocking {
+        broadcastSelectAllResult(requestId, false, e.message, errorTime - startTime)
+      }
+    }
+  }
+
+  /**
    * Find the next focusable node after the given node in document order.
    */
   private fun findNextFocusableNode(
@@ -966,6 +1058,42 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.d(TAG, "Broadcasted IME action result to ${webSocketServer.getConnectionCount()} clients")
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting IME action result", e)
+    }
+  }
+
+  /** Broadcast select all result to WebSocket clients */
+  private suspend fun broadcastSelectAllResult(
+    requestId: String?,
+    success: Boolean,
+    error: String?,
+    totalTimeMs: Long
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping select all result broadcast")
+      return
+    }
+
+    try {
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"select_all_result","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","success":$success""")
+          append(""","totalTimeMs":$totalTimeMs""")
+          if (error != null) {
+            append(""","error":"$error"""")
+          }
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted select all result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting select all result", e)
     }
   }
 

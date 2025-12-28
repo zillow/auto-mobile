@@ -35,9 +35,11 @@ export class ElementUtils {
         if (foundElement) {return;} // Already found one
 
         const nodeProperties = this.extractNodeProperties(node);
+        // Check for both 'class' and 'className' property names
+        const nodeClass = nodeProperties.class || nodeProperties.className;
         if ((nodeProperties.focused === "true" || nodeProperties.focused === true) &&
-          nodeProperties.class &&
-          inputClasses.some(cls => nodeProperties.class.includes(cls))) {
+          nodeClass &&
+          inputClasses.some(cls => nodeClass.includes(cls))) {
           const parsedNode = this.parseNodeBounds(node);
           if (parsedNode) {
             foundElement = parsedNode;
@@ -69,12 +71,12 @@ export class ElementUtils {
   getSwipeDurationFromSpeed(speed: "slow" | "fast" | "normal" = "normal"): number {
     switch (speed) {
       case "slow":
-        return 1000;
+        return 600;
       case "fast":
         return 100;
       case "normal":
       default:
-        return 500;
+        return 300;
     }
   }
 

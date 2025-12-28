@@ -368,6 +368,30 @@ class HierarchyDebouncer(
     fun getLastHierarchy(): ViewHierarchy? = lastHierarchy
 
     /**
+     * Get the timestamp of the last accessibility event.
+     * Used by the TypeScript MCP server to check if events have occurred since a request was made.
+     */
+    fun getLastEventTimestamp(): Long = lastEventTimestamp
+
+    /**
+     * Check if any accessibility events have occurred since the given timestamp.
+     * If no events have occurred (stale), trigger an immediate extraction.
+     * This is used when the MCP server is waiting for pushed data but no events are firing.
+     *
+     * @param sinceTimestamp The timestamp to compare against (usually the MCP request start time)
+     */
+    fun extractIfStale(sinceTimestamp: Long) {
+        if (lastEventTimestamp <= sinceTimestamp) {
+            // No events since the given timestamp - the UI is "stale" from MCP's perspective
+            // Trigger immediate extraction to push current state
+            Log.d(TAG, "extractIfStale: no events since $sinceTimestamp (lastEvent=$lastEventTimestamp), triggering extraction")
+            extractNow()
+        } else {
+            Log.d(TAG, "extractIfStale: events occurred since $sinceTimestamp (lastEvent=$lastEventTimestamp), skipping extraction")
+        }
+    }
+
+    /**
      * Get current state for debugging.
      */
     fun getState(): DebounceState {

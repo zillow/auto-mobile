@@ -38,7 +38,9 @@ data class WebSocketRequest(
     val text: String? = null,
     val resourceId: String? = null,  // Optional: target specific element by resource-id
     // IME action parameters
-    val action: String? = null  // IME action: done, next, search, send, go, previous
+    val action: String? = null,  // IME action: done, next, search, send, go, previous
+    // Stale check parameters
+    val sinceTimestamp: Long? = null  // For request_hierarchy_if_stale: extract only if no events since this timestamp
 )
 
 /**
@@ -50,10 +52,12 @@ class WebSocketServer(
     private val scope: CoroutineScope,
     private val perfProvider: PerfProvider = PerfProvider.instance,
     private val onRequestHierarchy: (() -> Unit)? = null,
+    private val onRequestHierarchyIfStale: ((sinceTimestamp: Long) -> Unit)? = null,
     private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
     private val onRequestSwipe: ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? = null,
     private val onRequestSetText: ((requestId: String?, text: String, resourceId: String?) -> Unit)? = null,
-    private val onRequestImeAction: ((requestId: String?, action: String) -> Unit)? = null
+    private val onRequestImeAction: ((requestId: String?, action: String) -> Unit)? = null,
+    private val onRequestSelectAll: ((requestId: String?) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "WebSocketServer"
@@ -261,6 +265,16 @@ class WebSocketServer(
                     Log.d(TAG, "Received hierarchy request (requestId: ${request.requestId})")
                     onRequestHierarchy?.invoke()
                 }
+                "request_hierarchy_if_stale" -> {
+                    val sinceTimestamp = request.sinceTimestamp
+                    if (sinceTimestamp != null) {
+                        Log.d(TAG, "Received hierarchy_if_stale request (requestId: ${request.requestId}, sinceTimestamp: $sinceTimestamp)")
+                        onRequestHierarchyIfStale?.invoke(sinceTimestamp)
+                    } else {
+                        Log.w(TAG, "request_hierarchy_if_stale missing sinceTimestamp, treating as regular request")
+                        onRequestHierarchy?.invoke()
+                    }
+                }
                 "request_screenshot" -> {
                     Log.d(TAG, "Received screenshot request (requestId: ${request.requestId})")
                     onRequestScreenshot?.invoke(request.requestId)
@@ -295,6 +309,10 @@ class WebSocketServer(
                     } else {
                         Log.w(TAG, "IME action request missing required action")
                     }
+                }
+                "request_select_all" -> {
+                    Log.d(TAG, "Received select_all request (requestId: ${request.requestId})")
+                    onRequestSelectAll?.invoke(request.requestId)
                 }
                 else -> {
                     Log.d(TAG, "Unknown message type: ${request.type}")

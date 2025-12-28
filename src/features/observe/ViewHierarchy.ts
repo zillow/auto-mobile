@@ -220,7 +220,7 @@ export class ViewHierarchy {
    * @param viewHierarchy - The view hierarchy to analyze
    */
   private analyzeZIndexAccessibility(viewHierarchy: ViewHierarchyResult): void {
-    if (!viewHierarchy || !viewHierarchy.hierarchy) {
+    if (!viewHierarchy) {
       return;
     }
 
@@ -229,7 +229,21 @@ export class ViewHierarchy {
     // Collect all elements with their Z-order information
     const allElements: ElementWithZOrder[] = [];
     const zOrder = { value: 0 };
-    this.collectElementsWithZOrder(viewHierarchy.hierarchy, zOrder, allElements);
+
+    // Collect from main hierarchy first
+    if (viewHierarchy.hierarchy) {
+      this.collectElementsWithZOrder(viewHierarchy.hierarchy, zOrder, allElements);
+    }
+
+    // Also collect from all windows (popups, toolbars, etc. have higher z-order)
+    if (viewHierarchy.windows) {
+      for (const window of viewHierarchy.windows) {
+        if (window.hierarchy) {
+          // Windows are rendered on top of main hierarchy
+          this.collectElementsWithZOrder(window.hierarchy, zOrder, allElements);
+        }
+      }
+    }
 
     logger.debug(`[Z_INDEX_ANALYSIS] Collected ${allElements.length} elements for Z-index analysis`);
 
@@ -1134,7 +1148,7 @@ export class ViewHierarchy {
    * @returns The focused element or null if none found
    */
   findFocusedElement(viewHierarchy: any): Element | null {
-    if (!viewHierarchy || !viewHierarchy.hierarchy) {
+    if (!viewHierarchy) {
       return null;
     }
 
@@ -1170,7 +1184,23 @@ export class ViewHierarchy {
       }
     };
 
-    traverseNode(viewHierarchy.hierarchy);
+    // Search in main hierarchy first
+    if (viewHierarchy.hierarchy) {
+      traverseNode(viewHierarchy.hierarchy);
+    }
+
+    // Also search in all windows (for popups, toolbars, etc.)
+    if (!focusedElement && viewHierarchy.windows) {
+      for (const window of viewHierarchy.windows) {
+        if (window.hierarchy) {
+          traverseNode(window.hierarchy);
+          if (focusedElement) {
+            break;
+          }
+        }
+      }
+    }
+
     return focusedElement;
   }
 

@@ -38,10 +38,21 @@ interface AccessibilityNode {
 /**
  * Interface for accessibility service hierarchy format
  */
+interface AccessibilityWindowHierarchy {
+  windowId: number;
+  windowType: string;
+  windowLayer: number;
+  packageName?: string;
+  isActive: boolean;
+  isFocused: boolean;
+  hierarchy?: AccessibilityNode;
+}
+
 interface AccessibilityHierarchy {
   updatedAt: number;
   packageName: string;
   hierarchy: AccessibilityNode;
+  windows?: AccessibilityWindowHierarchy[];
 }
 
 /**
@@ -109,6 +120,16 @@ export interface A11yImeActionResult {
 }
 
 /**
+ * Interface for select all result from accessibility service
+ */
+export interface A11ySelectAllResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
  * Interface for cached hierarchy with metadata
  */
 interface CachedHierarchy {
@@ -168,6 +189,10 @@ export class AccessibilityServiceClient {
   // IME action handling
   private pendingImeActionResolve: ((result: A11yImeActionResult) => void) | null = null;
   private pendingImeActionRequestId: string | null = null;
+
+  // Select all handling
+  private pendingSelectAllResolve: ((result: A11ySelectAllResult) => void) | null = null;
+  private pendingSelectAllRequestId: string | null = null;
 
   /**
    * Private constructor - use getInstance() instead
@@ -502,6 +527,23 @@ export class AccessibilityServiceClient {
           perfTiming
         });
       }
+
+      // Handle select all result
+      if (message.type === "select_all_result" && this.pendingSelectAllResolve) {
+        const selectAllMessage = message as any;
+        const perfTiming = selectAllMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Select all result (requestId: ${selectAllMessage.requestId}, success: ${selectAllMessage.success}, totalTimeMs: ${selectAllMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingSelectAllResolve;
+        this.pendingSelectAllResolve = null;
+        this.pendingSelectAllRequestId = null;
+        resolve({
+          success: selectAllMessage.success,
+          totalTimeMs: selectAllMessage.totalTimeMs,
+          error: selectAllMessage.error,
+          perfTiming
+        });
+      }
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error handling WebSocket message: ${error}`);
     }
@@ -641,13 +683,18 @@ export class AccessibilityServiceClient {
    * Wait for fresh data to arrive via WebSocket
    * @param timeout - Maximum time to wait in milliseconds
    * @param minTimestamp - Minimum timestamp the data must have (request start time)
-   * @returns CachedHierarchy if fresh data received, null on timeout
+   * @returns CachedHierarchy if fresh data received, null on timeout or screen off
    */
   private async waitForFreshData(timeout: number, minTimestamp: number): Promise<CachedHierarchy | null> {
-    return new Promise(resolve => {
-      const startTime = Date.now();
-      const checkInterval = 50; // Check every 50ms
+    const startTime = Date.now();
+    const checkInterval = 50; // Check every 50ms
+    const screenCheckInterval = 1000; // Check screen state every 1 second
+    const staleCheckDelay = 2000; // Send stale check request after 2 seconds of no push
+    let lastScreenCheck = startTime;
+    let screenCheckInProgress = false;
+    let staleCheckSent = false;
 
+    return new Promise(resolve => {
       const intervalId = setInterval(() => {
         const elapsed = Date.now() - startTime;
 
@@ -663,6 +710,33 @@ export class AccessibilityServiceClient {
             resolve(this.cachedHierarchy);
             return;
           }
+        }
+
+        // After staleCheckDelay ms of no push, send a "nudge" to the Android service
+        // This handles cases where no accessibility events are firing (e.g., Settings Intelligence)
+        if (!staleCheckSent && elapsed >= staleCheckDelay) {
+          staleCheckSent = true;
+          logger.info(`[ACCESSIBILITY_SERVICE] No push received after ${staleCheckDelay}ms, sending stale check request (sinceTimestamp: ${minTimestamp})`);
+          this.sendHierarchyIfStaleRequest(minTimestamp);
+        }
+
+        // Check screen state periodically to fail fast if screen is off
+        const now = Date.now();
+        if (!screenCheckInProgress && now - lastScreenCheck >= screenCheckInterval) {
+          screenCheckInProgress = true;
+          lastScreenCheck = now;
+
+          this.adb.isScreenOn().then(isOn => {
+            screenCheckInProgress = false;
+            if (!isOn) {
+              clearInterval(intervalId);
+              logger.warn("[ACCESSIBILITY_SERVICE] Screen is off - failing fast instead of waiting for timeout");
+              resolve(null);
+            }
+          }).catch(() => {
+            screenCheckInProgress = false;
+            // Ignore errors, continue waiting
+          });
         }
 
         // Check if timeout exceeded
@@ -695,6 +769,20 @@ export class AccessibilityServiceClient {
         hierarchy: convertedHierarchy,
         packageName: accessibilityHierarchy.packageName
       };
+
+      // Convert windows if present (for multi-window support - popups, toolbars, etc.)
+      if (accessibilityHierarchy.windows && accessibilityHierarchy.windows.length > 0) {
+        result.windows = accessibilityHierarchy.windows.map(window => ({
+          windowId: window.windowId,
+          windowType: window.windowType,
+          windowLayer: window.windowLayer,
+          packageName: window.packageName,
+          isActive: window.isActive,
+          isFocused: window.isFocused,
+          hierarchy: window.hierarchy ? this.convertAccessibilityNode(window.hierarchy) : undefined
+        }));
+        logger.info(`[ACCESSIBILITY_SERVICE] Converted ${result.windows.length} windows`);
+      }
 
       const duration = Date.now() - startTime;
       logger.info(`[ACCESSIBILITY_SERVICE] Format conversion completed in ${duration}ms`);
@@ -908,6 +996,35 @@ export class AccessibilityServiceClient {
       return true;
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to send WebSocket request: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Send a message via WebSocket to request hierarchy extraction IF no events
+   * have occurred since the given timestamp. This is used as a "nudge" when
+   * waiting for pushed data but no accessibility events are firing.
+   * @param sinceTimestamp - Extract only if no events occurred after this timestamp
+   * @returns true if message was sent successfully
+   */
+  private sendHierarchyIfStaleRequest(sinceTimestamp: number): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Cannot send stale check request - WebSocket not connected");
+      return false;
+    }
+
+    try {
+      const requestId = `stale_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const message = JSON.stringify({
+        type: "request_hierarchy_if_stale",
+        requestId,
+        sinceTimestamp
+      });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent hierarchy_if_stale request (requestId: ${requestId}, sinceTimestamp: ${sinceTimestamp})`);
+      return true;
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to send stale check request: ${error}`);
       return false;
     }
   }
@@ -1361,6 +1478,90 @@ export class AccessibilityServiceClient {
       return {
         success: false,
         action,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request select all text via the accessibility service.
+   * This uses ACTION_SET_SELECTION to select all text in the focused field,
+   * which is significantly faster than using ADB double-tap gestures.
+   *
+   * @param timeoutMs - Maximum time to wait for action completion in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11ySelectAllResult> - The select all result with timing information
+   */
+  async requestSelectAll(
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11ySelectAllResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for select all");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send select all request
+      const requestId = `selectAll_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      this.pendingSelectAllRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the select all result
+      const selectAllPromise = new Promise<A11ySelectAllResult>(resolve => {
+        this.pendingSelectAllResolve = resolve;
+
+        // Set up timeout
+        setTimeout(() => {
+          if (this.pendingSelectAllResolve === resolve) {
+            this.pendingSelectAllResolve = null;
+            this.pendingSelectAllRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Select all timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_select_all",
+          requestId
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent select all request (requestId: ${requestId})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForSelectAll", () => selectAllPromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Select all completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Select all failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Select all request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
         totalTimeMs: duration,
         error: `${error}`
       };

@@ -9,6 +9,22 @@ export interface ViewHierarchyResult {
   updatedAt?: number;
   /** Package name of the foreground app (from accessibility service) */
   packageName?: string;
+  /** All visible windows (including popups, toolbars, etc.) */
+  windows?: WindowHierarchy[];
+}
+
+/**
+ * Represents a single window's hierarchy with metadata.
+ * Used to capture floating windows like text selection toolbars, popups, etc.
+ */
+export interface WindowHierarchy {
+  windowId: number;
+  windowType: string;
+  windowLayer: number;
+  packageName?: string;
+  isActive: boolean;
+  isFocused: boolean;
+  hierarchy?: ViewHierarchyNode;
 }
 
 export interface Hierarchy {

@@ -117,6 +117,21 @@ export class ObserveScreen {
   }
 
   /**
+   * Collect wakefulness state (Android only)
+   * @param result - ObserveResult to update
+   */
+  public async collectWakefulness(result: ObserveResult): Promise<void> {
+    try {
+      const wakefulness = await this.adb.getWakefulness();
+      if (wakefulness) {
+        result.wakefulness = wakefulness;
+      }
+    } catch (error) {
+      logger.warn("Failed to get wakefulness state:", error);
+    }
+  }
+
+  /**
    * Collect view hierarchy and handle errors with accessibility service caching
    * @param result - ObserveResult to update
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
@@ -251,6 +266,7 @@ export class ObserveScreen {
           perf.track("screenSize", () => this.collectScreenSize(dumpsysWindow, result)),
           perf.track("systemInsets", () => this.collectSystemInsets(dumpsysWindow, result)),
           perf.track("rotation", () => this.collectRotationInfo(dumpsysWindow, result)),
+          perf.track("wakefulness", () => this.collectWakefulness(result)),
         ]);
 
         // Run view hierarchy separately to avoid perf tracker race condition

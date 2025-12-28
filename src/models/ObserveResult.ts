@@ -50,6 +50,14 @@ export interface ObserveResult {
   /** Whether a system intent chooser dialog was detected */
   intentChooserDetected?: boolean;
 
+  /**
+   * Device wakefulness state (Android only)
+   * - "Awake": Screen is on and device is interactive
+   * - "Asleep": Screen is off
+   * - "Dozing": Device is in ambient display / always-on mode
+   */
+  wakefulness?: "Awake" | "Asleep" | "Dozing";
+
   /** Error message if observation failed partially or completely */
   error?: string;
 
