@@ -1,6 +1,7 @@
 package dev.jasonpearson.automobile.accessibilityservice
 
 import android.util.Log
+import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
 
@@ -25,7 +27,18 @@ import kotlin.time.Duration.Companion.seconds
 @Serializable
 data class WebSocketRequest(
     val type: String,
-    val requestId: String? = null
+    val requestId: String? = null,
+    // Swipe parameters
+    val x1: Int? = null,
+    val y1: Int? = null,
+    val x2: Int? = null,
+    val y2: Int? = null,
+    val duration: Long? = null,
+    // Text input parameters
+    val text: String? = null,
+    val resourceId: String? = null,  // Optional: target specific element by resource-id
+    // IME action parameters
+    val action: String? = null  // IME action: done, next, search, send, go, previous
 )
 
 /**
@@ -35,8 +48,12 @@ data class WebSocketRequest(
 class WebSocketServer(
     private val port: Int = 8765,
     private val scope: CoroutineScope,
+    private val perfProvider: PerfProvider = PerfProvider.instance,
     private val onRequestHierarchy: (() -> Unit)? = null,
-    private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null
+    private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
+    private val onRequestSwipe: ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? = null,
+    private val onRequestSetText: ((requestId: String?, text: String, resourceId: String?) -> Unit)? = null,
+    private val onRequestImeAction: ((requestId: String?, action: String) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "WebSocketServer"
@@ -170,6 +187,30 @@ class WebSocketServer(
     }
 
     /**
+     * Broadcast a message with perf timing data included.
+     * Flushes accumulated perf data and injects it into the message.
+     *
+     * @param messageBuilder Function that takes optional perfTiming JsonElement and returns the complete message
+     */
+    suspend fun broadcastWithPerf(messageBuilder: (perfTiming: JsonElement?) -> String) {
+        val perfTiming = perfProvider.flush()
+        val message = messageBuilder(perfTiming)
+        _messageFlow.emit(message)
+    }
+
+    /**
+     * Broadcast a message synchronously (waits for delivery to all clients).
+     * Use this when message ordering is critical (e.g., hierarchy update before set_text_result).
+     *
+     * @param messageBuilder Function that takes optional perfTiming JsonElement and returns the complete message
+     */
+    suspend fun broadcastWithPerfSync(messageBuilder: (perfTiming: JsonElement?) -> String) {
+        val perfTiming = perfProvider.flush()
+        val message = messageBuilder(perfTiming)
+        broadcastToClients(message)
+    }
+
+    /**
      * Internal method to send message to all connected clients
      */
     private suspend fun broadcastToClients(message: String) {
@@ -223,6 +264,37 @@ class WebSocketServer(
                 "request_screenshot" -> {
                     Log.d(TAG, "Received screenshot request (requestId: ${request.requestId})")
                     onRequestScreenshot?.invoke(request.requestId)
+                }
+                "request_swipe" -> {
+                    Log.d(TAG, "Received swipe request (requestId: ${request.requestId})")
+                    val x1 = request.x1
+                    val y1 = request.y1
+                    val x2 = request.x2
+                    val y2 = request.y2
+                    val duration = request.duration ?: 300L
+                    if (x1 != null && y1 != null && x2 != null && y2 != null) {
+                        onRequestSwipe?.invoke(request.requestId, x1, y1, x2, y2, duration)
+                    } else {
+                        Log.w(TAG, "Swipe request missing required coordinates")
+                    }
+                }
+                "request_set_text" -> {
+                    Log.d(TAG, "Received set_text request (requestId: ${request.requestId})")
+                    val text = request.text
+                    if (text != null) {
+                        onRequestSetText?.invoke(request.requestId, text, request.resourceId)
+                    } else {
+                        Log.w(TAG, "Set text request missing required text")
+                    }
+                }
+                "request_ime_action" -> {
+                    Log.d(TAG, "Received ime_action request (requestId: ${request.requestId})")
+                    val action = request.action
+                    if (action != null) {
+                        onRequestImeAction?.invoke(request.requestId, action)
+                    } else {
+                        Log.w(TAG, "IME action request missing required action")
+                    }
                 }
                 else -> {
                     Log.d(TAG, "Unknown message type: ${request.type}")

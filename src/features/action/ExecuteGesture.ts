@@ -6,6 +6,8 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { logger } from "../../utils/logger";
 
 /**
  * Executes gestures using platform-specific commands
@@ -67,7 +69,15 @@ export class ExecuteGesture extends BaseVisualChange {
     perf: IPerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     const duration = options.duration || 300; // Default duration
-    await perf.track("inputSwipe", async () => {
+    const scrollMode = options.scrollMode || "adb"; // Default to ADB mode
+
+    // Use accessibility service swipe if requested
+    if (scrollMode === "a11y") {
+      return await this.executeA11ySwipe(x1, y1, x2, y2, duration, perf);
+    }
+
+    // Default ADB mode
+    await perf.track("adbInputSwipe", async () => {
       await this.adb.executeCommand(`shell input swipe ${x1} ${y1} ${x2} ${y2} ${duration}`);
     });
 
@@ -79,6 +89,78 @@ export class ExecuteGesture extends BaseVisualChange {
       y2,
       duration
     };
+  }
+
+  /**
+   * Execute swipe using accessibility service's dispatchGesture API.
+   * This is significantly faster than ADB's input swipe command.
+   * @param x1 - Starting X coordinate
+   * @param y1 - Starting Y coordinate
+   * @param x2 - Ending X coordinate
+   * @param y2 - Ending Y coordinate
+   * @param duration - Swipe duration in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Result of the swipe operation
+   */
+  private async executeA11ySwipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    duration: number,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<SwipeResult> {
+    try {
+      const client = AccessibilityServiceClient.getInstance(this.device, this.adb);
+
+      const result = await perf.track("a11ySwipe", async () => {
+        return await client.requestSwipe(x1, y1, x2, y2, duration, 5000, perf);
+      });
+
+      if (result.success) {
+        logger.info(`[SWIPE] A11y swipe successful: deviceTotal=${result.totalTimeMs}ms, gesture=${result.gestureTimeMs}ms`);
+        return {
+          success: true,
+          x1,
+          y1,
+          x2,
+          y2,
+          duration,
+          a11yTotalTimeMs: result.totalTimeMs,
+          a11yGestureTimeMs: result.gestureTimeMs
+        };
+      } else {
+        logger.warn(`[SWIPE] A11y swipe failed: ${result.error}, falling back to ADB`);
+        // Fall back to ADB on failure
+        await perf.track("adbInputSwipeFallback", async () => {
+          await this.adb.executeCommand(`shell input swipe ${x1} ${y1} ${x2} ${y2} ${duration}`);
+        });
+        return {
+          success: true,
+          x1,
+          y1,
+          x2,
+          y2,
+          duration,
+          fallbackReason: result.error
+        };
+      }
+    } catch (error) {
+      logger.warn(`[SWIPE] A11y swipe exception: ${error}, falling back to ADB`);
+      // Fall back to ADB on exception
+      await perf.track("adbInputSwipeFallback", async () => {
+        await this.adb.executeCommand(`shell input swipe ${x1} ${y1} ${x2} ${y2} ${duration}`);
+      });
+      return {
+        success: true,
+        x1,
+        y1,
+        x2,
+        y2,
+        duration,
+        fallbackReason: `${error}`
+      };
+    }
   }
 
   /**

@@ -3,6 +3,7 @@ import { BootedDevice, ExecResult } from "../../models";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class GetDumpsysWindow {
   private adb: AdbUtils;
@@ -26,9 +27,12 @@ export class GetDumpsysWindow {
 
   /**
    * Get cached dumpsys window data, using memory cache first, then disk cache
+   * @param perf - Optional performance tracker
    * @returns Promise with cached rotation value or executes fresh command
    */
-  public async execute(): Promise<ExecResult> {
+  public async execute(
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ExecResult> {
     // Check memory cache first
     const memoryCached = GetDumpsysWindow.memoryCache.get(this.device.deviceId);
     if (memoryCached && this.isCacheValid(memoryCached.timestamp)) {
@@ -37,7 +41,7 @@ export class GetDumpsysWindow {
 
     // Check disk cache
     try {
-      const diskCached = await this.loadFromDiskCache();
+      const diskCached = await perf.track("loadDiskCache", () => this.loadFromDiskCache());
       if (diskCached && this.isCacheValid(diskCached.timestamp)) {
         // Update memory cache with disk data
         GetDumpsysWindow.memoryCache.set(this.device.deviceId, diskCached);
@@ -48,15 +52,20 @@ export class GetDumpsysWindow {
     }
 
     // No valid cache found, refresh and return
-    return await this.refresh();
+    return await this.refresh(perf);
   }
 
   /**
    * Refresh dumpsys window data and update both memory and disk cache
+   * @param perf - Optional performance tracker
    * @returns Promise with fresh rotation value
    */
-  public async refresh(): Promise<ExecResult> {
-    const result = await this.adb.executeCommand("shell dumpsys window");
+  public async refresh(
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ExecResult> {
+    const result = await perf.track("adbDumpsysWindow", () =>
+      this.adb.executeCommand("shell dumpsys window")
+    );
     const timestamp = Date.now();
     const cacheEntry = { data: result, timestamp };
 
@@ -65,7 +74,7 @@ export class GetDumpsysWindow {
 
     // Update disk cache
     try {
-      await this.saveToDiskCache(cacheEntry);
+      await perf.track("saveDiskCache", () => this.saveToDiskCache(cacheEntry));
     } catch (error) {
       // Disk cache write failed, but we still return the result
       console.warn(`Failed to write disk cache for device ${this.device.deviceId}:`, error);

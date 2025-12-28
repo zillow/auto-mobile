@@ -83,6 +83,7 @@ export interface ScrollArgs {
   direction: "up" | "down" | "left" | "right";
   lookFor?: ScrollLookForArgs;
   speed?: "slow" | "normal" | "fast";
+  scrollMode?: "adb" | "a11y";
   platform: Platform;
 }
 
@@ -164,6 +165,7 @@ export const scrollSchema = z.object({
     maxTime: z.number().optional().describe("Maximum amount of time to spend scrolling, (default 10 seconds)")
   }).optional().describe("What we're searching for while scrolling"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
+  scrollMode: z.enum(["adb", "a11y"]).optional().describe("Scroll execution mode: 'adb' (default, ~540ms) or 'a11y' (accessibility service, ~50-150ms)"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
@@ -470,7 +472,8 @@ export function registerInteractionTools() {
           fingers: 1,
           randomize: false,
           lift: true,
-          pressure: 1
+          pressure: 1,
+          scrollMode: args.scrollMode
         },
         progress
       ));
@@ -534,7 +537,7 @@ export function registerInteractionTools() {
         const result = await perf.track(`scrollLoop_${scrollIteration}_swipe`, () => swipe.execute(
           containerElement!,
           elementUtils.getSwipeDirectionForScroll(direction),
-          { duration: 600 },
+          { duration: 600, scrollMode: args.scrollMode },
           progress
         ));
 

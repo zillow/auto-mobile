@@ -22,6 +22,7 @@ export interface ObservedChangeOptions {
   queryOptions?: ViewHierarchyQueryOptions;
   perf?: IPerformanceTracker;
   skipPreviousObserve?: boolean;
+  skipUiStability?: boolean;
 }
 
 export class BaseVisualChange {
@@ -122,9 +123,13 @@ export class BaseVisualChange {
       }
     }
 
-    // Start UI stability tracking if we have a package name
+    // Start UI stability tracking if we have a package name (skip if requested)
     let initState: any = null;
-    if (packageName) {
+    let gfxMetrics: GfxMetrics | null = null;
+
+    if (options.skipUiStability) {
+      logger.info("[BaseVisualChange] Skipping UI stability tracking (skipUiStability=true)");
+    } else if (packageName) {
       logger.info(`[BaseVisualChange] Starting UI stability initialization with package: ${packageName}`);
       initState = await perf.track("initUiStability", async () => {
         return this.awaitIdle.initializeUiStabilityTracking(
@@ -135,18 +140,17 @@ export class BaseVisualChange {
         logger.debug(`[BaseVisualChange] UI stability initialization failed: ${error}`);
         return null;
       });
-    }
 
-    // Execute UI stability waiting with appropriate state
-    let gfxMetrics: GfxMetrics | null = null;
-    if (packageName && packageName.trim() !== "") {
-      perf.serial("uiStability");
-      if (initState !== null) {
-        gfxMetrics = await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState, perf);
-      } else {
-        gfxMetrics = await this.awaitIdle.waitForUiStability(packageName, timeoutMs, perf);
+      // Execute UI stability waiting with appropriate state
+      if (packageName.trim() !== "") {
+        perf.serial("uiStability");
+        if (initState !== null) {
+          gfxMetrics = await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState, perf);
+        } else {
+          gfxMetrics = await this.awaitIdle.waitForUiStability(packageName, timeoutMs, perf);
+        }
+        perf.end();
       }
-      perf.end();
     }
 
     return await this.takeObservation(blockResult, previousObserveResult, {
@@ -177,9 +181,9 @@ export class BaseVisualChange {
     // This prevents returning stale cached data from before the action was executed
     const minTimestamp = options.actionStartTime ?? 0;
 
-    const latestObservation = await perf.track("finalObserve", async () => {
-      return this.observeScreen.execute(options.queryOptions, new NoOpPerformanceTracker(), true, minTimestamp);
-    });
+    perf.serial("finalObserve");
+    const latestObservation = await this.observeScreen.execute(options.queryOptions, perf, true, minTimestamp);
+    perf.end();
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {
       blockResult.success = latestObservation.viewHierarchy !== previousObserveResult.viewHierarchy;

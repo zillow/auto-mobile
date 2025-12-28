@@ -5,6 +5,7 @@ import { CryptoUtils } from "../../utils/crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { BootedDevice } from "../../models";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class Window {
   private adb: AdbUtils;
@@ -124,9 +125,13 @@ export class Window {
   /**
    * Get information about the active window
    * @param forceRefresh - Force refresh the cache (default: false)
+   * @param perf - Optional performance tracker
    * @returns Promise with active window information
    */
-  async getActive(forceRefresh: boolean = false): Promise<ActiveWindowInfo> {
+  async getActive(
+    forceRefresh: boolean = false,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ActiveWindowInfo> {
     // Return cached value if available and not forcing refresh
     if (!forceRefresh && this.cachedActiveWindow) {
       logger.info("[WINDOW] Using memory cached active window");
@@ -136,7 +141,7 @@ export class Window {
     // Try to read from disk cache if not in memory and not forcing refresh
     if (!forceRefresh && !this.cachedActiveWindow) {
       logger.info("[WINDOW] Using disk cached active window");
-      const diskCache = await this.readCacheFromDisk();
+      const diskCache = await perf.track("readDiskCache", () => this.readCacheFromDisk());
       if (diskCache) {
         this.cachedActiveWindow = diskCache;
         logger.info("[WINDOW] Using disk cached active window");
@@ -145,7 +150,9 @@ export class Window {
     }
 
     try {
-      const { stdout } = await this.adb.executeCommand(`shell "dumpsys window windows"`);
+      const { stdout } = await perf.track("adbDumpsysWindowWindows", () =>
+        this.adb.executeCommand(`shell "dumpsys window windows"`)
+      );
 
       // Default values
       let activityName = "";
@@ -249,12 +256,15 @@ export class Window {
 
   /**
    * Get a hash of the current activity name
+   * @param perf - Optional performance tracker
    * @returns Promise with activity name hash
    */
-  async getActiveHash(): Promise<string> {
+  async getActiveHash(
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<string> {
     logger.info("[WINDOW] Getting hash of active window");
     // Always force refresh when getting hash to ensure it reflects current state
-    const activeWindow = await this.getActive(true);
+    const activeWindow = await this.getActive(true, perf);
     const activityString = JSON.stringify(activeWindow);
     return CryptoUtils.generateCacheKey(activityString);
   }

@@ -84,6 +84,25 @@ export interface IPerformanceTracker {
    * Check if performance tracking is enabled
    */
   isEnabled(): boolean;
+
+  /**
+   * Add external timing data (e.g., from Android side) to the current block
+   * @param name - Name for the timing entry
+   * @param entry - The timing entry to add (with durationMs and optional children)
+   */
+  addExternalTiming(name: string, entry: TimingEntry | TimingEntry[]): void;
+
+  /**
+   * Start tracking an operation manually (for operations with complex timing)
+   * @param name - Operation name
+   */
+  startOperation(name: string): void;
+
+  /**
+   * End a manually tracked operation
+   * @param name - Operation name (must match startOperation)
+   */
+  endOperation(name: string): void;
 }
 
 /**
@@ -198,6 +217,46 @@ export class PerformanceTracker implements IPerformanceTracker {
   isEnabled(): boolean {
     return true;
   }
+
+  addExternalTiming(name: string, entry: TimingEntry | TimingEntry[]): void {
+    const entries = Array.isArray(entry) ? entry : [entry];
+
+    // Create a wrapper entry with children
+    const wrapperEntry: TimingEntry = {
+      name,
+      durationMs: entries.reduce((sum, e) => sum + e.durationMs, 0),
+      children: entries
+    };
+
+    if (Array.isArray(this.current.entries)) {
+      this.current.entries.push(wrapperEntry);
+    } else {
+      this.current.entries[name] = wrapperEntry;
+    }
+  }
+
+  private operationStarts: Map<string, number> = new Map();
+
+  startOperation(name: string): void {
+    this.operationStarts.set(name, Date.now());
+  }
+
+  endOperation(name: string): void {
+    const startMs = this.operationStarts.get(name);
+    if (startMs === undefined) {
+      return;
+    }
+    this.operationStarts.delete(name);
+
+    const durationMs = Date.now() - startMs;
+    const entry: TimingEntry = { name, durationMs };
+
+    if (Array.isArray(this.current.entries)) {
+      this.current.entries.push(entry);
+    } else {
+      this.current.entries[name] = entry;
+    }
+  }
 }
 
 /**
@@ -231,6 +290,18 @@ export class NoOpPerformanceTracker implements IPerformanceTracker {
 
   isEnabled(): boolean {
     return false;
+  }
+
+  addExternalTiming(_name: string, _entry: TimingEntry | TimingEntry[]): void {
+    // No-op
+  }
+
+  startOperation(_name: string): void {
+    // No-op
+  }
+
+  endOperation(_name: string): void {
+    // No-op
   }
 }
 

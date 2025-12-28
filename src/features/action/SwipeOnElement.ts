@@ -68,7 +68,8 @@ export class SwipeOnElement extends BaseVisualChange {
               flooredStartY,
               flooredEndX,
               flooredEndY,
-              options
+              options,
+              perf
             )
           );
           logger.info(`[SwipeOnElement] Swipe completed successfully: ${JSON.stringify(result)}`);
