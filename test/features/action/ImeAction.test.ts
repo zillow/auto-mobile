@@ -4,7 +4,8 @@ import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { Window } from "../../../src/features/observe/Window";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
-import { ExecResult, ObserveResult } from "../../../src/models";
+import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
+import { ExecResult, ObserveResult, BootedDevice } from "../../../src/models";
 import sinon from "sinon";
 
 describe("ImeAction", () => {
@@ -13,7 +14,14 @@ describe("ImeAction", () => {
   let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
   let mockWindow: sinon.SinonStubbedInstance<Window>;
   let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
+  let mockA11yClient: sinon.SinonStubbedInstance<AccessibilityServiceClient>;
 
+  // Test device for Android platform
+  const testDevice: BootedDevice = {
+    deviceId: "test-device",
+    platform: "android",
+    name: "Test Device"
+  };
 
   beforeEach(() => {
     // Create stubs for dependencies
@@ -21,6 +29,7 @@ describe("ImeAction", () => {
     mockObserveScreen = sinon.createStubInstance(ObserveScreen);
     mockWindow = sinon.createStubInstance(Window);
     mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
+    mockA11yClient = sinon.createStubInstance(AccessibilityServiceClient);
 
     // Stub the constructors and static calls
     sinon.stub(AdbUtils.prototype, "executeCommand").callsFake(mockAdb.executeCommand);
@@ -31,6 +40,9 @@ describe("ImeAction", () => {
     sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
     sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
     sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
+
+    // Stub AccessibilityServiceClient.getInstance to return our mock
+    getInstanceStub = sinon.stub(AccessibilityServiceClient, "getInstance").returns(mockA11yClient as unknown as AccessibilityServiceClient);
 
     // Set up default mock responses
     mockWindow.getCachedActiveWindow.resolves(null);
@@ -44,7 +56,14 @@ describe("ImeAction", () => {
     mockObserveScreen.getMostRecentCachedObserveResult.resolves(defaultObserveResult);
     mockObserveScreen.execute.resolves(defaultObserveResult);
 
-    imeAction = new ImeAction("test-device");
+    // Set up default AccessibilityServiceClient response (success)
+    mockA11yClient.requestImeAction.resolves({
+      success: true,
+      action: "done",
+      totalTimeMs: 50
+    });
+
+    imeAction = new ImeAction(testDevice);
   });
 
   afterEach(() => {
@@ -69,8 +88,12 @@ describe("ImeAction", () => {
   });
 
   describe("execute", () => {
-    it("should execute IME action 'done'", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+    it("should execute IME action 'done' via accessibility service", async () => {
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "done",
+        totalTimeMs: 50
+      });
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -80,12 +103,18 @@ describe("ImeAction", () => {
       assert.equal(result.action, "done");
       assert.isDefined(result.observation);
 
-      // Verify correct ADB command was called
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_ENTER");
+      // Verify accessibility service was called with correct action
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "done");
+      // Should NOT call ADB when accessibility service succeeds
+      sinon.assert.notCalled(mockAdb.executeCommand);
     });
 
-    it("should execute IME action 'next'", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+    it("should execute IME action 'next' via accessibility service", async () => {
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "next",
+        totalTimeMs: 50
+      });
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -94,11 +123,15 @@ describe("ImeAction", () => {
       assert.isTrue(result.success);
       assert.equal(result.action, "next");
 
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_TAB");
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "next");
     });
 
-    it("should execute IME action 'search'", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+    it("should execute IME action 'search' via accessibility service", async () => {
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "search",
+        totalTimeMs: 50
+      });
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -107,11 +140,15 @@ describe("ImeAction", () => {
       assert.isTrue(result.success);
       assert.equal(result.action, "search");
 
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_SEARCH");
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "search");
     });
 
-    it("should execute IME action 'send'", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+    it("should execute IME action 'send' via accessibility service", async () => {
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "send",
+        totalTimeMs: 50
+      });
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -120,11 +157,15 @@ describe("ImeAction", () => {
       assert.isTrue(result.success);
       assert.equal(result.action, "send");
 
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_ENTER");
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "send");
     });
 
-    it("should execute IME action 'go'", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+    it("should execute IME action 'go' via accessibility service", async () => {
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "go",
+        totalTimeMs: 50
+      });
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -133,11 +174,15 @@ describe("ImeAction", () => {
       assert.isTrue(result.success);
       assert.equal(result.action, "go");
 
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_ENTER");
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "go");
     });
 
-    it("should execute IME action 'previous' with key combination", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+    it("should execute IME action 'previous' via accessibility service", async () => {
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "previous",
+        totalTimeMs: 50
+      });
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -146,11 +191,7 @@ describe("ImeAction", () => {
       assert.isTrue(result.success);
       assert.equal(result.action, "previous");
 
-      // Should call both key events for Shift+Tab
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_SHIFT_LEFT");
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_TAB");
-      // At least 2 calls for the key combination, but BaseVisualChange might make additional calls
-      assert.isAtLeast(mockAdb.executeCommand.callCount, 2);
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "previous");
     });
 
     it("should handle empty action string", async () => {
@@ -160,12 +201,17 @@ describe("ImeAction", () => {
       assert.equal(result.action, "");
       assert.equal(result.error, "No IME action provided");
 
-      // Should not call ADB commands
+      // Should not call accessibility service or ADB commands
+      sinon.assert.notCalled(mockA11yClient.requestImeAction);
       sinon.assert.notCalled(mockAdb.executeCommand);
     });
 
     it("should work with progress callback", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "done",
+        totalTimeMs: 50
+      });
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -177,64 +223,95 @@ describe("ImeAction", () => {
       assert.isTrue(progressCallback.called);
     });
 
-    it("should handle ADB command failure", async () => {
-      const error = new Error("Failed to execute keyevent");
-      mockAdb.executeCommand.rejects(error);
-
+    it("should fall back to ADB when accessibility service fails", async () => {
+      // First call to accessibility service fails
+      mockA11yClient.requestImeAction.resolves({
+        success: false,
+        action: "done",
+        totalTimeMs: 50,
+        error: "No focused element"
+      });
+      mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
-      try {
-        const result = await imeAction.execute("done");
-        // If we get here, BaseVisualChange caught the error
-        assert.equal(result.action, "done");
-        assert.include(result.error || "", "Failed to execute IME action");
-      } catch (caughtError) {
-        // If the error bubbled up, that's also valid behavior
-        assert.include((caughtError as Error).message, "Failed to execute keyevent");
-      }
+      const result = await imeAction.execute("done");
 
+      assert.isTrue(result.success);
+      assert.equal(result.action, "done");
+
+      // Verify accessibility service was tried first
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "done");
+      // Then ADB fallback was used
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_ENTER");
     });
 
-    it("should handle ADB command failure for multi-key actions", async () => {
-      const error = new Error("Failed to execute keyevent");
-      mockAdb.executeCommand.onFirstCall().resolves(createMockExecResult());
-      mockAdb.executeCommand.onSecondCall().rejects(error);
-
+    it("should fall back to ADB for multi-key actions when accessibility service fails", async () => {
+      // Accessibility service fails
+      mockA11yClient.requestImeAction.resolves({
+        success: false,
+        action: "previous",
+        totalTimeMs: 50,
+        error: "No focused element"
+      });
+      mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
-      try {
-        const result = await imeAction.execute("previous");
-        // If we get here, BaseVisualChange handled the error
-        assert.equal(result.action, "previous");
-      } catch (caughtError) {
-        // If the error bubbled up, that's also valid behavior
-        assert.include((caughtError as Error).message, "Failed to execute keyevent");
-      }
+      const result = await imeAction.execute("previous");
 
-      // Should have attempted both key events
+      assert.isTrue(result.success);
+      assert.equal(result.action, "previous");
+
+      // Verify accessibility service was tried first
+      sinon.assert.calledWith(mockA11yClient.requestImeAction, "previous");
+      // Then ADB fallback was used with both key events for Shift+Tab
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_SHIFT_LEFT");
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_TAB");
     });
   });
 
   describe("constructor", () => {
-    it("should work with null deviceId", () => {
-      const imeActionInstance = new ImeAction("test-device");
+    it("should work with device object", () => {
+      const imeActionInstance = new ImeAction(testDevice);
       assert.isDefined(imeActionInstance);
     });
 
     it("should work with custom AdbUtils", () => {
-      const customAdb = new AdbUtils("custom-device");
-      const imeActionInstance = new ImeAction("test-device", customAdb);
+      const customAdb = new AdbUtils(testDevice);
+      const imeActionInstance = new ImeAction(testDevice, customAdb);
       assert.isDefined(imeActionInstance);
     });
   });
 
   describe("timing", () => {
-    it("should include delay before executing keyevent", async () => {
+    it("should complete quickly via accessibility service", async () => {
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "done",
+        totalTimeMs: 50
+      });
+      const mockObservation = createMockObserveResult();
+      mockObserveScreen.execute.resolves(mockObservation);
+
+      const startTime = Date.now();
+      const result = await imeAction.execute("done");
+      const elapsedTime = Date.now() - startTime;
+
+      assert.isTrue(result.success);
+      // Accessibility service path should be fast (no 100ms delay)
+      // Allow some margin for test execution
+      assert.isBelow(elapsedTime, 500);
+    });
+
+    it("should include delay when falling back to ADB keyevent", async () => {
+      // Make accessibility service fail to trigger ADB fallback
+      mockA11yClient.requestImeAction.resolves({
+        success: false,
+        action: "done",
+        totalTimeMs: 50,
+        error: "No focused element"
+      });
       mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
@@ -244,7 +321,7 @@ describe("ImeAction", () => {
       const elapsedTime = Date.now() - startTime;
 
       assert.isTrue(result.success);
-      // Should include at least 100ms delay plus some execution time
+      // ADB fallback includes 100ms delay plus some execution time
       assert.isAtLeast(elapsedTime, 100);
     });
   });
@@ -269,7 +346,11 @@ describe("ImeAction", () => {
       const mockCachedObservation = createMockObserveResult();
       mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockCachedObservation);
 
-      mockAdb.executeCommand.resolves(createMockExecResult());
+      mockA11yClient.requestImeAction.resolves({
+        success: true,
+        action: "done",
+        totalTimeMs: 50
+      });
       const observationError = new Error("Failed to observe screen");
       mockObserveScreen.execute.rejects(observationError);
 
@@ -301,8 +382,7 @@ describe("ImeAction", () => {
   });
 
   describe("edge cases", () => {
-    it("should handle all valid IME actions", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
+    it("should handle all valid IME actions via accessibility service", async () => {
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
@@ -310,19 +390,30 @@ describe("ImeAction", () => {
                 ["done", "next", "search", "send", "go", "previous"];
 
       for (const action of validActions) {
-        mockAdb.executeCommand.resetHistory();
+        mockA11yClient.requestImeAction.resetHistory();
+        mockA11yClient.requestImeAction.resolves({
+          success: true,
+          action,
+          totalTimeMs: 50
+        });
         const result = await imeAction.execute(action);
 
         assert.isTrue(result.success, `Action '${action}' should succeed`);
         assert.equal(result.action, action);
-        assert.isAtLeast(mockAdb.executeCommand.callCount, 1, `Action '${action}' should call ADB`);
+        sinon.assert.calledWith(mockA11yClient.requestImeAction, action);
       }
     });
 
     it("should handle rapid consecutive calls", async () => {
-      mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
+
+      // Set up mock to return success for each action
+      mockA11yClient.requestImeAction.callsFake(async (action: string) => ({
+        success: true,
+        action,
+        totalTimeMs: 50
+      }));
 
       const promises = [
         imeAction.execute("done"),
@@ -336,13 +427,24 @@ describe("ImeAction", () => {
         assert.isTrue(result.success, `Call ${index} should succeed`);
       });
 
-      // Should have called ADB command for each action
-      assert.isAtLeast(mockAdb.executeCommand.callCount, 3);
+      // Should have called accessibility service for each action
+      assert.equal(mockA11yClient.requestImeAction.callCount, 3);
     });
   });
 
-  describe("key mapping", () => {
-    it("should map done to KEYCODE_ENTER", async () => {
+  describe("key mapping (ADB fallback)", () => {
+    // These tests verify the ADB fallback behavior when accessibility service fails
+    beforeEach(() => {
+      // Make accessibility service fail to trigger ADB fallback
+      mockA11yClient.requestImeAction.resolves({
+        success: false,
+        action: "",
+        totalTimeMs: 50,
+        error: "No focused element"
+      });
+    });
+
+    it("should map done to KEYCODE_ENTER in ADB fallback", async () => {
       mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
@@ -352,7 +454,7 @@ describe("ImeAction", () => {
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_ENTER");
     });
 
-    it("should map next to KEYCODE_TAB", async () => {
+    it("should map next to KEYCODE_TAB in ADB fallback", async () => {
       mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
@@ -362,7 +464,7 @@ describe("ImeAction", () => {
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_TAB");
     });
 
-    it("should map search to KEYCODE_SEARCH", async () => {
+    it("should map search to KEYCODE_SEARCH in ADB fallback", async () => {
       mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
@@ -372,7 +474,7 @@ describe("ImeAction", () => {
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_SEARCH");
     });
 
-    it("should map send to KEYCODE_ENTER", async () => {
+    it("should map send to KEYCODE_ENTER in ADB fallback", async () => {
       mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
@@ -382,7 +484,7 @@ describe("ImeAction", () => {
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_ENTER");
     });
 
-    it("should map go to KEYCODE_ENTER", async () => {
+    it("should map go to KEYCODE_ENTER in ADB fallback", async () => {
       mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
@@ -392,7 +494,7 @@ describe("ImeAction", () => {
       sinon.assert.calledWith(mockAdb.executeCommand, "shell input keyevent KEYCODE_ENTER");
     });
 
-    it("should map previous to SHIFT+TAB combination", async () => {
+    it("should map previous to SHIFT+TAB combination in ADB fallback", async () => {
       mockAdb.executeCommand.resolves(createMockExecResult());
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);

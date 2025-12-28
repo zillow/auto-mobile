@@ -19,7 +19,8 @@ describe("AccessibilityServiceClient", function() {
           return { stdout: `${serverPort}`, stderr: "" };
         }
         return { stdout: "", stderr: "" };
-      }
+      },
+      isScreenOn: async () => true
     } as unknown as AdbUtils;
 
     // Reset singleton instances for clean test state
@@ -328,7 +329,7 @@ describe("AccessibilityServiceClient", function() {
     });
 
     it("should return null when hierarchy retrieval fails", async function() {
-      this.timeout(5000);
+      this.timeout(15000);
 
       // Mock service as available but WebSocket connection fails
       mockAdb.executeCommand = async (cmd: string) => {

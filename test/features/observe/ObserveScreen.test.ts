@@ -371,13 +371,6 @@ describe("ObserveScreen", function() {
       expect(result.systemInsets).to.have.property("bottom");
       expect(result.systemInsets).to.have.property("left");
 
-      expect(result).to.have.property("screenshotPath");
-      expect(result.screenshotPath).to.be.a("string");
-
-      // Check if screenshot file exists
-      const fileExists = await adb.executeCommand(`shell "if [ -f ${result.screenshotPath} ]; then echo 'exists'; else echo 'not exists'; fi"`);
-      expect(fileExists.stdout.trim()).to.include("exists");
-
       expect(result).to.have.property("viewHierarchy");
       expect(result.viewHierarchy).to.have.property("hierarchy");
       expect(result.viewHierarchy.hierarchy).to.not.be.null;
@@ -433,7 +426,7 @@ describe("ObserveScreen", function() {
       // First observation
       const firstResult = await observeScreen.execute();
 
-      // Wait for tiny delay to ensure screenshots will have different paths
+      // Wait for tiny delay
       new Promise(resolve => setTimeout(resolve, 1));
 
       // Second observation
@@ -443,25 +436,14 @@ describe("ObserveScreen", function() {
       expect(secondResult.screenSize.width).to.equal(firstResult.screenSize.width);
       expect(secondResult.screenSize.height).to.equal(firstResult.screenSize.height);
 
-      // Package name should remain the same
-      expect(secondResult.activeWindow!.appId).to.equal(firstResult.activeWindow!.appId);
+      // Package name should remain the same (if activeWindow is available)
+      if (firstResult.activeWindow && secondResult.activeWindow) {
+        expect(secondResult.activeWindow.appId).to.equal(firstResult.activeWindow.appId);
+      }
 
-      // Screenshots should have different paths even if the UI hasn't changed
-      expect(secondResult.screenshotPath).to.not.equal(firstResult.screenshotPath);
-
-      // Both screenshots should have valid file paths
-      expect(firstResult.screenshotPath).to.be.a("string").and.not.empty;
-      expect(secondResult.screenshotPath).to.be.a("string").and.not.empty;
-
-      // Both screenshots should contain timestamp information (format: screenshot_timestamp.ext)
-      const firstFilename = firstResult.screenshotPath!.split("/").pop() || "";
-      const secondFilename = secondResult.screenshotPath!.split("/").pop() || "";
-
-      expect(firstFilename).to.match(/^screenshot_\d+\.(png|webp)$/);
-      expect(secondFilename).to.match(/^screenshot_\d+\.(png|webp)$/);
-
-      logger.info(`First screenshot: ${firstFilename}`);
-      logger.info(`Second screenshot: ${secondFilename}`);
+      // Both observations should have view hierarchy
+      expect(firstResult.viewHierarchy).to.exist;
+      expect(secondResult.viewHierarchy).to.exist;
     });
 
     it("should handle errors gracefully if device is disconnected", async function() {

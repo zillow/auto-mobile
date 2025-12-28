@@ -273,6 +273,20 @@ export class ObserveScreen {
         // (it creates nested serial blocks that conflict with parallel tracking)
         await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
 
+        // Populate activeWindow from view hierarchy packageName if available
+        if (result.viewHierarchy?.packageName && !result.activeWindow) {
+          result.activeWindow = {
+            appId: result.viewHierarchy.packageName,
+            activityName: "",
+            layoutSeqSum: 0
+          };
+        }
+
+        // Fallback: if activeWindow still not populated, use the Window class
+        if (!result.activeWindow) {
+          await this.collectActiveWindow(result);
+        }
+
         perf.end();
         break;
 
