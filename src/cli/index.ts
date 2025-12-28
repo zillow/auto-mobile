@@ -201,23 +201,12 @@ Parameters:
     "checkRunningDevices"
   ];
 
-  const sourceMapTools = [
-    "addAppConfig",
-    "setAndroidAppSource",
-    "getAppConfigs",
-    "getSourceIndex",
-    "findActivitySource",
-    "findFragmentSource"
-  ];
-
   // Group tools by category (based on their prefixes or common patterns)
   tools.forEach(tool => {
     let category = "General";
 
     if (deviceTools.includes(tool.name)) {
       category = "Device Management";
-    } else if (sourceMapTools.includes(tool.name)) {
-      category = "Source Mapping";
     } else if (tool.name.includes("App") || tool.name.includes("app")) {
       category = "App Management";
     } else if (tool.name.startsWith("assert")) {

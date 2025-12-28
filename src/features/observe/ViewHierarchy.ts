@@ -12,8 +12,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { ScreenshotUtils } from "../../utils/screenshot-utils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { SourceMapper } from "../../utils/sourceMapper";
-import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions } from "../../models";
+import { ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
 import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -47,26 +46,12 @@ interface ElementWithZOrder {
   isClickable: boolean;
 }
 
-/**
- * Extended ViewHierarchyResult with source indexing information
- */
-interface ExtendedViewHierarchyResult extends ViewHierarchyResult {
-  sourceInfo?: {
-    activity?: ActivityInfo;
-    fragments?: FragmentInfo[];
-    views?: ViewInfo[];
-    composables?: ComposableInfo[];
-    appId?: string;
-  };
-}
-
 export class ViewHierarchy {
   private device: BootedDevice;
   private readonly adb: AdbUtils;
   private readonly webdriver: WebDriverAgent;
   private takeScreenshot: TakeScreenshot;
   private elementUtils: ElementUtils;
-  private sourceMapper: SourceMapper;
   private accessibilityServiceClient: AccessibilityServiceClient;
   private static viewHierarchyCache: Map<string, ViewHierarchyCache> = new Map();
   private static cacheDir: string = path.join("/tmp/auto-mobile", "view_hierarchy");
@@ -94,7 +79,6 @@ export class ViewHierarchy {
     this.webdriver = webdriver || new WebDriverAgent(device);
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
     this.elementUtils = new ElementUtils();
-    this.sourceMapper = SourceMapper.getInstance();
     this.accessibilityServiceClient = accessibilityServiceClient || AccessibilityServiceClient.getInstance(device, this.adb);
 
     // Ensure cache directories exist
@@ -1387,242 +1371,11 @@ export class ViewHierarchy {
   }
 
   /**
-   * Augment view hierarchy with source indexing information
-   * @param viewHierarchy - The view hierarchy to augment
-   * @returns Augmented view hierarchy with source information
-   */
-  private async augmentWithSourceIndexing(viewHierarchy: ExtendedViewHierarchyResult): Promise<ExtendedViewHierarchyResult> {
-    try {
-      // Skip if already has source info or if hierarchy has error
-      if (viewHierarchy.sourceInfo || (viewHierarchy.hierarchy as any)?.error) {
-        return viewHierarchy;
-      }
-
-      logger.debug("[SOURCE_INDEXING] Attempting to augment view hierarchy with source information");
-
-      // Extract activity information from the current activity
-      const currentActivity = await this.getCurrentActivityInfo();
-      if (!currentActivity) {
-        logger.debug("[SOURCE_INDEXING] No current activity found");
-        return viewHierarchy;
-      }
-
-      logger.debug(`[SOURCE_INDEXING] Current activity: ${currentActivity.activityName}, package: ${currentActivity.packageName}`);
-
-      const matchingConfig = this.sourceMapper.getMatchingAppConfig(currentActivity.packageName);
-
-      if (!matchingConfig) {
-        logger.debug(`[SOURCE_INDEXING] No app configuration found for package: ${currentActivity.packageName}`);
-        return viewHierarchy;
-      }
-
-      logger.debug(`[SOURCE_INDEXING] Found matching app config: ${matchingConfig.appId}`);
-
-      // Find activity source information
-      let activity: ActivityInfo | null = null;
-      try {
-        activity = await this.sourceMapper.findActivityInfo(
-          matchingConfig.appId,
-          currentActivity.activityName
-        );
-
-        if (activity) {
-          logger.debug(`[SOURCE_INDEXING] Found activity source: ${activity.sourceFile}`);
-        }
-      } catch (error) {
-        logger.warn(`[SOURCE_INDEXING] Error finding activity source: ${error}`);
-      }
-
-      // Find fragment source information
-      const fragments: FragmentInfo[] = [];
-      const fragmentNames = this.extractFragmentNames(viewHierarchy);
-
-      for (const fragmentName of fragmentNames) {
-        try {
-          const fragmentInfo = await this.sourceMapper.findFragmentInfo(
-            matchingConfig.appId,
-            fragmentName,
-            activity
-          );
-
-          if (fragmentInfo) {
-            fragments.push(fragmentInfo);
-            logger.debug(`[SOURCE_INDEXING] Found fragment source: ${fragmentInfo.sourceFile}`);
-          }
-        } catch (error) {
-          logger.warn(`[SOURCE_INDEXING] Error finding fragment source for ${fragmentName}: ${error}`);
-        }
-      }
-
-      // Find custom View source information
-      const views: ViewInfo[] = [];
-      const viewNames = this.extractViewNames(viewHierarchy);
-
-      for (const viewName of viewNames) {
-        try {
-          const viewInfo = await this.sourceMapper.findViewInfo(
-            matchingConfig.appId,
-            viewName,
-            activity || undefined,
-            fragments.length > 0 ? fragments[0] : undefined
-          );
-
-          if (viewInfo) {
-            views.push(viewInfo);
-            logger.debug(`[SOURCE_INDEXING] Found view source: ${viewInfo.sourceFile}`);
-          }
-        } catch (error) {
-          logger.warn(`[SOURCE_INDEXING] Error finding view source for ${viewName}: ${error}`);
-        }
-      }
-
-      // Find composable source information
-      const composables: ComposableInfo[] = [];
-      const composableNames = this.extractComposableNames(viewHierarchy);
-      for (const composableName of composableNames) {
-        try {
-          const composableInfo = await this.sourceMapper.findComposableInfo(
-            matchingConfig.appId,
-            composableName,
-            activity || undefined,
-            fragments.length > 0 ? fragments[0] : undefined
-          );
-
-          if (composableInfo) {
-            composables.push(composableInfo);
-            logger.debug(`[SOURCE_INDEXING] Found composable source: ${composableInfo.sourceFile}`);
-          }
-        } catch (error) {
-          logger.warn(`[SOURCE_INDEXING] Error finding composable source for ${composableName}: ${error}`);
-        }
-      }
-
-      // Add source information to the result
-      viewHierarchy.sourceInfo = {
-        activity: activity || undefined,
-        fragments: fragments.length > 0 ? fragments : undefined,
-        views: views.length > 0 ? views : undefined,
-        composables: composables.length > 0 ? composables : undefined,
-        appId: matchingConfig.appId
-      };
-
-      logger.debug(`[SOURCE_INDEXING] Augmented view hierarchy with ${activity ? 1 : 0} activity, ${fragments.length} fragment, ${views.length} view, and ${composables.length} composable source references`);
-
-    } catch (error) {
-      logger.warn(`[SOURCE_INDEXING] Error during source indexing augmentation: ${error}`);
-    }
-
-    return viewHierarchy;
-  }
-
-  /**
-   * Get current activity information from the device
-   * @returns Current activity info or null
-   */
-  private async getCurrentActivityInfo(): Promise<{ activityName: string; packageName: string } | null> {
-    try {
-      const result = await this.adb.executeCommand("shell dumpsys activity activities | grep -E 'mResumedActivity|mFocusedActivity' | head -1");
-      const output = result.stdout;
-
-      // Parse the current activity from dumpsys output
-      // Example: mResumedActivity: ActivityRecord{abc123 u0 com.example.myapp/.MainActivity t12345}
-      const activityMatch = output.match(/ActivityRecord\{[^}]+\s+([^\s]+)\/([^\s]+)\s+/);
-
-      if (activityMatch) {
-        const packageName = activityMatch[1];
-        const activityPath = activityMatch[2];
-
-        // Extract class name from activity path (e.g., ".MainActivity" -> "MainActivity")
-        const activityName = activityPath.startsWith(".") ?
-          `${packageName}${activityPath}` :
-          activityPath;
-
-        return { activityName, packageName };
-      }
-
-      logger.warn("[SOURCE_INDEXING] Could not parse current activity from dumpsys output");
-      return null;
-    } catch (error) {
-      logger.warn(`[SOURCE_INDEXING] Error getting current activity: ${error}`);
-      return null;
-    }
-  }
-
-  /**
-   * Extract fragment names from view hierarchy augmentation data
-   * @param viewHierarchy - The view hierarchy to search
-   * @returns Array of fragment class names
-   */
-  private extractFragmentNames(viewHierarchy: ViewHierarchyResult): string[] {
-    const fragmentNames: string[] = [];
-
-    // Traverse the hierarchy looking for fragment information added by augmentViewHierarchyWithClassAndFragment
-    const traverseNode = (node: any): void => {
-      if (node.fragment) {
-        fragmentNames.push(node.fragment);
-      }
-
-      if (node.node) {
-        const children = Array.isArray(node.node) ? node.node : [node.node];
-        for (const child of children) {
-          traverseNode(child);
-        }
-      }
-    };
-
-    if (viewHierarchy.hierarchy) {
-      traverseNode(viewHierarchy.hierarchy);
-    }
-
-    // Remove duplicates
-    return Array.from(new Set(fragmentNames));
-  }
-
-  /**
-   * Extract custom View class names from view hierarchy augmentation data
-   * @param viewHierarchy - The view hierarchy to search
-   * @returns Array of custom View class names
-   */
-  private extractViewNames(viewHierarchy: ViewHierarchyResult): string[] {
-    const viewNames: string[] = [];
-
-    // Traverse the hierarchy looking for custom view class information added by augmentViewHierarchyWithClassAndFragment
-    const traverseNode = (node: any): void => {
-      // Check for custom view class from augmentation
-      if (node.customView) {
-        viewNames.push(node.customView);
-      }
-
-      // Check for class property that doesn't match Android framework patterns
-      if (node.class && !node.class.match(/^(android\.|com\.android\.|androidx\.)/)) {
-        // Exclude fragments and activities as they are handled separately
-        if (!node.class.includes("Fragment") && !node.class.includes("Activity")) {
-          viewNames.push(node.class);
-        }
-      }
-
-      if (node.node) {
-        const children = Array.isArray(node.node) ? node.node : [node.node];
-        for (const child of children) {
-          traverseNode(child);
-        }
-      }
-    };
-
-    if (viewHierarchy.hierarchy) {
-      traverseNode(viewHierarchy.hierarchy);
-    }
-
-    // Remove duplicates
-    return Array.from(new Set(viewNames));
-  }
-
-  /**
    * Augment view hierarchy with class and fragment and custom view information from dumpsys activity top
    * @param viewHierarchy - The view hierarchy to augment
    * @param activityTopData - Class, fragment and view data from dumpsys activity top
    */
-  private augmentViewHierarchyWithClassAndFragment(viewHierarchy: ExtendedViewHierarchyResult, activityTopData: ActivityTopData): void {
+  private augmentViewHierarchyWithClassAndFragment(viewHierarchy: ViewHierarchyResult, activityTopData: ActivityTopData): void {
     if (!viewHierarchy || !viewHierarchy.hierarchy) {
       return;
     }
@@ -1690,38 +1443,5 @@ export class ViewHierarchy {
 
     // Start augmentation from the root node
     augmentNode(viewHierarchy.hierarchy);
-  }
-
-  /**
-   * Extract composable names from view hierarchy augmentation data
-   * @param viewHierarchy - The view hierarchy to search
-   * @returns Array of composable names
-   */
-  private extractComposableNames(viewHierarchy: ViewHierarchyResult): string[] {
-    const composableNames: string[] = [];
-
-    // Traverse the hierarchy looking for composable information
-    const traverseNode = (node: any): void => {
-      // Best-effort heuristic: look for nodes marked as composable or having a composable name
-      if (node.composable && typeof node.composable === "string" && node.composable.length > 0) {
-        composableNames.push(node.composable);
-      } else if (node.composableName && typeof node.composableName === "string" && node.composableName.length > 0) {
-        composableNames.push(node.composableName);
-      }
-
-      if (node.node) {
-        const children = Array.isArray(node.node) ? node.node : [node.node];
-        for (const child of children) {
-          traverseNode(child);
-        }
-      }
-    };
-
-    if (viewHierarchy.hierarchy) {
-      traverseNode(viewHierarchy.hierarchy);
-    }
-
-    // Remove duplicates
-    return Array.from(new Set(composableNames));
   }
 }
