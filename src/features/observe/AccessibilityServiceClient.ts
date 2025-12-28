@@ -50,7 +50,21 @@ interface AccessibilityHierarchy {
 interface WebSocketMessage {
   type: string;
   timestamp?: number;
+  requestId?: string;
   data?: AccessibilityHierarchy;
+  format?: string;
+  error?: string;
+}
+
+/**
+ * Interface for screenshot result
+ */
+export interface ScreenshotResult {
+  success: boolean;
+  data?: string; // Base64 encoded JPEG
+  format?: string;
+  timestamp?: number;
+  error?: string;
 }
 
 /**
@@ -95,6 +109,10 @@ export class AccessibilityServiceClient {
   private portForwardingSetup: boolean = false;
   private lastWebSocketTimeout: number = 0;
   private static readonly WEBSOCKET_TIMEOUT_COOLDOWN_MS = 5000; // Skip WebSocket wait for 5 seconds after timeout
+
+  // Screenshot handling
+  private pendingScreenshotResolve: ((result: ScreenshotResult) => void) | null = null;
+  private pendingScreenshotRequestId: string | null = null;
 
   /**
    * Private constructor - use getInstance() instead
@@ -312,6 +330,35 @@ export class AccessibilityServiceClient {
         };
 
         logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.updatedAt})`);
+      }
+
+      // Handle screenshot response
+      if (message.type === "screenshot" && this.pendingScreenshotResolve) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Received screenshot (requestId: ${message.requestId}, format: ${message.format})`);
+        const resolve = this.pendingScreenshotResolve;
+        this.pendingScreenshotResolve = null;
+        this.pendingScreenshotRequestId = null;
+
+        // Extract data from the message - it may be nested under 'data' key or directly on message
+        const base64Data = (message as any).data as string;
+        resolve({
+          success: true,
+          data: base64Data,
+          format: message.format || "jpeg",
+          timestamp: message.timestamp
+        });
+      }
+
+      // Handle screenshot error
+      if (message.type === "screenshot_error" && this.pendingScreenshotResolve) {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot error (requestId: ${message.requestId}): ${message.error}`);
+        const resolve = this.pendingScreenshotResolve;
+        this.pendingScreenshotResolve = null;
+        this.pendingScreenshotRequestId = null;
+        resolve({
+          success: false,
+          error: message.error || "Unknown error"
+        });
       }
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error handling WebSocket message: ${error}`);
@@ -780,6 +827,82 @@ export class AccessibilityServiceClient {
       }
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error during cleanup: ${error}`);
+    }
+  }
+
+  /**
+   * Request a screenshot from the accessibility service
+   * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<ScreenshotResult> - The screenshot result
+   */
+  async requestScreenshot(
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ScreenshotResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for screenshot");
+        return {
+          success: false,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send screenshot request
+      const requestId = `screenshot_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      this.pendingScreenshotRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the screenshot
+      const screenshotPromise = new Promise<ScreenshotResult>(resolve => {
+        this.pendingScreenshotResolve = resolve;
+
+        // Set up timeout
+        setTimeout(() => {
+          if (this.pendingScreenshotResolve === resolve) {
+            this.pendingScreenshotResolve = null;
+            this.pendingScreenshotRequestId = null;
+            resolve({
+              success: false,
+              error: `Screenshot timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({ type: "request_screenshot", requestId });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent screenshot request (requestId: ${requestId})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForScreenshot", () => screenshotPromise);
+
+      const duration = Date.now() - startTime;
+      if (result.success) {
+        const dataSize = result.data ? result.data.length : 0;
+        logger.info(`[ACCESSIBILITY_SERVICE] Screenshot received in ${duration}ms (${dataSize} base64 chars)`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot failed after ${duration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        error: `${error}`
+      };
     }
   }
 }

@@ -55,12 +55,20 @@ export interface IPerformanceTracker {
   parallel(name: string): IPerformanceTracker;
 
   /**
-   * Track a single operation's timing
+   * Track a single async operation's timing
    * @param name - Operation name
    * @param fn - Async function to execute and time
    * @returns The result of the function
    */
   track<T>(name: string, fn: () => Promise<T>): Promise<T>;
+
+  /**
+   * Track a single synchronous operation's timing
+   * @param name - Operation name
+   * @param fn - Sync function to execute and time
+   * @returns The result of the function
+   */
+  trackSync<T>(name: string, fn: () => T): T;
 
   /**
    * End the current block and return to parent
@@ -139,6 +147,24 @@ export class PerformanceTracker implements IPerformanceTracker {
     }
   }
 
+  trackSync<T>(name: string, fn: () => T): T {
+    const startMs = Date.now();
+    try {
+      return fn();
+    } finally {
+      const durationMs = Date.now() - startMs;
+      const entry: TimingEntry = { name, durationMs };
+
+      if (Array.isArray(this.current.entries)) {
+        // Serial block - push to array
+        this.current.entries.push(entry);
+      } else {
+        // Parallel block - add to object
+        this.current.entries[name] = entry;
+      }
+    }
+  }
+
   end(): IPerformanceTracker {
     if (this.current.parent) {
       const durationMs = Date.now() - this.current.startMs;
@@ -188,6 +214,10 @@ export class NoOpPerformanceTracker implements IPerformanceTracker {
   }
 
   async track<T>(_name: string, fn: () => Promise<T>): Promise<T> {
+    return fn();
+  }
+
+  trackSync<T>(_name: string, fn: () => T): T {
     return fn();
   }
 

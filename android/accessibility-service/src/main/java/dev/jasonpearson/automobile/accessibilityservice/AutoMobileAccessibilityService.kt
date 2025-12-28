@@ -6,8 +6,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.os.Build
+import android.util.Base64
 import android.util.Log
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import kotlinx.coroutines.CoroutineScope
@@ -17,8 +20,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
+import kotlin.coroutines.resume
 
 /**
  * Main AutoMobile Accessibility Service that provides view hierarchy extraction capabilities for
@@ -86,11 +93,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         @SuppressLint("UnspecifiedRegisterReceiverFlag") registerReceiver(commandReceiver, filter)
       }
 
-      // Start WebSocket server with hierarchy request callback
+      // Start WebSocket server with hierarchy and screenshot request callbacks
       webSocketServer = WebSocketServer(
           port = 8765,
           scope = serviceScope,
-          onRequestHierarchy = { extractAndStoreHierarchy() }
+          onRequestHierarchy = { extractAndStoreHierarchy() },
+          onRequestScreenshot = { requestId -> broadcastScreenshot(requestId) }
       )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -306,6 +314,115 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     } catch (e: Exception) {
       Log.e(TAG, "Error cleaning up UUID hierarchy files", e)
       // Don't let cleanup errors prevent the main operation
+    }
+  }
+
+  /**
+   * Takes a screenshot and returns it as a base64-encoded JPEG string.
+   * Requires Android R (API 30) or higher.
+   * Runs on IO dispatcher to avoid blocking the main thread.
+   */
+  private suspend fun takeScreenshotAsync(quality: Int = 80): String? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+      Log.w(TAG, "Screenshot API requires Android R (API 30) or higher")
+      return null
+    }
+
+    return withContext(Dispatchers.IO) {
+      try {
+        val startTime = System.currentTimeMillis()
+
+        // Use suspendCancellableCoroutine to bridge callback-based API
+        val bitmap = suspendCancellableCoroutine<Bitmap?> { continuation ->
+          takeScreenshot(
+            Display.DEFAULT_DISPLAY,
+            mainExecutor,
+            object : TakeScreenshotCallback {
+              override fun onSuccess(screenshot: ScreenshotResult) {
+                val hardwareBitmap = Bitmap.wrapHardwareBuffer(
+                  screenshot.hardwareBuffer,
+                  screenshot.colorSpace
+                )
+                screenshot.hardwareBuffer.close()
+                continuation.resume(hardwareBitmap)
+              }
+
+              override fun onFailure(errorCode: Int) {
+                Log.e(TAG, "Screenshot failed with error code: $errorCode")
+                continuation.resume(null)
+              }
+            }
+          )
+        }
+
+        if (bitmap == null) {
+          Log.e(TAG, "Failed to capture screenshot bitmap")
+          return@withContext null
+        }
+
+        val screenshotTime = System.currentTimeMillis() - startTime
+        Log.d(TAG, "Screenshot captured in ${screenshotTime}ms (${bitmap.width}x${bitmap.height})")
+
+        // Convert to JPEG bytes on IO thread
+        val encodeStart = System.currentTimeMillis()
+        val outputStream = ByteArrayOutputStream()
+
+        // Convert hardware bitmap to software bitmap for compression
+        val softwareBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+        bitmap.recycle()
+
+        softwareBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+        softwareBitmap.recycle()
+
+        val jpegBytes = outputStream.toByteArray()
+        val base64String = Base64.encodeToString(jpegBytes, Base64.NO_WRAP)
+
+        val encodeTime = System.currentTimeMillis() - encodeStart
+        val totalTime = System.currentTimeMillis() - startTime
+
+        Log.d(TAG, "Screenshot encoded: ${jpegBytes.size} bytes -> ${base64String.length} base64 chars in ${encodeTime}ms (total: ${totalTime}ms)")
+
+        base64String
+      } catch (e: Exception) {
+        Log.e(TAG, "Error taking screenshot", e)
+        null
+      }
+    }
+  }
+
+  /** Broadcast screenshot to WebSocket clients */
+  private fun broadcastScreenshot(requestId: String?) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping screenshot broadcast")
+      return
+    }
+
+    serviceScope.launch {
+      try {
+        val base64Image = takeScreenshotAsync()
+        if (base64Image != null) {
+          val message = buildString {
+            append("""{"type":"screenshot","timestamp":${System.currentTimeMillis()}""")
+            if (requestId != null) {
+              append(""","requestId":"$requestId"""")
+            }
+            append(""","format":"jpeg","data":"$base64Image"}""")
+          }
+          webSocketServer.broadcast(message)
+          Log.d(TAG, "Broadcasted screenshot to ${webSocketServer.getConnectionCount()} clients")
+        } else {
+          val errorMessage = buildString {
+            append("""{"type":"screenshot_error","timestamp":${System.currentTimeMillis()}""")
+            if (requestId != null) {
+              append(""","requestId":"$requestId"""")
+            }
+            append(""","error":"Failed to capture screenshot"}""")
+          }
+          webSocketServer.broadcast(errorMessage)
+        }
+      } catch (e: Exception) {
+        Log.e(TAG, "Error broadcasting screenshot", e)
+      }
     }
   }
 }

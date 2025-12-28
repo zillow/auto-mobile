@@ -35,7 +35,8 @@ data class WebSocketRequest(
 class WebSocketServer(
     private val port: Int = 8765,
     private val scope: CoroutineScope,
-    private val onRequestHierarchy: (() -> Unit)? = null
+    private val onRequestHierarchy: (() -> Unit)? = null,
+    private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "WebSocketServer"
@@ -218,6 +219,10 @@ class WebSocketServer(
                 "request_hierarchy" -> {
                     Log.d(TAG, "Received hierarchy request (requestId: ${request.requestId})")
                     onRequestHierarchy?.invoke()
+                }
+                "request_screenshot" -> {
+                    Log.d(TAG, "Received screenshot request (requestId: ${request.requestId})")
+                    onRequestScreenshot?.invoke(request.requestId)
                 }
                 else -> {
                     Log.d(TAG, "Unknown message type: ${request.type}")

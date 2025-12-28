@@ -19,6 +19,7 @@ import { ActionableError, BootedDevice } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
 import { Platform } from "../models";
+import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 
 // Type definitions for better TypeScript support
 export interface ClearTextArgs {
@@ -428,34 +429,42 @@ export function registerInteractionTools() {
 
   // Scroll handler
   const scrollHandler = async (device: BootedDevice, args: ScrollArgs, progress?: ProgressCallback) => {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("scroll");
+
     // Element-specific scrolling
     const observeScreen = new ObserveScreen(device);
     const swipe = new SwipeOnElement(device);
-    const observeResult = await observeScreen.execute();
+
+    const observeResult = await perf.track("initialObserve", () => observeScreen.execute());
 
     if (!observeResult.viewHierarchy) {
+      perf.end();
       throw new ActionableError("Could not get view hierarchy for element scrolling");
     }
 
     // Find the element by resource ID
-    const element = elementUtils.findElementByResourceId(
-      observeResult.viewHierarchy,
+    const element = perf.trackSync("findContainerElement", () => elementUtils.findElementByResourceId(
+      observeResult.viewHierarchy!,
       args.containerElementId,
       args.containerElementId,
       true // partial match
-    );
+    ));
 
     if (!element) {
+      perf.end();
       throw new ActionableError(`Container element not found with ID: ${args.containerElementId}`);
     }
 
     const containerElement = element;
 
     if (!args.lookFor) {
-      const duration = elementUtils.getSwipeDurationFromSpeed(args.speed);
-      const result = await swipe.execute(
-        containerElement,
-        elementUtils.getSwipeDirectionForScroll(args.direction), {
+      const duration = perf.trackSync("getSwipeDuration", () => elementUtils.getSwipeDurationFromSpeed(args.speed));
+      const swipeDirection = perf.trackSync("getSwipeDirection", () => elementUtils.getSwipeDirectionForScroll(args.direction));
+
+      const result = await perf.track("swipeExecution", () => swipe.execute(
+        containerElement!,
+        swipeDirection, {
           duration: duration,
           easing: "accelerateDecelerate",
           fingers: 1,
@@ -464,18 +473,21 @@ export function registerInteractionTools() {
           pressure: 1
         },
         progress
-      );
+      ));
 
+      perf.end();
       return createJSONToolResponse({
         message: `Scrolled ${args.direction} within element ${args.containerElementId}`,
         observation: result.observation
       });
 
     } else if (!args.lookFor.text && !args.lookFor.elementId) {
+      perf.end();
       throw new ActionableError("Either text or element id must be specified to look for something in a scrollable list.");
     } else {
-      let lastObservation = await observeScreen.execute();
+      let lastObservation = await perf.track("lookForInitialObserve", () => observeScreen.execute());
       if (!lastObservation.viewHierarchy || !lastObservation.screenSize) {
+        perf.end();
         throw new Error("Failed to get initial observation for scrolling until visible.");
       }
 
@@ -483,30 +495,34 @@ export function registerInteractionTools() {
       const maxTime = 120000; // args.lookFor.maxTime ?? 120000;
       const startTime = Date.now();
       let foundElement = null;
+      let scrollIteration = 0;
 
       while (Date.now() - startTime < maxTime) {
+        scrollIteration++;
+
         // Re-observe the screen to get current state
-        lastObservation = await observeScreen.execute();
+        lastObservation = await perf.track(`scrollLoop_${scrollIteration}_observe`, () => observeScreen.execute());
         if (!lastObservation.viewHierarchy) {
+          perf.end();
           throw new Error("Lost observation during scroll until visible.");
         }
 
         // Check if target element is now visible
         if (args.lookFor.text) {
-          foundElement = elementUtils.findElementByText(
-            lastObservation.viewHierarchy,
-            args.lookFor.text,
+          foundElement = perf.trackSync(`scrollLoop_${scrollIteration}_findByText`, () => elementUtils.findElementByText(
+            lastObservation.viewHierarchy!,
+            args.lookFor!.text!,
             args.containerElementId, // Search within the specific container
             true, // fuzzy match
             false // case-sensitive
-          );
+          ));
         } else if (args.lookFor.elementId) {
-          foundElement = elementUtils.findElementByResourceId(
-            lastObservation.viewHierarchy,
-            args.lookFor.elementId,
+          foundElement = perf.trackSync(`scrollLoop_${scrollIteration}_findById`, () => elementUtils.findElementByResourceId(
+            lastObservation.viewHierarchy!,
+            args.lookFor!.elementId!,
             args.containerElementId, // Search within the specific container
             true // partial match
-          );
+          ));
         }
 
         if (foundElement) {
@@ -515,26 +531,29 @@ export function registerInteractionTools() {
         }
 
         // Use the specific container element to swipe, not any scrollable element
-        const result = await swipe.execute(
-          containerElement,
+        const result = await perf.track(`scrollLoop_${scrollIteration}_swipe`, () => swipe.execute(
+          containerElement!,
           elementUtils.getSwipeDirectionForScroll(direction),
           { duration: 600 },
           progress
-        );
+        ));
 
         // Update observation from swipe result
         if (result.observation && result.observation.viewHierarchy) {
           lastObservation = result.observation;
         } else {
+          perf.end();
           throw new Error("Lost observation after swipe during scroll until visible.");
         }
       }
 
       if (!foundElement) {
+        perf.end();
         const target = args.lookFor.text ? `text "${args.lookFor.text}"` : `element with id "${args.lookFor.elementId}"`;
         throw new ActionableError(`${target} not found after scrolling for ${maxTime}ms.`);
       }
 
+      perf.end();
       const target = args.lookFor.text ? `text "${args.lookFor.text}"` : `element with id "${args.lookFor.elementId}"`;
       return createJSONToolResponse({
         message: `Scrolled until ${target} became visible`,
