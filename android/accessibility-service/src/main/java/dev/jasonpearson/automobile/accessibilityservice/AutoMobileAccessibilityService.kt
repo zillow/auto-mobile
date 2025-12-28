@@ -78,8 +78,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         @SuppressLint("UnspecifiedRegisterReceiverFlag") registerReceiver(commandReceiver, filter)
       }
 
-      // Start WebSocket server
-      webSocketServer = WebSocketServer(port = 8765, scope = serviceScope)
+      // Start WebSocket server with hierarchy request callback
+      webSocketServer = WebSocketServer(
+          port = 8765,
+          scope = serviceScope,
+          onRequestHierarchy = { extractAndStoreHierarchy() }
+      )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
 

@@ -89,7 +89,9 @@ export class AccessibilityServiceClient {
   private cachedHierarchy: CachedHierarchy | null = null;
   private isConnecting: boolean = false;
   private connectionAttempts: number = 0;
+  private lastConnectionAttempt: number = 0;
   private readonly maxConnectionAttempts: number = 3;
+  private static readonly CONNECTION_ATTEMPT_RESET_MS = 10000; // Reset attempts after 10 seconds
   private portForwardingSetup: boolean = false;
   private lastWebSocketTimeout: number = 0;
   private static readonly WEBSOCKET_TIMEOUT_COOLDOWN_MS = 5000; // Skip WebSocket wait for 5 seconds after timeout
@@ -192,6 +194,18 @@ export class AccessibilityServiceClient {
       return true;
     }
 
+    // If WebSocket exists but is not OPEN (stale/closing), clean it up and reset attempts
+    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+      logger.info(`[ACCESSIBILITY_SERVICE] Cleaning up stale WebSocket (state: ${this.ws.readyState})`);
+      try {
+        this.ws.close();
+      } catch {
+        // Ignore close errors on stale socket
+      }
+      this.ws = null;
+      this.connectionAttempts = 0; // Reset to allow new connection attempts
+    }
+
     if (this.isConnecting) {
       logger.debug("[ACCESSIBILITY_SERVICE] Connection already in progress, waiting...");
       // Wait for ongoing connection attempt
@@ -205,13 +219,21 @@ export class AccessibilityServiceClient {
       });
     }
 
+    // Reset connection attempts if enough time has passed since last attempt
     if (this.connectionAttempts >= this.maxConnectionAttempts) {
-      logger.warn(`[ACCESSIBILITY_SERVICE] Max connection attempts (${this.maxConnectionAttempts}) reached`);
-      return false;
+      const timeSinceLastAttempt = Date.now() - this.lastConnectionAttempt;
+      if (timeSinceLastAttempt >= AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Resetting connection attempts after ${timeSinceLastAttempt}ms cooldown`);
+        this.connectionAttempts = 0;
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Max connection attempts (${this.maxConnectionAttempts}) reached, cooldown remaining: ${AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS - timeSinceLastAttempt}ms`);
+        return false;
+      }
     }
 
     this.isConnecting = true;
     this.connectionAttempts++;
+    this.lastConnectionAttempt = Date.now();
 
     try {
       // Ensure port forwarding is setup
@@ -250,6 +272,8 @@ export class AccessibilityServiceClient {
           logger.info("[ACCESSIBILITY_SERVICE] WebSocket connection closed");
           this.ws = null;
           this.isConnecting = false;
+          // Reset connection attempts on close to allow future retries
+          this.connectionAttempts = 0;
         });
       }));
     } catch (error) {
@@ -311,17 +335,19 @@ export class AccessibilityServiceClient {
    * @param timeout - Maximum time to wait for fresh data in milliseconds
    * @param perf - Performance tracker for timing
    * @param skipWaitForFresh - If true, skip waiting for fresh data entirely (go straight to sync)
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value to be considered fresh
    * @returns Promise<AccessibilityHierarchyResponse>
    */
   async getLatestHierarchy(
     waitForFresh: boolean = false,
     timeout: number = 100,
     perf: IPerformanceTracker = new NoOpPerformanceTracker(),
-    skipWaitForFresh: boolean = false
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
   ): Promise<AccessibilityHierarchyResponse> {
     const startTime = Date.now();
 
-    logger.debug(`[ACCESSIBILITY_SERVICE] getLatestHierarchy: cache=${this.cachedHierarchy ? "exists" : "null"}, waitForFresh=${waitForFresh}, skipWaitForFresh=${skipWaitForFresh}`);
+    logger.debug(`[ACCESSIBILITY_SERVICE] getLatestHierarchy: cache=${this.cachedHierarchy ? "exists" : "null"}, waitForFresh=${waitForFresh}, skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp}`);
 
     try {
       // Ensure WebSocket connection is established
@@ -337,24 +363,37 @@ export class AccessibilityServiceClient {
 
       // If we have cached data and not waiting for fresh, return it immediately
       // This is the fast path for direct observe calls (skipWaitForFresh=true)
+      // But if minTimestamp is set, we must verify the cached data is new enough
       if (this.cachedHierarchy && !waitForFresh) {
         const cacheAge = startTime - this.cachedHierarchy.receivedAt;
-        const isFresh = cacheAge < 1000; // Consider fresh if less than 1 second old
-        const duration = Date.now() - startTime;
-        logger.debug(`[ACCESSIBILITY_SERVICE] Cache hit: ${duration}ms (age: ${cacheAge}ms, fresh: ${isFresh})`);
+        const updatedAt = this.cachedHierarchy.hierarchy.updatedAt;
 
-        return {
-          hierarchy: this.cachedHierarchy.hierarchy,
-          fresh: isFresh,
-          updatedAt: this.cachedHierarchy.hierarchy.updatedAt
-        };
+        // If minTimestamp is set, check if cached data is too old
+        if (minTimestamp > 0 && updatedAt < minTimestamp) {
+          logger.debug(`[ACCESSIBILITY_SERVICE] Cache rejected: updatedAt ${updatedAt} < minTimestamp ${minTimestamp} (stale by ${minTimestamp - updatedAt}ms)`);
+          // Fall through to wait for fresh data or sync
+        } else {
+          const isFresh = cacheAge < 1000; // Consider fresh if less than 1 second old
+          const duration = Date.now() - startTime;
+          logger.debug(`[ACCESSIBILITY_SERVICE] Cache hit: ${duration}ms (age: ${cacheAge}ms, fresh: ${isFresh}, updatedAt: ${updatedAt})`);
+
+          return {
+            hierarchy: this.cachedHierarchy.hierarchy,
+            fresh: isFresh,
+            updatedAt: updatedAt
+          };
+        }
       }
 
       // Wait for fresh data if requested (unless skipped or recently timed out)
-      if (waitForFresh && !skipWaitForFresh && !this.shouldSkipWebSocketWait()) {
-        logger.debug(`[ACCESSIBILITY_SERVICE] Waiting up to ${timeout}ms for fresh hierarchy data (must be newer than ${startTime})`);
+      // Also wait if cache was rejected due to minTimestamp
+      const cacheRejected = minTimestamp > 0 && this.cachedHierarchy && this.cachedHierarchy.hierarchy.updatedAt < minTimestamp;
+      if ((waitForFresh || cacheRejected) && !skipWaitForFresh && !this.shouldSkipWebSocketWait()) {
+        // Use minTimestamp if provided, otherwise use startTime
+        const waitMinTimestamp = minTimestamp > 0 ? minTimestamp : startTime;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Waiting up to ${timeout}ms for fresh hierarchy data (must be newer than ${waitMinTimestamp})`);
 
-        const freshData = await perf.track("waitForFresh", () => this.waitForFreshData(timeout, startTime));
+        const freshData = await perf.track("waitForFresh", () => this.waitForFreshData(timeout, waitMinTimestamp));
         const duration = Date.now() - startTime;
 
         if (freshData) {
@@ -565,12 +604,14 @@ export class AccessibilityServiceClient {
    * @param queryOptions - Options to filter the view hierarchy
    * @param perf - Performance tracker for timing
    * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
      * @returns Promise<ViewHierarchyResult | null> - The hierarchy or null if service unavailable
      */
   async getAccessibilityHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
     perf: IPerformanceTracker = new NoOpPerformanceTracker(),
-    skipWaitForFresh: boolean = false
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
   ): Promise<ViewHierarchyResult | null> {
     const startTime = Date.now();
 
@@ -590,7 +631,7 @@ export class AccessibilityServiceClient {
       // Get hierarchy from WebSocket service (wait for fresh data on first request, unless skipped)
       const waitForFresh = !skipWaitForFresh && (this.cachedHierarchy === null || !this.cachedHierarchy.fresh);
       const response = await perf.track("getHierarchy", () =>
-        this.getLatestHierarchy(waitForFresh, 100, perf, skipWaitForFresh)
+        this.getLatestHierarchy(waitForFresh, 100, perf, skipWaitForFresh, minTimestamp)
       );
 
       let hierarchyData = response.hierarchy;
@@ -644,8 +685,31 @@ export class AccessibilityServiceClient {
   }
 
   /**
-   * Request hierarchy synchronously via ADB broadcast
+   * Send a message via WebSocket to request hierarchy extraction
+   * @returns true if message was sent successfully
+   */
+  private sendHierarchyRequest(): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Cannot send request - WebSocket not connected");
+      return false;
+    }
+
+    try {
+      const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const message = JSON.stringify({ type: "request_hierarchy", requestId });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent hierarchy request via WebSocket (requestId: ${requestId})`);
+      return true;
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to send WebSocket request: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Request hierarchy synchronously via WebSocket message
    * Triggers extraction on device which pushes result via WebSocket
+   * Falls back to ADB broadcast if WebSocket send fails
    * @param perf - Performance tracker for timing
    * @returns Promise<AccessibilityHierarchy | null>
    */
@@ -655,20 +719,25 @@ export class AccessibilityServiceClient {
     const startTime = Date.now();
 
     try {
-      // Generate unique UUID for this request (required by broadcast receiver)
-      const uuid = `sync_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      logger.info("[ACCESSIBILITY_SERVICE] Requesting hierarchy sync via WebSocket");
 
-      logger.info(`[ACCESSIBILITY_SERVICE] Requesting hierarchy sync via ADB broadcast (uuid: ${uuid})`);
-
-      // Send broadcast to trigger hierarchy extraction
-      // The Android service will extract hierarchy and push via WebSocket
-      await perf.track("sendBroadcast", async () => {
-        await this.adb.executeCommand(
-          `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid}"`
-        );
+      // Try WebSocket request first (faster path)
+      const sentViaWebSocket = await perf.track("sendWsRequest", async () => {
+        return this.sendHierarchyRequest();
       });
 
-      // Wait for WebSocket push (triggered by the broadcast)
+      // Fall back to ADB broadcast if WebSocket failed
+      if (!sentViaWebSocket) {
+        logger.info("[ACCESSIBILITY_SERVICE] Falling back to ADB broadcast");
+        const uuid = `sync_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        await perf.track("sendBroadcast", async () => {
+          await this.adb.executeCommand(
+            `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid}"`
+          );
+        });
+      }
+
+      // Wait for WebSocket push (triggered by either method)
       // The Android service calls broadcastHierarchyUpdate() after extraction
       const freshData = await perf.track("waitForPush", () =>
         this.waitForFreshData(200, startTime)
@@ -680,7 +749,7 @@ export class AccessibilityServiceClient {
         return freshData.hierarchy;
       }
 
-      logger.warn("[ACCESSIBILITY_SERVICE] Timeout waiting for WebSocket push after broadcast");
+      logger.warn("[ACCESSIBILITY_SERVICE] Timeout waiting for WebSocket push after request");
       return null;
     } catch (error) {
       const duration = Date.now() - startTime;

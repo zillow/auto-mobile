@@ -507,18 +507,20 @@ export class ViewHierarchy {
    * @param queryOptions - Optional query options for targeted element retrieval
    * @param perf - Performance tracker for timing data
    * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
    * @returns Promise with parsed XML view hierarchy
    */
   async getViewHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
     perf: IPerformanceTracker = new NoOpPerformanceTracker(),
-    skipWaitForFresh: boolean = false
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
     switch (this.device.platform) {
       case "ios":
         return this.getiOSViewHierarchy(perf);
       case "android":
-        return this.getAndroidViewHierarchy(queryOptions, perf, skipWaitForFresh);
+        return this.getAndroidViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
       default:
         throw new Error("Unsupported platform");
     }
@@ -553,21 +555,23 @@ export class ViewHierarchy {
    * @param queryOptions - Optional query options for targeted element retrieval
    * @param perf - Performance tracker for timing data
    * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
    * @returns Promise with parsed XML view hierarchy
    */
   async getAndroidViewHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
     perf: IPerformanceTracker = new NoOpPerformanceTracker(),
-    skipWaitForFresh: boolean = false
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
-    logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy (skipWaitForFresh=${skipWaitForFresh})`);
+    logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
 
     perf.serial("android_viewHierarchy");
 
     // First try accessibility service if available and not skipped
     try {
-      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions, perf, skipWaitForFresh);
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
       if (accessibilityHierarchy) {
         perf.end();
         const accessibilityDuration = Date.now() - startTime;

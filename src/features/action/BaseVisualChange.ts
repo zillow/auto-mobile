@@ -96,6 +96,9 @@ export class BaseVisualChange {
       }
     }
 
+    // Record the action start time - used to ensure final observe returns fresh data
+    const actionStartTime = Date.now();
+
     const blockResult = await perf.track("executeBlock", async () => {
       return block(previousObserveResult!);
     });
@@ -174,7 +177,8 @@ export class BaseVisualChange {
       tolerancePercent: options.tolerancePercent ?? DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
       queryOptions: options.queryOptions,
       gfxMetrics,
-      perf
+      perf,
+      actionStartTime
     });
   }
 
@@ -187,12 +191,17 @@ export class BaseVisualChange {
       queryOptions?: ViewHierarchyQueryOptions;
       gfxMetrics?: GfxMetrics | null;
       perf?: IPerformanceTracker;
+      actionStartTime?: number;
     }
   ): Promise<any> {
     const perf = options.perf ?? new NoOpPerformanceTracker();
 
+    // Use actionStartTime as minTimestamp to ensure we get data captured after the action
+    // This prevents returning stale cached data from before the action was executed
+    const minTimestamp = options.actionStartTime ?? 0;
+
     const latestObservation = await perf.track("finalObserve", async () => {
-      return this.observeScreen.execute(options.queryOptions);
+      return this.observeScreen.execute(options.queryOptions, new NoOpPerformanceTracker(), true, minTimestamp);
     });
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {

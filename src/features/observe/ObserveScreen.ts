@@ -122,16 +122,18 @@ export class ObserveScreen {
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
    * @param perf - Performance tracker for timing data
    * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
    */
   public async collectViewHierarchy(
     result: ObserveResult,
     queryOptions?: ViewHierarchyQueryOptions,
     perf: IPerformanceTracker = new NoOpPerformanceTracker(),
-    skipWaitForFresh: boolean = false
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
   ): Promise<void> {
     try {
       const viewHierarchyStart = Date.now();
-      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, perf, skipWaitForFresh);
+      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
       logger.debug("Accessibility service availability cached as: true");
 
       if (viewHierarchy) {
@@ -224,12 +226,14 @@ export class ObserveScreen {
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
    * @param perf - Performance tracker for timing data
    * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
    */
   public async collectAllData(
     result: ObserveResult,
     queryOptions?: ViewHierarchyQueryOptions,
     perf: IPerformanceTracker = new NoOpPerformanceTracker(),
-    skipWaitForFresh: boolean = false
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
   ): Promise<void> {
     switch (this.device.platform) {
       case "android":
@@ -253,7 +257,7 @@ export class ObserveScreen {
 
         // Run view hierarchy separately to avoid perf tracker race condition
         // (it creates nested serial blocks that conflict with parallel tracking)
-        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh);
+        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
 
         perf.end();
         break;
@@ -264,7 +268,7 @@ export class ObserveScreen {
 
         await Promise.all([
           perf.track("screenSize", () => this.collectScreenSize({} as ExecResult, result)),
-          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh),
+          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp),
         ]);
 
         perf.end();
@@ -506,15 +510,17 @@ export class ObserveScreen {
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
    * @param perf - Performance tracker for timing data
    * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method (default: true for direct observe calls)
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value (used after actions to ensure fresh data)
    * @returns The observation result
    */
   async execute(
     queryOptions?: ViewHierarchyQueryOptions,
     perf: IPerformanceTracker = new NoOpPerformanceTracker(),
-    skipWaitForFresh: boolean = true // Default to true for direct observe tool requests
+    skipWaitForFresh: boolean = true, // Default to true for direct observe tool requests
+    minTimestamp: number = 0
   ): Promise<ObserveResult> {
     try {
-      logger.debug(`Executing observe command (skipWaitForFresh=${skipWaitForFresh})`);
+      logger.debug(`Executing observe command (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
       const startTime = Date.now();
 
       // Create base result object with timestamp
@@ -525,7 +531,7 @@ export class ObserveScreen {
 
       // Collect all data components with parallelization
       // Note: collectAllData tracks its phases internally, so we just call it directly
-      await this.collectAllData(result, queryOptions, perf, skipWaitForFresh);
+      await this.collectAllData(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
 
       // Cache the result for future use
       await perf.track("cacheResult", () => this.cacheObserveResult(result));

@@ -14,9 +14,19 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.seconds
+
+/**
+ * Incoming WebSocket message format
+ */
+@Serializable
+data class WebSocketRequest(
+    val type: String,
+    val requestId: String? = null
+)
 
 /**
  * WebSocket server that streams view hierarchy updates to connected clients.
@@ -24,7 +34,8 @@ import kotlin.time.Duration.Companion.seconds
  */
 class WebSocketServer(
     private val port: Int = 8765,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val onRequestHierarchy: (() -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "WebSocketServer"
@@ -77,13 +88,13 @@ class WebSocketServer(
                             // Send initial connection message
                             send(Frame.Text("""{"type":"connected","id":$connectionId}"""))
 
-                            // Listen for incoming messages (if needed)
+                            // Listen for incoming messages
                             for (frame in incoming) {
                                 when (frame) {
                                     is Frame.Text -> {
                                         val text = frame.readText()
                                         Log.d(TAG, "Received from client #$connectionId: $text")
-                                        // Handle client messages if needed
+                                        handleClientMessage(text)
                                     }
                                     is Frame.Close -> {
                                         Log.d(TAG, "Client #$connectionId closed connection")
@@ -196,4 +207,24 @@ class WebSocketServer(
      * Check if server is running
      */
     fun isRunning(): Boolean = server != null
+
+    /**
+     * Handle incoming client message
+     */
+    private fun handleClientMessage(message: String) {
+        try {
+            val request = json.decodeFromString<WebSocketRequest>(message)
+            when (request.type) {
+                "request_hierarchy" -> {
+                    Log.d(TAG, "Received hierarchy request (requestId: ${request.requestId})")
+                    onRequestHierarchy?.invoke()
+                }
+                else -> {
+                    Log.d(TAG, "Unknown message type: ${request.type}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse client message: $message", e)
+        }
+    }
 }
