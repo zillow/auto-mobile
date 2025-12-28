@@ -19,8 +19,13 @@ import { registerDeviceTools } from "./deviceTools";
 import { registerConfigurationTools } from "./configurationTools";
 import { registerDeepLinkTools } from "./deepLinkTools";
 import { registerEnvironmentTools } from "./environmentTools";
+import { registerDebugTools } from "./debugTools";
 
-export const createMcpServer = (): McpServer => {
+export interface McpServerOptions {
+  debug?: boolean;
+}
+
+export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   // Get configuration, device session, and test authoring managers
 
   // Register all tool categories
@@ -32,6 +37,11 @@ export const createMcpServer = (): McpServer => {
   registerConfigurationTools();
   registerDeepLinkTools();
   registerEnvironmentTools();
+
+  // Only register debug tools when --debug flag is passed
+  if (options.debug) {
+    registerDebugTools();
+  }
 
   // Create a new MCP server
   const server = new McpServer({

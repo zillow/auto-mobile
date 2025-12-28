@@ -1,0 +1,149 @@
+import { z } from "zod";
+import { ToolRegistry } from "./toolRegistry";
+import { ActionableError } from "../models/ActionableError";
+import { RawViewHierarchy } from "../features/debug/RawViewHierarchy";
+import { DebugSearch } from "../features/debug/DebugSearch";
+import { BugReport } from "../features/debug/BugReport";
+import { createJSONToolResponse } from "../utils/toolUtils";
+import { BootedDevice, Platform } from "../models";
+
+// Type definitions for tool arguments
+export interface RawViewHierarchyArgs {
+  platform: Platform;
+  source?: "uiautomator" | "accessibility-service" | "both";
+}
+
+export interface DebugSearchArgs {
+  platform: Platform;
+  text?: string;
+  resourceId?: string;
+  containerElementId?: string;
+  fuzzyMatch?: boolean;
+  caseSensitive?: boolean;
+  includeNearMisses?: boolean;
+  maxNearMisses?: number;
+}
+
+export interface BugReportArgs {
+  platform: Platform;
+  appId?: string;
+  includeScreenshot?: boolean;
+  includeRawHierarchy?: boolean;
+  includeLogcat?: boolean;
+  logcatLines?: number;
+  saveToFile?: boolean;
+  saveDir?: string;
+}
+
+// Schema definitions
+export const rawViewHierarchySchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  source: z.enum(["uiautomator", "accessibility-service", "both"])
+    .optional()
+    .describe("Source for hierarchy extraction: 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison")
+});
+
+export const debugSearchSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  text: z.string().optional().describe("Text to search for in elements"),
+  resourceId: z.string().optional().describe("Resource ID to search for"),
+  containerElementId: z.string().optional().describe("Container element ID to restrict search within"),
+  fuzzyMatch: z.boolean().optional().describe("Whether to use fuzzy matching (default: true)"),
+  caseSensitive: z.boolean().optional().describe("Whether to use case-sensitive matching (default: false)"),
+  includeNearMisses: z.boolean().optional().describe("Include elements that almost matched (default: true)"),
+  maxNearMisses: z.number().optional().describe("Maximum number of near-misses to include (default: 10)")
+});
+
+export const bugReportSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  appId: z.string().optional().describe("App package ID to filter logcat for specific app"),
+  includeScreenshot: z.boolean().optional().describe("Whether to include screenshot (default: true)"),
+  includeRawHierarchy: z.boolean().optional().describe("Whether to include raw view hierarchy XML (default: true)"),
+  includeLogcat: z.boolean().optional().describe("Whether to include logcat entries (default: true)"),
+  logcatLines: z.number().optional().describe("Number of recent logcat lines to include (default: 100)"),
+  saveToFile: z.boolean().optional().describe("Whether to save full report to a file (default: false)"),
+  saveDir: z.string().optional().describe("Directory to save report to")
+});
+
+// Register debug tools
+export function registerDebugTools() {
+  // Raw View Hierarchy handler
+  const rawViewHierarchyHandler = async (device: BootedDevice, args: RawViewHierarchyArgs) => {
+    try {
+      const rawViewHierarchy = new RawViewHierarchy(device);
+      const result = await rawViewHierarchy.execute({
+        source: args.source
+      });
+      return createJSONToolResponse(result);
+    } catch (error) {
+      throw new ActionableError(`Failed to get raw view hierarchy: ${error}`);
+    }
+  };
+
+  // Debug Search handler
+  const debugSearchHandler = async (device: BootedDevice, args: DebugSearchArgs) => {
+    try {
+      if (!args.text && !args.resourceId) {
+        throw new ActionableError("Either 'text' or 'resourceId' must be provided");
+      }
+
+      const debugSearch = new DebugSearch(device);
+      const result = await debugSearch.execute({
+        text: args.text,
+        resourceId: args.resourceId,
+        containerElementId: args.containerElementId,
+        fuzzyMatch: args.fuzzyMatch,
+        caseSensitive: args.caseSensitive,
+        includeNearMisses: args.includeNearMisses,
+        maxNearMisses: args.maxNearMisses
+      });
+      return createJSONToolResponse(result);
+    } catch (error) {
+      if (error instanceof ActionableError) {
+        throw error;
+      }
+      throw new ActionableError(`Failed to execute debug search: ${error}`);
+    }
+  };
+
+  // Bug Report handler
+  const bugReportHandler = async (device: BootedDevice, args: BugReportArgs) => {
+    try {
+      const bugReport = new BugReport(device);
+      const result = await bugReport.execute({
+        appId: args.appId,
+        includeScreenshot: args.includeScreenshot,
+        includeRawHierarchy: args.includeRawHierarchy,
+        includeLogcat: args.includeLogcat,
+        logcatLines: args.logcatLines,
+        saveToFile: args.saveToFile,
+        saveDir: args.saveDir
+      });
+      return createJSONToolResponse(result);
+    } catch (error) {
+      throw new ActionableError(`Failed to generate bug report: ${error}`);
+    }
+  };
+
+  // Register tools with the tool registry
+  ToolRegistry.registerDeviceAware(
+    "rawViewHierarchy",
+    "Get raw view hierarchy data without parsing. Returns XML from uiautomator and/or JSON from accessibility service. Useful for debugging when parsed hierarchy doesn't match what's on screen.",
+    rawViewHierarchySchema,
+    rawViewHierarchyHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "debugSearch",
+    "Debug element search operations. Shows all matching elements, which one would be selected, and near-misses that almost matched. Use this to understand why an element isn't being found or why the wrong element is being selected.",
+    debugSearchSchema,
+    debugSearchHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "bugReport",
+    "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, and optionally a screenshot. The report can be saved to a file for sharing with AutoMobile developers.",
+    bugReportSchema,
+    bugReportHandler
+  );
+}
