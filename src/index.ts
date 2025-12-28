@@ -6,10 +6,8 @@ import { createServer as createHttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./server";
 import { logger } from "./utils/logger";
-import { SourceMapper } from "./utils/sourceMapper";
 import { ConfigurationManager } from "./utils/configurationManager";
 import { runCliCommand } from "./cli";
-import { AppConfig } from "./models";
 import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
 
 // Interface for transport configuration
@@ -21,14 +19,12 @@ interface TransportConfig {
 
 // Parse command line arguments
 function parseArgs(): {
-  apps: AppConfig[];
   cliMode: boolean;
   cliArgs: string[];
   transport: TransportConfig;
   debugPerf: boolean;
   } {
   const args = process.argv.slice(2);
-  const apps: AppConfig[] = [];
 
   // Default transport configuration
   const transport: TransportConfig = {
@@ -84,42 +80,9 @@ function parseArgs(): {
         i++; // Skip the invalid argument
       }
     }
-
-    if (arg === "--android-app-id") {
-      const appId = args[i + 1];
-      if (appId && !appId.startsWith("--")) {
-        // Look for the next --android-source-dir
-        const sourceDirIndex = i + 2;
-        if (sourceDirIndex < args.length && args[sourceDirIndex] === "--android-source-dir") {
-          const sourceDir = args[sourceDirIndex + 1];
-          if (sourceDir && !sourceDir.startsWith("--")) {
-            apps.push({ appId, sourceDir, platform: "android", data: new Map() });
-            i = sourceDirIndex + 1; // Skip past both pairs
-          } else {
-            logger.warn(`Missing value for --android-source-dir after app ID: ${appId}`);
-            i++; // Skip the app ID
-          }
-        } else {
-          logger.warn(`Missing --android-source-dir after --android-app-id: ${appId}`);
-          i++; // Skip the app ID
-        }
-      }
-    } else if (arg === "--android-source-dir") {
-      const sourceDir = args[i + 1];
-      if (sourceDir && !sourceDir.startsWith("--")) {
-        // Look for the previous --android-app-id or next one
-        const appIdIndex = i - 2;
-        if (appIdIndex >= 0 && args[appIdIndex] === "--android-app-id") {
-          // Already handled in the app-id branch above
-        } else {
-          logger.warn(`Missing --android-app-id before --android-source-dir: ${sourceDir}`);
-          i++; // Skip the source dir
-        }
-      }
-    }
   }
 
-  return { apps, cliMode, cliArgs, transport, debugPerf };
+  return { cliMode, cliArgs, transport, debugPerf };
 }
 
 // Create and start Streamable HTTP server
@@ -392,28 +355,13 @@ async function main() {
     const configurationManager = ConfigurationManager.getInstance();
     await configurationManager.loadFromDisk();
 
-    // Initialize source index manager and load persistent app configurations
-    const sourceMapper = SourceMapper.getInstance();
-
-    // Parse command line arguments for additional app configs
-    const { apps, cliMode, cliArgs, transport, debugPerf } = parseArgs();
+    // Parse command line arguments
+    const { cliMode, cliArgs, transport, debugPerf } = parseArgs();
 
     // Enable performance tracking if --debug-perf flag is set
     if (debugPerf) {
       setDebugPerfEnabled(true);
       logger.info("Performance timing enabled (--debug-perf)");
-    }
-
-    // Add any command line app configs to the source index manager
-    for (const { appId, sourceDir, platform } of apps) {
-      if (sourceDir) {
-        try {
-          await sourceMapper.addAppConfig(appId, sourceDir, platform);
-          logger.info(`Added command line app configuration: ${appId} -> ${sourceDir}`);
-        } catch (error) {
-          logger.warn(`Failed to add command line app configuration ${appId}: ${error}`);
-        }
-      }
     }
 
     if (cliMode) {

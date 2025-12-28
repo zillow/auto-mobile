@@ -24,6 +24,7 @@ describe("AccessibilityServiceClient", function() {
     } as unknown as AdbUtils;
 
     // Reset singleton instances for clean test state
+    AccessibilityServiceClient.resetInstances();
     AccessibilityServiceManager.resetInstances();
 
     accessibilityServiceClient = new AccessibilityServiceClient("test-device", mockAdb);
@@ -331,7 +332,7 @@ describe("AccessibilityServiceClient", function() {
     it("should return null when hierarchy retrieval fails", async function() {
       this.timeout(15000);
 
-      // Mock service as available but WebSocket connection fails
+      // Mock service as available but all retrieval methods fail
       mockAdb.executeCommand = async (cmd: string) => {
         if (cmd.includes("pm list packages")) {
           return {
@@ -344,7 +345,11 @@ describe("AccessibilityServiceClient", function() {
             stderr: ""
           };
         } else if (cmd.includes("forward")) {
-          return { stdout: `${serverPort}`, stderr: "" };
+          // Port forwarding fails
+          throw new Error("Port forwarding failed");
+        } else if (cmd.includes("am broadcast")) {
+          // ADB broadcast also fails
+          throw new Error("Broadcast failed");
         }
         return { stdout: "", stderr: "" };
       };
