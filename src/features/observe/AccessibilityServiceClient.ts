@@ -739,8 +739,9 @@ export class AccessibilityServiceClient {
 
       // Wait for WebSocket push (triggered by either method)
       // The Android service calls broadcastHierarchyUpdate() after extraction
+      // Use 10 second timeout to handle long animations (switch toggles can trigger 10+ concurrent extractions)
       const freshData = await perf.track("waitForPush", () =>
-        this.waitForFreshData(200, startTime)
+        this.waitForFreshData(10000, startTime)
       );
 
       if (freshData) {

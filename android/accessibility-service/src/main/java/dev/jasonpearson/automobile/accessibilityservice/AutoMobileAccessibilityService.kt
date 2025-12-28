@@ -12,8 +12,10 @@ import android.view.accessibility.AccessibilityEvent
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -30,6 +32,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     // File name for app-scoped storage
     private const val HIERARCHY_FILE_NAME = "latest_hierarchy.json"
 
+    // Debounce delay for accessibility events (ms)
+    private const val HIERARCHY_DEBOUNCE_MS = 200L
+
     // Broadcast actions
     const val ACTION_EXTRACT_HIERARCHY = "dev.jasonpearson.automobile.EXTRACT_HIERARCHY"
 
@@ -42,6 +47,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private val json = Json { prettyPrint = true }
   private val jsonCompact = Json { prettyPrint = false }
   private lateinit var webSocketServer: WebSocketServer
+
+  // Debounce job for hierarchy extraction triggered by accessibility events
+  private var hierarchyDebounceJob: Job? = null
 
   private val commandReceiver =
       object : BroadcastReceiver() {
@@ -125,9 +133,15 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.d(TAG, "Accessibility event: ${event.eventType}, package: ${event.packageName}")
 
       // Extract and store view hierarchy when content or window changes
+      // Use debouncing to prevent flooding during rapid UI updates (e.g., switch animations)
       if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ||
           event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-        serviceScope.launch { extractAndStoreHierarchy() }
+        // Cancel previous debounce job and start new one
+        hierarchyDebounceJob?.cancel()
+        hierarchyDebounceJob = serviceScope.launch {
+          delay(HIERARCHY_DEBOUNCE_MS)
+          extractAndStoreHierarchy()
+        }
       }
     } catch (e: Exception) {
       Log.e(TAG, "Error handling accessibility event", e)
