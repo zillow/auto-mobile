@@ -7,6 +7,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { ActionableError, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Executes swipe gestures on the screen, respecting system insets
@@ -181,6 +182,9 @@ export class SwipeOnScreen extends BaseVisualChange {
     options: GestureOptions = {},
     progress?: ProgressCallback
   ): Promise<SwipeResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("swipeOnScreen");
+
     logger.info(`[SwipeOnScreen] Starting swipe: direction=${direction}, platform=${this.device.platform}`);
     logger.info(`[SwipeOnScreen] Options: ${JSON.stringify(options)}`);
 
@@ -190,14 +194,19 @@ export class SwipeOnScreen extends BaseVisualChange {
 
         switch (this.device.platform) {
           case "android":
-            return this.executeAndroid(observeResult, direction, options, progress);
+            return perf.track("androidSwipe", () =>
+              this.executeAndroid(observeResult, direction, options, progress)
+            );
           case "ios":
-            return this.executeiOS(observeResult, direction, options, progress);
+            return perf.track("iOSSwipe", () =>
+              this.executeiOS(observeResult, direction, options, progress)
+            );
         }
       }, {
         changeExpected: false,
         timeoutMs: 500,
-        progress
+        progress,
+        perf
       }
     );
   }

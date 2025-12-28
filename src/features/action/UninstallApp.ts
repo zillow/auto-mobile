@@ -3,6 +3,7 @@ import { UninstallAppResult } from "../../models/UninstallAppResult";
 import { BootedDevice } from "../../models";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
 import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
@@ -25,8 +26,12 @@ export class UninstallApp {
     packageName: string,
     keepData: boolean = false,
   ): Promise<UninstallAppResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("uninstallApp");
+
     // Validate package name
     if (!packageName || !packageName.trim()) {
+      perf.end();
       return {
         success: false,
         packageName: packageName || "",
@@ -38,10 +43,11 @@ export class UninstallApp {
 
     switch (this.device.platform) {
       case "ios":
-        return this.executeiOS(packageName);
+        return perf.track("iOSUninstall", () => this.executeiOS(packageName));
       case "android":
-        return this.executeAndroid(packageName, keepData);
+        return perf.track("androidUninstall", () => this.executeAndroid(packageName, keepData));
       default:
+        perf.end();
         throw new Error(`Unsupported platform: ${this.device.platform}`);
     }
   }

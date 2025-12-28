@@ -4,6 +4,7 @@ import { BootedDevice, SendTextResult } from "../../models";
 import { VirtualKeyboardManager } from "../../utils/virtualKeyboardManager";
 import { logger } from "../../utils/logger";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class InputText extends BaseVisualChange {
   private virtualKeyboardManager: VirtualKeyboardManager;
@@ -18,8 +19,12 @@ export class InputText extends BaseVisualChange {
     text: string,
     imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
   ): Promise<SendTextResult & { method?: "native" | "virtual" }> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("inputText");
+
     // Validate text input
     if (text === undefined || text === null) {
+      perf.end();
       return {
         success: false,
         text: "",
@@ -33,13 +38,19 @@ export class InputText extends BaseVisualChange {
           // Platform-specific text input execution
           switch (this.device.platform) {
             case "android":
-              return await this.executeAndroidTextInput(text, imeAction);
+              return await perf.track("androidTextInput", () =>
+                this.executeAndroidTextInput(text, imeAction)
+              );
             case "ios":
-              return await this.executeiOSTextInput(text, imeAction);
+              return await perf.track("iOSTextInput", () =>
+                this.executeiOSTextInput(text, imeAction)
+              );
             default:
+              perf.end();
               throw new Error(`Unsupported platform: ${this.device.platform}`);
           }
         } catch (error) {
+          perf.end();
           const errorMessage = error instanceof Error ? error.message : String(error);
 
           return {
@@ -53,7 +64,8 @@ export class InputText extends BaseVisualChange {
       {
         changeExpected: true,
         tolerancePercent: 0.00,
-        timeoutMs: 5000 // Reduce timeout for faster execution
+        timeoutMs: 5000, // Reduce timeout for faster execution
+        perf
       }
     );
   }

@@ -16,6 +16,7 @@ import { SourceMapper } from "../../utils/sourceMapper";
 import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Interface for activity top data
@@ -94,7 +95,7 @@ export class ViewHierarchy {
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
     this.elementUtils = new ElementUtils();
     this.sourceMapper = SourceMapper.getInstance();
-    this.accessibilityServiceClient = accessibilityServiceClient || new AccessibilityServiceClient(device, this.adb);
+    this.accessibilityServiceClient = accessibilityServiceClient || AccessibilityServiceClient.getInstance(device, this.adb);
 
     // Ensure cache directories exist
     if (!fs.existsSync(ViewHierarchy.cacheDir)) {
@@ -504,14 +505,20 @@ export class ViewHierarchy {
   /**
    * Retrieve the view hierarchy of the current screen
    * @param queryOptions - Optional query options for targeted element retrieval
+   * @param perf - Performance tracker for timing data
+   * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
    * @returns Promise with parsed XML view hierarchy
    */
-  async getViewHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
+  async getViewHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = false
+  ): Promise<ViewHierarchyResult> {
     switch (this.device.platform) {
       case "ios":
-        return this.getiOSViewHierarchy();
+        return this.getiOSViewHierarchy(perf);
       case "android":
-        return this.getAndroidViewHierarchy(queryOptions);
+        return this.getAndroidViewHierarchy(queryOptions, perf, skipWaitForFresh);
       default:
         throw new Error("Unsupported platform");
     }
@@ -519,63 +526,80 @@ export class ViewHierarchy {
 
   /**
    * Retrieve the view hierarchy of the current screen
+   * @param perf - Performance tracker for timing data
    * @returns Promise with parsed XML view hierarchy
    */
-  async getiOSViewHierarchy(): Promise<ViewHierarchyResult> {
+  async getiOSViewHierarchy(
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy for iOS`);
-    const viewHierarchy = await this.webdriver.getViewHierarchy(this.device);
+
+    perf.serial("ios_viewHierarchy");
+
+    const viewHierarchy = await perf.track("webdriver", () =>
+      this.webdriver.getViewHierarchy(this.device)
+    );
+
+    perf.end();
+
     const duration = Date.now() - startTime;
     logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${duration}ms`);
-    return await this.augmentWithSourceIndexing(viewHierarchy as ExtendedViewHierarchyResult);
+    return viewHierarchy;
   }
 
   /**
    * Retrieve the view hierarchy of the current screen
    * @param queryOptions - Optional query options for targeted element retrieval
+   * @param perf - Performance tracker for timing data
+   * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
    * @returns Promise with parsed XML view hierarchy
    */
-  async getAndroidViewHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult> {
+  async getAndroidViewHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = false
+  ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
-    logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy`);
+    logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy (skipWaitForFresh=${skipWaitForFresh})`);
+
+    perf.serial("android_viewHierarchy");
 
     // First try accessibility service if available and not skipped
     try {
-      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions);
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions, perf, skipWaitForFresh);
       if (accessibilityHierarchy) {
+        perf.end();
         const accessibilityDuration = Date.now() - startTime;
         logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
-        return await this.augmentWithSourceIndexing(accessibilityHierarchy as ExtendedViewHierarchyResult);
+        return accessibilityHierarchy;
       }
     } catch (err) {
       logger.warn(`[VIEW_HIERARCHY] Failed to get hierarchy from accessibility service: ${err}`);
     }
 
     try {
-      // Get fresh view hierarchy
-      const freshStartTime = Date.now();
-      const viewHierarchy = await this._getViewHierarchyWithoutCache();
-      const freshDuration = Date.now() - freshStartTime;
+      // Get fresh view hierarchy via uiautomator
+      const viewHierarchy = await perf.track("uiautomatorFallback", () =>
+        this._getViewHierarchyWithoutCache()
+      );
+      const freshDuration = Date.now() - startTime;
       logger.debug(`[VIEW_HIERARCHY] Fresh hierarchy fetched in ${freshDuration}ms`);
 
-      // Augment with source indexing information
-      const sourceStartTime = Date.now();
-      const extendedViewHierarchy = await this.augmentWithSourceIndexing(viewHierarchy as ExtendedViewHierarchyResult);
-      const sourceDuration = Date.now() - sourceStartTime;
-      logger.debug(`[VIEW_HIERARCHY] Source indexing augmentation took ${sourceDuration}ms`);
-
       // Cache the result using a timestamp
-      const cacheStartTime = Date.now();
       const timestamp = Date.now();
       logger.debug(`[VIEW_HIERARCHY] Caching view hierarchy with timestamp: ${timestamp}`);
-      await this.cacheViewHierarchy(timestamp, extendedViewHierarchy);
-      const cacheDuration = Date.now() - cacheStartTime;
-      logger.debug(`[VIEW_HIERARCHY] Caching completed in ${cacheDuration}ms`);
+      await perf.track("cacheHierarchy", () =>
+        this.cacheViewHierarchy(timestamp, viewHierarchy)
+      );
+
+      perf.end();
 
       const totalDuration = Date.now() - startTime;
       logger.debug(`[VIEW_HIERARCHY] *** FRESH HIERARCHY: getViewHierarchy completed in ${totalDuration}ms (fresh hierarchy) ***`);
       return viewHierarchy;
     } catch (err) {
+      perf.end();
       const totalDuration = Date.now() - startTime;
       logger.warn(`[VIEW_HIERARCHY] getViewHierarchy failed after ${totalDuration}ms:`, err);
 

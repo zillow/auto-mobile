@@ -1,6 +1,7 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BootedDevice, ClearAppDataResult } from "../../models";
 import { logger } from "../../utils/logger";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class ClearAppData {
   private device: BootedDevice;
@@ -14,20 +15,23 @@ export class ClearAppData {
   async execute(
     packageName: string,
   ): Promise<ClearAppDataResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("clearAppData");
+
     try {
-      await this.adb.executeCommand(`shell am force-stop ${packageName}`);
-      logger.info("Force stopping the application successful");
-      // TODO: need to poll for app stopped via dumpsys
-      // TODO: Add awaitidle
+      // pm clear both clears data AND stops the app, no need for separate force-stop
+      await perf.track("pmClear", async () => {
+        await this.adb.executeCommand(`shell pm clear ${packageName}`);
+        logger.info("Clearing app data was successful");
+      });
 
-      await this.adb.executeCommand(`shell pm clear ${packageName}`);
-      logger.info("Clearing app data was successful");
-
+      perf.end();
       return {
         success: true,
         packageName
       };
-    } catch (error) {
+    } catch {
+      perf.end();
       return {
         success: false,
         packageName,

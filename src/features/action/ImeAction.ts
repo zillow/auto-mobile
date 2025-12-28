@@ -3,6 +3,7 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ImeActionResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class ImeAction extends BaseVisualChange {
   constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
@@ -13,8 +14,12 @@ export class ImeAction extends BaseVisualChange {
     action: "done" | "next" | "search" | "send" | "go" | "previous",
     progress?: ProgressCallback
   ): Promise<ImeActionResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("imeAction");
+
     // Validate action input
     if (!action) {
+      perf.end();
       return {
         success: false,
         action: "",
@@ -25,13 +30,16 @@ export class ImeAction extends BaseVisualChange {
     return this.observedInteraction(
       async () => {
         try {
-          await this.executeImeAction(action);
+          await perf.track("executeImeAction", () =>
+            this.executeImeAction(action)
+          );
 
           return {
             success: true,
             action
           };
         } catch (error) {
+          perf.end();
           const errorMessage = error instanceof Error ? error.message : String(error);
 
           return {
@@ -45,7 +53,8 @@ export class ImeAction extends BaseVisualChange {
         changeExpected: true,
         tolerancePercent: 0.00,
         timeoutMs: 3000, // IME actions should be quick
-        progress
+        progress,
+        perf
       }
     );
   }

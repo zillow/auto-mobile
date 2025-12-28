@@ -5,6 +5,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker, IPerformanceTracker } from "../../utils/PerformanceTracker";
 
 interface NavigationCache {
     method: "gesture" | "hardware" | "element";
@@ -24,21 +25,26 @@ export class HomeScreen extends BaseVisualChange {
   }
 
   async execute(progress?: ProgressCallback): Promise<HomeScreenResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("homeScreen");
+
     // Check cache first
     const cachedMethod = this.getCachedNavigationMethod(this.device);
     if (cachedMethod) {
       logger.info(`[HomeScreen] Using cached navigation method: ${cachedMethod}`);
       // Only try the cached method, if it fails, surface the error to the caller.
-      return await this.executeNavigationMethod(cachedMethod, progress);
+      return await this.executeNavigationMethod(cachedMethod, progress, perf);
     }
 
     // Detect navigation style and only try that, no fallback logic.
-    const detectedMethod = await this.detectNavigationStyle(progress);
+    const detectedMethod = await perf.track("detectNavigationStyle", () =>
+      this.detectNavigationStyle(progress)
+    );
 
     // Cache the detected method (without getting device props again)
     this.cacheNavigationMethodSimple(this.device, detectedMethod);
 
-    return await this.executeNavigationMethod(detectedMethod, progress);
+    return await this.executeNavigationMethod(detectedMethod, progress, perf);
   }
 
   private getCachedNavigationMethod(device: BootedDevice): "gesture" | "hardware" | "element" | null {
@@ -175,38 +181,48 @@ export class HomeScreen extends BaseVisualChange {
 
   private async executeNavigationMethod(
     method: "gesture" | "hardware" | "element",
-    progress?: ProgressCallback
+    progress?: ProgressCallback,
+    perf?: IPerformanceTracker
   ): Promise<HomeScreenResult> {
     // Each method is tried directly. If it fails, error is surfaced.
     switch (method) {
       case "gesture":
         return await this.observedInteraction(
           async (observeResult: ObserveResult) =>
-            await this.executeGestureNavigation(observeResult, progress),
+            await (perf ? perf.track("gestureNavigation", () =>
+              this.executeGestureNavigation(observeResult, progress)
+            ) : this.executeGestureNavigation(observeResult, progress)),
           {
             changeExpected: true,
             timeoutMs: 5000,
-            progress
+            progress,
+            perf
           }
         );
       case "element":
         return await this.observedInteraction(
           async (observeResult: ObserveResult) =>
-            await this.executeElementNavigation(observeResult, progress),
+            await (perf ? perf.track("elementNavigation", () =>
+              this.executeElementNavigation(observeResult, progress)
+            ) : this.executeElementNavigation(observeResult, progress)),
           {
             changeExpected: true,
             timeoutMs: 5000,
-            progress
+            progress,
+            perf
           }
         );
       case "hardware":
         return await this.observedInteraction(
           async () =>
-            await this.executeHardwareNavigation(progress),
+            await (perf ? perf.track("hardwareNavigation", () =>
+              this.executeHardwareNavigation(progress)
+            ) : this.executeHardwareNavigation(progress)),
           {
             changeExpected: true,
             timeoutMs: 5000,
-            progress
+            progress,
+            perf
           }
         );
       default:

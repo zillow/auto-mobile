@@ -14,7 +14,7 @@ export const packageNameSchema = z.object({
 export const launchAppSchema = z.object({
   appId: z.string().describe("App package ID of the app"),
   clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false"),
-  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default true"),
+  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default false"),
 });
 
 export const installAppSchema = z.object({
@@ -45,9 +45,8 @@ export function registerAppTools(
       const launchApp = new LaunchApp(device);
       const result = await launchApp.execute(
         args.appId,
-        args.clearAppData || false,
-        args.coldBoot || true,
-        undefined
+        args.clearAppData ?? false,
+        args.coldBoot ?? false
       );
 
       return createJSONToolResponse({

@@ -4,6 +4,7 @@ import { BootedDevice, ClearTextResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class ClearText extends BaseVisualChange {
   private elementUtils: ElementUtils;
@@ -14,12 +15,15 @@ export class ClearText extends BaseVisualChange {
   }
 
   async execute(progress?: ProgressCallback): Promise<ClearTextResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("clearText");
+
     return this.observedInteraction(
       async (observeResult: ObserveResult) => {
         try {
           if (!observeResult.viewHierarchy) {
             // Fallback: if we can't get view hierarchy, use a reasonable default
-            await this.clearWithDeletes(200);
+            await perf.track("clearWithDeletes", () => this.clearWithDeletes(200));
             return { success: true };
           }
 
@@ -31,13 +35,14 @@ export class ClearText extends BaseVisualChange {
           // TODO: Move cursor to the end of the text
 
           if (textLength > 0) {
-            await this.clearWithDeletes(textLength);
+            await perf.track("clearWithDeletes", () => this.clearWithDeletes(textLength));
           }
 
           return {
             success: true
           };
         } catch (error) {
+          perf.end();
           return {
             success: false,
             error: "Failed to clear text"
@@ -48,7 +53,8 @@ export class ClearText extends BaseVisualChange {
         changeExpected: false, // TODO: can only make this true once we know for sure there was text in the text field
         tolerancePercent: 0.00,
         timeoutMs: 100,
-        progress
+        progress,
+        perf
       }
     );
   }

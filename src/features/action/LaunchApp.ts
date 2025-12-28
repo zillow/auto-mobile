@@ -8,6 +8,9 @@ import { logger } from "../../utils/logger";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
 import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
+import { createGlobalPerformanceTracker, IPerformanceTracker } from "../../utils/PerformanceTracker";
+
+export type ForegroundCheckMode = "parallel" | "single";
 
 export class LaunchApp extends BaseVisualChange {
 
@@ -32,9 +35,13 @@ export class LaunchApp extends BaseVisualChange {
   /**
    * Extract launcher activities using targeted adb command
    * @param packageName - Package name we're trying to launch
+   * @param perf - Optional performance tracker
    * @returns Array of launcher activity names
    */
-  private async extractLauncherActivities(packageName: string): Promise<string[]> {
+  private async extractLauncherActivities(
+    packageName: string,
+    perf?: IPerformanceTracker
+  ): Promise<string[]> {
     logger.info("extractLauncherActivities");
     const activities: string[] = [];
 
@@ -54,7 +61,9 @@ export class LaunchApp extends BaseVisualChange {
       for (let i = 0; i < approaches.length; i++) {
         try {
           logger.info(`[LaunchApp] Trying approach ${i + 1}: ${approaches[i]}`);
-          const result = await this.adb.executeCommand(approaches[i]);
+          const result = perf
+            ? await perf.track(`activityApproach_${i + 1}`, () => this.adb.executeCommand(approaches[i]))
+            : await this.adb.executeCommand(approaches[i]);
           logger.info(`[LaunchApp] Approach ${i + 1} result: ${result.stdout.length} chars of output`);
 
           if (result.stdout.trim()) {
@@ -104,7 +113,9 @@ export class LaunchApp extends BaseVisualChange {
       if (activities.length === 0) {
         logger.info(`[LaunchApp] No activities found, trying fallback approach`);
         try {
-          const simpleResult = await this.adb.executeCommand(`shell pm dump ${packageName}`);
+          const simpleResult = perf
+            ? await perf.track("activityFallback", () => this.adb.executeCommand(`shell pm dump ${packageName}`))
+            : await this.adb.executeCommand(`shell pm dump ${packageName}`);
           const lines = simpleResult.stdout.split("\n");
 
           for (const line of lines) {
@@ -141,19 +152,21 @@ export class LaunchApp extends BaseVisualChange {
    * @param clearAppData - Whether clear app data before launch
    * @param coldBoot - Whether to cold boot the app or resume if already running
    * @param activityName - Optional activity name to launch (Android only)
+   * @param foregroundCheckMode - Experimental: strategy for checking if app is in foreground
    */
   async execute(
     packageName: string,
     clearAppData: boolean,
     coldBoot: boolean,
-    activityName?: string
+    activityName?: string,
+    foregroundCheckMode: ForegroundCheckMode = "single"
   ): Promise<LaunchAppResult> {
     logger.info("execute");
     switch (this.device.platform) {
       case "ios":
         return this.executeiOS(packageName, clearAppData, coldBoot);
       case "android":
-        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName);
+        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName, foregroundCheckMode);
       default:
         throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
     }
@@ -229,18 +242,27 @@ export class LaunchApp extends BaseVisualChange {
    * @param clearAppData - Whether clear app data before launch
    * @param coldBoot - Whether to cold boot the app or resume if already running
    * @param activityName - Optional activity name to launch
+   * @param foregroundCheckMode - Strategy for checking if app is in foreground
    */
   private async executeAndroid(
     packageName: string,
     clearAppData: boolean,
     coldBoot: boolean,
-    activityName?: string
+    activityName?: string,
+    foregroundCheckMode: ForegroundCheckMode = "single"
   ): Promise<LaunchAppResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("launchApp");
+
     logger.info(`executeAndroid: ${packageName}`);
+
     // Check app status (installation and running)
-    const installedApps = await (new ListInstalledApps(this.device)).execute();
+    const installedApps = await perf.track("checkInstalled", async () => {
+      return (new ListInstalledApps(this.device)).execute();
+    });
     if (!installedApps.includes(packageName)) {
       logger.error(`[LaunchApp] App ${packageName} is not installed`);
+      perf.end();
       return {
         success: false,
         packageName: packageName,
@@ -249,69 +271,65 @@ export class LaunchApp extends BaseVisualChange {
     }
 
     // Check if app is running
-    const isRunningCmd = `shell ps | grep ${packageName} | grep -v grep | wc -l`;
-    logger.info(`[LaunchApp] Checking if app is running: ${isRunningCmd}`);
-    const isRunningOutput = await this.adb.executeCommand(isRunningCmd);
-    const isRunning = parseInt(isRunningOutput.trim(), 10) > 0;
-    logger.info(`[LaunchApp] App running: ${isRunning} (output: "${isRunningOutput.trim()}")`);
+    const isRunning = await perf.track("checkRunning", async () => {
+      const isRunningCmd = `shell ps | grep ${packageName} | grep -v grep | wc -l`;
+      logger.info(`[LaunchApp] Checking if app is running: ${isRunningCmd}`);
+      const isRunningOutput = await this.adb.executeCommand(isRunningCmd);
+      const result = parseInt(isRunningOutput.trim(), 10) > 0;
+      logger.info(`[LaunchApp] App running: ${result} (output: "${isRunningOutput.trim()}")`);
+      return result;
+    });
+
+    let didTerminateOrClear = false;
 
     if (isRunning) {
       if (clearAppData) {
-        await new ClearAppData(this.device).execute(packageName);
+        await perf.track("clearAppData", async () => {
+          return new ClearAppData(this.device).execute(packageName);
+        });
+        didTerminateOrClear = true;
       } else if (coldBoot) {
-        await new TerminateApp(this.device).execute(packageName);
+        await perf.track("terminateApp", async () => {
+          return new TerminateApp(this.device).execute(packageName, { skipObservation: true });
+        });
+        didTerminateOrClear = true;
       }
 
-      // Check if app is in foreground - use a more reliable approach
-      let isForeground: boolean = false;
-      try {
-        logger.info(`[LaunchApp] Checking if app is in foreground`);
+      // Skip foreground check if we just terminated or cleared - we know app is not in foreground
+      if (!didTerminateOrClear) {
+        // Check if app is in foreground - use a more reliable approach
+        const isForeground = await perf.track(`checkForeground_${foregroundCheckMode}`, async () => {
+          return this.checkAppForeground(packageName, foregroundCheckMode, perf);
+        });
 
-        // Revised, more robust foreground detection
-        const foregroundChecks = [
-          // Approach 1: Check for resumed activity
-          `shell dumpsys activity activities | grep "mResumedActivity" | grep "${packageName}"`,
-          // Approach 2: Check top activity with new activity command
-          `shell dumpsys activity | grep "ResumedActivity.*${packageName}"`,
-          // Approach 3: Check running processes (fallback)
-          `shell dumpsys window | grep "Window #" | grep "${packageName}"`
-        ];
-
-        for (let i = 0; i < foregroundChecks.length; i++) {
-          try {
-            logger.info(`[LaunchApp] Foreground check ${i + 1}: ${foregroundChecks[i]}`);
-            const checkResult = await this.adb.executeCommand(foregroundChecks[i]);
-            const output = (checkResult && checkResult.stdout ? checkResult.stdout : "").trim();
-            logger.info(`[LaunchApp] Foreground check ${i + 1} output: "${output}" (${output.length} chars)`);
-
-            if (output.length > 0) {
-              isForeground = true;
-              logger.info(`[LaunchApp] App is in foreground (detected by check ${i + 1})`);
-              break;
-            }
-          } catch (error) {
-            logger.warn(`[LaunchApp] Foreground check ${i + 1} failed:`, error);
+        if (isForeground) {
+          logger.info(`[LaunchApp] App ${packageName} is already in foreground`);
+          perf.end();
+          const result: LaunchAppResult = {
+            success: true,
+            packageName,
+            activityName,
+            error: "App is already in foreground"
+          };
+          // Add perfTiming if enabled
+          const timings = perf.getTimings();
+          if (perf.isEnabled() && timings) {
+            result.observation = {
+              updatedAt: new Date().toISOString(),
+              screenSize: { width: 0, height: 0 },
+              systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+              perfTiming: timings
+            };
           }
+          return result;
         }
-      } catch (outerError) {
-        logger.warn(`[LaunchApp] All foreground checks failed:`, outerError);
-        isForeground = false;
-      }
-
-      logger.info(`[LaunchApp] Final foreground status: ${isForeground}`);
-
-      if (isForeground) {
-        logger.info(`[LaunchApp] App ${packageName} is already in foreground`);
-        return {
-          success: true,
-          packageName,
-          activityName,
-          error: "App is already in foreground"
-        };
       }
     } else {
       if (clearAppData) {
-        await new ClearAppData(this.device).execute(packageName);
+        await perf.track("clearAppData", async () => {
+          return new ClearAppData(this.device).execute(packageName);
+        });
+        didTerminateOrClear = true;
       }
     }
 
@@ -319,95 +337,247 @@ export class LaunchApp extends BaseVisualChange {
 
     return this.observedInteraction(
       async () => {
-        logger.info("(");
-        let targetActivity = activityName;
+        return this.performLaunch(packageName, activityName, perf);
+      },
+      {
+        changeExpected: false,
+        perf,
+        skipPreviousObserve: didTerminateOrClear
+      }
+    );
+  }
 
-        // Try monkey launch first (ultra-fast approach)
-        if (!targetActivity) {
-          logger.info(`[LaunchApp] Trying monkey launch (ultra-fast approach)`);
-          try {
-            const monkeyCmd = `shell monkey -p ${packageName} 1`;
-            logger.info(`[LaunchApp] Monkey command: ${monkeyCmd}`);
-            await this.adb.executeCommand(monkeyCmd);
-            logger.info(`[LaunchApp] Monkey launch completed successfully`);
-            return {
-              success: true,
-              packageName,
-              activityName: "monkey_launch"
-            };
-          } catch (error) {
-            logger.info(`[LaunchApp] Monkey launch failed: ${error}, falling back to activity discovery`);
-          }
+  /**
+   * Check if app is in foreground
+   * @param packageName - Package name to check
+   * @param mode - Check strategy: 'single' (default) or 'parallel'
+   * @param perf - Optional performance tracker
+   */
+  private async checkAppForeground(
+    packageName: string,
+    mode: ForegroundCheckMode = "single",
+    perf?: IPerformanceTracker
+  ): Promise<boolean> {
+    logger.info(`[LaunchApp] Checking if app is in foreground (mode: ${mode})`);
+
+    switch (mode) {
+      case "parallel":
+        return this.checkForegroundParallel(packageName, perf);
+      case "single":
+      default:
+        return this.checkForegroundSingle(packageName, perf);
+    }
+  }
+
+  /**
+   * Parallel foreground check - runs all 3 dumpsys commands in parallel (kept for future use)
+   */
+  private async checkForegroundParallel(packageName: string, perf?: IPerformanceTracker): Promise<boolean> {
+    try {
+      // Note: Window check uses mCurrentFocus (not "Window #") to avoid false positives from background windows
+      const foregroundChecks = [
+        `shell dumpsys activity activities | grep "mResumedActivity" | grep "${packageName}"`,
+        `shell dumpsys activity | grep "ResumedActivity.*${packageName}"`,
+        `shell dumpsys window | grep "mCurrentFocus" | grep "${packageName}"`
+      ];
+
+      logger.info(`[LaunchApp] Running ${foregroundChecks.length} foreground checks in parallel`);
+
+      const checkPromises = foregroundChecks.map(async (cmd, i) => {
+        try {
+          const checkResult = perf
+            ? await perf.track(`parallelCheck_${i + 1}`, () => this.adb.executeCommand(cmd))
+            : await this.adb.executeCommand(cmd);
+          const output = (checkResult && checkResult.stdout ? checkResult.stdout : "").trim();
+          logger.info(`[LaunchApp] Parallel check ${i + 1} output: "${output}" (${output.length} chars)`);
+          return output.length > 0;
+        } catch (error) {
+          logger.warn(`[LaunchApp] Parallel check ${i + 1} failed:`, error);
+          return false;
         }
+      });
 
-        // If no specific activity provided, get launcher activities from pm dump
-        if (!targetActivity) {
-          logger.info(`[LaunchApp] No activity specified, extracting launcher activities`);
-          const launcherActivities = await this.extractLauncherActivities(packageName);
+      const results = await Promise.all(checkPromises);
+      const isForeground = results.some(result => result);
+      logger.info(`[LaunchApp] Final foreground status (parallel): ${isForeground}`);
+      return isForeground;
+    } catch (outerError) {
+      logger.warn(`[LaunchApp] Parallel foreground check failed:`, outerError);
+      return false;
+    }
+  }
 
-          if (launcherActivities.length > 0) {
-            targetActivity = launcherActivities[0];
-            logger.info(`[LaunchApp] Using first found activity: ${targetActivity}`);
-          } else {
-            logger.info(`[LaunchApp] No launcher activities found, trying common patterns`);
-            // Try common activity name patterns
-            const commonPatterns = [
-              `${packageName}.MainActivity`,
-              `${packageName}.ui.MainActivity`,
-              `${packageName}.main.MainActivity`,
-              `${packageName}.activity.MainActivity`,
-              `${packageName}.LauncherActivity`,
-              `${packageName}.MainLauncherActivity`
-            ];
+  /**
+   * Single dumpsys foreground check - uses one comprehensive dumpsys call
+   */
+  private async checkForegroundSingle(packageName: string, perf?: IPerformanceTracker): Promise<boolean> {
+    try {
+      // Use a single dumpsys activity activities call and parse the output
+      const cmd = `shell dumpsys activity activities | grep -E "(mResumedActivity|mFocusedActivity|topResumedActivity)" | head -5`;
+      logger.info(`[LaunchApp] Single dumpsys check: ${cmd}`);
 
-            for (const pattern of commonPatterns) {
-              try {
-                logger.info(`[LaunchApp] Trying common pattern: ${pattern}`);
-                await this.adb.executeCommand(`shell am start -n ${packageName}/${pattern}`);
-                logger.info(`[LaunchApp] Successfully launched with pattern: ${pattern}`);
-                return {
-                  success: true,
-                  packageName,
-                  activityName: pattern
-                };
-              } catch (error) {
-                logger.info(`[LaunchApp] Pattern ${pattern} failed: ${error}`);
-              }
-            }
+      const checkResult = perf
+        ? await perf.track("singleCheck", () => this.adb.executeCommand(cmd))
+        : await this.adb.executeCommand(cmd);
+
+      const output = (checkResult && checkResult.stdout ? checkResult.stdout : "").trim();
+      logger.info(`[LaunchApp] Single check output: "${output}" (${output.length} chars)`);
+
+      const isForeground = output.includes(packageName);
+      logger.info(`[LaunchApp] Final foreground status (single): ${isForeground}`);
+      return isForeground;
+    } catch (error) {
+      logger.warn(`[LaunchApp] Single foreground check failed:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Perform the actual app launch with timing
+   */
+  private async performLaunch(
+    packageName: string,
+    activityName: string | undefined,
+    perf: IPerformanceTracker
+  ): Promise<{ success: boolean; packageName: string; activityName?: string }> {
+    let targetActivity = activityName;
+
+    // Try am start with intent first (alternative to monkey)
+    if (!targetActivity) {
+      const intentResult = await perf.track("intentLaunch", async () => {
+        logger.info(`[LaunchApp] Trying am start with intent`);
+        try {
+          // Use am start with MAIN/LAUNCHER intent - more reliable than monkey
+          const intentCmd = `shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n ${packageName}/.MainActivity 2>/dev/null || am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
+          logger.info(`[LaunchApp] Intent command: ${intentCmd}`);
+          const result = await this.adb.executeCommand(intentCmd);
+          // Check if launch was successful (no "Error" in output)
+          if (result.stdout && !result.stdout.includes("Error")) {
+            logger.info(`[LaunchApp] Intent launch completed successfully`);
+            return { success: true };
           }
+          logger.info(`[LaunchApp] Intent launch returned error: ${result.stdout}`);
+          return { success: false };
+        } catch (error) {
+          logger.info(`[LaunchApp] Intent launch failed: ${error}, falling back to monkey`);
+          return { success: false };
         }
+      });
 
-        // Launch with specific activity if found, otherwise use default method
-        if (targetActivity) {
-          logger.info(`[LaunchApp] Launching with activity: ${targetActivity}`);
-          const launchCmd = `shell am start -n ${packageName}/${targetActivity}`;
-          logger.info(`[LaunchApp] Launch command: ${launchCmd}`);
-          await this.adb.executeCommand(launchCmd);
-          logger.info(`[LaunchApp] Launch command completed successfully`);
-        } else {
-          // Fallback to launcher intent
-          logger.info(`[LaunchApp] No activity found, trying launcher intent`);
-          try {
-            const launcherCmd = `shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
-            logger.info(`[LaunchApp] Launcher intent command: ${launcherCmd}`);
-            await this.adb.executeCommand(launcherCmd);
-            logger.info(`[LaunchApp] Launcher intent completed successfully`);
-          } catch (error) {
-            logger.error(`[LaunchApp] Launcher intent failed: ${error}`);
-            throw new ActionableError("No launcher activity found and launcher intent failed");
-          }
-        }
-
-        logger.info(`[LaunchApp] Launch completed successfully`);
+      if (intentResult.success) {
+        perf.end();
         return {
           success: true,
           packageName,
-          activityName: targetActivity
+          activityName: "intent_launch"
         };
-      },
-      {
-        changeExpected: false
       }
-    );
+    }
+
+    // Try monkey launch as fallback (fast but less reliable)
+    if (!targetActivity) {
+      const monkeyResult = await perf.track("monkeyLaunch", async () => {
+        logger.info(`[LaunchApp] Trying monkey launch (fallback approach)`);
+        try {
+          const monkeyCmd = `shell monkey -p ${packageName} 1`;
+          logger.info(`[LaunchApp] Monkey command: ${monkeyCmd}`);
+          await this.adb.executeCommand(monkeyCmd);
+          logger.info(`[LaunchApp] Monkey launch completed successfully`);
+          return { success: true };
+        } catch (error) {
+          logger.info(`[LaunchApp] Monkey launch failed: ${error}, falling back to activity discovery`);
+          return { success: false };
+        }
+      });
+
+      if (monkeyResult.success) {
+        perf.end();
+        return {
+          success: true,
+          packageName,
+          activityName: "monkey_launch"
+        };
+      }
+    }
+
+    // If no specific activity provided, get launcher activities from pm dump
+    if (!targetActivity) {
+      const launcherActivities = await perf.track("extractLauncherActivities", async () => {
+        logger.info(`[LaunchApp] No activity specified, extracting launcher activities`);
+        return this.extractLauncherActivities(packageName, perf);
+      });
+
+      if (launcherActivities.length > 0) {
+        targetActivity = launcherActivities[0];
+        logger.info(`[LaunchApp] Using first found activity: ${targetActivity}`);
+      } else {
+        // Try common activity name patterns
+        const patternResult = await perf.track("tryCommonPatterns", async () => {
+          logger.info(`[LaunchApp] No launcher activities found, trying common patterns`);
+          const commonPatterns = [
+            `${packageName}.MainActivity`,
+            `${packageName}.ui.MainActivity`,
+            `${packageName}.main.MainActivity`,
+            `${packageName}.activity.MainActivity`,
+            `${packageName}.LauncherActivity`,
+            `${packageName}.MainLauncherActivity`
+          ];
+
+          for (const pattern of commonPatterns) {
+            try {
+              logger.info(`[LaunchApp] Trying common pattern: ${pattern}`);
+              await this.adb.executeCommand(`shell am start -n ${packageName}/${pattern}`);
+              logger.info(`[LaunchApp] Successfully launched with pattern: ${pattern}`);
+              return { success: true, pattern };
+            } catch (error) {
+              logger.info(`[LaunchApp] Pattern ${pattern} failed: ${error}`);
+            }
+          }
+          return { success: false, pattern: null };
+        });
+
+        if (patternResult.success && patternResult.pattern) {
+          perf.end();
+          return {
+            success: true,
+            packageName,
+            activityName: patternResult.pattern
+          };
+        }
+      }
+    }
+
+    // Launch with specific activity if found, otherwise use default method
+    if (targetActivity) {
+      await perf.track("launchActivity", async () => {
+        logger.info(`[LaunchApp] Launching with activity: ${targetActivity}`);
+        const launchCmd = `shell am start -n ${packageName}/${targetActivity}`;
+        logger.info(`[LaunchApp] Launch command: ${launchCmd}`);
+        await this.adb.executeCommand(launchCmd);
+        logger.info(`[LaunchApp] Launch command completed successfully`);
+      });
+    } else {
+      // Fallback to launcher intent
+      await perf.track("launcherIntent", async () => {
+        logger.info(`[LaunchApp] No activity found, trying launcher intent`);
+        try {
+          const launcherCmd = `shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
+          logger.info(`[LaunchApp] Launcher intent command: ${launcherCmd}`);
+          await this.adb.executeCommand(launcherCmd);
+          logger.info(`[LaunchApp] Launcher intent completed successfully`);
+        } catch (error) {
+          logger.error(`[LaunchApp] Launcher intent failed: ${error}`);
+          throw new ActionableError("No launcher activity found and launcher intent failed");
+        }
+      });
+    }
+
+    logger.info(`[LaunchApp] Launch completed successfully`);
+    perf.end();
+    return {
+      success: true,
+      packageName,
+      activityName: targetActivity
+    };
   }
 }

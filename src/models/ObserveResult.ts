@@ -4,6 +4,7 @@ import { SystemInsets } from "./SystemInsets";
 import { ActiveWindowInfo } from "./ActiveWindowInfo";
 import { ViewHierarchyResult } from "./ViewHierarchyResult";
 import { TimingData } from "../utils/PerformanceTracker";
+import { GfxMetrics } from "./GfxMetrics";
 
 /**
  * Represents the result of observing the device state
@@ -54,4 +55,7 @@ export interface ObserveResult {
 
   /** Performance timing data (only present when --debug-perf is enabled) */
   perfTiming?: TimingData;
+
+  /** Graphics frame metrics from gfxinfo (only present when --debug-perf is enabled) */
+  gfxMetrics?: GfxMetrics;
 }

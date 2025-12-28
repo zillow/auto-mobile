@@ -4,6 +4,7 @@ import { BootedDevice, OpenURLResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
 import { LaunchApp } from "./LaunchApp";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class OpenURL extends BaseVisualChange {
 
@@ -15,11 +16,15 @@ export class OpenURL extends BaseVisualChange {
   async execute(
     url: string,
   ): Promise<OpenURLResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("openURL");
+
     logger.info(`[OpenURL] Starting URL open request: ${url}`);
 
     // Validate URL
     if (!url || !url.trim()) {
       logger.error("[OpenURL] Invalid URL provided");
+      perf.end();
       return {
         success: false,
         url: url || "",
@@ -37,6 +42,7 @@ export class OpenURL extends BaseVisualChange {
 
       if (!packageName) {
         logger.error("[OpenURL] No package name found in package URL");
+        perf.end();
         return {
           success: false,
           url: trimmedUrl,
@@ -49,8 +55,11 @@ export class OpenURL extends BaseVisualChange {
       try {
         // Use LaunchApp to properly launch the application
         const launchApp = new LaunchApp(this.device, this.adb);
-        const launchResult = await launchApp.execute(packageName, false, true);
+        const launchResult = await perf.track("launchApp", () =>
+          launchApp.execute(packageName, false, true)
+        );
 
+        perf.end();
         if (launchResult.success) {
           logger.info(`[OpenURL] Successfully launched app ${packageName}`);
           return {
@@ -67,6 +76,7 @@ export class OpenURL extends BaseVisualChange {
         }
       } catch (error) {
         logger.error(`[OpenURL] Exception while launching app ${packageName}:`, error);
+        perf.end();
         return {
           success: false,
           url: trimmedUrl,
@@ -83,16 +93,22 @@ export class OpenURL extends BaseVisualChange {
         // Platform-specific URL opening execution
         switch (this.device.platform) {
           case "android":
-            return await this.executeAndroidOpenURL(url);
+            return await perf.track("androidOpenURL", () =>
+              this.executeAndroidOpenURL(url)
+            );
           case "ios":
-            return await this.executeiOSOpenURL(url);
+            return await perf.track("iOSOpenURL", () =>
+              this.executeiOSOpenURL(url)
+            );
           default:
+            perf.end();
             throw new Error(`Unsupported platform: ${this.device.platform}`);
         }
       },
       {
         changeExpected: false,
-        timeoutMs: 12000
+        timeoutMs: 12000,
+        perf
       }
     );
   }

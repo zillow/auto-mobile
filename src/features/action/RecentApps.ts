@@ -6,6 +6,7 @@ import { PressButton } from "./PressButton";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Opens the recent apps screen using intelligent navigation detection
@@ -28,6 +29,9 @@ export class RecentApps extends BaseVisualChange {
    * @returns Result of the recent apps operation
    */
   async execute(progress?: ProgressCallback): Promise<RecentAppsResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("recentApps");
+
     return this.observedInteraction(
       async (observeResult: ObserveResult) => {
 
@@ -40,21 +44,28 @@ export class RecentApps extends BaseVisualChange {
 
         switch (navigationMethod) {
           case "gesture":
-            await this.executeGestureNavigation(observeResult);
+            await perf.track("gestureNavigation", () =>
+              this.executeGestureNavigation(observeResult)
+            );
             return { success: true, method: "gesture" };
           case "legacy":
-            await this.executeLegacyNavigation(observeResult);
+            await perf.track("legacyNavigation", () =>
+              this.executeLegacyNavigation(observeResult)
+            );
             return { success: true, method: "legacy" };
           case "hardware":
           default:
-            await this.executeHardwareNavigation();
+            await perf.track("hardwareNavigation", () =>
+              this.executeHardwareNavigation()
+            );
             return { success: true, method: "hardware" };
         }
       },
       {
         changeExpected: true,
         timeoutMs: 3000,
-        progress
+        progress,
+        perf
       }
     );
   }

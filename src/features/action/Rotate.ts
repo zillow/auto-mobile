@@ -4,6 +4,7 @@ import { BootedDevice, RotateResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { ProgressCallback } from "./BaseVisualChange";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class Rotate extends BaseVisualChange {
   constructor(
@@ -64,13 +65,18 @@ export class Rotate extends BaseVisualChange {
     orientation: "portrait" | "landscape",
     progress?: ProgressCallback
   ): Promise<RotateResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("rotate");
+
     return this.observedInteraction(
       async () => {
 
         const value = orientation === "portrait" ? 0 : 1;
 
         // Get current orientation
-        const currentOrientation = await this.getCurrentOrientation();
+        const currentOrientation = await perf.track("getCurrentOrientation", () =>
+          this.getCurrentOrientation()
+        );
 
         // Check if device is already in the desired orientation
         if (currentOrientation === orientation) {
@@ -154,7 +160,8 @@ export class Rotate extends BaseVisualChange {
       {
         changeExpected: true,
         timeoutMs: 5000,
-        progress
+        progress,
+        perf
       }
     );
   }

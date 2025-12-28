@@ -3,6 +3,7 @@ import { BootedDevice, IntentChooserResult, ObserveResult } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class HandleIntentChooser extends BaseVisualChange {
   private deepLinkManager: DeepLinkManager;
@@ -29,6 +30,8 @@ export class HandleIntentChooser extends BaseVisualChange {
     preference: "always" | "just_once" | "custom" = "just_once",
     customAppPackage?: string
   ): Promise<IntentChooserResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("handleIntentChooser");
 
     return this.observedInteraction(
       async (observeResult: ObserveResult) => {
@@ -38,15 +41,18 @@ export class HandleIntentChooser extends BaseVisualChange {
           return { success: false, error: "View hierarchy not found" };
         }
 
-        return await this.deepLinkManager.handleIntentChooser(
-          viewHierarchy,
-          preference,
-          customAppPackage
+        return await perf.track("handleChooser", () =>
+          this.deepLinkManager.handleIntentChooser(
+            viewHierarchy,
+            preference,
+            customAppPackage
+          )
         );
       },
       {
         changeExpected: false,
         timeoutMs: 500,
+        perf
       }
     );
   }

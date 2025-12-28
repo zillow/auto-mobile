@@ -4,9 +4,10 @@ import { ObserveScreen } from "../observe/ObserveScreen";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ActionableError, ActiveWindowInfo, BootedDevice, ObserveResult } from "../../models";
+import { ActionableError, ActiveWindowInfo, BootedDevice, GfxMetrics, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -19,6 +20,8 @@ export interface ObservedChangeOptions {
   progress?: ProgressCallback;
   tolerancePercent?: number;
   queryOptions?: ViewHierarchyQueryOptions;
+  perf?: IPerformanceTracker;
+  skipPreviousObserve?: boolean;
 }
 
 export class BaseVisualChange {
@@ -60,29 +63,42 @@ export class BaseVisualChange {
 
     const timeoutMs = options.timeoutMs || 12000;
     const progress = options.progress;
+    const perf = options.perf ?? new NoOpPerformanceTracker();
 
     if (progress) {
       await progress(0, 100, "Preparing to execute action...");
     }
 
-    // Fetch cached view hierarchy
+    // Fetch cached view hierarchy (skip if we just terminated/cleared the app)
     let previousObserveResult: ObserveResult | null = null;
-    try {
-      if (progress) {
-        await progress(10, 100, "Getting previous view hierarchy...");
+    if (options.skipPreviousObserve) {
+      logger.info("[BaseVisualChange] Skipping previous observe (app was terminated/cleared)");
+    } else {
+      try {
+        if (progress) {
+          await progress(10, 100, "Getting previous view hierarchy...");
+        }
+        previousObserveResult = await perf.track("getPreviousObserve", async () => {
+          const cached = await this.observeScreen.getMostRecentCachedObserveResult();
+          if (!cached?.viewHierarchy || cached.viewHierarchy.hierarchy.error) {
+            return this.observeScreen.execute(options.queryOptions);
+          }
+          return cached;
+        });
+      } catch {
+        previousObserveResult = await perf.track("getPreviousObserveFallback", async () => {
+          return this.observeScreen.execute(options.queryOptions);
+        });
       }
-      previousObserveResult = await this.observeScreen.getMostRecentCachedObserveResult();
-      if (!previousObserveResult?.viewHierarchy || !previousObserveResult.viewHierarchy || previousObserveResult.viewHierarchy.hierarchy.error) {
-        previousObserveResult = await this.observeScreen.execute(options.queryOptions);
+
+      if (!previousObserveResult) {
+        throw new ActionableError("Cannot perform action without view hierarchy");
       }
-    } catch (error) {
-      previousObserveResult = await this.observeScreen.execute(options.queryOptions);
     }
 
-    if (!previousObserveResult) {
-      throw new ActionableError("Cannot perform action without view hierarchy");
-    }
-    const blockResult = await block(previousObserveResult);
+    const blockResult = await perf.track("executeBlock", async () => {
+      return block(previousObserveResult!);
+    });
 
     // Get package name for UI stability waiting
     let packageName = options.packageName;
@@ -95,10 +111,12 @@ export class BaseVisualChange {
     if (!packageName && cachedPackageName) {
       packageName = cachedPackageName;
       logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: ${packageName}`);
-      parallelPromises.push(this.awaitIdle.initializeUiStabilityTracking(
-        packageName,
-        timeoutMs
-      ).catch(error => {
+      parallelPromises.push(perf.track("initUiStabilityOptimistic", async () => {
+        return this.awaitIdle.initializeUiStabilityTracking(
+          packageName!,
+          timeoutMs
+        );
+      }).catch(error => {
         logger.debug(`[BaseVisualChange] Optimistic initialization failed: ${error}`);
         return null;
       }));
@@ -108,7 +126,9 @@ export class BaseVisualChange {
       // Always start active window fetch to ensure we have the latest info
       logger.info("[BaseVisualChange] Starting active window fetch in parallel");
       parallelPromises.push(
-        this.window.getActive(true).catch(error => {
+        perf.track("getActiveWindow", async () => {
+          return this.window.getActive(true);
+        }).catch(error => {
           logger.debug(`[BaseVisualChange] Active window fetch failed: ${error}`);
           return null;
         })
@@ -138,27 +158,42 @@ export class BaseVisualChange {
     }
 
     // Execute UI stability waiting with appropriate state
+    let gfxMetrics: GfxMetrics | null = null;
     if (packageName && packageName.trim() !== "") {
+      perf.serial("uiStability");
       if (initState !== null) {
-        await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState);
+        gfxMetrics = await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState, perf);
       } else {
-        await this.awaitIdle.waitForUiStability(packageName, timeoutMs);
+        gfxMetrics = await this.awaitIdle.waitForUiStability(packageName, timeoutMs, perf);
       }
+      perf.end();
     }
 
     return await this.takeObservation(blockResult, previousObserveResult, {
       changeExpected: options.changeExpected,
       tolerancePercent: options.tolerancePercent ?? DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
-      queryOptions: options.queryOptions
+      queryOptions: options.queryOptions,
+      gfxMetrics,
+      perf
     });
   }
 
   private async takeObservation(
     blockResult: any,
     previousObserveResult: ObserveResult | null,
-    options: { changeExpected: boolean; tolerancePercent?: number; queryOptions?: ViewHierarchyQueryOptions }
+    options: {
+      changeExpected: boolean;
+      tolerancePercent?: number;
+      queryOptions?: ViewHierarchyQueryOptions;
+      gfxMetrics?: GfxMetrics | null;
+      perf?: IPerformanceTracker;
+    }
   ): Promise<any> {
-    const latestObservation = await this.observeScreen.execute(options.queryOptions);
+    const perf = options.perf ?? new NoOpPerformanceTracker();
+
+    const latestObservation = await perf.track("finalObserve", async () => {
+      return this.observeScreen.execute(options.queryOptions);
+    });
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {
       blockResult.success = latestObservation.viewHierarchy !== previousObserveResult.viewHierarchy;
@@ -172,6 +207,19 @@ export class BaseVisualChange {
         blockResult.success = true;
       } else if (blockResult && "success" in blockResult && blockResult.success === undefined) {
         blockResult.success = true;
+      }
+    }
+
+    // Add gfxMetrics to the observation if available
+    if (options.gfxMetrics) {
+      latestObservation.gfxMetrics = options.gfxMetrics;
+    }
+
+    // Add perf timing to the observation if enabled
+    if (perf.isEnabled()) {
+      const timings = perf.getTimings();
+      if (timings) {
+        latestObservation.perfTiming = timings;
       }
     }
 

@@ -1,7 +1,8 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { Idle } from "./Idle";
-import { BootedDevice } from "../../models";
+import { BootedDevice, GfxMetrics } from "../../models";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class AwaitIdle {
   private adb: AdbUtils;
@@ -152,7 +153,8 @@ export class AwaitIdle {
    * @param packageName - Package name of the app to monitor
    * @param timeoutMs - Maximum time to wait for stability
    * @param initState - Pre-initialized state from initializeUiStabilityTracking
-   * @returns Promise that resolves when UI is stable
+   * @param perf - Optional performance tracker
+   * @returns Promise that resolves with GfxMetrics when UI is stable
    */
   async waitForUiStabilityWithState(
     packageName: string,
@@ -164,12 +166,32 @@ export class AwaitIdle {
       prevSlowUiThread: number | null;
       prevFrameDeadlineMissed: number | null;
       firstGfxInfoLog: boolean;
-    }
-  ): Promise<void> {
+    },
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<GfxMetrics | null> {
     logger.info(`[AwaitIdle] Continuing UI stability wait with existing state for package: ${packageName}`);
 
     // Use the provided state instead of initializing
     let state = initState;
+    let pollCount = 0;
+    let isStable = false;
+    const finalMetrics: {
+      percentile50thMs: number | null;
+      percentile90thMs: number | null;
+      percentile95thMs: number | null;
+      percentile99thMs: number | null;
+      missedVsyncCount: number | null;
+      slowUiThreadCount: number | null;
+      frameDeadlineMissedCount: number | null;
+    } = {
+      percentile50thMs: null,
+      percentile90thMs: null,
+      percentile95thMs: null,
+      percentile99thMs: null,
+      missedVsyncCount: null,
+      slowUiThreadCount: null,
+      frameDeadlineMissedCount: null
+    };
 
     try {
       while (true) {
@@ -183,17 +205,26 @@ export class AwaitIdle {
 
         if (timeoutCheck.isStable) {
           logger.info(`[AwaitIdle] UI stable after ${timeoutCheck.elapsedTime}ms (stable for ${timeoutCheck.stableTime}ms)`);
-          return;
+          isStable = true;
+          break;
         }
 
         if (!timeoutCheck.shouldContinue) {
           logger.info(`[AwaitIdle] Timeout waiting for UI stability after ${timeoutMs}ms`);
-          return;
+          break;
         }
 
-        // Process single stability check
-        const checkResult = await this.processSingleUiStabilityCheck(packageName, state);
+        // Process single stability check with timing
+        pollCount++;
+        const checkResult = await perf.track(`gfxinfoPoll_${pollCount}`, async () => {
+          return this.processSingleUiStabilityCheck(packageName, state);
+        });
         state = { ...state, ...checkResult.updatedState };
+
+        // Update final metrics from state
+        finalMetrics.missedVsyncCount = state.prevMissedVsync;
+        finalMetrics.slowUiThreadCount = state.prevSlowUiThread;
+        finalMetrics.frameDeadlineMissedCount = state.prevFrameDeadlineMissed;
 
         logger.info(`[AwaitIdle] Waiting for stability: ${timeoutCheck.stableTime}ms/${this.stabilityThresholdMs}ms`);
 
@@ -203,21 +234,58 @@ export class AwaitIdle {
     } catch {
       logger.error("[AwaitIdle] Encountered an error while waiting for UI stability");
     }
+
+    // Get final gfxinfo to capture percentiles
+    try {
+      const finalGfxInfo = await perf.track("finalGfxinfo", async () => {
+        return this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName}`);
+      });
+      const metrics = this.idle.parseMetrics(finalGfxInfo.stdout);
+      finalMetrics.percentile50thMs = metrics.percentile50th;
+      finalMetrics.percentile90thMs = metrics.percentile90th;
+      finalMetrics.percentile95thMs = metrics.percentile95th;
+      finalMetrics.percentile99thMs = metrics.percentile99th;
+      finalMetrics.missedVsyncCount = metrics.missedVsync;
+      finalMetrics.slowUiThreadCount = metrics.slowUiThread;
+      finalMetrics.frameDeadlineMissedCount = metrics.frameDeadlineMissed;
+    } catch (err) {
+      logger.info(`[AwaitIdle] Failed to get final gfxinfo: ${err}`);
+    }
+
+    const stabilityWaitMs = Date.now() - initState.startTime;
+
+    return {
+      packageName,
+      percentile50thMs: finalMetrics.percentile50thMs,
+      percentile90thMs: finalMetrics.percentile90thMs,
+      percentile95thMs: finalMetrics.percentile95thMs,
+      percentile99thMs: finalMetrics.percentile99thMs,
+      missedVsyncCount: finalMetrics.missedVsyncCount,
+      slowUiThreadCount: finalMetrics.slowUiThreadCount,
+      frameDeadlineMissedCount: finalMetrics.frameDeadlineMissedCount,
+      pollCount,
+      stabilityWaitMs,
+      isStable
+    };
   }
 
   /**
    * Wait for UI to become stable by monitoring frame rendering
    * @param packageName - Package name of the app to monitor
    * @param timeoutMs - Maximum time to wait for stability
-   * @returns Promise that resolves when UI is stable
+   * @param perf - Optional performance tracker
+   * @returns Promise that resolves with GfxMetrics when UI is stable
    */
   async waitForUiStability(
     packageName: string,
     timeoutMs: number,
-  ): Promise<void> {
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<GfxMetrics | null> {
 
     logger.info(`[AwaitIdle] Waiting for UI stability for package: ${packageName} with timeoutMs: ${timeoutMs}`);
-    const state = await this.initializeUiStabilityTracking(packageName, timeoutMs);
-    await this.waitForUiStabilityWithState(packageName, timeoutMs, state);
+    const state = await perf.track("initUiStabilityTracking", async () => {
+      return this.initializeUiStabilityTracking(packageName, timeoutMs);
+    });
+    return this.waitForUiStabilityWithState(packageName, timeoutMs, state, perf);
   }
 }
