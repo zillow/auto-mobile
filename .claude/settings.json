@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm run test)",
+      "Bash(npm run test -- --grep:*)",
+      "Bash(npm install)",
+      "mcp__auto-mobile__*"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_ARG_FILE_PATH\" == *.ts ]]; then echo '{\"message\": \"Remember to run /validate after TypeScript changes\"}'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

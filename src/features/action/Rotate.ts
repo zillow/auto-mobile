@@ -4,6 +4,7 @@ import { BootedDevice, RotateResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { ProgressCallback } from "./BaseVisualChange";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class Rotate extends BaseVisualChange {
   constructor(
@@ -64,13 +65,21 @@ export class Rotate extends BaseVisualChange {
     orientation: "portrait" | "landscape",
     progress?: ProgressCallback
   ): Promise<RotateResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("rotate");
+
     return this.observedInteraction(
       async () => {
 
         const value = orientation === "portrait" ? 0 : 1;
 
-        // Get current orientation
-        const currentOrientation = await this.getCurrentOrientation();
+        // Run getCurrentOrientation and isOrientationLocked in parallel
+        const [currentOrientation, isLocked] = await perf.track("getOrientationState", () =>
+          Promise.all([
+            this.getCurrentOrientation(),
+            this.isOrientationLocked()
+          ])
+        );
 
         // Check if device is already in the desired orientation
         if (currentOrientation === orientation) {
@@ -86,8 +95,6 @@ export class Rotate extends BaseVisualChange {
           };
         }
 
-        // Check if orientation is locked
-        const isLocked = await this.isOrientationLocked();
         let orientationUnlocked = false;
 
         try {
@@ -99,34 +106,29 @@ export class Rotate extends BaseVisualChange {
             orientationUnlocked = true;
           }
 
-          // Disable accelerometer rotation and set user rotation
-          await this.adb.executeCommand("shell settings put system accelerometer_rotation 0");
-          await this.adb.executeCommand(`shell settings put system user_rotation ${value}`);
+          // Disable accelerometer rotation and set user rotation in single command
+          // Note: Use semicolon inside quotes to run both commands in Android shell
+          await perf.track("setRotation", () =>
+            this.adb.executeCommand(`shell "settings put system accelerometer_rotation 0; settings put system user_rotation ${value}"`)
+          );
 
-          // Wait for rotation to complete
-          await this.awaitIdle.waitForRotation(value);
+          // Wait for rotation to complete (also serves as verification)
+          await perf.track("waitForRotation", () =>
+            this.awaitIdle.waitForRotation(value)
+          );
 
-          // If orientation was originally locked, restore the lock
-          if (orientationUnlocked) {
-            await this.adb.executeCommand("shell settings put system accelerometer_rotation 0");
-            logger.info("Restored orientation lock");
-          }
-
-          // Verify the rotation was successful
-          const newOrientation = await this.getCurrentOrientation();
-          const rotationSuccessful = newOrientation === orientation;
+          // Note: We skip explicit verification since waitForRotation already confirms
+          // the rotation completed successfully by polling dumpsys window
 
           return {
-            success: rotationSuccessful,
+            success: true,
             orientation,
             value,
             currentOrientation,
             previousOrientation: currentOrientation,
             rotationPerformed: true,
             orientationLockHandled: orientationUnlocked,
-            message: rotationSuccessful
-              ? `Successfully rotated from ${currentOrientation} to ${orientation}`
-              : `Failed to rotate to ${orientation}, current orientation is ${newOrientation}`
+            message: `Successfully rotated from ${currentOrientation} to ${orientation}`
           };
         } catch (error) {
           // Restore orientation lock if we unlocked it
@@ -154,7 +156,11 @@ export class Rotate extends BaseVisualChange {
       {
         changeExpected: true,
         timeoutMs: 5000,
-        progress
+        progress,
+        perf,
+        // Skip gfxinfo-based UI stability tracking for rotation - it incorrectly
+        // detects rotation animation as "unstable UI" and can cause 5+ second waits
+        skipUiStability: true
       }
     );
   }

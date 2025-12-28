@@ -3,16 +3,19 @@ import { ScreenSize } from "./ScreenSize";
 import { SystemInsets } from "./SystemInsets";
 import { ActiveWindowInfo } from "./ActiveWindowInfo";
 import { ViewHierarchyResult } from "./ViewHierarchyResult";
+import { TimingData } from "../utils/PerformanceTracker";
+import { GfxMetrics } from "./GfxMetrics";
 
 /**
  * Represents the result of observing the device state
  */
 export interface ObserveResult {
   /**
-   * Timestamp when observation was made
-   * Can be a number (milliseconds) or ISO string depending on context
+   * Timestamp when the screen state was captured on the device (milliseconds since epoch)
+   * This comes from the AccessibilityService on Android or equivalent on iOS
+   * Falls back to server timestamp if device timestamp is unavailable
    */
-  timestamp: string | number;
+  updatedAt: string | number;
 
   /** Screen dimensions */
   screenSize: ScreenSize;
@@ -47,6 +50,20 @@ export interface ObserveResult {
   /** Whether a system intent chooser dialog was detected */
   intentChooserDetected?: boolean;
 
+  /**
+   * Device wakefulness state (Android only)
+   * - "Awake": Screen is on and device is interactive
+   * - "Asleep": Screen is off
+   * - "Dozing": Device is in ambient display / always-on mode
+   */
+  wakefulness?: "Awake" | "Asleep" | "Dozing";
+
   /** Error message if observation failed partially or completely */
   error?: string;
+
+  /** Performance timing data (only present when --debug-perf is enabled) */
+  perfTiming?: TimingData;
+
+  /** Graphics frame metrics from gfxinfo (only present when --debug-perf is enabled) */
+  gfxMetrics?: GfxMetrics;
 }

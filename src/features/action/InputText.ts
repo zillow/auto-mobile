@@ -4,6 +4,8 @@ import { BootedDevice, SendTextResult } from "../../models";
 import { VirtualKeyboardManager } from "../../utils/virtualKeyboardManager";
 import { logger } from "../../utils/logger";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 
 export class InputText extends BaseVisualChange {
   private virtualKeyboardManager: VirtualKeyboardManager;
@@ -18,8 +20,12 @@ export class InputText extends BaseVisualChange {
     text: string,
     imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
   ): Promise<SendTextResult & { method?: "native" | "virtual" }> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("inputText");
+
     // Validate text input
     if (text === undefined || text === null) {
+      perf.end();
       return {
         success: false,
         text: "",
@@ -33,13 +39,19 @@ export class InputText extends BaseVisualChange {
           // Platform-specific text input execution
           switch (this.device.platform) {
             case "android":
-              return await this.executeAndroidTextInput(text, imeAction);
+              return await perf.track("androidTextInput", () =>
+                this.executeAndroidTextInput(text, imeAction)
+              );
             case "ios":
-              return await this.executeiOSTextInput(text, imeAction);
+              return await perf.track("iOSTextInput", () =>
+                this.executeiOSTextInput(text, imeAction)
+              );
             default:
+              perf.end();
               throw new Error(`Unsupported platform: ${this.device.platform}`);
           }
         } catch (error) {
+          perf.end();
           const errorMessage = error instanceof Error ? error.message : String(error);
 
           return {
@@ -53,7 +65,9 @@ export class InputText extends BaseVisualChange {
       {
         changeExpected: true,
         tolerancePercent: 0.00,
-        timeoutMs: 5000 // Reduce timeout for faster execution
+        timeoutMs: 5000,
+        perf,
+        skipUiStability: true // Skip UI stability wait - a11y service already waits 100ms for tree update
       }
     );
   }
@@ -67,8 +81,50 @@ export class InputText extends BaseVisualChange {
   private async executeAndroidTextInput(
     text: string,
     imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
-  ): Promise<SendTextResult & { method?: "native" | "virtual" }> {
-    // Determine input method
+  ): Promise<SendTextResult & { method?: "native" | "virtual" | "a11y" }> {
+    // Use accessibility service exclusively (fastest method, ~10-30ms vs ~200-300ms for ADB)
+    // It also natively supports Unicode without needing virtual keyboard
+    const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+    const a11yResult = await a11yClient.requestSetText(text);
+
+    if (a11yResult.success) {
+      logger.info(`[InputText] Text input via accessibility service: ${a11yResult.totalTimeMs}ms`);
+
+      // Handle IME action if specified
+      if (imeAction) {
+        await this.executeImeAction(imeAction);
+      }
+
+      return {
+        success: true,
+        text,
+        imeAction,
+        method: "a11y"
+      };
+    }
+
+    // Return failure - do not fall back to ADB methods
+    logger.warn(`[InputText] Accessibility service setText failed: ${a11yResult.error}`);
+    return {
+      success: false,
+      text,
+      error: `Accessibility service setText failed: ${a11yResult.error}`,
+      method: "a11y"
+    };
+  }
+
+  // NOTE: Virtual and native ADB input methods are preserved below but disabled.
+  // They may be removed once accessibility service input is fully stable.
+
+  /**
+   * [DISABLED] Legacy fallback using ADB - kept for reference
+   * @deprecated Use accessibility service instead
+   */
+  private async _legacyExecuteAndroidTextInput(
+    text: string,
+    imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
+  ): Promise<SendTextResult & { method?: "native" | "virtual" | "a11y" }> {
+    // Fallback: Determine input method based on text content
     const inputMethod = VirtualKeyboardManager.getInputMethod(text);
 
     if (inputMethod === "virtual") {

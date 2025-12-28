@@ -4,6 +4,7 @@ import { GestureOptions } from "../../models/GestureOptions";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { BootedDevice } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Executes a fling gesture with high velocity
@@ -32,14 +33,15 @@ export class Fling extends BaseVisualChange {
     y2: number,
     options: GestureOptions = {}
   ): Promise<any> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("fling");
 
     // Use simple swipe for flings
-    return this.executeGesture.swipe(
-      x1,
-      y1,
-      x2,
-      y2,
-      options
+    const result = await perf.track("executeSwipe", () =>
+      this.executeGesture.swipe(x1, y1, x2, y2, options)
     );
+
+    perf.end();
+    return result;
   }
 }

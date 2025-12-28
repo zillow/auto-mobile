@@ -4,9 +4,10 @@ import { ObserveScreen } from "../observe/ObserveScreen";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ActionableError, ActiveWindowInfo, BootedDevice, ObserveResult } from "../../models";
+import { ActionableError, BootedDevice, GfxMetrics, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -19,6 +20,9 @@ export interface ObservedChangeOptions {
   progress?: ProgressCallback;
   tolerancePercent?: number;
   queryOptions?: ViewHierarchyQueryOptions;
+  perf?: IPerformanceTracker;
+  skipPreviousObserve?: boolean;
+  skipUiStability?: boolean;
 }
 
 export class BaseVisualChange {
@@ -60,105 +64,126 @@ export class BaseVisualChange {
 
     const timeoutMs = options.timeoutMs || 12000;
     const progress = options.progress;
+    const perf = options.perf ?? new NoOpPerformanceTracker();
 
     if (progress) {
       await progress(0, 100, "Preparing to execute action...");
     }
 
-    // Fetch cached view hierarchy
+    // Fetch cached view hierarchy (skip if we just terminated/cleared the app)
     let previousObserveResult: ObserveResult | null = null;
-    try {
-      if (progress) {
-        await progress(10, 100, "Getting previous view hierarchy...");
+    if (options.skipPreviousObserve) {
+      logger.info("[BaseVisualChange] Skipping previous observe (app was terminated/cleared)");
+    } else {
+      try {
+        if (progress) {
+          await progress(10, 100, "Getting previous view hierarchy...");
+        }
+        previousObserveResult = await perf.track("getPreviousObserve", async () => {
+          const cached = await this.observeScreen.getMostRecentCachedObserveResult();
+          if (!cached?.viewHierarchy || cached.viewHierarchy.hierarchy.error) {
+            return this.observeScreen.execute(options.queryOptions);
+          }
+          return cached;
+        });
+      } catch {
+        previousObserveResult = await perf.track("getPreviousObserveFallback", async () => {
+          return this.observeScreen.execute(options.queryOptions);
+        });
       }
-      previousObserveResult = await this.observeScreen.getMostRecentCachedObserveResult();
-      if (!previousObserveResult?.viewHierarchy || !previousObserveResult.viewHierarchy || previousObserveResult.viewHierarchy.hierarchy.error) {
-        previousObserveResult = await this.observeScreen.execute(options.queryOptions);
+
+      if (!previousObserveResult) {
+        throw new ActionableError("Cannot perform action without view hierarchy");
       }
-    } catch (error) {
-      previousObserveResult = await this.observeScreen.execute(options.queryOptions);
     }
 
-    if (!previousObserveResult) {
-      throw new ActionableError("Cannot perform action without view hierarchy");
-    }
-    const blockResult = await block(previousObserveResult);
+    // Record the action start time - used to ensure final observe returns fresh data
+    const actionStartTime = Date.now();
+
+    const blockResult = await perf.track("executeBlock", async () => {
+      return block(previousObserveResult!);
+    });
 
     // Get package name for UI stability waiting
+    // Priority: options > previousObserveResult.viewHierarchy.packageName > cached
     let packageName = options.packageName;
-    const cachedPackageName = (await this.window.getCachedActiveWindow())?.appId;
 
-    // Start all parallel operations immediately
-    const parallelPromises: Promise<any>[] = [];
-
-    // Always start UI stability tracking if we have a cached package name
-    if (!packageName && cachedPackageName) {
-      packageName = cachedPackageName;
-      logger.info(`[BaseVisualChange] Starting optimistic UI stability initialization with cached package: ${packageName}`);
-      parallelPromises.push(this.awaitIdle.initializeUiStabilityTracking(
-        packageName,
-        timeoutMs
-      ).catch(error => {
-        logger.debug(`[BaseVisualChange] Optimistic initialization failed: ${error}`);
-        return null;
-      }));
+    // Try to get packageName from the observe result's view hierarchy (from accessibility service)
+    if (!packageName && previousObserveResult?.viewHierarchy?.packageName) {
+      packageName = previousObserveResult.viewHierarchy.packageName;
+      logger.info(`[BaseVisualChange] Using packageName from view hierarchy: ${packageName}`);
     }
 
-    if (this.device.platform === "android") {
-      // Always start active window fetch to ensure we have the latest info
-      logger.info("[BaseVisualChange] Starting active window fetch in parallel");
-      parallelPromises.push(
-        this.window.getActive(true).catch(error => {
-          logger.debug(`[BaseVisualChange] Active window fetch failed: ${error}`);
-          return null;
-        })
-      );
+    // Fall back to cached active window if no packageName from hierarchy
+    if (!packageName) {
+      const cachedPackageName = (await this.window.getCachedActiveWindow())?.appId;
+      if (cachedPackageName) {
+        packageName = cachedPackageName;
+        logger.info(`[BaseVisualChange] Using cached packageName: ${packageName}`);
+      }
     }
 
-    // Execute all parallel operations
-    const results = await Promise.all(parallelPromises);
-
-    // Process results
+    // Start UI stability tracking if we have a package name (skip if requested)
     let initState: any = null;
-    let activeWindowResult: ActiveWindowInfo | undefined = undefined;
+    let gfxMetrics: GfxMetrics | null = null;
 
-    if (results.length === 2) {
-      // Both UI stability and active window promises were created
-      initState = results[0];
-      activeWindowResult = results[1] as ActiveWindowInfo;
-    } else if (results.length === 1) {
-      // Only active window promise was created
-      activeWindowResult = results[0] as ActiveWindowInfo;
-    }
+    if (options.skipUiStability) {
+      logger.info("[BaseVisualChange] Skipping UI stability tracking (skipUiStability=true)");
+    } else if (packageName) {
+      logger.info(`[BaseVisualChange] Starting UI stability initialization with package: ${packageName}`);
+      initState = await perf.track("initUiStability", async () => {
+        return this.awaitIdle.initializeUiStabilityTracking(
+          packageName!,
+          timeoutMs
+        );
+      }).catch(error => {
+        logger.debug(`[BaseVisualChange] UI stability initialization failed: ${error}`);
+        return null;
+      });
 
-    // Update package name from active window result if needed
-    if (activeWindowResult && activeWindowResult.appId) {
-      packageName = activeWindowResult.appId;
-      logger.info(`[BaseVisualChange] Updated package name from active window: ${packageName}`);
-    }
-
-    // Execute UI stability waiting with appropriate state
-    if (packageName && packageName.trim() !== "") {
-      if (initState !== null) {
-        await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState);
-      } else {
-        await this.awaitIdle.waitForUiStability(packageName, timeoutMs);
+      // Execute UI stability waiting with appropriate state
+      if (packageName.trim() !== "") {
+        perf.serial("uiStability");
+        if (initState !== null) {
+          gfxMetrics = await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState, perf);
+        } else {
+          gfxMetrics = await this.awaitIdle.waitForUiStability(packageName, timeoutMs, perf);
+        }
+        perf.end();
       }
     }
 
     return await this.takeObservation(blockResult, previousObserveResult, {
       changeExpected: options.changeExpected,
       tolerancePercent: options.tolerancePercent ?? DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT,
-      queryOptions: options.queryOptions
+      queryOptions: options.queryOptions,
+      gfxMetrics,
+      perf,
+      actionStartTime
     });
   }
 
   private async takeObservation(
     blockResult: any,
     previousObserveResult: ObserveResult | null,
-    options: { changeExpected: boolean; tolerancePercent?: number; queryOptions?: ViewHierarchyQueryOptions }
+    options: {
+      changeExpected: boolean;
+      tolerancePercent?: number;
+      queryOptions?: ViewHierarchyQueryOptions;
+      gfxMetrics?: GfxMetrics | null;
+      perf?: IPerformanceTracker;
+      actionStartTime?: number;
+    }
   ): Promise<any> {
-    const latestObservation = await this.observeScreen.execute(options.queryOptions);
+    const perf = options.perf ?? new NoOpPerformanceTracker();
+
+    // Use actionStartTime as minTimestamp to ensure we get data captured after the action
+    // This prevents returning stale cached data from before the action was executed
+    const minTimestamp = options.actionStartTime ?? 0;
+
+    perf.serial("finalObserve");
+    const latestObservation = await this.observeScreen.execute(options.queryOptions, perf, true, minTimestamp);
+    perf.end();
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {
       blockResult.success = latestObservation.viewHierarchy !== previousObserveResult.viewHierarchy;
@@ -172,6 +197,19 @@ export class BaseVisualChange {
         blockResult.success = true;
       } else if (blockResult && "success" in blockResult && blockResult.success === undefined) {
         blockResult.success = true;
+      }
+    }
+
+    // Add gfxMetrics to the observation if available
+    if (options.gfxMetrics) {
+      latestObservation.gfxMetrics = options.gfxMetrics;
+    }
+
+    // Add perf timing to the observation if enabled
+    if (perf.isEnabled()) {
+      const timings = perf.getTimings();
+      if (timings) {
+        latestObservation.perfTiming = timings;
       }
     }
 

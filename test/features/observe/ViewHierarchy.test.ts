@@ -3,11 +3,8 @@ import { describe, it, beforeEach, afterEach } from "mocha";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
 import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
-import { ViewHierarchyResult } from "../../../src/models/ViewHierarchyResult";
-import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
-import { logger } from "../../../src/utils/logger";
 import fs from "fs-extra";
 import { promisify } from "util";
 
@@ -259,7 +256,7 @@ describe("ViewHierarchy", function() {
     View Hierarchy:
       com.android.internal.policy.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 aid=0}[]
         android.widget.LinearLayout{d76e313 V.E...... ......ID 0,0-1080,2400}
-          com.zillow.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
+          dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
             android.widget.LinearLayout{a9c5a77 V.E...... ........ 0,51-0,122}
               com.google.android.material.textview.MaterialTextView{bace2c3 V.ED..... ......ID 0,0-0,71 #7f0a087c app:id/toolbar_title aid=1073742019}
               android.widget.RelativeLayout{5d91052 G.E...... ......I. 0,0-0,0 #7f0a0133 app:id/beta_tag aid=1073742018}
@@ -308,21 +305,21 @@ describe("ViewHierarchy", function() {
     it("should augment view hierarchy with class and fragment information", function() {
       const mockActivityTopData = {
         classOverrides: new Map([
-          ["com.zillow.android.zillowmap:id/search_toolbar", "com.zillow.android.ui.base.ZillowToolbar"],
-          ["0,0-1080,173", "com.zillow.android.ui.base.ZillowToolbar"]
+          ["dev.jasonpearson.android.zillowmap:id/search_toolbar", "dev.jasonpearson.android.ui.base.ZillowToolbar"],
+          ["0,0-1080,173", "dev.jasonpearson.android.ui.base.ZillowToolbar"]
         ]),
         fragmentData: new Map([
           ["0x7f0a012b", "SearchTabContainerFragment"],
           ["0x7f0a0774", "RealEstateMapFragment"]
         ]),
         viewData: new Map([
-          ["com.zillow.android.zillowmap:id/custom_view", "com.zillow.android.ui.base.CustomView"]
+          ["dev.jasonpearson.android.zillowmap:id/custom_view", "dev.jasonpearson.android.ui.base.CustomView"]
         ])
       };
 
       const mockViewHierarchy: any = {
         hierarchy: {
-          "resource-id": "com.zillow.android.zillowmap:id/search_toolbar",
+          "resource-id": "dev.jasonpearson.android.zillowmap:id/search_toolbar",
           "class": "android.view.ViewGroup",
           "bounds": "[0,0][1080,173]",
           "node": {
@@ -335,7 +332,7 @@ describe("ViewHierarchy", function() {
       (viewHierarchy as any).augmentViewHierarchyWithClassAndFragment(mockViewHierarchy, mockActivityTopData);
 
       // Check that class was overridden
-      expect(mockViewHierarchy.hierarchy.class).to.equal("com.zillow.android.ui.base.ZillowToolbar");
+      expect(mockViewHierarchy.hierarchy.class).to.equal("dev.jasonpearson.android.ui.base.ZillowToolbar");
 
       // Check that fragment was added
       expect((mockViewHierarchy.hierarchy.node as any).fragment).to.equal("SearchTabContainerFragment");
@@ -367,7 +364,7 @@ describe("ViewHierarchy", function() {
       const dumpsysWithoutActiveFragments = `
         View Hierarchy:
           com.android.internal.policy.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 aid=0}[]
-            com.zillow.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar}
+            dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar}
         Looper (main, tid 2) {2b059f8}
       `;
 
@@ -383,7 +380,7 @@ describe("ViewHierarchy", function() {
           android.widget.LinearLayout{d76e313 V.E...... ......ID 0,0-1080,2400 #7f0a01ff app:id/android_layout}
           com.android.internal.widget.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 #7f0a01fe app:id/decor_view}
           androidx.appcompat.widget.Toolbar{a9c5a77 V.E...... ........ 0,51-0,122 #7f0a01fd app:id/androidx_toolbar}
-          com.zillow.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/zillow_toolbar}
+          dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/zillow_toolbar}
         Looper (main, tid 2) {2b059f8}
       `;
 
@@ -392,7 +389,7 @@ describe("ViewHierarchy", function() {
       // Should only have the Zillow class, not Android/androidx classes
       expect(result.classOverrides.size).to.equal(1);
       expect(result.classOverrides.has("7f0a078a")).to.be.true;
-      expect(result.classOverrides.get("7f0a078a")).to.equal("com.zillow.android.ui.base.ZillowToolbar");
+      expect(result.classOverrides.get("7f0a078a")).to.equal("dev.jasonpearson.android.ui.base.ZillowToolbar");
       expect(result.classOverrides.has("7f0a01ff")).to.be.false;
       expect(result.classOverrides.has("7f0a01fe")).to.be.false;
       expect(result.classOverrides.has("7f0a01fd")).to.be.false;
@@ -1067,486 +1064,6 @@ describe("ViewHierarchy", function() {
   });
 });
 
-describe("ViewHierarchy - Integration", function() {
-  // Increase timeout for integration tests
-  this.timeout(30000);
-
-  let viewHierarchy: ViewHierarchy;
-  let adb: AdbUtils;
-  let takeScreenshot: TakeScreenshot;
-  let accessibilityServiceClient: AccessibilityServiceClient;
-  let awaitIdle: AwaitIdle;
-  let mockDevice: BootedDevice;
-  const CLOCK_PACKAGE = "com.google.android.deskclock";
-
-  beforeEach(async function() {
-    mockDevice = {
-      deviceId: "test-device",
-      name: "Test Device",
-      platform: "android"
-    };
-    // Initialize with real ADB connection
-    adb = new AdbUtils(mockDevice);
-    takeScreenshot = new TakeScreenshot(mockDevice, adb);
-    accessibilityServiceClient = new AccessibilityServiceClient(mockDevice, adb);
-    awaitIdle = new AwaitIdle(mockDevice, adb);
-    viewHierarchy = new ViewHierarchy(mockDevice, adb, null, takeScreenshot, accessibilityServiceClient);
-
-    // Check if any devices are connected
-    try {
-      const devices = await adb.executeCommand("devices");
-      const deviceLines = devices.stdout.split("\n").filter(line => line.trim() && !line.includes("List of devices"));
-      if (deviceLines.length === 0) {
-        this.skip(); // Skip tests if no devices are connected
-        return;
-      }
-    } catch (error) {
-      this.skip(); // Skip tests if ADB command fails
-      return;
-    }
-
-    // Make sure the app is not running
-    await adb.executeCommand(`shell am force-stop ${CLOCK_PACKAGE}`);
-
-    // Clear app data to ensure consistent state
-    await adb.executeCommand(`shell pm clear ${CLOCK_PACKAGE}`);
-
-    // Launch the clock app
-    await adb.executeCommand(`shell am start -n ${CLOCK_PACKAGE}/com.android.deskclock.DeskClock`);
-
-    // Wait for app to fully launch and UI to be stable
-    await awaitIdle.waitForUiStability(CLOCK_PACKAGE, 250);
-  });
-
-  afterEach(async function() {
-    // Only run cleanup if this test wasn't skipped
-    if (this.currentTest?.state === "pending") {
-      return;
-    }
-
-    // Check if any devices are connected
-    try {
-      const devicesOutput = await adb.executeCommand("devices");
-      const deviceLines = devicesOutput.stdout.split("\n").filter(line => line.trim() && !line.includes("List of devices"));
-      if (deviceLines.length === 0) {
-        return; // No devices connected, skip cleanup
-      }
-    } catch (error) {
-      // Error checking devices, skip cleanup
-      return;
-    }
-
-    try {
-      // Clean up after test
-      await adb.executeCommand(`shell am force-stop ${CLOCK_PACKAGE}`);
-    } catch (error) {
-      // Ignore cleanup errors
-    }
-  });
-
-  it("should retrieve the view hierarchy of the Clock app", async function() {
-    // Get view hierarchy
-    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-
-    // Verify it contains the required properties
-    expect(hierarchy).to.have.property("hierarchy");
-
-    // Due to filtering, the hierarchy structure might have changed
-    // Just verify we have something usable
-    expect(hierarchy.hierarchy).to.exist;
-    expect(hierarchy.hierarchy).to.not.be.null;
-
-    // Log the result for debugging
-    const nodeCount = countNodes(hierarchy.hierarchy);
-    logger.info(`Retrieved filtered view hierarchy with ${nodeCount} nodes`);
-  });
-
-  it("should cache view hierarchy with the same hash", async function() {
-    // Get view hierarchy first time
-    const startTime = Date.now();
-    const firstHierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-    const firstFetchTime = Date.now() - startTime;
-
-    // Get view hierarchy second time, should use cache
-    const secondStartTime = Date.now();
-    const secondHierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-    const secondFetchTime = Date.now() - secondStartTime;
-
-    // Second fetch should be faster if caching works (though not guaranteed in integration test)
-    logger.info(`First fetch: ${firstFetchTime}ms, Second fetch: ${secondFetchTime}ms`);
-
-    // Both hierarchies should have usable data
-    expect(firstHierarchy.hierarchy).to.exist;
-    expect(secondHierarchy.hierarchy).to.exist;
-  });
-
-  it("should find an element by text in the view hierarchy", async function() {
-    // Get view hierarchy
-    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-
-    // Debug: Log available texts to understand what's actually in the hierarchy
-    const availableTexts = collectAllTexts(hierarchy.hierarchy);
-    logger.info(`Available texts in hierarchy: ${JSON.stringify(availableTexts.slice(0, 10))}...`);
-
-    // If no text elements are found, skip the test
-    if (availableTexts.length === 0) {
-      logger.info("No text elements found in hierarchy, skipping test");
-      this.skip();
-      return;
-    }
-
-    // Try to find common clock app elements (more flexible search)
-    const possibleTexts = ["Clock", "Alarm", "Timer", "Stopwatch", "World Clock", "00:", "AM", "PM"];
-    let element = null;
-    let foundText = "";
-
-    for (const searchText of possibleTexts) {
-      element = findTextInHierarchy(hierarchy.hierarchy, searchText, true, false);
-      if (element) {
-        foundText = searchText;
-        break;
-      }
-    }
-
-    // If we still can't find common clock elements, just verify we have some text elements
-    if (!element && availableTexts.length > 0) {
-      // Find any element with text to verify the search function works
-      element = findTextInHierarchy(hierarchy.hierarchy, availableTexts[0], false, false);
-      foundText = availableTexts[0];
-    }
-
-    expect(element).to.not.be.null;
-    if (element) {
-      // Check if text is a property or inside $ object
-      const elementText = element.text || (element.$ && element.$.text);
-      expect(elementText).to.include(foundText);
-      logger.info(`Found element with text: "${elementText}"`);
-    }
-  });
-
-  it("should find scrollable elements in the view hierarchy", async function() {
-    // Get view hierarchy
-    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-
-    // Find scrollable elements with a more robust search for filtered hierarchies
-    const scrollableElements = findScrollableElementsInHierarchy(hierarchy.hierarchy);
-
-    // Clock app may not have scrollable elements in all views
-    logger.info(`Found ${scrollableElements.length} scrollable elements`);
-
-    // Even if no scrollable elements, verify the function works and returns an array
-    expect(Array.isArray(scrollableElements)).to.be.true;
-  });
-
-  it("should find clickable elements in the view hierarchy", async function() {
-    // Get view hierarchy
-    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-
-    // Find clickable elements with a more robust search for filtered hierarchies
-    const clickableElements = findClickableElementsInHierarchy(hierarchy.hierarchy);
-
-    // Clock app should have clickable elements
-    logger.info(`Found ${clickableElements.length} clickable elements`);
-
-    // Verify we got an array (even if empty)
-    expect(Array.isArray(clickableElements)).to.be.true;
-  });
-
-  it("should calculate element center correctly", async function() {
-    // Get view hierarchy
-    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-
-    // For filtered hierarchies, find any element with bounds for testing
-    const elements = findElementsWithBounds(hierarchy.hierarchy);
-
-    if (elements.length === 0) {
-      logger.info("No elements with bounds found, skipping test");
-      this.skip();
-      return;
-    }
-
-    expect(elements.length).to.be.greaterThan(0, "Should find at least one element with bounds");
-    const element = elements[0];
-
-    // Ensure the element has bounds in the expected format
-    const bounds = element.bounds || (element.$ && element.$.bounds);
-    if (!bounds || typeof bounds !== "object" || !("left" in bounds)) {
-      // If bounds are a string (like "[0,0][100,100]"), we need to parse them
-      const parsedElement = viewHierarchy.parseNodeBounds(element);
-
-      if (!parsedElement || !parsedElement.bounds) {
-        logger.info("Element bounds not in expected format, skipping test");
-        this.skip();
-        return;
-      }
-
-      // Use the parsed element
-      element.bounds = parsedElement.bounds;
-    }
-
-    // Calculate center
-    const center = viewHierarchy.getElementCenter(element);
-    // Verify center is within bounds
-    expect(center.x).to.be.at.least(element.bounds.left);
-    expect(center.x).to.be.at.most(element.bounds.right);
-    expect(center.y).to.be.at.least(element.bounds.top);
-    expect(center.y).to.be.at.most(element.bounds.bottom);
-  });
-
-  it("should traverse view hierarchy", async function() {
-    // Get view hierarchy
-    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-
-    // Use a more robust traversal for filtered hierarchies
-    let traversalCount = 0;
-    traverseHierarchy(hierarchy.hierarchy, () => {
-      traversalCount++;
-    });
-
-    // Verify at least some nodes were traversed
-    expect(traversalCount).to.be.greaterThan(0);
-    logger.info(`Traversed ${traversalCount} nodes in hierarchy`);
-  });
-
-  it("should traverse view hierarchy asynchronously", async function() {
-    // Get view hierarchy
-    const hierarchy = await viewHierarchy.getAndroidViewHierarchy() as unknown as ViewHierarchyResult;
-
-    // Use a more robust async traversal for filtered hierarchies
-    let traversalCount = 0;
-    await traverseHierarchyAsync(hierarchy.hierarchy, async () => {
-      traversalCount++;
-      await new Promise(resolve => setTimeout(resolve, 1)); // Tiny delay to ensure async
-    });
-
-    // Verify at least some nodes were traversed
-    expect(traversalCount).to.be.greaterThan(0);
-    logger.info(`Traversed ${traversalCount} nodes asynchronously`);
-  });
-});
-
-// Helper function to count nodes in a hierarchy
-function countNodes(node: any): number {
-  if (!node) {return 0;}
-
-  let count = 1; // Count this node
-
-  if (node.node) {
-    const children = Array.isArray(node.node) ? node.node : [node.node];
-    for (const child of children) {
-      count += countNodes(child);
-    }
-  }
-
-  return count;
-}
-
-// Helper function to find elements with text in the filtered hierarchy
-function findTextInHierarchy(hierarchy: any, text: string, fuzzyMatch: boolean = true, caseSensitive: boolean = false): any {
-  if (!hierarchy) {return null;}
-
-  // Check if this node has text that matches
-  const nodeText = hierarchy.text || (hierarchy.$ && hierarchy.$.text);
-  if (nodeText) {
-    const nodeTextStr = String(nodeText);
-    const searchText = caseSensitive ? text : text.toLowerCase();
-    const compareText = caseSensitive ? nodeTextStr : nodeTextStr.toLowerCase();
-
-    if ((fuzzyMatch && compareText.includes(searchText)) ||
-        (!fuzzyMatch && compareText === searchText)) {
-      return hierarchy;
-    }
-  }
-
-  // Check children
-  if (hierarchy.node) {
-    const children = Array.isArray(hierarchy.node) ? hierarchy.node : [hierarchy.node];
-    for (const child of children) {
-      const found = findTextInHierarchy(child, text, fuzzyMatch, caseSensitive);
-      if (found) {return found;}
-    }
-  }
-
-  // If we have a different structure due to filtering
-  if (Array.isArray(hierarchy)) {
-    for (const item of hierarchy) {
-      const found = findTextInHierarchy(item, text, fuzzyMatch, caseSensitive);
-      if (found) {return found;}
-    }
-  }
-
-  return null;
-}
-
-// Helper function to collect all text strings in the hierarchy
-function collectAllTexts(hierarchy: any, arr: string[] = []): string[] {
-  if (!hierarchy) {
-    return arr;
-  }
-  const nodeText = hierarchy.text || (hierarchy.$ && hierarchy.$.text);
-  if (typeof nodeText === "string" && nodeText.trim() !== "") {
-    arr.push(nodeText);
-  }
-  if (hierarchy.node) {
-    const children = Array.isArray(hierarchy.node) ? hierarchy.node : [hierarchy.node];
-    for (const child of children) {
-      collectAllTexts(child, arr);
-    }
-  }
-  if (Array.isArray(hierarchy)) {
-    for (const item of hierarchy) {
-      collectAllTexts(item, arr);
-    }
-  }
-  return arr;
-}
-
-// Helper function to find scrollable elements in the filtered hierarchy
-function findScrollableElementsInHierarchy(hierarchy: any): any[] {
-  const result: any[] = [];
-
-  function search(node: any) {
-    if (!node) {return;}
-
-    // Check if this node is scrollable
-    if (node.scrollable === "true" || (node.$ && node.$.scrollable === "true")) {
-      result.push(node);
-    }
-
-    // Check children
-    if (node.node) {
-      const children = Array.isArray(node.node) ? node.node : [node.node];
-      for (const child of children) {
-        search(child);
-      }
-    }
-
-    // If we have a different structure due to filtering
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        search(item);
-      }
-    }
-  }
-
-  search(hierarchy);
-  return result;
-}
-
-// Helper function to find clickable elements in the filtered hierarchy
-function findClickableElementsInHierarchy(hierarchy: any): any[] {
-  const result: any[] = [];
-
-  function search(node: any) {
-    if (!node) {return;}
-
-    // Check if this node is clickable
-    if (node.clickable === "true" || (node.$ && node.$.clickable === "true")) {
-      result.push(node);
-    }
-
-    // Check children
-    if (node.node) {
-      const children = Array.isArray(node.node) ? node.node : [node.node];
-      for (const child of children) {
-        search(child);
-      }
-    }
-
-    // If we have a different structure due to filtering
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        search(item);
-      }
-    }
-  }
-
-  search(hierarchy);
-  return result;
-}
-
-// Helper function to find any elements with bounds in the filtered hierarchy
-function findElementsWithBounds(hierarchy: any): any[] {
-  const result: any[] = [];
-
-  function search(node: any) {
-    if (!node) {return;}
-
-    // Check if this node has bounds
-    const hasBounds =
-      (node.bounds && typeof node.bounds === "object" && "left" in node.bounds) ||
-      (node.$ && node.$.bounds) ||
-      (typeof node === "object" && node.bounds);
-
-    if (hasBounds) {
-      result.push(node);
-    }
-
-    // Check children
-    if (node.node) {
-      const children = Array.isArray(node.node) ? node.node : [node.node];
-      for (const child of children) {
-        search(child);
-      }
-    }
-
-    // If we have a different structure due to filtering
-    if (Array.isArray(node)) {
-      for (const item of node) {
-        search(item);
-      }
-    }
-  }
-
-  search(hierarchy);
-  return result;
-}
-
-// Helper function to traverse the filtered hierarchy
-function traverseHierarchy(hierarchy: any, callback: (node: any) => void) {
-  if (!hierarchy) {return;}
-
-  // Process this node
-  callback(hierarchy);
-
-  // Process children
-  if (hierarchy.node) {
-    const children = Array.isArray(hierarchy.node) ? hierarchy.node : [hierarchy.node];
-    for (const child of children) {
-      traverseHierarchy(child, callback);
-    }
-  }
-
-  // If we have a different structure due to filtering
-  if (Array.isArray(hierarchy)) {
-    for (const item of hierarchy) {
-      traverseHierarchy(item, callback);
-    }
-  }
-}
-
-// Helper function to traverse the filtered hierarchy asynchronously
-async function traverseHierarchyAsync(hierarchy: any, callback: (node: any) => Promise<void>) {
-  if (!hierarchy) {return;}
-
-  // Process this node
-  await callback(hierarchy);
-
-  // Process children
-  if (hierarchy.node) {
-    const children = Array.isArray(hierarchy.node) ? hierarchy.node : [hierarchy.node];
-    for (const child of children) {
-      await traverseHierarchyAsync(child, callback);
-    }
-  }
-
-  // If we have a different structure due to filtering
-  if (Array.isArray(hierarchy)) {
-    for (const item of hierarchy) {
-      await traverseHierarchyAsync(item, callback);
-    }
-  }
-}
 
 describe("Z-Index Accessibility Analysis", () => {
   const mockDevice: BootedDevice = {

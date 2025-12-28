@@ -1,0 +1,325 @@
+package dev.jasonpearson.automobile.accessibilityservice
+
+import android.util.Log
+import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.cio.*
+import io.ktor.server.engine.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.server.websocket.*
+import io.ktor.websocket.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.seconds
+
+/**
+ * Incoming WebSocket message format
+ */
+@Serializable
+data class WebSocketRequest(
+    val type: String,
+    val requestId: String? = null,
+    // Swipe parameters
+    val x1: Int? = null,
+    val y1: Int? = null,
+    val x2: Int? = null,
+    val y2: Int? = null,
+    val duration: Long? = null,
+    // Text input parameters
+    val text: String? = null,
+    val resourceId: String? = null,  // Optional: target specific element by resource-id
+    // IME action parameters
+    val action: String? = null,  // IME action: done, next, search, send, go, previous
+    // Stale check parameters
+    val sinceTimestamp: Long? = null  // For request_hierarchy_if_stale: extract only if no events since this timestamp
+)
+
+/**
+ * WebSocket server that streams view hierarchy updates to connected clients.
+ * Designed to work with adb port forwarding for MCP server communication.
+ */
+class WebSocketServer(
+    private val port: Int = 8765,
+    private val scope: CoroutineScope,
+    private val perfProvider: PerfProvider = PerfProvider.instance,
+    private val onRequestHierarchy: (() -> Unit)? = null,
+    private val onRequestHierarchyIfStale: ((sinceTimestamp: Long) -> Unit)? = null,
+    private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
+    private val onRequestSwipe: ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? = null,
+    private val onRequestSetText: ((requestId: String?, text: String, resourceId: String?) -> Unit)? = null,
+    private val onRequestImeAction: ((requestId: String?, action: String) -> Unit)? = null,
+    private val onRequestSelectAll: ((requestId: String?) -> Unit)? = null
+) {
+    companion object {
+        private const val TAG = "WebSocketServer"
+    }
+
+    private var server: EmbeddedServer<*, *>? = null
+    private val connections = mutableSetOf<DefaultWebSocketSession>()
+    private val connectionCount = AtomicInteger(0)
+
+    // Flow to broadcast messages to all connected clients
+    private val _messageFlow = MutableSharedFlow<String>(replay = 0, extraBufferCapacity = 10)
+
+    private val json = Json {
+        prettyPrint = false
+        ignoreUnknownKeys = true
+    }
+
+    /**
+     * Start the WebSocket server
+     */
+    fun start() {
+        if (server != null) {
+            Log.w(TAG, "Server already running")
+            return
+        }
+
+        try {
+            server = embeddedServer(CIO, port = port) {
+                install(WebSockets) {
+                    pingPeriod = 15.seconds
+                    timeout = 60.seconds
+                    maxFrameSize = Long.MAX_VALUE
+                    masking = false
+                }
+
+                install(ContentNegotiation) {
+                    json(json)
+                }
+
+                routing {
+                    webSocket("/ws") {
+                        val connectionId = connectionCount.incrementAndGet()
+                        Log.d(TAG, "Client #$connectionId connected")
+
+                        synchronized(connections) {
+                            connections.add(this)
+                        }
+
+                        try {
+                            // Send initial connection message
+                            send(Frame.Text("""{"type":"connected","id":$connectionId}"""))
+
+                            // Listen for incoming messages
+                            for (frame in incoming) {
+                                when (frame) {
+                                    is Frame.Text -> {
+                                        val text = frame.readText()
+                                        Log.d(TAG, "Received from client #$connectionId: $text")
+                                        handleClientMessage(text)
+                                    }
+                                    is Frame.Close -> {
+                                        Log.d(TAG, "Client #$connectionId closed connection")
+                                    }
+                                    else -> {
+                                        Log.d(TAG, "Received frame type: ${frame.frameType}")
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in WebSocket connection #$connectionId", e)
+                        } finally {
+                            synchronized(connections) {
+                                connections.remove(this)
+                            }
+                            Log.d(TAG, "Client #$connectionId disconnected. Active connections: ${connections.size}")
+                        }
+                    }
+
+                    // Health check endpoint
+                    get("/health") {
+                        call.respond(HttpStatusCode.OK, "OK")
+                    }
+                }
+            }.start(wait = false)
+
+            // Launch coroutine to handle message broadcasting
+            scope.launch {
+                _messageFlow.asSharedFlow().collect { message ->
+                    broadcastToClients(message)
+                }
+            }
+
+            Log.i(TAG, "WebSocket server started on port $port")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start WebSocket server", e)
+            server = null
+        }
+    }
+
+    /**
+     * Stop the WebSocket server
+     */
+    fun stop() {
+        try {
+            synchronized(connections) {
+                connections.forEach { connection ->
+                    scope.launch {
+                        try {
+                            connection.close(CloseReason(CloseReason.Codes.GOING_AWAY, "Server shutting down"))
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error closing connection", e)
+                        }
+                    }
+                }
+                connections.clear()
+            }
+
+            server?.stop(1000, 2000)
+            server = null
+            Log.i(TAG, "WebSocket server stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping WebSocket server", e)
+        }
+    }
+
+    /**
+     * Broadcast a message to all connected clients
+     */
+    suspend fun broadcast(message: String) {
+        _messageFlow.emit(message)
+    }
+
+    /**
+     * Broadcast a message with perf timing data included.
+     * Flushes accumulated perf data and injects it into the message.
+     *
+     * @param messageBuilder Function that takes optional perfTiming JsonElement and returns the complete message
+     */
+    suspend fun broadcastWithPerf(messageBuilder: (perfTiming: JsonElement?) -> String) {
+        val perfTiming = perfProvider.flush()
+        val message = messageBuilder(perfTiming)
+        _messageFlow.emit(message)
+    }
+
+    /**
+     * Broadcast a message synchronously (waits for delivery to all clients).
+     * Use this when message ordering is critical (e.g., hierarchy update before set_text_result).
+     *
+     * @param messageBuilder Function that takes optional perfTiming JsonElement and returns the complete message
+     */
+    suspend fun broadcastWithPerfSync(messageBuilder: (perfTiming: JsonElement?) -> String) {
+        val perfTiming = perfProvider.flush()
+        val message = messageBuilder(perfTiming)
+        broadcastToClients(message)
+    }
+
+    /**
+     * Internal method to send message to all connected clients
+     */
+    private suspend fun broadcastToClients(message: String) {
+        val deadConnections = mutableListOf<DefaultWebSocketSession>()
+
+        synchronized(connections) {
+            connections.toList()
+        }.forEach { connection ->
+            try {
+                connection.send(Frame.Text(message))
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to send to connection, marking as dead", e)
+                deadConnections.add(connection)
+            }
+        }
+
+        // Remove dead connections
+        if (deadConnections.isNotEmpty()) {
+            synchronized(connections) {
+                connections.removeAll(deadConnections.toSet())
+            }
+            Log.d(TAG, "Removed ${deadConnections.size} dead connections. Active: ${connections.size}")
+        }
+    }
+
+    /**
+     * Get the number of active connections
+     */
+    fun getConnectionCount(): Int {
+        return synchronized(connections) {
+            connections.size
+        }
+    }
+
+    /**
+     * Check if server is running
+     */
+    fun isRunning(): Boolean = server != null
+
+    /**
+     * Handle incoming client message
+     */
+    private fun handleClientMessage(message: String) {
+        try {
+            val request = json.decodeFromString<WebSocketRequest>(message)
+            when (request.type) {
+                "request_hierarchy" -> {
+                    Log.d(TAG, "Received hierarchy request (requestId: ${request.requestId})")
+                    onRequestHierarchy?.invoke()
+                }
+                "request_hierarchy_if_stale" -> {
+                    val sinceTimestamp = request.sinceTimestamp
+                    if (sinceTimestamp != null) {
+                        Log.d(TAG, "Received hierarchy_if_stale request (requestId: ${request.requestId}, sinceTimestamp: $sinceTimestamp)")
+                        onRequestHierarchyIfStale?.invoke(sinceTimestamp)
+                    } else {
+                        Log.w(TAG, "request_hierarchy_if_stale missing sinceTimestamp, treating as regular request")
+                        onRequestHierarchy?.invoke()
+                    }
+                }
+                "request_screenshot" -> {
+                    Log.d(TAG, "Received screenshot request (requestId: ${request.requestId})")
+                    onRequestScreenshot?.invoke(request.requestId)
+                }
+                "request_swipe" -> {
+                    Log.d(TAG, "Received swipe request (requestId: ${request.requestId})")
+                    val x1 = request.x1
+                    val y1 = request.y1
+                    val x2 = request.x2
+                    val y2 = request.y2
+                    val duration = request.duration ?: 300L
+                    if (x1 != null && y1 != null && x2 != null && y2 != null) {
+                        onRequestSwipe?.invoke(request.requestId, x1, y1, x2, y2, duration)
+                    } else {
+                        Log.w(TAG, "Swipe request missing required coordinates")
+                    }
+                }
+                "request_set_text" -> {
+                    Log.d(TAG, "Received set_text request (requestId: ${request.requestId})")
+                    val text = request.text
+                    if (text != null) {
+                        onRequestSetText?.invoke(request.requestId, text, request.resourceId)
+                    } else {
+                        Log.w(TAG, "Set text request missing required text")
+                    }
+                }
+                "request_ime_action" -> {
+                    Log.d(TAG, "Received ime_action request (requestId: ${request.requestId})")
+                    val action = request.action
+                    if (action != null) {
+                        onRequestImeAction?.invoke(request.requestId, action)
+                    } else {
+                        Log.w(TAG, "IME action request missing required action")
+                    }
+                }
+                "request_select_all" -> {
+                    Log.d(TAG, "Received select_all request (requestId: ${request.requestId})")
+                    onRequestSelectAll?.invoke(request.requestId)
+                }
+                else -> {
+                    Log.d(TAG, "Unknown message type: ${request.type}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse client message: $message", e)
+        }
+    }
+}

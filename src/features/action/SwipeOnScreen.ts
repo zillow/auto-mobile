@@ -7,6 +7,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { ActionableError, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
+import { createGlobalPerformanceTracker, IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Executes swipe gestures on the screen, respecting system insets
@@ -27,13 +28,15 @@ export class SwipeOnScreen extends BaseVisualChange {
    * @param direction - Direction to swipe ('up', 'down', 'left', 'right')
    * @param options - Additional gesture options
    * @param progress - Optional progress callback
+   * @param perf - Optional performance tracker
    * @returns Result of the swipe operation
    */
   async executeAndroid(
     observeResult: ObserveResult,
     direction: "up" | "down" | "left" | "right",
     options: GestureOptions = {},
-    progress?: ProgressCallback
+    progress?: ProgressCallback,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     logger.info(`[SwipeOnScreen] In observedInteraction callback`);
 
@@ -86,7 +89,8 @@ export class SwipeOnScreen extends BaseVisualChange {
         flooredStartY,
         flooredEndX,
         flooredEndY,
-        options
+        options,
+        perf
       );
       logger.info(`[SwipeOnScreen] Swipe completed successfully: ${JSON.stringify(result)}`);
       return result;
@@ -181,6 +185,9 @@ export class SwipeOnScreen extends BaseVisualChange {
     options: GestureOptions = {},
     progress?: ProgressCallback
   ): Promise<SwipeResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("swipeOnScreen");
+
     logger.info(`[SwipeOnScreen] Starting swipe: direction=${direction}, platform=${this.device.platform}`);
     logger.info(`[SwipeOnScreen] Options: ${JSON.stringify(options)}`);
 
@@ -190,14 +197,19 @@ export class SwipeOnScreen extends BaseVisualChange {
 
         switch (this.device.platform) {
           case "android":
-            return this.executeAndroid(observeResult, direction, options, progress);
+            return perf.track("androidSwipe", () =>
+              this.executeAndroid(observeResult, direction, options, progress, perf)
+            );
           case "ios":
-            return this.executeiOS(observeResult, direction, options, progress);
+            return perf.track("iOSSwipe", () =>
+              this.executeiOS(observeResult, direction, options, progress)
+            );
         }
       }, {
         changeExpected: false,
         timeoutMs: 500,
-        progress
+        progress,
+        perf
       }
     );
   }

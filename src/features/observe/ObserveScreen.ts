@@ -15,6 +15,7 @@ import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../ut
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Interface for cached observe result
@@ -116,18 +117,49 @@ export class ObserveScreen {
   }
 
   /**
+   * Collect wakefulness state (Android only)
+   * @param result - ObserveResult to update
+   */
+  public async collectWakefulness(result: ObserveResult): Promise<void> {
+    try {
+      const wakefulness = await this.adb.getWakefulness();
+      if (wakefulness) {
+        result.wakefulness = wakefulness;
+      }
+    } catch (error) {
+      logger.warn("Failed to get wakefulness state:", error);
+    }
+  }
+
+  /**
    * Collect view hierarchy and handle errors with accessibility service caching
    * @param result - ObserveResult to update
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param perf - Performance tracker for timing data
+   * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
    */
-  public async collectViewHierarchy(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
+  public async collectViewHierarchy(
+    result: ObserveResult,
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
+  ): Promise<void> {
     try {
       const viewHierarchyStart = Date.now();
-      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions);
+      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
       logger.debug("Accessibility service availability cached as: true");
 
       if (viewHierarchy) {
         result.viewHierarchy = viewHierarchy;
+
+        // Use the updatedAt from the view hierarchy if available (from accessibility service)
+        if (viewHierarchy.updatedAt) {
+          result.updatedAt = viewHierarchy.updatedAt;
+          logger.debug(`Using updatedAt from view hierarchy: ${viewHierarchy.updatedAt}`);
+        }
+
         const focusedElement = this.viewHierarchy.findFocusedElement(viewHierarchy);
         if (focusedElement) {
           result.focusedElement = focusedElement;
@@ -207,43 +239,67 @@ export class ObserveScreen {
    * Collect all observation data with parallelization
    * @param result - ObserveResult to update
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param perf - Performance tracker for timing data
+   * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
    */
-  public async collectAllData(result: ObserveResult, queryOptions?: ViewHierarchyQueryOptions): Promise<void> {
+  public async collectAllData(
+    result: ObserveResult,
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
+  ): Promise<void> {
     switch (this.device.platform) {
       case "android":
-        // Start dumpsys window fetch early since multiple operations need it
-        const dumpsysWindowPromise = this.dumpsysWindow.execute();
+        // Phase 1: Get dumpsys window data for screen info
+        // Note: We no longer call collectActiveWindow here - packageName comes from accessibility service
+        perf.serial("phase1_initial");
 
-        // Start these operations in parallel while dumpsys is running
-        const parallelPromises: Promise<any>[] = [
-          dumpsysWindowPromise,
-          this.collectActiveWindow(result),
-        ];
+        const dumpsysWindow = await perf.track("dumpsysWindow", () => this.dumpsysWindow.execute());
+        perf.end();
 
-        const [dumpsysWindow] = await Promise.all(parallelPromises);
+        // Phase 2: Parallel - quick operations using shared dumpsys data
+        perf.parallel("phase2_collect");
 
-        // Now run the remaining operations in parallel using the shared dumpsys data
-        const androidFinalPromises: Promise<void>[] = [
-          this.collectScreenSize(dumpsysWindow, result),
-          this.collectSystemInsets(dumpsysWindow, result),
-          this.collectRotationInfo(dumpsysWindow, result),
-          this.collectViewHierarchy(result, queryOptions),
-        ];
+        await Promise.all([
+          perf.track("screenSize", () => this.collectScreenSize(dumpsysWindow, result)),
+          perf.track("systemInsets", () => this.collectSystemInsets(dumpsysWindow, result)),
+          perf.track("rotation", () => this.collectRotationInfo(dumpsysWindow, result)),
+          perf.track("wakefulness", () => this.collectWakefulness(result)),
+        ]);
 
-        // Execute all remaining operations in parallel
-        await Promise.all(androidFinalPromises);
+        // Run view hierarchy separately to avoid perf tracker race condition
+        // (it creates nested serial blocks that conflict with parallel tracking)
+        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
+
+        // Populate activeWindow from view hierarchy packageName if available
+        if (result.viewHierarchy?.packageName && !result.activeWindow) {
+          result.activeWindow = {
+            appId: result.viewHierarchy.packageName,
+            activityName: "",
+            layoutSeqSum: 0
+          };
+        }
+
+        // Fallback: if activeWindow still not populated, use the Window class
+        if (!result.activeWindow) {
+          await this.collectActiveWindow(result);
+        }
+
+        perf.end();
         break;
+
       case "ios":
         // iOS-specific data collection logic here
+        perf.parallel("ios_collect");
 
-        // Now run the remaining operations in parallel using the shared dumpsys data
-        const iosFinalPromises: Promise<void>[] = [
-          this.collectScreenSize({} as ExecResult, result),
-          this.collectViewHierarchy(result, queryOptions),
-        ];
+        await Promise.all([
+          perf.track("screenSize", () => this.collectScreenSize({} as ExecResult, result)),
+          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp),
+        ]);
 
-        // Execute all remaining operations in parallel
-        await Promise.all(iosFinalPromises);
+        perf.end();
         break;
     }
   }
@@ -263,11 +319,11 @@ export class ObserveScreen {
 
   /**
    * Create base observe result object
-   * @returns Base ObserveResult with timestamp and default values
+   * @returns Base ObserveResult with updatedAt and default values
    */
   createBaseResult(): ObserveResult {
     return {
-      timestamp: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       screenSize: { width: 0, height: 0 },
       systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
     };
@@ -304,7 +360,7 @@ export class ObserveScreen {
       logger.info(`[OBSERVE_CACHE] No cached observe result available (${duration}ms)`);
 
       return {
-        timestamp: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
         error: "No cached observe result available"
@@ -314,7 +370,7 @@ export class ObserveScreen {
       logger.warn(`[OBSERVE_CACHE] Error getting cached observe result after ${duration}ms: ${error}`);
 
       return {
-        timestamp: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
         error: "Failed to retrieve cached observe result"
@@ -480,21 +536,41 @@ export class ObserveScreen {
   /**
    * Execute the observe command
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
+   * @param perf - Performance tracker for timing data
+   * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method (default: true for direct observe calls)
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value (used after actions to ensure fresh data)
    * @returns The observation result
    */
-  async execute(queryOptions?: ViewHierarchyQueryOptions): Promise<ObserveResult> {
+  async execute(
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = true, // Default to true for direct observe tool requests
+    minTimestamp: number = 0
+  ): Promise<ObserveResult> {
     try {
-      logger.debug("Executing observe command");
+      logger.debug(`Executing observe command (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
       const startTime = Date.now();
 
       // Create base result object with timestamp
       const result = this.createBaseResult();
 
+      // Wrap entire observation in serial tracking
+      perf.serial("observe");
+
       // Collect all data components with parallelization
-      await this.collectAllData(result, queryOptions);
+      // Note: collectAllData tracks its phases internally, so we just call it directly
+      await this.collectAllData(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
 
       // Cache the result for future use
-      await this.cacheObserveResult(result);
+      await perf.track("cacheResult", () => this.cacheObserveResult(result));
+
+      perf.end();
+
+      // Attach performance timing if enabled
+      const timings = perf.getTimings();
+      if (timings) {
+        result.perfTiming = timings;
+      }
 
       logger.debug("Observe command completed");
       logger.debug(`Total observe command execution took ${Date.now() - startTime}ms`);
@@ -502,7 +578,7 @@ export class ObserveScreen {
     } catch (err) {
       logger.error("Critical error in observe command:", err);
       return {
-        timestamp: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
         error: "Observation failed due to device access error"

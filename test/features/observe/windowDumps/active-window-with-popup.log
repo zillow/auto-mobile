@@ -370,7 +370,7 @@ WINDOW MANAGER WINDOWS (dumpsys window windows)
     mPrepareSyncSeqId=0
   Window #9 Window{ddf8489 u0 Pop-Up Window}:
     mDisplayId=0 rootTaskId=8 mSession=Session{8b3234c 4199:u0a10207} mClient=android.os.BinderProxy@951b390
-    mOwnerUid=10207 showForAllUsers=false package=com.zillow.android.zillowmap appop=NONE
+    mOwnerUid=10207 showForAllUsers=false package=dev.jasonpearson.android.zillowmap appop=NONE
     mAttrs={(42,1169)(477x873) gr=TOP START CENTER sim={adjust=pan} ty=APPLICATION_SUB_PANEL fmt=TRANSLUCENT surfaceInsets=Rect(42, 42 - 42, 42)
       fl=WATCH_OUTSIDE_TOUCH HARDWARE_ACCELERATED
       pfl=INSET_PARENT_FRAME_BY_IME
@@ -379,9 +379,9 @@ WINDOW MANAGER WINDOWS (dumpsys window windows)
       frameRateBoostOnTouch=true
       dvrrWindowFrameRateHint=true}
     Requested w=477 h=873 mLayoutSeq=258
-    mParentWindow=Window{10634fe u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity} mLayoutAttached=true
-    mBaseLayer=21000 mSubLayer=2    mToken=ActivityRecord{5cd319f u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity t8}
-    mActivityRecord=ActivityRecord{5cd319f u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity t8}
+    mParentWindow=Window{10634fe u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity} mLayoutAttached=true
+    mBaseLayer=21000 mSubLayer=2    mToken=ActivityRecord{5cd319f u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity t8}
+    mActivityRecord=ActivityRecord{5cd319f u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity t8}
     drawnStateEvaluated=true    mightAffectAllDrawn=true
     mViewVisibility=0x0 mHaveFrame=true mObscured=false
     mGivenContentInsets=[0,0][0,0] mGivenVisibleInsets=[0,0][0,0]
@@ -400,9 +400,9 @@ WINDOW MANAGER WINDOWS (dumpsys window windows)
     isVisible=true
     keepClearAreas: restricted=[], unrestricted=[]
     mPrepareSyncSeqId=0
-  Window #10 Window{10634fe u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity}:
+  Window #10 Window{10634fe u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity}:
     mDisplayId=0 rootTaskId=8 mSession=Session{8b3234c 4199:u0a10207} mClient=android.os.BinderProxy@61db8b9
-    mOwnerUid=10207 showForAllUsers=false package=com.zillow.android.zillowmap appop=NONE
+    mOwnerUid=10207 showForAllUsers=false package=dev.jasonpearson.android.zillowmap appop=NONE
     mAttrs={(0,0)(fillxfill) sim={state=always_hidden adjust=nothing} layoutInDisplayCutoutMode=always ty=BASE_APPLICATION wanim=0x1030309
       fl=LAYOUT_IN_SCREEN LAYOUT_INSET_DECOR SPLIT_TOUCH HARDWARE_ACCELERATED DRAWS_SYSTEM_BAR_BACKGROUNDS
       pfl=NO_MOVE_ANIMATION FORCE_DRAW_STATUS_BAR_BACKGROUND FIT_INSETS_CONTROLLED
@@ -413,8 +413,8 @@ WINDOW MANAGER WINDOWS (dumpsys window windows)
       frameRateBoostOnTouch=true
       dvrrWindowFrameRateHint=true}
     Requested w=1080 h=2400 mLayoutSeq=258
-    mBaseLayer=21000 mSubLayer=0    mToken=ActivityRecord{5cd319f u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity t8}
-    mActivityRecord=ActivityRecord{5cd319f u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity t8}
+    mBaseLayer=21000 mSubLayer=0    mToken=ActivityRecord{5cd319f u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity t8}
+    mActivityRecord=ActivityRecord{5cd319f u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity t8}
     drawnStateEvaluated=true    mightAffectAllDrawn=true
     mViewVisibility=0x0 mHaveFrame=true mObscured=false
     mGivenContentInsets=[0,0][0,0] mGivenVisibleInsets=[0,0][0,0]
@@ -424,8 +424,8 @@ WINDOW MANAGER WINDOWS (dumpsys window windows)
     mHasSurface=true isReadyForDisplay()=true mWindowRemovalAllowed=false
     Frames: parent=[0,0][1080,2400] display=[0,0][1080,2400] frame=[0,0][1080,2400] last=[0,0][1080,2400] insetsChanged=false
      surface=[0,0][0,0]
-    WindowStateAnimator{f57a9e6 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity}:
-      mSurface=Surface(name=com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity)/@0xbfb9b27
+    WindowStateAnimator{f57a9e6 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity}:
+      mSurface=Surface(name=dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity)/@0xbfb9b27
       Surface: shown=true      mDrawState=HAS_DRAWN       mLastHidden=false
       mEnterAnimationPending=false      mSystemDecorRect=[0,0][0,0]
     mForceSeamlesslyRotate=false seamlesslyRotate: pending=null

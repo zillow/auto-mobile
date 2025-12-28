@@ -6,6 +6,7 @@ import { BootedDevice, ExecResult, ScreenSize } from "../../models";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class GetScreenSize {
   private adb: AdbUtils;
@@ -145,11 +146,17 @@ export class GetScreenSize {
   /**
    * Get screen size for Android devices
    * @param dumpsysResult - Optional dumpsys result for optimization
+   * @param perf - Optional performance tracker
    * @returns Promise with screen size
    */
-  private async getAndroidScreenSize(dumpsysResult?: ExecResult): Promise<ScreenSize> {
+  private async getAndroidScreenSize(
+    dumpsysResult?: ExecResult,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ScreenSize> {
     // First get the physical screen size
-    const { stdout } = await this.adb.executeCommand("shell wm size");
+    const { stdout } = await perf.track("adbWmSize", () =>
+      this.adb.executeCommand("shell wm size")
+    );
     const { width: physicalWidth, height: physicalHeight } = this.parsePhysicalDimensions(stdout);
 
     // Then check the current rotation to determine actual dimensions
@@ -158,7 +165,9 @@ export class GetScreenSize {
       rotation = await this.detectDeviceRotation(dumpsysResult);
     } else {
       // Get dumpsys result if not provided
-      const dumpsysOutput = await this.adb.executeCommand("shell dumpsys window");
+      const dumpsysOutput = await perf.track("adbDumpsysWindow", () =>
+        this.adb.executeCommand("shell dumpsys window")
+      );
       rotation = await this.detectDeviceRotation(dumpsysOutput);
     }
 
@@ -175,9 +184,14 @@ export class GetScreenSize {
 
   /**
    * Get the screen size and resolution
+   * @param dumpsysResult - Optional dumpsys result for optimization
+   * @param perf - Optional performance tracker
    * @returns Promise with width and height
    */
-  async execute(dumpsysResult?: ExecResult): Promise<ScreenSize> {
+  async execute(
+    dumpsysResult?: ExecResult,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ScreenSize> {
     const cacheKey = this.generateCacheKey(this.device.deviceId);
 
     // Check memory cache first
@@ -200,10 +214,10 @@ export class GetScreenSize {
 
       if (isiOSDevice) {
         // iOS device - use axe to get screen size
-        return await this.axe.getScreenSize();
+        return await perf.track("iOSGetScreenSize", () => this.axe.getScreenSize());
       } else {
         // Android device - use adb to get screen size
-        return await this.getAndroidScreenSize(dumpsysResult);
+        return await this.getAndroidScreenSize(dumpsysResult, perf);
       }
     } catch (err) {
       throw new Error(`Failed to get screen size: ${err instanceof Error ? err.message : String(err)}`);

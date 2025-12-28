@@ -7,6 +7,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { SwipeResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Executes swipe gestures on specific UI elements
@@ -35,6 +36,9 @@ export class SwipeOnElement extends BaseVisualChange {
     options: GestureOptions = {},
     progress?: ProgressCallback
   ): Promise<SwipeResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("swipeOnElement");
+
     logger.info(`[SwipeOnElement] Starting swipe: direction=${direction}, platform=${this.device.platform}`);
     logger.info(`[SwipeOnElement] Element bounds: ${JSON.stringify(element.bounds)}`);
     logger.info(`[SwipeOnElement] Options: ${JSON.stringify(options)}`);
@@ -58,16 +62,20 @@ export class SwipeOnElement extends BaseVisualChange {
         logger.info(`[SwipeOnElement] Floored swipe coordinates: start=(${flooredStartX}, ${flooredStartY}), end=(${flooredEndX}, ${flooredEndY})`);
 
         try {
-          const result = await this.executeGesture.swipe(
-            flooredStartX,
-            flooredStartY,
-            flooredEndX,
-            flooredEndY,
-            options
+          const result = await perf.track("executeSwipe", () =>
+            this.executeGesture.swipe(
+              flooredStartX,
+              flooredStartY,
+              flooredEndX,
+              flooredEndY,
+              options,
+              perf
+            )
           );
           logger.info(`[SwipeOnElement] Swipe completed successfully: ${JSON.stringify(result)}`);
           return result;
         } catch (error) {
+          perf.end();
           logger.error(`[SwipeOnElement] Swipe execution failed: ${error}`);
           throw error;
         }
@@ -75,7 +83,8 @@ export class SwipeOnElement extends BaseVisualChange {
       {
         changeExpected: false,
         timeoutMs: 500,
-        progress
+        progress,
+        perf
       }
     );
   }

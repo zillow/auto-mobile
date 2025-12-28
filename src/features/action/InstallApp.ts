@@ -1,6 +1,7 @@
 import path from "path";
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BootedDevice } from "../../models";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class InstallApp {
   private adb: AdbUtils;
@@ -19,22 +20,32 @@ export class InstallApp {
    * @param apkPath - Path to the APK file
    */
   async execute(apkPath: string): Promise<{ success: boolean; upgrade: boolean }> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("installApp");
+
     if (!path.isAbsolute(apkPath)) {
       apkPath = path.resolve(process.cwd(), apkPath);
     }
 
     // Extract package name from APK
-    const packageNameCmd = `dump badging "${apkPath}" | grep "package:" | grep -o "name='[^']*'" | cut -d= -f2 | tr -d "'"`;
-    const packageName = await this.adb.executeCommand(packageNameCmd);
+    const packageName = await perf.track("extractPackageName", async () => {
+      const packageNameCmd = `dump badging "${apkPath}" | grep "package:" | grep -o "name='[^']*'" | cut -d= -f2 | tr -d "'"`;
+      return this.adb.executeCommand(packageNameCmd);
+    });
 
     // Check if app is already installed
-    const isInstalledCmd = `shell pm list packages -f ${packageName.trim()} | grep -c ${packageName.trim()}`;
-    const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd, undefined, undefined, true);
-    const isInstalled = parseInt(isInstalledOutput.trim(), 10) > 0;
+    const isInstalled = await perf.track("checkInstalled", async () => {
+      const isInstalledCmd = `shell pm list packages -f ${packageName.trim()} | grep -c ${packageName.trim()}`;
+      const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd, undefined, undefined, true);
+      return parseInt(isInstalledOutput.trim(), 10) > 0;
+    });
 
-    const installOutput = await this.adb.executeCommand(`install -r "${apkPath}"`);
-    const success = installOutput.includes("Success");
+    const success = await perf.track("adbInstall", async () => {
+      const installOutput = await this.adb.executeCommand(`install -r "${apkPath}"`);
+      return installOutput.includes("Success");
+    });
 
+    perf.end();
     return {
       success: success,
       upgrade: isInstalled && success

@@ -1,9 +1,20 @@
+import WebSocket from "ws";
+import { randomBytes } from "crypto";
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ViewHierarchyResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
-import { v4 as uuidv4 } from "uuid";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+
+/**
+ * Generate a cryptographically secure random suffix for request IDs.
+ * Uses crypto.randomBytes which is much more secure than Math.random().
+ * @returns 8-character hex string
+ */
+function generateSecureId(): string {
+  return randomBytes(4).toString("hex");
+}
 
 /**
  * Interface for accessibility service node format
@@ -37,166 +48,717 @@ interface AccessibilityNode {
 /**
  * Interface for accessibility service hierarchy format
  */
+interface AccessibilityWindowHierarchy {
+  windowId: number;
+  windowType: string;
+  windowLayer: number;
+  packageName?: string;
+  isActive: boolean;
+  isFocused: boolean;
+  hierarchy?: AccessibilityNode;
+}
+
 interface AccessibilityHierarchy {
-  timestamp: number;
+  updatedAt: number;
   packageName: string;
   hierarchy: AccessibilityNode;
+  windows?: AccessibilityWindowHierarchy[];
 }
 
 /**
- * Client for interacting with the AutoMobile Accessibility Service
+ * Interface for WebSocket message from accessibility service
+ */
+interface WebSocketMessage {
+  type: string;
+  timestamp?: number;
+  requestId?: string;
+  data?: AccessibilityHierarchy;
+  format?: string;
+  error?: string;
+}
+
+/**
+ * Interface for screenshot result
+ */
+export interface ScreenshotResult {
+  success: boolean;
+  data?: string; // Base64 encoded JPEG
+  format?: string;
+  timestamp?: number;
+  error?: string;
+}
+
+/**
+ * Interface for Android-side performance timing data
+ */
+export interface AndroidPerfTiming {
+  name: string;
+  durationMs: number;
+  children?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for swipe result from accessibility service
+ */
+export interface A11ySwipeResult {
+  success: boolean;
+  totalTimeMs: number;
+  gestureTimeMs?: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for set text result from accessibility service
+ */
+export interface A11ySetTextResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for IME action result from accessibility service
+ */
+export interface A11yImeActionResult {
+  success: boolean;
+  action: string;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for select all result from accessibility service
+ */
+export interface A11ySelectAllResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for cached hierarchy with metadata
+ */
+interface CachedHierarchy {
+  hierarchy: AccessibilityHierarchy;
+  receivedAt: number;
+  fresh: boolean;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for hierarchy response with freshness indicator
+ */
+export interface AccessibilityHierarchyResponse {
+  hierarchy: AccessibilityHierarchy | null;
+  fresh: boolean;
+  updatedAt?: number; // Timestamp from device (only present when hierarchy data exists)
+  perfTiming?: AndroidPerfTiming[]; // Android-side performance timing data
+}
+
+/**
+ * Client for interacting with the AutoMobile Accessibility Service via WebSocket
+ * Uses singleton pattern per device to maintain persistent WebSocket connection
  */
 export class AccessibilityServiceClient {
   private device: BootedDevice;
   private adb: AdbUtils;
-  private static readonly PACKAGE_NAME = "com.zillow.automobile.accessibilityservice";
-  private static readonly HIERARCHY_FILE_PATH = "files/latest_hierarchy.json";
+  private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
+  private static readonly WEBSOCKET_PORT = 8765;
+  private static readonly WEBSOCKET_URL = `ws://localhost:${AccessibilityServiceClient.WEBSOCKET_PORT}/ws`;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+  // Singleton instances per device
+  private static instances: Map<string, AccessibilityServiceClient> = new Map();
+
+  private ws: WebSocket | null = null;
+  private cachedHierarchy: CachedHierarchy | null = null;
+  private isConnecting: boolean = false;
+  private connectionAttempts: number = 0;
+  private lastConnectionAttempt: number = 0;
+  private readonly maxConnectionAttempts: number = 3;
+  private static readonly CONNECTION_ATTEMPT_RESET_MS = 10000; // Reset attempts after 10 seconds
+  private portForwardingSetup: boolean = false;
+  private lastWebSocketTimeout: number = 0;
+  private static readonly WEBSOCKET_TIMEOUT_COOLDOWN_MS = 5000; // Skip WebSocket wait for 5 seconds after timeout
+
+  // Screenshot handling
+  private pendingScreenshotResolve: ((result: ScreenshotResult) => void) | null = null;
+  private pendingScreenshotRequestId: string | null = null;
+
+  // Swipe handling
+  private pendingSwipeResolve: ((result: A11ySwipeResult) => void) | null = null;
+  private pendingSwipeRequestId: string | null = null;
+
+  // Set text handling
+  private pendingSetTextResolve: ((result: A11ySetTextResult) => void) | null = null;
+  private pendingSetTextRequestId: string | null = null;
+
+  // IME action handling
+  private pendingImeActionResolve: ((result: A11yImeActionResult) => void) | null = null;
+  private pendingImeActionRequestId: string | null = null;
+
+  // Select all handling
+  private pendingSelectAllResolve: ((result: A11ySelectAllResult) => void) | null = null;
+  private pendingSelectAllRequestId: string | null = null;
+
+  /**
+   * Private constructor - use getInstance() instead
+   */
+  private constructor(device: BootedDevice, adb: AdbUtils) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
+    this.adb = adb;
     AccessibilityServiceManager.getInstance(device, adb);
   }
 
   /**
-   * Query the accessibility service for targeted view hierarchy using broadcast receiver
-   * @param queryOptions - Options to filter the view hierarchy
-   * @returns Promise<AccessibilityHierarchy | null> - The hierarchy data or null if unavailable
+   * Get singleton instance for a device
+   * @param device - The booted device
+   * @param adb - Optional AdbUtils instance
+   * @returns AccessibilityServiceClient instance
    */
-  async getTargetedHierarchy(queryOptions: ViewHierarchyQueryOptions): Promise<AccessibilityHierarchy | null> {
-    const startTime = Date.now();
-    const queryId = uuidv4();
+  public static getInstance(device: BootedDevice, adb: AdbUtils | null = null): AccessibilityServiceClient {
+    const deviceId = device.deviceId;
+    if (!AccessibilityServiceClient.instances.has(deviceId)) {
+      logger.debug(`[ACCESSIBILITY_SERVICE] Creating singleton for device: ${deviceId}`);
+      AccessibilityServiceClient.instances.set(
+        deviceId,
+        new AccessibilityServiceClient(device, adb || new AdbUtils(device))
+      );
+    }
+    return AccessibilityServiceClient.instances.get(deviceId)!;
+  }
 
-    try {
-      logger.info(`[ACCESSIBILITY_SERVICE] Sending targeted hierarchy request with UUID: ${queryId}`);
+  /**
+   * Reset all instances (for testing)
+   */
+  public static resetInstances(): void {
+    for (const instance of AccessibilityServiceClient.instances.values()) {
+      instance.close().catch(() => {});
+    }
+    AccessibilityServiceClient.instances.clear();
+    logger.info("[ACCESSIBILITY_SERVICE] Reset all singleton instances");
+  }
 
-      // Prepare broadcast command with query parameters
-      const broadcastCommand = this.buildBroadcastCommand(queryId, queryOptions);
-      const hierarchyFileName = `hierarchy_${queryId}.json`;
+  /**
+   * Check if WebSocket is currently connected
+   */
+  public isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
 
-      // Run broadcast and polling in parallel
-      const broadcastPromise = this.adb.executeCommand(broadcastCommand);
+  /**
+   * Check if there is cached hierarchy data
+   */
+  public hasCachedHierarchy(): boolean {
+    return this.cachedHierarchy !== null;
+  }
 
-      // Start polling after 100ms delay to give the service time to write the file
-      const pollingPromise = (async () => {
-        // Initial delay to let the service process the broadcast
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        const maxDelay = 500;
-        let delay = 50; // Start with 50ms since we already waited 100ms
-        let result;
-
-        while (delay <= maxDelay) {
-          try {
-            result = await this.adb.executeCommand(
-              `shell run-as ${AccessibilityServiceClient.PACKAGE_NAME} cat files/${hierarchyFileName}`
-            );
-
-            if (result.stdout && result.stdout.trim() !== "") {
-              return result;
-            }
-          } catch (err) {
-            // Ignore errors and continue polling
-            logger.debug(`[ACCESSIBILITY_SERVICE] Error while reading hierarchy file (retrying in ${delay}ms): ${err}`);
-          }
-
-          // Wait for the current delay period
-          await new Promise(resolve => setTimeout(resolve, delay));
-
-          // Double the delay for the next iteration (exponential backoff)
-          delay *= 2;
-        }
-
-        return null;
-      })();
-
-      // Wait for both broadcast and polling to complete
-      const [, pollingResult] = await Promise.all([broadcastPromise, pollingPromise]);
-
-      // If result is still not available after maximum retries
-      if (!pollingResult || !pollingResult.stdout || pollingResult.stdout.trim() === "") {
-        logger.warn(`[ACCESSIBILITY_SERVICE] No hierarchy data received for query ID: ${queryId}`);
-        return null;
-      }
-
-      // Parse the JSON response
-      const hierarchyData: AccessibilityHierarchy = JSON.parse(pollingResult.stdout);
-
-      const duration = Date.now() - startTime;
-      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved targeted hierarchy in ${duration}ms (query: ${queryId})`);
-
-      return hierarchyData;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to get targeted hierarchy after ${duration}ms: ${error}`);
-      return null;
+  /**
+   * Invalidate the cached hierarchy data.
+   * This forces the next getHierarchy call to wait for fresh data.
+   * Should be called after any action that modifies the UI (like setText, swipe, tap).
+   */
+  public invalidateCache(): void {
+    if (this.cachedHierarchy) {
+      logger.debug("[ACCESSIBILITY_SERVICE] Invalidating cached hierarchy");
+      this.cachedHierarchy = null;
     }
   }
 
   /**
-   * Build broadcast command for accessibility service
-   * @param uuid - Unique identifier for the request
-   * @param queryOptions - Query options for filtering
-   * @returns Complete broadcast command string
+   * Setup ADB port forwarding for WebSocket connection
+   * @param perf - Performance tracker for timing
    */
-  private buildBroadcastCommand(uuid: string, queryOptions: ViewHierarchyQueryOptions): string {
-    const baseCommand = `shell am broadcast -a com.zillow.automobile.EXTRACT_HIERARCHY`;
-    const extras: string[] = [`--es uuid "${uuid}"`];
-
-    if (queryOptions.text) {
-      extras.push(`--es text "${queryOptions.text}"`);
+  private async setupPortForwarding(
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<void> {
+    if (this.portForwardingSetup) {
+      return;
     }
-    if (queryOptions.elementId) {
-      extras.push(`--es elementId "${queryOptions.elementId}"`);
-    }
-    if (queryOptions.containerElementId) {
-      extras.push(`--es containerElementId "${queryOptions.containerElementId}"`);
-    }
-    if (queryOptions.xpath) {
-      extras.push(`--es xpath "${queryOptions.xpath}"`);
-    }
-
-    return `${baseCommand} ${extras.join(" ")}`;
-  }
-
-  /**
-     * Query the accessibility service for the latest view hierarchy
-   * @param queryOptions - Options to filter the view hierarchy
-     * @returns Promise<AccessibilityHierarchy | null> - The hierarchy data or null if unavailable
-     */
-  async getLatestHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<AccessibilityHierarchy | null> {
-    const startTime = Date.now();
 
     try {
-      logger.info("[ACCESSIBILITY_SERVICE] Querying latest view hierarchy from accessibility service");
+      logger.info(`[ACCESSIBILITY_SERVICE] Setting up port forwarding for WebSocket: localhost:${AccessibilityServiceClient.WEBSOCKET_PORT} → device:${AccessibilityServiceClient.WEBSOCKET_PORT}`);
 
-      // If query options are provided, use targeted hierarchy retrieval
-      // if (queryOptions) {
-      //   return await this.getTargetedHierarchy(queryOptions);
-      // }
-
-      // Otherwise, get the standard latest hierarchy
-      const result = await this.adb.executeCommand(
-        `shell run-as ${AccessibilityServiceClient.PACKAGE_NAME} cat ${AccessibilityServiceClient.HIERARCHY_FILE_PATH}`
+      // Clear any existing forwarding for this port
+      await perf.track("clearPortForward", () =>
+        this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+          // Ignore errors if no forwarding exists
+        })
       );
 
-      if (!result.stdout || result.stdout.trim() === "") {
-        logger.warn("[ACCESSIBILITY_SERVICE] No hierarchy data received from accessibility service");
-        return null;
+      // Setup new forwarding
+      await perf.track("setupPortForward", () =>
+        this.adb.executeCommand(`forward tcp:${AccessibilityServiceClient.WEBSOCKET_PORT} tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`)
+      );
+
+      this.portForwardingSetup = true;
+      logger.info("[ACCESSIBILITY_SERVICE] Port forwarding setup complete");
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to setup port forwarding: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect to the WebSocket server
+   * @param perf - Performance tracker for timing
+   */
+  private async connectWebSocket(
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<boolean> {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      logger.debug("[ACCESSIBILITY_SERVICE] WebSocket already connected (reusing connection)");
+      return true;
+    }
+
+    // If WebSocket exists but is not OPEN (stale/closing), clean it up and reset attempts
+    if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
+      logger.info(`[ACCESSIBILITY_SERVICE] Cleaning up stale WebSocket (state: ${this.ws.readyState})`);
+      try {
+        this.ws.close();
+      } catch {
+        // Ignore close errors on stale socket
+      }
+      this.ws = null;
+      this.connectionAttempts = 0; // Reset to allow new connection attempts
+      // Reset port forwarding flag so next attempt will re-setup the forward
+      this.portForwardingSetup = false;
+    }
+
+    if (this.isConnecting) {
+      logger.debug("[ACCESSIBILITY_SERVICE] Connection already in progress, waiting...");
+      // Wait for ongoing connection attempt
+      return new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+          if (!this.isConnecting) {
+            clearInterval(checkInterval);
+            resolve(this.ws?.readyState === WebSocket.OPEN);
+          }
+        }, 100);
+      });
+    }
+
+    // Reset connection attempts if enough time has passed since last attempt
+    if (this.connectionAttempts >= this.maxConnectionAttempts) {
+      const timeSinceLastAttempt = Date.now() - this.lastConnectionAttempt;
+      if (timeSinceLastAttempt >= AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Resetting connection attempts after ${timeSinceLastAttempt}ms cooldown`);
+        this.connectionAttempts = 0;
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Max connection attempts (${this.maxConnectionAttempts}) reached, cooldown remaining: ${AccessibilityServiceClient.CONNECTION_ATTEMPT_RESET_MS - timeSinceLastAttempt}ms`);
+        return false;
+      }
+    }
+
+    this.isConnecting = true;
+    this.connectionAttempts++;
+    this.lastConnectionAttempt = Date.now();
+
+    try {
+      // Ensure port forwarding is setup
+      await perf.track("portForwarding", () => this.setupPortForwarding(perf));
+
+      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${AccessibilityServiceClient.WEBSOCKET_URL} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts})`);
+
+      return await perf.track("wsConnect", () => new Promise<boolean>((resolve, reject) => {
+        const ws = new WebSocket(AccessibilityServiceClient.WEBSOCKET_URL);
+        const connectionTimeout = setTimeout(() => {
+          ws.close();
+          // Reset port forwarding flag so next attempt will re-setup the forward
+          this.portForwardingSetup = false;
+          reject(new Error("WebSocket connection timeout"));
+        }, 5000);
+
+        ws.on("open", () => {
+          clearTimeout(connectionTimeout);
+          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connected successfully");
+          this.ws = ws;
+          this.isConnecting = false;
+          this.connectionAttempts = 0; // Reset on successful connection
+          resolve(true);
+        });
+
+        ws.on("message", (data: WebSocket.Data) => {
+          this.handleWebSocketMessage(data);
+        });
+
+        ws.on("error", error => {
+          clearTimeout(connectionTimeout);
+          logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket error: ${error.message}`);
+          this.isConnecting = false;
+          // Reset port forwarding flag so next attempt will re-setup the forward
+          this.portForwardingSetup = false;
+          reject(error);
+        });
+
+        ws.on("close", () => {
+          logger.info("[ACCESSIBILITY_SERVICE] WebSocket connection closed");
+          this.ws = null;
+          this.isConnecting = false;
+          // Reset connection attempts on close to allow future retries
+          this.connectionAttempts = 0;
+        });
+      }));
+    } catch (error) {
+      this.isConnecting = false;
+      // Reset port forwarding flag so next attempt will re-setup the forward
+      this.portForwardingSetup = false;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to connect to WebSocket: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Handle incoming WebSocket message
+   */
+  private handleWebSocketMessage(data: WebSocket.Data): void {
+    try {
+      const message: WebSocketMessage = JSON.parse(data.toString());
+
+      if (message.type === "connected") {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Received connection confirmation`);
+        return;
       }
 
-      // Parse the JSON response
-      const hierarchyData: AccessibilityHierarchy = JSON.parse(result.stdout);
+      if (message.type === "hierarchy_update" && message.data) {
+        const now = Date.now();
+        const perfTiming = (message as any).perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Received hierarchy update (updatedAt: ${message.data.updatedAt}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-      const duration = Date.now() - startTime;
-      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved hierarchy in ${duration}ms (timestamp: ${hierarchyData.timestamp})`);
+        // Mark previous cache as stale
+        if (this.cachedHierarchy) {
+          this.cachedHierarchy.fresh = false;
+        }
 
-      return hierarchyData;
+        // Update cache with fresh data
+        this.cachedHierarchy = {
+          hierarchy: message.data,
+          receivedAt: now,
+          fresh: true,
+          perfTiming
+        };
+
+        logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.updatedAt})`);
+      }
+
+      // Handle screenshot response
+      if (message.type === "screenshot" && this.pendingScreenshotResolve) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Received screenshot (requestId: ${message.requestId}, format: ${message.format})`);
+        const resolve = this.pendingScreenshotResolve;
+        this.pendingScreenshotResolve = null;
+        this.pendingScreenshotRequestId = null;
+
+        // Extract data from the message - it may be nested under 'data' key or directly on message
+        const base64Data = (message as any).data as string;
+        resolve({
+          success: true,
+          data: base64Data,
+          format: message.format || "jpeg",
+          timestamp: message.timestamp
+        });
+      }
+
+      // Handle screenshot error
+      if (message.type === "screenshot_error" && this.pendingScreenshotResolve) {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot error (requestId: ${message.requestId}): ${message.error}`);
+        const resolve = this.pendingScreenshotResolve;
+        this.pendingScreenshotResolve = null;
+        this.pendingScreenshotRequestId = null;
+        resolve({
+          success: false,
+          error: message.error || "Unknown error"
+        });
+      }
+
+      // Handle swipe result
+      if (message.type === "swipe_result" && this.pendingSwipeResolve) {
+        const swipeMessage = message as any;
+        const perfTiming = swipeMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Swipe result (requestId: ${swipeMessage.requestId}, success: ${swipeMessage.success}, totalTimeMs: ${swipeMessage.totalTimeMs}, gestureTimeMs: ${swipeMessage.gestureTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        // NOTE: Do not invalidate cache on swipe - swipe is not guaranteed to change the hierarchy
+        // (e.g., scrolling at end of list produces no change)
+
+        const resolve = this.pendingSwipeResolve;
+        this.pendingSwipeResolve = null;
+        this.pendingSwipeRequestId = null;
+        resolve({
+          success: swipeMessage.success,
+          totalTimeMs: swipeMessage.totalTimeMs,
+          gestureTimeMs: swipeMessage.gestureTimeMs,
+          error: swipeMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle set text result
+      if (message.type === "set_text_result" && this.pendingSetTextResolve) {
+        const setTextMessage = message as any;
+        const perfTiming = setTextMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Set text result (requestId: ${setTextMessage.requestId}, success: ${setTextMessage.success}, totalTimeMs: ${setTextMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        // NOTE: We do NOT invalidate cache here because:
+        // 1. The Android service calls extractNowBlocking() BEFORE sending set_text_result
+        // 2. This pushes fresh hierarchy via hierarchy_update message
+        // 3. The fresh hierarchy is cached before we receive set_text_result
+        // 4. Invalidating here would throw away the fresh data we just received!
+
+        const resolve = this.pendingSetTextResolve;
+        this.pendingSetTextResolve = null;
+        this.pendingSetTextRequestId = null;
+        resolve({
+          success: setTextMessage.success,
+          totalTimeMs: setTextMessage.totalTimeMs,
+          error: setTextMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle IME action result
+      if (message.type === "ime_action_result" && this.pendingImeActionResolve) {
+        const imeActionMessage = message as any;
+        const perfTiming = imeActionMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] IME action result (requestId: ${imeActionMessage.requestId}, action: ${imeActionMessage.action}, success: ${imeActionMessage.success}, totalTimeMs: ${imeActionMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        // NOTE: We do NOT invalidate cache here - same reason as set_text_result
+        // The Android service extracts fresh hierarchy before sending the result
+
+        const resolve = this.pendingImeActionResolve;
+        this.pendingImeActionResolve = null;
+        this.pendingImeActionRequestId = null;
+        resolve({
+          success: imeActionMessage.success,
+          action: imeActionMessage.action,
+          totalTimeMs: imeActionMessage.totalTimeMs,
+          error: imeActionMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle select all result
+      if (message.type === "select_all_result" && this.pendingSelectAllResolve) {
+        const selectAllMessage = message as any;
+        const perfTiming = selectAllMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Select all result (requestId: ${selectAllMessage.requestId}, success: ${selectAllMessage.success}, totalTimeMs: ${selectAllMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingSelectAllResolve;
+        this.pendingSelectAllResolve = null;
+        this.pendingSelectAllRequestId = null;
+        resolve({
+          success: selectAllMessage.success,
+          totalTimeMs: selectAllMessage.totalTimeMs,
+          error: selectAllMessage.error,
+          perfTiming
+        });
+      }
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Error handling WebSocket message: ${error}`);
+    }
+  }
+
+  /**
+   * Check if we should skip WebSocket wait due to recent timeout
+   */
+  private shouldSkipWebSocketWait(): boolean {
+    if (this.lastWebSocketTimeout === 0) {
+      return false;
+    }
+    const timeSinceTimeout = Date.now() - this.lastWebSocketTimeout;
+    return timeSinceTimeout < AccessibilityServiceClient.WEBSOCKET_TIMEOUT_COOLDOWN_MS;
+  }
+
+  /**
+   * Get the latest hierarchy from cache or wait for fresh data
+   * @param waitForFresh - If true, wait up to timeout for fresh data
+   * @param timeout - Maximum time to wait for fresh data in milliseconds
+   * @param perf - Performance tracker for timing
+   * @param skipWaitForFresh - If true, skip waiting for fresh data entirely (go straight to sync)
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value to be considered fresh
+   * @returns Promise<AccessibilityHierarchyResponse>
+   */
+  async getLatestHierarchy(
+    waitForFresh: boolean = false,
+    timeout: number = 100,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
+  ): Promise<AccessibilityHierarchyResponse> {
+    const startTime = Date.now();
+
+    logger.debug(`[ACCESSIBILITY_SERVICE] getLatestHierarchy: cache=${this.cachedHierarchy ? "exists" : "null"}, waitForFresh=${waitForFresh}, skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp}`);
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection");
+        return {
+          hierarchy: null,
+          fresh: false
+          // updatedAt not included - no device data available
+        };
+      }
+
+      // If we have cached data and not waiting for fresh, return it immediately
+      // This is the fast path for direct observe calls (skipWaitForFresh=true)
+      // But if minTimestamp is set, we must verify the cached data is new enough
+      if (this.cachedHierarchy && !waitForFresh) {
+        const cacheAge = startTime - this.cachedHierarchy.receivedAt;
+        const updatedAt = this.cachedHierarchy.hierarchy.updatedAt;
+
+        // If minTimestamp is set, check if cached data is too old
+        if (minTimestamp > 0 && updatedAt < minTimestamp) {
+          logger.debug(`[ACCESSIBILITY_SERVICE] Cache rejected: updatedAt ${updatedAt} < minTimestamp ${minTimestamp} (stale by ${minTimestamp - updatedAt}ms)`);
+          // Fall through to wait for fresh data or sync
+        } else {
+          const isFresh = cacheAge < 1000; // Consider fresh if less than 1 second old
+          const duration = Date.now() - startTime;
+          logger.debug(`[ACCESSIBILITY_SERVICE] Cache hit: ${duration}ms (age: ${cacheAge}ms, fresh: ${isFresh}, updatedAt: ${updatedAt})`);
+
+          return {
+            hierarchy: this.cachedHierarchy.hierarchy,
+            fresh: isFresh,
+            updatedAt: updatedAt,
+            perfTiming: this.cachedHierarchy.perfTiming
+          };
+        }
+      }
+
+      // Wait for fresh data if requested (unless skipped or recently timed out)
+      // Also wait if cache was rejected due to minTimestamp
+      // IMPORTANT: When cacheRejected is true, we MUST wait for fresh data regardless of skipWaitForFresh
+      // because the caller requires data newer than minTimestamp (e.g., after an action like inputText)
+      const cacheRejected = minTimestamp > 0 && this.cachedHierarchy && this.cachedHierarchy.hierarchy.updatedAt < minTimestamp;
+      const shouldWait = (waitForFresh || cacheRejected) && (!skipWaitForFresh || cacheRejected) && !this.shouldSkipWebSocketWait();
+      if (shouldWait) {
+        // Use minTimestamp if provided, otherwise use startTime
+        const waitMinTimestamp = minTimestamp > 0 ? minTimestamp : startTime;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Waiting up to ${timeout}ms for fresh hierarchy data (must be newer than ${waitMinTimestamp})`);
+
+        const freshData = await perf.track("waitForFresh", () => this.waitForFreshData(timeout, waitMinTimestamp));
+        const duration = Date.now() - startTime;
+
+        if (freshData) {
+          logger.info(`[ACCESSIBILITY_SERVICE] Received fresh hierarchy in ${duration}ms (updatedAt: ${freshData.hierarchy.updatedAt})`);
+          return {
+            hierarchy: freshData.hierarchy,
+            fresh: true,
+            updatedAt: freshData.hierarchy.updatedAt,
+            perfTiming: freshData.perfTiming
+          };
+        } else {
+          // Record timeout so we skip WebSocket wait for a while
+          this.lastWebSocketTimeout = Date.now();
+          logger.warn(`[ACCESSIBILITY_SERVICE] Timeout waiting for fresh data after ${duration}ms, will skip WebSocket wait for ${AccessibilityServiceClient.WEBSOCKET_TIMEOUT_COOLDOWN_MS}ms`);
+
+          // Return cached data if available, mark as stale so caller knows to try sync method
+          if (this.cachedHierarchy) {
+            // Mark cache as stale since we couldn't get fresh push data
+            this.cachedHierarchy.fresh = false;
+            logger.info(`[ACCESSIBILITY_SERVICE] Returning stale cached data (updatedAt: ${this.cachedHierarchy.hierarchy.updatedAt}), marked cache as stale`);
+            return {
+              hierarchy: this.cachedHierarchy.hierarchy,
+              fresh: false,
+              updatedAt: this.cachedHierarchy.hierarchy.updatedAt,
+              perfTiming: this.cachedHierarchy.perfTiming
+            };
+          }
+        }
+      } else if (skipWaitForFresh || this.shouldSkipWebSocketWait()) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Skipping WebSocket wait (skipWaitForFresh=${skipWaitForFresh}, recentTimeout=${this.shouldSkipWebSocketWait()})`);
+      }
+
+      // No cached data available
+      logger.debug("[ACCESSIBILITY_SERVICE] No cached hierarchy data available");
+      return {
+        hierarchy: null,
+        fresh: false
+        // updatedAt not included - no device data available
+      };
     } catch (error) {
       const duration = Date.now() - startTime;
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to get hierarchy after ${duration}ms: ${error}`);
-      return null;
+      return {
+        hierarchy: null,
+        fresh: false
+        // updatedAt not included - no device data available
+      };
     }
+  }
+
+  /**
+   * Wait for fresh data to arrive via WebSocket
+   * @param timeout - Maximum time to wait in milliseconds
+   * @param minTimestamp - Minimum timestamp the data must have (request start time)
+   * @returns CachedHierarchy if fresh data received, null on timeout or screen off
+   */
+  private async waitForFreshData(timeout: number, minTimestamp: number): Promise<CachedHierarchy | null> {
+    const startTime = Date.now();
+    const checkInterval = 50; // Check every 50ms
+    const screenCheckInterval = 1000; // Check screen state every 1 second
+    const staleCheckDelay = 2000; // Send stale check request after 2 seconds of no push
+    let lastScreenCheck = startTime;
+    let screenCheckInProgress = false;
+    let staleCheckSent = false;
+
+    return new Promise(resolve => {
+      const intervalId = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+
+        // Check if we received data that was updated AFTER our request started
+        // This ensures we get fresh pushed data, not stale cached data
+        if (this.cachedHierarchy) {
+          const receivedAfterRequest = this.cachedHierarchy.receivedAt > minTimestamp;
+          const updatedAfterRequest = this.cachedHierarchy.hierarchy.updatedAt > minTimestamp;
+
+          if (receivedAfterRequest || updatedAfterRequest) {
+            clearInterval(intervalId);
+            logger.debug(`[ACCESSIBILITY_SERVICE] Fresh data received: receivedAt=${this.cachedHierarchy.receivedAt} (>${minTimestamp}? ${receivedAfterRequest}), updatedAt=${this.cachedHierarchy.hierarchy.updatedAt} (>${minTimestamp}? ${updatedAfterRequest})`);
+            resolve(this.cachedHierarchy);
+            return;
+          }
+        }
+
+        // After staleCheckDelay ms of no push, send a "nudge" to the Android service
+        // This handles cases where no accessibility events are firing (e.g., Settings Intelligence)
+        if (!staleCheckSent && elapsed >= staleCheckDelay) {
+          staleCheckSent = true;
+          logger.info(`[ACCESSIBILITY_SERVICE] No push received after ${staleCheckDelay}ms, sending stale check request (sinceTimestamp: ${minTimestamp})`);
+          this.sendHierarchyIfStaleRequest(minTimestamp);
+        }
+
+        // Check screen state periodically to fail fast if screen is off
+        const now = Date.now();
+        if (!screenCheckInProgress && now - lastScreenCheck >= screenCheckInterval) {
+          screenCheckInProgress = true;
+          lastScreenCheck = now;
+
+          this.adb.isScreenOn().then(isOn => {
+            screenCheckInProgress = false;
+            if (!isOn) {
+              clearInterval(intervalId);
+              logger.warn("[ACCESSIBILITY_SERVICE] Screen is off - failing fast instead of waiting for timeout");
+              resolve(null);
+            }
+          }).catch(() => {
+            screenCheckInProgress = false;
+            // Ignore errors, continue waiting
+          });
+        }
+
+        // Check if timeout exceeded
+        if (elapsed >= timeout) {
+          clearInterval(intervalId);
+          if (this.cachedHierarchy) {
+            logger.debug(`[ACCESSIBILITY_SERVICE] Timeout: cached data receivedAt=${this.cachedHierarchy.receivedAt}, updatedAt=${this.cachedHierarchy.hierarchy.updatedAt}, minTimestamp=${minTimestamp}`);
+          }
+          resolve(null);
+        }
+      }, checkInterval);
+    });
   }
 
   /**
@@ -214,8 +776,23 @@ export class AccessibilityServiceClient {
       const convertedHierarchy = this.convertAccessibilityNode(accessibilityHierarchy.hierarchy);
 
       const result: ViewHierarchyResult = {
-        hierarchy: convertedHierarchy
+        hierarchy: convertedHierarchy,
+        packageName: accessibilityHierarchy.packageName
       };
+
+      // Convert windows if present (for multi-window support - popups, toolbars, etc.)
+      if (accessibilityHierarchy.windows && accessibilityHierarchy.windows.length > 0) {
+        result.windows = accessibilityHierarchy.windows.map(window => ({
+          windowId: window.windowId,
+          windowType: window.windowType,
+          windowLayer: window.windowLayer,
+          packageName: window.packageName,
+          isActive: window.isActive,
+          isFocused: window.isFocused,
+          hierarchy: window.hierarchy ? this.convertAccessibilityNode(window.hierarchy) : undefined
+        }));
+        logger.info(`[ACCESSIBILITY_SERVICE] Converted ${result.windows.length} windows`);
+      }
 
       const duration = Date.now() - startTime;
       logger.info(`[ACCESSIBILITY_SERVICE] Format conversion completed in ${duration}ms`);
@@ -319,38 +896,685 @@ export class AccessibilityServiceClient {
      * Get view hierarchy from accessibility service
      * This is the main entry point for getting hierarchy data from the accessibility service
    * @param queryOptions - Options to filter the view hierarchy
+   * @param perf - Performance tracker for timing
+   * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
      * @returns Promise<ViewHierarchyResult | null> - The hierarchy or null if service unavailable
      */
-  async getAccessibilityHierarchy(queryOptions?: ViewHierarchyQueryOptions): Promise<ViewHierarchyResult | null> {
+  async getAccessibilityHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
+  ): Promise<ViewHierarchyResult | null> {
     const startTime = Date.now();
+
+    perf.serial("a11yService");
 
     try {
       // Check if service is available
-
-      const available = await AccessibilityServiceManager.getInstance(this.device, this.adb).isAvailable();
+      const available = await perf.track("checkAvailable", () =>
+        AccessibilityServiceManager.getInstance(this.device, this.adb).isAvailable()
+      );
       if (!available) {
         logger.info("[ACCESSIBILITY_SERVICE] Service not available, will use fallback");
+        perf.end();
         return null;
       }
 
-      // Get hierarchy from service
-      const accessibilityHierarchy = await this.getLatestHierarchy(queryOptions);
-      if (!accessibilityHierarchy) {
-        logger.warn("[ACCESSIBILITY_SERVICE] Failed to get hierarchy from service, will use fallback");
-        return null;
+      // Get hierarchy from WebSocket service (wait for fresh data on first request, unless skipped)
+      const waitForFresh = !skipWaitForFresh && (this.cachedHierarchy === null || !this.cachedHierarchy.fresh);
+      const response = await perf.track("getHierarchy", () =>
+        this.getLatestHierarchy(waitForFresh, 100, perf, skipWaitForFresh, minTimestamp)
+      );
+
+      let hierarchyData = response.hierarchy;
+      let isFresh = response.fresh;
+      let androidPerfTiming = response.perfTiming;
+
+      // If no hierarchy from WebSocket or data is stale, sync to get fresh data
+      // observe should always return the current screen state
+      const needsSync = !hierarchyData || !isFresh;
+      if (needsSync) {
+        logger.info(`[ACCESSIBILITY_SERVICE] WebSocket returned ${hierarchyData ? "stale" : "no"} data (fresh=${isFresh}), syncing for fresh data`);
+
+        const syncResult = await perf.track("syncRequest", () =>
+          this.requestHierarchySync(perf)
+        );
+
+        if (syncResult) {
+          hierarchyData = syncResult.hierarchy;
+          // Update androidPerfTiming from sync result (fresher than initial response)
+          if (syncResult.perfTiming) {
+            androidPerfTiming = syncResult.perfTiming;
+          }
+          isFresh = true;
+          logger.info("[ACCESSIBILITY_SERVICE] Successfully retrieved hierarchy via sync ADB method");
+        } else if (!hierarchyData) {
+          // Both WebSocket and sync failed with no data at all
+          logger.warn("[ACCESSIBILITY_SERVICE] Both WebSocket and sync methods failed, will use fallback");
+          perf.end();
+          return null;
+        }
+        // If sync failed but we have stale data from WebSocket, use that
       }
 
       // Convert to expected format
-      const convertedHierarchy = this.convertToViewHierarchyResult(accessibilityHierarchy);
+      const convertedHierarchy = await perf.track("convert", () =>
+        Promise.resolve(this.convertToViewHierarchyResult(hierarchyData!))
+      );
+
+      // Add the device timestamp to the result
+      if (hierarchyData!.updatedAt) {
+        convertedHierarchy.updatedAt = hierarchyData!.updatedAt;
+      }
+
+      // Merge Android-side performance timing into the tracker
+      if (androidPerfTiming && androidPerfTiming.length > 0) {
+        perf.addExternalTiming("androidPerf", androidPerfTiming as any);
+      }
+
+      perf.end();
 
       const duration = Date.now() - startTime;
-      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved and converted hierarchy in ${duration}ms`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Successfully retrieved and converted hierarchy in ${duration}ms (fresh: ${isFresh}, updatedAt: ${hierarchyData!.updatedAt})`);
 
       return convertedHierarchy;
     } catch (error) {
+      perf.end();
       const duration = Date.now() - startTime;
-      logger.warn(`[ACCESSIBILITY_SERVICE] getViewHierarchyWithFallback failed after ${duration}ms: ${error}`);
+      logger.warn(`[ACCESSIBILITY_SERVICE] getAccessibilityHierarchy failed after ${duration}ms: ${error}`);
       return null;
+    }
+  }
+
+  /**
+   * Send a message via WebSocket to request hierarchy extraction
+   * @returns true if message was sent successfully
+   */
+  private sendHierarchyRequest(): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Cannot send request - WebSocket not connected");
+      return false;
+    }
+
+    try {
+      const requestId = `req_${Date.now()}_${generateSecureId()}`;
+      const message = JSON.stringify({ type: "request_hierarchy", requestId });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent hierarchy request via WebSocket (requestId: ${requestId})`);
+      return true;
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to send WebSocket request: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Send a message via WebSocket to request hierarchy extraction IF no events
+   * have occurred since the given timestamp. This is used as a "nudge" when
+   * waiting for pushed data but no accessibility events are firing.
+   * @param sinceTimestamp - Extract only if no events occurred after this timestamp
+   * @returns true if message was sent successfully
+   */
+  private sendHierarchyIfStaleRequest(sinceTimestamp: number): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Cannot send stale check request - WebSocket not connected");
+      return false;
+    }
+
+    try {
+      const requestId = `stale_${Date.now()}_${generateSecureId()}`;
+      const message = JSON.stringify({
+        type: "request_hierarchy_if_stale",
+        requestId,
+        sinceTimestamp
+      });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent hierarchy_if_stale request (requestId: ${requestId}, sinceTimestamp: ${sinceTimestamp})`);
+      return true;
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to send stale check request: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Request hierarchy synchronously via WebSocket message
+   * Triggers extraction on device which pushes result via WebSocket
+   * Falls back to ADB broadcast if WebSocket send fails
+   * @param perf - Performance tracker for timing
+   * @returns Promise with hierarchy and perfTiming, or null if failed
+   */
+  async requestHierarchySync(
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null> {
+    const startTime = Date.now();
+
+    try {
+      logger.info("[ACCESSIBILITY_SERVICE] Requesting hierarchy sync via WebSocket");
+
+      // Try WebSocket request first (faster path)
+      const sentViaWebSocket = await perf.track("sendWsRequest", async () => {
+        return this.sendHierarchyRequest();
+      });
+
+      // Fall back to ADB broadcast if WebSocket failed
+      if (!sentViaWebSocket) {
+        logger.info("[ACCESSIBILITY_SERVICE] Falling back to ADB broadcast");
+        const uuid = `sync_${Date.now()}_${generateSecureId()}`;
+        await perf.track("sendBroadcast", async () => {
+          await this.adb.executeCommand(
+            `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid}"`
+          );
+        });
+      }
+
+      // Wait for WebSocket push (triggered by either method)
+      // The Android service calls broadcastHierarchyUpdate() after extraction
+      // Use 10 second timeout to handle long animations (switch toggles can trigger 10+ concurrent extractions)
+      const freshData = await perf.track("waitForPush", () =>
+        this.waitForFreshData(10000, startTime)
+      );
+
+      if (freshData) {
+        const duration = Date.now() - startTime;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sync complete: ${duration}ms (updatedAt: ${freshData.hierarchy.updatedAt})`);
+        return {
+          hierarchy: freshData.hierarchy,
+          perfTiming: freshData.perfTiming
+        };
+      }
+
+      logger.warn("[ACCESSIBILITY_SERVICE] Timeout waiting for WebSocket push after request");
+      return null;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Sync hierarchy request failed after ${duration}ms: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Close WebSocket connection and cleanup
+   */
+  async close(): Promise<void> {
+    try {
+      if (this.ws) {
+        logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
+        this.ws.close();
+        this.ws = null;
+      }
+
+      // Optionally remove port forwarding
+      if (this.portForwardingSetup) {
+        await this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+          // Ignore errors
+        });
+        this.portForwardingSetup = false;
+      }
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Error during cleanup: ${error}`);
+    }
+  }
+
+  /**
+   * Request a screenshot from the accessibility service
+   * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<ScreenshotResult> - The screenshot result
+   */
+  async requestScreenshot(
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<ScreenshotResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for screenshot");
+        return {
+          success: false,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send screenshot request
+      const requestId = `screenshot_${Date.now()}_${generateSecureId()}`;
+      this.pendingScreenshotRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the screenshot
+      const screenshotPromise = new Promise<ScreenshotResult>(resolve => {
+        this.pendingScreenshotResolve = resolve;
+
+        // Set up timeout
+        setTimeout(() => {
+          if (this.pendingScreenshotResolve === resolve) {
+            this.pendingScreenshotResolve = null;
+            this.pendingScreenshotRequestId = null;
+            resolve({
+              success: false,
+              error: `Screenshot timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({ type: "request_screenshot", requestId });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent screenshot request (requestId: ${requestId})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForScreenshot", () => screenshotPromise);
+
+      const duration = Date.now() - startTime;
+      if (result.success) {
+        const dataSize = result.data ? result.data.length : 0;
+        logger.info(`[ACCESSIBILITY_SERVICE] Screenshot received in ${duration}ms (${dataSize} base64 chars)`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot failed after ${duration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request a swipe gesture from the accessibility service using dispatchGesture API.
+   * This is significantly faster than ADB's input swipe command.
+   * @param x1 - Starting X coordinate
+   * @param y1 - Starting Y coordinate
+   * @param x2 - Ending X coordinate
+   * @param y2 - Ending Y coordinate
+   * @param duration - Swipe duration in milliseconds (default: 300)
+   * @param timeoutMs - Maximum time to wait for swipe completion in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11ySwipeResult> - The swipe result with timing information
+   */
+  async requestSwipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    duration: number = 300,
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11ySwipeResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for swipe");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send swipe request
+      const requestId = `swipe_${Date.now()}_${generateSecureId()}`;
+      this.pendingSwipeRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the swipe result
+      const swipePromise = new Promise<A11ySwipeResult>(resolve => {
+        this.pendingSwipeResolve = resolve;
+
+        // Set up timeout
+        setTimeout(() => {
+          if (this.pendingSwipeResolve === resolve) {
+            this.pendingSwipeResolve = null;
+            this.pendingSwipeRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Swipe timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_swipe",
+          requestId,
+          x1: Math.round(x1),
+          y1: Math.round(y1),
+          x2: Math.round(x2),
+          y2: Math.round(y2),
+          duration
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent swipe request (requestId: ${requestId}, ${x1},${y1} -> ${x2},${y2}, duration: ${duration}ms)`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForSwipe", () => swipePromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Swipe completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Swipe failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Swipe request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request text input via the accessibility service using ACTION_SET_TEXT.
+   * This is significantly faster than ADB's input text command because it
+   * bypasses the entire ADB/shell overhead and directly sets text on the
+   * focused input field.
+   *
+   * @param text - The text to input
+   * @param resourceId - Optional resource-id to target a specific element (otherwise uses focused element)
+   * @param timeoutMs - Maximum time to wait for text input in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11ySetTextResult> - The text input result with timing information
+   */
+  async requestSetText(
+    text: string,
+    resourceId?: string,
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11ySetTextResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for setText");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send set text request
+      const requestId = `setText_${Date.now()}_${generateSecureId()}`;
+      this.pendingSetTextRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the set text result
+      const setTextPromise = new Promise<A11ySetTextResult>(resolve => {
+        this.pendingSetTextResolve = resolve;
+
+        // Set up timeout
+        setTimeout(() => {
+          if (this.pendingSetTextResolve === resolve) {
+            this.pendingSetTextResolve = null;
+            this.pendingSetTextRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Set text timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_set_text",
+          requestId,
+          text,
+          resourceId
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent set text request (requestId: ${requestId}, text length: ${text.length}, resourceId: ${resourceId || "focused"})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForSetText", () => setTextPromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Set text completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Set text failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Set text request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Clear text from the currently focused input field via the accessibility service.
+   * This uses ACTION_SET_TEXT with an empty string, which is significantly faster
+   * than sending multiple KEYCODE_DEL events via ADB.
+   *
+   * @param resourceId - Optional resource-id to target a specific element (otherwise uses focused element)
+   * @param timeoutMs - Maximum time to wait for clear operation in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11ySetTextResult> - The clear result with timing information
+   */
+  async requestClearText(
+    resourceId?: string,
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11ySetTextResult> {
+    logger.debug("[ACCESSIBILITY_SERVICE] Clearing text via requestSetText with empty string");
+    return this.requestSetText("", resourceId, timeoutMs, perf);
+  }
+
+  /**
+   * Request an IME action via the accessibility service.
+   * This properly handles focus movement (next/previous) by finding the next/previous
+   * focusable element and calling ACTION_FOCUS, rather than using KEYCODE_TAB
+   * which would insert a tab character.
+   *
+   * For done/go/send/search actions, it dismisses the keyboard by going back.
+   *
+   * @param action - The IME action to perform: done, next, search, send, go, previous
+   * @param timeoutMs - Maximum time to wait for action completion in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11yImeActionResult> - The IME action result with timing information
+   */
+  async requestImeAction(
+    action: "done" | "next" | "search" | "send" | "go" | "previous",
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yImeActionResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for IME action");
+        return {
+          success: false,
+          action,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send IME action request
+      const requestId = `imeAction_${Date.now()}_${generateSecureId()}`;
+      this.pendingImeActionRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the IME action result
+      const imeActionPromise = new Promise<A11yImeActionResult>(resolve => {
+        this.pendingImeActionResolve = resolve;
+
+        // Set up timeout
+        setTimeout(() => {
+          if (this.pendingImeActionResolve === resolve) {
+            this.pendingImeActionResolve = null;
+            this.pendingImeActionRequestId = null;
+            resolve({
+              success: false,
+              action,
+              totalTimeMs: Date.now() - startTime,
+              error: `IME action timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_ime_action",
+          requestId,
+          action
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent IME action request (requestId: ${requestId}, action: ${action})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForImeAction", () => imeActionPromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] IME action completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, action=${result.action}`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] IME action failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] IME action request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        action,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request select all text via the accessibility service.
+   * This uses ACTION_SET_SELECTION to select all text in the focused field,
+   * which is significantly faster than using ADB double-tap gestures.
+   *
+   * @param timeoutMs - Maximum time to wait for action completion in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11ySelectAllResult> - The select all result with timing information
+   */
+  async requestSelectAll(
+    timeoutMs: number = 5000,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11ySelectAllResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for select all");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send select all request
+      const requestId = `selectAll_${Date.now()}_${generateSecureId()}`;
+      this.pendingSelectAllRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the select all result
+      const selectAllPromise = new Promise<A11ySelectAllResult>(resolve => {
+        this.pendingSelectAllResolve = resolve;
+
+        // Set up timeout
+        setTimeout(() => {
+          if (this.pendingSelectAllResolve === resolve) {
+            this.pendingSelectAllResolve = null;
+            this.pendingSelectAllRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Select all timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_select_all",
+          requestId
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent select all request (requestId: ${requestId})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForSelectAll", () => selectAllPromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Select all completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Select all failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Select all request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
     }
   }
 }

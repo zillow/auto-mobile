@@ -14,6 +14,7 @@ import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Command to tap on UI element containing specified text
@@ -32,7 +33,7 @@ export class TapOnElement extends BaseVisualChange {
   ) {
     super(device, adb, axe);
     this.elementUtils = new ElementUtils();
-    this.accessibilityService = new AccessibilityServiceClient(device, this.adb);
+    this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.webdriver = webdriver || new WebDriverAgent(device);
   }
 
@@ -134,6 +135,9 @@ export class TapOnElement extends BaseVisualChange {
       return this.createErrorResult(options.action, "tap on action is required");
     }
 
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("tapOnElement");
+
     try {
       // Tap on the calculated point using observedChange
       return await this.observedInteraction(
@@ -141,10 +145,13 @@ export class TapOnElement extends BaseVisualChange {
 
           const viewHierarchy = observeResult.viewHierarchy;
           if (!viewHierarchy) {
+            perf.end();
             return { success: false, error: "Unable to get view hierarchy, cannot tap on element" };
           }
 
-          const element = await this.findElementToTap(options, viewHierarchy);
+          const element = await perf.track("findElement", () =>
+            this.findElementToTap(options, viewHierarchy)
+          );
           const tapPoint = this.elementUtils.getElementCenter(element);
 
           if (options.action === "focus") {
@@ -153,6 +160,7 @@ export class TapOnElement extends BaseVisualChange {
 
             if (isFocused) {
               logger.info(`Element is already focused, no action needed`);
+              perf.end();
               return {
                 success: true,
                 element: element,
@@ -168,17 +176,20 @@ export class TapOnElement extends BaseVisualChange {
           }
 
           // Platform-specific tap execution
-          switch (this.device.platform) {
-            case "android":
-              await this.executeAndroidTap(options.action, tapPoint.x, tapPoint.y);
-              break;
-            case "ios":
-              await this.executeiOSTap(options.action, tapPoint.x, tapPoint.y);
-              break;
-            default:
-              throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
-          }
+          await perf.track("executeTap", async () => {
+            switch (this.device.platform) {
+              case "android":
+                await this.executeAndroidTap(options.action, tapPoint.x, tapPoint.y);
+                break;
+              case "ios":
+                await this.executeiOSTap(options.action, tapPoint.x, tapPoint.y);
+                break;
+              default:
+                throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
+            }
+          });
 
+          perf.end();
           return {
             success: true,
             action: options.action,
@@ -193,10 +204,12 @@ export class TapOnElement extends BaseVisualChange {
           },
           changeExpected: false,
           timeoutMs: 800, // Reduce timeout for faster execution
-          progress
+          progress,
+          perf
         }
       );
     } catch (error) {
+      perf.end();
       throw new ActionableError(`Failed to perform tap on element: ${error}`);
     }
   }

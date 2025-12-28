@@ -2,6 +2,7 @@ import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
 import { Axe, AxeButton } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class PressButton extends BaseVisualChange {
   constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
@@ -13,19 +14,28 @@ export class PressButton extends BaseVisualChange {
     button: string,
     progress?: ProgressCallback
   ): Promise<PressButtonResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("pressButton");
+
     return this.observedInteraction(
       async () => {
         try {
           // Platform-specific button press execution
           switch (this.device.platform) {
             case "android":
-              return await this.executeAndroidButtonPress(button);
+              return await perf.track("androidButtonPress", () =>
+                this.executeAndroidButtonPress(button)
+              );
             case "ios":
-              return await this.executeiOSButtonPress(button);
+              return await perf.track("iOSButtonPress", () =>
+                this.executeiOSButtonPress(button)
+              );
             default:
+              perf.end();
               throw new Error(`Unsupported platform: ${this.device.platform}`);
           }
         } catch (error) {
+          perf.end();
           return {
             success: false,
             button,
@@ -37,7 +47,8 @@ export class PressButton extends BaseVisualChange {
       {
         changeExpected: false,
         timeoutMs: 2000, // Reduce timeout for faster execution
-        progress
+        progress,
+        perf
       }
     );
   }

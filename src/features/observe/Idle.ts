@@ -1,6 +1,7 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
 import { UiStabilityResult, TouchIdleResult, RotationCheckResult, BootedDevice } from "../../models";
+import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class Idle {
   private adb: AdbUtils;
@@ -75,19 +76,23 @@ export class Idle {
    * @param targetRotation - The expected rotation value
    * @param startTime - When rotation checking started
    * @param timeoutMs - Maximum time to wait for rotation
+   * @param perf - Optional performance tracker
    * @returns Object containing rotation check results
    */
   async getRotationStatus(
     targetRotation: number,
     startTime: number,
-    timeoutMs: number
+    timeoutMs: number,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<RotationCheckResult> {
     const currentElapsed = Date.now() - startTime;
     const shouldContinue = currentElapsed < timeoutMs;
 
     try {
       // Check the current rotation through window manager service
-      const { stdout } = await this.adb.executeCommand('shell dumpsys window | grep -i "mRotation="');
+      const { stdout } = await perf.track("adbDumpsysWindowRotation", () =>
+        this.adb.executeCommand('shell dumpsys window | grep -i "mRotation="')
+      );
       const rotationMatch = stdout.match(/mRotation=(\d+)/);
 
       if (rotationMatch) {
@@ -129,17 +134,21 @@ export class Idle {
    * Measure UI idle status by resetting gfx stats and taking an immediate measurement
    * @param packageName - Package name of the app to monitor
    * @param measurementDelayMs - Time to wait after reset before measuring (default 200ms)
+   * @param perf - Optional performance tracker
    * @returns Object containing UI idle measurement results
    */
   async getUiStabilitySnapshot(
     packageName: string,
-    measurementDelayMs: number = 200
+    measurementDelayMs: number = 200,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<UiStabilityResult> {
     logger.info(`[AwaitIdle] Measuring UI idle for ${packageName} with ${measurementDelayMs}ms delay`);
 
     try {
       // Reset the gfxinfo stats for the package
-      await this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName} reset`);
+      await perf.track("adbGfxinfoReset", () =>
+        this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName} reset`)
+      );
 
       // Wait for measurement period to accumulate data
       await new Promise(resolve => setTimeout(resolve, measurementDelayMs));
@@ -150,7 +159,8 @@ export class Idle {
         null, // No previous missed vsync
         null, // No previous slow UI thread
         null, // No previous frame deadline missed
-        false // Not first log since we just reset
+        false, // Not first log since we just reset
+        perf
       );
     } catch (err) {
       logger.info(`[Idle] Error measuring UI idle: ${err}`);
@@ -169,11 +179,18 @@ export class Idle {
    * Get frame stats from adb command
    * @param packageName - Package name of the app
    * @param firstGfxInfoLog - Whether this is the first gfx info log
+   * @param perf - Optional performance tracker
    * @returns Frame stats output string
    */
-  private async getFrameStats(packageName: string, firstGfxInfoLog: boolean): Promise<string> {
+  private async getFrameStats(
+    packageName: string,
+    firstGfxInfoLog: boolean,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<string> {
     try {
-      const { stdout } = await this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName}`);
+      const { stdout } = await perf.track("adbGfxinfo", () =>
+        this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName}`)
+      );
       if (firstGfxInfoLog) {
         logger.info(`[AwaitIdle] Initial gfxinfo stdout for ${packageName}:\n${stdout}`);
       }
@@ -401,6 +418,7 @@ export class Idle {
    * @param prevSlowUiThread - Previous slow UI thread count
    * @param prevFrameDeadlineMissed - Previous frame deadline missed count
    * @param firstGfxInfoLog - Whether this is the first gfx info log
+   * @param perf - Optional performance tracker
    * @returns Object containing stability check results and updated state
    */
   async getUiStability(
@@ -408,7 +426,8 @@ export class Idle {
     prevMissedVsync: number | null,
     prevSlowUiThread: number | null,
     prevFrameDeadlineMissed: number | null,
-    firstGfxInfoLog: boolean
+    firstGfxInfoLog: boolean,
+    perf: IPerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<UiStabilityResult> {
     try {
       // For system packages, use a simpler approach
@@ -425,7 +444,7 @@ export class Idle {
       }
 
       // Get the frame stats
-      const stdout = await this.getFrameStats(packageName, firstGfxInfoLog);
+      const stdout = await this.getFrameStats(packageName, firstGfxInfoLog, perf);
 
       // If we get empty output, treat as stable (package might not support gfxinfo)
       if (!stdout || stdout.trim() === "") {

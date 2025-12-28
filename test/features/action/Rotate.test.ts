@@ -168,12 +168,8 @@ describe("Rotate", () => {
         .onSecondCall().resolves(createMockExecResult("1")); // After rotation, return landscape
       // Mock getting orientation lock status as unlocked
       mockAdb.executeCommand.withArgs("shell settings get system accelerometer_rotation").resolves(createMockExecResult("1"));
-      // Mock successful unlock
-      mockAdb.executeCommand.withArgs("shell settings put system accelerometer_rotation 0").resolves(createMockExecResult());
-      // Mock successful rotation
-      mockAdb.executeCommand.withArgs("shell settings put system user_rotation 1").resolves(createMockExecResult());
-      // Mock successful restore lock
-      mockAdb.executeCommand.withArgs("shell settings put system accelerometer_rotation 1").resolves(createMockExecResult());
+      // Mock successful combined rotation command (disables accelerometer + sets rotation in one call)
+      mockAdb.executeCommand.withArgs("shell \"settings put system accelerometer_rotation 0; settings put system user_rotation 1\"").resolves(createMockExecResult());
 
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
@@ -187,9 +183,8 @@ describe("Rotate", () => {
       assert.isTrue(result.rotationPerformed);
       assert.include(result.message || "", "Successfully rotated from portrait to landscape");
 
-      // Verify rotation commands were called
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell settings put system accelerometer_rotation 0");
-      sinon.assert.calledWith(mockAdb.executeCommand, "shell settings put system user_rotation 1");
+      // Verify combined rotation command was called
+      sinon.assert.calledWith(mockAdb.executeCommand, "shell \"settings put system accelerometer_rotation 0; settings put system user_rotation 1\"");
     });
 
     it("should handle locked orientation by temporarily unlocking", async () => {
@@ -199,29 +194,27 @@ describe("Rotate", () => {
         .onSecondCall().resolves(createMockExecResult("0")); // After rotation, return portrait
       // Mock getting orientation lock status as locked
       mockAdb.executeCommand.withArgs("shell settings get system accelerometer_rotation").resolves(createMockExecResult("0"));
-      // Mock successful unlock
+      // Mock successful unlock (called when orientation is locked)
       mockAdb.executeCommand.withArgs("shell settings put system accelerometer_rotation 1").resolves(createMockExecResult());
-      // Mock successful rotation
-      mockAdb.executeCommand.withArgs("shell settings put system user_rotation 0").resolves(createMockExecResult());
-      // Mock successful restore lock
-      mockAdb.executeCommand.withArgs("shell settings put system accelerometer_rotation 0").resolves(createMockExecResult());
+      // Mock successful combined rotation command
+      mockAdb.executeCommand.withArgs("shell \"settings put system accelerometer_rotation 0; settings put system user_rotation 0\"").resolves(createMockExecResult());
 
       const mockObservation = createMockObserveResult();
       mockObserveScreen.execute.resolves(mockObservation);
 
-      // The implementation should attempt the rotation and handle errors gracefully
-      await rotate.execute("portrait");
+      const result = await rotate.execute("portrait");
 
-      // Verify that unlock and restore lock commands were called even if rotation failed
+      assert.isTrue(result.success);
+      assert.isTrue(result.orientationLockHandled);
+
+      // Verify that unlock command was called before rotation
       const unlockCalls = mockAdb.executeCommand.getCalls().filter(call =>
         call.args[0] === "shell settings put system accelerometer_rotation 1"
       );
-      const restoreLockCalls = mockAdb.executeCommand.getCalls().filter(call =>
-        call.args[0] === "shell settings put system accelerometer_rotation 0"
-      );
-
       assert.isAtLeast(unlockCalls.length, 1);
-      assert.isAtLeast(restoreLockCalls.length, 1);
+
+      // Verify combined rotation command was called
+      sinon.assert.calledWith(mockAdb.executeCommand, "shell \"settings put system accelerometer_rotation 0; settings put system user_rotation 0\"");
     });
   });
 

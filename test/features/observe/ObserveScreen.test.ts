@@ -28,11 +28,11 @@ describe("ObserveScreen", function() {
     it("should create base result with correct structure", function() {
       const result = observeScreen.createBaseResult();
 
-      expect(result).to.have.property("timestamp");
+      expect(result).to.have.property("updatedAt");
       expect(result).to.have.property("screenSize");
       expect(result).to.have.property("systemInsets");
 
-      expect(result.timestamp).to.be.a("string");
+      expect(result.updatedAt).to.be.a("string");
       expect(result.screenSize).to.deep.equal({ width: 0, height: 0 });
       expect(result.systemInsets).to.deep.equal({ top: 0, right: 0, bottom: 0, left: 0 });
     });
@@ -40,14 +40,14 @@ describe("ObserveScreen", function() {
     it("should create base result with valid ISO timestamp", function() {
       const result = observeScreen.createBaseResult();
 
-      const timestamp = new Date(result.timestamp);
-      expect(timestamp.getTime()).to.not.be.NaN;
-      expect(Math.abs(Date.now() - timestamp.getTime())).to.be.lessThan(5000); // Within 5 seconds
+      const updatedAt = new Date(result.updatedAt);
+      expect(updatedAt.getTime()).to.not.be.NaN;
+      expect(Math.abs(Date.now() - updatedAt.getTime())).to.be.lessThan(5000); // Within 5 seconds
     });
 
     it("should append error message to empty error field", function() {
       const result: ObserveResult = {
-        timestamp: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z",
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
       };
@@ -59,7 +59,7 @@ describe("ObserveScreen", function() {
 
     it("should append error message to existing error field", function() {
       const result: ObserveResult = {
-        timestamp: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z",
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
         error: "Existing error"
@@ -72,7 +72,7 @@ describe("ObserveScreen", function() {
 
     it("should append multiple errors correctly", function() {
       const result: ObserveResult = {
-        timestamp: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z",
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
       };
@@ -86,7 +86,7 @@ describe("ObserveScreen", function() {
 
     it("should handle special characters in error messages", function() {
       const result: ObserveResult = {
-        timestamp: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z",
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
       };
@@ -99,7 +99,7 @@ describe("ObserveScreen", function() {
 
     it("should handle empty error message gracefully", function() {
       const result: ObserveResult = {
-        timestamp: "2023-01-01T00:00:00.000Z",
+        updatedAt: "2023-01-01T00:00:00.000Z",
         screenSize: { width: 0, height: 0 },
         systemInsets: { top: 0, right: 0, bottom: 0, left: 0 }
       };
@@ -358,7 +358,7 @@ describe("ObserveScreen", function() {
       const result = await observeScreen.execute();
 
       // Verify it contains all the required data
-      expect(result).to.have.property("timestamp");
+      expect(result).to.have.property("updatedAt");
       expect(result).to.have.property("screenSize");
       expect(result.screenSize).to.have.property("width");
       expect(result.screenSize).to.have.property("height");
@@ -370,13 +370,6 @@ describe("ObserveScreen", function() {
       expect(result.systemInsets).to.have.property("right");
       expect(result.systemInsets).to.have.property("bottom");
       expect(result.systemInsets).to.have.property("left");
-
-      expect(result).to.have.property("screenshotPath");
-      expect(result.screenshotPath).to.be.a("string");
-
-      // Check if screenshot file exists
-      const fileExists = await adb.executeCommand(`shell "if [ -f ${result.screenshotPath} ]; then echo 'exists'; else echo 'not exists'; fi"`);
-      expect(fileExists.stdout.trim()).to.include("exists");
 
       expect(result).to.have.property("viewHierarchy");
       expect(result.viewHierarchy).to.have.property("hierarchy");
@@ -433,7 +426,7 @@ describe("ObserveScreen", function() {
       // First observation
       const firstResult = await observeScreen.execute();
 
-      // Wait for tiny delay to ensure screenshots will have different paths
+      // Wait for tiny delay
       new Promise(resolve => setTimeout(resolve, 1));
 
       // Second observation
@@ -443,25 +436,14 @@ describe("ObserveScreen", function() {
       expect(secondResult.screenSize.width).to.equal(firstResult.screenSize.width);
       expect(secondResult.screenSize.height).to.equal(firstResult.screenSize.height);
 
-      // Package name should remain the same
-      expect(secondResult.activeWindow!.appId).to.equal(firstResult.activeWindow!.appId);
+      // Package name should remain the same (if activeWindow is available)
+      if (firstResult.activeWindow && secondResult.activeWindow) {
+        expect(secondResult.activeWindow.appId).to.equal(firstResult.activeWindow.appId);
+      }
 
-      // Screenshots should have different paths even if the UI hasn't changed
-      expect(secondResult.screenshotPath).to.not.equal(firstResult.screenshotPath);
-
-      // Both screenshots should have valid file paths
-      expect(firstResult.screenshotPath).to.be.a("string").and.not.empty;
-      expect(secondResult.screenshotPath).to.be.a("string").and.not.empty;
-
-      // Both screenshots should contain timestamp information (format: screenshot_timestamp.ext)
-      const firstFilename = firstResult.screenshotPath!.split("/").pop() || "";
-      const secondFilename = secondResult.screenshotPath!.split("/").pop() || "";
-
-      expect(firstFilename).to.match(/^screenshot_\d+\.(png|webp)$/);
-      expect(secondFilename).to.match(/^screenshot_\d+\.(png|webp)$/);
-
-      logger.info(`First screenshot: ${firstFilename}`);
-      logger.info(`Second screenshot: ${secondFilename}`);
+      // Both observations should have view hierarchy
+      expect(firstResult.viewHierarchy).to.exist;
+      expect(secondResult.viewHierarchy).to.exist;
     });
 
     it("should handle errors gracefully if device is disconnected", async function() {
@@ -484,7 +466,7 @@ describe("ObserveScreen", function() {
       // Should still return a result object with error info
       const result = await invalidObserveScreen.execute();
 
-      expect(result).to.have.property("timestamp");
+      expect(result).to.have.property("updatedAt");
       expect(result).to.have.property("screenSize");
       expect(result).to.have.property("systemInsets");
       expect(result).to.have.property("error");

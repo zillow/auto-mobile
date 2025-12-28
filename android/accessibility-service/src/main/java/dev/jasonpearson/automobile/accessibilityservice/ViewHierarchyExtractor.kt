@@ -4,9 +4,11 @@ import android.graphics.Rect
 import android.os.Build
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
+import dev.jasonpearson.automobile.accessibilityservice.models.WindowHierarchy
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.serialization.builtins.ListSerializer
@@ -55,6 +57,193 @@ class ViewHierarchyExtractor {
     } catch (e: Exception) {
       Log.e(TAG, "Error extracting view hierarchy", e)
       ViewHierarchy(error = "Failed to extract view hierarchy: ${e.message}")
+    }
+  }
+
+  /**
+   * Extracts view hierarchy from all visible windows.
+   * This captures popups, toolbars, and other floating windows that aren't in the main window.
+   * Filters out irrelevant windows (system UI, input methods, selection handles) to reduce payload size.
+   *
+   * @param windows List of all accessibility windows (from AccessibilityService.windows)
+   * @param activeWindowRoot Root node of the active window (for backward compatibility)
+   * @param textFilter Optional text filter
+   */
+  fun extractFromAllWindows(
+      windows: List<AccessibilityWindowInfo>,
+      activeWindowRoot: AccessibilityNodeInfo?,
+      textFilter: String? = null
+  ): ViewHierarchy {
+    if (windows.isEmpty() && activeWindowRoot == null) {
+      Log.w(TAG, "No windows available for extraction")
+      return ViewHierarchy(error = "No windows available")
+    }
+
+    val windowHierarchies = mutableListOf<WindowHierarchy>()
+    var mainHierarchy: UIElementInfo? = null
+    var mainPackageName: String? = null
+
+    // Extract from each window
+    for (window in windows) {
+      try {
+        val rootNode = window.root ?: continue
+
+        val windowType = when (window.type) {
+          AccessibilityWindowInfo.TYPE_APPLICATION -> "application"
+          AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "input_method"
+          AccessibilityWindowInfo.TYPE_SYSTEM -> "system"
+          AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY -> "accessibility_overlay"
+          AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER -> "split_screen_divider"
+          AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY -> "magnification_overlay"
+          else -> "unknown_${window.type}"
+        }
+
+        val element = extractNodeInfo(rootNode, 0, textFilter)
+        val processedElement = element?.let { processForAccessibility(it) }
+        val packageName = rootNode.packageName?.toString()
+
+        // The active window becomes the main hierarchy (backward compatibility)
+        if (window.isActive) {
+          mainHierarchy = processedElement
+          mainPackageName = packageName
+          // Skip adding to windows list - it's already in main hierarchy
+          continue
+        }
+
+        // Filter out irrelevant windows to reduce payload size
+        if (shouldSkipWindow(windowType, processedElement)) {
+          Log.d(TAG, "Skipping window ${window.id} (type=$windowType): filtered out")
+          continue
+        }
+
+        // Get window layer for z-ordering
+        val layer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+          window.displayId
+        } else {
+          window.id
+        }
+
+        windowHierarchies.add(
+          WindowHierarchy(
+            windowId = window.id,
+            windowType = windowType,
+            windowLayer = layer,
+            packageName = packageName,
+            isActive = window.isActive,
+            isFocused = window.isFocused,
+            hierarchy = processedElement
+          )
+        )
+      } catch (e: Exception) {
+        Log.e(TAG, "Error extracting hierarchy from window ${window.id}", e)
+      }
+    }
+
+    // Fallback to activeWindowRoot if no active window found in window list
+    if (mainHierarchy == null && activeWindowRoot != null) {
+      val element = extractNodeInfo(activeWindowRoot, 0, textFilter)
+      mainHierarchy = element?.let { processForAccessibility(it) }
+      mainPackageName = activeWindowRoot.packageName?.toString()
+    }
+
+    Log.d(TAG, "Extracted ${windowHierarchies.size} additional window hierarchies (after filtering)")
+
+    return ViewHierarchy(
+      packageName = mainPackageName,
+      hierarchy = mainHierarchy,
+      windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null
+    )
+  }
+
+  /**
+   * Determines if a window should be skipped based on filtering heuristics.
+   * We skip windows that don't add useful information for UI automation:
+   * - System windows (status bar, navigation bar)
+   * - Input method windows (keyboard)
+   * - Tiny windows without actionable content (selection handles)
+   * - Windows without any clickable elements with text/content-desc
+   */
+  private fun shouldSkipWindow(windowType: String, hierarchy: UIElementInfo?): Boolean {
+    // Skip system windows (status bar, nav bar, etc.)
+    if (windowType == "system") return true
+
+    // Skip input method windows (keyboard)
+    if (windowType == "input_method") return true
+
+    // Skip accessibility overlays and magnification overlays
+    if (windowType == "accessibility_overlay" || windowType == "magnification_overlay") return true
+
+    // Skip split screen divider
+    if (windowType == "split_screen_divider") return true
+
+    // If no hierarchy, skip
+    if (hierarchy == null) return true
+
+    // Check if window has any actionable content worth keeping
+    if (!hasActionableContent(hierarchy)) {
+      // Check window size - tiny windows without content are likely selection handles
+      val bounds = hierarchy.bounds
+      if (bounds != null) {
+        val width = bounds.right - bounds.left
+        val height = bounds.bottom - bounds.top
+        val area = width * height
+        // Skip tiny windows (less than 100x100 = 10,000 px²)
+        if (area < 10000) {
+          Log.d(TAG, "Skipping tiny window with area $area px² and no actionable content")
+          return true
+        }
+      }
+      // No actionable content regardless of size
+      return true
+    }
+
+    return false
+  }
+
+  /**
+   * Checks if a hierarchy contains actionable content worth including.
+   * Actionable content = clickable elements with text or content-desc.
+   */
+  private fun hasActionableContent(element: UIElementInfo): Boolean {
+    // Check if this element is actionable
+    if (element.isClickable || element.isLongClickable) {
+      // Has meaningful identifier?
+      if (!element.text.isNullOrBlank() ||
+          !element.contentDesc.isNullOrBlank() ||
+          !element.resourceId.isNullOrBlank()) {
+        return true
+      }
+    }
+
+    // Check children recursively via node property
+    val nodeElement = element.node ?: return false
+    return hasActionableContentInNode(nodeElement)
+  }
+
+  /**
+   * Recursively checks if a node JsonElement contains actionable content.
+   */
+  private fun hasActionableContentInNode(nodeElement: JsonElement): Boolean {
+    return when {
+      nodeElement is JsonObject -> {
+        try {
+          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
+          hasActionableContent(child)
+        } catch (e: Exception) {
+          false
+        }
+      }
+      nodeElement is JsonArray -> {
+        nodeElement.jsonArray.any { childJson ->
+          try {
+            val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+            hasActionableContent(child)
+          } catch (e: Exception) {
+            false
+          }
+        }
+      }
+      else -> false
     }
   }
 

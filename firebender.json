@@ -26,5 +26,14 @@
     "dist/",
     ".view_hierarchy_cache/",
     "*.js"
-  ]
+  ],
+  "mcpServers": {
+    "auto-mobile": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "auto-mobile"
+      ]
+    }
+  }
 }

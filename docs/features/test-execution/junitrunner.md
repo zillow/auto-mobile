@@ -5,7 +5,7 @@ modules, but AutoMobile's automatic test authoring will still attempt to place t
 matches the UI being tested.
 
 ```gradle
-testImplementation("com.zillow.automobile.junitrunner:x.y.z")
+testImplementation("dev.jasonpearson.automobile.junitrunner:x.y.z")
 ```
 
 Note that this artifact hasn't been published to Maven Central just yet and is forthcoming.  

@@ -203,8 +203,8 @@ describe("Window", () => {
       const result = await window.getActive(true);
 
       // Should extract the package and activity from the mActivityRecord line within the Pop-Up Window block
-      expect(result.appId).to.equal("com.zillow.android.zillowmap");
-      expect(result.activityName).to.equal("com.zillow.android.appshell.MainTabActivity");
+      expect(result.appId).to.equal("dev.jasonpearson.android.zillowmap");
+      expect(result.activityName).to.equal("dev.jasonpearson.android.appshell.MainTabActivity");
       expect(result.layoutSeqSum).to.be.greaterThan(0);
     });
 
@@ -216,11 +216,11 @@ describe("Window", () => {
 
         Window #9 Window{ddf8489 u0 Pop-Up Window}:
           mDisplayId=0 rootTaskId=8 mSession=Session{8b3234c 4199:u0a10207}
-          mOwnerUid=10207 showForAllUsers=false package=com.zillow.android.zillowmap appop=NONE
-          mActivityRecord=ActivityRecord{5cd319f u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity t8}
+          mOwnerUid=10207 showForAllUsers=false package=dev.jasonpearson.android.zillowmap appop=NONE
+          mActivityRecord=ActivityRecord{5cd319f u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity t8}
           mViewVisibility=0x0 mHaveFrame=true mObscured=false
 
-        Window #10 Window{10634fe u0 com.zillow.android.zillowmap/com.zillow.android.appshell.MainTabActivity}:
+        Window #10 Window{10634fe u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity}:
           mDisplayId=0 rootTaskId=8
           mLayoutSeq=258
       `;
@@ -235,8 +235,8 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("com.zillow.android.zillowmap");
-      expect(result.activityName).to.equal("com.zillow.android.appshell.MainTabActivity");
+      expect(result.appId).to.equal("dev.jasonpearson.android.zillowmap");
+      expect(result.activityName).to.equal("dev.jasonpearson.android.appshell.MainTabActivity");
       expect(result.layoutSeqSum).to.equal(258);
     });
 

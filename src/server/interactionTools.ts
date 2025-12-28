@@ -15,10 +15,11 @@ import { Rotate } from "../features/action/Rotate";
 import { ElementUtils } from "../features/utility/ElementUtils";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { OpenURL } from "../features/action/OpenURL";
-import { ActionableError, BootedDevice } from "../models";
+import { ActionableError, BootedDevice, ViewHierarchyResult } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { logger } from "../utils/logger";
 import { Platform } from "../models";
+import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 
 // Type definitions for better TypeScript support
 export interface ClearTextArgs {
@@ -77,11 +78,17 @@ export interface SwipeOnElementArgs {
   platform: Platform;
 }
 
+export interface ScrollContainerArgs {
+  elementId?: string;
+  text?: string;
+}
+
 export interface ScrollArgs {
-  containerElementId: string;
+  container: ScrollContainerArgs;
   direction: "up" | "down" | "left" | "right";
   lookFor?: ScrollLookForArgs;
   speed?: "slow" | "normal" | "fast";
+  scrollMode?: "adb" | "a11y";
   platform: Platform;
 }
 
@@ -155,14 +162,18 @@ export const dragAndDropSchema = z.object({
 });
 
 export const scrollSchema = z.object({
-  containerElementId: z.string().describe("Element ID to scroll until visible"),
+  container: z.object({
+    elementId: z.string().optional().describe("Resource ID of the container element (finds nearest scrollable parent if element is not scrollable)"),
+    text: z.string().optional().describe("Text within the container (finds nearest scrollable parent of element containing this text)")
+  }).describe("Container element to scroll within - specify elementId or text to locate it"),
   direction: z.enum(["up", "down", "left", "right"]).describe("Scroll direction"),
   lookFor: z.object({
     elementId: z.string().optional().describe("ID of the element to look for while scrolling"),
     text: z.string().optional().describe("Optional text to look for while scrolling"),
-    maxTime: z.number().optional().describe("Maximum amount of time to spend scrolling, (default 10 seconds)")
+    maxTime: z.number().optional().describe("Maximum amount of time to spend scrolling, (default 15 seconds)")
   }).optional().describe("What we're searching for while scrolling"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
+  scrollMode: z.enum(["adb", "a11y"]).optional().describe("Scroll execution mode: 'adb' (default, ~540ms) or 'a11y' (accessibility service, ~50-150ms)"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
@@ -426,120 +437,378 @@ export function registerInteractionTools() {
     }
   };
 
+  /**
+   * Compute a simple fingerprint of view hierarchy for change detection.
+   * Uses text content and bounds to detect if scroll actually changed the view.
+   */
+  const computeHierarchyFingerprint = (hierarchy: ViewHierarchyResult): string => {
+    const extractTexts = (node: Record<string, unknown>): string[] => {
+      const texts: string[] = [];
+      if (node.text && typeof node.text === "string") {
+        texts.push(`${node.text}@${node.bounds || ""}`);
+      }
+      if (node["resource-id"] && typeof node["resource-id"] === "string") {
+        texts.push(`#${node["resource-id"]}@${node.bounds || ""}`);
+      }
+      if (node.node) {
+        if (Array.isArray(node.node)) {
+          for (const child of node.node) {
+            texts.push(...extractTexts(child));
+          }
+        } else if (typeof node.node === "object") {
+          texts.push(...extractTexts(node.node as Record<string, unknown>));
+        }
+      }
+      return texts;
+    };
+
+    const root = hierarchy.hierarchy?.node || hierarchy.hierarchy;
+    if (!root) {return "";}
+    const texts = extractTexts(root as Record<string, unknown>);
+    return texts.sort().join("|");
+  };
+
+  /**
+   * Find scrollable container element. If the found element is not scrollable,
+   * traverse up to find the nearest scrollable parent.
+   */
+  const findScrollableContainer = (
+    viewHierarchy: ViewHierarchyResult,
+    container: ScrollContainerArgs
+  ): { element: ReturnType<typeof elementUtils.findElementByText>, searchedBy: string } => {
+    if (!container.elementId && !container.text) {
+      throw new ActionableError("Container must specify either elementId or text");
+    }
+
+    // Helper to check if node is scrollable
+    const isScrollable = (node: Record<string, unknown>): boolean => {
+      return node.scrollable === "true" || node.scrollable === true;
+    };
+
+    // Helper to parse bounds string to element bounds
+    const parseBounds = (boundsStr: string): { left: number; top: number; right: number; bottom: number } | null => {
+      const match = boundsStr.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+      if (!match) {return null;}
+      return {
+        left: parseInt(match[1], 10),
+        top: parseInt(match[2], 10),
+        right: parseInt(match[3], 10),
+        bottom: parseInt(match[4], 10)
+      };
+    };
+
+    // Helper to find scrollable parent that contains given bounds
+    const findScrollableParent = (
+      node: Record<string, unknown>,
+      targetBounds: { left: number; top: number; right: number; bottom: number }
+    ): Record<string, unknown> | null => {
+      const nodeBounds = node.bounds ? parseBounds(node.bounds as string) : null;
+
+      // Check if this node contains the target bounds
+      const containsTarget = nodeBounds &&
+        nodeBounds.left <= targetBounds.left &&
+        nodeBounds.top <= targetBounds.top &&
+        nodeBounds.right >= targetBounds.right &&
+        nodeBounds.bottom >= targetBounds.bottom;
+
+      if (containsTarget && isScrollable(node)) {
+        return node;
+      }
+
+      // Search children
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        for (const child of children) {
+          if (typeof child === "object") {
+            const result = findScrollableParent(child as Record<string, unknown>, targetBounds);
+            if (result) {return result;}
+          }
+        }
+      }
+
+      return null;
+    };
+
+    // Find initial element
+    let foundElement: ReturnType<typeof elementUtils.findElementByText> = null;
+    let searchedBy = "";
+
+    if (container.elementId) {
+      foundElement = elementUtils.findElementByResourceId(
+        viewHierarchy,
+        container.elementId,
+        undefined,
+        true // partial match
+      );
+      searchedBy = `elementId "${container.elementId}"`;
+    } else if (container.text) {
+      foundElement = elementUtils.findElementByText(
+        viewHierarchy,
+        container.text,
+        undefined,
+        true, // fuzzy match
+        false // case-insensitive
+      );
+      searchedBy = `text "${container.text}"`;
+    }
+
+    if (!foundElement) {
+      throw new ActionableError(`Container element not found with ${searchedBy}`);
+    }
+
+    // If element is already scrollable, return it
+    if (foundElement.scrollable) {
+      logger.info(`[scroll] Found scrollable container directly via ${searchedBy}`);
+      return { element: foundElement, searchedBy };
+    }
+
+    // Otherwise, find the nearest scrollable parent
+    logger.info(`[scroll] Element found via ${searchedBy} is not scrollable, searching for scrollable parent`);
+
+    const root = viewHierarchy.hierarchy?.node || viewHierarchy.hierarchy;
+    if (!root) {
+      throw new ActionableError(`Element found via ${searchedBy} is not scrollable and no parent hierarchy available`);
+    }
+
+    const scrollableParent = findScrollableParent(root as Record<string, unknown>, foundElement.bounds);
+
+    if (!scrollableParent) {
+      throw new ActionableError(`Element found via ${searchedBy} is not scrollable and no scrollable parent found`);
+    }
+
+    // Convert scrollable parent node to Element
+    const parentBounds = parseBounds(scrollableParent.bounds as string);
+    if (!parentBounds) {
+      throw new ActionableError(`Could not parse bounds of scrollable parent`);
+    }
+
+    const scrollableElement = {
+      bounds: parentBounds,
+      text: scrollableParent.text as string | undefined,
+      resourceId: scrollableParent["resource-id"] as string | undefined,
+      scrollable: true,
+      className: scrollableParent.className as string | undefined
+    };
+
+    logger.info(`[scroll] Found scrollable parent: bounds=${JSON.stringify(scrollableElement.bounds)}`);
+    return { element: scrollableElement, searchedBy: `scrollable parent of ${searchedBy}` };
+  };
+
   // Scroll handler
   const scrollHandler = async (device: BootedDevice, args: ScrollArgs, progress?: ProgressCallback) => {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("scroll");
+
+    logger.info(`[scroll] Starting scroll: direction=${args.direction}, container=${JSON.stringify(args.container)}, lookFor=${JSON.stringify(args.lookFor)}`);
+
     // Element-specific scrolling
     const observeScreen = new ObserveScreen(device);
     const swipe = new SwipeOnElement(device);
-    const observeResult = await observeScreen.execute();
+
+    const observeResult = await perf.track("initialObserve", () => observeScreen.execute());
 
     if (!observeResult.viewHierarchy) {
+      perf.end();
       throw new ActionableError("Could not get view hierarchy for element scrolling");
     }
 
-    // Find the element by resource ID
-    const element = elementUtils.findElementByResourceId(
-      observeResult.viewHierarchy,
-      args.containerElementId,
-      args.containerElementId,
-      true // partial match
+    // Find the scrollable container element
+    const { element, searchedBy } = perf.trackSync("findContainerElement", () =>
+      findScrollableContainer(observeResult.viewHierarchy!, args.container)
     );
 
     if (!element) {
-      throw new ActionableError(`Container element not found with ID: ${args.containerElementId}`);
+      perf.end();
+      throw new ActionableError(`Container element not found`);
     }
 
     const containerElement = element;
+    logger.info(`[scroll] Using container found via ${searchedBy}: bounds=${JSON.stringify(containerElement.bounds)}, scrollable=${containerElement.scrollable}`);
 
     if (!args.lookFor) {
-      const duration = elementUtils.getSwipeDurationFromSpeed(args.speed);
-      const result = await swipe.execute(
-        containerElement,
-        elementUtils.getSwipeDirectionForScroll(args.direction), {
+      // Simple scroll without looking for element
+      const duration = perf.trackSync("getSwipeDuration", () => elementUtils.getSwipeDurationFromSpeed(args.speed));
+      const swipeDirection = perf.trackSync("getSwipeDirection", () => elementUtils.getSwipeDirectionForScroll(args.direction));
+
+      // Compute fingerprint before scroll
+      const beforeFingerprint = perf.trackSync("computeBeforeFingerprint", () =>
+        computeHierarchyFingerprint(observeResult.viewHierarchy!)
+      );
+
+      logger.info(`[scroll] Executing simple scroll: direction=${swipeDirection}, duration=${duration}ms`);
+
+      const result = await perf.track("swipeExecution", () => swipe.execute(
+        containerElement!,
+        swipeDirection, {
           duration: duration,
           easing: "accelerateDecelerate",
           fingers: 1,
           randomize: false,
           lift: true,
-          pressure: 1
+          pressure: 1,
+          scrollMode: args.scrollMode
         },
         progress
+      ));
+
+      // Compute fingerprint after scroll to detect if anything changed
+      const afterFingerprint = perf.trackSync("computeAfterFingerprint", () =>
+        result.observation?.viewHierarchy ? computeHierarchyFingerprint(result.observation.viewHierarchy) : ""
       );
 
+      const hierarchyChanged = beforeFingerprint !== afterFingerprint;
+      logger.info(`[scroll] Scroll complete: hierarchyChanged=${hierarchyChanged}`);
+
+      perf.end();
+      const scrollTimings = perf.getTimings();
       return createJSONToolResponse({
-        message: `Scrolled ${args.direction} within element ${args.containerElementId}`,
-        observation: result.observation
+        message: `Scrolled ${args.direction} within container (${searchedBy})`,
+        hierarchyChanged,
+        observation: result.observation,
+        perfTiming: scrollTimings
       });
 
     } else if (!args.lookFor.text && !args.lookFor.elementId) {
+      perf.end();
       throw new ActionableError("Either text or element id must be specified to look for something in a scrollable list.");
     } else {
-      let lastObservation = await observeScreen.execute();
+      // Scroll with lookFor - search for element
+      let lastObservation = await perf.track("lookForInitialObserve", () => observeScreen.execute());
       if (!lastObservation.viewHierarchy || !lastObservation.screenSize) {
+        perf.end();
         throw new Error("Failed to get initial observation for scrolling until visible.");
       }
 
       const direction = args.direction;
-      const maxTime = 120000; // args.lookFor.maxTime ?? 120000;
+      const maxTime = args.lookFor.maxTime ?? 15000; // Reduced from 120s to 15s default
       const startTime = Date.now();
       let foundElement = null;
+      let scrollIteration = 0;
+      let lastFingerprint = perf.trackSync("computeInitialFingerprint", () =>
+        computeHierarchyFingerprint(lastObservation.viewHierarchy!)
+      );
+      let unchangedScrollCount = 0;
+      const maxUnchangedScrolls = 3; // Stop after 3 consecutive unchanged scrolls
+
+      const target = args.lookFor.text ? `text "${args.lookFor.text}"` : `element with id "${args.lookFor.elementId}"`;
+      logger.info(`[scroll] Looking for ${target} with maxTime=${maxTime}ms`);
+
+      // First check if element is already visible
+      if (args.lookFor.text) {
+        foundElement = perf.trackSync("initialFindByText", () => elementUtils.findElementByText(
+          lastObservation.viewHierarchy!,
+          args.lookFor!.text!,
+          args.container.elementId, // Optionally restrict search to container
+          true,
+          false
+        ));
+      } else if (args.lookFor.elementId) {
+        foundElement = perf.trackSync("initialFindById", () => elementUtils.findElementByResourceId(
+          lastObservation.viewHierarchy!,
+          args.lookFor!.elementId!,
+          args.container.elementId, // Optionally restrict search to container
+          true
+        ));
+      }
+
+      if (foundElement) {
+        logger.info(`[scroll] Element already visible, no scrolling needed`);
+        perf.end();
+        const scrollTimings = perf.getTimings();
+        return createJSONToolResponse({
+          message: `${target} was already visible`,
+          found: true,
+          scrollIterations: 0,
+          observation: lastObservation,
+          perfTiming: scrollTimings
+        });
+      }
 
       while (Date.now() - startTime < maxTime) {
-        // Re-observe the screen to get current state
-        lastObservation = await observeScreen.execute();
-        if (!lastObservation.viewHierarchy) {
-          throw new Error("Lost observation during scroll until visible.");
-        }
+        scrollIteration++;
+        logger.info(`[scroll] Iteration ${scrollIteration}: elapsed=${Date.now() - startTime}ms`);
 
-        // Check if target element is now visible
-        if (args.lookFor.text) {
-          foundElement = elementUtils.findElementByText(
-            lastObservation.viewHierarchy,
-            args.lookFor.text,
-            args.containerElementId, // Search within the specific container
-            true, // fuzzy match
-            false // case-sensitive
-          );
-        } else if (args.lookFor.elementId) {
-          foundElement = elementUtils.findElementByResourceId(
-            lastObservation.viewHierarchy,
-            args.lookFor.elementId,
-            args.containerElementId, // Search within the specific container
-            true // partial match
-          );
-        }
-
-        if (foundElement) {
-          logger.info(`Found element after scrolling for ${Date.now() - startTime}ms.`);
-          break;
-        }
-
-        // Use the specific container element to swipe, not any scrollable element
-        const result = await swipe.execute(
-          containerElement,
+        // Perform scroll
+        const swipeStartTime = Date.now();
+        const swipeDuration = elementUtils.getSwipeDurationFromSpeed(args.speed);
+        const result = await perf.track(`iteration${scrollIteration}_swipe`, () => swipe.execute(
+          containerElement!,
           elementUtils.getSwipeDirectionForScroll(direction),
-          { duration: 600 },
+          { duration: swipeDuration, scrollMode: args.scrollMode },
           progress
-        );
+        ));
+        logger.info(`[scroll] Iteration ${scrollIteration}: swipe (duration=${swipeDuration}ms) took ${Date.now() - swipeStartTime}ms`);
 
         // Update observation from swipe result
         if (result.observation && result.observation.viewHierarchy) {
           lastObservation = result.observation;
         } else {
+          perf.end();
           throw new Error("Lost observation after swipe during scroll until visible.");
+        }
+
+        // Check if hierarchy changed (detect scroll end)
+        const currentFingerprint = perf.trackSync(`iteration${scrollIteration}_fingerprint`, () =>
+          computeHierarchyFingerprint(lastObservation.viewHierarchy!)
+        );
+
+        if (currentFingerprint === lastFingerprint) {
+          unchangedScrollCount++;
+          logger.info(`[scroll] Iteration ${scrollIteration}: hierarchy unchanged (${unchangedScrollCount}/${maxUnchangedScrolls})`);
+
+          if (unchangedScrollCount >= maxUnchangedScrolls) {
+            perf.end();
+            const elapsed = Date.now() - startTime;
+            throw new ActionableError(
+              `Scroll reached end of container (no change after ${maxUnchangedScrolls} scrolls). ` +
+              `${target} not found after ${scrollIteration} iterations (${elapsed}ms).`
+            );
+          }
+        } else {
+          unchangedScrollCount = 0;
+          lastFingerprint = currentFingerprint;
+        }
+
+        // Check if target element is now visible
+        if (args.lookFor.text) {
+          foundElement = perf.trackSync(`iteration${scrollIteration}_findByText`, () => elementUtils.findElementByText(
+            lastObservation.viewHierarchy!,
+            args.lookFor!.text!,
+            args.container.elementId, // Optionally restrict search to container
+            true,
+            false
+          ));
+        } else if (args.lookFor.elementId) {
+          foundElement = perf.trackSync(`iteration${scrollIteration}_findById`, () => elementUtils.findElementByResourceId(
+            lastObservation.viewHierarchy!,
+            args.lookFor!.elementId!,
+            args.container.elementId, // Optionally restrict search to container
+            true
+          ));
+        }
+
+        if (foundElement) {
+          const elapsed = Date.now() - startTime;
+          logger.info(`[scroll] Found ${target} after ${scrollIteration} iterations (${elapsed}ms)`);
+          break;
         }
       }
 
       if (!foundElement) {
-        const target = args.lookFor.text ? `text "${args.lookFor.text}"` : `element with id "${args.lookFor.elementId}"`;
-        throw new ActionableError(`${target} not found after scrolling for ${maxTime}ms.`);
+        perf.end();
+        const elapsed = Date.now() - startTime;
+        throw new ActionableError(`${target} not found after scrolling for ${elapsed}ms (${scrollIteration} iterations, timeout=${maxTime}ms).`);
       }
 
-      const target = args.lookFor.text ? `text "${args.lookFor.text}"` : `element with id "${args.lookFor.elementId}"`;
+      perf.end();
+      const scrollTimings = perf.getTimings();
       return createJSONToolResponse({
         message: `Scrolled until ${target} became visible`,
-        found: !!foundElement,
-        observation: lastObservation
+        found: true,
+        scrollIterations: scrollIteration,
+        elapsedMs: Date.now() - startTime,
+        observation: lastObservation,
+        perfTiming: scrollTimings
       });
     }
   };

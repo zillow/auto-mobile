@@ -235,4 +235,36 @@ export class AdbUtils {
 
     return devices;
   }
+
+  /**
+   * Check if the device screen is currently on
+   * Uses dumpsys power to check mWakefulness state
+   * @returns Promise<boolean> - true if screen is on (Awake), false if off (Asleep/Dozing)
+   */
+  async isScreenOn(): Promise<boolean> {
+    const wakefulness = await this.getWakefulness();
+    return wakefulness === "Awake";
+  }
+
+  /**
+   * Get the device wakefulness state
+   * Uses dumpsys power to check mWakefulness state
+   * @returns Promise with wakefulness state: "Awake", "Asleep", "Dozing", or null if unknown
+   */
+  async getWakefulness(): Promise<"Awake" | "Asleep" | "Dozing" | null> {
+    try {
+      const result = await this.executeCommand("shell dumpsys power | grep mWakefulness=", undefined, undefined, true);
+      const match = result.stdout.match(/mWakefulness=(\w+)/);
+      if (match) {
+        const state = match[1];
+        if (state === "Awake" || state === "Asleep" || state === "Dozing") {
+          return state;
+        }
+      }
+      return null;
+    } catch {
+      logger.debug("[ADB] Failed to get wakefulness state");
+      return null;
+    }
+  }
 }

@@ -10,6 +10,7 @@ import { SourceMapper } from "./utils/sourceMapper";
 import { ConfigurationManager } from "./utils/configurationManager";
 import { runCliCommand } from "./cli";
 import { AppConfig } from "./models";
+import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
 
 // Interface for transport configuration
 interface TransportConfig {
@@ -24,6 +25,7 @@ function parseArgs(): {
   cliMode: boolean;
   cliArgs: string[];
   transport: TransportConfig;
+  debugPerf: boolean;
   } {
   const args = process.argv.slice(2);
   const apps: AppConfig[] = [];
@@ -37,6 +39,9 @@ function parseArgs(): {
 
   // Detect CLI mode based on command line flag
   const cliMode = args.includes("--cli");
+
+  // Detect debug-perf mode for performance timing output
+  const debugPerf = args.includes("--debug-perf");
 
   // Extract CLI-specific arguments (everything after --cli)
   const cliIndex = args.indexOf("--cli");
@@ -114,7 +119,7 @@ function parseArgs(): {
     }
   }
 
-  return { apps, cliMode, cliArgs, transport };
+  return { apps, cliMode, cliArgs, transport, debugPerf };
 }
 
 // Create and start Streamable HTTP server
@@ -391,7 +396,13 @@ async function main() {
     const sourceMapper = SourceMapper.getInstance();
 
     // Parse command line arguments for additional app configs
-    const { apps, cliMode, cliArgs, transport } = parseArgs();
+    const { apps, cliMode, cliArgs, transport, debugPerf } = parseArgs();
+
+    // Enable performance tracking if --debug-perf flag is set
+    if (debugPerf) {
+      setDebugPerfEnabled(true);
+      logger.info("Performance timing enabled (--debug-perf)");
+    }
 
     // Add any command line app configs to the source index manager
     for (const { appId, sourceDir, platform } of apps) {

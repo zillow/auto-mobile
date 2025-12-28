@@ -1,42 +1,41 @@
 import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, SelectAllTextResult } from "../../models";
-import { ElementUtils } from "../utility/ElementUtils";
-import { ActionableError, ObserveResult } from "../../models";
 import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { logger } from "../../utils/logger";
 
 export class SelectAllText extends BaseVisualChange {
-  private elementUtils: ElementUtils;
 
   constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
     super(device, adb, axe);
-    this.elementUtils = new ElementUtils();
   }
 
   async execute(progress?: ProgressCallback): Promise<SelectAllTextResult> {
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("selectAllText");
+
     return this.observedInteraction(
-      async (observeResult: ObserveResult) => {
+      async () => {
         try {
-
-          // Find the focused text input field
-          const targetElement = this.elementUtils.findFocusedTextInput(observeResult.viewHierarchy);
-
-          // If no focused element, find any text input field
-          if (!targetElement) {
-            throw new ActionableError("No focused text input field found. Please focus on a text field first.");
+          // Platform-specific select all execution
+          switch (this.device.platform) {
+            case "android":
+              return await perf.track("androidSelectAll", () =>
+                this.executeAndroidSelectAll()
+              );
+            case "ios":
+              // iOS implementation could use similar accessibility approach
+              // For now, fall back to error
+              perf.end();
+              throw new Error("Select all not yet implemented for iOS");
+            default:
+              perf.end();
+              throw new Error(`Unsupported platform: ${this.device.platform}`);
           }
-
-          // Get center coordinates of the text field
-          const tapPoint = this.elementUtils.getElementCenter(targetElement);
-
-          await this.adb.executeCommand(`shell input tap ${tapPoint.x} ${tapPoint.y}`);
-          await new Promise(resolve => setTimeout(resolve, 100));
-          await this.adb.executeCommand(`shell input tap ${tapPoint.x} ${tapPoint.y}`);
-
-          return {
-            success: true
-          };
         } catch (error) {
+          perf.end();
           return {
             success: false,
             error: `Failed to select all text: ${error instanceof Error ? error.message : String(error)}`
@@ -47,9 +46,33 @@ export class SelectAllText extends BaseVisualChange {
         changeExpected: false,
         tolerancePercent: 0,
         timeoutMs: 500,
-        progress
+        progress,
+        perf,
+        skipUiStability: true // Skip UI stability wait - a11y service is fast
       }
     );
   }
 
+  /**
+   * Execute Android-specific select all using accessibility service.
+   * Uses ACTION_SET_SELECTION which is significantly faster than ADB double-tap.
+   */
+  private async executeAndroidSelectAll(): Promise<SelectAllTextResult> {
+    const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+    const a11yResult = await a11yClient.requestSelectAll();
+
+    if (a11yResult.success) {
+      logger.info(`[SelectAllText] Select all via accessibility service: ${a11yResult.totalTimeMs}ms`);
+      return {
+        success: true
+      };
+    }
+
+    // Return failure
+    logger.warn(`[SelectAllText] Accessibility service selectAll failed: ${a11yResult.error}`);
+    return {
+      success: false,
+      error: `Accessibility service selectAll failed: ${a11yResult.error}`
+    };
+  }
 }

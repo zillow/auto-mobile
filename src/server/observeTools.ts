@@ -5,6 +5,7 @@ import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice } from "../models";
+import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 
 // Schema definitions
 export const observeSchema = z.object({
@@ -20,8 +21,9 @@ export function registerObserveTools() {
   // Observe handler
   const observeHandler = async (device: BootedDevice) => {
     try {
+      const perf = createGlobalPerformanceTracker();
       const observeScreen = new ObserveScreen(device);
-      const result = await observeScreen.execute();
+      const result = await observeScreen.execute(undefined, perf);
       return createJSONToolResponse(result);
     } catch (error) {
       throw new ActionableError(`Failed to execute observe: ${error}`);
