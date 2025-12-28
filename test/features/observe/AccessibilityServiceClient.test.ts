@@ -12,6 +12,16 @@ describe("AccessibilityServiceClient", function() {
   const serverPort: number = 8765;
 
   beforeEach(async function() {
+    // Remove any existing ADB port forward on the test port to ensure test isolation
+    try {
+      const { exec } = require("child_process");
+      const { promisify } = require("util");
+      const execAsync = promisify(exec);
+      await execAsync(`adb forward --remove tcp:${serverPort}`).catch(() => {});
+    } catch {
+      // Ignore errors - port may not be forwarded
+    }
+
     // Create mock ADB instance
     mockAdb = {
       executeCommand: async (cmd: string) => {
@@ -26,6 +36,7 @@ describe("AccessibilityServiceClient", function() {
     // Reset singleton instances for clean test state
     AccessibilityServiceClient.resetInstances();
     AccessibilityServiceManager.resetInstances();
+    AccessibilityServiceClient.resetInstances();
 
     accessibilityServiceClient = new AccessibilityServiceClient("test-device", mockAdb);
     AccessibilityServiceManager.getInstance("test-device", mockAdb).clearAvailabilityCache();
@@ -37,11 +48,18 @@ describe("AccessibilityServiceClient", function() {
       await accessibilityServiceClient.close();
     }
 
-    // Close mock server
+    // Close mock server and wait for it to fully close
     if (mockWebSocketServer) {
-      mockWebSocketServer.close();
+      await new Promise<void>(resolve => {
+        mockWebSocketServer!.close(() => {
+          resolve();
+        });
+      });
       mockWebSocketServer = null;
     }
+
+    // Small delay to ensure port is fully released
+    await new Promise(resolve => setTimeout(resolve, 100));
   });
 
   /**

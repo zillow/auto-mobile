@@ -19,6 +19,7 @@ import { registerDeviceTools } from "./deviceTools";
 import { registerConfigurationTools } from "./configurationTools";
 import { registerDeepLinkTools } from "./deepLinkTools";
 import { registerEnvironmentTools } from "./environmentTools";
+import { registerDebugTools } from "./debugTools";
 
 export const createMcpServer = (): McpServer => {
   // Get configuration, device session, and test authoring managers
@@ -32,6 +33,7 @@ export const createMcpServer = (): McpServer => {
   registerConfigurationTools();
   registerDeepLinkTools();
   registerEnvironmentTools();
+  registerDebugTools();
 
   // Create a new MCP server
   const server = new McpServer({
