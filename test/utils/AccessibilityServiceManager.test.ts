@@ -43,7 +43,7 @@ describe("AccessibilityServiceManager", function() {
 
   describe("isInstalled", function() {
     it("should return true when accessibility service package is installed", async function() {
-      fakeAdb.setCommandResponse("shell pm list packages", {
+      fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
         stderr: ""
       });
@@ -53,8 +53,8 @@ describe("AccessibilityServiceManager", function() {
     });
 
     it("should return false when accessibility service package is not installed", async function() {
-      fakeAdb.setCommandResponse("pm list packages", {
-        stdout: "package:com.other.app\n",
+      fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
+        stdout: "",
         stderr: ""
       });
 
@@ -64,7 +64,7 @@ describe("AccessibilityServiceManager", function() {
 
     it("should return false when ADB command fails", async function() {
       // FakeAdbExecutor doesn't throw by default, so we set it to return empty
-      fakeAdb.setCommandResponse("pm list packages", {
+      fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: "",
         stderr: "Error"
       });
@@ -108,7 +108,7 @@ describe("AccessibilityServiceManager", function() {
 
   describe("isAvailable", function() {
     it("should return true when service is both installed and enabled", async function() {
-      fakeAdb.setCommandResponse("pm list packages", {
+      fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
         stderr: ""
       });
@@ -123,7 +123,7 @@ describe("AccessibilityServiceManager", function() {
     });
 
     it("should return false when service is installed but not enabled", async function() {
-      fakeAdb.setCommandResponse("pm list packages", {
+      fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
         stderr: ""
       });
@@ -138,8 +138,8 @@ describe("AccessibilityServiceManager", function() {
     });
 
     it("should return false when service is not installed", async function() {
-      fakeAdb.setCommandResponse("pm list packages", {
-        stdout: "package:com.other.app\n",
+      fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
+        stdout: "",
         stderr: ""
       });
       fakeAdb.setCommandResponse("settings get secure", {
