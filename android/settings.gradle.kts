@@ -32,6 +32,8 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":accessibility-service")
 
+include(":auto-mobile-sdk")
+
 include(":junit-runner")
 
 include(":playground:analytics")
