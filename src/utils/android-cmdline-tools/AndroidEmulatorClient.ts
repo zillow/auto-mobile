@@ -33,6 +33,13 @@ export interface AndroidEmulator {
   isAvdRunning(avdName: string): Promise<boolean>;
 
   /**
+   * Check if a specific AVD is currently starting (booting up)
+   * @param avdName - The AVD name to check
+   * @returns Promise with boolean indicating if the AVD is currently starting
+   */
+  isAvdStarting(avdName: string): Promise<boolean>;
+
+  /**
    * Check if any emulator is currently running
    * @returns Promise with array of running emulator info
    */
@@ -404,6 +411,63 @@ export class AndroidEmulatorClient implements AndroidEmulator {
   }
 
   /**
+   * Check if a specific AVD is currently starting (booting up)
+   * @param avdName - The AVD name to check
+   * @returns Promise with boolean indicating if the AVD is currently starting
+   */
+  async isAvdStarting(avdName: string): Promise<boolean> {
+    try {
+      const { existsSync, readdirSync, readFileSync } = require("fs");
+      const path = require("path");
+
+      // Check the temp directory where emulator advertises running instances
+      const runningDir = path.join(require("os").tmpdir(), "avd", "running");
+
+      if (!existsSync(runningDir)) {
+        return false;
+      }
+
+      // Read all pid_*.ini files
+      const files = readdirSync(runningDir);
+      const pidFiles = files.filter((f: string) => f.startsWith("pid_") && f.endsWith(".ini"));
+
+      for (const file of pidFiles) {
+        try {
+          const filePath = path.join(runningDir, file);
+          const content = readFileSync(filePath, "utf-8");
+
+          // Check if this file is for our AVD
+          const avdIdMatch = content.match(/^avd\.id=(.+)$/m);
+          if (avdIdMatch && avdIdMatch[1] === avdName) {
+            // Extract PID from filename (pid_12345.ini -> 12345)
+            const pidMatch = file.match(/pid_(\d+)\.ini/);
+            if (pidMatch) {
+              const pid = parseInt(pidMatch[1], 10);
+
+              // Check if the process is still alive
+              try {
+                process.kill(pid, 0); // Signal 0 checks if process exists without killing it
+                logger.info(`AVD '${avdName}' is currently starting (PID: ${pid})`);
+                return true;
+              } catch (e) {
+                // Process doesn't exist, the pid file is stale
+                logger.debug(`Stale pid file found for AVD '${avdName}' (PID ${pid} not running)`);
+              }
+            }
+          }
+        } catch (error) {
+          logger.debug(`Failed to read pid file ${file}: ${error}`);
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logger.debug(`Failed to check if AVD is starting: ${error}`);
+      return false;
+    }
+  }
+
+  /**
    * Check if any emulator is currently running
    * @returns Promise with array of running emulator info
    */
@@ -495,9 +559,19 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       throw new ActionableError(`AVD '${avdName}' not found. Available AVDs: ${availableAvds.join(", ")}`);
     }
 
-    // Check if already running
+    // Check if already running or starting
     if (await this.isAvdRunning(avdName)) {
-      throw new ActionableError(`AVD '${avdName}' is already running`);
+      logger.info(`AVD '${avdName}' is already running - waiting for it to be ready`);
+      // AVD is already running, return a mock ChildProcess since we didn't spawn it
+      // The caller (waitForEmulatorReady) will wait for it to be ready
+      return {} as ChildProcess;
+    }
+
+    if (await this.isAvdStarting(avdName)) {
+      logger.info(`AVD '${avdName}' is already starting - waiting for it to be ready`);
+      // AVD is already starting, return a mock ChildProcess since we didn't spawn it
+      // The caller (waitForEmulatorReady) will wait for it to be ready
+      return {} as ChildProcess;
     }
 
     // Check architecture compatibility before attempting to start
@@ -599,6 +673,17 @@ export class AndroidEmulatorClient implements AndroidEmulator {
         clearTimeout(startupTimeout);
         if (code !== 0) {
           logger.error(`Emulator process exited with code: ${code}`);
+
+          // Check if exit was due to "already running" error
+          if (initialOutput.includes("Running multiple emulators with the same AVD")) {
+            logger.info(`AVD '${avdName}' is already starting/running - this is expected, will wait for it to be ready`);
+            if (!startupValidationComplete) {
+              startupValidationComplete = true;
+              // Return a mock ChildProcess - the caller will wait for the AVD to be ready
+              resolve({} as ChildProcess);
+            }
+            return;
+          }
 
           // Check if exit was due to PANIC
           const panicResult = this.detectArchitecturePanic(initialOutput);
