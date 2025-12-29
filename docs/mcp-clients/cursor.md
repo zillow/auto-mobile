@@ -11,7 +11,7 @@ or copy the following into your Cursor `mcp.json`:
   "mcpServers": {
     "AutoMobile": {
       "command": "npx",
-      "args": ["-y", "auto-mobile@latest"]
+      "args": ["-y", "@kaeawc/auto-mobile@latest"]
     }
   }
 }

@@ -126,7 +126,7 @@ For AutoMobile's CLI you can always run the tool without commands to get helpful
 a dedicated documentation page beyond running tool output and updating [this page](features/cli.md).
 
 ```text
-npm install -g auto-mobile@latest
+npm install -g @kaeawc/auto-mobile@latest
 auto-mobile --cli
 ```
 

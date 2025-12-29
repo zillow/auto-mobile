@@ -22,7 +22,7 @@ If your favorite MCP client doesn't have that capability yet, copy the following
       "command": "npx",
       "args": [
         "-y",
-        "auto-mobile@latest"
+        "@kaeawc/auto-mobile@latest"
       ]
     }
   }
@@ -55,7 +55,7 @@ If you have a private npm registry for proxying public npm:
         "-y",
         "--registry",
         "https://your.awesome.private.registry.net/path/to/npm/proxy",
-        "auto-mobile@latest"
+        "@kaeawc/auto-mobile@latest"
       ]
     }
   }
@@ -65,7 +65,7 @@ If you have a private npm registry for proxying public npm:
 You can also install it directly as a CLI tool.
 
 ```shell
-npm install -g auto-mobile@latest
+npm install -g @kaeawc/auto-mobile@latest
 
 # Test CLI mode to check installation succeeded
 auto-mobile --cli

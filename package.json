@@ -1,5 +1,5 @@
 {
-  "name": "auto-mobile",
+  "name": "@kaeawc/auto-mobile",
   "version": "0.0.6",
   "description": "Mobile device interaction automation via MCP",
   "scripts": {
@@ -52,6 +52,10 @@
     }
   ],
   "homepage": "https://kaeawc.github.io/auto-mobile/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kaeawc/auto-mobile.git"
+  },
   "publishConfig": {
     "access": "public"
   },

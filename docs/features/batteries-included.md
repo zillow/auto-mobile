@@ -44,23 +44,23 @@ You can opt out of any or all automated behaviors via CLI arguments:
 
 ```bash
 # Disable automatic SDK detection
-npx auto-mobile --no-auto-sdk
+npx @kaeawc/auto-mobile --no-auto-sdk
 
 # Use specific SDK path without validation
-npx auto-mobile --android-home /custom/path --no-validate-sdk
+npx @kaeawc/auto-mobile --android-home /custom/path --no-validate-sdk
 ```
 
 #### Device Management
 
 ```bash
 # Disable device auto-detection
-npx auto-mobile --no-auto-device
+npx @kaeawc/auto-mobile --no-auto-device
 
 # Skip USB debugging setup assistance
-npx auto-mobile --no-setup-assistance
+npx @kaeawc/auto-mobile --no-setup-assistance
 
 # Disable emulator auto-start
-npx auto-mobile --no-auto-emulator
+npx @kaeawc/auto-mobile --no-auto-emulator
 ```
 
 By leveraging these batteries-included features, AutoMobile provides a smooth onboarding experience while 
