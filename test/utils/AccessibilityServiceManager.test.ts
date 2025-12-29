@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
-import { AndroidAccessibilityServiceManager } from "../../src/utils/accessibilityServiceManager";
+import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { AdbClient } from "../../src/utils/android-cmdline-tools/AdbClient";
 import { BootedDevice } from "../../src/models";
