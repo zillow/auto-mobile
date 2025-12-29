@@ -68,7 +68,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
         // Get the registered tool
         const tool = ToolRegistry.getTool(step.tool);
         if (!tool) {
-          logger.info("Could not find tool: ${step.tool}");
+          logger.info(`Could not find tool: ${step.tool}`);
           return {
             success: false,
             executedSteps,
