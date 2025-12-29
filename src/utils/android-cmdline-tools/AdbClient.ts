@@ -65,6 +65,7 @@ export class AdbClient implements AdbExecutor {
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
   spawnFn: typeof spawn;
   private adbPath: string;
+  private isTestMode: boolean;
 
   // Static cache for device list
   private static deviceListCache: { devices: BootedDevice[], timestamp: number } | null = null;
@@ -85,6 +86,7 @@ export class AdbClient implements AdbExecutor {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
+    this.isTestMode = execAsyncFn !== null; // If custom execAsync provided, we're in test mode
     // Initialize with fallback, will be updated lazily
     this.adbPath = this.getFallbackAdbPath();
   }
@@ -135,6 +137,11 @@ export class AdbClient implements AdbExecutor {
    * Ensure ADB path is properly detected and cached
    */
   private async ensureAdbPath(): Promise<string> {
+    // In test mode, skip detection and use fallback (usually "adb")
+    if (this.isTestMode) {
+      return this.adbPath;
+    }
+
     // Update cached path if needed
     const detectedPath = await this.getAdbPath();
     this.adbPath = detectedPath;
