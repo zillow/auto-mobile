@@ -1,11 +1,11 @@
 import { ActionableError, BootedDevice, Platform, SomePlatform } from "../models";
 import { MultiPlatformDeviceManager } from "./deviceUtils";
-import { AdbClient } from "./android-cmdline-tools/adb";
-import { SimCtlClient } from "./ios-cmdline-tools/simctl";
+import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { SimCtlClient } from "./ios-cmdline-tools/SimCtlClient";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
-import { AndroidAccessibilityServiceManager } from "./accessibilityServiceManager";
-import { AndroidEmulatorClient } from "./android-cmdline-tools/emulator";
+import { AndroidAccessibilityServiceManager } from "./AccessibilityServiceManager";
+import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorClient";
 import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
 

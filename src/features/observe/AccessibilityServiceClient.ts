@@ -1,10 +1,10 @@
 import WebSocket from "ws";
 import { randomBytes } from "crypto";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ViewHierarchyResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
-import { AndroidAccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
+import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 

@@ -6,7 +6,7 @@ import { createServer as createHttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./server";
 import { logger } from "./utils/logger";
-import { ConfigurationManager } from "./utils/configurationManager";
+import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { runCliCommand } from "./cli";
 import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
 

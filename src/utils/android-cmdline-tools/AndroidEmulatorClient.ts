@@ -2,7 +2,7 @@ import { ChildProcess, exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
 import { BootedDevice, DeviceInfo, ExecResult, ActionableError } from "../../models";
-import { AdbClient } from "./adb";
+import { AdbClient } from "./AdbClient";
 import { arch } from "os";
 import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
 

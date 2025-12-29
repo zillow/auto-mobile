@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { AxeClient } from "../../../src/utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../../src/utils/ios-cmdline-tools/AxeClient";
 import { BootedDevice, ExecResult } from "../../../src/models";
 
 describe("Axe", function() {

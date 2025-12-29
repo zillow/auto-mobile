@@ -1,5 +1,5 @@
 import path from "path";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BootedDevice } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 

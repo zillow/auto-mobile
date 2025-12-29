@@ -1,4 +1,4 @@
-import { DeviceSelector as DeviceSelectorImpl, AvailableDevice, DeviceSelectionOptions } from "./deviceSelector";
+import { DeviceSelector as DeviceSelectorImpl, AvailableDevice, DeviceSelectionOptions } from "./DeviceSelector";
 
 /**
  * Interface for device selection operations

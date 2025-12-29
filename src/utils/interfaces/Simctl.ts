@@ -9,4 +9,4 @@ export type {
   AppleDevice,
   AppleDeviceRuntime,
   AppleDeviceType,
-} from "../ios-cmdline-tools/simctl";
+} from "../ios-cmdline-tools/SimCtlClient";

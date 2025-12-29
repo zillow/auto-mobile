@@ -1,6 +1,6 @@
 import fs from "fs-extra";
 import path from "path";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { Window } from "./Window";
 import { logger } from "../../utils/logger";
 import { ScreenshotResult } from "../../models/ScreenshotResult";

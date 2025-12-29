@@ -1,4 +1,4 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { ActiveWindowInfo } from "../../models/ActiveWindowInfo";
 import { logger } from "../../utils/logger";
 import { NodeCryptoService } from "../../utils/crypto";

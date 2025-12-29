@@ -1,6 +1,6 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
-import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
-import { DeviceDetection } from "../../utils/deviceDetection";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
+import { DeviceDetection } from "../../utils/DeviceDetection";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ScreenSize } from "../../models";
 import * as fs from "fs";

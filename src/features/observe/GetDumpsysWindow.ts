@@ -1,4 +1,4 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BootedDevice, ExecResult } from "../../models";
 import * as fs from "fs/promises";
 import * as path from "path";

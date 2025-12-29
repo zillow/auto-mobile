@@ -1,8 +1,8 @@
 import { ChildProcess } from "child_process";
 import { DeviceInfo, ActionableError, SomePlatform, BootedDevice } from "../models";
-import { AdbClient } from "./android-cmdline-tools/adb";
-import { SimCtlClient } from "./ios-cmdline-tools/simctl";
-import { AndroidEmulatorClient } from "./android-cmdline-tools/emulator";
+import { AdbClient } from "./android-cmdline-tools/AdbClient";
+import { SimCtlClient } from "./ios-cmdline-tools/SimCtlClient";
+import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorClient";
 
 /**
  * Interface for device utility operations

@@ -4,7 +4,7 @@ import { ActionableError } from "../models/ActionableError";
 import { DemoMode } from "../features/utility/DemoMode";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { DeviceSessionManager } from "../utils/deviceSessionManager";
+import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { BootedDevice, Platform } from "../models";
 
 // Schema definitions

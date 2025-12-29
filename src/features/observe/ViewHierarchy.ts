@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 import xml2js from "xml2js";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { NodeCryptoService } from "../../utils/crypto";
 import { BootedDevice, ViewHierarchyCache } from "../../models";
@@ -14,7 +14,7 @@ import { ScreenshotUtils } from "../../utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
+import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**

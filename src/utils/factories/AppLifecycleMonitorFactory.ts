@@ -1,5 +1,5 @@
-import { AppLifecycleMonitor } from "../appLifecycleMonitor";
-import { AdbClient } from "../android-cmdline-tools/adb";
+import { AppLifecycleMonitor } from "../AppLifecycleMonitor";
+import { AdbClient } from "../android-cmdline-tools/AdbClient";
 import { AdbExecutor } from "../android-cmdline-tools/interfaces/AdbExecutor";
 import { logger } from "../logger";
 

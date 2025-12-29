@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { WebDriverAgent } from "../../../src/utils/ios-cmdline-tools/webdriver";
+import { WebDriverAgent } from "../../../src/utils/ios-cmdline-tools/WebDriverAgent";
 import { BootedDevice, ExecResult } from "../../../src/models";
 
 describe("WebDriverAgent", function() {

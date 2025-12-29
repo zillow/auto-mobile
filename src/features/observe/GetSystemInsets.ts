@@ -1,8 +1,8 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { BootedDevice, SystemInsets } from "../../models";
 import { ExecResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 
 export class GetSystemInsets {
   private adb: AdbClient;

@@ -1,4 +1,4 @@
-import { AdbClient } from "./android-cmdline-tools/adb";
+import { AdbClient } from "./android-cmdline-tools/AdbClient";
 import { logger } from "./logger";
 import * as fs from "fs/promises";
 import * as path from "path";

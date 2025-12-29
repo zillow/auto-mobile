@@ -7,13 +7,13 @@ import {
   TapOnElementResult,
   ViewHierarchyResult
 } from "../../models";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
+import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**

@@ -1,8 +1,8 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { UninstallAppResult } from "../../models/UninstallAppResult";
 import { BootedDevice } from "../../models";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
-import { SimCtlClient } from "../../utils/ios-cmdline-tools/simctl";
+import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 // TODO: Create MCP tool call that exposes this functionality

@@ -15,4 +15,4 @@ export type {
   CompanionInfo,
   TargetDescription,
   IdbLaunchResult,
-} from "../ios-cmdline-tools/axe";
+} from "../ios-cmdline-tools/AxeClient";

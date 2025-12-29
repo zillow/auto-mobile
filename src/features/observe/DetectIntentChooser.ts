@@ -1,8 +1,8 @@
 import { logger } from "../../utils/logger";
-import { DeepLinkManager } from "../../utils/deepLinkManager";
+import { DeepLinkManager } from "../../utils/DeepLinkManager";
 import { BootedDevice, IntentChooserResult, ObserveResult } from "../../models";
 import { BaseVisualChange } from "../action/BaseVisualChange";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 
 export class DetectIntentChooser extends BaseVisualChange {
   private deepLinkManager: DeepLinkManager;

@@ -1,4 +1,4 @@
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { Idle } from "./Idle";
 import { BootedDevice, GfxMetrics } from "../../models";

@@ -1,7 +1,6 @@
 import { expect } from "chai";
 import { SharpImageUtils } from "../../src/utils/image-utils";
 import { FakeImageUtils } from "../fakes/FakeImageUtils";
-import { ImageUtils } from "../../src/utils/interfaces/ImageUtils";
 
 describe("ImageUtils", () => {
   let imageUtils: SharpImageUtils;

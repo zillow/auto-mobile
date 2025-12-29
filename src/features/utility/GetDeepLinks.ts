@@ -1,5 +1,5 @@
 import { logger } from "../../utils/logger";
-import { DeepLinkManager } from "../../utils/deepLinkManager";
+import { DeepLinkManager } from "../../utils/DeepLinkManager";
 import { BootedDevice, DeepLinkResult } from "../../models";
 
 export class GetDeepLinks {

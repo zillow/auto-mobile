@@ -1,8 +1,8 @@
-import { DeepLinkManager } from "../../utils/deepLinkManager";
+import { DeepLinkManager } from "../../utils/DeepLinkManager";
 import { BootedDevice, IntentChooserResult, ObserveResult } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
-import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class HandleIntentChooser extends BaseVisualChange {

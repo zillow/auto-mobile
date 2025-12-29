@@ -5,10 +5,10 @@ export {
   SpawnOptions,
 } from "./PlatformExecutor";
 // Re-export from co-located interfaces
-export { AppLifecycleMonitor } from "../appLifecycleMonitor";
-export { DeviceSessionManager } from "../deviceSessionManager";
-export { DeepLinkManager } from "../deepLinkManager";
-export { AccessibilityServiceManager } from "../accessibilityServiceManager";
+export { AppLifecycleMonitor } from "../AppLifecycleMonitor";
+export { DeviceSessionManager } from "../DeviceSessionManager";
+export { DeepLinkManager } from "../DeepLinkManager";
+export { AccessibilityServiceManager } from "../AccessibilityServiceManager";
 // Screenshot utilities - split into focused classes (Phase 3.1)
 export { ScreenshotComparator } from "../screenshot/ScreenshotComparator";
 export { PerceptualHasher } from "../screenshot/PerceptualHasher";
@@ -44,7 +44,7 @@ export { SimCtl as Simctl } from "./Simctl";
 export { DefaultToolResponseFormatter, ToolResponseFormatter } from "../toolUtils";
 export { NodeCryptoService, CryptoService } from "../crypto";
 // Re-export from co-located interfaces
-export { DeviceDetection, DevicePlatform } from "../deviceDetection";
+export { DeviceDetection, DevicePlatform } from "../DeviceDetection";
 export {
   Axe,
   AxeButton,
@@ -59,7 +59,7 @@ export {
 } from "./Axe";
 // Re-export from co-located interfaces
 export { DeviceSelector } from "../DeviceSelectorService";
-export { ConfigurationManager } from "../configurationManager";
+export { ConfigurationManager } from "../ConfigurationManager";
 export { Logger, LogLevel } from "../logger";
 // Element utilities - split into focused classes (Phase 3.2)
 export { ElementFinder } from "../../features/utility/ElementFinder";

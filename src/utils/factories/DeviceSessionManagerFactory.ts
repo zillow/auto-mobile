@@ -1,5 +1,5 @@
-import { DeviceSessionManager } from "../deviceSessionManager";
-import { AdbClient } from "../android-cmdline-tools/adb";
+import { DeviceSessionManager } from "../DeviceSessionManager";
+import { AdbClient } from "../android-cmdline-tools/AdbClient";
 import { MultiPlatformDeviceManager } from "../deviceUtils";
 import { AdbExecutor } from "../android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "../interfaces/DeviceUtils";

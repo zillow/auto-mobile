@@ -4,4 +4,4 @@
  */
 
 // Re-export from new location for backward compatibility
-export type { WebDriver, WebDriverAgentOptions } from "../ios-cmdline-tools/webdriver";
+export type { WebDriver, WebDriverAgentOptions } from "../ios-cmdline-tools/WebDriverAgent";

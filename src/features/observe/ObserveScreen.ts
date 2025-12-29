@@ -7,14 +7,14 @@ import { ViewHierarchy } from "./ViewHierarchy";
 import { Window } from "./Window";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { GetDumpsysWindow } from "./GetDumpsysWindow";
-import { AdbClient } from "../../utils/android-cmdline-tools/adb";
-import { DeepLinkManager } from "../../utils/deepLinkManager";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { DeepLinkManager } from "../../utils/DeepLinkManager";
 import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
-import { AndroidAccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
-import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
+import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
+import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**

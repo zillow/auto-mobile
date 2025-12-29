@@ -4,4 +4,4 @@
  */
 
 // Re-export from new location for backward compatibility
-export type { AndroidEmulator } from "../android-cmdline-tools/emulator";
+export type { AndroidEmulator } from "../android-cmdline-tools/AndroidEmulatorClient";

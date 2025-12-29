@@ -3,7 +3,7 @@ import { describe, it, beforeEach, afterEach } from "mocha";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/accessibilityServiceManager";
-import { AdbClient } from "../../../src/utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import { BootedDevice } from "../../../src/models";
 import WebSocket from "ws";
 import { createInstantFailureWebSocketFactory, createSuccessWebSocketFactory } from "../../fakes/FakeWebSocket";
