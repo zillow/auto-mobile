@@ -12,7 +12,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { ScreenshotUtils } from "../../utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions } from "../../models";
+import { ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -48,13 +48,14 @@ interface ElementWithZOrder {
 
 /**
  * Extended ViewHierarchyResult with source indexing information
+ * Note: Source indexing has been removed. This interface is kept for backward compatibility.
  */
 interface ExtendedViewHierarchyResult extends ViewHierarchyResult {
   sourceInfo?: {
-    activity?: ActivityInfo;
-    fragments?: FragmentInfo[];
-    views?: ViewInfo[];
-    composables?: ComposableInfo[];
+    activity?: any;
+    fragments?: any[];
+    views?: any[];
+    composables?: any[];
     appId?: string;
   };
 }

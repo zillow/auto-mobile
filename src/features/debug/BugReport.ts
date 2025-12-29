@@ -2,7 +2,7 @@ import fs from "fs-extra";
 import os from "os";
 import path from "path";
 import { randomBytes } from "crypto";
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { BootedDevice, BugReportResult } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
@@ -51,16 +51,16 @@ export interface BugReportOptions {
  */
 export class BugReport {
   private device: BootedDevice;
-  private readonly adb: AdbUtils;
+  private readonly adb: AdbClient;
   private viewHierarchy: ViewHierarchy;
   private takeScreenshot: TakeScreenshot;
 
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null
+    adb: AdbClient | null = null
   ) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
+    this.adb = adb || new AdbClient(device);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);
     this.takeScreenshot = new TakeScreenshot(device, this.adb);
   }
