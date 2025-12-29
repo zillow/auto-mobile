@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { Simctl } from "../../../src/utils/ios-cmdline-tools/simctl";
+import { Simctl } from "../../../src/utils/ios-cmdline-tools/SimCtlClient";
 import { BootedDevice, ExecResult } from "../../../src/models";
 
 describe("Simctl", function() {

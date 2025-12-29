@@ -1,4 +1,4 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { DemoModeResult } from "../../models/DemoModeResult";
 import { BaseVisualChange } from "../action/BaseVisualChange";
@@ -16,7 +16,7 @@ export interface DemoModeOptions {
 
 export class DemoMode extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
     super(device, adb);
   }
 

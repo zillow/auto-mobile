@@ -2,12 +2,7 @@ import { expect } from "chai";
 import { registerDeepLinkTools } from "../../src/server/deepLinkTools";
 import { ToolRegistry } from "../../src/server/toolRegistry";
 import { DeviceUtils } from "../../src/utils/deviceUtils";
-import { ObserveScreen } from "../../src/features/observe/ObserveScreen";
-import { Window } from "../../src/features/observe/Window";
-import { AwaitIdle } from "../../src/features/observe/AwaitIdle";
-import { DeviceSessionManager } from "../../src/utils/deviceSessionManager";
-import { ObserveResult } from "../../src/models";
-import sinon from "sinon";
+import { FakeDeepLinkManager } from "../fakes/FakeDeepLinkManager";
 
 // Helper function to check if AVDs are available
 async function checkAvdAvailability(): Promise<boolean> {
@@ -24,29 +19,13 @@ async function checkAvdAvailability(): Promise<boolean> {
 describe("Deep Link Tools Registration", function() {
   this.timeout(5000);
   let avdsAvailable: boolean;
-  let mockObserveScreen: sinon.SinonStubbedInstance<ObserveScreen>;
-  let mockWindow: sinon.SinonStubbedInstance<Window>;
-  let mockAwaitIdle: sinon.SinonStubbedInstance<AwaitIdle>;
-  let mockDeviceSessionManager: sinon.SinonStubbedInstance<DeviceSessionManager>;
-
-  const mockObserveResult: ObserveResult = {
-    timestamp: "2025-01-01T00:00:00.000Z",
-    screenSize: { width: 1080, height: 1920 },
-    systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
-    viewHierarchy: `
-      <hierarchy>
-        <node class="android.widget.LinearLayout">
-          <node text="Normal app content" />
-        </node>
-      </hierarchy>
-    `
-  };
+  let fakeDeepLinkManager: FakeDeepLinkManager;
 
   before(async function() {
     // Check if AVDs are available once before all tests
     avdsAvailable = await checkAvdAvailability();
     if (!avdsAvailable) {
-      console.log("⚠️  Skipping device-dependent tests: No AVDs available or Android SDK not found");
+      console.log("Skipping device-dependent tests: No AVDs available or Android SDK not found");
     }
   });
 
@@ -54,41 +33,14 @@ describe("Deep Link Tools Registration", function() {
     // Clear the tool registry before each test
     (ToolRegistry as any).tools.clear();
 
-    // Set up mocks for BaseVisualChange dependencies
-    mockObserveScreen = sinon.createStubInstance(ObserveScreen);
-    mockWindow = sinon.createStubInstance(Window);
-    mockAwaitIdle = sinon.createStubInstance(AwaitIdle);
-    mockDeviceSessionManager = sinon.createStubInstance(DeviceSessionManager);
-
-    // Stub the prototype methods
-    sinon.stub(ObserveScreen.prototype, "execute").callsFake(mockObserveScreen.execute);
-    sinon.stub(ObserveScreen.prototype, "getMostRecentCachedObserveResult").callsFake(mockObserveScreen.getMostRecentCachedObserveResult);
-    sinon.stub(Window.prototype, "getCachedActiveWindow").callsFake(mockWindow.getCachedActiveWindow);
-    sinon.stub(Window.prototype, "getActive").callsFake(mockWindow.getActive);
-    sinon.stub(AwaitIdle.prototype, "initializeUiStabilityTracking").callsFake(mockAwaitIdle.initializeUiStabilityTracking);
-    sinon.stub(AwaitIdle.prototype, "waitForUiStability").callsFake(mockAwaitIdle.waitForUiStability);
-    sinon.stub(AwaitIdle.prototype, "waitForUiStabilityWithState").callsFake(mockAwaitIdle.waitForUiStabilityWithState);
-
-    // Mock DeviceSessionManager
-    sinon.stub(DeviceSessionManager, "getInstance").returns(mockDeviceSessionManager);
-
-    // Set up default mock responses
-    mockWindow.getCachedActiveWindow.resolves(null);
-    mockWindow.getActive.resolves({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
-    mockAwaitIdle.initializeUiStabilityTracking.resolves();
-    mockAwaitIdle.waitForUiStability.resolves();
-    mockAwaitIdle.waitForUiStabilityWithState.resolves();
-    mockObserveScreen.getMostRecentCachedObserveResult.resolves(mockObserveResult);
-    mockObserveScreen.execute.resolves(mockObserveResult);
-
-    // Configure DeviceSessionManager to throw device error when no device is available
-    mockDeviceSessionManager.ensureDeviceReady.rejects(new Error("No devices are connected and no Android Virtual Devices (AVDs) are available. Please connect a physical device or create an AVD first."));
+    // Create fake deep link manager for testing
+    fakeDeepLinkManager = new FakeDeepLinkManager();
   });
 
   afterEach(() => {
     // Clean up after each test
     (ToolRegistry as any).tools.clear();
-    sinon.restore();
+    fakeDeepLinkManager.clearHistory();
   });
 
   describe("registerDeepLinkTools", () => {

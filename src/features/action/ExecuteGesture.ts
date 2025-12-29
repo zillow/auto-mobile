@@ -1,11 +1,11 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BootedDevice, Point } from "../../models";
 import { FingerPath } from "../../models";
 import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { logger } from "../../utils/logger";
 
@@ -14,7 +14,7 @@ import { logger } from "../../utils/logger";
  */
 export class ExecuteGesture extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
     super(device, adb, axe);
     this.device = device;
   }
@@ -37,7 +37,7 @@ export class ExecuteGesture extends BaseVisualChange {
     x2: number,
     y2: number,
     options: GestureOptions = {},
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     // Platform-specific swipe execution (no observedInteraction - caller handles observation)
     switch (this.device.platform) {
@@ -66,7 +66,7 @@ export class ExecuteGesture extends BaseVisualChange {
     x2: number,
     y2: number,
     options: GestureOptions = {},
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     const duration = options.duration || 300; // Default duration
     const scrollMode = options.scrollMode || "adb"; // Default to ADB mode
@@ -108,7 +108,7 @@ export class ExecuteGesture extends BaseVisualChange {
     x2: number,
     y2: number,
     duration: number,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     try {
       const client = AccessibilityServiceClient.getInstance(this.device, this.adb);

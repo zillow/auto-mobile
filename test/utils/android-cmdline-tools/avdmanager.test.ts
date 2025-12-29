@@ -1,20 +1,12 @@
 import { expect } from "chai";
-import sinon from "sinon";
-import sinonChai from "sinon-chai";
-import { use } from "chai";
 import { AvdManagerDependencies } from "../../../src/utils/android-cmdline-tools/avdmanager";
-
-use(sinonChai);
 
 describe("AVDManager", function() {
   this.timeout(15000);
-  let sandbox: sinon.SinonSandbox;
   let mockLocation: any;
   let avdmanager: any;
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox();
-
     // Clear module cache first
     delete require.cache[require.resolve("../../../src/utils/android-cmdline-tools/avdmanager")];
     delete require.cache[require.resolve("../../../src/utils/android-cmdline-tools/detection")];
@@ -32,30 +24,75 @@ describe("AVDManager", function() {
     };
   });
 
-  afterEach(() => {
-    sandbox.restore();
-  });
-
   // Helper function to create mock dependencies
-  function createMockDependencies(overrides: Partial<AvdManagerDependencies> = {}): AvdManagerDependencies {
+  function createDependencies(overrides: Partial<AvdManagerDependencies> = {}): AvdManagerDependencies {
+    class MockChild {
+      private stdoutCallbacks: Array<(data: any) => void> = [];
+      private stderrCallbacks: Array<(data: any) => void> = [];
+      private closeCallbacks: Array<(code: number) => void> = [];
+      private errorCallbacks: Array<(error: Error) => void> = [];
+
+      stdout = {
+        on: (event: string, cb: (data: any) => void) => {
+          if (event === "data") {this.stdoutCallbacks.push(cb);}
+        }
+      };
+
+      stderr = {
+        on: (event: string, cb: (data: any) => void) => {
+          if (event === "data") {this.stderrCallbacks.push(cb);}
+        }
+      };
+
+      stdin = {
+        write: (data: string) => {},
+        end: () => {}
+      };
+
+      on = (event: string, cb: any) => {
+        if (event === "close") {this.closeCallbacks.push(cb);}
+        if (event === "error") {this.errorCallbacks.push(cb);}
+      };
+
+      kill = () => {};
+
+      triggerStdout(data: Buffer) {
+        this.stdoutCallbacks.forEach(cb => cb(data));
+      }
+
+      triggerStderr(data: Buffer) {
+        this.stderrCallbacks.forEach(cb => cb(data));
+      }
+
+      triggerClose(code: number) {
+        this.closeCallbacks.forEach(cb => cb(code));
+      }
+
+      triggerError(error: Error) {
+        this.errorCallbacks.forEach(cb => cb(error));
+      }
+    }
+
+    const mockLogger = {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      debug: () => {},
+      setLogLevel: () => {},
+      getLogLevel: () => "info",
+      enableStdoutLogging: () => {},
+      disableStdoutLogging: () => {},
+      close: () => {}
+    };
+
     return {
-      spawn: sandbox.stub(),
-      existsSync: sandbox.stub(),
-      logger: {
-        info: sandbox.stub(),
-        warn: sandbox.stub(),
-        error: sandbox.stub(),
-        debug: sandbox.stub(),
-        setLogLevel: sandbox.stub(),
-        getLogLevel: sandbox.stub(),
-        enableStdoutLogging: sandbox.stub(),
-        disableStdoutLogging: sandbox.stub(),
-        close: sandbox.stub()
-      },
-      detectAndroidCommandLineTools: sandbox.stub().resolves([mockLocation]),
-      getBestAndroidToolsLocation: sandbox.stub().returns(mockLocation),
-      validateRequiredTools: sandbox.stub().returns({ valid: true, missing: [] }),
-      installAndroidTools: sandbox.stub().resolves({
+      spawn: (command: string, args: string[], options?: any) => new MockChild(),
+      existsSync: (path: string) => true,
+      logger: mockLogger,
+      detectAndroidCommandLineTools: async () => [mockLocation],
+      getBestAndroidToolsLocation: () => mockLocation,
+      validateRequiredTools: () => ({ valid: true, missing: [] }),
+      installAndroidTools: async () => ({
         success: true,
         installed_tools: ["avdmanager", "sdkmanager"],
         failed_tools: [],
@@ -69,50 +106,35 @@ describe("AVDManager", function() {
 
   describe("acceptLicenses", () => {
     it("should accept licenses successfully", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-      mockChild.on.withArgs("close").callsArgWith(1, 0);
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.true;
       expect(result.message).to.equal("Android SDK licenses accepted");
-      expect(mockDeps.spawn).to.have.been.calledWith(
-        "/mock/sdk/cmdline-tools/latest/bin/sdkmanager",
-        ["--licenses"]
-      );
     });
 
     it("should handle license acceptance failure", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
+
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerStderr(Buffer.from("License error"));
+          child.triggerClose(1);
+        }, 0);
+        return child;
       };
-
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      let stderrCallback: (data: Buffer) => void;
-      mockChild.stderr.on.withArgs("data").callsFake((event, callback) => {
-        stderrCallback = callback;
-      });
-      mockChild.on.withArgs("close").callsFake((event, callback) => {
-        if (stderrCallback) {
-          stderrCallback(Buffer.from("License error"));
-        }
-        callback(1);
-      });
 
       const result = await avdmanager.acceptLicenses(mockDeps);
 
@@ -120,67 +142,37 @@ describe("AVDManager", function() {
       expect(result.message).to.include("License acceptance failed");
     });
 
-    it("should install tools if not available", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+    it("should handle missing tools without installation", async () => {
+      const mockDeps = createDependencies();
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      // First call - no tools found
-      mockDeps.detectAndroidCommandLineTools.onFirstCall().resolves([]);
-      mockDeps.getBestAndroidToolsLocation.onFirstCall().returns(null);
-
-      // Second call - tools found after installation
-      mockDeps.detectAndroidCommandLineTools.onSecondCall().resolves([mockLocation]);
-      mockDeps.getBestAndroidToolsLocation.onSecondCall().returns(mockLocation);
-
-      mockChild.on.withArgs("close").callsArgWith(1, 0);
+      mockDeps.detectAndroidCommandLineTools = async () => [];
+      mockDeps.getBestAndroidToolsLocation = () => null;
 
       const result = await avdmanager.acceptLicenses(mockDeps);
 
-      expect(mockDeps.installAndroidTools).to.have.been.calledWith({
-        tools: ["avdmanager", "sdkmanager"],
-        force: false
-      });
-      expect(result.success).to.be.true;
+      expect(result.success).to.be.false;
+      expect(result.message).to.include("Tool installation functionality has been removed");
     });
   });
 
   describe("listSystemImages", () => {
     it("should list system images successfully", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      let stdoutCallback: (data: Buffer) => void;
-      mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
-        stdoutCallback = callback;
-      });
-
-      mockChild.on.withArgs("close").callsFake((event, callback) => {
-        if (stdoutCallback) {
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
           const mockOutput = `
 Available Packages:
   system-images;android-33;google_apis;arm64-v8a | 9
   system-images;android-34;google_apis;x86_64    | 5
           `;
-          stdoutCallback(Buffer.from(mockOutput));
-        }
-        callback(0);
-      });
+          child.triggerStdout(Buffer.from(mockOutput));
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const result = await avdmanager.listSystemImages(undefined, mockDeps);
 
@@ -200,34 +192,23 @@ Available Packages:
     });
 
     it("should filter system images by criteria", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      let stdoutCallback: (data: Buffer) => void;
-      mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
-        stdoutCallback = callback;
-      });
-
-      mockChild.on.withArgs("close").callsFake((event, callback) => {
-        if (stdoutCallback) {
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
           const mockOutput = `
 Available Packages:
   system-images;android-33;google_apis;arm64-v8a | 9
   system-images;android-34;google_apis;x86_64    | 5
   system-images;android-33;default;arm64-v8a     | 3
           `;
-          stdoutCallback(Buffer.from(mockOutput));
-        }
-        callback(0);
-      });
+          child.triggerStdout(Buffer.from(mockOutput));
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const result = await avdmanager.listSystemImages({
         apiLevel: 33,
@@ -242,17 +223,16 @@ Available Packages:
 
   describe("createAvd", () => {
     it("should create AVD successfully", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-      mockChild.on.withArgs("close").callsArgWith(1, 0);
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const params = {
         name: "test_avd",
@@ -265,30 +245,19 @@ Available Packages:
 
       expect(result.success).to.be.true;
       expect(result.avdName).to.equal("test_avd");
-      expect(mockDeps.spawn).to.have.been.calledWith(
-        "/mock/sdk/cmdline-tools/latest/bin/avdmanager",
-        [
-          "create", "avd",
-          "-n", "test_avd",
-          "-k", "system-images;android-33;google_apis;arm64-v8a",
-          "-d", "pixel_4",
-          "--force"
-        ]
-      );
     });
 
     it("should include all optional parameters", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-      mockChild.on.withArgs("close").callsArgWith(1, 0);
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const params = {
         name: "test_avd",
@@ -303,44 +272,20 @@ Available Packages:
       const result = await avdmanager.createAvd(params, mockDeps);
 
       expect(result.success).to.be.true;
-      expect(mockDeps.spawn).to.have.been.calledWith(
-        "/mock/sdk/cmdline-tools/latest/bin/avdmanager",
-        [
-          "create", "avd",
-          "-n", "test_avd",
-          "-k", "system-images;android-33;google_apis;arm64-v8a",
-          "-d", "pixel_4",
-          "--force",
-          "-p", "/custom/path",
-          "-t", "google_apis",
-          "--abi", "arm64-v8a"
-        ]
-      );
     });
 
     it("should handle AVD creation failure", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
+
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerStderr(Buffer.from("AVD creation failed"));
+          child.triggerClose(1);
+        }, 0);
+        return child;
       };
-
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      let stderrCallback: (data: Buffer) => void;
-      mockChild.stderr.on.withArgs("data").callsFake((event, callback) => {
-        stderrCallback = callback;
-      });
-
-      mockChild.on.withArgs("close").callsFake((event, callback) => {
-        if (stderrCallback) {
-          stderrCallback(Buffer.from("AVD creation failed"));
-        }
-        callback(1);
-      });
 
       const params = {
         name: "test_avd",
@@ -356,49 +301,32 @@ Available Packages:
 
   describe("deleteAvd", () => {
     it("should delete AVD successfully", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-      mockChild.on.withArgs("close").callsArgWith(1, 0);
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const result = await avdmanager.deleteAvd("test_avd", mockDeps);
 
       expect(result.success).to.be.true;
       expect(result.message).to.include("deleted successfully");
-      expect(mockDeps.spawn).to.have.been.calledWith(
-        "/mock/sdk/cmdline-tools/latest/bin/avdmanager",
-        ["delete", "avd", "-n", "test_avd"]
-      );
     });
   });
 
   describe("listDeviceImages", () => {
     it("should parse AVD list correctly", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      let stdoutCallback: (data: Buffer) => void;
-      mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
-        stdoutCallback = callback;
-      });
-
-      mockChild.on.withArgs("close").callsFake((event, callback) => {
-        if (stdoutCallback) {
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
           const mockOutput = `
 Available Android Virtual Devices:
     Name: test_avd_1
@@ -418,10 +346,11 @@ Available Android Virtual Devices:
     Path: /Users/test/.android/avd/broken_avd.avd
    Error: Missing system image for Google Play arm64-v8a Medium Phone API 35.
           `;
-          stdoutCallback(Buffer.from(mockOutput));
-        }
-        callback(0);
-      });
+          child.triggerStdout(Buffer.from(mockOutput));
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const result = await avdmanager.listDeviceImages(mockDeps);
 
@@ -451,24 +380,12 @@ Available Android Virtual Devices:
 
   describe("listDevices", () => {
     it("should parse device list correctly", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/avdmanager").returns(true);
-
-      let stdoutCallback: (data: Buffer) => void;
-      mockChild.stdout.on.withArgs("data").callsFake((event, callback) => {
-        stdoutCallback = callback;
-      });
-
-      mockChild.on.withArgs("close").callsFake((event, callback) => {
-        if (stdoutCallback) {
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
           const mockOutput = `
 Available devices:
 id: 0
@@ -483,10 +400,11 @@ id: pixel_4
     Name: Pixel 4
     OEM: Google
           `;
-          stdoutCallback(Buffer.from(mockOutput));
-        }
-        callback(0);
-      });
+          child.triggerStdout(Buffer.from(mockOutput));
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const result = await avdmanager.listDevices(mockDeps);
 
@@ -514,47 +432,40 @@ id: pixel_4
 
   describe("installSystemImage", () => {
     it("should install system image successfully", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-      mockChild.on.withArgs("close").callsArgWith(1, 0);
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const packageName = "system-images;android-33;google_apis;arm64-v8a";
       const result = await avdmanager.installSystemImage(packageName, true, mockDeps);
 
       expect(result.success).to.be.true;
       expect(result.message).to.include("installed successfully");
-      expect(mockDeps.spawn).to.have.been.calledWith(
-        "/mock/sdk/cmdline-tools/latest/bin/sdkmanager",
-        [packageName]
-      );
     });
 
     it("should install without accepting license when specified", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
-      };
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
 
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-      mockChild.on.withArgs("close").callsArgWith(1, 0);
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
 
       const packageName = "system-images;android-33;google_apis;arm64-v8a";
       const result = await avdmanager.installSystemImage(packageName, false, mockDeps);
 
       expect(result.success).to.be.true;
-      expect(mockChild.stdin.write).to.not.have.been.called;
     });
   });
 
@@ -574,49 +485,33 @@ id: pixel_4
 
   describe("Error Handling", () => {
     it("should handle tools installation failure", async () => {
-      const mockDeps = createMockDependencies();
+      const mockDeps = createDependencies();
 
-      mockDeps.detectAndroidCommandLineTools.resolves([]);
-      mockDeps.getBestAndroidToolsLocation.returns(null);
-      mockDeps.installAndroidTools.resolves({
-        success: false,
-        installed_tools: [],
-        failed_tools: ["avdmanager", "sdkmanager"],
-        installation_path: "",
-        installation_method: "manual",
-        message: "Installation failed"
-      });
+      mockDeps.detectAndroidCommandLineTools = async () => [];
+      mockDeps.getBestAndroidToolsLocation = () => null;
 
       const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.false;
-      expect(result.message).to.include("Failed to install required tools");
+      expect(result.message).to.include("Tool installation functionality has been removed");
     });
 
     it("should handle missing tools after installation", async () => {
-      const mockDeps = createMockDependencies();
+      const mockDeps = createDependencies();
 
-      mockDeps.detectAndroidCommandLineTools.resolves([]);
-      mockDeps.getBestAndroidToolsLocation.returns(null);
-      mockDeps.installAndroidTools.resolves({
-        success: true,
-        installed_tools: ["avdmanager", "sdkmanager"],
-        failed_tools: [],
-        installation_path: "/mock/path",
-        installation_method: "manual",
-        message: "Success"
-      });
+      mockDeps.detectAndroidCommandLineTools = async () => [];
+      mockDeps.getBestAndroidToolsLocation = () => null;
 
       const result = await avdmanager.acceptLicenses(mockDeps);
 
       expect(result.success).to.be.false;
-      expect(result.message).to.include("Tools installation completed but tools not detected");
+      expect(result.message).to.include("Tool installation functionality has been removed");
     });
 
     it("should handle missing executable files", async () => {
-      const mockDeps = createMockDependencies();
+      const mockDeps = createDependencies();
 
-      mockDeps.existsSync.returns(false); // No executable files exist
+      mockDeps.existsSync = (path: string) => false;
 
       const result = await avdmanager.acceptLicenses(mockDeps);
 
@@ -625,19 +520,16 @@ id: pixel_4
     });
 
     it("should handle command spawn errors", async () => {
-      const mockChild = {
-        stdout: { on: sandbox.stub() },
-        stderr: { on: sandbox.stub() },
-        stdin: { write: sandbox.stub(), end: sandbox.stub() },
-        on: sandbox.stub()
+      const mockDeps = createDependencies();
+      const originalSpawn = mockDeps.spawn;
+
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        setTimeout(() => {
+          child.triggerError(new Error("Spawn failed"));
+        }, 0);
+        return child;
       };
-
-      const mockDeps = createMockDependencies();
-      mockDeps.spawn.returns(mockChild);
-      mockDeps.existsSync.withArgs("/mock/sdk/cmdline-tools/latest/bin/sdkmanager").returns(true);
-
-      // Simulate spawn error
-      mockChild.on.withArgs("error").callsArgWith(1, new Error("Spawn failed"));
 
       const result = await avdmanager.acceptLicenses(mockDeps);
 

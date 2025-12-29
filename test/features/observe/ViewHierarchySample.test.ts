@@ -3,7 +3,7 @@ import { describe, it } from "mocha";
 import path from "path";
 import xml2js from "xml2js";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
-import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { logger } from "../../../src/utils/logger";
 import { readFileAsync } from "../../../src/utils/io";
@@ -14,16 +14,16 @@ describe("ViewHierarchy - Sample Data", function() {
   this.timeout(10000);
 
   let viewHierarchy: ViewHierarchy;
-  let adb: AdbUtils;
+  let fakeAdb: FakeAdbExecutor;
   let takeScreenshot: TakeScreenshot;
   let accessibilityClient: AccessibilityServiceClient;
 
   beforeEach(function() {
-    // Initialize with test mode
-    adb = new AdbUtils();
-    takeScreenshot = new TakeScreenshot("test-device", adb);
-    accessibilityClient = new AccessibilityServiceClient("test-device", adb);
-    viewHierarchy = new ViewHierarchy("test-device", adb, takeScreenshot, accessibilityClient);
+    // Initialize with fake ADB
+    fakeAdb = new FakeAdbExecutor();
+    takeScreenshot = new TakeScreenshot("test-device", fakeAdb);
+    accessibilityClient = new AccessibilityServiceClient("test-device", fakeAdb);
+    viewHierarchy = new ViewHierarchy("test-device", fakeAdb, takeScreenshot, accessibilityClient);
   });
 
   // Helper function to read and parse XML file

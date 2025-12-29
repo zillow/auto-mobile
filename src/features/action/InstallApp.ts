@@ -1,18 +1,18 @@
 import path from "path";
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BootedDevice } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class InstallApp {
-  private adb: AdbUtils;
+  private adb: AdbClient;
 
   /**
    * Create an InstallApp instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(device);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    this.adb = adb || new AdbClient(device);
   }
 
   /**

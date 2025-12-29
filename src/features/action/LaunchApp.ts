@@ -1,35 +1,35 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, LaunchAppResult } from "../../models";
 import { ActionableError } from "../../models";
 import { TerminateApp } from "./TerminateApp";
 import { ClearAppData } from "./ClearAppData";
 import { logger } from "../../utils/logger";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
-import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
-import { createGlobalPerformanceTracker, IPerformanceTracker } from "../../utils/PerformanceTracker";
+import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
+import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 
 export type ForegroundCheckMode = "parallel" | "single";
 
 export class LaunchApp extends BaseVisualChange {
 
-  private simctl: Simctl;
+  private simctl: SimCtlClient;
   /**
    * Create an LaunchApp instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
-   * @param axe - Optional Axe instance for testing
-   * @param simctl - Optional Simctl instance for testing
+   * @param adb - Optional AdbClient instance for testing
+   * @param axe - Optional AxeClient instance for testing
+   * @param simctl - Optional SimCtlClient instance for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null,
-    axe: Axe | null = null,
-    simctl: Simctl | null = null) {
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null,
+    simctl: SimCtlClient | null = null) {
     super(device, adb, axe);
     this.device = device;
-    this.simctl = simctl || new Simctl(this.device);
+    this.simctl = simctl || new SimCtlClient(this.device);
   }
 
   /**
@@ -40,7 +40,7 @@ export class LaunchApp extends BaseVisualChange {
    */
   private async extractLauncherActivities(
     packageName: string,
-    perf?: IPerformanceTracker
+    perf?: PerformanceTracker
   ): Promise<string[]> {
     logger.info("extractLauncherActivities");
     const activities: string[] = [];
@@ -356,7 +356,7 @@ export class LaunchApp extends BaseVisualChange {
   private async checkAppForeground(
     packageName: string,
     mode: ForegroundCheckMode = "single",
-    perf?: IPerformanceTracker
+    perf?: PerformanceTracker
   ): Promise<boolean> {
     logger.info(`[LaunchApp] Checking if app is in foreground (mode: ${mode})`);
 
@@ -372,7 +372,7 @@ export class LaunchApp extends BaseVisualChange {
   /**
    * Parallel foreground check - runs all 3 dumpsys commands in parallel (kept for future use)
    */
-  private async checkForegroundParallel(packageName: string, perf?: IPerformanceTracker): Promise<boolean> {
+  private async checkForegroundParallel(packageName: string, perf?: PerformanceTracker): Promise<boolean> {
     try {
       // Note: Window check uses mCurrentFocus (not "Window #") to avoid false positives from background windows
       const foregroundChecks = [
@@ -410,7 +410,7 @@ export class LaunchApp extends BaseVisualChange {
   /**
    * Single dumpsys foreground check - uses one comprehensive dumpsys call
    */
-  private async checkForegroundSingle(packageName: string, perf?: IPerformanceTracker): Promise<boolean> {
+  private async checkForegroundSingle(packageName: string, perf?: PerformanceTracker): Promise<boolean> {
     try {
       // Use a single dumpsys activity activities call and parse the output
       const cmd = `shell dumpsys activity activities | grep -E "(mResumedActivity|mFocusedActivity|topResumedActivity)" | head -5`;
@@ -438,7 +438,7 @@ export class LaunchApp extends BaseVisualChange {
   private async performLaunch(
     packageName: string,
     activityName: string | undefined,
-    perf: IPerformanceTracker
+    perf: PerformanceTracker
   ): Promise<{ success: boolean; packageName: string; activityName?: string }> {
     let targetActivity = activityName;
 

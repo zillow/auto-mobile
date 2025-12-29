@@ -1,20 +1,12 @@
 import { expect } from "chai";
 import { ListInstalledApps } from "../../../src/features/observe/ListInstalledApps";
-import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
-import { ExecResult, BootedDevice } from "../../../src/models";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
+import { BootedDevice } from "../../../src/models";
 
 describe("ListInstalledApps", function() {
   let listInstalledApps: ListInstalledApps;
-  let mockAdb: Partial<AdbUtils>;
+  let fakeAdb: FakeAdbExecutor;
   let mockDevice: BootedDevice;
-
-  const createMockExecResult = (stdout: string, stderr = ""): ExecResult => ({
-    stdout,
-    stderr,
-    toString: () => stdout,
-    trim: () => stdout.trim(),
-    includes: (searchString: string) => stdout.includes(searchString),
-  });
 
   beforeEach(function() {
     mockDevice = {
@@ -22,16 +14,10 @@ describe("ListInstalledApps", function() {
       platform: "android"
     } as BootedDevice;
 
-    mockAdb = {
-      executeCommand: async (command: string) => {
-        if (command === "shell pm list packages") {
-          return createMockExecResult("package:com.android.chrome\npackage:com.google.android.gms\npackage:com.example.myapp\n");
-        }
-        return createMockExecResult("");
-      }
-    };
+    fakeAdb = new FakeAdbExecutor();
+    fakeAdb.setCommandResponse("shell pm list packages", { stdout: "package:com.android.chrome\npackage:com.google.android.gms\npackage:com.example.myapp\n", stderr: "" });
 
-    listInstalledApps = new ListInstalledApps(mockDevice, mockAdb as AdbUtils);
+    listInstalledApps = new ListInstalledApps(mockDevice, fakeAdb);
   });
 
   describe("execute", function() {
@@ -46,7 +32,7 @@ describe("ListInstalledApps", function() {
     });
 
     it("should filter out empty lines and non-package lines", async function() {
-      mockAdb.executeCommand = async () => createMockExecResult("package:com.example.app\n\nsome other line\npackage:com.test.app\n");
+      fakeAdb.setCommandResponse("shell pm list packages", { stdout: "package:com.example.app\n\nsome other line\npackage:com.test.app\n", stderr: "" });
 
       const result = await listInstalledApps.execute();
 
@@ -56,9 +42,7 @@ describe("ListInstalledApps", function() {
     });
 
     it("should handle adb command failure gracefully", async function() {
-      mockAdb.executeCommand = async () => {
-        throw new Error("ADB command failed");
-      };
+      fakeAdb.setCommandResponse("shell pm list packages", { stdout: "", stderr: "error" });
 
       const result = await listInstalledApps.execute();
 
@@ -67,7 +51,7 @@ describe("ListInstalledApps", function() {
     });
 
     it("should trim package names correctly", async function() {
-      mockAdb.executeCommand = async () => createMockExecResult("package: com.example.app \npackage:com.test.app\t\n");
+      fakeAdb.setCommandResponse("shell pm list packages", { stdout: "package: com.example.app \npackage:com.test.app\t\n", stderr: "" });
 
       const result = await listInstalledApps.execute();
 

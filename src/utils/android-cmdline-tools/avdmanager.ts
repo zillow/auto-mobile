@@ -29,7 +29,7 @@ const createDefaultDependencies = (): AvdManagerDependencies => ({
   detectAndroidCommandLineTools,
   getBestAndroidToolsLocation,
   validateRequiredTools,
-  installAndroidTools
+  installAndroidTools // This function now throws - kept for compatibility with existing code
 });
 
 /**
@@ -110,39 +110,15 @@ async function ensureToolsAvailable(dependencies = createDefaultDependencies()):
   const bestLocation = dependencies.getBestAndroidToolsLocation(locations);
 
   if (!bestLocation) {
-    dependencies.logger.info("Android command line tools not found, installing...");
-    const installResult = await dependencies.installAndroidTools({
-      tools: ["avdmanager", "sdkmanager"],
-      force: false
-    });
-
-    if (!installResult.success) {
-      throw new Error(`Failed to install required tools: ${installResult.message}`);
-    }
-
-    // Re-detect after installation
-    const updatedLocations = await dependencies.detectAndroidCommandLineTools();
-    const newBestLocation = dependencies.getBestAndroidToolsLocation(updatedLocations);
-
-    if (!newBestLocation) {
-      throw new Error("Tools installation completed but tools not detected");
-    }
-
-    return newBestLocation;
+    dependencies.logger.error("Android command line tools not found and tool installation has been removed");
+    throw new Error("Android command line tools not found. Tool installation functionality has been removed. Please install Android SDK manually from https://developer.android.com/studio or using Homebrew: brew install --cask android-commandlinetools");
   }
 
   // Validate that required tools are available
   const validation = dependencies.validateRequiredTools(bestLocation, ["avdmanager", "sdkmanager"]);
   if (!validation.valid) {
-    dependencies.logger.info(`Missing required tools: ${validation.missing.join(", ")}, installing...`);
-    const installResult = await dependencies.installAndroidTools({
-      tools: validation.missing,
-      force: false
-    });
-
-    if (!installResult.success) {
-      throw new Error(`Failed to install missing tools: ${installResult.message}`);
-    }
+    dependencies.logger.error(`Missing required tools: ${validation.missing.join(", ")} and tool installation has been removed`);
+    throw new Error(`Missing required tools: ${validation.missing.join(", ")}. Tool installation functionality has been removed. Please install Android SDK manually.`);
   }
 
   return bestLocation;

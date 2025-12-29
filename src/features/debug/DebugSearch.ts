@@ -1,4 +1,4 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { BootedDevice, Element, ViewHierarchyResult, DebugSearchResult, DebugSearchMatch } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
@@ -48,16 +48,16 @@ export interface DebugSearchOptions {
  */
 export class DebugSearch {
   private device: BootedDevice;
-  private readonly adb: AdbUtils;
+  private readonly adb: AdbClient;
   private viewHierarchy: ViewHierarchy;
   private elementUtils: ElementUtils;
 
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null
+    adb: AdbClient | null = null
   ) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
+    this.adb = adb || new AdbClient(device);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);
     this.elementUtils = new ElementUtils();
   }

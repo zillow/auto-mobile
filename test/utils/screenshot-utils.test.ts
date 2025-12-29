@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { describe, it, beforeEach, afterEach } from "mocha";
-import { ScreenshotUtils } from "../../src/utils/screenshot-utils";
+import { ScreenshotUtils } from "../../src/utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../src/utils/constants";
 import fs from "fs-extra";
 import path from "path";

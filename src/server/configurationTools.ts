@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
-import { ConfigurationManager } from "../utils/configurationManager";
+import { ConfigurationManager } from "../utils/ConfigurationManager";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 

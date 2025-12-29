@@ -1,14 +1,28 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ImeActionResult, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { AccessibilityService } from "../observe/interfaces/AccessibilityService";
+import { Timer } from "../../utils/interfaces/Timer";
+import { defaultTimer } from "../../utils/SystemTimer";
 
 export class ImeAction extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+  private a11yService: AccessibilityService | null = null;
+  private timer: Timer;
+
+  constructor(
+    device: BootedDevice,
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null,
+    a11yService: AccessibilityService | null = null,
+    timer: Timer = defaultTimer
+  ) {
     super(device, adb, axe);
+    this.a11yService = a11yService;
+    this.timer = timer;
   }
 
   async execute(
@@ -74,8 +88,8 @@ export class ImeAction extends BaseVisualChange {
     action: "done" | "next" | "search" | "send" | "go" | "previous",
     _observeResult: ObserveResult
   ): Promise<ImeActionResult> {
-    // Use accessibility service (proper focus management instead of key codes)
-    const a11yClient = AccessibilityServiceClient.getInstance(this.device, this.adb);
+    // Use provided a11y service or get default instance
+    const a11yClient = this.a11yService || AccessibilityServiceClient.getInstance(this.device, this.adb);
     const a11yResult = await a11yClient.requestImeAction(action);
 
     if (a11yResult.success) {
@@ -122,7 +136,7 @@ export class ImeAction extends BaseVisualChange {
 
     try {
       // Small delay to ensure any preceding text input is processed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await this.timer.sleep(100);
 
       // Execute the key event(s)
       if (keyCode.includes(" ")) {

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { describe, it, beforeEach, afterEach } from "mocha";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
-import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
@@ -26,7 +26,7 @@ const teardownReadFileMock = () => {
 describe("ViewHierarchy", function() {
   describe("Unit Tests for Public Methods", function() {
     let viewHierarchy: ViewHierarchy;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -37,10 +37,8 @@ describe("ViewHierarchy", function() {
         name: "Test Device",
         platform: "android"
       };
-      // Create mocks for testing
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      // Create fakes for testing
+      fakeAdb = new FakeAdbExecutor();
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -53,7 +51,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
       setupReadFileMock();
     });
 
@@ -220,185 +218,10 @@ describe("ViewHierarchy", function() {
     });
   });
 
-  describe("Dumpsys Activity Top Integration Tests", function() {
-    let viewHierarchy: ViewHierarchy;
-    let mockAdb: AdbUtils;
-    let mockTakeScreenshot: TakeScreenshot;
-    let mockAccessibilityServiceClient: AccessibilityServiceClient;
-    let mockDevice: BootedDevice;
-
-    beforeEach(function() {
-      mockDevice = {
-        deviceId: "test-device",
-        name: "Test Device",
-        platform: "android"
-      };
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
-
-      mockTakeScreenshot = {
-        execute: async () => ({ success: true, path: "/tmp/test.png" })
-      } as unknown as TakeScreenshot;
-
-      mockAccessibilityServiceClient = {
-        getLatestHierarchy: async () => null,
-        convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-        convertAccessibilityNode: () => ({}),
-        getAccessibilityHierarchy: async () => null
-      } as unknown as AccessibilityServiceClient;
-
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
-    });
-
-    it("should parse dumpsys activity top output for class overrides", function() {
-      const sampleDumpsysOutput = `
-    View Hierarchy:
-      com.android.internal.policy.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 aid=0}[]
-        android.widget.LinearLayout{d76e313 V.E...... ......ID 0,0-1080,2400}
-          dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
-            android.widget.LinearLayout{a9c5a77 V.E...... ........ 0,51-0,122}
-              com.google.android.material.textview.MaterialTextView{bace2c3 V.ED..... ......ID 0,0-0,71 #7f0a087c app:id/toolbar_title aid=1073742019}
-              android.widget.RelativeLayout{5d91052 G.E...... ......I. 0,0-0,0 #7f0a0133 app:id/beta_tag aid=1073742018}
-                com.google.android.material.textview.MaterialTextView{1d11f23 V.ED..... ......ID 0,0-0,0 #7f0a0134 app:id/beta_tag_text}
-      Looper (main, tid 2) {2b059f8}
-        (Total messages: 0, polling=false, quitting=false)
-      `;
-
-      const result = (viewHierarchy as any).parseDumpsysActivityTop(sampleDumpsysOutput);
-
-      expect(result.classOverrides.size).to.be.greaterThan(0);
-      // Check that custom classes were identified (non-Android classes)
-      let foundCustomClass = false;
-      for (const value of result.classOverrides.values()) {
-        if (!value.match(/^(android\.|com\.android\.|androidx\.)/)) {
-          foundCustomClass = true;
-          break;
-        }
-      }
-      expect(foundCustomClass).to.be.true;
-    });
-
-    it("should parse dumpsys activity top output for fragment data", function() {
-      const sampleDumpsysOutput = `
-    Active Fragments:
-      NavHostFragment{97b69d} (5e6014e0-0916-441b-98fc-b250f5c30f83 id=0x7f0a012b)
-          mFragmentId=#7f0a012b mContainerId=#7f0a012b mTag=null
-          SearchTabContainerFragment{fc93440} (92eba8cc-8e59-4c67-9dcf-2f98fc626dd1 id=0x7f0a012b tag=8ba7a0d8-1d7d-4159-ab80-e3adbf1888ca)
-              mFragmentId=#7f0a012b mContainerId=#7f0a012b mTag=8ba7a0d8-1d7d-4159-ab80-e3adbf1888ca
-              Child FragmentManager{54867e5 in SearchTabContainerFragment{fc93440}}}:
-                Active Fragments:
-                RealEstateMapFragment{889490d} (ca2b0904-c6ce-46d1-a9a7-0b3afe6209e8 id=0x7f0a0774 tag=MAIN_FRAGMENT)
-                    mFragmentId=#7f0a0774 mContainerId=#7f0a0774 mTag=MAIN_FRAGMENT
-      `;
-
-      const result = (viewHierarchy as any).parseDumpsysActivityTop(sampleDumpsysOutput);
-
-      expect(result.fragmentData.size).to.be.greaterThan(0);
-      // Check that we found SearchTabContainerFragment and RealEstateMapFragment
-      expect(result.fragmentData.has("0x7f0a012b")).to.be.true;
-      expect(result.fragmentData.get("0x7f0a012b")).to.equal("SearchTabContainerFragment");
-      expect(result.fragmentData.has("0x7f0a0774")).to.be.true;
-      expect(result.fragmentData.get("0x7f0a0774")).to.equal("RealEstateMapFragment");
-    });
-
-    it("should augment view hierarchy with class and fragment information", function() {
-      const mockActivityTopData = {
-        classOverrides: new Map([
-          ["dev.jasonpearson.android.zillowmap:id/search_toolbar", "dev.jasonpearson.android.ui.base.ZillowToolbar"],
-          ["0,0-1080,173", "dev.jasonpearson.android.ui.base.ZillowToolbar"]
-        ]),
-        fragmentData: new Map([
-          ["0x7f0a012b", "SearchTabContainerFragment"],
-          ["0x7f0a0774", "RealEstateMapFragment"]
-        ]),
-        viewData: new Map([
-          ["dev.jasonpearson.android.zillowmap:id/custom_view", "dev.jasonpearson.android.ui.base.CustomView"]
-        ])
-      };
-
-      const mockViewHierarchy: any = {
-        hierarchy: {
-          "resource-id": "dev.jasonpearson.android.zillowmap:id/search_toolbar",
-          "class": "android.view.ViewGroup",
-          "bounds": "[0,0][1080,173]",
-          "node": {
-            "resource-id": "0x7f0a012b",
-            "class": "android.widget.FrameLayout"
-          }
-        }
-      };
-
-      (viewHierarchy as any).augmentViewHierarchyWithClassAndFragment(mockViewHierarchy, mockActivityTopData);
-
-      // Check that class was overridden
-      expect(mockViewHierarchy.hierarchy.class).to.equal("dev.jasonpearson.android.ui.base.ZillowToolbar");
-
-      // Check that fragment was added
-      expect((mockViewHierarchy.hierarchy.node as any).fragment).to.equal("SearchTabContainerFragment");
-    });
-
-    it("should handle empty dumpsys output gracefully", function() {
-      const emptyDumpsysOutput = "";
-
-      const result = (viewHierarchy as any).parseDumpsysActivityTop(emptyDumpsysOutput);
-
-      expect(result.classOverrides.size).to.equal(0);
-      expect(result.fragmentData.size).to.equal(0);
-    });
-
-    it("should handle dumpsys output without view hierarchy section", function() {
-      const dumpsysWithoutViewHierarchy = `
-        Some other output
-        No View Hierarchy here
-        Looper (main, tid 2) {2b059f8}
-      `;
-
-      const result = (viewHierarchy as any).parseDumpsysActivityTop(dumpsysWithoutViewHierarchy);
-
-      expect(result.classOverrides.size).to.equal(0);
-      expect(result.fragmentData.size).to.equal(0);
-    });
-
-    it("should handle dumpsys output without active fragments section", function() {
-      const dumpsysWithoutActiveFragments = `
-        View Hierarchy:
-          com.android.internal.policy.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 aid=0}[]
-            dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar}
-        Looper (main, tid 2) {2b059f8}
-      `;
-
-      const result = (viewHierarchy as any).parseDumpsysActivityTop(dumpsysWithoutActiveFragments);
-
-      expect(result.classOverrides.size).to.be.greaterThan(0);
-      expect(result.fragmentData.size).to.equal(0);
-    });
-
-    it("should only override non-Android classes", function() {
-      const dumpsysWithMixedClasses = `
-        View Hierarchy:
-          android.widget.LinearLayout{d76e313 V.E...... ......ID 0,0-1080,2400 #7f0a01ff app:id/android_layout}
-          com.android.internal.widget.DecorView{930a38 I.E...... R.....ID 0,0-1080,2400 #7f0a01fe app:id/decor_view}
-          androidx.appcompat.widget.Toolbar{a9c5a77 V.E...... ........ 0,51-0,122 #7f0a01fd app:id/androidx_toolbar}
-          dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/zillow_toolbar}
-        Looper (main, tid 2) {2b059f8}
-      `;
-
-      const result = (viewHierarchy as any).parseDumpsysActivityTop(dumpsysWithMixedClasses);
-
-      // Should only have the Zillow class, not Android/androidx classes
-      expect(result.classOverrides.size).to.equal(1);
-      expect(result.classOverrides.has("7f0a078a")).to.be.true;
-      expect(result.classOverrides.get("7f0a078a")).to.equal("dev.jasonpearson.android.ui.base.ZillowToolbar");
-      expect(result.classOverrides.has("7f0a01ff")).to.be.false;
-      expect(result.classOverrides.has("7f0a01fe")).to.be.false;
-      expect(result.classOverrides.has("7f0a01fd")).to.be.false;
-    });
-  });
 
   describe("Cache Management Tests", function() {
     let viewHierarchy: ViewHierarchy;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -409,10 +232,8 @@ describe("ViewHierarchy", function() {
         name: "Test Device",
         platform: "android"
       };
-      // Create mocks for testing
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      // Create fakes for testing
+      fakeAdb = new FakeAdbExecutor();
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -425,7 +246,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     it("should return null from checkInMemoryCache when no cache exists", async function() {
@@ -552,7 +373,7 @@ describe("ViewHierarchy", function() {
 
   describe("XML Processing Tests", function() {
     let viewHierarchy: ViewHierarchy;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -563,9 +384,7 @@ describe("ViewHierarchy", function() {
         name: "Test Device",
         platform: "android"
       };
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      fakeAdb = new FakeAdbExecutor();
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -578,7 +397,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     it("should process valid XML data correctly", async function() {
@@ -610,14 +429,8 @@ describe("ViewHierarchy", function() {
 
     it("should execute uiautomator dump command", async function() {
       const xmlContent = '<?xml version="1.0"?><hierarchy><node text="test"/></hierarchy>';
-      const mockAdbWithOutput = {
-        executeCommand: async (cmd: string) => {
-          if (cmd.includes("uiautomator dump")) {
-            return { stdout: xmlContent, stderr: "" };
-          }
-          return { stdout: "", stderr: "" };
-        }
-      } as unknown as AdbUtils;
+      const fakeAdbWithOutput = new FakeAdbExecutor();
+      fakeAdbWithOutput.setCommandResponse("uiautomator dump", { stdout: xmlContent, stderr: "" });
 
       const mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
@@ -626,7 +439,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, mockAdbWithOutput, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, fakeAdbWithOutput, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       const result = await viewHierarchyWithMock.executeUiAutomatorDump();
       expect(result).to.equal(xmlContent);
@@ -641,9 +454,7 @@ describe("ViewHierarchy", function() {
         platform: "android"
       };
 
-      const mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      const fakeAdb = new FakeAdbExecutor();
 
       const mockTakeScreenshotFail = {
         execute: async () => ({ success: false, error: "Screenshot failed" })
@@ -656,7 +467,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshotFail, mockAccessibilityServiceClient);
+      const viewHierarchyWithMock = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshotFail, mockAccessibilityServiceClient);
 
       try {
         await viewHierarchyWithMock.getOrCreateScreenshotBuffer(null);
@@ -670,7 +481,7 @@ describe("ViewHierarchy", function() {
 
   describe("Error Handling Tests", function() {
     let viewHierarchy: ViewHierarchy;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -681,9 +492,7 @@ describe("ViewHierarchy", function() {
         name: "Test Device",
         platform: "android"
       };
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      fakeAdb = new FakeAdbExecutor();
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -696,7 +505,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
       setupReadFileMock();
     });
 
@@ -723,7 +532,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithMocks = new ViewHierarchy(mockDevice, mockAdb, null, mockTakeScreenshotError, mockAccessibilityServiceClient);
+      const viewHierarchyWithMocks = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshotError, mockAccessibilityServiceClient);
 
       const result = await viewHierarchyWithMocks.getAndroidViewHierarchy();
 
@@ -732,11 +541,14 @@ describe("ViewHierarchy", function() {
     });
 
     it("should handle ADB errors in executeUiAutomatorDump", async function() {
-      const mockAdbError = {
-        executeCommand: async () => {
-          throw new Error("null root node returned by UiTestAutomationBridge");
-        }
-      } as unknown as AdbUtils;
+      const fakeAdbError = new FakeAdbExecutor();
+      fakeAdbError.setDefaultResponse({
+        stdout: "",
+        stderr: "null root node returned by UiTestAutomationBridge",
+        toString() { return this.stderr; },
+        trim() { return this.stderr.trim(); },
+        includes(searchString: string) { return this.stderr.includes(searchString); }
+      });
 
       const mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
@@ -745,7 +557,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       try {
         await viewHierarchyWithError.executeUiAutomatorDump();
@@ -756,11 +568,14 @@ describe("ViewHierarchy", function() {
     });
 
     it("should handle device locked/screen off error in _getViewHierarchyWithoutCache", async function() {
-      const mockAdbLockedError = {
-        executeCommand: async () => {
-          throw new Error("null root node returned by UiTestAutomationBridge");
-        }
-      } as unknown as AdbUtils;
+      const fakeAdbLockedError = new FakeAdbExecutor();
+      fakeAdbLockedError.setDefaultResponse({
+        stdout: "",
+        stderr: "null root node returned by UiTestAutomationBridge",
+        toString() { return this.stderr; },
+        trim() { return this.stderr.trim(); },
+        includes(searchString: string) { return this.stderr.includes(searchString); }
+      });
 
       const mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
@@ -769,7 +584,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbLockedError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbLockedError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -780,11 +595,14 @@ describe("ViewHierarchy", function() {
     });
 
     it("should handle cat file not found error in _getViewHierarchyWithoutCache", async function() {
-      const mockAdbCatError = {
-        executeCommand: async () => {
-          throw new Error("cat: /sdcard/window_dump.xml: No such file or directory");
-        }
-      } as unknown as AdbUtils;
+      const fakeAdbCatError = new FakeAdbExecutor();
+      fakeAdbCatError.setDefaultResponse({
+        stdout: "",
+        stderr: "cat: /sdcard/window_dump.xml: No such file or directory",
+        toString() { return this.stderr; },
+        trim() { return this.stderr.trim(); },
+        includes(searchString: string) { return this.stderr.includes(searchString); }
+      });
 
       const mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
@@ -793,7 +611,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbCatError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbCatError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -804,11 +622,14 @@ describe("ViewHierarchy", function() {
     });
 
     it("should handle generic error in _getViewHierarchyWithoutCache", async function() {
-      const mockAdbGenericError = {
-        executeCommand: async () => {
-          throw new Error("Some other generic error");
-        }
-      } as unknown as AdbUtils;
+      const fakeAdbGenericError = new FakeAdbExecutor();
+      fakeAdbGenericError.setDefaultResponse({
+        stdout: "",
+        stderr: "Some other generic error",
+        toString() { return this.stderr; },
+        trim() { return this.stderr.trim(); },
+        includes(searchString: string) { return this.stderr.includes(searchString); }
+      });
 
       const mockAccessibilityServiceClient = {
         getLatestHierarchy: async () => null,
@@ -817,7 +638,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      const viewHierarchyWithError = new ViewHierarchy(mockDevice, mockAdbGenericError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
+      const viewHierarchyWithError = new ViewHierarchy(mockDevice, fakeAdbGenericError, null, mockTakeScreenshot, mockAccessibilityServiceClient);
 
       // Call _getViewHierarchyWithoutCache directly to test its error handling
       const result = await (viewHierarchyWithError as any)._getViewHierarchyWithoutCache();
@@ -830,7 +651,7 @@ describe("ViewHierarchy", function() {
 
   describe("FilterViewHierarchy Tests", function() {
     let viewHierarchy: ViewHierarchy;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -841,9 +662,7 @@ describe("ViewHierarchy", function() {
         name: "Test Device",
         platform: "android"
       };
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      fakeAdb = new FakeAdbExecutor();
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -856,7 +675,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     it("should handle empty hierarchy", function() {
@@ -898,7 +717,7 @@ describe("ViewHierarchy", function() {
 
   describe("Edge Cases and Additional Coverage", function() {
     let viewHierarchy: ViewHierarchy;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockTakeScreenshot: TakeScreenshot;
     let mockAccessibilityServiceClient: AccessibilityServiceClient;
     let mockDevice: BootedDevice;
@@ -909,9 +728,7 @@ describe("ViewHierarchy", function() {
         name: "Test Device",
         platform: "android"
       };
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      fakeAdb = new FakeAdbExecutor();
 
       mockTakeScreenshot = {
         execute: async () => ({ success: true, path: "/tmp/test.png" })
@@ -924,7 +741,7 @@ describe("ViewHierarchy", function() {
         getAccessibilityHierarchy: async () => null
       } as unknown as AccessibilityServiceClient;
 
-      viewHierarchy = new ViewHierarchy(mockDevice, mockAdb, mockTakeScreenshot, mockAccessibilityServiceClient);
+      viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb, null, mockTakeScreenshot, mockAccessibilityServiceClient);
     });
 
     it("should handle node with empty children array", function() {
@@ -1080,7 +897,7 @@ describe("Z-Index Accessibility Analysis", () => {
       getAccessibilityHierarchy: async () => null
     } as unknown as AccessibilityServiceClient;
 
-    const viewHierarchy = new ViewHierarchy(mockDevice, null, null, mockAccessibilityServiceClient);
+    const viewHierarchy = new ViewHierarchy(mockDevice, null, null, null, mockAccessibilityServiceClient);
 
     // Mock XML with clickable elements at different Z levels
     const mockXml = `
@@ -1134,7 +951,7 @@ describe("Z-Index Accessibility Analysis", () => {
       getAccessibilityHierarchy: async () => null
     } as unknown as AccessibilityServiceClient;
 
-    const viewHierarchy = new ViewHierarchy(mockDevice, null, null, mockAccessibilityServiceClient);
+    const viewHierarchy = new ViewHierarchy(mockDevice, null, null, null, mockAccessibilityServiceClient);
 
     // Mock XML with overlapping clickable elements
     const mockXml = `
@@ -1188,7 +1005,7 @@ describe("Z-Index Accessibility Analysis", () => {
       getAccessibilityHierarchy: async () => null
     } as unknown as AccessibilityServiceClient;
 
-    const viewHierarchy = new ViewHierarchy(mockDevice, null, null, mockAccessibilityServiceClient);
+    const viewHierarchy = new ViewHierarchy(mockDevice, null, null, null, mockAccessibilityServiceClient);
 
     // Mock XML with element without bounds
     const mockXml = `

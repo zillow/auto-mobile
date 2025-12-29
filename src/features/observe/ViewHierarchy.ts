@@ -1,30 +1,21 @@
 import fs from "fs-extra";
 import path from "path";
 import xml2js from "xml2js";
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { CryptoUtils } from "../../utils/crypto";
+import { NodeCryptoService } from "../../utils/crypto";
 import { BootedDevice, ViewHierarchyCache } from "../../models";
 import { Element } from "../../models";
 import { ViewHierarchyResult } from "../../models";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { ElementUtils } from "../utility/ElementUtils";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
-import { ScreenshotUtils } from "../../utils/screenshot-utils";
+import { ScreenshotUtils } from "../../utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
-
-/**
- * Interface for activity top data
- */
-interface ActivityTopData {
-  classOverrides: Map<string, string>;
-  fragmentData: Map<string, string>;
-  viewData: Map<string, string>;
-}
+import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Interface for element bounds
@@ -48,7 +39,7 @@ interface ElementWithZOrder {
 
 export class ViewHierarchy {
   private device: BootedDevice;
-  private readonly adb: AdbUtils;
+  private readonly adb: AdbClient;
   private readonly webdriver: WebDriverAgent;
   private takeScreenshot: TakeScreenshot;
   private elementUtils: ElementUtils;
@@ -62,20 +53,20 @@ export class ViewHierarchy {
   /**
    * Create a ViewHierarchy instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    * @param webdriver - Optional IdbPython instance for testing
    * @param takeScreenshot - Optional TakeScreenshot instance for testing
    * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null,
+    adb: AdbClient | null = null,
     webdriver: WebDriverAgent | null = null,
     takeScreenshot: TakeScreenshot | null = null,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
+    this.adb = adb || new AdbClient(device);
     this.webdriver = webdriver || new WebDriverAgent(device);
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
     this.elementUtils = new ElementUtils();
@@ -250,7 +241,7 @@ export class ViewHierarchy {
    * @returns MD5 hash of the screenshot
    */
   calculateScreenshotHash(screenshotBuffer: Buffer): string {
-    return CryptoUtils.generateCacheKey(screenshotBuffer);
+    return NodeCryptoService.generateCacheKey(screenshotBuffer);
   }
 
   /**
@@ -510,7 +501,7 @@ export class ViewHierarchy {
    */
   async getViewHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
@@ -530,7 +521,7 @@ export class ViewHierarchy {
    * @returns Promise with parsed XML view hierarchy
    */
   async getiOSViewHierarchy(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy for iOS`);
@@ -558,7 +549,7 @@ export class ViewHierarchy {
    */
   async getAndroidViewHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
@@ -758,9 +749,17 @@ export class ViewHierarchy {
     const tempFile = "/data/local/tmp/window_dump.xml";
 
     // Use shell subcommand to ensure atomicity and avoid separate rm command
-    const { stdout } = await this.adb.executeCommand(`shell "(uiautomator dump ${tempFile} >/dev/null 2>&1 && cat ${tempFile}; rm -f ${tempFile}) 2>/dev/null"`);
+    const result = await this.adb.executeCommand(`shell "(uiautomator dump ${tempFile} >/dev/null 2>&1 && cat ${tempFile}; rm -f ${tempFile}) 2>/dev/null"`);
 
-    return this.extractXmlFromAdbOutput(stdout, tempFile);
+    // Check for any error indicators in stderr and throw if found
+    if (result.stderr) {
+      const stderrStr = String(result.stderr);
+      if (stderrStr.trim().length > 0) {
+        throw new Error(stderrStr);
+      }
+    }
+
+    return this.extractXmlFromAdbOutput(result.stdout, tempFile);
   }
 
   /**
@@ -984,23 +983,13 @@ export class ViewHierarchy {
     const dumpStart = Date.now();
 
     try {
-      // Run uiautomator dump and dumpsys activity top in parallel
-      const [xmlData, dumpsysResult] = await Promise.all([
-        this.executeUiAutomatorDump(), // Returns string
-        this.adb.executeCommand("shell dumpsys activity top") // Returns ExecResult
-      ]);
-      const dumpsysOutput = dumpsysResult.stdout || "";
+      // Run uiautomator dump
+      const xmlData = await this.executeUiAutomatorDump();
 
-      logger.debug(`uiautomator dump && dumpsys activity top took ${Date.now() - dumpStart}ms`);
+      logger.debug(`uiautomator dump took ${Date.now() - dumpStart}ms`);
 
       // Process XML data into view hierarchy result
       const hierarchyResult = await this.processXmlData(xmlData);
-
-      // Augment the view hierarchy with class and fragment info from dumpsys output
-      const activityTopData = this.parseDumpsysActivityTop(dumpsysOutput);
-      logger.debug(`Found ${activityTopData.classOverrides.size} class overrides, ${activityTopData.fragmentData.size} fragments, and ${activityTopData.viewData.size} custom views from dumpsys activity top`);
-
-      this.augmentViewHierarchyWithClassAndFragment(hierarchyResult, activityTopData);
 
       return hierarchyResult;
     } catch (err) {
@@ -1271,177 +1260,4 @@ export class ViewHierarchy {
     }
   }
 
-  /**
-   * Parse dumpsys activity top output to extract class and fragment information
-   * @param dumpsysOutput - Raw output from dumpsys activity top
-   * @returns ActivityTopData containing class and fragment mappings
-   */
-  private parseDumpsysActivityTop(dumpsysOutput: string): ActivityTopData {
-    const classOverrides = new Map<string, string>();
-    const fragmentData = new Map<string, string>();
-    const viewData = new Map<string, string>();
-
-    const lines = dumpsysOutput.split("\n");
-    let inViewHierarchy = false;
-    let inActiveFragments = false;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Check if we're entering the View Hierarchy section
-      if (line.includes("View Hierarchy:")) {
-        inViewHierarchy = true;
-        continue;
-      }
-
-      // Check if we're leaving the View Hierarchy section
-      if (inViewHierarchy && line.includes("Looper (main")) {
-        inViewHierarchy = false;
-        continue;
-      }
-
-      // Check if we're entering the Active Fragments section
-      if (line.includes("Active Fragments:")) {
-        inActiveFragments = true;
-        continue;
-      }
-
-      // Reset when we hit other major sections after Active Fragments
-      if (inActiveFragments && line.match(/^[A-Z][a-zA-Z\s]+:/)) {
-        inActiveFragments = false;
-      }
-
-      // Parse View Hierarchy for class names that don't match standard Android patterns
-      if (inViewHierarchy) {
-        // Look for lines with class definitions like:
-        // dev.jasonpearson.android.ui.base.ZillowToolbar{9958b11 VFE...... ........ 0,0-1080,173 #7f0a078a app:id/search_toolbar aid=1073742017}
-        const classMatch = line.match(/^\s*([a-zA-Z][a-zA-Z0-9._$]*)\{[^}]+\}/);
-        if (classMatch) {
-          const className = classMatch[1];
-          // Check if class doesn't match android.*, com.android.*, or androidx.* patterns
-          if (!className.match(/^(android\.|com\.android\.|androidx\.)/)) {
-            // Extract resource-id from the same line if present
-            const resourceIdMatch = line.match(/#([a-zA-Z0-9_:]+)\s+app:id\/([a-zA-Z0-9_]+)/);
-            const boundsMatch = line.match(/(\d+,\d+-\d+,\d+)/);
-
-            if (resourceIdMatch) {
-              const resourceId = `${resourceIdMatch[1]}`;
-              classOverrides.set(resourceId, className);
-
-              // Detect if this is a custom View class (not Fragment or Activity)
-              if (!className.includes("Fragment") && !className.includes("Activity")) {
-                viewData.set(resourceId, className);
-              }
-            } else if (boundsMatch) {
-              const bounds = boundsMatch[1];
-              classOverrides.set(bounds, className);
-
-              // Detect if this is a custom View class (not Fragment or Activity)
-              if (!className.includes("Fragment") && !className.includes("Activity")) {
-                viewData.set(bounds, className);
-              }
-            }
-          }
-        }
-      }
-
-      // Parse Active Fragments for fragment information
-      if (inActiveFragments) {
-        // Look for fragment definitions like:
-        // SearchTabContainerFragment{fc93440} (92eba8cc-8e59-4c67-9dcf-2f98fc626dd1 id=0x7f0a012b tag=8ba7a0d8-1d7d-4159-ab80-e3adbf1888ca)
-        const fragmentMatch = line.match(/(\w*Fragment)\{[^}]+\}\s+\([^)]*id=(0x[0-9a-fA-F]+)/);
-        if (fragmentMatch) {
-          const fragmentName = fragmentMatch[1];
-          const fragmentId = fragmentMatch[2];
-          fragmentData.set(fragmentId, fragmentName);
-        }
-
-        // Alternative format for fragments like:
-        // #0: SearchTabContainerFragment{fc93440} (92eba8cc-8e59-4c67-9dcf-2f98fc626dd1 id=0x7f0a012b tag=...)
-        const altFragmentMatch = line.match(/#\d+:\s+(\w*Fragment)\{[^}]+\}\s+\([^)]*id=(0x[0-9a-fA-F]+)/);
-        if (altFragmentMatch) {
-          const fragmentName = altFragmentMatch[1];
-          const fragmentId = altFragmentMatch[2];
-          fragmentData.set(fragmentId, fragmentName);
-        }
-      }
-    }
-
-    return { classOverrides, fragmentData, viewData };
-  }
-
-  /**
-   * Augment view hierarchy with class and fragment and custom view information from dumpsys activity top
-   * @param viewHierarchy - The view hierarchy to augment
-   * @param activityTopData - Class, fragment and view data from dumpsys activity top
-   */
-  private augmentViewHierarchyWithClassAndFragment(viewHierarchy: ViewHierarchyResult, activityTopData: ActivityTopData): void {
-    if (!viewHierarchy || !viewHierarchy.hierarchy) {
-      return;
-    }
-
-    // Function to recursively augment nodes with class, fragment, view, and composable information
-    const augmentNode = (node: any): void => {
-      if (!node) {
-        return;
-      }
-
-      // Check for class override based on resource-id
-      const resourceId = node["resource-id"];
-      if (resourceId && activityTopData.classOverrides.has(resourceId)) {
-        const customClass = activityTopData.classOverrides.get(resourceId);
-        if (customClass) {
-          node["class"] = customClass;
-        }
-      }
-
-      // Check for class override based on bounds
-      const bounds = node["bounds"];
-      if (bounds && activityTopData.classOverrides.has(bounds)) {
-        const customClass = activityTopData.classOverrides.get(bounds);
-        if (customClass) {
-          node["class"] = customClass;
-        }
-      }
-
-      // Add fragment information if the resource-id matches a fragment container
-      if (resourceId && activityTopData.fragmentData.has(resourceId)) {
-        const fragmentClass = activityTopData.fragmentData.get(resourceId);
-        if (fragmentClass) {
-          node["fragment"] = fragmentClass;
-        }
-      }
-
-      // Add custom view information if the resource-id or bounds matches a custom view
-      if (resourceId && activityTopData.viewData.has(resourceId)) {
-        const viewClass = activityTopData.viewData.get(resourceId);
-        if (viewClass) {
-          node["customView"] = viewClass;
-        }
-      } else if (bounds && activityTopData.viewData.has(bounds)) {
-        const viewClass = activityTopData.viewData.get(bounds);
-        if (viewClass) {
-          node["customView"] = viewClass;
-        }
-      }
-
-      // Mark composable if node has "composable" property
-      if (node.composable && typeof node.composable === "string" && node.composable.length > 0) {
-        node["isComposable"] = true;
-        // Optionally, establish a standard property for composable name
-        node["composableName"] = node.composable;
-      }
-
-      // Recursively augment child nodes
-      if (node.node) {
-        const children = Array.isArray(node.node) ? node.node : [node.node];
-        for (const child of children) {
-          augmentNode(child);
-        }
-      }
-    };
-
-    // Start augmentation from the root node
-    augmentNode(viewHierarchy.hierarchy);
-  }
 }

@@ -3,15 +3,34 @@
  */
 
 /**
- * Tool utilities class that provides utility functions
+ * Interface for tool response formatter
  */
-export class ToolUtils {
+export interface ToolResponseFormatter {
+  createJSONToolResponse(content: any): {
+    content: Array<{
+      type: "text";
+      text: string;
+    }>;
+  };
+  createImageToolResponse(base64Data: string, mimeType: string): {
+    content: Array<{
+      type: "image";
+      data: string;
+      mimeType: string;
+    }>;
+  };
+}
+
+/**
+ * Default tool response formatting implementation
+ */
+export class DefaultToolResponseFormatter implements ToolResponseFormatter {
   /**
    * Creates a standardized tool response with text content
    * @param content Any data that will be stringified as JSON
    * @returns A properly formatted tool response object
    */
-  static createJSONToolResponse(content: any): {
+  createJSONToolResponse(content: any): {
     content: Array<{
       type: "text";
       text: string;
@@ -33,7 +52,7 @@ export class ToolUtils {
    * @param mimeType The MIME type of the image (e.g., "image/png", "image/webp")
    * @returns A properly formatted tool response object
    */
-  static createImageToolResponse(base64Data: string, mimeType: string): {
+  createImageToolResponse(base64Data: string, mimeType: string): {
     content: Array<{
       type: "image";
       data: string;
@@ -50,8 +69,12 @@ export class ToolUtils {
       ]
     };
   }
+
+  // Static convenience methods for backward compatibility
+  static createJSONToolResponse = (content: any) => new DefaultToolResponseFormatter().createJSONToolResponse(content);
+  static createImageToolResponse = (base64Data: string, mimeType: string) => new DefaultToolResponseFormatter().createImageToolResponse(base64Data, mimeType);
 }
 
 // Export convenience functions for backward compatibility
-export const createJSONToolResponse = ToolUtils.createJSONToolResponse;
-export const createImageToolResponse = ToolUtils.createImageToolResponse;
+export const createJSONToolResponse = DefaultToolResponseFormatter.createJSONToolResponse;
+export const createImageToolResponse = DefaultToolResponseFormatter.createImageToolResponse;

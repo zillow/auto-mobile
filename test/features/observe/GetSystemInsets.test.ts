@@ -1,14 +1,13 @@
 import { expect } from "chai";
-import { describe, it, beforeEach, afterEach } from "mocha";
+import { describe, it, beforeEach } from "mocha";
 import { GetSystemInsets } from "../../../src/features/observe/GetSystemInsets";
-import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
-import { ExecResult, BootedDevice } from "../../../src/models";
-import sinon from "sinon";
+import { BootedDevice } from "../../../src/models";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 
 describe("GetSystemInsets", function() {
   describe("Unit Tests for Extracted Methods", function() {
     let getSystemInsets: GetSystemInsets;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let testDevice: BootedDevice;
 
     beforeEach(function() {
@@ -18,11 +17,9 @@ describe("GetSystemInsets", function() {
         deviceId: "test-device-id"
       };
 
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      fakeAdb = new FakeAdbExecutor();
 
-      getSystemInsets = new GetSystemInsets(testDevice, mockAdb);
+      getSystemInsets = new GetSystemInsets(testDevice, fakeAdb);
     });
 
     it("should parse status bar height correctly", function() {
@@ -135,8 +132,7 @@ describe("GetSystemInsets", function() {
     this.timeout(15000);
 
     let getSystemInsets: GetSystemInsets;
-    let mockAdb: any;
-    let adbStub: sinon.SinonStub;
+    let fakeAdb: FakeAdbExecutor;
     let testDevice: BootedDevice;
 
     beforeEach(async function() {
@@ -147,29 +143,19 @@ describe("GetSystemInsets", function() {
         deviceId: "test-device-id"
       };
 
-      // Create mock ADB that simulates no devices available (to skip tests safely)
-      mockAdb = {
-        executeCommand: sinon.stub().resolves({
-          stdout: "List of devices attached\n", // Empty device list
-          stderr: "",
-          toString: () => "List of devices attached\n",
-          trim: () => "List of devices attached",
-          includes: () => false
-        }),
-        setDevice: sinon.stub(),
-        getBootedEmulators: sinon.stub().resolves([])
-      };
-
-      // Stub the AdbUtils constructor to prevent real async operations
-      adbStub = sinon.stub(AdbUtils.prototype as any, "constructor").returns(undefined);
+      // Create fake ADB that simulates no devices available (to skip tests safely)
+      fakeAdb = new FakeAdbExecutor();
+      fakeAdb.setDefaultResponse({
+        stdout: "List of devices attached\n", // Empty device list
+        stderr: ""
+      });
 
       // Create GetSystemInsets with mocked dependencies
-      getSystemInsets = new GetSystemInsets(testDevice);
-      (getSystemInsets as any).adb = mockAdb;
+      getSystemInsets = new GetSystemInsets(testDevice, fakeAdb);
 
       // Check for available devices (mocked to return empty list)
       try {
-        const devices = await mockAdb.executeCommand("devices");
+        const devices = await fakeAdb.executeCommand("devices");
         const deviceLines = devices.stdout.split("\n").filter((line: string) => line.trim() && !line.includes("List of devices"));
         if (deviceLines.length === 0) {
           this.skip(); // Skip tests if no devices are connected (which will always be the case with our mock)
@@ -181,28 +167,17 @@ describe("GetSystemInsets", function() {
       }
     });
 
-    afterEach(function() {
-      // Clean up stubs
-      if (adbStub) {
-        adbStub.restore();
-      }
-      sinon.restore();
-    });
-
     it("should get system insets from real device", async function() {
       // This test will be skipped due to the beforeEach logic above
       // But if it somehow runs, we'll provide a mock response
-      mockAdb.executeCommand = sinon.stub().resolves({
+      fakeAdb.setDefaultResponse({
         stdout: `
           statusBars frame=[0,0][1080,96] visible=true
           navigationBars frame=[0,2256][1080,2400] visible=true
           systemGestures sideHint=LEFT frame=[0,96][32,2256]
           systemGestures sideHint=RIGHT frame=[1048,96][1080,2256]
         `,
-        stderr: "",
-        toString: () => "mock output",
-        trim: () => "mock output",
-        includes: () => false
+        stderr: ""
       });
 
       const result = await getSystemInsets.execute({

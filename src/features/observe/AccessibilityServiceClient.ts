@@ -1,11 +1,12 @@
 import WebSocket from "ws";
 import { randomBytes } from "crypto";
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ViewHierarchyResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
-import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -58,7 +59,7 @@ interface AccessibilityWindowHierarchy {
   hierarchy?: AccessibilityNode;
 }
 
-interface AccessibilityHierarchy {
+export interface AccessibilityHierarchy {
   updatedAt: number;
   packageName: string;
   hierarchy: AccessibilityNode;
@@ -160,12 +161,201 @@ export interface AccessibilityHierarchyResponse {
 }
 
 /**
+ * Interface for accessibility service providing Android UI hierarchy and interaction capabilities
+ * via WebSocket connection to Android device accessibility service
+ */
+export interface AccessibilityService {
+  /**
+   * Get view hierarchy from accessibility service
+   * This is the main entry point for getting hierarchy data from the accessibility service
+   *
+   * @param queryOptions - Optional options to filter the view hierarchy
+   * @param perf - Optional performance tracker for timing measurements
+   * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value to be considered fresh
+   * @returns Promise<ViewHierarchyResult | null> - The converted hierarchy or null if service unavailable
+   */
+  getAccessibilityHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf?: PerformanceTracker,
+    skipWaitForFresh?: boolean,
+    minTimestamp?: number
+  ): Promise<ViewHierarchyResult | null>;
+
+  /**
+   * Get the latest hierarchy from cache or wait for fresh data
+   * Combines WebSocket push data with ADB sync fallback for reliable data retrieval
+   *
+   * @param waitForFresh - If true, wait up to timeout for fresh data
+   * @param timeout - Maximum time to wait for fresh data in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @param skipWaitForFresh - If true, skip waiting for fresh data entirely
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
+   * @returns Promise<AccessibilityHierarchyResponse> - Hierarchy response with freshness indicator
+   */
+  getLatestHierarchy(
+    waitForFresh?: boolean,
+    timeout?: number,
+    perf?: PerformanceTracker,
+    skipWaitForFresh?: boolean,
+    minTimestamp?: number
+  ): Promise<AccessibilityHierarchyResponse>;
+
+  /**
+   * Request hierarchy synchronously via WebSocket message
+   * Triggers extraction on device which pushes result via WebSocket
+   * Falls back to ADB broadcast if WebSocket send fails
+   *
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise with hierarchy and perfTiming, or null if failed
+   */
+  requestHierarchySync(
+    perf?: PerformanceTracker
+  ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null>;
+
+  /**
+   * Convert accessibility service hierarchy format to ViewHierarchyResult format
+   * Transforms internal AccessibilityHierarchy format to the expected ViewHierarchyResult
+   *
+   * @param accessibilityHierarchy - The accessibility service hierarchy data
+   * @returns ViewHierarchyResult - Converted hierarchy in the expected format
+   */
+  convertToViewHierarchyResult(accessibilityHierarchy: AccessibilityHierarchy): ViewHierarchyResult;
+
+  /**
+   * Request a swipe gesture from the accessibility service using dispatchGesture API
+   * This is significantly faster than ADB's input swipe command
+   *
+   * @param x1 - Starting X coordinate
+   * @param y1 - Starting Y coordinate
+   * @param x2 - Ending X coordinate
+   * @param y2 - Ending Y coordinate
+   * @param duration - Swipe duration in milliseconds (default: 300)
+   * @param timeoutMs - Maximum time to wait for swipe completion in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise<A11ySwipeResult> - The swipe result with timing information
+   */
+  requestSwipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    duration?: number,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11ySwipeResult>;
+
+  /**
+   * Request text input via the accessibility service using ACTION_SET_TEXT
+   * This is significantly faster than ADB's input text command because it
+   * bypasses the entire ADB/shell overhead and directly sets text on the focused input field
+   *
+   * @param text - The text to input
+   * @param resourceId - Optional resource-id to target a specific element (otherwise uses focused element)
+   * @param timeoutMs - Maximum time to wait for text input in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise<A11ySetTextResult> - The text input result with timing information
+   */
+  requestSetText(
+    text: string,
+    resourceId?: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11ySetTextResult>;
+
+  /**
+   * Clear text from the currently focused input field via the accessibility service
+   * This uses ACTION_SET_TEXT with an empty string, which is significantly faster
+   * than sending multiple KEYCODE_DEL events via ADB
+   *
+   * @param resourceId - Optional resource-id to target a specific element (otherwise uses focused element)
+   * @param timeoutMs - Maximum time to wait for clear operation in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise<A11ySetTextResult> - The clear result with timing information
+   */
+  requestClearText(
+    resourceId?: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11ySetTextResult>;
+
+  /**
+   * Request an IME action via the accessibility service
+   * This properly handles focus movement (next/previous) by finding the next/previous
+   * focusable element and calling ACTION_FOCUS, rather than using KEYCODE_TAB
+   * which would insert a tab character.
+   * For done/go/send/search actions, it dismisses the keyboard by going back
+   *
+   * @param action - The IME action to perform: done, next, search, send, go, previous
+   * @param timeoutMs - Maximum time to wait for action completion in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise<A11yImeActionResult> - The IME action result with timing information
+   */
+  requestImeAction(
+    action: "done" | "next" | "search" | "send" | "go" | "previous",
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yImeActionResult>;
+
+  /**
+   * Request select all text via the accessibility service
+   * This uses ACTION_SET_SELECTION to select all text in the focused field,
+   * which is significantly faster than using ADB double-tap gestures
+   *
+   * @param timeoutMs - Maximum time to wait for action completion in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise<A11ySelectAllResult> - The select all result with timing information
+   */
+  requestSelectAll(
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11ySelectAllResult>;
+
+  /**
+   * Request a screenshot from the accessibility service
+   *
+   * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise<ScreenshotResult> - The screenshot result
+   */
+  requestScreenshot(
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<ScreenshotResult>;
+
+  /**
+   * Check if WebSocket is currently connected to the accessibility service
+   * @returns true if WebSocket connection is open, false otherwise
+   */
+  isConnected(): boolean;
+
+  /**
+   * Check if there is cached hierarchy data available
+   * @returns true if hierarchy data exists in cache, false otherwise
+   */
+  hasCachedHierarchy(): boolean;
+
+  /**
+   * Invalidate the cached hierarchy data
+   * This forces the next getHierarchy call to wait for fresh data
+   * Should be called after any action that modifies the UI (like setText, swipe, tap)
+   */
+  invalidateCache(): void;
+
+  /**
+   * Close WebSocket connection and cleanup resources
+   * @returns Promise that resolves when cleanup is complete
+   */
+  close(): Promise<void>;
+}
+
+/**
  * Client for interacting with the AutoMobile Accessibility Service via WebSocket
  * Uses singleton pattern per device to maintain persistent WebSocket connection
  */
-export class AccessibilityServiceClient {
+export class AccessibilityServiceClient implements AccessibilityService {
   private device: BootedDevice;
-  private adb: AdbUtils;
+  private adb: AdbClient;
   private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
   private static readonly WEBSOCKET_PORT = 8765;
   private static readonly WEBSOCKET_URL = `ws://localhost:${AccessibilityServiceClient.WEBSOCKET_PORT}/ws`;
@@ -204,28 +394,40 @@ export class AccessibilityServiceClient {
   private pendingSelectAllResolve: ((result: A11ySelectAllResult) => void) | null = null;
   private pendingSelectAllRequestId: string | null = null;
 
+  // WebSocket factory for testing
+  private webSocketFactory: (url: string) => WebSocket;
+
+  // Timer for testing
+  private timer: Timer;
+
   /**
    * Private constructor - use getInstance() instead
+   * @param device - The booted device
+   * @param adb - The ADB client
+   * @param webSocketFactory - Optional WebSocket factory for testing (default: creates real WebSocket)
+   * @param timer - Optional timer for testing (default: defaultTimer)
    */
-  private constructor(device: BootedDevice, adb: AdbUtils) {
+  private constructor(device: BootedDevice, adb: AdbClient, webSocketFactory?: (url: string) => WebSocket, timer?: Timer) {
     this.device = device;
     this.adb = adb;
-    AccessibilityServiceManager.getInstance(device, adb);
+    this.webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
+    this.timer = timer || defaultTimer;
+    AndroidAccessibilityServiceManager.getInstance(device, adb);
   }
 
   /**
    * Get singleton instance for a device
    * @param device - The booted device
-   * @param adb - Optional AdbUtils instance
+   * @param adb - Optional AdbClient instance
    * @returns AccessibilityServiceClient instance
    */
-  public static getInstance(device: BootedDevice, adb: AdbUtils | null = null): AccessibilityServiceClient {
+  public static getInstance(device: BootedDevice, adb: AdbClient | null = null): AccessibilityServiceClient {
     const deviceId = device.deviceId;
     if (!AccessibilityServiceClient.instances.has(deviceId)) {
       logger.debug(`[ACCESSIBILITY_SERVICE] Creating singleton for device: ${deviceId}`);
       AccessibilityServiceClient.instances.set(
         deviceId,
-        new AccessibilityServiceClient(device, adb || new AdbUtils(device))
+        new AccessibilityServiceClient(device, adb || new AdbClient(device))
       );
     }
     return AccessibilityServiceClient.instances.get(deviceId)!;
@@ -240,6 +442,24 @@ export class AccessibilityServiceClient {
     }
     AccessibilityServiceClient.instances.clear();
     logger.info("[ACCESSIBILITY_SERVICE] Reset all singleton instances");
+  }
+
+  /**
+   * Create instance for testing with custom WebSocket factory
+   * This bypasses the singleton pattern and allows injecting a fake WebSocket
+   * @param device - The booted device
+   * @param adb - The ADB client
+   * @param webSocketFactory - WebSocket factory function
+   * @param timer - Optional timer for testing
+   * @returns AccessibilityServiceClient instance
+   */
+  public static createForTesting(
+    device: BootedDevice,
+    adb: AdbClient,
+    webSocketFactory: (url: string) => WebSocket,
+    timer?: Timer
+  ): AccessibilityServiceClient {
+    return new AccessibilityServiceClient(device, adb, webSocketFactory, timer);
   }
 
   /**
@@ -273,7 +493,7 @@ export class AccessibilityServiceClient {
    * @param perf - Performance tracker for timing
    */
   private async setupPortForwarding(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<void> {
     if (this.portForwardingSetup) {
       return;
@@ -307,7 +527,7 @@ export class AccessibilityServiceClient {
    * @param perf - Performance tracker for timing
    */
   private async connectWebSocket(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<boolean> {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       logger.debug("[ACCESSIBILITY_SERVICE] WebSocket already connected (reusing connection)");
@@ -332,9 +552,9 @@ export class AccessibilityServiceClient {
       logger.debug("[ACCESSIBILITY_SERVICE] Connection already in progress, waiting...");
       // Wait for ongoing connection attempt
       return new Promise(resolve => {
-        const checkInterval = setInterval(() => {
+        const checkInterval = this.timer.setInterval(() => {
           if (!this.isConnecting) {
-            clearInterval(checkInterval);
+            this.timer.clearInterval(checkInterval);
             resolve(this.ws?.readyState === WebSocket.OPEN);
           }
         }, 100);
@@ -364,8 +584,8 @@ export class AccessibilityServiceClient {
       logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${AccessibilityServiceClient.WEBSOCKET_URL} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts})`);
 
       return await perf.track("wsConnect", () => new Promise<boolean>((resolve, reject) => {
-        const ws = new WebSocket(AccessibilityServiceClient.WEBSOCKET_URL);
-        const connectionTimeout = setTimeout(() => {
+        const ws = this.webSocketFactory(AccessibilityServiceClient.WEBSOCKET_URL);
+        const connectionTimeout = this.timer.setTimeout(() => {
           ws.close();
           // Reset port forwarding flag so next attempt will re-setup the forward
           this.portForwardingSetup = false;
@@ -373,7 +593,7 @@ export class AccessibilityServiceClient {
         }, 5000);
 
         ws.on("open", () => {
-          clearTimeout(connectionTimeout);
+          this.timer.clearTimeout(connectionTimeout);
           logger.info("[ACCESSIBILITY_SERVICE] WebSocket connected successfully");
           this.ws = ws;
           this.isConnecting = false;
@@ -386,7 +606,7 @@ export class AccessibilityServiceClient {
         });
 
         ws.on("error", error => {
-          clearTimeout(connectionTimeout);
+          this.timer.clearTimeout(connectionTimeout);
           logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket error: ${error.message}`);
           this.isConnecting = false;
           // Reset port forwarding flag so next attempt will re-setup the forward
@@ -582,7 +802,7 @@ export class AccessibilityServiceClient {
   async getLatestHierarchy(
     waitForFresh: boolean = false,
     timeout: number = 100,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<AccessibilityHierarchyResponse> {
@@ -696,7 +916,7 @@ export class AccessibilityServiceClient {
    * @returns CachedHierarchy if fresh data received, null on timeout or screen off
    */
   private async waitForFreshData(timeout: number, minTimestamp: number): Promise<CachedHierarchy | null> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const checkInterval = 50; // Check every 50ms
     const screenCheckInterval = 1000; // Check screen state every 1 second
     const staleCheckDelay = 2000; // Send stale check request after 2 seconds of no push
@@ -705,8 +925,8 @@ export class AccessibilityServiceClient {
     let staleCheckSent = false;
 
     return new Promise(resolve => {
-      const intervalId = setInterval(() => {
-        const elapsed = Date.now() - startTime;
+      const intervalId = this.timer.setInterval(() => {
+        const elapsed = this.timer.now() - startTime;
 
         // Check if we received data that was updated AFTER our request started
         // This ensures we get fresh pushed data, not stale cached data
@@ -715,7 +935,7 @@ export class AccessibilityServiceClient {
           const updatedAfterRequest = this.cachedHierarchy.hierarchy.updatedAt > minTimestamp;
 
           if (receivedAfterRequest || updatedAfterRequest) {
-            clearInterval(intervalId);
+            this.timer.clearInterval(intervalId);
             logger.debug(`[ACCESSIBILITY_SERVICE] Fresh data received: receivedAt=${this.cachedHierarchy.receivedAt} (>${minTimestamp}? ${receivedAfterRequest}), updatedAt=${this.cachedHierarchy.hierarchy.updatedAt} (>${minTimestamp}? ${updatedAfterRequest})`);
             resolve(this.cachedHierarchy);
             return;
@@ -731,7 +951,7 @@ export class AccessibilityServiceClient {
         }
 
         // Check screen state periodically to fail fast if screen is off
-        const now = Date.now();
+        const now = this.timer.now();
         if (!screenCheckInProgress && now - lastScreenCheck >= screenCheckInterval) {
           screenCheckInProgress = true;
           lastScreenCheck = now;
@@ -739,7 +959,7 @@ export class AccessibilityServiceClient {
           this.adb.isScreenOn().then(isOn => {
             screenCheckInProgress = false;
             if (!isOn) {
-              clearInterval(intervalId);
+              this.timer.clearInterval(intervalId);
               logger.warn("[ACCESSIBILITY_SERVICE] Screen is off - failing fast instead of waiting for timeout");
               resolve(null);
             }
@@ -751,7 +971,7 @@ export class AccessibilityServiceClient {
 
         // Check if timeout exceeded
         if (elapsed >= timeout) {
-          clearInterval(intervalId);
+          this.timer.clearInterval(intervalId);
           if (this.cachedHierarchy) {
             logger.debug(`[ACCESSIBILITY_SERVICE] Timeout: cached data receivedAt=${this.cachedHierarchy.receivedAt}, updatedAt=${this.cachedHierarchy.hierarchy.updatedAt}, minTimestamp=${minTimestamp}`);
           }
@@ -903,7 +1123,7 @@ export class AccessibilityServiceClient {
      */
   async getAccessibilityHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<ViewHierarchyResult | null> {
@@ -914,7 +1134,7 @@ export class AccessibilityServiceClient {
     try {
       // Check if service is available
       const available = await perf.track("checkAvailable", () =>
-        AccessibilityServiceManager.getInstance(this.device, this.adb).isAvailable()
+        AndroidAccessibilityServiceManager.getInstance(this.device, this.adb).isAvailable()
       );
       if (!available) {
         logger.info("[ACCESSIBILITY_SERVICE] Service not available, will use fallback");
@@ -1047,7 +1267,7 @@ export class AccessibilityServiceClient {
    * @returns Promise with hierarchy and perfTiming, or null if failed
    */
   async requestHierarchySync(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null> {
     const startTime = Date.now();
 
@@ -1126,7 +1346,7 @@ export class AccessibilityServiceClient {
    */
   async requestScreenshot(
     timeoutMs: number = 5000,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ScreenshotResult> {
     const startTime = Date.now();
 
@@ -1150,7 +1370,7 @@ export class AccessibilityServiceClient {
         this.pendingScreenshotResolve = resolve;
 
         // Set up timeout
-        setTimeout(() => {
+        this.timer.setTimeout(() => {
           if (this.pendingScreenshotResolve === resolve) {
             this.pendingScreenshotResolve = null;
             this.pendingScreenshotRequestId = null;
@@ -1213,7 +1433,7 @@ export class AccessibilityServiceClient {
     y2: number,
     duration: number = 300,
     timeoutMs: number = 5000,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySwipeResult> {
     const startTime = Date.now();
 
@@ -1238,7 +1458,7 @@ export class AccessibilityServiceClient {
         this.pendingSwipeResolve = resolve;
 
         // Set up timeout
-        setTimeout(() => {
+        this.timer.setTimeout(() => {
           if (this.pendingSwipeResolve === resolve) {
             this.pendingSwipeResolve = null;
             this.pendingSwipeRequestId = null;
@@ -1307,7 +1527,7 @@ export class AccessibilityServiceClient {
     text: string,
     resourceId?: string,
     timeoutMs: number = 5000,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySetTextResult> {
     const startTime = Date.now();
 
@@ -1332,7 +1552,7 @@ export class AccessibilityServiceClient {
         this.pendingSetTextResolve = resolve;
 
         // Set up timeout
-        setTimeout(() => {
+        this.timer.setTimeout(() => {
           if (this.pendingSetTextResolve === resolve) {
             this.pendingSetTextResolve = null;
             this.pendingSetTextRequestId = null;
@@ -1395,7 +1615,7 @@ export class AccessibilityServiceClient {
   async requestClearText(
     resourceId?: string,
     timeoutMs: number = 5000,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySetTextResult> {
     logger.debug("[ACCESSIBILITY_SERVICE] Clearing text via requestSetText with empty string");
     return this.requestSetText("", resourceId, timeoutMs, perf);
@@ -1417,7 +1637,7 @@ export class AccessibilityServiceClient {
   async requestImeAction(
     action: "done" | "next" | "search" | "send" | "go" | "previous",
     timeoutMs: number = 5000,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yImeActionResult> {
     const startTime = Date.now();
 
@@ -1443,7 +1663,7 @@ export class AccessibilityServiceClient {
         this.pendingImeActionResolve = resolve;
 
         // Set up timeout
-        setTimeout(() => {
+        this.timer.setTimeout(() => {
           if (this.pendingImeActionResolve === resolve) {
             this.pendingImeActionResolve = null;
             this.pendingImeActionRequestId = null;
@@ -1505,7 +1725,7 @@ export class AccessibilityServiceClient {
    */
   async requestSelectAll(
     timeoutMs: number = 5000,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySelectAllResult> {
     const startTime = Date.now();
 
@@ -1530,7 +1750,7 @@ export class AccessibilityServiceClient {
         this.pendingSelectAllResolve = resolve;
 
         // Set up timeout
-        setTimeout(() => {
+        this.timer.setTimeout(() => {
           if (this.pendingSelectAllResolve === resolve) {
             this.pendingSelectAllResolve = null;
             this.pendingSelectAllRequestId = null;

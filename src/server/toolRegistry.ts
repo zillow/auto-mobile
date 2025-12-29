@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { DeviceSessionManager } from "../utils/deviceSessionManager";
+import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { ActionableError, BootedDevice, SomePlatform } from "../models";
 
 // Progress notification interface

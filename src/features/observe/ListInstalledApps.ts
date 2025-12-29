@@ -1,21 +1,21 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { ActionableError, BootedDevice } from "../../models";
-import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
+import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 
 export class ListInstalledApps {
-  private adb: AdbUtils;
-  private simctl: Simctl;
+  private adb: AdbClient;
+  private simctl: SimCtlClient;
   private device: BootedDevice;
   /**
    * Create an ListInstalledApps instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
-   * @param simctl - Optional Axe instance for testing
+   * @param adb - Optional AdbClient instance for testing
+   * @param simctl - Optional SimCtlClient instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, simctl: Simctl | null = null) {
-    this.adb = adb || new AdbUtils(device);
-    this.simctl = simctl || new Simctl(device);
+  constructor(device: BootedDevice, adb: AdbClient | null = null, simctl: SimCtlClient | null = null) {
+    this.adb = adb || new AdbClient(device);
+    this.simctl = simctl || new SimCtlClient(device);
     this.device = device;
   }
 

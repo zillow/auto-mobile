@@ -1,11 +1,11 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
-import { Axe, AxeButton } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient, AxeButton } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class PressButton extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
     super(device, adb, axe);
     this.device = device;
   }

@@ -1,16 +1,16 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
-import { DeviceDetection } from "../../utils/deviceDetection";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
+import { DeviceDetection } from "../../utils/DeviceDetection";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ScreenSize } from "../../models";
 import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class GetScreenSize {
-  private adb: AdbUtils;
-  private axe: Axe;
+  private adb: AdbClient;
+  private axe: AxeClient;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, ScreenSize>();
   private static cacheDir = path.join(process.cwd(), ".cache", "screen-size");
@@ -18,13 +18,13 @@ export class GetScreenSize {
   /**
    * Create a Window instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    * @param axe - Optional IdbUtils instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
-    this.axe = axe || new Axe(device);
+    this.adb = adb || new AdbClient(device);
+    this.axe = axe || new AxeClient(device);
   }
 
   /**
@@ -151,7 +151,7 @@ export class GetScreenSize {
    */
   private async getAndroidScreenSize(
     dumpsysResult?: ExecResult,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ScreenSize> {
     // First get the physical screen size
     const { stdout } = await perf.track("adbWmSize", () =>
@@ -190,7 +190,7 @@ export class GetScreenSize {
    */
   async execute(
     dumpsysResult?: ExecResult,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ScreenSize> {
     const cacheKey = this.generateCacheKey(this.device.deviceId);
 

@@ -1,16 +1,16 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, RotateResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { ProgressCallback } from "./BaseVisualChange";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class Rotate extends BaseVisualChange {
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null,
-    axe: Axe | null = null
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null
   ) {
     super(device, adb, axe);
   }

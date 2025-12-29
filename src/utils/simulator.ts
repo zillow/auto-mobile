@@ -3,6 +3,85 @@ import { promisify } from "util";
 import { logger } from "./logger";
 import { ExecResult } from "../models";
 
+/**
+ * Interface for iOS simulator utilities
+ * Provides simulator management and control capabilities
+ */
+export interface AppleSimulatorInfo {
+  name: string;
+  udid: string;
+  state: string;
+  isAvailable: boolean;
+  deviceType: string;
+  runtime: string;
+}
+
+export interface AppleSimulatorManager {
+  /**
+   * List all available iOS simulators
+   * @returns Promise with array of simulator names
+   */
+  listSimulators(): Promise<string[]>;
+
+  /**
+   * Get detailed information about all simulators
+   * @returns Promise with array of simulator info
+   */
+  getSimulatorInfo(): Promise<AppleSimulatorInfo[]>;
+
+  /**
+   * Get list of running iOS simulators
+   * @returns Promise with array of running simulator info
+   */
+  getRunningSimulators(): Promise<AppleSimulatorInfo[]>;
+
+  /**
+   * Start an iOS simulator by name
+   * @param simulatorName - Name of the simulator to start
+   * @param timeoutMs - Optional timeout in milliseconds
+   * @returns Promise with result
+   */
+  startSimulator(simulatorName: string, timeoutMs?: number): Promise<{
+    success: boolean;
+    simulatorName: string;
+    udid?: string;
+    error?: string;
+  }>;
+
+  /**
+   * Shut down an iOS simulator
+   * @param simulatorName - Name of the simulator to shut down
+   * @returns Promise with result
+   */
+  shutdownSimulator(simulatorName: string): Promise<{
+    success: boolean;
+    simulatorName: string;
+    error?: string;
+  }>;
+
+  /**
+   * Check if a specific simulator is running
+   * @param simulatorName - Name of the simulator to check
+   * @returns Promise with boolean indicating if running
+   */
+  isSimulatorRunning(simulatorName: string): Promise<boolean>;
+
+  /**
+   * List installed apps on a simulator
+   * @param udid - Simulator UDID
+   * @returns Promise with array of installed app identifiers
+   */
+  listInstalledApps(udid: string): Promise<string[]>;
+
+  /**
+   * Launch an app on a simulator
+   * @param udid - Simulator UDID
+   * @param appBundleId - App bundle identifier
+   * @returns Promise that resolves when app launch is initiated
+   */
+  launchApp(udid: string, appBundleId: string): Promise<void>;
+}
+
 const execAsync = async (command: string): Promise<ExecResult> => {
   const result = await promisify(exec)(command);
 
@@ -24,21 +103,12 @@ const execAsync = async (command: string): Promise<ExecResult> => {
   return enhancedResult;
 };
 
-export interface SimulatorInfo {
-  name: string;
-  udid: string;
-  state: string;
-  isAvailable: boolean;
-  deviceType: string;
-  runtime: string;
-}
-
-export class SimulatorUtils {
+export class SimCtlSimulatorManager implements AppleSimulatorManager {
   private execAsync: (command: string) => Promise<ExecResult>;
   private spawnFn: typeof spawn;
 
   /**
-   * Create a SimulatorUtils instance
+   * Create an AppleSimulatorManager instance
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
    */
@@ -84,11 +154,11 @@ export class SimulatorUtils {
    * Get detailed information about all simulators
    * @returns Promise with array of simulator info
    */
-  async getSimulatorInfo(): Promise<SimulatorInfo[]> {
+  async getSimulatorInfo(): Promise<AppleSimulatorInfo[]> {
     try {
       const result = await this.execAsync("xcrun simctl list devices --json");
       const data = JSON.parse(result.stdout);
-      const simulators: SimulatorInfo[] = [];
+      const simulators: AppleSimulatorInfo[] = [];
 
       Object.keys(data.devices).forEach(runtime => {
         if (Array.isArray(data.devices[runtime])) {
@@ -116,7 +186,7 @@ export class SimulatorUtils {
    * Get list of running iOS simulators
    * @returns Promise with array of running simulator info
    */
-  async getRunningSimulators(): Promise<SimulatorInfo[]> {
+  async getRunningSimulators(): Promise<AppleSimulatorInfo[]> {
     try {
       const allSimulators = await this.getSimulatorInfo();
       return allSimulators.filter(sim => sim.state === "Booted");

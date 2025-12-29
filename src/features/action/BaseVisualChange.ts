@@ -1,13 +1,13 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AwaitIdle } from "../observe/AwaitIdle";
 import { ObserveScreen } from "../observe/ObserveScreen";
 import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ActionableError, BootedDevice, GfxMetrics, ObserveResult } from "../../models";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -20,15 +20,15 @@ export interface ObservedChangeOptions {
   progress?: ProgressCallback;
   tolerancePercent?: number;
   queryOptions?: ViewHierarchyQueryOptions;
-  perf?: IPerformanceTracker;
+  perf?: PerformanceTracker;
   skipPreviousObserve?: boolean;
   skipUiStability?: boolean;
 }
 
 export class BaseVisualChange {
   device: BootedDevice;
-  adb: AdbUtils;
-  axe: Axe;
+  adb: AdbClient;
+  axe: AxeClient;
   awaitIdle: AwaitIdle;
   observeScreen: ObserveScreen;
   window: Window;
@@ -36,17 +36,17 @@ export class BaseVisualChange {
   /**
    * Create an BaseVisualChange instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    * @param axe - Optional Axe instance for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null,
-    axe: Axe | null = null
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null
   ) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
-    this.axe = axe || new Axe(device);
+    this.adb = adb || new AdbClient(device);
+    this.axe = axe || new AxeClient(device);
     this.awaitIdle = new AwaitIdle(device, this.adb);
     this.observeScreen = new ObserveScreen(device, this.adb);
     this.window = new Window(device, this.adb);
@@ -171,7 +171,7 @@ export class BaseVisualChange {
       tolerancePercent?: number;
       queryOptions?: ViewHierarchyQueryOptions;
       gfxMetrics?: GfxMetrics | null;
-      perf?: IPerformanceTracker;
+      perf?: PerformanceTracker;
       actionStartTime?: number;
     }
   ): Promise<any> {

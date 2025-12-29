@@ -1,18 +1,18 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { UiStabilityResult, TouchIdleResult, RotationCheckResult, BootedDevice } from "../../models";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class Idle {
-  private adb: AdbUtils;
+  private adb: AdbClient;
 
   /**
    * Create an Idle instance
    * @param device - Optional device ID
    * @param adb
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(device);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    this.adb = adb || new AdbClient(device);
   }
 
   /**
@@ -83,7 +83,7 @@ export class Idle {
     targetRotation: number,
     startTime: number,
     timeoutMs: number,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<RotationCheckResult> {
     const currentElapsed = Date.now() - startTime;
     const shouldContinue = currentElapsed < timeoutMs;
@@ -140,7 +140,7 @@ export class Idle {
   async getUiStabilitySnapshot(
     packageName: string,
     measurementDelayMs: number = 200,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<UiStabilityResult> {
     logger.info(`[AwaitIdle] Measuring UI idle for ${packageName} with ${measurementDelayMs}ms delay`);
 
@@ -185,7 +185,7 @@ export class Idle {
   private async getFrameStats(
     packageName: string,
     firstGfxInfoLog: boolean,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<string> {
     try {
       const { stdout } = await perf.track("adbGfxinfo", () =>
@@ -427,7 +427,7 @@ export class Idle {
     prevSlowUiThread: number | null,
     prevFrameDeadlineMissed: number | null,
     firstGfxInfoLog: boolean,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<UiStabilityResult> {
     try {
       // For system packages, use a simpler approach

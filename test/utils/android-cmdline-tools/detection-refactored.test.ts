@@ -1,38 +1,24 @@
 import { expect } from "chai";
-import sinon from "sinon";
 import {
   getTypicalAndroidSdkPaths,
   getHomebrewAndroidToolsPath,
-  getAndroidSdkFromEnvironment,
-  DetectionDependencies
+  getAndroidSdkFromEnvironment
 } from "../../../src/utils/android-cmdline-tools/detection";
+import { FakeSystemDetection } from "../../fakes/FakeSystemDetection";
 
 describe("Detection Module (Refactored)", () => {
-  let sandbox: sinon.SinonSandbox;
+  let systemDetection: FakeSystemDetection;
 
   beforeEach(() => {
-    sandbox = sinon.createSandbox();
-  });
-
-  afterEach(() => {
-    sandbox.restore();
+    systemDetection = new FakeSystemDetection();
   });
 
   describe("getTypicalAndroidSdkPaths", () => {
     it("should return macOS paths when platform is darwin", () => {
-      const mockDependencies: DetectionDependencies = {
-        exec: sandbox.stub(),
-        existsSync: sandbox.stub(),
-        platform: sandbox.stub().returns("darwin"),
-        homedir: sandbox.stub().returns("/Users/testuser"),
-        logger: {
-          info: sandbox.stub(),
-          warn: sandbox.stub(),
-          error: sandbox.stub()
-        } as any
-      };
+      systemDetection.setPlatform("darwin");
+      systemDetection.setHomeDir("/Users/testuser");
 
-      const paths = getTypicalAndroidSdkPaths(mockDependencies);
+      const paths = getTypicalAndroidSdkPaths(systemDetection);
 
       expect(paths).to.include("/Users/testuser/Library/Android/sdk");
       expect(paths).to.include("/opt/android-sdk");
@@ -40,19 +26,10 @@ describe("Detection Module (Refactored)", () => {
     });
 
     it("should return Linux paths when platform is linux", () => {
-      const mockDependencies: DetectionDependencies = {
-        exec: sandbox.stub(),
-        existsSync: sandbox.stub(),
-        platform: sandbox.stub().returns("linux"),
-        homedir: sandbox.stub().returns("/home/testuser"),
-        logger: {
-          info: sandbox.stub(),
-          warn: sandbox.stub(),
-          error: sandbox.stub()
-        } as any
-      };
+      systemDetection.setPlatform("linux");
+      systemDetection.setHomeDir("/home/testuser");
 
-      const paths = getTypicalAndroidSdkPaths(mockDependencies);
+      const paths = getTypicalAndroidSdkPaths(systemDetection);
 
       expect(paths).to.include("/home/testuser/Android/Sdk");
       expect(paths).to.include("/opt/android-sdk");
@@ -62,90 +39,37 @@ describe("Detection Module (Refactored)", () => {
 
   describe("getHomebrewAndroidToolsPath", () => {
     it("should return null for non-macOS platforms", () => {
-      const mockDependencies: DetectionDependencies = {
-        exec: sandbox.stub(),
-        existsSync: sandbox.stub(),
-        platform: sandbox.stub().returns("linux"),
-        homedir: sandbox.stub(),
-        logger: {
-          info: sandbox.stub(),
-          warn: sandbox.stub(),
-          error: sandbox.stub()
-        } as any
-      };
+      systemDetection.setPlatform("linux");
 
-      const path = getHomebrewAndroidToolsPath(mockDependencies);
+      const path = getHomebrewAndroidToolsPath(systemDetection);
 
       expect(path).to.be.null;
     });
 
     it("should return path when homebrew installation exists on macOS", () => {
-      const mockDependencies: DetectionDependencies = {
-        exec: sandbox.stub(),
-        existsSync: sandbox.stub().returns(true),
-        platform: sandbox.stub().returns("darwin"),
-        homedir: sandbox.stub(),
-        logger: {
-          info: sandbox.stub(),
-          warn: sandbox.stub(),
-          error: sandbox.stub()
-        } as any
-      };
+      systemDetection.setPlatform("darwin");
+      systemDetection.addExistingFile("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest");
 
-      const path = getHomebrewAndroidToolsPath(mockDependencies);
+      const path = getHomebrewAndroidToolsPath(systemDetection);
 
       expect(path).to.equal("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest");
-      expect(mockDependencies.existsSync).to.have.been.calledWith("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest");
     });
   });
 
   describe("getAndroidSdkFromEnvironment", () => {
     it("should return ANDROID_HOME path when it exists", () => {
-      const originalEnv = process.env;
-      process.env = { ...originalEnv, ANDROID_HOME: "/path/to/android-home" };
+      systemDetection.setEnvVar("ANDROID_HOME", "/path/to/android-home");
+      systemDetection.addExistingFile("/path/to/android-home");
 
-      const mockDependencies: DetectionDependencies = {
-        exec: sandbox.stub(),
-        existsSync: sandbox.stub().withArgs("/path/to/android-home").returns(true),
-        platform: sandbox.stub(),
-        homedir: sandbox.stub(),
-        logger: {
-          info: sandbox.stub(),
-          warn: sandbox.stub(),
-          error: sandbox.stub()
-        } as any
-      };
-
-      const path = getAndroidSdkFromEnvironment(mockDependencies);
+      const path = getAndroidSdkFromEnvironment(systemDetection);
 
       expect(path).to.equal("/path/to/android-home");
-
-      // Restore environment
-      process.env = originalEnv;
     });
 
     it("should return null when no environment variables are set", () => {
-      const originalEnv = process.env;
-      process.env = {};
-
-      const mockDependencies: DetectionDependencies = {
-        exec: sandbox.stub(),
-        existsSync: sandbox.stub(),
-        platform: sandbox.stub(),
-        homedir: sandbox.stub(),
-        logger: {
-          info: sandbox.stub(),
-          warn: sandbox.stub(),
-          error: sandbox.stub()
-        } as any
-      };
-
-      const path = getAndroidSdkFromEnvironment(mockDependencies);
+      const path = getAndroidSdkFromEnvironment(systemDetection);
 
       expect(path).to.be.null;
-
-      // Restore environment
-      process.env = originalEnv;
     });
   });
 });

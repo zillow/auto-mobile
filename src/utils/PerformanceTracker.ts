@@ -41,18 +41,18 @@ interface TimingBlock {
 /**
  * Interface for performance tracking - enables dependency injection and testing
  */
-export interface IPerformanceTracker {
+export interface PerformanceTracker {
   /**
    * Start a serial block (results in JSON array)
    * Operations within will be recorded in order
    */
-  serial(name: string): IPerformanceTracker;
+  serial(name: string): PerformanceTracker;
 
   /**
    * Start a parallel block (results in JSON object)
    * Operations within are assumed to run concurrently
    */
-  parallel(name: string): IPerformanceTracker;
+  parallel(name: string): PerformanceTracker;
 
   /**
    * Track a single async operation's timing
@@ -73,7 +73,7 @@ export interface IPerformanceTracker {
   /**
    * End the current block and return to parent
    */
-  end(): IPerformanceTracker;
+  end(): PerformanceTracker;
 
   /**
    * Get the final timing data (null if tracking disabled)
@@ -106,9 +106,9 @@ export interface IPerformanceTracker {
 }
 
 /**
- * Real implementation of performance tracking
+ * Default implementation of performance tracking
  */
-export class PerformanceTracker implements IPerformanceTracker {
+export class DefaultPerformanceTracker implements PerformanceTracker {
   private root: TimingBlock;
   private current: TimingBlock;
 
@@ -124,7 +124,7 @@ export class PerformanceTracker implements IPerformanceTracker {
     this.current = this.root;
   }
 
-  serial(name: string): IPerformanceTracker {
+  serial(name: string): PerformanceTracker {
     const block: TimingBlock = {
       name,
       type: "serial",
@@ -136,7 +136,7 @@ export class PerformanceTracker implements IPerformanceTracker {
     return this;
   }
 
-  parallel(name: string): IPerformanceTracker {
+  parallel(name: string): PerformanceTracker {
     const block: TimingBlock = {
       name,
       type: "parallel",
@@ -184,7 +184,7 @@ export class PerformanceTracker implements IPerformanceTracker {
     }
   }
 
-  end(): IPerformanceTracker {
+  end(): PerformanceTracker {
     if (this.current.parent) {
       const durationMs = Date.now() - this.current.startMs;
       const entry: TimingEntry = {
@@ -263,12 +263,22 @@ export class PerformanceTracker implements IPerformanceTracker {
  * No-op implementation for when performance tracking is disabled
  * All methods are essentially pass-through with minimal overhead
  */
-export class NoOpPerformanceTracker implements IPerformanceTracker {
-  serial(_name: string): IPerformanceTracker {
+export class NoOpPerformanceTracker implements PerformanceTracker {
+  private root: TimingBlock = {
+    name: "noop",
+    type: "serial",
+    startMs: 0,
+    entries: [],
+    parent: null
+  };
+  private current: TimingBlock = this.root;
+  private operationStarts: Map<string, number> = new Map();
+
+  serial(_name: string): PerformanceTracker {
     return this;
   }
 
-  parallel(_name: string): IPerformanceTracker {
+  parallel(_name: string): PerformanceTracker {
     return this;
   }
 
@@ -280,7 +290,7 @@ export class NoOpPerformanceTracker implements IPerformanceTracker {
     return fn();
   }
 
-  end(): IPerformanceTracker {
+  end(): PerformanceTracker {
     return this;
   }
 
@@ -308,8 +318,8 @@ export class NoOpPerformanceTracker implements IPerformanceTracker {
 /**
  * Factory function to create appropriate tracker based on enabled flag
  */
-export function createPerformanceTracker(enabled: boolean): IPerformanceTracker {
-  return enabled ? new PerformanceTracker() : new NoOpPerformanceTracker();
+export function createPerformanceTracker(enabled: boolean): PerformanceTracker {
+  return enabled ? new DefaultPerformanceTracker() : new NoOpPerformanceTracker();
 }
 
 /**
@@ -335,6 +345,6 @@ export function isDebugPerfEnabled(): boolean {
 /**
  * Create a tracker based on global debug-perf state
  */
-export function createGlobalPerformanceTracker(): IPerformanceTracker {
+export function createGlobalPerformanceTracker(): PerformanceTracker {
   return createPerformanceTracker(debugPerfEnabled);
 }

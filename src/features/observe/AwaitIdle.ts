@@ -1,11 +1,11 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { Idle } from "./Idle";
 import { BootedDevice, GfxMetrics } from "../../models";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class AwaitIdle {
-  private adb: AdbUtils;
+  private adb: AdbClient;
   private idle: Idle;
 
   private stabilityThresholdMs = 60;
@@ -14,10 +14,10 @@ export class AwaitIdle {
   /**
    * Create a AwaitIdle instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(device);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    this.adb = adb || new AdbClient(device);
     this.idle = new Idle(device, this.adb);
   }
 
@@ -167,7 +167,7 @@ export class AwaitIdle {
       prevFrameDeadlineMissed: number | null;
       firstGfxInfoLog: boolean;
     },
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<GfxMetrics | null> {
     logger.info(`[AwaitIdle] Continuing UI stability wait with existing state for package: ${packageName}`);
 
@@ -279,7 +279,7 @@ export class AwaitIdle {
   async waitForUiStability(
     packageName: string,
     timeoutMs: number,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<GfxMetrics | null> {
 
     logger.info(`[AwaitIdle] Waiting for UI stability for package: ${packageName} with timeoutMs: ${timeoutMs}`);
