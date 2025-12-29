@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { DeepLinkManager } from "../../src/utils/deepLinkManager";
+import { DeepLinkManager } from "../../src/utils/DeepLinkManager";
 import { ElementUtils } from "../../src/features/utility/ElementUtils";
 import { ViewHierarchyResult, BootedDevice } from "../../src/models";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";

@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { GetDeepLinks } from "../../../src/features/utility/GetDeepLinks";
-import { DeepLinkManager } from "../../../src/utils/deepLinkManager";
+import { DeepLinkManager } from "../../../src/utils/DeepLinkManager";
 import { DeepLinkResult } from "../../../src/models";
 
 describe("GetDeepLinks", () => {

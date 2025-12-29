@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { AppLifecycleMonitor, AppLifecycleEvent } from "../../src/utils/appLifecycleMonitor";
+import { AppLifecycleMonitor, AppLifecycleEvent } from "../../src/utils/AppLifecycleMonitor";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { AppLifecycleMonitorFactory } from "../../src/utils/factories/AppLifecycleMonitorFactory";
 
