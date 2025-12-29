@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { describe, it, beforeEach, afterEach } from "mocha";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
-import { AndroidAccessibilityServiceManager } from "../../../src/utils/accessibilityServiceManager";
+import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import { BootedDevice } from "../../../src/models";
 import WebSocket from "ws";
@@ -62,7 +62,7 @@ describe("AccessibilityServiceClient", function() {
 
     // Close mock server and wait for it to fully close
     if (mockWebSocketServer) {
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         mockWebSocketServer!.close(() => {
           resolve();
         });
