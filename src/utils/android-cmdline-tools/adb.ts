@@ -4,6 +4,45 @@ import { logger } from "../logger";
 import { BootedDevice, ExecResult } from "../../models";
 import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
 
+/**
+ * Interface for executing ADB commands
+ * Enables dependency injection and testing with fakes
+ */
+export interface AdbExecutor {
+  /**
+   * Execute an ADB command
+   * @param command - The ADB command to execute (without "adb -s <device>" prefix)
+   * @param timeoutMs - Optional timeout in milliseconds
+   * @param maxBuffer - Optional maximum buffer size for command output
+   * @param noRetry - Optional flag to disable retry logic
+   * @returns Promise with command output
+   */
+  executeCommand(
+    command: string,
+    timeoutMs?: number,
+    maxBuffer?: number,
+    noRetry?: boolean,
+  ): Promise<ExecResult>;
+
+  /**
+   * Get the list of booted Android devices
+   * @returns Promise with array of booted devices
+   */
+  getBootedAndroidDevices(): Promise<BootedDevice[]>;
+
+  /**
+   * Check if the device screen is currently on
+   * @returns Promise<boolean> - true if screen is on (Awake), false otherwise
+   */
+  isScreenOn(): Promise<boolean>;
+
+  /**
+   * Get the device wakefulness state
+   * @returns Promise with wakefulness state: "Awake", "Asleep", "Dozing", or null if unknown
+   */
+  getWakefulness(): Promise<"Awake" | "Asleep" | "Dozing" | null>;
+}
+
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
   const options = maxBuffer ? { maxBuffer } : undefined;
@@ -21,7 +60,7 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
   return enhancedResult;
 };
 
-export class AdbUtils {
+export class AdbClient implements AdbExecutor {
   device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
   spawnFn: typeof spawn;
@@ -33,7 +72,7 @@ export class AdbUtils {
   private static readonly MAX_ADB_RETRIES = 3;
 
   /**
-   * Create an AdbUtils instance
+   * Create an AdbClient instance
    * @param device - Optional device
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
@@ -190,7 +229,7 @@ export class AdbUtils {
       logger.info(`[ADB] Command completed in ${duration}ms: ${command}`);
       return result;
     } catch (error) {
-      if (!noRetry && attempt < AdbUtils.MAX_ADB_RETRIES) {
+      if (!noRetry && attempt < AdbClient.MAX_ADB_RETRIES) {
         return this.executeCommandImpl(command, timeoutMs, maxBuffer, attempt + 1, noRetry);
       } else {
         const duration = Date.now() - startTime;
@@ -206,11 +245,11 @@ export class AdbUtils {
    */
   async getBootedAndroidDevices(): Promise<BootedDevice[]> {
     // Check cache first
-    if (AdbUtils.deviceListCache) {
-      const cacheAge = Date.now() - AdbUtils.deviceListCache.timestamp;
-      if (cacheAge < AdbUtils.DEVICE_LIST_CACHE_TTL) {
+    if (AdbClient.deviceListCache) {
+      const cacheAge = Date.now() - AdbClient.deviceListCache.timestamp;
+      if (cacheAge < AdbClient.DEVICE_LIST_CACHE_TTL) {
         logger.info(`Getting list of connected devices (cached, age: ${cacheAge}ms)`);
-        return AdbUtils.deviceListCache.devices;
+        return AdbClient.deviceListCache.devices;
       }
     }
 
@@ -228,7 +267,7 @@ export class AdbUtils {
       });
 
     // Cache the result
-    AdbUtils.deviceListCache = {
+    AdbClient.deviceListCache = {
       devices,
       timestamp: Date.now()
     };
@@ -268,3 +307,6 @@ export class AdbUtils {
     }
   }
 }
+
+// Backward compatibility export
+export const AdbUtils = AdbClient;

@@ -1,14 +1,14 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, SelectAllTextResult } from "../../models";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { logger } from "../../utils/logger";
 
 export class SelectAllText extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
     super(device, adb, axe);
   }
 

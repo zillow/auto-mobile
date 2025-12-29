@@ -7,15 +7,15 @@ import { ViewHierarchy } from "./ViewHierarchy";
 import { Window } from "./Window";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { GetDumpsysWindow } from "./GetDumpsysWindow";
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { DeepLinkManager } from "../../utils/deepLinkManager";
 import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
-import { AccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AndroidAccessibilityServiceManager } from "../../utils/accessibilityServiceManager";
+import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Interface for cached observe result
@@ -36,8 +36,8 @@ export class ObserveScreen {
   private window: Window;
   private screenshotUtil: TakeScreenshot;
   private dumpsysWindow: GetDumpsysWindow;
-  private adb: AdbUtils;
-  private axe: Axe;
+  private adb: AdbClient;
+  private axe: AxeClient;
   private webdriver: WebDriverAgent;
   private deepLinkManager: DeepLinkManager;
 
@@ -46,10 +46,10 @@ export class ObserveScreen {
   private static observeResultCacheDir: string = path.join("/tmp/auto-mobile", "observe_results");
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null, webdriver: WebDriverAgent | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null, webdriver: WebDriverAgent | null = null) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
-    this.axe = axe || new Axe(device);
+    this.adb = adb || new AdbClient(device);
+    this.axe = axe || new AxeClient(device);
     this.webdriver = webdriver || new WebDriverAgent(device);
     this.screenSize = new GetScreenSize(device, this.adb);
     this.systemInsets = new GetSystemInsets(device, this.adb);
@@ -142,7 +142,7 @@ export class ObserveScreen {
   public async collectViewHierarchy(
     result: ObserveResult,
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<void> {
@@ -173,7 +173,7 @@ export class ObserveScreen {
       logger.warn("Failed to get view hierarchy:", error);
 
       // Clear cache on failure
-      AccessibilityServiceManager.getInstance(this.device, this.adb).clearAvailabilityCache();
+      AndroidAccessibilityServiceManager.getInstance(this.device, this.adb).clearAvailabilityCache();
 
       // Check if the error is due to screen being off
       const errorStr = String(error);
@@ -246,7 +246,7 @@ export class ObserveScreen {
   public async collectAllData(
     result: ObserveResult,
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<void> {
@@ -543,7 +543,7 @@ export class ObserveScreen {
    */
   async execute(
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = true, // Default to true for direct observe tool requests
     minTimestamp: number = 0
   ): Promise<ObserveResult> {

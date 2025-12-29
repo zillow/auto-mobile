@@ -1,4 +1,4 @@
-import { AdbUtils } from "./android-cmdline-tools/adb";
+import { AdbClient } from "./android-cmdline-tools/adb";
 import { logger } from "./logger";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -12,9 +12,27 @@ import { BootedDevice } from "../models";
 
 const execAsync = promisify(exec);
 
-export class AccessibilityServiceManager {
+/**
+ * Interface for accessibility service management
+ */
+export interface AccessibilityServiceManager {
+  setup(force?: boolean): Promise<{
+    success: boolean;
+    message: string;
+    error?: string;
+  }>;
+  isInstalled(): Promise<boolean>;
+  isEnabled(): Promise<boolean>;
+  isAvailable(): Promise<boolean>;
+  downloadApk(): Promise<string>;
+  install(apkPath: string): Promise<void>;
+  enable(): Promise<void>;
+  cleanupApk(apkPath: string): Promise<void>;
+}
+
+export class AndroidAccessibilityServiceManager implements AccessibilityServiceManager {
   private readonly device: BootedDevice;
-  private adb: AdbUtils;
+  private adb: AdbClient;
   public static readonly PACKAGE = "dev.jasonpearson.automobile.accessibilityservice";
   public static readonly ACTIVITY = "dev.jasonpearson.automobile.accessibilityservice.MainActivity";
 
@@ -31,33 +49,33 @@ export class AccessibilityServiceManager {
   private static readonly STATUS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
   private attemptedAutomatedSetup: boolean = false;
-  private static instances: Map<string, AccessibilityServiceManager> = new Map();
+  private static instances: Map<string, AndroidAccessibilityServiceManager> = new Map();
 
-  private constructor(device: BootedDevice, adb: AdbUtils) {
+  private constructor(device: BootedDevice, adb: AdbClient) {
     // home should either be process.env.HOME or bash resolution of home for current user
     const homeDir = process.env.HOME || require("os").homedir();
     if (!homeDir) {
       throw new Error("Home directory for current user not found");
     }
     this.device = device;
-    this.adb = adb || new AdbUtils(this.device);
+    this.adb = adb || new AdbClient(this.device);
   }
 
-  public static getInstance(device: BootedDevice, adb: AdbUtils | null = null): AccessibilityServiceManager {
-    if (!AccessibilityServiceManager.instances.has(device.deviceId)) {
-      AccessibilityServiceManager.instances.set(device.deviceId, new AccessibilityServiceManager(
+  public static getInstance(device: BootedDevice, adb: AdbClient | null = null): AndroidAccessibilityServiceManager {
+    if (!AndroidAccessibilityServiceManager.instances.has(device.deviceId)) {
+      AndroidAccessibilityServiceManager.instances.set(device.deviceId, new AndroidAccessibilityServiceManager(
         device,
-        adb || new AdbUtils(device)
+        adb || new AdbClient(device)
       ));
     }
-    return AccessibilityServiceManager.instances.get(device.deviceId)!;
+    return AndroidAccessibilityServiceManager.instances.get(device.deviceId)!;
   }
 
   /**
    * Reset all instances (for testing)
    */
   public static resetInstances(): void {
-    AccessibilityServiceManager.instances.clear();
+    AndroidAccessibilityServiceManager.instances.clear();
   }
 
   /**
@@ -77,7 +95,7 @@ export class AccessibilityServiceManager {
     // Check cache first
     if (this.cachedInstallation && this.cachedInstallation.isInstalled) {
       const cacheAge = Date.now() - this.cachedInstallation.timestamp;
-      if (cacheAge < AccessibilityServiceManager.STATUS_CACHE_TTL) {
+      if (cacheAge < AndroidAccessibilityServiceManager.STATUS_CACHE_TTL) {
         logger.info(`[ACCESSIBILITY_SERVICE] Using cached installation status (age: ${cacheAge}ms): ${this.cachedInstallation.isInstalled ? "installed" : "not installed"}`);
         return this.cachedInstallation.isInstalled;
       } else {
@@ -87,8 +105,8 @@ export class AccessibilityServiceManager {
 
     try {
       logger.info("[ACCESSIBILITY_SERVICE] Checking if accessibility service is installed");
-      const result = await this.adb.executeCommand(`shell pm list packages | grep ${AccessibilityServiceManager.PACKAGE}`, undefined, undefined, true);
-      const isInstalled = result.stdout.includes(AccessibilityServiceManager.PACKAGE);
+      const result = await this.adb.executeCommand(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, undefined, undefined, true);
+      const isInstalled = result.stdout.includes(AndroidAccessibilityServiceManager.PACKAGE);
 
       // Cache the result
       this.cachedInstallation = {
@@ -96,7 +114,7 @@ export class AccessibilityServiceManager {
         timestamp: Date.now()
       };
 
-      logger.info(`[ACCESSIBILITY_SERVICE] Service installation status: ${isInstalled ? "installed" : "not installed"} (cached for ${AccessibilityServiceManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Service installation status: ${isInstalled ? "installed" : "not installed"} (cached for ${AndroidAccessibilityServiceManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
       return isInstalled;
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error checking installation status: ${error}`);
@@ -111,7 +129,7 @@ export class AccessibilityServiceManager {
     // Check cache first
     if (this.cachedEnabled && this.cachedEnabled.isEnabled) {
       const cacheAge = Date.now() - this.cachedEnabled.timestamp;
-      if (cacheAge < AccessibilityServiceManager.STATUS_CACHE_TTL) {
+      if (cacheAge < AndroidAccessibilityServiceManager.STATUS_CACHE_TTL) {
         logger.info(`[ACCESSIBILITY_SERVICE] Using cached enabled status (age: ${cacheAge}ms): ${this.cachedEnabled.isEnabled ? "enabled" : "disabled"}`);
         return this.cachedEnabled.isEnabled;
       } else {
@@ -122,7 +140,7 @@ export class AccessibilityServiceManager {
     try {
       logger.info("[ACCESSIBILITY_SERVICE] Checking if accessibility service is enabled");
       const result = await this.adb.executeCommand("shell settings get secure enabled_accessibility_services");
-      const isEnabled = result.stdout.includes(AccessibilityServiceManager.PACKAGE);
+      const isEnabled = result.stdout.includes(AndroidAccessibilityServiceManager.PACKAGE);
 
       // Cache the result
       this.cachedEnabled = {
@@ -130,7 +148,7 @@ export class AccessibilityServiceManager {
         timestamp: Date.now()
       };
 
-      logger.info(`[ACCESSIBILITY_SERVICE] Service enabled status: ${isEnabled ? "enabled" : "disabled"} (cached for ${AccessibilityServiceManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Service enabled status: ${isEnabled ? "enabled" : "disabled"} (cached for ${AndroidAccessibilityServiceManager.STATUS_CACHE_TTL / 1000 / 60} minutes)`);
       return isEnabled;
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error checking enabled status: ${error}`);
@@ -148,7 +166,7 @@ export class AccessibilityServiceManager {
     // Check cache first
     if (this.cachedAvailability && this.cachedAvailability.isAvailable) {
       const cacheAge = Date.now() - this.cachedAvailability.timestamp;
-      if (cacheAge < AccessibilityServiceManager.AVAILABILITY_CACHE_TTL) {
+      if (cacheAge < AndroidAccessibilityServiceManager.AVAILABILITY_CACHE_TTL) {
         logger.info(`[ACCESSIBILITY_SERVICE] Using cached overall availability (age: ${cacheAge}ms): ${this.cachedAvailability.isAvailable}`);
         return this.cachedAvailability.isAvailable;
       } else {
@@ -174,7 +192,7 @@ export class AccessibilityServiceManager {
         timestamp: Date.now()
       };
 
-      logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available} (cached for ${AccessibilityServiceManager.AVAILABILITY_CACHE_TTL / 1000 / 60} minutes)`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Availability check completed in ${duration}ms - Available: ${available} (cached for ${AndroidAccessibilityServiceManager.AVAILABILITY_CACHE_TTL / 1000 / 60} minutes)`);
       return available;
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -196,10 +214,10 @@ export class AccessibilityServiceManager {
     await fs.mkdir(tempDir, { recursive: true });
 
     try {
-      logger.info("Downloading APK", { url: AccessibilityServiceManager.APK_URL, destination: apkPath });
+      logger.info("Downloading APK", { url: AndroidAccessibilityServiceManager.APK_URL, destination: apkPath });
 
       // Use curl to download the APK
-      const { stderr } = await execAsync(`curl -L -o "${apkPath}" "${AccessibilityServiceManager.APK_URL}"`);
+      const { stderr } = await execAsync(`curl -L -o "${apkPath}" "${AndroidAccessibilityServiceManager.APK_URL}"`);
 
       if (stderr && !stderr.includes("100")) {
         logger.warn("Download may have failed", { stderr });
@@ -272,13 +290,13 @@ export class AccessibilityServiceManager {
     try {
       logger.info("Enabling Accessibility Service input method");
 
-      await new TerminateApp(this.device).execute(AccessibilityServiceManager.PACKAGE);
+      await new TerminateApp(this.device).execute(AndroidAccessibilityServiceManager.PACKAGE);
 
       await new LaunchApp(this.device).execute(
-        AccessibilityServiceManager.PACKAGE,
+        AndroidAccessibilityServiceManager.PACKAGE,
         false,
         false,
-        AccessibilityServiceManager.ACTIVITY
+        AndroidAccessibilityServiceManager.ACTIVITY
       );
 
       await new TapOnElement(this.device).execute({

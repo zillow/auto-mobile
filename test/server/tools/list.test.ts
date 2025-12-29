@@ -5,7 +5,7 @@ import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import sinon from "sinon";
+import { FakeToolRegistry } from "../../fakes/FakeToolRegistry";
 
 describe("MCP Tools List", () => {
   let fixture: McpTestFixture;
@@ -23,8 +23,14 @@ describe("MCP Tools List", () => {
 
   it("given no tools are registered, endpoint should return an empty list", async function() {
 
-    // Mock the ToolRegistry to return no tools
-    const stub = sinon.stub(ToolRegistry, "getToolDefinitions").returns([]);
+    // Create fake registry with no tools registered
+    const fakeRegistry = new FakeToolRegistry();
+
+    // Save original method
+    const originalGetToolDefinitions = ToolRegistry.getToolDefinitions;
+
+    // Replace with fake that returns no tools
+    (ToolRegistry as any).getToolDefinitions = () => fakeRegistry.getTools();
 
     try {
       // Create server using createMcpServer()
@@ -68,7 +74,7 @@ describe("MCP Tools List", () => {
       await client.close();
     } finally {
       // Restore the original method
-      stub.restore();
+      (ToolRegistry as any).getToolDefinitions = originalGetToolDefinitions;
     }
   });
 

@@ -1,17 +1,43 @@
 import { logger } from "./logger";
 
+/**
+ * Interface for device detection utilities
+ */
 export type DevicePlatform = "android" | "ios";
 
-/**
- * Device detection utility to determine platform based on device ID
- */
-export class DeviceDetection {
+export interface DeviceDetection {
   /**
    * Detect device platform based on device ID patterns
    * @param deviceId - The device identifier
    * @returns The detected platform
    */
-  static detectPlatform(deviceId: string): DevicePlatform {
+  detectPlatform(deviceId: string): DevicePlatform;
+
+  /**
+   * Check if a device ID represents an iOS device
+   * @param deviceId - The device identifier
+   * @returns True if iOS device
+   */
+  isiOSDevice(deviceId: string): boolean;
+
+  /**
+   * Check if a device ID represents an Android device
+   * @param deviceId - The device identifier
+   * @returns True if Android device
+   */
+  isAndroidDevice(deviceId: string): boolean;
+}
+
+/**
+ * Device detection utility to determine platform based on device ID
+ */
+export class DeviceDetection implements DeviceDetection {
+  /**
+   * Detect device platform based on device ID patterns
+   * @param deviceId - The device identifier
+   * @returns The detected platform
+   */
+  detectPlatform(deviceId: string): DevicePlatform {
     if (!deviceId) {
       logger.warn("[DeviceDetection] Empty device ID provided, defaulting to Android");
       return "android";
@@ -51,8 +77,8 @@ export class DeviceDetection {
    * @param deviceId - The device identifier
    * @returns True if iOS device
    */
-  static isiOSDevice(deviceId: string): boolean {
-    return DeviceDetection.detectPlatform(deviceId) === "ios";
+  isiOSDevice(deviceId: string): boolean {
+    return this.detectPlatform(deviceId) === "ios";
   }
 
   /**
@@ -60,7 +86,12 @@ export class DeviceDetection {
    * @param deviceId - The device identifier
    * @returns True if Android device
    */
-  static isAndroidDevice(deviceId: string): boolean {
-    return DeviceDetection.detectPlatform(deviceId) === "android";
+  isAndroidDevice(deviceId: string): boolean {
+    return this.detectPlatform(deviceId) === "android";
   }
+
+  // Static convenience methods for backward compatibility
+  static detectPlatform = (deviceId: string) => new DeviceDetection().detectPlatform(deviceId);
+  static isiOSDevice = (deviceId: string) => new DeviceDetection().isiOSDevice(deviceId);
+  static isAndroidDevice = (deviceId: string) => new DeviceDetection().isAndroidDevice(deviceId);
 }

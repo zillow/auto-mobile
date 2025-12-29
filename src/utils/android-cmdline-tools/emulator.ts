@@ -2,9 +2,64 @@ import { ChildProcess, exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
 import { BootedDevice, DeviceInfo, ExecResult, ActionableError } from "../../models";
-import { AdbUtils } from "./adb";
+import { AdbClient } from "./adb";
 import { arch } from "os";
 import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
+
+/**
+ * Interface for Android Emulator (AVD) management
+ * Provides emulator lifecycle and control capabilities
+ */
+export interface AndroidEmulator {
+  /**
+   * Execute an emulator command
+   * @param command - The command to execute
+   * @param timeoutMs - Optional timeout in milliseconds
+   * @returns Promise with stdout and stderr
+   */
+  executeCommand(command: string, timeoutMs?: number): Promise<ExecResult>;
+
+  /**
+   * List all available AVDs
+   * @returns Promise with array of AVD names
+   */
+  listAvds(): Promise<DeviceInfo[]>;
+
+  /**
+   * Check if a specific AVD is running
+   * @param avdName - The AVD name to check
+   * @returns Promise with boolean indicating if the AVD is running
+   */
+  isAvdRunning(avdName: string): Promise<boolean>;
+
+  /**
+   * Check if any emulator is currently running
+   * @returns Promise with array of running emulator info
+   */
+  getBootedDevices(onlyEmulators?: boolean): Promise<BootedDevice[]>;
+
+  /**
+   * Start an emulator with the specified AVD
+   * @param avdName - The AVD name to start
+   * @returns Promise with the spawned child process
+   */
+  startEmulator(avdName: string): Promise<ChildProcess>;
+
+  /**
+   * Kill a running emulator
+   * @param device - The device to kill
+   * @returns Promise that resolves when emulator is stopped
+   */
+  killDevice(device: BootedDevice): Promise<void>;
+
+  /**
+   * Wait for the emulator to be ready for use
+   * @param avdName - The AVD name to wait for
+   * @param timeoutMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
+   * @returns Promise that resolves with device ID when emulator is ready
+   */
+  waitForEmulatorReady(avdName: string, timeoutMs?: number): Promise<BootedDevice>;
+}
 
 const execAsync = async (command: string): Promise<ExecResult> => {
   const result = await promisify(exec)(command);
@@ -28,13 +83,13 @@ const execAsync = async (command: string): Promise<ExecResult> => {
   return enhancedResult;
 };
 
-export class AndroidEmulator {
+export class AndroidEmulatorClient implements AndroidEmulator {
   private execAsync: (command: string) => Promise<ExecResult>;
   private spawnFn: typeof spawn;
   private emulatorPath: string;
 
   /**
-   * Create an DeviceUtils instance
+   * Create an AndroidEmulatorClient instance
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
    */
@@ -63,28 +118,95 @@ export class AndroidEmulator {
   }
 
   /**
-   * Gets the emulator path asynchronously via detection.
-   * @returns Promise<string>
+   * Try multiple common paths to find the emulator executable
+   * @returns Promise<string | null> The emulator path if found, null otherwise
    */
-  private async getEmulatorPath(): Promise<string> {
-    // Try to find via Android command line tools detection
+  private async tryMultiplePaths(): Promise<string | null> {
+    const { existsSync } = require("fs");
+    const path = require("path");
+
+    // Build list of potential emulator paths
+    const potentialPaths: string[] = [];
+
+    // 1. Check environment variables first (highest priority)
+    const androidHome = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT || process.env.ANDROID_SDK_HOME;
+    if (androidHome) {
+      potentialPaths.push(`${androidHome}/emulator/emulator`);
+      potentialPaths.push(`${androidHome}/emulator/emulator-arm64-v8a`);
+    }
+
+    // 2. Check standard macOS Android SDK location
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    if (homeDir) {
+      potentialPaths.push(path.join(homeDir, "Library/Android/sdk/emulator/emulator"));
+      potentialPaths.push(path.join(homeDir, ".android/emulator/emulator"));
+    }
+
+    // 3. Check Linux/WSL locations
+    potentialPaths.push("/usr/lib/android-sdk/emulator/emulator");
+    potentialPaths.push("/opt/android-sdk/emulator/emulator");
+
+    // 4. Check Homebrew locations
+    potentialPaths.push("/opt/homebrew/bin/emulator");
+    potentialPaths.push("/usr/local/bin/emulator");
+    potentialPaths.push("/opt/homebrew/Caskroom/android-studio/*/Contents/emulator/emulator");
+
+    // 5. Try to find via Android command line tools detection
     try {
       const locations = await detectAndroidCommandLineTools();
       const bestLocation = getBestAndroidToolsLocation(locations);
 
       if (bestLocation) {
-        // For Homebrew installations, the emulator is in the SDK root directory
-        if (bestLocation.source === "homebrew") {
-          // /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest -> /opt/homebrew/share/android-commandlinetools
-          const sdkRoot = bestLocation.path.replace("/cmdline-tools/latest", "");
-          return `${sdkRoot}/emulator/emulator`;
-        }
-        // For standard installations, look in the parent SDK directory
-        const sdkRoot = bestLocation.path.replace("/cmdline-tools/latest", "");
-        return `${sdkRoot}/emulator/emulator`;
+        // Check various emulator locations relative to SDK root
+        const sdkRoot = bestLocation.path.replace("/cmdline-tools/latest", "").replace("/cmdline-tools", "");
+        potentialPaths.push(`${sdkRoot}/emulator/emulator`);
+        potentialPaths.push(`${sdkRoot}/emulator/emulator-arm64-v8a`);
+
+        // Also check Homebrew location structure
+        potentialPaths.push(`${sdkRoot}/../emulator/emulator`);
       }
     } catch (error) {
-      logger.debug(`Failed to detect emulator path via Android tools detection: ${error}`);
+      logger.debug(`Failed to detect Android tools: ${error}`);
+    }
+
+    // 6. Check system PATH
+    potentialPaths.push("emulator");
+
+    // Try each path
+    for (const potentialPath of potentialPaths) {
+      try {
+        // Handle glob patterns - skip them in basic existence check
+        if (potentialPath.includes("*")) {
+          continue;
+        }
+
+        // Expand ~ if present
+        const expandedPath = potentialPath.startsWith("~")
+          ? path.join(homeDir || "", potentialPath.slice(1))
+          : potentialPath;
+
+        if (existsSync(expandedPath)) {
+          logger.debug(`Found emulator at: ${expandedPath}`);
+          return expandedPath;
+        }
+      } catch (error) {
+        logger.debug(`Failed to check path ${potentialPath}: ${error}`);
+      }
+    }
+
+    logger.debug(`Emulator not found in any of these paths:\n${potentialPaths.join("\n")}`);
+    return null;
+  }
+
+  /**
+   * Gets the emulator path asynchronously via detection.
+   * @returns Promise<string>
+   */
+  private async getEmulatorPath(): Promise<string> {
+    // Try multiple common paths
+    const foundPath = await this.tryMultiplePaths();
+    if (foundPath) {
+      return foundPath;
     }
 
     // Fall back to default
@@ -253,7 +375,21 @@ export class AndroidEmulator {
         .map(name => ({ name, platform: "android", isRunning: false, source: "local" } as DeviceInfo));
     } catch (error) {
       logger.error("Failed to list AVDs:", error);
-      throw new ActionableError(`Failed to list AVDs: ${error}`);
+
+      // Check if the error is because emulator is not found
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes("No such file or directory") || errorMsg.includes("command not found") || errorMsg.includes("ENOENT")) {
+        throw new ActionableError(
+          `Android emulator not found. Please install it using one of these methods:\n` +
+          `1. Via Homebrew: brew install android-emulator\n` +
+          `2. Via Android Studio: Download from https://developer.android.com/studio\n` +
+          `3. Via Android SDK Manager: sdkmanager --install "emulator"\n\n` +
+          `Or set ANDROID_HOME to point to your Android SDK installation:\n` +
+          `export ANDROID_HOME=/path/to/android/sdk`
+        );
+      }
+
+      throw new ActionableError(`Failed to list AVDs: ${errorMsg}`);
     }
   }
 
@@ -273,7 +409,7 @@ export class AndroidEmulator {
    */
   async getBootedDevices(onlyEmulators: boolean = false): Promise<BootedDevice[]> {
     try {
-      const adb = new AdbUtils();
+      const adb = new AdbClient();
       const devices = await adb.getBootedAndroidDevices();
       const runningDevices: BootedDevice[] = [];
 
@@ -285,7 +421,7 @@ export class AndroidEmulator {
         const deviceId = device.deviceId;
         try {
           // Try to get the AVD name from the running emulator
-          const adbWithDevice = new AdbUtils(device);
+          const adbWithDevice = new AdbClient(device);
           const result = await adbWithDevice.executeCommand("emu avd name");
           const avdName = result.stdout.trim().replace(/\r?\n.*$/, ""); // Remove any trailing newlines and additional text
 
@@ -314,7 +450,7 @@ export class AndroidEmulator {
 
         try {
           // Try to get the actual device model name
-          const adbWithDevice = new AdbUtils(device);
+          const adbWithDevice = new AdbClient(device);
           const result = await adbWithDevice.executeCommand("shell getprop ro.product.model");
           const modelName = result.stdout.trim();
 
@@ -505,7 +641,7 @@ export class AndroidEmulator {
     }
 
     // Use ADB to stop the emulator
-    const adb = new AdbUtils(emulator);
+    const adb = new AdbClient(emulator);
     await adb.executeCommand("emu kill");
 
     logger.info(`Killed emulator '${device.name}'`);
@@ -561,7 +697,7 @@ export class AndroidEmulator {
               // Check if the device is online and ready
               // Run device state and package manager checks in parallel for faster detection
               logger.info(`[PARALLEL] Running device state and package manager checks for ${emulator.deviceId}...`);
-              const adb = new AdbUtils(emulator);
+              const adb = new AdbClient(emulator);
               try {
                 const [deviceStateResult, packageManagerResult] = await Promise.allSettled([
                   adb.executeCommand("get-state"),

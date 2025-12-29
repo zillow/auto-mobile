@@ -1,20 +1,20 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { UninstallAppResult } from "../../models/UninstallAppResult";
 import { BootedDevice } from "../../models";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
-import { Simctl } from "../../utils/ios-cmdline-tools/simctl";
+import { SimCtlClient } from "../../utils/ios-cmdline-tools/simctl";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
   private device: BootedDevice;
-  private adb: AdbUtils;
-  private simctl: Simctl;
+  private adb: AdbClient;
+  private simctl: SimCtlClient;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, simctl: Simctl | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, simctl: SimCtlClient | null = null) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
-    this.simctl = simctl || new Simctl(device);
+    this.adb = adb || new AdbClient(device);
+    this.simctl = simctl || new SimCtlClient(device);
   }
 
   /**

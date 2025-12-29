@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ToolRegistry, ProgressCallback } from "./toolRegistry";
-import { DeviceUtils } from "../utils/deviceUtils";
+import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
 
@@ -14,11 +14,14 @@ export const listDevicesSchema = z.object({
 });
 
 export const startDeviceSchema = z.object({
-  localDevice: z.object({
+  device: z.object({
     name: z.string().describe("The device name to start"),
-    deviceId: z.string().optional().describe("The device ID")
-  }),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+    platform: z.enum(["android", "ios"]).describe("Target platform"),
+    deviceId: z.string().optional().describe("The device ID"),
+    isRunning: z.boolean().optional().describe("Whether device is running"),
+    source: z.string().optional().describe("Device source (local/remote)")
+  }).describe("Device to start"),
+  timeoutMs: z.number().optional().describe("Maximum time to wait for device readiness in milliseconds")
 });
 
 export const killDeviceSchema = z.object({
@@ -30,7 +33,7 @@ export const killDeviceSchema = z.object({
 });
 
 // Export interfaces for type safety
-export interface startDeviceArgs {
+export interface StartDeviceArgs {
   device: DeviceInfo;
   timeoutMs?: number;
 }
@@ -43,7 +46,7 @@ export interface ListDevicesArgs {
   platform: SomePlatform;
 }
 
-export interface listDeviceImagesArgs {
+export interface ListDeviceImagesArgs {
   platform: SomePlatform;
 }
 
@@ -51,7 +54,7 @@ export function registerDeviceTools() {
   // List all connected devices (physical and emulators) handler
   const listBootedDevicesHandler = async (args: ListDevicesArgs) => {
     try {
-      const deviceUtils = new DeviceUtils();
+      const deviceUtils = new MultiPlatformDeviceManager();
       const bootedDevices = await deviceUtils.getBootedDevices(args.platform);
 
       // Categorize devices by type
@@ -85,10 +88,10 @@ export function registerDeviceTools() {
   };
 
   // List AVDs handler
-  const listDeviceImagesHandler = async (args: listDeviceImagesArgs) => {
+  const listDeviceImagesHandler = async (args: ListDeviceImagesArgs) => {
     try {
 
-      const deviceUtils = new DeviceUtils();
+      const deviceUtils = new MultiPlatformDeviceManager();
       const imageList = await deviceUtils.listDeviceImages(args.platform);
 
       return createJSONToolResponse({
@@ -103,9 +106,9 @@ export function registerDeviceTools() {
   };
 
   // Start emulator handler
-  const startDeviceHandler = async (args: startDeviceArgs, progress?: ProgressCallback) => {
+  const startDeviceHandler = async (args: StartDeviceArgs, progress?: ProgressCallback) => {
     try {
-      const deviceUtils = new DeviceUtils();
+      const deviceUtils = new MultiPlatformDeviceManager();
       const childProcess = await deviceUtils.startDevice(args.device);
 
       if (progress) {
@@ -135,7 +138,7 @@ export function registerDeviceTools() {
 
   const killDeviceHandler = async (args: KillDeviceArgs) => {
     try {
-      const deviceUtils = new DeviceUtils();
+      const deviceUtils = new MultiPlatformDeviceManager();
       await deviceUtils.killDevice(args.device);
       return createJSONToolResponse({
         message: `${args.device.platform} '${args.device.name}' shutdown successfully`,

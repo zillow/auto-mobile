@@ -1,21 +1,21 @@
 import fs from "fs-extra";
 import path from "path";
 import xml2js from "xml2js";
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { logger } from "../../utils/logger";
-import { CryptoUtils } from "../../utils/crypto";
+import { NodeCryptoService } from "../../utils/crypto";
 import { BootedDevice, ViewHierarchyCache } from "../../models";
 import { Element } from "../../models";
 import { ViewHierarchyResult } from "../../models";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { ElementUtils } from "../utility/ElementUtils";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
-import { ScreenshotUtils } from "../../utils/screenshot-utils";
+import { ScreenshotUtils } from "../../utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ViewHierarchyQueryOptions } from "../../models";
+import { ActivityInfo, FragmentInfo, ViewInfo, ComposableInfo, ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
  * Interface for activity top data
@@ -46,9 +46,22 @@ interface ElementWithZOrder {
   isClickable: boolean;
 }
 
+/**
+ * Extended ViewHierarchyResult with source indexing information
+ */
+interface ExtendedViewHierarchyResult extends ViewHierarchyResult {
+  sourceInfo?: {
+    activity?: ActivityInfo;
+    fragments?: FragmentInfo[];
+    views?: ViewInfo[];
+    composables?: ComposableInfo[];
+    appId?: string;
+  };
+}
+
 export class ViewHierarchy {
   private device: BootedDevice;
-  private readonly adb: AdbUtils;
+  private readonly adb: AdbClient;
   private readonly webdriver: WebDriverAgent;
   private takeScreenshot: TakeScreenshot;
   private elementUtils: ElementUtils;
@@ -62,20 +75,20 @@ export class ViewHierarchy {
   /**
    * Create a ViewHierarchy instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    * @param webdriver - Optional IdbPython instance for testing
    * @param takeScreenshot - Optional TakeScreenshot instance for testing
    * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null,
+    adb: AdbClient | null = null,
     webdriver: WebDriverAgent | null = null,
     takeScreenshot: TakeScreenshot | null = null,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
+    this.adb = adb || new AdbClient(device);
     this.webdriver = webdriver || new WebDriverAgent(device);
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
     this.elementUtils = new ElementUtils();
@@ -250,7 +263,7 @@ export class ViewHierarchy {
    * @returns MD5 hash of the screenshot
    */
   calculateScreenshotHash(screenshotBuffer: Buffer): string {
-    return CryptoUtils.generateCacheKey(screenshotBuffer);
+    return NodeCryptoService.generateCacheKey(screenshotBuffer);
   }
 
   /**
@@ -510,7 +523,7 @@ export class ViewHierarchy {
    */
   async getViewHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
@@ -530,7 +543,7 @@ export class ViewHierarchy {
    * @returns Promise with parsed XML view hierarchy
    */
   async getiOSViewHierarchy(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy for iOS`);
@@ -558,7 +571,7 @@ export class ViewHierarchy {
    */
   async getAndroidViewHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker(),
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
@@ -758,9 +771,17 @@ export class ViewHierarchy {
     const tempFile = "/data/local/tmp/window_dump.xml";
 
     // Use shell subcommand to ensure atomicity and avoid separate rm command
-    const { stdout } = await this.adb.executeCommand(`shell "(uiautomator dump ${tempFile} >/dev/null 2>&1 && cat ${tempFile}; rm -f ${tempFile}) 2>/dev/null"`);
+    const result = await this.adb.executeCommand(`shell "(uiautomator dump ${tempFile} >/dev/null 2>&1 && cat ${tempFile}; rm -f ${tempFile}) 2>/dev/null"`);
 
-    return this.extractXmlFromAdbOutput(stdout, tempFile);
+    // Check for any error indicators in stderr and throw if found
+    if (result.stderr) {
+      const stderrStr = String(result.stderr);
+      if (stderrStr.trim().length > 0) {
+        throw new Error(stderrStr);
+      }
+    }
+
+    return this.extractXmlFromAdbOutput(result.stdout, tempFile);
   }
 
   /**
@@ -1371,11 +1392,122 @@ export class ViewHierarchy {
   }
 
   /**
+   * Augment view hierarchy with source indexing information
+   * @param viewHierarchy - The view hierarchy to augment
+   * @returns Augmented view hierarchy with source information
+   */
+  private async augmentWithSourceIndexing(viewHierarchy: ExtendedViewHierarchyResult): Promise<ExtendedViewHierarchyResult> {
+    throw new Error("SourceMapper functionality has been removed");
+  }
+
+  /**
+   * Get current activity information from the device
+   * @returns Current activity info or null
+   */
+  private async getCurrentActivityInfo(): Promise<{ activityName: string; packageName: string } | null> {
+    try {
+      const result = await this.adb.executeCommand("shell dumpsys activity activities | grep -E 'mResumedActivity|mFocusedActivity' | head -1");
+      const output = result.stdout;
+
+      // Parse the current activity from dumpsys output
+      // Example: mResumedActivity: ActivityRecord{abc123 u0 com.example.myapp/.MainActivity t12345}
+      const activityMatch = output.match(/ActivityRecord\{[^}]+\s+([^\s]+)\/([^\s]+)\s+/);
+
+      if (activityMatch) {
+        const packageName = activityMatch[1];
+        const activityPath = activityMatch[2];
+
+        // Extract class name from activity path (e.g., ".MainActivity" -> "MainActivity")
+        const activityName = activityPath.startsWith(".") ?
+          `${packageName}${activityPath}` :
+          activityPath;
+
+        return { activityName, packageName };
+      }
+
+      logger.warn("[SOURCE_INDEXING] Could not parse current activity from dumpsys output");
+      return null;
+    } catch (error) {
+      logger.warn(`[SOURCE_INDEXING] Error getting current activity: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Extract fragment names from view hierarchy augmentation data
+   * @param viewHierarchy - The view hierarchy to search
+   * @returns Array of fragment class names
+   */
+  private extractFragmentNames(viewHierarchy: ViewHierarchyResult): string[] {
+    const fragmentNames: string[] = [];
+
+    // Traverse the hierarchy looking for fragment information added by augmentViewHierarchyWithClassAndFragment
+    const traverseNode = (node: any): void => {
+      if (node.fragment) {
+        fragmentNames.push(node.fragment);
+      }
+
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        for (const child of children) {
+          traverseNode(child);
+        }
+      }
+    };
+
+    if (viewHierarchy.hierarchy) {
+      traverseNode(viewHierarchy.hierarchy);
+    }
+
+    // Remove duplicates
+    return Array.from(new Set(fragmentNames));
+  }
+
+  /**
+   * Extract custom View class names from view hierarchy augmentation data
+   * @param viewHierarchy - The view hierarchy to search
+   * @returns Array of custom View class names
+   */
+  private extractViewNames(viewHierarchy: ViewHierarchyResult): string[] {
+    const viewNames: string[] = [];
+
+    // Traverse the hierarchy looking for custom view class information added by augmentViewHierarchyWithClassAndFragment
+    const traverseNode = (node: any): void => {
+      // Check for custom view class from augmentation
+      if (node.customView) {
+        viewNames.push(node.customView);
+      }
+
+      // Check for class property that doesn't match Android framework patterns
+      if (node.class && !node.class.match(/^(android\.|com\.android\.|androidx\.)/)) {
+        // Exclude fragments and activities as they are handled separately
+        if (!node.class.includes("Fragment") && !node.class.includes("Activity")) {
+          viewNames.push(node.class);
+        }
+      }
+
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        for (const child of children) {
+          traverseNode(child);
+        }
+      }
+    };
+
+    if (viewHierarchy.hierarchy) {
+      traverseNode(viewHierarchy.hierarchy);
+    }
+
+    // Remove duplicates
+    return Array.from(new Set(viewNames));
+  }
+
+  /**
    * Augment view hierarchy with class and fragment and custom view information from dumpsys activity top
    * @param viewHierarchy - The view hierarchy to augment
    * @param activityTopData - Class, fragment and view data from dumpsys activity top
    */
-  private augmentViewHierarchyWithClassAndFragment(viewHierarchy: ViewHierarchyResult, activityTopData: ActivityTopData): void {
+  private augmentViewHierarchyWithClassAndFragment(viewHierarchy: ExtendedViewHierarchyResult, activityTopData: ActivityTopData): void {
     if (!viewHierarchy || !viewHierarchy.hierarchy) {
       return;
     }
@@ -1443,5 +1575,38 @@ export class ViewHierarchy {
 
     // Start augmentation from the root node
     augmentNode(viewHierarchy.hierarchy);
+  }
+
+  /**
+   * Extract composable names from view hierarchy augmentation data
+   * @param viewHierarchy - The view hierarchy to search
+   * @returns Array of composable names
+   */
+  private extractComposableNames(viewHierarchy: ViewHierarchyResult): string[] {
+    const composableNames: string[] = [];
+
+    // Traverse the hierarchy looking for composable information
+    const traverseNode = (node: any): void => {
+      // Best-effort heuristic: look for nodes marked as composable or having a composable name
+      if (node.composable && typeof node.composable === "string" && node.composable.length > 0) {
+        composableNames.push(node.composable);
+      } else if (node.composableName && typeof node.composableName === "string" && node.composableName.length > 0) {
+        composableNames.push(node.composableName);
+      }
+
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        for (const child of children) {
+          traverseNode(child);
+        }
+      }
+    };
+
+    if (viewHierarchy.hierarchy) {
+      traverseNode(viewHierarchy.hierarchy);
+    }
+
+    // Remove duplicates
+    return Array.from(new Set(composableNames));
   }
 }

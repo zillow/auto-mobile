@@ -1,28 +1,77 @@
 import { ChildProcess } from "child_process";
 import { DeviceInfo, ActionableError, SomePlatform, BootedDevice } from "../models";
-import { AdbUtils } from "./android-cmdline-tools/adb";
-import { Simctl } from "./ios-cmdline-tools/simctl";
-import { AndroidEmulator } from "./android-cmdline-tools/emulator";
+import { AdbClient } from "./android-cmdline-tools/adb";
+import { SimCtlClient } from "./ios-cmdline-tools/simctl";
+import { AndroidEmulatorClient } from "./android-cmdline-tools/emulator";
 
-export class DeviceUtils {
-  private adb: AdbUtils;
-  private emulator: AndroidEmulator;
-  private simctl: Simctl;
+/**
+ * Interface for device utility operations
+ * Provides platform-agnostic device management for Android emulators and iOS simulators
+ */
+export interface PlatformDeviceManager {
+  /**
+   * List all available device images for a specific platform
+   * @param platform - Target platform ("android", "ios", or "either" for both)
+   * @returns Promise with array of available device information
+   */
+  listDeviceImages(platform: SomePlatform): Promise<DeviceInfo[]>;
 
   /**
-   * Create an DeviceUtils instance
-   * @param adb - An instance of AdbUtils for interacting with Android Debug Bridge
-   * @param idb - An instance of IdbCompanion for interacting with iOS simulator controls
-   * @param emulator - An instance of AndroidEmulator for interacting with iOS simulator controls
+   * Check if a specific device image is currently running
+   * @param device - The device info to check
+   * @returns Promise with boolean indicating if the device image is running
+   */
+  isDeviceImageRunning(device: DeviceInfo): Promise<boolean>;
+
+  /**
+   * Get all currently booted/running devices for a specific platform
+   * @param platform - Target platform ("android", "ios", or "either" for both)
+   * @returns Promise with array of booted device information
+   */
+  getBootedDevices(platform: SomePlatform): Promise<BootedDevice[]>;
+
+  /**
+   * Start a device (emulator or simulator)
+   * @param device - The device to start
+   * @returns Promise with the spawned child process for the running device
+   */
+  startDevice(device: DeviceInfo): Promise<ChildProcess>;
+
+  /**
+   * Kill/terminate a running device
+   * @param device - The booted device to kill
+   * @returns Promise that resolves when the device has been stopped
+   */
+  killDevice(device: BootedDevice): Promise<void>;
+
+  /**
+   * Wait for a device to be ready for use after starting
+   * @param device - The device to wait for
+   * @param timeoutMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
+   * @returns Promise that resolves with the booted device information when device is ready
+   */
+  waitForDeviceReady(device: DeviceInfo, timeoutMs?: number): Promise<BootedDevice>;
+}
+
+export class MultiPlatformDeviceManager implements PlatformDeviceManager {
+  private adb: AdbClient;
+  private emulator: AndroidEmulatorClient;
+  private simctl: SimCtlClient;
+
+  /**
+   * Create a PlatformDeviceManager instance
+   * @param adb - An instance of AdbClient for interacting with Android Debug Bridge
+   * @param idb - An instance of SimCtlClient for interacting with iOS simulator controls
+   * @param emulator - An instance of AndroidEmulatorClient for managing Android emulators
    */
   constructor(
-    adb: AdbUtils | null = null,
-    idb: Simctl | null = null,
-    emulator: AndroidEmulator | null = null,
+    adb: AdbClient | null = null,
+    idb: SimCtlClient | null = null,
+    emulator: AndroidEmulatorClient | null = null,
   ) {
-    this.adb = adb || new AdbUtils();
-    this.simctl = idb || new Simctl();
-    this.emulator = emulator || new AndroidEmulator();
+    this.adb = adb || new AdbClient();
+    this.simctl = idb || new SimCtlClient();
+    this.emulator = emulator || new AndroidEmulatorClient();
   }
 
   /**

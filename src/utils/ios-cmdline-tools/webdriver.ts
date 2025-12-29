@@ -5,6 +5,99 @@ import * as path from "path";
 import { logger } from "../logger";
 import { ActionableError, BootedDevice, DeviceInfo, ExecResult, ViewHierarchyResult } from "../../models";
 
+/**
+ * Interface for WebDriverAgent (iOS automation via WebDriverAgent)
+ * Provides iOS device automation capabilities through WebDriverAgent protocol
+ */
+export interface WebDriverAgentOptions {
+  wdaHost?: string;
+  wdaPort?: number;
+  mjpegPort?: number;
+  bundleId?: string;
+  derivedDataPath?: string;
+  launchTimeout?: number;
+  connectionTimeout?: number;
+}
+
+export interface WebDriver {
+  /**
+   * Get the target device
+   */
+  device: BootedDevice | null;
+
+  /**
+   * Set the target device ID
+   * @param device - Device identifier
+   */
+  setDevice(device: BootedDevice): void;
+
+  /**
+   * Start WebDriverAgent on the device using xcodebuild
+   * @param timeoutMs - Timeout in milliseconds
+   * @returns Promise that resolves when WDA is ready
+   */
+  start(timeoutMs?: number): Promise<WebDriverAgentOptions>;
+
+  /**
+   * Stop WebDriverAgent
+   */
+  stop(): Promise<void>;
+
+  /**
+   * Check if WebDriverAgent is running
+   * @returns Promise with boolean indicating if WDA is running
+   */
+  isRunning(): Promise<boolean>;
+
+  /**
+   * Get WebDriverAgent status
+   * @returns Promise with status object
+   */
+  getStatus(): Promise<any>;
+
+  /**
+   * Create a new session
+   * @param capabilities - Session capabilities
+   * @returns Promise with session response
+   */
+  createSession(capabilities?: any): Promise<any>;
+
+  /**
+   * Delete a session
+   * @param sessionId - Session ID to delete
+   * @returns Promise with delete response
+   */
+  deleteSession(sessionId: string): Promise<any>;
+
+  /**
+   * Get view hierarchy (page source)
+   * @param device - Booted device
+   * @returns Promise with view hierarchy result
+   */
+  getViewHierarchy(device: BootedDevice): Promise<ViewHierarchyResult>;
+
+  /**
+   * Parse iOS XML to Android-compatible view hierarchy format
+   * @param xmlData - iOS XML string to parse
+   * @returns Promise with parsed and filtered view hierarchy in Android format
+   */
+  parseIOSXmlToViewHierarchy(xmlData: string): Promise<ViewHierarchyResult>;
+
+  /**
+   * Execute a WebDriverAgent command
+   * @param command - The command to execute
+   * @param timeoutMs - Optional timeout in milliseconds
+   * @returns Promise with command output
+   */
+  executeCommand(command: string, timeoutMs?: number): Promise<ExecResult>;
+
+  /**
+   * Check if Xcode command line tools are available
+   * @returns Promise with boolean indicating availability
+   */
+  isAvailable(): Promise<boolean>;
+}
+
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
   const options = maxBuffer ? { maxBuffer } : undefined;
@@ -28,17 +121,7 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
   return enhancedResult;
 };
 
-interface WebDriverAgentOptions {
-    wdaHost?: string;
-    wdaPort?: number;
-    mjpegPort?: number;
-    bundleId?: string;
-    derivedDataPath?: string;
-    launchTimeout?: number;
-    connectionTimeout?: number;
-}
-
-export class WebDriverAgent {
+export class WebDriverAgent implements WebDriver {
   device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
   private xcodebuildProcess: ChildProcess | null = null;

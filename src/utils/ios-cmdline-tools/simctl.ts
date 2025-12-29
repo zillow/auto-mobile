@@ -3,34 +3,6 @@ import { promisify } from "util";
 import { logger } from "../logger";
 import { ExecResult, ActionableError, DeviceInfo, BootedDevice, ScreenSize } from "../../models";
 
-// Enhance the standard execAsync result to implement the ExecResult interface
-const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
-  const options = maxBuffer ? { maxBuffer } : undefined;
-  const result = await promisify(exec)(command, options);
-
-  // Add the required string methods
-  const enhancedResult: ExecResult = {
-    stdout: typeof result.stdout === "string" ? result.stdout : result.stdout.toString(),
-    stderr: typeof result.stderr === "string" ? result.stderr : result.stderr.toString(),
-    toString() {
-      return this.stdout;
-    },
-    trim() {
-      return this.stdout.trim();
-    },
-    includes(searchString: string) {
-      return this.stdout.includes(searchString);
-    }
-  };
-
-  return enhancedResult;
-};
-
-/**
- * This file provides an interface to interact with iOS simulators using simctl.
- * It allows you to list, create, boot, and delete simulators.
- */
-
 export interface AppleDevice {
   udid: string;
   name: string;
@@ -63,6 +35,181 @@ export interface AppleDeviceType {
   productFamily: string;
 }
 
+/**
+ * Interface for iOS simulator control using simctl
+ * Provides methods to manage and interact with iOS simulators
+ */
+export interface SimCtl {
+  /**
+   * Set the target device ID
+   * @param device - Device identifier
+   */
+  setDevice(device: BootedDevice): void;
+
+  /**
+   * Execute a simctl command
+   * @param command - The simctl command to execute
+   * @param timeoutMs - Optional timeout in milliseconds
+   * @returns Promise with command output
+   */
+  executeCommand(command: string, timeoutMs?: number): Promise<ExecResult>;
+
+  /**
+   * Check if simctl is available
+   * @returns Promise with boolean indicating availability
+   */
+  isAvailable(): Promise<boolean>;
+
+  /**
+   * Check if a simulator is running by name
+   * @param name - Simulator name
+   * @returns Promise with boolean indicating if running
+   */
+  isSimulatorRunning(name: string): Promise<boolean>;
+
+  /**
+   * Start a simulator by UDID
+   * @param udid - Device UDID to start
+   * @returns Promise that resolves when simulator is started
+   */
+  startSimulator(udid: string): Promise<any>;
+
+  /**
+   * Kill a simulator
+   * @param device - Device to kill
+   * @returns Promise that resolves when kill is complete
+   */
+  killSimulator(device: BootedDevice): Promise<void>;
+
+  /**
+   * Wait for a simulator to be ready
+   * @param udid - Device UDID to wait for
+   * @returns Promise with booted device information
+   */
+  waitForSimulatorReady(udid: string): Promise<BootedDevice>;
+
+  /**
+   * Get the list of available (booted and shutdown) simulator UDIDs
+   * @returns Promise with an array of device info
+   */
+  listSimulatorImages(): Promise<DeviceInfo[]>;
+
+  /**
+   * Get the list of booted simulator UDIDs
+   * @returns Promise with an array of booted devices
+   */
+  getBootedSimulators(): Promise<BootedDevice[]>;
+
+  /**
+   * Get device information by UDID
+   * @param udid - Device UDID
+   * @returns Promise with device information or null if not found
+   */
+  getDeviceInfo(udid: string): Promise<AppleDevice | null>;
+
+  /**
+   * Boot a simulator by UDID
+   * @param udid - Device UDID to boot
+   * @returns Promise with booted device information
+   */
+  bootSimulator(udid: string): Promise<BootedDevice>;
+
+  /**
+   * Get available device types (iPhone models, iPad models, etc.)
+   * @returns Promise with array of device types
+   */
+  getDeviceTypes(): Promise<AppleDeviceType[]>;
+
+  /**
+   * Get available iOS runtimes
+   * @returns Promise with array of runtimes
+   */
+  getRuntimes(): Promise<AppleDeviceRuntime[]>;
+
+  /**
+   * Create a new simulator
+   * @param name - Name for the new simulator
+   * @param deviceType - Device type identifier (e.g., "iPhone 15")
+   * @param runtime - Runtime identifier (e.g., "iOS 17.0")
+   * @returns Promise with the UDID of the created simulator
+   */
+  createSimulator(name: string, deviceType: string, runtime: string): Promise<string>;
+
+  /**
+   * Delete a simulator by UDID
+   * @param udid - Device UDID to delete
+   * @returns Promise that resolves when deletion is complete
+   */
+  deleteSimulator(udid: string): Promise<void>;
+
+  /**
+   * List all installed apps on the simulator
+   * @param deviceId - Optional device ID (defaults to "booted" for current booted simulator)
+   * @returns Promise with array of app objects
+   */
+  listApps(deviceId?: string): Promise<any[]>;
+
+  /**
+   * Launch an app on the simulator
+   * @param bundleId - The bundle identifier of the app to launch
+   * @param options - Launch options
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   * @returns Promise with launch result containing success status and optional PID
+   */
+  launchApp(
+    bundleId: string,
+    options?: { foregroundIfRunning?: boolean },
+    deviceId?: string
+  ): Promise<{
+    success: boolean;
+    pid?: number;
+    error?: string;
+  }>;
+
+  /**
+   * Terminate an app on the simulator
+   * @param bundleId - The bundle identifier of the app to terminate
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   * @returns Promise that resolves when termination is complete
+   */
+  terminateApp(bundleId: string, deviceId?: string): Promise<void>;
+
+  /**
+   * Get the screen size of the simulator
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   * @returns Promise with screen dimensions
+   */
+  getScreenSize(deviceId?: string): Promise<ScreenSize>;
+}
+
+// Enhance the standard execAsync result to implement the ExecResult interface
+const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
+  const options = maxBuffer ? { maxBuffer } : undefined;
+  const result = await promisify(exec)(command, options);
+
+  // Add the required string methods
+  const enhancedResult: ExecResult = {
+    stdout: typeof result.stdout === "string" ? result.stdout : result.stdout.toString(),
+    stderr: typeof result.stderr === "string" ? result.stderr : result.stderr.toString(),
+    toString() {
+      return this.stdout;
+    },
+    trim() {
+      return this.stdout.trim();
+    },
+    includes(searchString: string) {
+      return this.stdout.includes(searchString);
+    }
+  };
+
+  return enhancedResult;
+};
+
+/**
+ * This file provides an interface to interact with iOS simulators using simctl.
+ * It allows you to list, create, boot, and delete simulators.
+ */
+
 export interface SimulatorList {
   devices: { [runtimeId: string]: AppleDevice[] };
   pairs: any;
@@ -70,7 +217,7 @@ export interface SimulatorList {
   devicetypes: AppleDeviceType[];
 }
 
-export class Simctl {
+export class SimCtlClient implements SimCtl {
   device: BootedDevice | null;
   execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
 
@@ -235,11 +382,11 @@ export class Simctl {
    */
   async listSimulatorImages(): Promise<DeviceInfo[]> {
     // Check cache first
-    if (Simctl.deviceListCache) {
-      const cacheAge = Date.now() - Simctl.deviceListCache.timestamp;
-      if (cacheAge < Simctl.DEVICE_LIST_CACHE_TTL) {
+    if (SimCtlClient.deviceListCache) {
+      const cacheAge = Date.now() - SimCtlClient.deviceListCache.timestamp;
+      if (cacheAge < SimCtlClient.DEVICE_LIST_CACHE_TTL) {
         logger.info(`Getting list of iOS simulators (cached, age: ${cacheAge}ms)`);
-        return Simctl.deviceListCache.devices;
+        return SimCtlClient.deviceListCache.devices;
       }
     }
 
@@ -265,7 +412,7 @@ export class Simctl {
       }
 
       // Cache the result
-      Simctl.deviceListCache = {
+      SimCtlClient.deviceListCache = {
         devices,
         timestamp: Date.now()
       };
@@ -537,3 +684,6 @@ export class Simctl {
     throw new ActionableError("Unable to determine screen size from provided data.");
   }
 }
+
+// Backward compatibility export
+export { SimCtlClient as Simctl };

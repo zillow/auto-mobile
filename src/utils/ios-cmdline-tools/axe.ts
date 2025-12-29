@@ -8,28 +8,6 @@ import {
   ScreenSize, SwipeResult, ActionableError
 } from "../../models";
 
-// Enhance the standard execAsync result to implement the ExecResult interface
-const execAsync = async (command: string): Promise<ExecResult> => {
-  const result = await promisify(exec)(command);
-
-  // Add the required string methods
-  const enhancedResult: ExecResult = {
-    stdout: result.stdout.toString(),
-    stderr: result.stderr.toString(),
-    toString() {
-      return this.stdout;
-    },
-    trim() {
-      return this.stdout.trim();
-    },
-    includes(searchString: string) {
-      return this.stdout.includes(searchString);
-    }
-  };
-
-  return enhancedResult;
-};
-
 export type AxeButton = "apple_pay" | "home" | "lock" | "side_button" | "siri";
 
 export interface IdbAppInfo {
@@ -116,7 +94,165 @@ export interface IdbLaunchResult {
   error?: string;
 }
 
-export class Axe {
+/**
+ * Interface for Axe iOS command line tool wrapper
+ * Provides methods for controlling iOS simulators and devices
+ */
+export interface Axe {
+  /**
+   * Set the target device ID
+   */
+  setDevice(device: BootedDevice): void;
+
+  /**
+   * Get the base Axe command
+   */
+  getBaseCommand(): string;
+
+  /**
+   * Execute an axe command
+   */
+  executeCommand(command: string, timeoutMs?: number): Promise<ExecResult>;
+
+  /**
+   * List all available simulators
+   */
+  listTargets(): Promise<IdbTargetInfo[]>;
+
+  /**
+   * Describe the current target
+   */
+  describe(): Promise<TargetDescription>;
+
+  /**
+   * Tap at coordinates
+   */
+  tap(x: number, y: number, duration?: number): Promise<ExecResult>;
+
+  /**
+   * Swipe from start to end coordinates
+   */
+  swipe(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+    stepSize?: number,
+    duration?: number
+  ): Promise<SwipeResult>;
+
+  /**
+   * Press a button
+   */
+  pressButton(buttonType: AxeButton): Promise<ExecResult>;
+
+  /**
+   * Input text
+   */
+  inputText(text: string): Promise<ExecResult>;
+
+  /**
+   * Get the screen size
+   */
+  getScreenSize(): Promise<ScreenSize>;
+
+  /**
+   * Open URL
+   */
+  openUrl(url: string): Promise<ExecResult>;
+
+  /**
+   * Focus simulator window
+   */
+  focus(): Promise<ExecResult>;
+
+  /**
+   * Kill axe processes
+   */
+  kill(): Promise<ExecResult>;
+
+  /**
+   * Check if axe is available on the system
+   */
+  isAvailable(): Promise<boolean>;
+
+  /**
+   * Execute a gesture preset
+   */
+  executeGesture(
+    preset: string,
+    options?: {
+      preDelay?: number;
+      postDelay?: number;
+      screenWidth?: number;
+      screenHeight?: number;
+    }
+  ): Promise<ExecResult>;
+
+  /**
+   * Scroll up using gesture preset
+   */
+  scrollUp(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+
+  /**
+   * Scroll down using gesture preset
+   */
+  scrollDown(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+
+  /**
+   * Scroll left using gesture preset
+   */
+  scrollLeft(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+
+  /**
+   * Scroll right using gesture preset
+   */
+  scrollRight(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+
+  /**
+   * Swipe from left edge (back navigation)
+   */
+  swipeFromLeftEdge(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+
+  /**
+   * Swipe from right edge
+   */
+  swipeFromRightEdge(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+
+  /**
+   * Swipe from top edge
+   */
+  swipeFromTopEdge(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+
+  /**
+   * Swipe from bottom edge
+   */
+  swipeFromBottomEdge(options?: { preDelay?: number; postDelay?: number }): Promise<ExecResult>;
+}
+
+// Enhance the standard execAsync result to implement the ExecResult interface
+const execAsync = async (command: string): Promise<ExecResult> => {
+  const result = await promisify(exec)(command);
+
+  // Add the required string methods
+  const enhancedResult: ExecResult = {
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+    toString() {
+      return this.stdout;
+    },
+    trim() {
+      return this.stdout.trim();
+    },
+    includes(searchString: string) {
+      return this.stdout.includes(searchString);
+    }
+  };
+
+  return enhancedResult;
+};
+
+export class AxeClient implements Axe {
   device: BootedDevice | null;
   execAsync: (command: string) => Promise<ExecResult>;
 

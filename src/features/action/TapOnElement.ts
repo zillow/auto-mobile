@@ -7,12 +7,12 @@ import {
   TapOnElementResult,
   ViewHierarchyResult
 } from "../../models";
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/webdriver";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
@@ -27,8 +27,8 @@ export class TapOnElement extends BaseVisualChange {
 
   constructor(
     device: BootedDevice,
-    adb: AdbUtils | null = null,
-    axe: Axe | null = null,
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null,
     webdriver: WebDriverAgent | null = null
   ) {
     super(device, adb, axe);

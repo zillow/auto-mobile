@@ -15,6 +15,28 @@ export const baseRules = {
 		{args: "none", caughtErrors: "none"},
 	],
 
+	"@typescript-eslint/naming-convention": [
+		2,
+		// Interfaces: PascalCase, no "I" prefix, no "Interface" suffix
+		{
+			selector: "interface",
+			format: ["PascalCase"],
+			custom: {
+				regex: "^I[A-Z]|Interface$",
+				match: false,
+			},
+		},
+		// Classes: PascalCase, no "Impl" suffix
+		{
+			selector: "class",
+			format: ["PascalCase"],
+			custom: {
+				regex: "Impl$",
+				match: false,
+			},
+		},
+	],
+
 	/**
 	 * Enforced rules
 	 */

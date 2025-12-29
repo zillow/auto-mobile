@@ -5,13 +5,63 @@ import fs from "fs";
 import path from "path";
 import { ensureDirExists, statAsync, renameAsync } from "./io";
 
+/**
+ * Interface for logger functionality
+ */
+export interface Logger {
+  /**
+   * Logs a debug message
+   */
+  debug(message: string, ...args: any[]): void;
+
+  /**
+   * Logs an info message
+   */
+  info(message: string, ...args: any[]): void;
+
+  /**
+   * Logs a warning message
+   */
+  warn(message: string, ...args: any[]): void;
+
+  /**
+   * Logs an error message
+   */
+  error(message: string, ...args: any[]): void;
+
+  /**
+   * Sets the current log level
+   */
+  setLogLevel(level: LogLevel): void;
+
+  /**
+   * Gets the current log level
+   */
+  getLogLevel(): LogLevel;
+
+  /**
+   * Enables logging to STDOUT in addition to log files
+   */
+  enableStdoutLogging(): void;
+
+  /**
+   * Disables logging to STDOUT
+   */
+  disableStdoutLogging(): void;
+
+  /**
+   * Closes the log stream
+   */
+  close(): void;
+}
+
 export const LogLevel = {
-  DEBUG: 0,
-  INFO: 1,
-  WARN: 2,
-  ERROR: 3,
-  NONE: 4
-} as const;
+  DEBUG: 0 as const,
+  INFO: 1 as const,
+  WARN: 2 as const,
+  ERROR: 3 as const,
+  NONE: 4 as const
+};
 
 export type LogLevel = typeof LogLevel[keyof typeof LogLevel];
 
@@ -103,7 +153,7 @@ const writeToLogFile = async (level: string, message: string, args: any[]) => {
 };
 
 // Logger object with all methods
-export const logger = {
+export const logger: Logger = {
   /**
    * Sets the current log level
    */

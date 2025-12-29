@@ -1,9 +1,9 @@
 import { expect } from "chai";
-import { Axe } from "../../../src/utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../../src/utils/ios-cmdline-tools/axe";
 import { BootedDevice, ExecResult } from "../../../src/models";
 
 describe("Axe", function() {
-  let axe: Axe;
+  let axe: AxeClient;
   let mockDevice: BootedDevice;
   let mockExecAsync: (command: string) => Promise<ExecResult>;
 
@@ -25,7 +25,7 @@ describe("Axe", function() {
       };
     };
 
-    axe = new Axe(mockDevice, mockExecAsync);
+    axe = new AxeClient(mockDevice, mockExecAsync);
   });
 
   describe("isAvailable", function() {
@@ -43,7 +43,7 @@ describe("Axe", function() {
         return { stdout: "", stderr: "", toString: () => "", trim: () => "", includes: () => false };
       };
 
-      axe = new Axe(null, mockExecAsync);
+      axe = new AxeClient(null, mockExecAsync);
 
       const available = await axe.isAvailable();
       expect(available).to.be.true;
@@ -54,7 +54,7 @@ describe("Axe", function() {
         throw new Error("Command not found: axe");
       };
 
-      axe = new Axe(null, mockExecAsync);
+      axe = new AxeClient(null, mockExecAsync);
 
       const available = await axe.isAvailable();
       expect(available).to.be.false;
@@ -75,7 +75,7 @@ describe("Axe", function() {
         };
       };
 
-      axe = new Axe(mockDevice, mockExecAsync);
+      axe = new AxeClient(mockDevice, mockExecAsync);
       await axe.executeCommand("describe-ui");
 
       expect(executedCommand).to.equal("axe describe-ui --udid test-ios-device-id");
@@ -94,7 +94,7 @@ describe("Axe", function() {
         };
       };
 
-      axe = new Axe(null, mockExecAsync);
+      axe = new AxeClient(null, mockExecAsync);
       await axe.executeCommand("describe-ui");
 
       expect(executedCommand).to.equal("axe describe-ui");
@@ -115,7 +115,7 @@ describe("Axe", function() {
         };
       };
 
-      axe = new Axe(mockDevice, mockExecAsync);
+      axe = new AxeClient(mockDevice, mockExecAsync);
       await axe.tap(100, 200);
 
       expect(executedCommand).to.equal("axe tap -x 100 -y 200 --udid test-ios-device-id");

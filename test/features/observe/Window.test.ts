@@ -1,8 +1,7 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { Window } from "../../../src/features/observe/Window";
-import sinon from "sinon";
-import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { ExecResult } from "../../../src/models/ExecResult";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import fs from "fs";
@@ -10,7 +9,7 @@ import path from "path";
 
 describe("Window", () => {
   let window: Window;
-  let adbStub: sinon.SinonStubbedInstance<AdbUtils>;
+  let fakeAdb: FakeAdbExecutor;
   let mockDevice: BootedDevice;
 
   beforeEach(() => {
@@ -19,8 +18,8 @@ describe("Window", () => {
       name: "Test Device",
       platform: "android"
     };
-    adbStub = sinon.createStubInstance(AdbUtils);
-    window = new Window(mockDevice, adbStub as unknown as AdbUtils);
+    fakeAdb = new FakeAdbExecutor();
+    window = new Window(mockDevice, fakeAdb as any);
     // Clear cache before each test to prevent stale results
     window.clearCache();
   });
@@ -32,8 +31,8 @@ describe("Window", () => {
         name: "Test Device",
         platform: "android"
       };
-      const customAdb = sinon.createStubInstance(AdbUtils);
-      const windowInstance = new Window(mockDevice, customAdb as unknown as AdbUtils);
+      const customAdb = new FakeAdbExecutor();
+      const windowInstance = new Window(mockDevice, customAdb as any);
       expect(windowInstance).to.be.instanceOf(Window);
     });
 
@@ -55,7 +54,7 @@ describe("Window", () => {
         mLayoutSeq=123
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -78,7 +77,7 @@ describe("Window", () => {
         mLayoutSeq=789
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -99,7 +98,7 @@ describe("Window", () => {
         mLayoutSeq=100
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -120,7 +119,7 @@ describe("Window", () => {
         Some other content without mLayoutSeq
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -144,7 +143,7 @@ describe("Window", () => {
         mLayoutSeq=456
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -160,9 +159,15 @@ describe("Window", () => {
     });
 
     it("should handle adb command failure gracefully", async () => {
-      adbStub.executeCommand.rejects(new Error("ADB command failed"));
+      // Create a custom fake that throws an error
+      const errorFakeAdb = new (class extends FakeAdbExecutor {
+        async executeCommand(): Promise<ExecResult> {
+          throw new Error("ADB command failed");
+        }
+      })();
+      const windowWithError = new Window(mockDevice, errorFakeAdb as any);
 
-      const result = await window.getActive(true);
+      const result = await windowWithError.getActive(true);
 
       expect(result.appId).to.equal("");
       expect(result.activityName).to.equal("");
@@ -170,7 +175,7 @@ describe("Window", () => {
     });
 
     it("should handle empty dumpsys output", async () => {
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: "",
         stderr: "",
         toString: () => "",
@@ -192,7 +197,7 @@ describe("Window", () => {
         "utf8"
       );
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -225,7 +230,7 @@ describe("Window", () => {
           mLayoutSeq=258
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -257,7 +262,7 @@ describe("Window", () => {
           mLayoutSeq=123
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -287,7 +292,7 @@ describe("Window", () => {
           mLayoutSeq=456
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: dumpsysOutput,
         stderr: "",
         toString: () => dumpsysOutput,
@@ -320,25 +325,25 @@ describe("Window", () => {
         mLayoutSeq=124
       `;
 
-      // Set up stub to return different outputs for consecutive calls
-      adbStub.executeCommand.onFirstCall().resolves({
+      // Get hash for first state
+      fakeAdb.setDefaultResponse({
         stdout: firstState,
         stderr: "",
         toString: () => firstState,
         trim: () => firstState.trim(),
         includes: (str: string) => firstState.includes(str)
       } as ExecResult);
+      const firstHash = await window.getActiveHash();
 
-      adbStub.executeCommand.onSecondCall().resolves({
+      // Reset fake and set up for second state
+      fakeAdb.clearHistory();
+      fakeAdb.setDefaultResponse({
         stdout: secondState,
         stderr: "",
         toString: () => secondState,
         trim: () => secondState.trim(),
         includes: (str: string) => secondState.includes(str)
       } as ExecResult);
-
-      // Get hashes for both states
-      const firstHash = await window.getActiveHash();
       const secondHash = await window.getActiveHash();
 
       // Verify that the hashes are different
@@ -353,8 +358,8 @@ describe("Window", () => {
         mLayoutSeq=123
       `;
 
-      // Set up stub to return the same output twice
-      adbStub.executeCommand.resolves({
+      // Set up fake to return the same output
+      fakeAdb.setDefaultResponse({
         stdout: uiState,
         stderr: "",
         toString: () => uiState,
@@ -387,25 +392,25 @@ describe("Window", () => {
         mLayoutSeq=123
       `;
 
-      // Set up stub to return different outputs
-      adbStub.executeCommand.onFirstCall().resolves({
+      // Get hash for first state
+      fakeAdb.setDefaultResponse({
         stdout: uiState,
         stderr: "",
         toString: () => uiState,
         trim: () => uiState.trim(),
         includes: (str: string) => uiState.includes(str)
       } as ExecResult);
+      const firstHash = await window.getActiveHash();
 
-      adbStub.executeCommand.onSecondCall().resolves({
+      // Reset fake and set up for same visible state
+      fakeAdb.clearHistory();
+      fakeAdb.setDefaultResponse({
         stdout: sameVisibleState,
         stderr: "",
         toString: () => sameVisibleState,
         trim: () => sameVisibleState.trim(),
         includes: (str: string) => sameVisibleState.includes(str)
       } as ExecResult);
-
-      // Get hashes for both states
-      const firstHash = await window.getActiveHash();
       const secondHash = await window.getActiveHash();
 
       // Verify that the hashes are the same since only invisible windows differ
@@ -426,25 +431,25 @@ describe("Window", () => {
         mLayoutSeq=124
       `;
 
-      // Set up stub to return different outputs
-      adbStub.executeCommand.onFirstCall().resolves({
+      // Get hash for first state
+      fakeAdb.setDefaultResponse({
         stdout: firstState,
         stderr: "",
         toString: () => firstState,
         trim: () => firstState.trim(),
         includes: (str: string) => firstState.includes(str)
       } as ExecResult);
+      const firstHash = await window.getActiveHash();
 
-      adbStub.executeCommand.onSecondCall().resolves({
+      // Reset fake and set up for second state
+      fakeAdb.clearHistory();
+      fakeAdb.setDefaultResponse({
         stdout: secondState,
         stderr: "",
         toString: () => secondState,
         trim: () => secondState.trim(),
         includes: (str: string) => secondState.includes(str)
       } as ExecResult);
-
-      // Get hashes for both states
-      const firstHash = await window.getActiveHash();
       const secondHash = await window.getActiveHash();
 
       // Verify that the hashes are different due to transaction sequence change
@@ -457,7 +462,7 @@ describe("Window", () => {
         mLayoutSeq=123
       `;
 
-      adbStub.executeCommand.resolves({
+      fakeAdb.setDefaultResponse({
         stdout: uiState,
         stderr: "",
         toString: () => uiState,

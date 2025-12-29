@@ -1,12 +1,12 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { BootedDevice, ExecResult } from "../../models";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class GetDumpsysWindow {
-  private adb: AdbUtils;
+  private adb: AdbClient;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, { data: ExecResult; timestamp: number }>();
   private static readonly CACHE_TTL_MS = 30000; // 30 seconds
@@ -16,11 +16,11 @@ export class GetDumpsysWindow {
   /**
    * Create a GetDumpsysWindow instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
     this.device = device;
-    this.adb = adb || new AdbUtils(device);
+    this.adb = adb || new AdbClient(device);
     this.cacheDir = path.join(os.tmpdir(), "auto-mobile-cache");
     this.cacheFilePath = path.join(this.cacheDir, `dumpsys-window-${device.deviceId}.json`);
   }
@@ -31,7 +31,7 @@ export class GetDumpsysWindow {
    * @returns Promise with cached rotation value or executes fresh command
    */
   public async execute(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ExecResult> {
     // Check memory cache first
     const memoryCached = GetDumpsysWindow.memoryCache.get(this.device.deviceId);
@@ -61,7 +61,7 @@ export class GetDumpsysWindow {
    * @returns Promise with fresh rotation value
    */
   public async refresh(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ExecResult> {
     const result = await perf.track("adbDumpsysWindow", () =>
       this.adb.executeCommand("shell dumpsys window")

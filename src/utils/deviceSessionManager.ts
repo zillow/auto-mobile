@@ -1,31 +1,106 @@
 import { ActionableError, BootedDevice, Platform, SomePlatform } from "../models";
-import { DeviceUtils } from "./deviceUtils";
-import { AdbUtils } from "./android-cmdline-tools/adb";
-import { Simctl } from "./ios-cmdline-tools/simctl";
+import { MultiPlatformDeviceManager } from "./deviceUtils";
+import { AdbClient } from "./android-cmdline-tools/adb";
+import { SimCtlClient } from "./ios-cmdline-tools/simctl";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
-import { AccessibilityServiceManager } from "./accessibilityServiceManager";
-import { AndroidEmulator } from "./android-cmdline-tools/emulator";
+import { AndroidAccessibilityServiceManager } from "./accessibilityServiceManager";
+import { AndroidEmulatorClient } from "./android-cmdline-tools/emulator";
+import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
+import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
 
-export class DeviceSessionManager {
+/**
+ * Interface for device session management
+ * Handles device detection, verification, and lifecycle for Android and iOS platforms
+ */
+export interface DeviceSessionManager {
+  /**
+   * Get the current device ID
+   */
+  getCurrentDevice(): BootedDevice | undefined;
+
+  /**
+   * Get the current platform
+   */
+  getCurrentPlatform(): Platform | undefined;
+
+  /**
+   * Set the current device ID and platform
+   */
+  setCurrentDevice(device: BootedDevice, platform: Platform): void;
+
+  /**
+   * Ensure a device is ready for the specified platform and return its ID
+   * Throws an error if both Android and iOS devices are connected
+   */
+  ensureDeviceReady(platform: SomePlatform, providedDeviceId?: string): Promise<BootedDevice>;
+
+  /**
+   * Detect the platform of connected devices
+   */
+  detectConnectedPlatforms(): Promise<BootedDevice[]>;
+
+  /**
+   * Verify a specific device is connected and ready for the given platform
+   */
+  verifyDevice(deviceId: string, platform: Platform): Promise<void>;
+
+  /**
+   * Verify an Android device is connected and ready
+   */
+  verifyAndroidDevice(deviceId: string): Promise<void>;
+
+  /**
+   * Verify an iOS device is connected and ready
+   */
+  verifyIosDevice(deviceId: string): Promise<void>;
+
+  /**
+   * Find an available device or start an emulator for the specified platform
+   */
+  findOrStartDevice(platform: Platform): Promise<BootedDevice>;
+
+  /**
+   * Find an available Android device or start an emulator
+   */
+  findOrStartAndroidDevice(): Promise<BootedDevice>;
+
+  /**
+   * Find an available iOS device or start a simulator
+   */
+  findOrStartIosDevice(): Promise<BootedDevice>;
+}
+
+export class DeviceSessionManager implements DeviceSessionManager {
   private currentDevice: BootedDevice | undefined;
   private currentPlatform: Platform | undefined;
   private static instance: DeviceSessionManager;
-  private adb: AdbUtils;
-  private simctl: Simctl;
-  private androidEmulator: AndroidEmulator;
-  private deviceUtils: DeviceUtils;
+  private adb: AdbClient;
+  private simctl: SimCtlClient | undefined;
+  private androidEmulator: AndroidEmulatorClient | undefined;
+  private deviceUtils: PlatformDeviceManager;
   private window: Window | undefined;
 
-  private constructor() {
-    this.adb = new AdbUtils(null);
-    this.simctl = new Simctl(null);
-    this.androidEmulator = new AndroidEmulator();
-    this.deviceUtils = new DeviceUtils(
-      this.adb,
-      this.simctl,
-      this.androidEmulator
-    );
+  private constructor(adb?: AdbExecutor, deviceUtils?: PlatformDeviceManager) {
+    // Use injected adb or create default AdbClient
+    if (adb) {
+      this.adb = adb as AdbClient;
+    } else {
+      this.adb = new AdbClient(null);
+    }
+
+    // Use injected deviceUtils or create default DeviceUtils
+    if (deviceUtils) {
+      this.deviceUtils = deviceUtils;
+    } else {
+      this.simctl = new SimCtlClient(null);
+      this.androidEmulator = new AndroidEmulatorClient();
+      this.deviceUtils = new MultiPlatformDeviceManager(
+        this.adb,
+        this.simctl,
+        this.androidEmulator
+      );
+    }
   }
 
   public static getInstance(): DeviceSessionManager {
@@ -33,6 +108,10 @@ export class DeviceSessionManager {
       DeviceSessionManager.instance = new DeviceSessionManager();
     }
     return DeviceSessionManager.instance;
+  }
+
+  public static createInstance(adb?: AdbExecutor, deviceUtils?: PlatformDeviceManager): DeviceSessionManager {
+    return new DeviceSessionManager(adb, deviceUtils);
   }
 
   /**
@@ -57,8 +136,8 @@ export class DeviceSessionManager {
     this.currentPlatform = platform;
 
     if (platform === "android") {
-      // Update AdbUtils with new device ID
-      this.adb = new AdbUtils(device);
+      // Update AdbClient with new device ID
+      this.adb = new AdbClient(device);
     }
 
     // Reset window when device changes
@@ -68,7 +147,7 @@ export class DeviceSessionManager {
   /**
    * Detect the platform of connected devices
    */
-  private async detectConnectedPlatforms(): Promise<BootedDevice[]> {
+  public async detectConnectedPlatforms(): Promise<BootedDevice[]> {
     const devices: BootedDevice[] = [];
 
     try {
@@ -81,8 +160,10 @@ export class DeviceSessionManager {
 
     try {
       // Check for iOS devices/simulators via xcrun simctl
-      const iosDevices = await this.simctl.getBootedSimulators();
-      devices.push(...iosDevices);
+      if (this.simctl) {
+        const iosDevices = await this.simctl.getBootedSimulators();
+        devices.push(...iosDevices);
+      }
     } catch (error) {
       logger.warn(`Failed to detect iOS devices: ${error}`);
     }
@@ -171,7 +252,7 @@ export class DeviceSessionManager {
   /**
    * Verify a specific device is connected and ready for the given platform
    */
-  private async verifyDevice(deviceId: string, platform: Platform): Promise<void> {
+  public async verifyDevice(deviceId: string, platform: Platform): Promise<void> {
     if (platform === "android") {
       await this.verifyAndroidDevice(deviceId);
     } else {
@@ -182,7 +263,7 @@ export class DeviceSessionManager {
   /**
    * Verify an Android device is connected and ready
    */
-  private async verifyAndroidDevice(deviceId: string): Promise<void> {
+  public async verifyAndroidDevice(deviceId: string): Promise<void> {
     const allDevices = await this.adb.getBootedAndroidDevices();
     const device = allDevices.find(device => device.name === deviceId);
 
@@ -223,7 +304,7 @@ export class DeviceSessionManager {
     }
 
     try {
-      await AccessibilityServiceManager.getInstance(device).setup();
+      await AndroidAccessibilityServiceManager.getInstance(device).setup();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`[DeviceSessionManager] Failed to setup accessibility service: ${errorMessage}`);
@@ -237,7 +318,10 @@ export class DeviceSessionManager {
   /**
    * Verify an iOS device is connected and ready
    */
-  private async verifyIosDevice(deviceId: string): Promise<void> {
+  public async verifyIosDevice(deviceId: string): Promise<void> {
+    if (!this.simctl) {
+      throw new ActionableError("iOS simulator tools not available");
+    }
     const deviceInfo = await this.simctl.getDeviceInfo(deviceId);
 
     if (!deviceInfo) {
@@ -262,7 +346,7 @@ export class DeviceSessionManager {
   /**
    * Find an available device or start an emulator for the specified platform
    */
-  private async findOrStartDevice(platform: Platform): Promise<BootedDevice> {
+  public async findOrStartDevice(platform: Platform): Promise<BootedDevice> {
     if (platform === "android") {
       return await this.findOrStartAndroidDevice();
     } else {
@@ -273,7 +357,7 @@ export class DeviceSessionManager {
   /**
    * Find an available Android device or start an emulator
    */
-  private async findOrStartAndroidDevice(): Promise<BootedDevice> {
+  public async findOrStartAndroidDevice(): Promise<BootedDevice> {
     const allDevices = await this.deviceUtils.getBootedDevices("android");
 
     if (allDevices.length > 0) {
@@ -314,7 +398,10 @@ export class DeviceSessionManager {
   /**
    * Find an available iOS device or start a simulator
    */
-  private async findOrStartIosDevice(): Promise<BootedDevice> {
+  public async findOrStartIosDevice(): Promise<BootedDevice> {
+    if (!this.simctl) {
+      throw new ActionableError("iOS simulator tools not available");
+    }
     const allDevices = await this.simctl.listSimulatorImages();
 
     if (allDevices.length === 0) {
@@ -338,7 +425,7 @@ export class DeviceSessionManager {
     const deviceId = device.deviceId!;
     logger.info(`Booting iOS simulator ${device}...`);
 
-    const bootedDevice = await this.simctl.bootSimulator(deviceId);
+    const bootedDevice = await this.simctl!.bootSimulator(deviceId);
     await this.verifyIosDevice(deviceId);
     return bootedDevice;
   }

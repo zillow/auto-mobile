@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { describe, it, beforeEach, afterEach } from "mocha";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
-import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AwaitIdle } from "../../../src/features/observe/AwaitIdle";
 import { ObserveResult } from "../../../src/models/ObserveResult";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
@@ -10,7 +10,7 @@ import { logger } from "../../../src/utils/logger";
 describe("ObserveScreen", function() {
   describe("Unit Tests for Extracted Methods", function() {
     let observeScreen: ObserveScreen;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockDevice: BootedDevice;
 
     beforeEach(function() {
@@ -19,10 +19,8 @@ describe("ObserveScreen", function() {
         name: "Test Device",
         platform: "android"
       };
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
-      observeScreen = new ObserveScreen(mockDevice, mockAdb);
+      fakeAdb = new FakeAdbExecutor();
+      observeScreen = new ObserveScreen(mockDevice, fakeAdb);
     });
 
     it("should create base result with correct structure", function() {
@@ -120,10 +118,8 @@ describe("ObserveScreen", function() {
         name: "Test Device",
         platform: "android"
       };
-      const mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
-      const observeScreen = new ObserveScreen(mockDevice, mockAdb);
+      const fakeAdb = new FakeAdbExecutor();
+      const observeScreen = new ObserveScreen(mockDevice, fakeAdb);
       viewHierarchy = (observeScreen as any).viewHierarchy;
     });
 
@@ -285,7 +281,7 @@ describe("ObserveScreen", function() {
     this.timeout(30000);
 
     let observeScreen: ObserveScreen;
-    let adb: AdbUtils;
+    let adb: FakeAdbExecutor;
     let awaitIdle: AwaitIdle;
     let mockDevice: BootedDevice;
     const CLOCK_PACKAGE = "com.google.android.deskclock";
@@ -297,7 +293,7 @@ describe("ObserveScreen", function() {
         platform: "android"
       };
       // Initialize with real ADB connection
-      adb = new AdbUtils();
+      adb = new FakeAdbExecutor();
       observeScreen = new ObserveScreen(mockDevice, adb);
       awaitIdle = new AwaitIdle(mockDevice, adb);
 

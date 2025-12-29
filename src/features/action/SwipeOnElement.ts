@@ -1,11 +1,11 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, GestureOptions } from "../../models";
 import { Element } from "../../models";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { ElementUtils } from "../utility/ElementUtils";
 import { SwipeResult } from "../../models";
-import { Axe } from "../../utils/ios-cmdline-tools/axe";
+import { AxeClient } from "../../utils/ios-cmdline-tools/axe";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
@@ -16,7 +16,7 @@ export class SwipeOnElement extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbUtils | null = null, axe: Axe | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
     super(device, adb, axe);
     this.executeGesture = new ExecuteGesture(device, adb);
     this.elementUtils = new ElementUtils();

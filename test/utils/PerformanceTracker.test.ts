@@ -2,8 +2,8 @@ import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import {
   PerformanceTracker,
+  DefaultPerformanceTracker,
   NoOpPerformanceTracker,
-  IPerformanceTracker,
   createPerformanceTracker,
   TimingEntry,
   TimingData,
@@ -17,7 +17,7 @@ describe("PerformanceTracker", function() {
     let tracker: PerformanceTracker;
 
     beforeEach(function() {
-      tracker = new PerformanceTracker();
+      tracker = new DefaultPerformanceTracker();
     });
 
     it("should be enabled", function() {
@@ -143,7 +143,7 @@ describe("PerformanceTracker", function() {
   });
 
   describe("NoOpPerformanceTracker", function() {
-    let tracker: NoOpPerformanceTracker;
+    let tracker: PerformanceTracker;
 
     beforeEach(function() {
       tracker = new NoOpPerformanceTracker();
@@ -172,7 +172,7 @@ describe("PerformanceTracker", function() {
   describe("createPerformanceTracker factory", function() {
     it("should create PerformanceTracker when enabled is true", function() {
       const tracker = createPerformanceTracker(true);
-      expect(tracker).to.be.instanceOf(PerformanceTracker);
+      expect(tracker).to.be.instanceOf(DefaultPerformanceTracker);
       expect(tracker.isEnabled()).to.be.true;
     });
 
@@ -212,18 +212,18 @@ describe("PerformanceTracker", function() {
     });
   });
 
-  describe("IPerformanceTracker interface", function() {
+  describe("PerformanceTracker interface", function() {
     it("should be implementable as a fake for testing", async function() {
       // Example fake implementation for testing
-      class FakePerformanceTracker implements IPerformanceTracker {
+      class FakePerformanceTracker implements PerformanceTracker {
         public calls: { method: string; name: string }[] = [];
 
-        serial(name: string): IPerformanceTracker {
+        serial(name: string): PerformanceTracker {
           this.calls.push({ method: "serial", name });
           return this;
         }
 
-        parallel(name: string): IPerformanceTracker {
+        parallel(name: string): PerformanceTracker {
           this.calls.push({ method: "parallel", name });
           return this;
         }
@@ -233,7 +233,7 @@ describe("PerformanceTracker", function() {
           return fn();
         }
 
-        end(): IPerformanceTracker {
+        end(): PerformanceTracker {
           this.calls.push({ method: "end", name: "" });
           return this;
         }

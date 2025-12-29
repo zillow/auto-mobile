@@ -2,12 +2,6 @@ import { z } from "zod";
 import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, SomePlatform } from "../models";
-import {
-  getInstallationStatus,
-  setupCompleteAndroidEnvironment,
-  CompleteSetupParams,
-  checkJavaInstallation
-} from "../utils/android-cmdline-tools/install";
 import { logger } from "../utils/logger";
 
 // Schema definitions
@@ -86,93 +80,50 @@ async function installAndroidDependencies(
   args: InstallPlatformDependenciesArgs,
   progress?: ProgressCallback
 ): Promise<any> {
-  logger.info(`Installing Android dependencies with update: ${args.update}`);
+  logger.info(`Install platform dependencies request received for Android (not supported)`);
 
   if (progress) {
-    await progress(10, 100, "Starting Android dependency installation...");
-  }
-
-  // Determine if we should force installation based on update parameter
-  let shouldForce = false;
-  if (args.update === "force") {
-    shouldForce = true;
-  } else if (args.update === "never") {
-    shouldForce = false;
-  }
-  // For "ifAvailable", we'll handle updates separately
-
-  // Always use comprehensive setup - AutoMobile is opinionated about providing complete environment
-  const setupParams: CompleteSetupParams = {
-    installJava: true,
-    installXcodeTools: true,
-    force: shouldForce
-  };
-
-  if (progress) {
-    await progress(30, 100, "Setting up complete Android development environment...");
-  }
-
-  const result = await setupCompleteAndroidEnvironment(setupParams);
-
-  // Handle updates if requested and installation was successful but not forced
-  let updateResult = null;
-  if (args.update === "ifAvailable" && result.success && !shouldForce) {
-    if (progress) {
-      await progress(60, 100, "Checking for available updates...");
-    }
-
-    try {
-      // Attempt to update by forcing a reinstall
-      const updateParams: CompleteSetupParams = {
-        installJava: true,
-        installXcodeTools: true,
-        force: true
-      };
-      updateResult = await setupCompleteAndroidEnvironment(updateParams);
-      logger.info(`Update attempt completed: ${updateResult.success ? "successful" : "failed"}`);
-    } catch (error) {
-      logger.warn(`Update attempt failed but continuing: ${error}`);
-      // Don't fail the overall operation for update failures when using "ifAvailable"
-    }
-  }
-
-  if (progress) {
-    await progress(100, 100, "Complete Android environment setup finished");
+    await progress(100, 100, "Tool installation functionality has been removed");
   }
 
   return createJSONToolResponse({
-    success: result.success,
-    message: result.success ? "Complete Android development environment installed" : "Some components failed to install",
+    success: false,
+    message: "Tool installation functionality has been removed. Please install Android command-line tools manually.",
     platform: "android",
     updateMode: args.update,
-    steps: result.steps,
-    environmentVariables: result.environmentVariables,
-    recommendations: result.recommendations,
-    updateAttempted: args.update === "ifAvailable" && updateResult !== null,
-    updateSuccessful: updateResult?.success || false
+    steps: [],
+    environmentVariables: {},
+    recommendations: [
+      "Android command-line tools installation is no longer automated",
+      "Please install Android SDK manually from: https://developer.android.com/studio",
+      "Or on macOS with Homebrew: brew install --cask android-commandlinetools",
+      "Then set ANDROID_HOME environment variable to your SDK installation directory"
+    ],
+    updateAttempted: false,
+    updateSuccessful: false
   });
 }
 
 async function checkAndroidDependencies(): Promise<any> {
-  logger.info("Checking Android dependencies status");
-
-  const status = await getInstallationStatus();
-  const javaStatus = await checkJavaInstallation();
+  logger.info("Checking Android dependencies status (installation functionality removed)");
 
   return createJSONToolResponse({
     platform: "android",
-    hasInstallation: status.hasInstallation,
-    locations: status.locations,
-    bestLocation: status.bestLocation,
-    recommendations: status.recommendations,
-    availableTools: status.bestLocation?.available_tools || [],
-    installationPath: status.bestLocation?.path || null,
-    installationSource: status.bestLocation?.source || null,
-    version: status.bestLocation?.version || null,
+    hasInstallation: false,
+    locations: [],
+    bestLocation: null,
+    recommendations: [
+      "Tool installation functionality has been removed",
+      "Please install Android SDK manually from: https://developer.android.com/studio"
+    ],
+    availableTools: [],
+    installationPath: null,
+    installationSource: null,
+    version: null,
     java: {
-      installed: javaStatus.installed,
-      version: javaStatus.version,
-      javaHome: javaStatus.javaHome
+      installed: false,
+      version: undefined,
+      javaHome: undefined
     }
   });
 }

@@ -1,5 +1,6 @@
 import { logger } from "./logger";
-import { AdbUtils } from "./android-cmdline-tools/adb";
+import { AdbClient } from "./android-cmdline-tools/adb";
+import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import {
   DeepLinkResult,
   IntentFilter,
@@ -10,12 +11,55 @@ import {
 } from "../models";
 import { ElementUtils } from "../features/utility/ElementUtils";
 
-export class DeepLinkManager {
-  private adbUtils: AdbUtils;
+/**
+ * Interface for deep link management and intent chooser handling
+ * Provides methods to query deep links from apps and handle system intent chooser dialogs
+ */
+export interface DeepLinkManager {
+  /**
+   * Set the target device ID
+   * @param device - Device identifier
+   */
+  setDeviceId(device: BootedDevice): void;
+
+  /**
+   * Get deep links for an application by querying the package manager
+   * @param appId - The application package ID
+   * @returns Promise with deep link information
+   */
+  getDeepLinks(appId: string): Promise<DeepLinkResult>;
+
+  /**
+   * Detect system intent chooser dialog in view hierarchy
+   * @param viewHierarchy - Current view hierarchy result
+   * @returns True if intent chooser is detected
+   */
+  detectIntentChooser(viewHierarchy: ViewHierarchyResult): boolean;
+
+  /**
+   * Handle system intent chooser dialog automatically
+   * @param viewHierarchy - Current view hierarchy result
+   * @param preference - User preference for handling ("always", "just_once", or "custom")
+   * @param customAppPackage - Optional specific app package to select
+   * @returns Result of intent chooser handling
+   */
+  handleIntentChooser(
+    viewHierarchy: ViewHierarchyResult,
+    preference?: "always" | "just_once" | "custom",
+    customAppPackage?: string
+  ): Promise<IntentChooserResult>;
+}
+
+export class DeepLinkManager implements DeepLinkManager {
+  private adbUtils: AdbClient | AdbExecutor;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice | null = null) {
-    this.adbUtils = new AdbUtils(device);
+  constructor(device: BootedDevice | null = null, adb?: AdbExecutor) {
+    if (adb) {
+      this.adbUtils = adb as AdbClient;
+    } else {
+      this.adbUtils = new AdbClient(device);
+    }
     this.elementUtils = new ElementUtils();
   }
 
@@ -24,7 +68,9 @@ export class DeepLinkManager {
      * @param deviceId - Device identifier
      */
   setDeviceId(device: BootedDevice): void {
-    this.adbUtils.setDevice(device);
+    if ("setDevice" in this.adbUtils) {
+      (this.adbUtils as AdbClient).setDevice(device);
+    }
   }
 
   /**
@@ -40,6 +86,22 @@ export class DeepLinkManager {
       const packageInfoResult = await this.adbUtils.executeCommand(
         `shell dumpsys package ${appId}`
       );
+
+      // Check if the command failed (stderr indicates failure)
+      if (packageInfoResult.stderr && packageInfoResult.stderr.trim().length > 0) {
+        logger.error(`[DeepLinkManager] ADB command failed for ${appId}: ${packageInfoResult.stderr}`);
+        return {
+          success: false,
+          appId,
+          deepLinks: {
+            schemes: [],
+            hosts: [],
+            intentFilters: [],
+            supportedMimeTypes: []
+          },
+          error: packageInfoResult.stderr
+        };
+      }
 
       // Parse the results
       const deepLinks = this.parsePackageDumpsysOutput(appId, packageInfoResult.stdout);
@@ -333,7 +395,17 @@ export class DeepLinkManager {
       if (targetElement) {
         // Simulate tap on the target element
         const center = this.elementUtils.getElementCenter(targetElement);
-        await this.adbUtils.executeCommand(`shell input tap ${center.x} ${center.y}`);
+        const tapResult = await this.adbUtils.executeCommand(`shell input tap ${center.x} ${center.y}`);
+
+        // Check if tap command failed
+        if (tapResult.stderr && tapResult.stderr.trim().length > 0) {
+          logger.error(`[DeepLinkManager] Failed to tap on intent chooser option: ${tapResult.stderr}`);
+          return {
+            success: false,
+            detected: true,
+            error: tapResult.stderr
+          };
+        }
 
         logger.info(`[DeepLinkManager] Tapped on intent chooser option at (${center.x}, ${center.y})`);
 

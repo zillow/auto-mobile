@@ -1,14 +1,14 @@
-import { AdbUtils } from "../../utils/android-cmdline-tools/adb";
+import { AdbClient } from "../../utils/android-cmdline-tools/adb";
 import { ActiveWindowInfo } from "../../models/ActiveWindowInfo";
 import { logger } from "../../utils/logger";
-import { CryptoUtils } from "../../utils/crypto";
+import { NodeCryptoService } from "../../utils/crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { BootedDevice } from "../../models";
-import { IPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class Window {
-  private adb: AdbUtils;
+  private adb: AdbClient;
   private cachedActiveWindow: ActiveWindowInfo | null = null;
   private readonly device: BootedDevice;
   private cacheDir: string = "/tmp/auto-mobile/window";
@@ -16,10 +16,10 @@ export class Window {
   /**
    * Create a Window instance
    * @param device - Optional device
-   * @param adb - Optional AdbUtils instance for testing
+   * @param adb - Optional AdbClient instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbUtils | null = null) {
-    this.adb = adb || new AdbUtils(device);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    this.adb = adb || new AdbClient(device);
     this.device = device;
   }
 
@@ -27,7 +27,7 @@ export class Window {
    * Get the cache file path based on device ID
    */
   private getCacheFilePath(): string {
-    const deviceHash = CryptoUtils.generateCacheKey(this.device.deviceId);
+    const deviceHash = NodeCryptoService.generateCacheKey(this.device.deviceId);
     return path.join(this.cacheDir, deviceHash);
   }
 
@@ -130,7 +130,7 @@ export class Window {
    */
   async getActive(
     forceRefresh: boolean = false,
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<ActiveWindowInfo> {
     // Return cached value if available and not forcing refresh
     if (!forceRefresh && this.cachedActiveWindow) {
@@ -260,12 +260,12 @@ export class Window {
    * @returns Promise with activity name hash
    */
   async getActiveHash(
-    perf: IPerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<string> {
     logger.info("[WINDOW] Getting hash of active window");
     // Always force refresh when getting hash to ensure it reflects current state
     const activeWindow = await this.getActive(true, perf);
     const activityString = JSON.stringify(activeWindow);
-    return CryptoUtils.generateCacheKey(activityString);
+    return NodeCryptoService.generateCacheKey(activityString);
   }
 }

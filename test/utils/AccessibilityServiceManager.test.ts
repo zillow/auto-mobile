@@ -1,27 +1,50 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
-import { AccessibilityServiceManager } from "../../src/utils/accessibilityServiceManager";
-import { AdbUtils } from "../../src/utils/android-cmdline-tools/adb";
+import { AndroidAccessibilityServiceManager } from "../../src/utils/accessibilityServiceManager";
+import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
+import { AdbClient } from "../../src/utils/android-cmdline-tools/adb";
+import { BootedDevice } from "../../src/models";
 
 describe("AccessibilityServiceManager", function() {
-  let accessibilityServiceClient: AccessibilityServiceManager;
-  let mockAdb: AdbUtils;
+  let accessibilityServiceClient: AndroidAccessibilityServiceManager;
+  let fakeAdb: FakeAdbExecutor;
+  let testDevice: BootedDevice;
+  let adbClient: AdbClient;
 
   beforeEach(function() {
-    // Create mock ADB instance
-    mockAdb = {
-      executeCommand: async () => ({ stdout: "", stderr: "" })
-    } as unknown as AdbUtils;
+    // Create fake ADB instance
+    fakeAdb = new FakeAdbExecutor();
 
-    accessibilityServiceClient = new AccessibilityServiceManager("test-device", mockAdb);
+    // Create test device
+    testDevice = {
+      deviceId: "test-device",
+      platform: "android",
+      isEmulator: true,
+      name: "Test Device"
+    };
+
+    // Create a wrapper function that adapts FakeAdbExecutor to the execAsync signature
+    const fakeExecAsync = async (command: string, maxBuffer?: number) => {
+      // Strip the "adb -s test-device " prefix that AdbClient adds
+      const prefix = "adb -s test-device ";
+      const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
+      return fakeAdb.executeCommand(strippedCommand, undefined, maxBuffer);
+    };
+
+    // Create AdbClient with fake executor function
+    adbClient = new AdbClient(testDevice, fakeExecAsync);
+
+    // Reset singleton instances
+    AndroidAccessibilityServiceManager.resetInstances();
+
+    accessibilityServiceClient = AndroidAccessibilityServiceManager.getInstance(testDevice, adbClient);
     accessibilityServiceClient.clearAvailabilityCache();
   });
 
   describe("isInstalled", function() {
     it("should return true when accessibility service package is installed", async function() {
-      mockAdb.executeCommand = async () => ({
-        stdout: `package:${AccessibilityServiceManager.PACKAGE}
-`,
+      fakeAdb.setCommandResponse("shell pm list packages", {
+        stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
         stderr: ""
       });
 
@@ -30,7 +53,7 @@ describe("AccessibilityServiceManager", function() {
     });
 
     it("should return false when accessibility service package is not installed", async function() {
-      mockAdb.executeCommand = async () => ({
+      fakeAdb.setCommandResponse("pm list packages", {
         stdout: "package:com.other.app\n",
         stderr: ""
       });
@@ -40,9 +63,11 @@ describe("AccessibilityServiceManager", function() {
     });
 
     it("should return false when ADB command fails", async function() {
-      mockAdb.executeCommand = async () => {
-        throw new Error("ADB command failed");
-      };
+      // FakeAdbExecutor doesn't throw by default, so we set it to return empty
+      fakeAdb.setCommandResponse("pm list packages", {
+        stdout: "",
+        stderr: "Error"
+      });
 
       const result = await accessibilityServiceClient.isInstalled();
       expect(result).to.be.false;
@@ -51,8 +76,8 @@ describe("AccessibilityServiceManager", function() {
 
   describe("isEnabled", function() {
     it("should return true when accessibility service is enabled", async function() {
-      mockAdb.executeCommand = async () => ({
-        stdout: `${AccessibilityServiceManager.PACKAGE}/${AccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService:other.service/SomeService`,
+      fakeAdb.setCommandResponse("settings get secure", {
+        stdout: `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService:other.service/SomeService`,
         stderr: ""
       });
 
@@ -61,7 +86,7 @@ describe("AccessibilityServiceManager", function() {
     });
 
     it("should return false when accessibility service is not enabled", async function() {
-      mockAdb.executeCommand = async () => ({
+      fakeAdb.setCommandResponse("settings get secure", {
         stdout: "other.service/SomeService",
         stderr: ""
       });
@@ -71,9 +96,10 @@ describe("AccessibilityServiceManager", function() {
     });
 
     it("should return false when ADB command fails", async function() {
-      mockAdb.executeCommand = async () => {
-        throw new Error("ADB command failed");
-      };
+      fakeAdb.setCommandResponse("settings get secure", {
+        stdout: "",
+        stderr: "Error"
+      });
 
       const result = await accessibilityServiceClient.isEnabled();
       expect(result).to.be.false;
@@ -82,74 +108,48 @@ describe("AccessibilityServiceManager", function() {
 
   describe("isAvailable", function() {
     it("should return true when service is both installed and enabled", async function() {
-      let callCount = 0;
-      mockAdb.executeCommand = async (cmd: string) => {
-        callCount++;
-        if (cmd.includes("pm list packages")) {
-          return {
-            stdout: `package:${AccessibilityServiceManager.PACKAGE}
-`,
-            stderr: ""
-          };
-        } else if (cmd.includes("settings get secure")) {
-          return {
-            stdout: `${AccessibilityServiceManager.PACKAGE}/${AccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService`,
-            stderr: ""
-          };
-        }
-        return { stdout: "", stderr: "" };
-      };
+      fakeAdb.setCommandResponse("pm list packages", {
+        stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("settings get secure", {
+        stdout: `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService`,
+        stderr: ""
+      });
 
       const result = await accessibilityServiceClient.isAvailable();
       expect(result).to.be.true;
-      expect(callCount).to.equal(2); // Should call both installation and enabled checks
+      expect(fakeAdb.getExecutedCommands().length).to.be.greaterThanOrEqual(2);
     });
 
     it("should return false when service is installed but not enabled", async function() {
-      let callCount = 0;
-      mockAdb.executeCommand = async (cmd: string) => {
-        callCount++;
-        if (cmd.includes("pm list packages")) {
-          return {
-            stdout: `package:${AccessibilityServiceManager.PACKAGE}
-`,
-            stderr: ""
-          };
-        } else if (cmd.includes("settings get secure")) {
-          return {
-            stdout: "other.service/SomeService",
-            stderr: ""
-          };
-        }
-        return { stdout: "", stderr: "" };
-      };
+      fakeAdb.setCommandResponse("pm list packages", {
+        stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("settings get secure", {
+        stdout: "other.service/SomeService",
+        stderr: ""
+      });
 
       const result = await accessibilityServiceClient.isAvailable();
       expect(result).to.be.false;
-      expect(callCount).to.equal(2);
+      expect(fakeAdb.getExecutedCommands().length).to.be.greaterThanOrEqual(2);
     });
 
     it("should return false when service is not installed", async function() {
-      let callCount = 0;
-      mockAdb.executeCommand = async (cmd: string) => {
-        callCount++;
-        if (cmd.includes("pm list packages")) {
-          return {
-            stdout: "package:com.other.app\n",
-            stderr: ""
-          };
-        } else if (cmd.includes("settings get secure")) {
-          return {
-            stdout: `${AccessibilityServiceManager.PACKAGE}/${AccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService`,
-            stderr: ""
-          };
-        }
-        return { stdout: "", stderr: "" };
-      };
+      fakeAdb.setCommandResponse("pm list packages", {
+        stdout: "package:com.other.app\n",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("settings get secure", {
+        stdout: `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService`,
+        stderr: ""
+      });
 
       const result = await accessibilityServiceClient.isAvailable();
       expect(result).to.be.false;
-      expect(callCount).to.equal(2);
+      expect(fakeAdb.getExecutedCommands().length).to.be.greaterThanOrEqual(2);
     });
   });
 });

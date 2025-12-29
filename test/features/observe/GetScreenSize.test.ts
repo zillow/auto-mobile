@@ -1,25 +1,23 @@
 import { expect } from "chai";
 import { describe, it, beforeEach } from "mocha";
 import { GetScreenSize } from "../../../src/features/observe/GetScreenSize";
-import { AdbUtils } from "../../../src/utils/android-cmdline-tools/adb";
 import { BootedDevice } from "../../../src/models";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 
 describe("GetScreenSize", function() {
   describe("Unit Tests for Extracted Methods", function() {
     let getScreenSize: GetScreenSize;
-    let mockAdb: AdbUtils;
+    let fakeAdb: FakeAdbExecutor;
     let mockDevice: BootedDevice;
 
     beforeEach(function() {
-      mockAdb = {
-        executeCommand: async () => ({ stdout: "", stderr: "" })
-      } as unknown as AdbUtils;
+      fakeAdb = new FakeAdbExecutor();
       mockDevice = {
         name: "test-device",
         platform: "android",
         deviceId: "test-device"
       } as BootedDevice;
-      getScreenSize = new GetScreenSize(mockDevice, mockAdb);
+      getScreenSize = new GetScreenSize(mockDevice, fakeAdb);
     });
 
     it("should parse physical dimensions correctly", function() {

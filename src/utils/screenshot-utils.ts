@@ -5,7 +5,7 @@ import { PNG } from "pngjs";
 import { logger } from "./logger";
 import { readFileAsync, readdirAsync } from "./io";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "./constants";
-import { CryptoUtils } from "./crypto";
+import { NodeCryptoService } from "./crypto";
 
 // Add dynamic import function for pixelmatch
 async function getPixelmatch() {
@@ -655,6 +655,6 @@ export class ScreenshotUtils {
    * @returns MD5 hash string
    */
   static generateImageHash(buffer: Buffer): string {
-    return CryptoUtils.generateCacheKey(buffer);
+    return NodeCryptoService.generateCacheKey(buffer);
   }
 }
