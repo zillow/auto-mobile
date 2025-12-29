@@ -5,7 +5,7 @@
   "mcpServers": {
     "AutoMobile": {
       "command": "npx",
-      "args": ["-y", "auto-mobile@latest"]
+      "args": ["-y", "@kaeawc/auto-mobile@latest"]
     }
   }
 }
