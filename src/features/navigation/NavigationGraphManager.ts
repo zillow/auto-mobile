@@ -104,8 +104,14 @@ export class NavigationGraphManager implements NavigationGraph {
 
   /**
    * Record a navigation event from WebSocket.
+   * If the event contains an applicationId, automatically sets/switches the current app.
    */
   public recordNavigationEvent(event: NavigationEvent): void {
+    // Auto-set current app from navigation event if provided
+    if (event.applicationId && event.applicationId !== this.currentAppId) {
+      this.setCurrentApp(event.applicationId);
+    }
+
     const graph = this.getGraph();
     if (!graph) {
       logger.warn(`[NAVIGATION_GRAPH] Cannot record event - no current app set`);

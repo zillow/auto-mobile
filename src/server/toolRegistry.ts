@@ -162,6 +162,11 @@ class ToolRegistryClass {
   getDeviceSessionManager(): DeviceSessionManager {
     return this.deviceSessionManager;
   }
+
+  // Clear all registered tools (for testing)
+  clearTools(): void {
+    this.tools.clear();
+  }
 }
 
 // Export a singleton instance

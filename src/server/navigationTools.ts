@@ -16,10 +16,6 @@ export const getNavigationGraphSchema = z.object({
   platform: z.enum(["android", "ios"]).default("android")
 });
 
-export const setCurrentAppSchema = z.object({
-  appId: z.string().describe("The app package ID to track navigation for"),
-  platform: z.enum(["android", "ios"]).default("android")
-});
 
 // Export interfaces for type safety
 export interface NavigateToArgs {
@@ -28,11 +24,6 @@ export interface NavigateToArgs {
 }
 
 export interface GetNavigationGraphArgs {
-  platform: Platform;
-}
-
-export interface SetCurrentAppArgs {
-  appId: string;
   platform: Platform;
 }
 
@@ -104,24 +95,6 @@ export function registerNavigationTools() {
     }
   };
 
-  // Set current app handler
-  const setCurrentAppHandler = async (
-    device: BootedDevice,
-    args: SetCurrentAppArgs
-  ) => {
-    try {
-      const manager = NavigationGraphManager.getInstance();
-      manager.setCurrentApp(args.appId);
-
-      return createJSONToolResponse({
-        message: `Now tracking navigation for app: ${args.appId}`,
-        appId: args.appId
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to set current app: ${error}`);
-    }
-  };
-
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "navigateTo",
@@ -140,14 +113,5 @@ export function registerNavigationTools() {
     "Shows known screens, transitions, and which tool calls triggered each navigation.",
     getNavigationGraphSchema,
     getNavigationGraphHandler
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "setNavigationApp",
-    "Set the current app to track navigation for. " +
-    "Navigation graphs are maintained per-app. " +
-    "Call this when switching between apps to track separate navigation histories.",
-    setCurrentAppSchema,
-    setCurrentAppHandler
   );
 }

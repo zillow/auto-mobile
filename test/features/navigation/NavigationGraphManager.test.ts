@@ -71,6 +71,38 @@ describe("NavigationGraphManager", () => {
       assert.equal(manager.getCurrentScreen(), "HomeScreen");
     });
 
+    it("should auto-set current app from applicationId in event", () => {
+      NavigationGraphManager.resetInstance();
+      const freshManager = NavigationGraphManager.getInstance();
+
+      // No app set initially
+      assert.isNull(freshManager.getCurrentAppId());
+
+      // Record event with applicationId
+      const event = createEvent("HomeScreen");
+      event.applicationId = "com.auto.detected.app";
+      freshManager.recordNavigationEvent(event);
+
+      // App should be auto-set
+      assert.equal(freshManager.getCurrentAppId(), "com.auto.detected.app");
+      assert.deepEqual(freshManager.getKnownScreens(), ["HomeScreen"]);
+    });
+
+    it("should switch apps when applicationId changes", () => {
+      manager.recordNavigationEvent(createEventWithApp("Screen1", "com.app1"));
+      assert.equal(manager.getCurrentAppId(), "com.app1");
+      assert.deepEqual(manager.getKnownScreens(), ["Screen1"]);
+
+      // Switch to different app
+      manager.recordNavigationEvent(createEventWithApp("Screen2", "com.app2"));
+      assert.equal(manager.getCurrentAppId(), "com.app2");
+      assert.deepEqual(manager.getKnownScreens(), ["Screen2"]);
+
+      // Original app's graph should still exist
+      manager.setCurrentApp("com.app1");
+      assert.deepEqual(manager.getKnownScreens(), ["Screen1"]);
+    });
+
     it("should update node on revisit", () => {
       const event1 = createEvent("HomeScreen", 1000);
       manager.recordNavigationEvent(event1);
@@ -327,5 +359,22 @@ function createEvent(
     metadata: {},
     timestamp: timestamp ?? Date.now(),
     sequenceNumber: 0
+  };
+}
+
+// Helper function to create navigation events with applicationId
+function createEventWithApp(
+  destination: string,
+  applicationId: string,
+  timestamp?: number
+): NavigationEvent {
+  return {
+    destination,
+    source: "TEST",
+    arguments: {},
+    metadata: {},
+    timestamp: timestamp ?? Date.now(),
+    sequenceNumber: 0,
+    applicationId
   };
 }

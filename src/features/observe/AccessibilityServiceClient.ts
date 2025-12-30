@@ -781,9 +781,13 @@ export class AccessibilityServiceClient implements AccessibilityService {
         const navMessage = message as any;
         const event = navMessage.event as NavigationEvent;
         if (event) {
+          // Extract applicationId from the message if provided
+          if (navMessage.applicationId) {
+            event.applicationId = navMessage.applicationId;
+          }
           logger.debug(
             `[ACCESSIBILITY_SERVICE] Navigation event: ${event.destination} ` +
-            `(source: ${event.source}, timestamp: ${event.timestamp})`
+            `(source: ${event.source}, app: ${event.applicationId || "unknown"}, timestamp: ${event.timestamp})`
           );
           NavigationGraphManager.getInstance().recordNavigationEvent(event);
         }

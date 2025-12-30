@@ -8,6 +8,8 @@ export interface NavigationEvent {
   metadata: Record<string, string>;
   timestamp: number; // milliseconds
   sequenceNumber: number;
+  /** The application package ID (e.g., "com.example.app") */
+  applicationId?: string;
 }
 
 /**
