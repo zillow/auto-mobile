@@ -91,8 +91,9 @@ RUN apk add --no-cache nodejs npm
 
 # Enable corepack for pnpm support
 # Disable download prompts for non-interactive environments
+# Note: Alpine's npm doesn't include corepack, so we install it first
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable && corepack prepare pnpm@10.26.2 --activate
+RUN npm install -g corepack@0.29.4 && corepack enable && corepack prepare pnpm@10.26.2 --activate
 
 # Install ktfmt (Kotlin formatter)
 # Check for updates: https://github.com/facebook/ktfmt/releases
@@ -194,8 +195,9 @@ RUN apk --no-cache add \
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
 # Enable corepack for pnpm support in runtime stage
+# Note: Alpine's npm doesn't include corepack, so we install it first
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN corepack enable && corepack prepare pnpm@10.26.2 --activate
+RUN npm install -g corepack@0.29.4 && corepack enable && corepack prepare pnpm@10.26.2 --activate
 
 # Copy Android SDK from builder (needed for ADB at runtime)
 COPY --from=builder /opt/android-sdk /opt/android-sdk
