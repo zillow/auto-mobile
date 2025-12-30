@@ -46,6 +46,30 @@ export class ObserveScreen {
   private static observeResultCacheDir: string = path.join("/tmp/auto-mobile", "observe_results");
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+  /**
+   * Get the most recent cached observe result from memory (static accessor).
+   * Returns the most recently cached result if available and not expired.
+   */
+  static getRecentCachedResult(): ObserveResult | undefined {
+    if (ObserveScreen.observeResultCache.size === 0) {
+      return undefined;
+    }
+
+    const now = Date.now();
+    let mostRecentEntry: ObserveResultCache | undefined;
+    let mostRecentTimestamp = 0;
+
+    for (const entry of ObserveScreen.observeResultCache.values()) {
+      const age = now - entry.timestamp;
+      if (age <= ObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS && entry.timestamp > mostRecentTimestamp) {
+        mostRecentEntry = entry;
+        mostRecentTimestamp = entry.timestamp;
+      }
+    }
+
+    return mostRecentEntry?.observeResult;
+  }
+
   constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null, webdriver: WebDriverAgent | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);

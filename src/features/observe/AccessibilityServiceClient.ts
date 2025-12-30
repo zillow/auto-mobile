@@ -7,6 +7,7 @@ import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOption
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
+import { NavigationGraphManager, NavigationEvent } from "../navigation/NavigationGraphManager";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -773,6 +774,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
           error: selectAllMessage.error,
           perfTiming
         });
+      }
+
+      // Handle navigation event
+      if (message.type === "navigation_event") {
+        const navMessage = message as any;
+        const event = navMessage.event as NavigationEvent;
+        if (event) {
+          logger.debug(
+            `[ACCESSIBILITY_SERVICE] Navigation event: ${event.destination} ` +
+            `(source: ${event.source}, timestamp: ${event.timestamp})`
+          );
+          NavigationGraphManager.getInstance().recordNavigationEvent(event);
+        }
       }
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error handling WebSocket message: ${error}`);

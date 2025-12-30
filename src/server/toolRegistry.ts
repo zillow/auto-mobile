@@ -2,6 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { ActionableError, BootedDevice, SomePlatform } from "../models";
+import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
+import { UIStateExtractor } from "../features/navigation/UIStateExtractor";
+import { ObserveScreen } from "../features/observe/ObserveScreen";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -68,6 +71,21 @@ class ToolRegistryClass {
       const device = await this.deviceSessionManager.ensureDeviceReady(platform, providedDeviceId);
 
       try {
+        // Record tool call for navigation graph correlation
+        // Only record UI interaction tools that may cause navigation
+        // Excludes app lifecycle tools (launchApp, terminateApp, homeScreen, etc.)
+        // as they don't represent replayable in-app navigation paths
+        const navigationRelevantTools = [
+          "tapOn", "swipe", "scroll", "swipeOnElement", "swipeOnScreen",
+          "pressButton", "pressKey", "inputText", "clearText", "imeAction"
+        ];
+        if (navigationRelevantTools.includes(name)) {
+          // Extract UI state from the most recent cached observation
+          const cachedResult = ObserveScreen.getRecentCachedResult();
+          const uiState = UIStateExtractor.extract(cachedResult?.viewHierarchy);
+          NavigationGraphManager.getInstance().recordToolCall(name, args, uiState);
+        }
+
         let response: any | undefined;
         if (device !== undefined) {
           response = await handler(device, args, progress);
