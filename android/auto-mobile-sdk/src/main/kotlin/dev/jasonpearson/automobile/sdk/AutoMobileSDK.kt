@@ -41,6 +41,7 @@ object AutoMobileSDK {
     const val EXTRA_DESTINATION = "destination"
     const val EXTRA_SOURCE = "source"
     const val EXTRA_TIMESTAMP = "timestamp"
+    const val EXTRA_APPLICATION_ID = "application_id"
 
     /**
      * Initialize the SDK with application context.
@@ -104,6 +105,7 @@ object AutoMobileSDK {
                     putExtra(EXTRA_DESTINATION, event.destination)
                     putExtra(EXTRA_SOURCE, event.source.name)
                     putExtra(EXTRA_TIMESTAMP, System.currentTimeMillis())
+                    putExtra(EXTRA_APPLICATION_ID, ctx.packageName)
                     // Serialize arguments as strings
                     event.arguments.forEach { (key, value) ->
                         putExtra("arg_$key", value?.toString() ?: "null")

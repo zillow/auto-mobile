@@ -19,7 +19,8 @@ data class TimestampedNavigationEvent(
     val arguments: Map<String, String>,
     val metadata: Map<String, String>,
     val timestamp: Long, // System.currentTimeMillis()
-    val sequenceNumber: Long // Monotonically increasing sequence number
+    val sequenceNumber: Long, // Monotonically increasing sequence number
+    val applicationId: String? = null // Package name of the app that generated this event
 )
 
 /**
@@ -57,7 +58,13 @@ class NavigationEventAccumulator {
     /**
      * Manually add a navigation event from external sources (e.g., broadcasts).
      */
-    fun addEvent(destination: String, source: String, arguments: Map<String, String>, metadata: Map<String, String>) {
+    fun addEvent(
+        destination: String,
+        source: String,
+        arguments: Map<String, String>,
+        metadata: Map<String, String>,
+        applicationId: String? = null
+    ) {
         val timestamp = System.currentTimeMillis()
         val sequence = sequenceNumber++
 
@@ -67,7 +74,8 @@ class NavigationEventAccumulator {
             arguments = arguments,
             metadata = metadata,
             timestamp = timestamp,
-            sequenceNumber = sequence
+            sequenceNumber = sequence,
+            applicationId = applicationId
         )
 
         events.add(timestampedEvent)
