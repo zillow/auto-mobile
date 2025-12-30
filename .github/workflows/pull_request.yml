@@ -237,3 +237,175 @@ jobs:
         with:
           name: playground-app-apk
           path: android/playground/app/build/outputs/apk/debug/playground-app-debug.apk
+
+  # =============================================================================
+  # Docker Build and Validation
+  # =============================================================================
+
+  hadolint:
+    name: "Lint Dockerfile"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Run hadolint"
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          config: .hadolint.yaml
+          failure-threshold: error
+
+  docker-build:
+    name: "Build Docker Image"
+    runs-on: ubuntu-latest
+    needs: hadolint
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Set up Docker Buildx"
+        uses: docker/setup-buildx-action@v3
+
+      - name: "Build Docker image"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: auto-mobile:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: "Run container structure tests"
+        run: |
+          IMAGE_NAME=auto-mobile:test bash scripts/docker/test_container.sh
+
+      - name: "Test MCP stdio protocol"
+        run: |
+          set -e  # Exit on any error
+
+          # Test that the server can receive and respond to MCP initialize
+          echo "Testing MCP stdio protocol..."
+
+          # MCP initialize request
+          INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
+
+          # Run container with timeout, capture both stdout and stderr
+          # Give server 30 seconds to respond (more reasonable than 5)
+          RESPONSE=$(echo "$INIT" | timeout 30 docker run -i --rm auto-mobile:test 2>&1 | head -1)
+
+          echo "Raw response: $RESPONSE"
+
+          # Check if response is empty
+          if [ -z "$RESPONSE" ]; then
+            echo "ERROR: No response received from MCP server"
+            echo "The server did not return any output within 30 seconds"
+            exit 1
+          fi
+
+          # Validate JSON structure
+          if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+            echo "ERROR: Response is not valid JSON"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for required JSON-RPC field
+          if ! echo "$RESPONSE" | jq -e '.jsonrpc == "2.0"' >/dev/null 2>&1; then
+            echo "ERROR: Missing or invalid 'jsonrpc' field"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for result field (MCP initialize response should have a result)
+          if ! echo "$RESPONSE" | jq -e '.result' >/dev/null 2>&1; then
+            echo "ERROR: Missing 'result' field in response"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for serverInfo in result
+          if ! echo "$RESPONSE" | jq -e '.result.serverInfo' >/dev/null 2>&1; then
+            echo "ERROR: Missing 'serverInfo' in result"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for capabilities in result
+          if ! echo "$RESPONSE" | jq -e '.result.capabilities' >/dev/null 2>&1; then
+            echo "ERROR: Missing 'capabilities' in result"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Verify serverInfo has expected fields
+          SERVER_NAME=$(echo "$RESPONSE" | jq -r '.result.serverInfo.name')
+          SERVER_VERSION=$(echo "$RESPONSE" | jq -r '.result.serverInfo.version')
+
+          if [ "$SERVER_NAME" != "AutoMobile" ]; then
+            echo "ERROR: Expected serverInfo.name='AutoMobile', got '$SERVER_NAME'"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          if [ "$SERVER_VERSION" != "0.0.1" ]; then
+            echo "ERROR: Expected serverInfo.version='0.0.1', got '$SERVER_VERSION'"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # All checks passed!
+          echo "✓ MCP stdio protocol test PASSED"
+          echo "  - Valid JSON-RPC 2.0 response"
+          echo "  - Contains serverInfo: name=$SERVER_NAME, version=$SERVER_VERSION"
+          echo "  - Contains capabilities structure"
+          echo "Test completed successfully!"
+
+  docker-compose-test:
+    name: "Test Docker Compose"
+    runs-on: ubuntu-latest
+    needs: hadolint
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Test docker-compose configuration"
+        run: |
+          docker compose config
+
+      - name: "Build with docker-compose"
+        run: |
+          docker compose build auto-mobile
+
+      - name: "Verify services are defined"
+        run: |
+          docker compose config --services | grep -q auto-mobile
+          docker compose config --services | grep -q auto-mobile-dev
+
+  docker-security-scan:
+    name: "Docker Security Scan"
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Build Docker image for scanning"
+        run: |
+          docker build -t auto-mobile:scan .
+
+      - name: "Run Trivy vulnerability scanner"
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "auto-mobile:scan"
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH"
+
+      - name: "Upload Trivy results to GitHub Security"
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"
