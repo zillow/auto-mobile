@@ -113,9 +113,18 @@ RUN sdkmanager --install \
     "platforms;android-36" \
     "build-tools;35.0.0" \
     "cmdline-tools;latest" \
-    "emulator" \
-    "system-images;android-36;google_apis;x86_64" \
     && sdkmanager --update
+
+# Install emulator and system images (x86_64 only - not available for ARM)
+# Skip on ARM64 architectures as emulator is x86_64 only
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        sdkmanager --install \
+            "emulator" \
+            "system-images;android-36;google_apis;x86_64"; \
+    else \
+        echo "Skipping emulator installation on $ARCH (emulator only available for x86_64)"; \
+    fi
 
 # Set working directory
 WORKDIR /workspace
@@ -204,7 +213,8 @@ RUN curl -L -o /usr/local/bin/tini "https://github.com/krallin/tini/releases/dow
     && chmod +x /usr/local/bin/tini
 
 # Create a non-root user for running the application
-RUN useradd -m -u 1000 automobile \
+# Don't hardcode UID to avoid conflicts with existing users
+RUN useradd -m automobile \
     && chown -R automobile:automobile /workspace \
     && mkdir -p /home/automobile/.android \
     && chown -R automobile:automobile /home/automobile/.android

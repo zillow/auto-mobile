@@ -71,12 +71,10 @@ Desktop.ini
 # -----------------------------------------------------------------------------
 # TypeScript & Testing
 # -----------------------------------------------------------------------------
-# Source files (TypeScript gets compiled inside container)
-src/
+# Exclude test files but keep src/ for building inside container
 test/
-*.ts
-!*.d.ts
-tsconfig*.json
+**/*.test.ts
+**/*.spec.ts
 
 # -----------------------------------------------------------------------------
 # Documentation & Planning (not needed at runtime)
@@ -194,7 +192,13 @@ venv/
 # -----------------------------------------------------------------------------
 firebender.json
 .config/
-scripts/
+# Keep scripts needed for build, exclude only docker/validation/github scripts
+scripts/docker/
+scripts/hadolint/
+scripts/ktfmt/
+scripts/shellcheck/
+scripts/xml/
+scripts/github/
 
 # Temporary files
 *.tmp
