@@ -36,9 +36,9 @@ Add this to your Claude Desktop configuration file:
 }
 ```
 
-### Using Pre-built Image from Registry
+### Using Pre-built Image from Docker Hub (Recommended)
 
-If you publish the image to a registry:
+Use the official published image for easier setup:
 
 ```json
 {
@@ -54,7 +54,31 @@ If you publish the image to a registry:
         "--privileged",
         "--network", "host",
         "-v", "${HOME}/.android:/home/automobile/.android",
-        "ghcr.io/kaeawc/auto-mobile:latest"
+        "kaeawc/auto-mobile:latest"
+      ]
+    }
+  }
+}
+```
+
+**Note**: The `--pull=always` flag ensures you get the latest version automatically.
+
+To pin to a specific version for production:
+
+```json
+{
+  "mcpServers": {
+    "auto-mobile": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--init",
+        "--privileged",
+        "--network", "host",
+        "-v", "${HOME}/.android:/home/automobile/.android",
+        "kaeawc/auto-mobile:0.0.6"
       ]
     }
   }

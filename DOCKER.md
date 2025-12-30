@@ -31,6 +31,20 @@ docker-compose up auto-mobile
 docker-compose up auto-mobile-dev
 ```
 
+## Pre-built Images
+
+Published images are available on Docker Hub:
+
+```bash
+# Pull latest version
+docker pull kaeawc/auto-mobile:latest
+
+# Pull specific version
+docker pull kaeawc/auto-mobile:0.0.6
+```
+
+For setup and publishing details, see [Docker Hub Setup Guide](docs/docker-hub-setup.md).
+
 ## What's Included
 
 The Docker image contains:

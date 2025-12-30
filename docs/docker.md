@@ -20,6 +20,22 @@ The Docker setup provides a complete Android development environment with:
   - shellcheck - Shell script validator
   - xmlstarlet - XML processing
 
+### Pre-built Images
+
+Official images are published to Docker Hub and support both AMD64 and ARM64 architectures:
+
+```bash
+# Pull the latest version
+docker pull kaeawc/auto-mobile:latest
+
+# Pull a specific version
+docker pull kaeawc/auto-mobile:0.0.6
+```
+
+**Available on Docker Hub**: https://hub.docker.com/r/kaeawc/auto-mobile
+
+For setup and publishing details, see the [Docker Hub Setup Guide](docker-hub-setup.md).
+
 ## Quick Start
 
 > **Note**: If you're setting up AutoMobile for use with MCP clients (Claude Desktop, Continue.dev, Cline, etc.), see the [MCP Client Configuration Guide](mcp-docker-config.md) for specific setup instructions.
