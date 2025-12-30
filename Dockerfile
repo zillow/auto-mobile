@@ -89,11 +89,9 @@ SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 # Alpine 3.23 includes Node.js 24.x in its package repositories
 RUN apk add --no-cache nodejs npm
 
-# Enable corepack for pnpm support
-# Disable download prompts for non-interactive environments
-# Note: Alpine's npm doesn't include corepack, so we install it first
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN npm install -g corepack@0.29.4 && corepack enable && corepack prepare pnpm@10.26.2 --activate
+# Install pnpm directly via npm
+# Alpine's npm doesn't include corepack, and corepack has signature verification issues
+RUN npm install -g pnpm@10.26.2
 
 # Install ktfmt (Kotlin formatter)
 # Check for updates: https://github.com/facebook/ktfmt/releases
@@ -194,10 +192,9 @@ RUN apk --no-cache add \
 # Now that bash is installed, set it as the default shell
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
-# Enable corepack for pnpm support in runtime stage
-# Note: Alpine's npm doesn't include corepack, so we install it first
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN npm install -g corepack@0.29.4 && corepack enable && corepack prepare pnpm@10.26.2 --activate
+# Install pnpm directly via npm in runtime stage
+# Alpine's npm doesn't include corepack, and corepack has signature verification issues
+RUN npm install -g pnpm@10.26.2
 
 # Copy Android SDK from builder (needed for ADB at runtime)
 COPY --from=builder /opt/android-sdk /opt/android-sdk
