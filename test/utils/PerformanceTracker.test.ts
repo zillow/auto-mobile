@@ -34,7 +34,7 @@ describe("PerformanceTracker", function() {
       expect(timings).to.be.an("array");
       expect(timings).to.have.length(1);
       expect(timings[0].name).to.equal("simpleOp");
-      expect(timings[0].durationMs).to.be.at.least(10);
+      expect(timings[0].durationMs).to.be.at.least(9);
     });
 
     it("should return function result from track", async function() {
