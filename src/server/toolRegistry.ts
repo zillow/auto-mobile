@@ -91,6 +91,14 @@ class ToolRegistryClass {
           response = await handler(device, args, progress);
         }
 
+        // After swipeOn executes with lookFor, update the tool call with scroll position
+        if (name === "swipeOn" && args.lookFor && response?.success && response?.found) {
+          const scrollPosition = UIStateExtractor.createScrollPosition(args);
+          if (scrollPosition) {
+            NavigationGraphManager.getInstance().updateScrollPosition(scrollPosition);
+          }
+        }
+
         return response;
       } catch (error) {
         if (error instanceof ActionableError) {

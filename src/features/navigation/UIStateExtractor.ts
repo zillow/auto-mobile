@@ -1,5 +1,6 @@
-import { UIState, SelectedElement, ModalState } from "../../utils/interfaces/NavigationGraph";
+import { UIState, SelectedElement, ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
 import { ViewHierarchyResult, WindowHierarchy } from "../../models";
+import { SwipeOnOptions } from "../../models";
 
 /**
  * Extracts UI state from a view hierarchy.
@@ -246,5 +247,39 @@ export class UIStateExtractor {
 
     // Prefer resource-id over text
     return resourceId || text;
+  }
+
+  /**
+   * Create a ScrollPosition from swipeOn options (when lookFor is used).
+   * This captures the scroll action needed to make a navigation element visible.
+   */
+  static createScrollPosition(options: SwipeOnOptions): ScrollPosition | undefined {
+    // Only create scroll position for lookFor scrolls (explicit element search)
+    if (!options.lookFor) {
+      return undefined;
+    }
+
+    const scrollPosition: ScrollPosition = {
+      targetElement: {
+        text: options.lookFor.text,
+        resourceId: options.lookFor.elementId
+      },
+      direction: options.direction
+    };
+
+    // Add container information if specified
+    if (options.container) {
+      scrollPosition.container = {
+        text: options.container.text,
+        resourceId: options.container.elementId
+      };
+    }
+
+    // Add speed if specified
+    if (options.speed) {
+      scrollPosition.speed = options.speed;
+    }
+
+    return scrollPosition;
   }
 }

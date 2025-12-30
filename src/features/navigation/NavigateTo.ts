@@ -9,7 +9,7 @@ import {
   NavigationEdge,
   UIState
 } from "./NavigationGraphManager";
-import { ModalState } from "../../utils/interfaces/NavigationGraph";
+import { ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
 import { ProgressCallback } from "../../server/toolRegistry";
 import { UIStateExtractor } from "./UIStateExtractor";
 import { ObserveScreen } from "../observe/ObserveScreen";
@@ -134,6 +134,14 @@ export class NavigateTo {
         // Execute navigation step
         try {
           if (edge.interaction) {
+            // Set up scroll position if required (must happen before UI state setup)
+            if (edge.uiState?.scrollPosition) {
+              const scrollAction = await this.setupScrollPosition(edge.uiState.scrollPosition, options.platform);
+              if (scrollAction) {
+                executedPath.push(scrollAction);
+              }
+            }
+
             // Set up required UI state before executing the tool call
             const setupActions = await this.setupUIState(edge, options.platform);
             if (setupActions.length > 0) {
@@ -318,6 +326,73 @@ export class NavigateTo {
     }
 
     return setupActions;
+  }
+
+  /**
+   * Set up scroll position to make a navigation element visible.
+   * Uses swipeOn with lookFor to scroll until the target element is found.
+   *
+   * @returns Description of the scroll action performed, or null if skipped
+   */
+  private async setupScrollPosition(
+    scrollPosition: ScrollPosition,
+    platform: string
+  ): Promise<string | null> {
+    logger.info(
+      `[NAVIGATE_TO] Setting up scroll position: ` +
+      `target=${scrollPosition.targetElement.text || scrollPosition.targetElement.resourceId}, ` +
+      `direction=${scrollPosition.direction}`
+    );
+
+    try {
+      // Get the swipeOn tool from the registry
+      const swipeOnTool = ToolRegistry.getTool("swipeOn");
+      if (!swipeOnTool) {
+        logger.warn(`[NAVIGATE_TO] swipeOn tool not found, skipping scroll setup`);
+        return null;
+      }
+
+      // Build swipeOn arguments with lookFor
+      const swipeOnArgs: any = {
+        platform,
+        direction: scrollPosition.direction,
+        lookFor: {
+          text: scrollPosition.targetElement.text,
+          elementId: scrollPosition.targetElement.resourceId
+        }
+      };
+
+      // Add container if specified
+      if (scrollPosition.container) {
+        swipeOnArgs.container = {
+          text: scrollPosition.container.text,
+          elementId: scrollPosition.container.resourceId
+        };
+      }
+
+      // Add speed if specified
+      if (scrollPosition.speed) {
+        swipeOnArgs.speed = scrollPosition.speed;
+      }
+
+      // Execute swipeOn with lookFor
+      const result = await swipeOnTool.handler(swipeOnArgs);
+
+      if (result?.success && result?.found) {
+        logger.info(`[NAVIGATE_TO] Successfully scrolled to target element`);
+        return `swipeOn(lookFor: ${JSON.stringify(scrollPosition.targetElement)})`;
+      } else {
+        // Element not found after scrolling - log warning but continue
+        logger.warn(
+          `[NAVIGATE_TO] Could not find target element after scrolling, ` +
+          `continuing anyway (element might still be accessible)`
+        );
+        return null;
+      }
+    } catch (error) {
+      logger.warn(`[NAVIGATE_TO] Error setting up scroll position: ${error}, continuing anyway`);
+      return null;
+    }
   }
 
   /**

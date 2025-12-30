@@ -8,7 +8,8 @@ import {
   PathResult,
   ToolCallInteraction,
   ExportedGraph,
-  UIState
+  UIState,
+  ScrollPosition
 } from "../../utils/interfaces/NavigationGraph";
 
 // Re-export types for convenience
@@ -233,6 +234,44 @@ export class NavigationGraphManager implements NavigationGraph {
 
     // Clean up old tool calls
     this.cleanupToolCallHistory(graph);
+  }
+
+  /**
+   * Update the most recent swipeOn tool call with scroll position information.
+   * This is called after a swipeOn with lookFor completes successfully.
+   */
+  public updateScrollPosition(scrollPosition: ScrollPosition): void {
+    const graph = this.getGraph();
+    if (!graph || graph.toolCallHistory.length === 0) {
+      logger.debug(`[NAVIGATION_GRAPH] Cannot update scroll position: no graph or tool calls`);
+      return;
+    }
+
+    // Find the most recent swipeOn tool call
+    const recentSwipeOn = [...graph.toolCallHistory]
+      .reverse()
+      .find(tc => tc.toolName === "swipeOn");
+
+    if (!recentSwipeOn) {
+      logger.debug(`[NAVIGATION_GRAPH] No recent swipeOn tool call to update`);
+      return;
+    }
+
+    // Update the UI state with scroll position
+    if (!recentSwipeOn.uiState) {
+      recentSwipeOn.uiState = {
+        selectedElements: [],
+        scrollPosition
+      };
+    } else {
+      recentSwipeOn.uiState.scrollPosition = scrollPosition;
+    }
+
+    logger.debug(
+      `[NAVIGATION_GRAPH] Updated scroll position for swipeOn: ` +
+      `target=${scrollPosition.targetElement.text || scrollPosition.targetElement.resourceId}, ` +
+      `direction=${scrollPosition.direction}`
+    );
   }
 
   /**

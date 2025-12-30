@@ -572,6 +572,99 @@ describe("UIStateExtractor", () => {
       assert.equal(result!.modalStack![0].type, "bottomsheet");
     });
   });
+
+  describe("createScrollPosition", () => {
+    it("should return undefined when lookFor is not specified", () => {
+      const options = {
+        direction: "down" as const,
+        platform: "android" as const
+      };
+      const result = UIStateExtractor.createScrollPosition(options);
+      assert.isUndefined(result);
+    });
+
+    it("should create scroll position with target element", () => {
+      const options = {
+        direction: "down" as const,
+        platform: "android" as const,
+        lookFor: {
+          text: "Advanced Settings"
+        }
+      };
+      const result = UIStateExtractor.createScrollPosition(options);
+
+      assert.isDefined(result);
+      assert.equal(result!.direction, "down");
+      assert.equal(result!.targetElement.text, "Advanced Settings");
+      assert.isUndefined(result!.container);
+      assert.isUndefined(result!.speed);
+    });
+
+    it("should create scroll position with container", () => {
+      const options = {
+        direction: "up" as const,
+        platform: "android" as const,
+        lookFor: {
+          text: "Notification Settings",
+          elementId: "com.app:id/notification_item"
+        },
+        container: {
+          elementId: "com.app:id/settings_list"
+        }
+      };
+      const result = UIStateExtractor.createScrollPosition(options);
+
+      assert.isDefined(result);
+      assert.equal(result!.direction, "up");
+      assert.equal(result!.targetElement.text, "Notification Settings");
+      assert.equal(result!.targetElement.resourceId, "com.app:id/notification_item");
+      assert.isDefined(result!.container);
+      assert.equal(result!.container!.resourceId, "com.app:id/settings_list");
+      assert.isUndefined(result!.speed);
+    });
+
+    it("should create scroll position with speed", () => {
+      const options = {
+        direction: "down" as const,
+        platform: "android" as const,
+        lookFor: {
+          text: "Developer Options"
+        },
+        speed: "slow" as const
+      };
+      const result = UIStateExtractor.createScrollPosition(options);
+
+      assert.isDefined(result);
+      assert.equal(result!.direction, "down");
+      assert.equal(result!.targetElement.text, "Developer Options");
+      assert.equal(result!.speed, "slow");
+    });
+
+    it("should create scroll position with all fields", () => {
+      const options = {
+        direction: "left" as const,
+        platform: "android" as const,
+        lookFor: {
+          text: "Tab 3",
+          elementId: "com.app:id/tab_3"
+        },
+        container: {
+          text: "Tab Container",
+          elementId: "com.app:id/tab_container"
+        },
+        speed: "fast" as const
+      };
+      const result = UIStateExtractor.createScrollPosition(options);
+
+      assert.isDefined(result);
+      assert.equal(result!.direction, "left");
+      assert.equal(result!.targetElement.text, "Tab 3");
+      assert.equal(result!.targetElement.resourceId, "com.app:id/tab_3");
+      assert.equal(result!.container!.text, "Tab Container");
+      assert.equal(result!.container!.resourceId, "com.app:id/tab_container");
+      assert.equal(result!.speed, "fast");
+    });
+  });
 });
 
 // Helper function to create ViewHierarchyResult
