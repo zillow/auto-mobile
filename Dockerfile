@@ -46,6 +46,13 @@ ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/35.0.0
 
+# Upgrade Alpine from 3.19 to 3.23 to get Node.js 24
+# This upgrades all system packages (musl, OpenSSL, etc.) to v3.23
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories \
+    && echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories \
+    && apk update \
+    && apk upgrade --no-cache
+
 # Install base system dependencies with Alpine apk
 RUN apk --no-cache add \
     # Build essentials
@@ -79,8 +86,7 @@ RUN apk --no-cache add \
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
 # Install Node.js 24.x for Alpine
-# Alpine uses different approach than Ubuntu
-ENV NODE_VERSION=24.12.0
+# Alpine 3.23 includes Node.js 24.x in its package repositories
 RUN apk add --no-cache nodejs npm
 
 # Install ktfmt (Kotlin formatter)
@@ -155,6 +161,13 @@ ENV PAGER=cat
 ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/35.0.0
+
+# Upgrade Alpine from 3.19 to 3.23 to get Node.js 24
+# This upgrades all system packages (musl, OpenSSL, etc.) to v3.23
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories \
+    && echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories \
+    && apk update \
+    && apk upgrade --no-cache
 
 # Install runtime dependencies only (no build tools)
 RUN apk --no-cache add \
