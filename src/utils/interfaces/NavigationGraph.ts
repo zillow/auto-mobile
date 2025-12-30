@@ -13,6 +13,22 @@ export interface NavigationEvent {
 }
 
 /**
+ * Represents a modal state (bottom sheet, dialog, popup, etc.) in the UI hierarchy.
+ */
+export interface ModalState {
+  /** Type of modal (bottomsheet, dialog, popup, menu) */
+  type: "bottomsheet" | "dialog" | "popup" | "menu" | "overlay";
+  /** Unique identifier (resource-id preferred, falls back to text content) */
+  identifier?: string;
+  /** Stack depth (0 = base screen, higher = on top) */
+  layer: number;
+  /** Window ID from accessibility service */
+  windowId?: number;
+  /** Window type from accessibility service */
+  windowType?: string;
+}
+
+/**
  * Represents a selected UI element (tab, menu item, etc.) captured at the time of a tool call.
  */
 export interface SelectedElement {
@@ -30,6 +46,8 @@ export interface UIState {
   selectedElements: SelectedElement[];
   /** The destination/screen name if available from view hierarchy */
   destinationId?: string;
+  /** Active modal stack (bottom sheets, dialogs, popups, etc.) */
+  modalStack?: ModalState[];
 }
 
 /**
@@ -51,6 +69,8 @@ export interface NavigationNode {
   firstSeenAt: number; // milliseconds
   lastSeenAt: number; // milliseconds
   visitCount: number;
+  /** Modal stack state when this node was recorded */
+  modalStack?: ModalState[];
 }
 
 /**
@@ -64,6 +84,10 @@ export interface NavigationEdge {
   edgeType: "tool" | "back" | "unknown";
   /** UI state required before executing the interaction (e.g., which tab must be active) */
   uiState?: UIState;
+  /** Modal stack at the source screen */
+  fromModalStack?: ModalState[];
+  /** Modal stack at the destination screen */
+  toModalStack?: ModalState[];
 }
 
 /**

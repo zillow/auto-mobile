@@ -9,6 +9,7 @@ import {
   NavigationEdge,
   UIState
 } from "./NavigationGraphManager";
+import { ModalState } from "../../utils/interfaces/NavigationGraph";
 import { ProgressCallback } from "../../server/toolRegistry";
 import { UIStateExtractor } from "./UIStateExtractor";
 import { ObserveScreen } from "../observe/ObserveScreen";
@@ -257,17 +258,20 @@ export class NavigateTo {
 
   /**
    * Set up the required UI state before executing a navigation step.
-   * Compares the required state (from edge.uiState) with current state
-   * and taps on any missing selected elements.
+   * Handles modal stack alignment and selected elements.
    *
    * @returns Array of setup actions that were performed
    */
   private async setupUIState(edge: NavigationEdge, platform: string): Promise<string[]> {
     const requiredState = edge.uiState;
-    if (!requiredState?.selectedElements?.length) {
+
+    // Early return if no UI state requirements
+    if (!requiredState?.modalStack?.length && !requiredState?.selectedElements?.length) {
       logger.debug(`[NAVIGATE_TO] No UI state requirements for edge`);
       return [];
     }
+
+    const setupActions: string[] = [];
 
     // Get current UI state from a fresh observation
     const currentState = await this.getCurrentUIState(platform);
@@ -276,24 +280,41 @@ export class NavigateTo {
       return [];
     }
 
-    // Find which selected elements are missing
-    const missingElements = this.findMissingSelections(
-      requiredState.selectedElements,
-      currentState.selectedElements
-    );
-
-    if (missingElements.length === 0) {
-      logger.debug(`[NAVIGATE_TO] UI state already matches requirements`);
-      return [];
+    // Step 1: Handle modal stack alignment
+    if (requiredState.modalStack?.length) {
+      const modalStackActions = await this.setupModalStack(
+        currentState.modalStack || [],
+        requiredState.modalStack,
+        platform
+      );
+      setupActions.push(...modalStackActions);
     }
 
-    // Tap on missing elements to set up the required state
-    const setupActions: string[] = [];
-    for (const element of missingElements) {
-      const tapped = await this.tapOnElement(element, platform);
-      if (tapped) {
-        setupActions.push(`tapOn(${JSON.stringify(element)})`);
+    // Step 2: Handle selected elements (tabs, menu items, etc.)
+    if (requiredState.selectedElements?.length) {
+      // Get current state again after modal stack changes if modals were dismissed
+      const updatedState = setupActions.length > 0
+        ? await this.getCurrentUIState(platform)
+        : currentState;
+
+      if (updatedState) {
+        const missingElements = this.findMissingSelections(
+          requiredState.selectedElements,
+          updatedState.selectedElements
+        );
+
+        // Tap on missing elements to set up the required state
+        for (const element of missingElements) {
+          const tapped = await this.tapOnElement(element, platform);
+          if (tapped) {
+            setupActions.push(`tapOn(${JSON.stringify(element)})`);
+          }
+        }
       }
+    }
+
+    if (setupActions.length === 0) {
+      logger.debug(`[NAVIGATE_TO] UI state already matches requirements`);
     }
 
     return setupActions;
@@ -393,5 +414,200 @@ export class NavigateTo {
       logger.warn(`[NAVIGATE_TO] Failed to tap on "${identifier}": ${error}`);
       return false;
     }
+  }
+
+  /**
+   * Align the current modal stack with the required modal stack.
+   * Dismisses extra modals and opens missing ones.
+   *
+   * @returns Array of actions performed
+   */
+  private async setupModalStack(
+    currentStack: ModalState[],
+    requiredStack: ModalState[],
+    platform: string
+  ): Promise<string[]> {
+    const actions: string[] = [];
+
+    // Dismiss extra modals from the top down
+    while (currentStack.length > requiredStack.length) {
+      const topModal = currentStack[currentStack.length - 1];
+      logger.info(`[NAVIGATE_TO] Dismissing modal: ${topModal.type} (layer ${topModal.layer})`);
+
+      const dismissed = await this.dismissTopModal(topModal, platform);
+      if (dismissed) {
+        actions.push(`dismissModal(${topModal.type})`);
+        currentStack.pop();
+        // Small delay for modal to dismiss
+        await this.sleep(300);
+      } else {
+        logger.warn(`[NAVIGATE_TO] Failed to dismiss ${topModal.type}, stopping modal alignment`);
+        break;
+      }
+    }
+
+    // Note: Opening modals is complex and depends on app-specific UI interactions
+    // For now, we only handle dismissal. Opening modals will happen naturally
+    // when executing the navigation edge interaction.
+    if (requiredStack.length > currentStack.length) {
+      logger.debug(
+        `[NAVIGATE_TO] Required modal stack has ${requiredStack.length - currentStack.length} more modal(s), ` +
+        `will be opened by navigation interaction`
+      );
+    }
+
+    return actions;
+  }
+
+  /**
+   * Dismiss the top modal using context-aware dismissal methods.
+   * Tries different strategies based on modal type.
+   *
+   * @returns true if dismissal succeeded
+   */
+  private async dismissTopModal(modal: ModalState, platform: string): Promise<boolean> {
+    logger.debug(`[NAVIGATE_TO] Attempting to dismiss ${modal.type} modal`);
+
+    // Strategy 1: Try back button (works for most dialogs)
+    if (modal.type === "dialog") {
+      try {
+        await this.pressBack();
+        await this.sleep(200);
+
+        // Verify dismissal
+        const currentState = await this.getCurrentUIState(platform);
+        const dismissed = !currentState?.modalStack?.some(m => m.windowId === modal.windowId);
+        if (dismissed) {
+          logger.info(`[NAVIGATE_TO] Dismissed ${modal.type} with back button`);
+          return true;
+        }
+      } catch (error) {
+        logger.debug(`[NAVIGATE_TO] Back button failed for ${modal.type}: ${error}`);
+      }
+    }
+
+    // Strategy 2: Swipe down for bottom sheets
+    if (modal.type === "bottomsheet") {
+      try {
+        const swipeTool = ToolRegistry.getTool("swipe");
+        if (swipeTool) {
+          // Swipe down from middle of screen to dismiss bottom sheet
+          await swipeTool.handler({
+            action: "swipe",
+            direction: "down",
+            platform
+          });
+          await this.sleep(200);
+
+          // Verify dismissal
+          const currentState = await this.getCurrentUIState(platform);
+          const dismissed = !currentState?.modalStack?.some(m => m.windowId === modal.windowId);
+          if (dismissed) {
+            logger.info(`[NAVIGATE_TO] Dismissed bottom sheet with swipe down`);
+            return true;
+          }
+        }
+
+        // Fallback to back button
+        await this.pressBack();
+        await this.sleep(200);
+
+        const currentState = await this.getCurrentUIState(platform);
+        const dismissed = !currentState?.modalStack?.some(m => m.windowId === modal.windowId);
+        if (dismissed) {
+          logger.info(`[NAVIGATE_TO] Dismissed bottom sheet with back button`);
+          return true;
+        }
+      } catch (error) {
+        logger.debug(`[NAVIGATE_TO] Swipe down failed for bottom sheet: ${error}`);
+      }
+    }
+
+    // Strategy 3: Look for close/cancel button
+    if (modal.type === "dialog" || modal.type === "bottomsheet") {
+      try {
+        const closeButtonTapped = await this.tapCloseButton(platform);
+        if (closeButtonTapped) {
+          await this.sleep(200);
+
+          // Verify dismissal
+          const currentState = await this.getCurrentUIState(platform);
+          const dismissed = !currentState?.modalStack?.some(m => m.windowId === modal.windowId);
+          if (dismissed) {
+            logger.info(`[NAVIGATE_TO] Dismissed ${modal.type} with close button`);
+            return true;
+          }
+        }
+      } catch (error) {
+        logger.debug(`[NAVIGATE_TO] Close button tap failed: ${error}`);
+      }
+    }
+
+    // Strategy 4: Tap outside (for popups and menus)
+    if (modal.type === "popup" || modal.type === "menu" || modal.type === "overlay") {
+      try {
+        // Tap top-left corner (usually outside modal)
+        await this.adb.executeCommand("shell input tap 50 50");
+        await this.sleep(200);
+
+        // Verify dismissal
+        const currentState = await this.getCurrentUIState(platform);
+        const dismissed = !currentState?.modalStack?.some(m => m.windowId === modal.windowId);
+        if (dismissed) {
+          logger.info(`[NAVIGATE_TO] Dismissed ${modal.type} by tapping outside`);
+          return true;
+        }
+      } catch (error) {
+        logger.debug(`[NAVIGATE_TO] Tap outside failed: ${error}`);
+      }
+    }
+
+    // Final fallback: back button
+    try {
+      await this.pressBack();
+      await this.sleep(200);
+
+      const currentState = await this.getCurrentUIState(platform);
+      const dismissed = !currentState?.modalStack?.some(m => m.windowId === modal.windowId);
+      if (dismissed) {
+        logger.info(`[NAVIGATE_TO] Dismissed ${modal.type} with back button (fallback)`);
+        return true;
+      }
+    } catch (error) {
+      logger.debug(`[NAVIGATE_TO] Final back button attempt failed: ${error}`);
+    }
+
+    logger.warn(`[NAVIGATE_TO] All dismissal strategies failed for ${modal.type}`);
+    return false;
+  }
+
+  /**
+   * Try to tap a close/cancel button in the current view.
+   */
+  private async tapCloseButton(platform: string): Promise<boolean> {
+    const tapTool = ToolRegistry.getTool("tapOn");
+    if (!tapTool) {
+      return false;
+    }
+
+    // Common close button texts
+    const closeTexts = ["Close", "Cancel", "Dismiss", "×", "✕"];
+
+    for (const text of closeTexts) {
+      try {
+        await tapTool.handler({
+          action: "tap",
+          text,
+          platform
+        });
+        logger.debug(`[NAVIGATE_TO] Tapped close button: "${text}"`);
+        return true;
+      } catch (error) {
+        // Button not found, try next
+        continue;
+      }
+    }
+
+    return false;
   }
 }

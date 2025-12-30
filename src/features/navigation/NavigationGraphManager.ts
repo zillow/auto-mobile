@@ -121,25 +121,37 @@ export class NavigationGraphManager implements NavigationGraph {
     const screenName = event.destination;
     const timestamp = event.timestamp;
 
+    // Get modal stack from the most recent tool call (if any)
+    const recentToolCall = this.findCorrelatedToolCall(graph, timestamp);
+    const currentModalStack = recentToolCall?.uiState?.modalStack;
+
     // Update or create node
     if (!graph.nodes.has(screenName)) {
       graph.nodes.set(screenName, {
         screenName,
         firstSeenAt: timestamp,
         lastSeenAt: timestamp,
-        visitCount: 1
+        visitCount: 1,
+        modalStack: currentModalStack
       });
-      logger.info(`[NAVIGATION_GRAPH] New screen discovered: ${screenName}`);
+      const modalInfo = currentModalStack?.length
+        ? ` with ${currentModalStack.length} modal(s)`
+        : "";
+      logger.info(`[NAVIGATION_GRAPH] New screen discovered: ${screenName}${modalInfo}`);
     } else {
       const node = graph.nodes.get(screenName)!;
       node.lastSeenAt = timestamp;
       node.visitCount++;
+      // Update modal stack to the latest observed state
+      node.modalStack = currentModalStack;
       logger.debug(`[NAVIGATION_GRAPH] Screen revisited: ${screenName} (visit #${node.visitCount})`);
     }
 
     // Create edge from previous screen to current screen
     if (graph.currentScreen && graph.currentScreen !== screenName) {
       const interaction = this.findCorrelatedToolCall(graph, timestamp);
+      const fromNode = graph.nodes.get(graph.currentScreen);
+      const toNode = graph.nodes.get(screenName);
 
       const edge: NavigationEdge = {
         from: graph.currentScreen,
@@ -147,7 +159,9 @@ export class NavigationGraphManager implements NavigationGraph {
         interaction,
         timestamp,
         edgeType: interaction ? "tool" : "unknown",
-        uiState: interaction?.uiState
+        uiState: interaction?.uiState,
+        fromModalStack: fromNode?.modalStack,
+        toModalStack: toNode?.modalStack
       };
 
       graph.edges.push(edge);
@@ -156,8 +170,9 @@ export class NavigationGraphManager implements NavigationGraph {
         const uiStateInfo = interaction.uiState?.selectedElements.length
           ? ` (requires: ${interaction.uiState.selectedElements.map(e => e.text || e.resourceId).join(", ")})`
           : "";
+        const modalInfo = this.formatModalStackChange(fromNode?.modalStack, toNode?.modalStack);
         logger.info(
-          `[NAVIGATION_GRAPH] Edge added: ${graph.currentScreen} → ${screenName} via ${interaction.toolName}${uiStateInfo}`
+          `[NAVIGATION_GRAPH] Edge added: ${graph.currentScreen} → ${screenName} via ${interaction.toolName}${uiStateInfo}${modalInfo}`
         );
       } else {
         logger.info(
@@ -167,6 +182,25 @@ export class NavigationGraphManager implements NavigationGraph {
     }
 
     graph.currentScreen = screenName;
+  }
+
+  /**
+   * Format modal stack change for logging.
+   */
+  private formatModalStackChange(from: any[] | undefined, to: any[] | undefined): string {
+    if (!from && !to) {
+      return "";
+    }
+    if (!from && to) {
+      return ` [modals: 0 → ${to.length}]`;
+    }
+    if (from && !to) {
+      return ` [modals: ${from.length} → 0]`;
+    }
+    if (from && to && from.length !== to.length) {
+      return ` [modals: ${from.length} → ${to.length}]`;
+    }
+    return "";
   }
 
   /**
@@ -192,7 +226,10 @@ export class NavigationGraphManager implements NavigationGraph {
     const uiStateInfo = uiState?.selectedElements.length
       ? ` (UI: ${uiState.selectedElements.map(e => e.text || e.resourceId).join(", ")})`
       : "";
-    logger.debug(`[NAVIGATION_GRAPH] Tool call recorded: ${toolName} at ${timestamp}${uiStateInfo}`);
+    const modalInfo = uiState?.modalStack?.length
+      ? ` [${uiState.modalStack.length} modal(s)]`
+      : "";
+    logger.debug(`[NAVIGATION_GRAPH] Tool call recorded: ${toolName} at ${timestamp}${uiStateInfo}${modalInfo}`);
 
     // Clean up old tool calls
     this.cleanupToolCallHistory(graph);
