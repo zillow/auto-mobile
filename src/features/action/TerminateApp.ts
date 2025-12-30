@@ -27,15 +27,41 @@ export class TerminateApp extends BaseVisualChange {
     options?: {
       progress?: ProgressCallback;
       skipObservation?: boolean;
+      userId?: number;
     }
   ): Promise<TerminateAppResult> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("terminateApp");
 
     const terminateLogic = async (): Promise<TerminateAppResult> => {
+      // Auto-detect target user if not specified
+      const targetUserId = await perf.track("detectTargetUser", async () => {
+        if (options?.userId !== undefined) {
+          return options.userId;
+        }
+
+        // Check if app is in foreground and get its user
+        const foregroundApp = await this.adb.getForegroundApp();
+        if (foregroundApp && foregroundApp.packageName === packageName) {
+          return foregroundApp.userId;
+        }
+
+        // Get list of users and prefer work profile
+        const users = await this.adb.listUsers();
+
+        // Find first work profile (userId > 0 and running)
+        const workProfile = users.find(u => u.userId > 0 && u.running);
+        if (workProfile) {
+          return workProfile.userId;
+        }
+
+        // Fall back to primary user
+        return 0;
+      });
+
       // Check if app is installed
       const isInstalled = await perf.track("checkInstalled", async () => {
-        const isInstalledCmd = `shell pm list packages -f ${packageName} | grep -c ${packageName}`;
+        const isInstalledCmd = `shell pm list packages --user ${targetUserId} -f ${packageName} | grep -c ${packageName}`;
         const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd, undefined, undefined, true);
         return parseInt(isInstalledOutput.trim(), 10) > 0;
       });
@@ -47,7 +73,8 @@ export class TerminateApp extends BaseVisualChange {
           packageName,
           wasInstalled: false,
           wasRunning: false,
-          wasForeground: false
+          wasForeground: false,
+          userId: targetUserId
         };
       }
 
@@ -61,31 +88,21 @@ export class TerminateApp extends BaseVisualChange {
           packageName,
           wasInstalled: true,
           wasRunning: false,
-          wasForeground: false
+          wasForeground: false,
+          userId: targetUserId
         };
       }
 
-      // Check if app is in foreground
+      // Check if app is in foreground using getForegroundApp (which returns user context)
       const isForeground = await perf.track("checkForeground", async () => {
-        try {
-          const currentAppCmd = `shell "dumpsys window windows | grep '${packageName}'"`;
-          const currentAppOutput = await this.adb.executeCommand(currentAppCmd, undefined, undefined, true);
-
-          // App is in foreground if it's either the top app or an IME target
-          const isTopApp = currentAppOutput.includes(`topApp=ActivityRecord{`) &&
-            currentAppOutput.includes(`${packageName}`);
-          const isImeTarget = currentAppOutput.includes(`imeLayeringTarget`) &&
-            currentAppOutput.includes(`${packageName}`);
-
-          return isTopApp || isImeTarget;
-        } catch {
-          // grep returns non-zero when no matches found
-          return false;
-        }
+        const foregroundApp = await this.adb.getForegroundApp();
+        return foregroundApp !== null &&
+               foregroundApp.packageName === packageName &&
+               foregroundApp.userId === targetUserId;
       });
 
       await perf.track("forceStop", async () => {
-        await this.adb.executeCommand(`shell am force-stop ${packageName}`);
+        await this.adb.executeCommand(`shell am force-stop --user ${targetUserId} ${packageName}`);
       });
 
       perf.end();
@@ -95,6 +112,7 @@ export class TerminateApp extends BaseVisualChange {
         wasInstalled: true,
         wasRunning: true,
         wasForeground: isForeground,
+        userId: targetUserId
       };
     };
 

@@ -1,47 +1,9 @@
 import { exec, spawn } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
-import { BootedDevice, ExecResult } from "../../models";
+import { BootedDevice, ExecResult, AndroidUser } from "../../models";
 import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
-
-/**
- * Interface for executing ADB commands
- * Enables dependency injection and testing with fakes
- */
-export interface AdbExecutor {
-  /**
-   * Execute an ADB command
-   * @param command - The ADB command to execute (without "adb -s <device>" prefix)
-   * @param timeoutMs - Optional timeout in milliseconds
-   * @param maxBuffer - Optional maximum buffer size for command output
-   * @param noRetry - Optional flag to disable retry logic
-   * @returns Promise with command output
-   */
-  executeCommand(
-    command: string,
-    timeoutMs?: number,
-    maxBuffer?: number,
-    noRetry?: boolean,
-  ): Promise<ExecResult>;
-
-  /**
-   * Get the list of booted Android devices
-   * @returns Promise with array of booted devices
-   */
-  getBootedAndroidDevices(): Promise<BootedDevice[]>;
-
-  /**
-   * Check if the device screen is currently on
-   * @returns Promise<boolean> - true if screen is on (Awake), false otherwise
-   */
-  isScreenOn(): Promise<boolean>;
-
-  /**
-   * Get the device wakefulness state
-   * @returns Promise with wakefulness state: "Awake", "Asleep", "Dozing", or null if unknown
-   */
-  getWakefulness(): Promise<"Awake" | "Asleep" | "Dozing" | null>;
-}
+import { AdbExecutor } from "./interfaces/AdbExecutor";
 
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
@@ -310,6 +272,84 @@ export class AdbClient implements AdbExecutor {
       return null;
     } catch {
       logger.debug("[ADB] Failed to get wakefulness state");
+      return null;
+    }
+  }
+
+  /**
+   * List all Android users on the device (personal, work profiles, etc.)
+   * Parses output from "pm list users" command
+   * Example output:
+   *   Users:
+   *     UserInfo{0:Owner:13} running
+   *     UserInfo{10:Work profile:30} running
+   * @returns Promise with array of Android users
+   */
+  async listUsers(): Promise<AndroidUser[]> {
+    try {
+      const result = await this.executeCommand("shell pm list users", undefined, undefined, true);
+      const lines = result.stdout.split("\n");
+      const users: AndroidUser[] = [];
+
+      for (const line of lines) {
+        // Match pattern: UserInfo{userId:name:flags} [running]
+        const match = line.match(/UserInfo\{(\d+):([^:]+):(\d+)\}\s*(running)?/);
+        if (match) {
+          users.push({
+            userId: parseInt(match[1], 10),
+            name: match[2],
+            flags: parseInt(match[3], 10),
+            running: match[4] === "running"
+          });
+        }
+      }
+
+      logger.info(`[ADB] Found ${users.length} user(s): ${users.map(u => `${u.userId}:${u.name}`).join(", ")}`);
+      return users;
+    } catch (error) {
+      logger.warn(`[ADB] Failed to list users: ${(error as Error).message}`);
+      // Return primary user as fallback
+      return [{
+        userId: 0,
+        name: "Owner",
+        flags: 13,
+        running: true
+      }];
+    }
+  }
+
+  /**
+   * Get the current foreground app package name and user ID
+   * Uses dumpsys activity to find the resumed/focused activity
+   * @returns Promise with { packageName: string, userId: number } or null if no app in foreground
+   */
+  async getForegroundApp(): Promise<{ packageName: string; userId: number } | null> {
+    try {
+      const result = await this.executeCommand(
+        'shell dumpsys activity activities | grep -E "(mResumedActivity|mFocusedActivity|topResumedActivity)" | head -1',
+        undefined,
+        undefined,
+        true
+      );
+
+      // Parse output to extract package name and user ID
+      // Example patterns:
+      //   mResumedActivity: ActivityRecord{abc1234 u0 com.example.app/.MainActivity t123}
+      //   mFocusedActivity: ActivityRecord{abc1234 u10 com.example.app/.MainActivity t123}
+      //   topResumedActivity=ActivityRecord{abc1234 u0 com.example.app/.MainActivity t123}
+
+      const match = result.stdout.match(/u(\d+)\s+([a-zA-Z0-9._]+)\//);
+      if (match) {
+        const userId = parseInt(match[1], 10);
+        const packageName = match[2];
+        logger.info(`[ADB] Foreground app: ${packageName} (user ${userId})`);
+        return { packageName, userId };
+      }
+
+      logger.debug("[ADB] No foreground app detected");
+      return null;
+    } catch (error) {
+      logger.debug(`[ADB] Failed to get foreground app: ${(error as Error).message}`);
       return null;
     }
   }

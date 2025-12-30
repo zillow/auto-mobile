@@ -9,6 +9,8 @@ export interface TerminateAppResult {
   wasInstalled: boolean;
   wasRunning: boolean;
   wasForeground: boolean;
+  /** Android user ID where the app was terminated (0 for primary user, 10+ for work profiles) */
+  userId?: number;
   observation?: ObserveResult;
   error?: string;
 }

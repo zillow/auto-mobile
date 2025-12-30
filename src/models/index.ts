@@ -1,5 +1,6 @@
 export * from "./ActionableError";
 export * from "./ActiveWindowInfo";
+export * from "./AndroidUser";
 export * from "./AppStatusResult";
 export * from "./ClearAppDataResult";
 export * from "./ClearTextResult";
@@ -19,6 +20,7 @@ export * from "./GestureOptions";
 export * from "./GfxMetrics";
 export * from "./HomeScreenResult";
 export * from "./ImeActionResult";
+export * from "./InstalledApp";
 export * from "./InstallAppResult";
 export * from "./IntentChooserResult";
 export * from "./LaunchAppResult";

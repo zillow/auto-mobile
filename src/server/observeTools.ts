@@ -34,12 +34,22 @@ export function registerObserveTools() {
   const listAppsHandler = async (device: BootedDevice) => {
     try {
       const listInstalledApps = new ListInstalledApps(device);
-      const apps = await listInstalledApps.execute();
 
-      return createJSONToolResponse({
-        message: `Listed ${apps.length} apps`,
-        apps
-      });
+      // For Android, return detailed app info with userId, foreground status, etc.
+      // For iOS, return simple package names
+      if (device.platform === "android") {
+        const apps = await listInstalledApps.executeDetailed();
+        return createJSONToolResponse({
+          message: `Listed ${apps.length} app installation(s) across all user profiles`,
+          apps
+        });
+      } else {
+        const apps = await listInstalledApps.execute();
+        return createJSONToolResponse({
+          message: `Listed ${apps.length} apps`,
+          apps
+        });
+      }
     } catch (error) {
       throw new ActionableError(`Failed to list apps: ${error}`);
     }
@@ -55,7 +65,7 @@ export function registerObserveTools() {
 
   ToolRegistry.registerDeviceAware(
     "listApps",
-    "List all apps installed on the device",
+    "List all apps installed on the device. For Android, returns detailed info including userId (0=personal, 10+=work profile), foreground status, and recent status. For iOS, returns package names only.",
     listAppsSchema,
     listAppsHandler
   );

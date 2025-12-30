@@ -1,5 +1,5 @@
 import { AdbExecutor } from "../../src/utils/android-cmdline-tools/interfaces/AdbExecutor";
-import { BootedDevice, ExecResult } from "../../src/models";
+import { BootedDevice, ExecResult, AndroidUser } from "../../src/models";
 
 /**
  * Fake implementation of AdbExecutor for testing
@@ -14,6 +14,8 @@ export class FakeAdbExecutor implements AdbExecutor {
   private screenOn: boolean = true;
   private wakefulness: "Awake" | "Asleep" | "Dozing" | null = "Awake";
   private devices: BootedDevice[] = [];
+  private users: AndroidUser[] = [{ userId: 0, name: "Owner", flags: 13, running: true }];
+  private foregroundApp: { packageName: string; userId: number } | null = null;
 
   /**
    * Create a proper ExecResult with all required methods
@@ -72,6 +74,22 @@ export class FakeAdbExecutor implements AdbExecutor {
    */
   setDevices(devices: BootedDevice[]): void {
     this.devices = devices;
+  }
+
+  /**
+   * Configure Android users (for work profile testing)
+   * @param users - Array of Android users
+   */
+  setUsers(users: AndroidUser[]): void {
+    this.users = users;
+  }
+
+  /**
+   * Configure foreground app
+   * @param app - Foreground app info or null
+   */
+  setForegroundApp(app: { packageName: string; userId: number } | null): void {
+    this.foregroundApp = app;
   }
 
   /**
@@ -137,5 +155,13 @@ export class FakeAdbExecutor implements AdbExecutor {
 
   async getWakefulness(): Promise<"Awake" | "Asleep" | "Dozing" | null> {
     return this.wakefulness;
+  }
+
+  async listUsers(): Promise<AndroidUser[]> {
+    return this.users;
+  }
+
+  async getForegroundApp(): Promise<{ packageName: string; userId: number } | null> {
+    return this.foregroundApp;
   }
 }

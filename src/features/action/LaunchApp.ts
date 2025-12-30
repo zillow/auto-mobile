@@ -153,20 +153,22 @@ export class LaunchApp extends BaseVisualChange {
    * @param coldBoot - Whether to cold boot the app or resume if already running
    * @param activityName - Optional activity name to launch (Android only)
    * @param foregroundCheckMode - Experimental: strategy for checking if app is in foreground
+   * @param userId - Optional Android user ID (auto-detected if not provided)
    */
   async execute(
     packageName: string,
     clearAppData: boolean,
     coldBoot: boolean,
     activityName?: string,
-    foregroundCheckMode: ForegroundCheckMode = "single"
+    foregroundCheckMode: ForegroundCheckMode = "single",
+    userId?: number
   ): Promise<LaunchAppResult> {
     logger.info("execute");
     switch (this.device.platform) {
       case "ios":
         return this.executeiOS(packageName, clearAppData, coldBoot);
       case "android":
-        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName, foregroundCheckMode);
+        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName, foregroundCheckMode, userId);
       default:
         throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
     }
@@ -243,18 +245,48 @@ export class LaunchApp extends BaseVisualChange {
    * @param coldBoot - Whether to cold boot the app or resume if already running
    * @param activityName - Optional activity name to launch
    * @param foregroundCheckMode - Strategy for checking if app is in foreground
+   * @param userId - Optional Android user ID (auto-detected if not provided)
    */
   private async executeAndroid(
     packageName: string,
     clearAppData: boolean,
     coldBoot: boolean,
     activityName?: string,
-    foregroundCheckMode: ForegroundCheckMode = "single"
+    foregroundCheckMode: ForegroundCheckMode = "single",
+    userId?: number
   ): Promise<LaunchAppResult> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("launchApp");
 
     logger.info(`executeAndroid: ${packageName}`);
+
+    // Auto-detect target user if not specified
+    const targetUserId = await perf.track("detectTargetUser", async () => {
+      if (userId !== undefined) {
+        return userId;
+      }
+
+      // Check if app is in foreground and get its user
+      const foregroundApp = await this.adb.getForegroundApp();
+      if (foregroundApp && foregroundApp.packageName === packageName) {
+        logger.info(`[LaunchApp] App is in foreground in user ${foregroundApp.userId}`);
+        return foregroundApp.userId;
+      }
+
+      // Get list of users and prefer work profile
+      const users = await this.adb.listUsers();
+
+      // Find first work profile (userId > 0 and running)
+      const workProfile = users.find(u => u.userId > 0 && u.running);
+      if (workProfile) {
+        logger.info(`[LaunchApp] Using work profile: user ${workProfile.userId}`);
+        return workProfile.userId;
+      }
+
+      // Fall back to primary user
+      logger.info(`[LaunchApp] Using primary user: user 0`);
+      return 0;
+    });
 
     // Check app status (installation and running)
     const installedApps = await perf.track("checkInstalled", async () => {
@@ -266,6 +298,7 @@ export class LaunchApp extends BaseVisualChange {
       return {
         success: false,
         packageName: packageName,
+        userId: targetUserId,
         error: "App is not installed"
       };
     }
@@ -297,18 +330,23 @@ export class LaunchApp extends BaseVisualChange {
 
       // Skip foreground check if we just terminated or cleared - we know app is not in foreground
       if (!didTerminateOrClear) {
-        // Check if app is in foreground - use a more reliable approach
-        const isForeground = await perf.track(`checkForeground_${foregroundCheckMode}`, async () => {
-          return this.checkAppForeground(packageName, foregroundCheckMode, perf);
+        // Check if app is in foreground - use getForegroundApp which returns user context
+        const foregroundApp = await perf.track(`checkForeground`, async () => {
+          return this.adb.getForegroundApp();
         });
 
+        const isForeground = foregroundApp &&
+                             foregroundApp.packageName === packageName &&
+                             foregroundApp.userId === targetUserId;
+
         if (isForeground) {
-          logger.info(`[LaunchApp] App ${packageName} is already in foreground`);
+          logger.info(`[LaunchApp] App ${packageName} is already in foreground in user ${targetUserId}`);
           perf.end();
           const result: LaunchAppResult = {
             success: true,
             packageName,
             activityName,
+            userId: targetUserId,
             error: "App is already in foreground"
           };
           // Add perfTiming if enabled
@@ -318,6 +356,7 @@ export class LaunchApp extends BaseVisualChange {
               updatedAt: new Date().toISOString(),
               screenSize: { width: 0, height: 0 },
               systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+              userId: targetUserId,
               perfTiming: timings
             };
           }
@@ -337,7 +376,7 @@ export class LaunchApp extends BaseVisualChange {
 
     return this.observedInteraction(
       async () => {
-        return this.performLaunch(packageName, activityName, perf);
+        return this.performLaunch(packageName, activityName, targetUserId, perf);
       },
       {
         changeExpected: false,
@@ -438,17 +477,18 @@ export class LaunchApp extends BaseVisualChange {
   private async performLaunch(
     packageName: string,
     activityName: string | undefined,
+    userId: number,
     perf: PerformanceTracker
-  ): Promise<{ success: boolean; packageName: string; activityName?: string }> {
+  ): Promise<{ success: boolean; packageName: string; activityName?: string; userId: number }> {
     let targetActivity = activityName;
 
     // Try am start with intent first (alternative to monkey)
     if (!targetActivity) {
       const intentResult = await perf.track("intentLaunch", async () => {
-        logger.info(`[LaunchApp] Trying am start with intent`);
+        logger.info(`[LaunchApp] Trying am start with intent for user ${userId}`);
         try {
           // Use am start with MAIN/LAUNCHER intent - more reliable than monkey
-          const intentCmd = `shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n ${packageName}/.MainActivity 2>/dev/null || am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
+          const intentCmd = `shell am start --user ${userId} -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n ${packageName}/.MainActivity 2>/dev/null || am start --user ${userId} -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
           logger.info(`[LaunchApp] Intent command: ${intentCmd}`);
           const result = await this.adb.executeCommand(intentCmd);
           // Check if launch was successful (no "Error" in output)
@@ -469,7 +509,8 @@ export class LaunchApp extends BaseVisualChange {
         return {
           success: true,
           packageName,
-          activityName: "intent_launch"
+          activityName: "intent_launch",
+          userId
         };
       }
     }
@@ -477,9 +518,9 @@ export class LaunchApp extends BaseVisualChange {
     // Try monkey launch as fallback (fast but less reliable)
     if (!targetActivity) {
       const monkeyResult = await perf.track("monkeyLaunch", async () => {
-        logger.info(`[LaunchApp] Trying monkey launch (fallback approach)`);
+        logger.info(`[LaunchApp] Trying monkey launch (fallback approach) for user ${userId}`);
         try {
-          const monkeyCmd = `shell monkey -p ${packageName} 1`;
+          const monkeyCmd = `shell monkey -p ${packageName} --user ${userId} 1`;
           logger.info(`[LaunchApp] Monkey command: ${monkeyCmd}`);
           await this.adb.executeCommand(monkeyCmd);
           logger.info(`[LaunchApp] Monkey launch completed successfully`);
@@ -495,7 +536,8 @@ export class LaunchApp extends BaseVisualChange {
         return {
           success: true,
           packageName,
-          activityName: "monkey_launch"
+          activityName: "monkey_launch",
+          userId
         };
       }
     }
@@ -526,7 +568,7 @@ export class LaunchApp extends BaseVisualChange {
           for (const pattern of commonPatterns) {
             try {
               logger.info(`[LaunchApp] Trying common pattern: ${pattern}`);
-              await this.adb.executeCommand(`shell am start -n ${packageName}/${pattern}`);
+              await this.adb.executeCommand(`shell am start --user ${userId} -n ${packageName}/${pattern}`);
               logger.info(`[LaunchApp] Successfully launched with pattern: ${pattern}`);
               return { success: true, pattern };
             } catch (error) {
@@ -541,7 +583,8 @@ export class LaunchApp extends BaseVisualChange {
           return {
             success: true,
             packageName,
-            activityName: patternResult.pattern
+            activityName: patternResult.pattern,
+            userId
           };
         }
       }
@@ -550,8 +593,8 @@ export class LaunchApp extends BaseVisualChange {
     // Launch with specific activity if found, otherwise use default method
     if (targetActivity) {
       await perf.track("launchActivity", async () => {
-        logger.info(`[LaunchApp] Launching with activity: ${targetActivity}`);
-        const launchCmd = `shell am start -n ${packageName}/${targetActivity}`;
+        logger.info(`[LaunchApp] Launching with activity: ${targetActivity} for user ${userId}`);
+        const launchCmd = `shell am start --user ${userId} -n ${packageName}/${targetActivity}`;
         logger.info(`[LaunchApp] Launch command: ${launchCmd}`);
         await this.adb.executeCommand(launchCmd);
         logger.info(`[LaunchApp] Launch command completed successfully`);
@@ -559,9 +602,9 @@ export class LaunchApp extends BaseVisualChange {
     } else {
       // Fallback to launcher intent
       await perf.track("launcherIntent", async () => {
-        logger.info(`[LaunchApp] No activity found, trying launcher intent`);
+        logger.info(`[LaunchApp] No activity found, trying launcher intent for user ${userId}`);
         try {
-          const launcherCmd = `shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
+          const launcherCmd = `shell am start --user ${userId} -a android.intent.action.MAIN -c android.intent.category.LAUNCHER ${packageName}`;
           logger.info(`[LaunchApp] Launcher intent command: ${launcherCmd}`);
           await this.adb.executeCommand(launcherCmd);
           logger.info(`[LaunchApp] Launcher intent completed successfully`);
@@ -577,7 +620,8 @@ export class LaunchApp extends BaseVisualChange {
     return {
       success: true,
       packageName,
-      activityName: targetActivity
+      activityName: targetActivity,
+      userId
     };
   }
 }
