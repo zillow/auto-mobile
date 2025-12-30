@@ -2,7 +2,23 @@
 
 This project includes Docker support for running AutoMobile in a containerized environment with all required Android development tools.
 
-## Quick Start
+## For MCP Clients (Claude Desktop, Continue.dev, etc.)
+
+To use this Docker image with MCP clients, see the [MCP Client Configuration Guide](docs/mcp-docker-config.md) for complete setup instructions.
+
+**Quick example for Claude Desktop**:
+```json
+{
+  "mcpServers": {
+    "auto-mobile": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "--init", "--privileged", "--network", "host", "auto-mobile:latest"]
+    }
+  }
+}
+```
+
+## For Development & Testing
 
 ```bash
 # Build the image
@@ -75,4 +91,24 @@ docker-compose build --no-cache
 docker-compose up
 ```
 
-For more help, see the [full Docker documentation](docs/docker.md).
+## Testing
+
+### Validate Dockerfile
+```bash
+# Lint Dockerfile
+./scripts/docker/validate_dockerfile.sh
+
+# Run container structure tests
+./scripts/docker/test_container.sh
+```
+
+### Test MCP stdio Protocol
+```bash
+# Build image
+docker build -t auto-mobile:latest .
+
+# Test stdio communication
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | docker run -i --rm --init auto-mobile:latest
+```
+
+For more help, see the [full Docker documentation](docs/docker.md) and [MCP configuration guide](docs/mcp-docker-config.md).

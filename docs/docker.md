@@ -22,6 +22,8 @@ The Docker setup provides a complete Android development environment with:
 
 ## Quick Start
 
+> **Note**: If you're setting up AutoMobile for use with MCP clients (Claude Desktop, Continue.dev, Cline, etc.), see the [MCP Client Configuration Guide](mcp-docker-config.md) for specific setup instructions.
+
 ### Build the Docker Image
 
 ```bash
@@ -336,8 +338,67 @@ test:
     - docker run --rm auto-mobile:test npm test
 ```
 
+## Validation and Testing
+
+### Dockerfile Validation
+
+Validate the Dockerfile using hadolint:
+
+```bash
+./scripts/docker/validate_dockerfile.sh
+```
+
+This checks for:
+- Best practices violations
+- Security issues
+- Performance problems
+- Maintainability concerns
+
+### Container Structure Tests
+
+Run comprehensive container tests:
+
+```bash
+# Build the image first
+docker build -t auto-mobile:latest .
+
+# Run tests
+./scripts/docker/test_container.sh
+```
+
+Tests include:
+- Image existence and startup
+- Node.js and Java versions
+- Android SDK components
+- Development tools availability
+- MCP stdio protocol communication
+- User configuration
+- Init system (tini) presence
+
+### MCP stdio Protocol Testing
+
+Test the MCP server's stdio communication:
+
+```bash
+# Send an initialize request
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | docker run -i --rm --init auto-mobile:latest
+```
+
+Expected response should be a JSON-RPC message with server capabilities.
+
+### CI/CD Testing
+
+The project includes a GitHub Actions workflow (`.github/workflows/docker.yml`) that automatically:
+- Lints the Dockerfile with hadolint
+- Builds the Docker image
+- Runs container structure tests
+- Tests MCP stdio protocol
+- Scans for security vulnerabilities with Trivy
+- Validates docker-compose configuration
+
 ## Next Steps
 
+- [MCP Client Configuration](mcp-docker-config.md) - Configure MCP clients to use Docker
 - [Installation Guide](installation.md) - Native installation
 - [Getting Started](getting-started.md) - Using AutoMobile
-- [MCP Server Documentation](mcp-server.md) - Server configuration
+- [MCP Server Documentation](mcp-server.md) - Server capabilities

@@ -130,5 +130,16 @@ RUN node --version \
     && shellcheck --version \
     && xmlstarlet --version
 
-# Default command
-CMD ["npm", "start"]
+# Install tini for proper signal handling (PID 1 problem)
+# This is critical for stdio-based MCP servers
+USER root
+RUN curl -L -o /usr/local/bin/tini https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64 \
+    && chmod +x /usr/local/bin/tini
+USER automobile
+
+# Entrypoint for proper signal handling
+ENTRYPOINT ["/usr/local/bin/tini", "--"]
+
+# Default command - Run MCP server in stdio mode (default)
+# For other transports, override with: docker run ... npm run dev:sse
+CMD ["node", "dist/src/index.js"]

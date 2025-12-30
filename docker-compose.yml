@@ -40,8 +40,10 @@ services:
     # Working directory
     working_dir: /workspace
 
-    # Default command (can be overridden)
-    command: npm start
+    # Override default command for different transport mode
+    # Default Dockerfile CMD is: node dist/src/index.js (stdio mode)
+    # Override here for streamable mode
+    command: ["npm", "start"]
 
   # Development service with auto-reload
   auto-mobile-dev:
@@ -70,7 +72,7 @@ services:
     working_dir: /workspace
 
     # Run in development mode with auto-reload
-    command: npm run dev
+    command: ["npm", "run", "dev"]
 
 volumes:
   android-sdk:
