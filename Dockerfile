@@ -4,6 +4,7 @@
 # This Dockerfile pins specific versions for reproducibility and security.
 # Versions should be updated periodically by checking the following sources:
 #
+# - Azul Zulu JDK: https://hub.docker.com/r/azul/zulu-openjdk-alpine
 # - Node.js: https://nodejs.org/en/about/previous-releases (LTS versions)
 # - ktfmt: https://github.com/facebook/ktfmt/releases
 # - lychee: https://github.com/lycheeverse/lychee/releases
@@ -22,7 +23,8 @@
 # ==============================================================================
 # BUILDER STAGE - Contains all build-time dependencies
 # ==============================================================================
-FROM --platform=linux/amd64 ubuntu:24.04 AS builder
+ARG ZULU_VERSION=21.0.2
+FROM --platform=linux/amd64 azul/zulu-openjdk-alpine:${ZULU_VERSION} AS builder
 
 # Metadata labels for Docker Hub
 LABEL org.opencontainers.image.title="AutoMobile" \
@@ -35,51 +37,51 @@ LABEL org.opencontainers.image.title="AutoMobile" \
       platform.architecture="x86_64-only" \
       platform.note="Android SDK requires x86_64; ARM64 not supported"
 
-# Avoid prompts from apt
-ENV DEBIAN_FRONTEND=noninteractive
+# Set environment
+ENV TERM=dumb
+ENV PAGER=cat
 
 # Set up environment variables for Android SDK
 ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/35.0.0
 
-# Use bash with pipefail for better error handling
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-# Install base system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install base system dependencies with Alpine apk
+RUN apk --no-cache add \
     # Build essentials
-    build-essential \
+    bash \
     curl \
     wget \
     git \
     unzip \
     zip \
     tar \
-    # Java 21 (required for Android build tools and ktfmt)
-    openjdk-21-jdk \
+    gzip \
+    # Alpine compatibility layer for glibc (needed for Android tools)
+    gcompat \
     # Development tools
     ripgrep \
     shellcheck \
     xmlstarlet \
     jq \
+    yq \
     # Required for better-sqlite3 and other native modules
     python3 \
-    python3-pip \
+    py3-pip \
     make \
     g++ \
-    # Android emulator dependencies (if needed)
-    libgl1-mesa-dev \
-    libpulse0 \
     # Utilities
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    openssh-client \
+    openssl-dev
 
-# Install Node.js 24.x
-# Check for updates: https://nodejs.org/en/about/previous-releases
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Now that bash is installed, set it as the default shell
+SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
+
+# Install Node.js 24.x for Alpine
+# Alpine uses different approach than Ubuntu
+ENV NODE_VERSION=24.12.0
+RUN apk add --no-cache nodejs npm
 
 # Install ktfmt (Kotlin formatter)
 # Check for updates: https://github.com/facebook/ktfmt/releases
@@ -94,7 +96,7 @@ RUN mkdir -p /opt/ktfmt \
 # Check for updates: https://github.com/lycheeverse/lychee/releases
 ENV LYCHEE_VERSION=0.19.1
 RUN curl -L -o /tmp/lychee.tar.gz \
-       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-gnu.tar.gz" \
+       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-musl.tar.gz" \
     && tar -xzf /tmp/lychee.tar.gz -C /tmp \
     && mv /tmp/lychee /usr/local/bin/lychee \
     && chmod +x /usr/local/bin/lychee \
@@ -143,41 +145,35 @@ RUN npm run build
 # ==============================================================================
 # RUNTIME STAGE - Minimal image with only runtime dependencies
 # ==============================================================================
-FROM --platform=linux/amd64 ubuntu:24.04 AS runtime
+FROM --platform=linux/amd64 azul/zulu-openjdk-alpine:${ZULU_VERSION} AS runtime
 
-# Avoid prompts from apt
-ENV DEBIAN_FRONTEND=noninteractive
+# Set environment
+ENV TERM=dumb
+ENV PAGER=cat
 
 # Set up environment variables for Android SDK
 ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/35.0.0
 
-# Use bash with pipefail for better error handling
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
 # Install runtime dependencies only (no build tools)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Node.js runtime dependencies
+RUN apk --no-cache add \
+    # Node.js runtime
+    nodejs \
+    npm \
+    # Runtime utilities
+    bash \
     curl \
     ca-certificates \
-    # Java 21 runtime (required for Android tools and ktfmt)
-    openjdk-21-jre-headless \
-    # Runtime utilities
     ripgrep \
     shellcheck \
     xmlstarlet \
     jq \
-    # Android emulator dependencies (if needed at runtime)
-    libgl1-mesa-dev \
-    libpulse0 \
-    && rm -rf /var/lib/apt/lists/*
+    # Alpine compatibility layer for Android tools
+    gcompat
 
-# Install Node.js 24.x
-# Check for updates: https://nodejs.org/en/about/previous-releases
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Now that bash is installed, set it as the default shell
+SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
 # Copy Android SDK from builder (needed for ADB at runtime)
 COPY --from=builder /opt/android-sdk /opt/android-sdk
@@ -212,7 +208,7 @@ RUN curl -L -o /usr/local/bin/tini "https://github.com/krallin/tini/releases/dow
     && chmod +x /usr/local/bin/tini
 
 # Create a non-root user for running the application
-RUN useradd -m automobile \
+RUN adduser -D automobile \
     && chown -R automobile:automobile /workspace \
     && mkdir -p /home/automobile/.android \
     && chown -R automobile:automobile /home/automobile/.android

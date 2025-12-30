@@ -3,10 +3,10 @@
 
 # Ignore rules
 ignored:
-  # DL3008: Pin versions in apt-get install - we use latest for base system tools
-  - DL3008
-  # DL3009: Delete apt-cache after installation - we already do this with rm -rf
-  - DL3009
+  # DL3018: Pin versions in apk add - Alpine package versions change frequently
+  - DL3018
+  # DL3029: Do not use --platform flag - intentional to enforce x86_64 architecture
+  - DL3029
   # DL3059: Multiple consecutive RUN instructions - optimizing for readability
   - DL3059
 
