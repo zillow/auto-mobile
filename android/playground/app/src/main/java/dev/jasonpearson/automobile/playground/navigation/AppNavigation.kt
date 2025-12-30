@@ -24,6 +24,8 @@ import dev.jasonpearson.automobile.mediaplayer.VideoPlayerScreen
 import dev.jasonpearson.automobile.onboarding.OnboardingScreen
 import dev.jasonpearson.automobile.settings.SettingsScreen
 import dev.jasonpearson.automobile.slides.SlidesScreen
+import dev.jasonpearson.automobile.sdk.AutoMobileSDK
+import dev.jasonpearson.automobile.sdk.adapters.Navigation3Adapter
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 import dev.jasonpearson.automobile.storage.NavigationTracker
 import dev.jasonpearson.automobile.storage.UserPreferences
@@ -200,6 +202,15 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
   // Create back stack using nav3 with state restoration
   val backStack = rememberNavBackStack(startDestination)
 
+  // Register a navigation listener to log all navigation events
+  LaunchedEffect(Unit) {
+    AutoMobileSDK.addNavigationListener { event ->
+      Log.d(
+          TAG,
+          "AutoMobileSDK Navigation Event: destination=${event.destination}, source=${event.source}, arguments=${event.arguments}, metadata=${event.metadata}")
+    }
+  }
+
   // Set up the deep link callback for runtime navigation
   LaunchedEffect(Unit) {
     Log.d(TAG, "Setting up deep link callback")
@@ -266,7 +277,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
               rememberViewModelStoreNavEntryDecorator()),
       entryProvider =
           entryProvider {
-            entry<OnboardingDestination> {
+            entry<OnboardingDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
               LaunchedEffect(Unit) {
                 Log.d(TAG, "Navigated to OnboardingScreen")
                 analyticsTracker.trackScreenView("OnboardingScreen")
@@ -284,7 +296,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
               }
             }
 
-            entry<LoginDestination> {
+            entry<LoginDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
               LaunchedEffect(Unit) {
                 Log.d(TAG, "Navigated to LoginScreen")
                 analyticsTracker.trackScreenView("LoginScreen")
@@ -310,6 +323,11 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
             }
 
             entry<HomeDestination> { homeDestination ->
+              Navigation3Adapter.TrackNavigation(
+                  destination = homeDestination,
+                  extractArguments = {
+                    mapOf("selectedTab" to it.selectedTab, "selectedSubTab" to it.selectedSubTab)
+                  })
               LaunchedEffect(Unit) {
                 Log.d(
                     TAG,
@@ -357,6 +375,9 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
             }
 
             entry<SlidesDestination> { slidesDestination ->
+              Navigation3Adapter.TrackNavigation(
+                  destination = slidesDestination,
+                  extractArguments = { mapOf("slideIndex" to it.slideIndex) })
               LaunchedEffect(Unit) {
                 Log.d(
                     TAG,
@@ -379,6 +400,9 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
             }
 
             entry<VideoPlayerDestination> { videoPlayerDestination ->
+              Navigation3Adapter.TrackNavigation(
+                  destination = videoPlayerDestination,
+                  extractArguments = { mapOf("videoId" to it.videoId) })
               LaunchedEffect(Unit) {
                 Log.d(
                     TAG,
@@ -400,7 +424,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                   }
             }
 
-            entry<SettingsDestination> {
+            entry<SettingsDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
               LaunchedEffect(Unit) {
                 Log.d(TAG, "Navigated to SettingsScreen")
                 analyticsTracker.trackScreenView("SettingsScreen")

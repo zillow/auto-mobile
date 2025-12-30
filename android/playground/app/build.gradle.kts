@@ -77,6 +77,9 @@ dependencies {
   // Splash Screen API support for Android 12+ backported to API 23+
   implementation(libs.androidx.core.splashscreen)
 
+  // AutoMobile SDK for navigation tracking
+  implementation(projects.autoMobileSdk)
+
   // Playground module dependencies
   implementation(projects.playground.design.system)
   implementation(projects.playground.login)
