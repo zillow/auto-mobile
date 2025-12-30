@@ -1,0 +1,176 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Accessibility Service APK
+        run: |
+          cd android
+          ./gradlew clean
+          ./gradlew :accessibility-service:assembleDebug
+
+      - name: Verify APK exists
+        run: |
+          APK_PATH="android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "Error: APK not found at $APK_PATH"
+            exit 1
+          fi
+          echo "APK found at $APK_PATH"
+          ls -lh "$APK_PATH"
+
+      - name: Calculate APK checksum
+        id: checksum
+        run: |
+          APK_PATH="android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
+          CHECKSUM=$(sha256sum "$APK_PATH" | cut -d' ' -f1)
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+          echo "APK SHA256: $CHECKSUM"
+
+      - name: Update AccessibilityServiceManager with new version and checksum
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHECKSUM="${{ steps.checksum.outputs.checksum }}"
+
+          # Update APK_URL version
+          sed -i "s|releases/download/v[0-9]\+\.[0-9]\+\.[0-9]\+/|releases/download/v${VERSION}/|g" \
+            src/utils/AccessibilityServiceManager.ts
+
+          # Update checksum
+          sed -i "s/const expectedChecksum = \"[a-f0-9]\{64\}\";/const expectedChecksum = \"${CHECKSUM}\";/g" \
+            src/utils/AccessibilityServiceManager.ts
+
+          echo "Updated AccessibilityServiceManager.ts"
+
+      - name: Create release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Extract changelog for this version if it exists
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(awk "/## \[${VERSION}\]/,/## \[/" CHANGELOG.md | sed '1d;$d' | sed '/^$/d')
+            if [ -z "$NOTES" ]; then
+              NOTES="Release v${VERSION}"
+            fi
+          else
+            NOTES="Release v${VERSION}"
+          fi
+
+          # Add checksum to notes
+          CHECKSUM="${{ steps.checksum.outputs.checksum }}"
+          NOTES="${NOTES}
+
+## Accessibility Service APK
+
+**SHA256 Checksum:** \`${CHECKSUM}\`
+
+Download the APK from the release assets below."
+
+          # Save to file for GitHub release
+          echo "$NOTES" > release_notes.txt
+
+          # Also output for later steps
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: AutoMobile v${{ steps.version.outputs.version }}
+          body_path: release_notes.txt
+          files: |
+            android/accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request with updated checksum
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update accessibility service to v${{ steps.version.outputs.version }}"
+          branch: release/update-checksum-${{ steps.version.outputs.version }}
+          title: "chore: Update accessibility service to v${{ steps.version.outputs.version }}"
+          body: |
+            This PR updates the AccessibilityServiceManager to use the newly released accessibility service APK.
+
+            **Version:** v${{ steps.version.outputs.version }}
+            **SHA256:** `${{ steps.checksum.outputs.checksum }}`
+
+            This was automatically generated by the release workflow.
+
+            Please review and merge to complete the release process.
+          labels: |
+            automated
+            release
+          assignees: ${{ github.actor }}
+
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Version:** v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **APK Built:** accessibility-service-debug.apk" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **SHA256:** \`${{ steps.checksum.outputs.checksum }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Release Created:** https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review and merge the auto-generated PR" >> $GITHUB_STEP_SUMMARY
+          echo "2. Publish to npm: \`npm publish\`" >> $GITHUB_STEP_SUMMARY
