@@ -378,3 +378,142 @@ function createEventWithApp(
     applicationId
   };
 }
+
+describe("NavigationGraphManager - Scroll Position", () => {
+  let manager: NavigationGraphManager;
+
+  beforeEach(() => {
+    // Get singleton and clear
+    manager = NavigationGraphManager.getInstance();
+    manager.clearAllGraphs();
+    manager.setCurrentApp("com.test.scrollapp");
+  });
+
+  afterEach(() => {
+    manager.clearAllGraphs();
+  });
+
+  it("should update scroll position on most recent swipeOn tool call", () => {
+    // Record a swipeOn tool call
+    manager.recordToolCall("swipeOn", {
+      direction: "down",
+      lookFor: { text: "Advanced Settings" }
+    });
+
+    // Update with scroll position
+    manager.updateScrollPosition({
+      targetElement: { text: "Advanced Settings" },
+      direction: "down"
+    });
+
+    // Record navigation event to correlate
+    manager.recordNavigationEvent(createEvent("Settings"));
+    manager.recordNavigationEvent(createEvent("AdvancedSettings"));
+
+    // Check that the edge has scroll position
+    const edges = manager.getEdgesFrom("Settings");
+    assert.lengthOf(edges, 1);
+    assert.isDefined(edges[0].uiState);
+    assert.isDefined(edges[0].uiState!.scrollPosition);
+    assert.equal(edges[0].uiState!.scrollPosition!.targetElement.text, "Advanced Settings");
+    assert.equal(edges[0].uiState!.scrollPosition!.direction, "down");
+  });
+
+  it("should update existing uiState with scroll position", () => {
+    // Record a swipeOn tool call with existing UI state
+    const existingUIState = {
+      selectedElements: [{ text: "Settings Tab" }],
+      destinationId: "Settings"
+    };
+    manager.recordToolCall("swipeOn", {
+      direction: "down",
+      lookFor: { text: "Advanced Settings" }
+    }, existingUIState);
+
+    // Update with scroll position
+    manager.updateScrollPosition({
+      targetElement: { text: "Advanced Settings" },
+      direction: "down"
+    });
+
+    // Record navigation event
+    manager.recordNavigationEvent(createEvent("Settings"));
+    manager.recordNavigationEvent(createEvent("AdvancedSettings"));
+
+    // Check that both selected elements and scroll position exist
+    const edges = manager.getEdgesFrom("Settings");
+    assert.lengthOf(edges, 1);
+    assert.isDefined(edges[0].uiState);
+    assert.lengthOf(edges[0].uiState!.selectedElements, 1);
+    assert.equal(edges[0].uiState!.selectedElements[0].text, "Settings Tab");
+    assert.isDefined(edges[0].uiState!.scrollPosition);
+    assert.equal(edges[0].uiState!.scrollPosition!.targetElement.text, "Advanced Settings");
+  });
+
+  it("should handle scroll position with container and speed", () => {
+    manager.recordToolCall("swipeOn", {
+      direction: "up",
+      lookFor: { text: "Item" },
+      container: { resourceId: "com.app:id/list" },
+      speed: "slow"
+    });
+
+    manager.updateScrollPosition({
+      targetElement: { text: "Item" },
+      container: { resourceId: "com.app:id/list" },
+      direction: "up",
+      speed: "slow"
+    });
+
+    manager.recordNavigationEvent(createEvent("Home"));
+    manager.recordNavigationEvent(createEvent("Details"));
+
+    const edges = manager.getEdgesFrom("Home");
+    assert.lengthOf(edges, 1);
+    const scrollPos = edges[0].uiState!.scrollPosition!;
+    assert.equal(scrollPos.targetElement.text, "Item");
+    assert.equal(scrollPos.container!.resourceId, "com.app:id/list");
+    assert.equal(scrollPos.direction, "up");
+    assert.equal(scrollPos.speed, "slow");
+  });
+
+  it("should not update if no swipeOn tool call exists", () => {
+    // Record a different tool call
+    manager.recordToolCall("tapOn", { text: "Button" });
+
+    // Try to update scroll position
+    manager.updateScrollPosition({
+      targetElement: { text: "Element" },
+      direction: "down"
+    });
+
+    // Should not throw, just log and return
+    // No assertion needed, just verify it doesn't crash
+  });
+
+  it("should update most recent swipeOn when multiple exist", () => {
+    // Record multiple swipeOn calls
+    manager.recordToolCall("swipeOn", {
+      direction: "down",
+      lookFor: { text: "First" }
+    });
+
+    manager.recordToolCall("swipeOn", {
+      direction: "up",
+      lookFor: { text: "Second" }
+    });
+
+    // Update should affect the most recent one
+    manager.updateScrollPosition({
+      targetElement: { text: "Second" },
+      direction: "up"
+    });
+
+    manager.recordNavigationEvent(createEvent("Screen1"));
+    manager.recordNavigationEvent(createEvent("Screen2"));
+
+    const edges = manager.getEdgesFrom("Screen1");
+    assert.lengthOf(edges, 1);
+    assert.equal(edges[0].uiState!.scrollPosition!.targetElement.text, "Second");
+  });
+});

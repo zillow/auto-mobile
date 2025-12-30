@@ -38,6 +38,28 @@ export interface SelectedElement {
 }
 
 /**
+ * Represents scroll position needed to make a navigation element visible.
+ */
+export interface ScrollPosition {
+  /** The scrollable container that was scrolled */
+  container?: {
+    text?: string;
+    resourceId?: string;
+    contentDesc?: string;
+  };
+  /** The target element that was scrolled to */
+  targetElement: {
+    text?: string;
+    resourceId?: string;
+    contentDesc?: string;
+  };
+  /** Direction that was scrolled */
+  direction: "up" | "down" | "left" | "right";
+  /** Speed used for scrolling */
+  speed?: "slow" | "normal" | "fast";
+}
+
+/**
  * Represents the UI state at the time of a tool call.
  * Captures context needed to replay navigation (e.g., which tab is active).
  */
@@ -48,6 +70,8 @@ export interface UIState {
   destinationId?: string;
   /** Active modal stack (bottom sheets, dialogs, popups, etc.) */
   modalStack?: ModalState[];
+  /** Scroll position required to make navigation elements visible */
+  scrollPosition?: ScrollPosition;
 }
 
 /**
