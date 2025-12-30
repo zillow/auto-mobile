@@ -344,13 +344,15 @@ export class MonkeyNavigate extends BaseVisualChange {
    * Check if element is a navigation candidate
    */
   private isNavigationCandidate(element: Element): boolean {
-    // Must be clickable
-    if (!element.clickable) {
+    // Must be clickable (handle both boolean and string values from XML parsing)
+    const isClickable = element.clickable === true || (element.clickable as any) === "true";
+    if (!isClickable) {
       return false;
     }
 
-    // Must be enabled
-    if (element.enabled === false) {
+    // Must be enabled (handle both boolean and string values from XML parsing)
+    const isEnabled = element.enabled !== false && (element.enabled as any) !== "false";
+    if (!isEnabled) {
       return false;
     }
 
