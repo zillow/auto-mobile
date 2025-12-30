@@ -9,6 +9,7 @@ import { TapOnElement } from "../features/action/TapOnElement";
 import { PressButton } from "../features/action/PressButton";
 import { TerminateApp } from "../features/action/TerminateApp";
 import { BootedDevice } from "../models";
+import { APK_URL, APK_SHA256_CHECKSUM } from "../constants/release";
 
 const execAsync = promisify(exec);
 
@@ -35,9 +36,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   private adb: AdbClient;
   public static readonly PACKAGE = "dev.jasonpearson.automobile.accessibilityservice";
   public static readonly ACTIVITY = "dev.jasonpearson.automobile.accessibilityservice.MainActivity";
-
-  // TODO: Instead of downloading an APK we should bundle it with the npm package
-  private static readonly APK_URL = "https://github.com/kaeawc/auto-mobile/releases/download/0.0.6/accessibility-service-debug.apk";
+  private static readonly APK_URL = APK_URL;
 
   // Static cache for service availability
   private cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;
@@ -229,22 +228,25 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         throw new Error(`Downloaded APK is too small (${stats.size} bytes), likely invalid`);
       }
 
-      // Perform checksum verification
-      const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
-      const actualChecksum = sha256sum.split(" ")[0];
+      // Perform checksum verification (only if checksum is provided)
+      if (APK_SHA256_CHECKSUM.length > 0) {
+        const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
+        const actualChecksum = sha256sum.split(" ")[0];
 
-      // Expected checksum for the APK
-      const expectedChecksum = "979fa82f632d004a3f94dd7cd366be2a8bbab55f19d0bfd722f852c3cea674d4";
+        if (actualChecksum !== APK_SHA256_CHECKSUM) {
+          logger.warn("APK checksum verification failed", {
+            expected: APK_SHA256_CHECKSUM,
+            actual: actualChecksum
+          });
+          throw new Error(`APK checksum verification failed. Expected: ${APK_SHA256_CHECKSUM}, Got: ${actualChecksum}`);
+        }
 
-      if (actualChecksum !== expectedChecksum) {
-        logger.warn("APK checksum verification failed", {
-          expected: expectedChecksum,
-          actual: actualChecksum
+        logger.info("APK checksum verified successfully", { checksum: actualChecksum });
+      } else {
+        logger.warn("APK checksum verification SKIPPED - no checksum provided (development mode)", {
+          apkUrl: AndroidAccessibilityServiceManager.APK_URL
         });
-        throw new Error(`APK checksum verification failed. Expected: ${expectedChecksum}, Got: ${actualChecksum}`);
       }
-
-      logger.info("APK checksum verified successfully", { checksum: actualChecksum });
 
       logger.info("APK downloaded successfully", { path: apkPath, size: stats.size });
       return apkPath;
