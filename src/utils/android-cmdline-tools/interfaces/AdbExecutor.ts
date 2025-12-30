@@ -1,4 +1,4 @@
-import { BootedDevice, ExecResult } from "../../../models";
+import { BootedDevice, ExecResult, AndroidUser } from "../../../models";
 
 /**
  * Interface for executing ADB commands
@@ -37,4 +37,16 @@ export interface AdbExecutor {
    * @returns Promise with wakefulness state: "Awake", "Asleep", "Dozing", or null if unknown
    */
   getWakefulness(): Promise<"Awake" | "Asleep" | "Dozing" | null>;
+
+  /**
+   * List all Android users on the device (personal, work profiles, etc.)
+   * @returns Promise with array of Android users
+   */
+  listUsers(): Promise<AndroidUser[]>;
+
+  /**
+   * Get the current foreground app package name and user ID
+   * @returns Promise with { packageName: string, userId: number } or null if no app in foreground
+   */
+  getForegroundApp(): Promise<{ packageName: string; userId: number } | null>;
 }

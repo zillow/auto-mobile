@@ -93,21 +93,21 @@ export function registerAppTools(
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "launchApp",
-    "Launch an app by package name",
+    "Launch an app by package name. For Android, automatically detects and targets the appropriate user profile (personal or work). Returns userId indicating which profile was used (0=personal, 10+=work profile).",
     launchAppSchema,
     launchAppHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "terminateApp",
-    "Terminate an app by package name",
+    "Terminate an app by package name. For Android, automatically detects and targets the appropriate user profile. Returns userId indicating which profile was targeted.",
     packageNameSchema,
     terminateAppHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "installApp",
-    "Install an APK file on the device",
+    "Install an APK file on the device. For Android, automatically installs to the appropriate user profile (work profile if exists, otherwise personal). Returns userId indicating where the app was installed.",
     installAppSchema,
     installAppHandler
   );

@@ -18,8 +18,9 @@ export class InstallApp {
   /**
    * Install an APK file
    * @param apkPath - Path to the APK file
+   * @param userId - Optional Android user ID (auto-detected if not provided)
    */
-  async execute(apkPath: string): Promise<{ success: boolean; upgrade: boolean }> {
+  async execute(apkPath: string, userId?: number): Promise<{ success: boolean; upgrade: boolean; userId: number }> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("installApp");
 
@@ -33,22 +34,48 @@ export class InstallApp {
       return this.adb.executeCommand(packageNameCmd);
     });
 
-    // Check if app is already installed
+    // Auto-detect target user if not specified
+    const targetUserId = await perf.track("detectTargetUser", async () => {
+      if (userId !== undefined) {
+        return userId;
+      }
+
+      // Check if app is in foreground and get its user
+      const foregroundApp = await this.adb.getForegroundApp();
+      if (foregroundApp && foregroundApp.packageName === packageName.trim()) {
+        return foregroundApp.userId;
+      }
+
+      // Get list of users and prefer work profile
+      const users = await this.adb.listUsers();
+
+      // Find first work profile (flags 30 typically indicates managed/work profile)
+      const workProfile = users.find(u => u.userId > 0 && u.running);
+      if (workProfile) {
+        return workProfile.userId;
+      }
+
+      // Fall back to primary user
+      return 0;
+    });
+
+    // Check if app is already installed for this user
     const isInstalled = await perf.track("checkInstalled", async () => {
-      const isInstalledCmd = `shell pm list packages -f ${packageName.trim()} | grep -c ${packageName.trim()}`;
+      const isInstalledCmd = `shell pm list packages --user ${targetUserId} -f ${packageName.trim()} | grep -c ${packageName.trim()}`;
       const isInstalledOutput = await this.adb.executeCommand(isInstalledCmd, undefined, undefined, true);
       return parseInt(isInstalledOutput.trim(), 10) > 0;
     });
 
     const success = await perf.track("adbInstall", async () => {
-      const installOutput = await this.adb.executeCommand(`install -r "${apkPath}"`);
+      const installOutput = await this.adb.executeCommand(`install --user ${targetUserId} -r "${apkPath}"`);
       return installOutput.includes("Success");
     });
 
     perf.end();
     return {
       success: success,
-      upgrade: isInstalled && success
+      upgrade: isInstalled && success,
+      userId: targetUserId
     };
   }
 }

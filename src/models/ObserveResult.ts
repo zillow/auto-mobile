@@ -58,6 +58,14 @@ export interface ObserveResult {
    */
   wakefulness?: "Awake" | "Asleep" | "Dozing";
 
+  /**
+   * Android user ID for the foreground app (Android only)
+   * - 0: Primary user (personal profile)
+   * - 10+: Work profile or other managed profiles
+   * This indicates which user profile the current foreground app is running in
+   */
+  userId?: number;
+
   /** Error message if observation failed partially or completely */
   error?: string;
 

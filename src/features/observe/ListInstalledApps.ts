@@ -1,6 +1,6 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { ActionableError, BootedDevice } from "../../models";
+import { ActionableError, BootedDevice, InstalledApp } from "../../models";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 
 export class ListInstalledApps {
@@ -31,18 +31,74 @@ export class ListInstalledApps {
           const apps = await this.simctl.listApps();
           return apps.map((app: any) => app.bundleId);
         case "android":
-          // Android device - use adb to get installed apps
-          const { stdout } = await this.adb.executeCommand("shell pm list packages");
-          return stdout
-            .split("\n")
-            .filter(line => line.startsWith("package:"))
-            .map(line => line.replace("package:", "").trim());
+          // For backward compatibility, just return package names
+          const detailedApps = await this.executeDetailed();
+          return detailedApps.map(app => app.packageName);
         default:
           throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
       }
     } catch (error) {
       logger.warn("Failed to list installed apps:", error);
       return []; // Return empty array on error
+    }
+  }
+
+  /**
+   * List all installed packages on Android with detailed user profile information
+   * Returns apps from all user profiles (personal, work, etc.) with foreground/recent status
+   * @returns Promise with list of installed app details
+   */
+  async executeDetailed(): Promise<InstalledApp[]> {
+    if (this.device.platform !== "android") {
+      logger.warn("executeDetailed() is only supported on Android");
+      return [];
+    }
+
+    try {
+      const installedApps: InstalledApp[] = [];
+
+      // Get all users on the device
+      const users = await this.adb.listUsers();
+
+      // Get the current foreground app
+      const foregroundApp = await this.adb.getForegroundApp();
+
+      // List packages for each user
+      for (const user of users) {
+        try {
+          const { stdout } = await this.adb.executeCommand(
+            `shell pm list packages --user ${user.userId}`
+          );
+
+          const packages = stdout
+            .split("\n")
+            .filter(line => line.startsWith("package:"))
+            .map(line => line.replace("package:", "").trim())
+            .filter(pkg => pkg.length > 0);
+
+          for (const packageName of packages) {
+            const isForeground = foregroundApp !== null &&
+                                 foregroundApp.packageName === packageName &&
+                                 foregroundApp.userId === user.userId;
+
+            installedApps.push({
+              packageName,
+              userId: user.userId,
+              foreground: isForeground,
+              recent: false // TODO: Implement recent app detection
+            });
+          }
+        } catch (error) {
+          logger.warn(`Failed to list packages for user ${user.userId}:`, error);
+          // Continue with other users
+        }
+      }
+
+      logger.info(`Found ${installedApps.length} installed app(s) across ${users.length} user(s)`);
+      return installedApps;
+    } catch (error) {
+      logger.warn("Failed to list installed apps with details:", error);
+      return [];
     }
   }
 }
