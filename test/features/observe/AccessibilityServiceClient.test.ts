@@ -52,6 +52,9 @@ describe("AccessibilityServiceClient", function() {
 
     accessibilityServiceClient = AccessibilityServiceClient.getInstance(testDevice, adbClient);
     AndroidAccessibilityServiceManager.getInstance(testDevice, adbClient).clearAvailabilityCache();
+
+    // Clear any cached hierarchy data to prevent cache contamination between tests (issue #72)
+    accessibilityServiceClient.invalidateCache();
   });
 
   afterEach(async function() {
@@ -200,15 +203,26 @@ describe("AccessibilityServiceClient", function() {
     });
 
     it("should handle WebSocket connection failure gracefully", async function() {
-      this.timeout(6000); // Increased to allow for 5000ms WebSocket timeout + cleanup (see issue #68)
+      // Use FakeWebSocket with instant failure and FakeTimer for fast, reliable test execution
+      // See issues #68 (timeout race condition) and #72 (cache contamination)
+      fakeTimer.setSleepDuration(1);
 
-      // Don't create a server, so connection will fail
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        createInstantFailureWebSocketFactory(),
+        fakeTimer
+      );
 
-      const result = await accessibilityServiceClient.getLatestHierarchy(true, 1000);
+      try {
+        const result = await testClient.getLatestHierarchy(true, 1000);
 
-      expect(result).to.not.be.null;
-      expect(result.hierarchy).to.be.null;
-      expect(result.fresh).to.be.false;
+        expect(result).to.not.be.null;
+        expect(result.hierarchy).to.be.null;
+        expect(result.fresh).to.be.false;
+      } finally {
+        await testClient.close();
+      }
     });
   });
 
