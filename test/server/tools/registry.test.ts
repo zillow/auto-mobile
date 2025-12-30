@@ -73,7 +73,7 @@ describe("MCP Tools Registry", () => {
       observe: ["observe"],
 
       // Interaction tools (touch, gestures, input)
-      interaction: ["tapOn", "sendText", "pressButton", "swipeOnScreen", "swipeOnElement"],
+      interaction: ["tapOn", "sendText", "pressButton", "swipeOn"],
 
       // App management tools (lifecycle management)
       app: ["listApps", "launchApp", "terminateApp", "installApp"],

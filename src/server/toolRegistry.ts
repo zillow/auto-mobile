@@ -76,7 +76,7 @@ class ToolRegistryClass {
         // Excludes app lifecycle tools (launchApp, terminateApp, homeScreen, etc.)
         // as they don't represent replayable in-app navigation paths
         const navigationRelevantTools = [
-          "tapOn", "swipe", "scroll", "swipeOnElement", "swipeOnScreen",
+          "tapOn", "swipeOn",
           "pressButton", "pressKey", "inputText", "clearText", "imeAction"
         ];
         if (navigationRelevantTools.includes(name)) {
