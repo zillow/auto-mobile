@@ -242,6 +242,28 @@ jobs:
   # Docker Build and Validation
   # =============================================================================
 
+  detect-docker-changes:
+    name: "Detect Docker File Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      docker-changed: ${{ steps.filter.outputs.docker }}
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Check for Docker-related changes"
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docker:
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+              - '.dockerignore'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.hadolint.yaml'
+
   hadolint:
     name: "Lint Dockerfile"
     runs-on: ubuntu-latest
@@ -259,7 +281,8 @@ jobs:
   docker-build:
     name: "Build Docker Image"
     runs-on: ubuntu-latest
-    needs: hadolint
+    needs: [hadolint, detect-docker-changes]
+    if: needs.detect-docker-changes.outputs.docker-changed == 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -380,7 +403,8 @@ jobs:
   docker-compose-test:
     name: "Test Docker Compose"
     runs-on: ubuntu-latest
-    needs: hadolint
+    needs: [hadolint, detect-docker-changes]
+    if: needs.detect-docker-changes.outputs.docker-changed == 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
