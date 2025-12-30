@@ -168,16 +168,16 @@ jobs:
 
       - name: "Test docker-compose configuration"
         run: |
-          docker-compose config
+          docker compose config
 
       - name: "Build with docker-compose"
         run: |
-          docker-compose build auto-mobile
+          docker compose build auto-mobile
 
       - name: "Verify services are defined"
         run: |
-          docker-compose config --services | grep -q auto-mobile
-          docker-compose config --services | grep -q auto-mobile-dev
+          docker compose config --services | grep -q auto-mobile
+          docker compose config --services | grep -q auto-mobile-dev
 
   security-scan:
     name: "Security Scan"
