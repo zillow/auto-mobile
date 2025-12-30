@@ -89,6 +89,11 @@ SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 # Alpine 3.23 includes Node.js 24.x in its package repositories
 RUN apk add --no-cache nodejs npm
 
+# Enable corepack for pnpm support
+# Disable download prompts for non-interactive environments
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@10.26.2 --activate
+
 # Install ktfmt (Kotlin formatter)
 # Check for updates: https://github.com/facebook/ktfmt/releases
 ENV KTFMT_VERSION=0.55
@@ -137,16 +142,16 @@ RUN sdkmanager --install \
 WORKDIR /workspace
 
 # Copy package files first for better caching
-COPY package*.json ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 
 # Install Node.js dependencies
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # ==============================================================================
 # RUNTIME STAGE - Minimal image with only runtime dependencies
@@ -188,6 +193,10 @@ RUN apk --no-cache add \
 # Now that bash is installed, set it as the default shell
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
+# Enable corepack for pnpm support in runtime stage
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable && corepack prepare pnpm@10.26.2 --activate
+
 # Copy Android SDK from builder (needed for ADB at runtime)
 COPY --from=builder /opt/android-sdk /opt/android-sdk
 
@@ -202,7 +211,9 @@ COPY --from=builder /usr/local/bin/lychee /usr/local/bin/lychee
 WORKDIR /workspace
 
 # Copy package files and node_modules from builder
-COPY --from=builder /workspace/package*.json ./
+COPY --from=builder /workspace/package.json ./
+COPY --from=builder /workspace/pnpm-lock.yaml ./
+COPY --from=builder /workspace/.npmrc ./
 COPY --from=builder /workspace/node_modules ./node_modules
 
 # Copy built application from builder
@@ -231,7 +242,7 @@ USER automobile
 
 # Verify runtime installations
 RUN node --version \
-    && npm --version \
+    && pnpm --version \
     && java -version \
     && adb version \
     && sdkmanager --list_installed \
@@ -245,5 +256,5 @@ RUN node --version \
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
 
 # Default command - Run MCP server in stdio mode (default)
-# For other transports, override with: docker run ... npm run dev:sse
+# For other transports, override with: docker run ... pnpm run dev:sse
 CMD ["node", "dist/src/index.js"]

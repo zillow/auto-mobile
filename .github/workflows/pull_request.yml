@@ -77,15 +77,15 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Build TypeScript"
-        run: npm run build
+        run: pnpm run build
 
       - name: "Perform CodeQL Analysis"
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{matrix.language}}"
 
-  npm-audit:
-    name: "NPM Security Audit"
+  pnpm-audit:
+    name: "pnpm Security Audit"
     runs-on: ubuntu-latest
     steps:
       - name: "Git Checkout"
@@ -93,17 +93,17 @@ jobs:
 
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
-      - name: "Run NPM Audit"
+      - name: "Run pnpm Audit"
         run: |
-          npm audit --audit-level=moderate --json > npm-audit-results.json || true
+          pnpm audit --audit-level=moderate --json > pnpm-audit-results.json || true
         continue-on-error: true
 
-      - name: "Upload NPM Audit Results"
+      - name: "Upload pnpm Audit Results"
         uses: actions/upload-artifact@v4.4.0
         if: always()
         with:
-          name: npm-audit-results
-          path: npm-audit-results.json
+          name: pnpm-audit-results
+          path: pnpm-audit-results.json
 
   mcp-build-and-test:
     name: "Node TypeScript Build and Test"
@@ -115,10 +115,10 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
-        run: npm run lint
+        run: pnpm run lint
 
       - name: "Run Tests"
-        run: npm run test
+        run: pnpm run test
 
   junit-runner-unit-tests:
     name: "Run JUnit Runner Unit Tests"
@@ -261,7 +261,8 @@ jobs:
               - 'docker-compose.yml'
               - '.dockerignore'
               - 'package.json'
-              - 'package-lock.json'
+              - 'pnpm-lock.yaml'
+              - '.npmrc'
               - '.hadolint.yaml'
 
   hadolint:

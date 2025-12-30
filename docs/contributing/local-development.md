@@ -8,9 +8,9 @@ up for the development environment maintainers use.
 If you're about to build AutoMobile from source for the very first time after cloning you should do the following:
 
 ```shell
-npm install
-npm run build
-npm install -g
+pnpm install
+pnpm run build
+pnpm install -g
 ```
 
 ## Hot Reload
@@ -24,11 +24,11 @@ recompile code as changes are made.
 **Streamable HTTP (Recommended)** - Modern MCP transport with full streaming support:
 ```shell
 # Start with hot reloading (ts-node-dev), streamable is the default
-npm run dev
-npm run dev:streamable
+pnpm run dev
+pnpm run dev:streamable
 
 # Custom port
-npm run dev:port 8080
+pnpm run dev:port 8080
 ```
 
 Configuration for your favorite MCP client:

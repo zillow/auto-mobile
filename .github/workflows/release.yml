@@ -19,11 +19,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.26.2
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '24'
+          cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Set up Java
@@ -44,7 +49,7 @@ jobs:
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Install Node dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
@@ -80,13 +85,13 @@ jobs:
           node scripts/generate-release-constants.js
 
       - name: Run tests
-        run: npm run test
+        run: pnpm run test
 
       - name: Run lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build TypeScript with injected checksum
-        run: npm run build
+        run: pnpm run build
 
       - name: Create release notes
         id: release_notes
@@ -116,7 +121,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Publish to npm
-        run: npm publish
+        run: pnpm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
