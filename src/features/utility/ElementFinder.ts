@@ -306,7 +306,7 @@ export class ElementFinder {
     for (const rootNode of rootNodes) {
       let foundScrollable: Element | null = null;
       this.parser.traverseNode(rootNode, (node: any) => {
-        if (foundScrollable) return; // Already found one
+        if (foundScrollable) {return;} // Already found one
         const nodeProperties = this.parser.extractNodeProperties(node);
         if (nodeProperties.scrollable === "true" || nodeProperties.scrollable === true) {
           const parsedNode = this.parser.parseNodeBounds(node);

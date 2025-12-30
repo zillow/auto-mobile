@@ -16,7 +16,6 @@ import { ExecuteGesture } from "./ExecuteGesture";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { ObserveScreen } from "../observe/ObserveScreen";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 
 /**
@@ -82,11 +81,14 @@ export class SwipeOn extends BaseVisualChange {
 
     try {
       // Determine which mode to use
-      if (options.screen) {
-        return await this.executeScreenSwipe(options, progress, perf);
-      } else if (options.lookFor) {
+      if (options.lookFor) {
+        // Scroll-until-visible mode
         return await this.executeScrollUntilVisible(options, progress, perf);
+      } else if (!options.container) {
+        // No container = screen swipe
+        return await this.executeScreenSwipe(options, progress, perf);
       } else {
+        // Container specified = swipe within container
         return await this.executeElementSwipe(options, progress, perf);
       }
     } catch (error) {
@@ -103,23 +105,22 @@ export class SwipeOn extends BaseVisualChange {
       return "direction is required";
     }
 
-    // Count how many target types are specified
-    const targetCount = [options.screen, options.text, options.elementId].filter(Boolean).length;
-
-    if (targetCount === 0 && !options.lookFor) {
-      return "Must specify a target: screen, text, elementId, or use lookFor to scroll within a container";
+    // Validate container if specified
+    if (options.container) {
+      const containerFieldCount = [options.container.elementId, options.container.text].filter(Boolean).length;
+      if (containerFieldCount === 0) {
+        return "container must specify either elementId or text";
+      }
+      if (containerFieldCount > 1) {
+        return "container can only specify one of: elementId or text";
+      }
     }
 
-    if (targetCount > 1) {
-      return "Only one target type can be specified: screen, text, or elementId";
-    }
-
-    // If lookFor is specified, we need a container context
+    // If lookFor is specified, validate it
     if (options.lookFor) {
       if (!options.lookFor.text && !options.lookFor.elementId) {
         return "lookFor requires either text or elementId to search for";
       }
-      // lookFor can work with screen (default container) or explicit container
     }
 
     return null;
@@ -149,11 +150,11 @@ export class SwipeOn extends BaseVisualChange {
         const bounds = (options.includeSystemInsets === true)
           ? { left: 0, top: 0, right: screenWidth, bottom: screenHeight }
           : {
-              left: insets.left,
-              top: insets.top,
-              right: screenWidth - insets.right,
-              bottom: screenHeight - insets.bottom
-            };
+            left: insets.left,
+            top: insets.top,
+            right: screenWidth - insets.right,
+            bottom: screenHeight - insets.bottom
+          };
 
         const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
           options.direction,
@@ -200,7 +201,7 @@ export class SwipeOn extends BaseVisualChange {
     progress?: ProgressCallback,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeOnResult> {
-    logger.info(`[SwipeOn] Starting element swipe: direction=${options.direction}, text=${options.text}, elementId=${options.elementId}`);
+    logger.info(`[SwipeOn] Starting element swipe: direction=${options.direction}, container=${JSON.stringify(options.container)}`);
 
     return this.observedInteraction(
       async (observeResult: ObserveResult) => {
@@ -209,7 +210,7 @@ export class SwipeOn extends BaseVisualChange {
           throw new ActionableError("Unable to get view hierarchy, cannot swipe on element");
         }
 
-        // Find the target element
+        // Find the container element
         const element = await perf.track("findElement", () =>
           this.findTargetElement(options, viewHierarchy)
         );
@@ -245,9 +246,9 @@ export class SwipeOn extends BaseVisualChange {
       },
       {
         queryOptions: {
-          text: options.text,
-          elementId: options.elementId,
-          containerElementId: options.containerElementId
+          text: options.container?.text,
+          elementId: options.container?.elementId,
+          containerElementId: undefined // No nested container restriction
         },
         changeExpected: false,
         timeoutMs: 500,
@@ -280,6 +281,30 @@ export class SwipeOn extends BaseVisualChange {
 
     logger.info(`[SwipeOn] Using container: bounds=${JSON.stringify(containerElement.bounds)}, scrollable=${containerElement.scrollable}`);
 
+    // Calculate container height as percentage of screen height
+    const containerHeight = containerElement.bounds.bottom - containerElement.bounds.top;
+    const screenHeight = lastObservation.screenSize!.height;
+    const heightPercentage = (containerHeight / screenHeight) * 100;
+
+    // Limit speed for lookFor to prevent skipping elements
+    // Large containers (≥80% screen height) → max "normal" speed
+    // Smaller containers → max "slow" speed
+    let effectiveSpeed = options.speed;
+    if (heightPercentage >= 80) {
+      if (!effectiveSpeed || effectiveSpeed === "fast") {
+        effectiveSpeed = "normal";
+        logger.info(`[SwipeOn] Container is ${heightPercentage.toFixed(1)}% of screen height, limiting lookFor speed to "normal"`);
+      }
+    } else {
+      if (!effectiveSpeed || effectiveSpeed === "normal" || effectiveSpeed === "fast") {
+        effectiveSpeed = "slow";
+        logger.info(`[SwipeOn] Container is ${heightPercentage.toFixed(1)}% of screen height, limiting lookFor speed to "slow"`);
+      }
+    }
+
+    // Override options speed for the duration calculations
+    const lookForOptions = { ...options, speed: effectiveSpeed };
+
     const maxTime = options.lookFor!.maxTime ?? 15000;
     const startTime = Date.now();
     let foundElement: Element | null = null;
@@ -295,7 +320,7 @@ export class SwipeOn extends BaseVisualChange {
 
     // First check if element is already visible
     foundElement = await perf.track("initialSearch", () =>
-      this.findElementInHierarchy(options.lookFor!, lastObservation.viewHierarchy!, options.containerElementId)
+      this.findElementInHierarchy(options.lookFor!, lastObservation.viewHierarchy!, options.container?.elementId)
     );
 
     if (foundElement) {
@@ -307,6 +332,7 @@ export class SwipeOn extends BaseVisualChange {
         element: foundElement,
         found: true,
         scrollIterations: 0,
+        elapsedMs: Date.now() - startTime,
         x1: 0,
         y1: 0,
         x2: 0,
@@ -322,10 +348,10 @@ export class SwipeOn extends BaseVisualChange {
       logger.info(`[SwipeOn] Iteration ${scrollIteration}: elapsed=${Date.now() - startTime}ms`);
 
       // Perform scroll
-      const swipeDuration = this.getDuration(options);
-      const swipeDirection = this.elementUtils.getSwipeDirectionForScroll(options.direction);
+      const swipeDuration = this.getDuration(lookForOptions);
+      // Use direction directly (finger swipe direction) for consistency with regular swipes
       const { startX, startY, endX, endY } = this.elementUtils.getSwipeWithinBounds(
-        swipeDirection,
+        options.direction,
         containerElement.bounds
       );
 
@@ -386,7 +412,7 @@ export class SwipeOn extends BaseVisualChange {
       foundElement = await this.findElementInHierarchy(
         options.lookFor!,
         lastObservation.viewHierarchy!,
-        options.containerElementId
+        options.container?.elementId
       );
 
       if (foundElement) {
@@ -431,22 +457,26 @@ export class SwipeOn extends BaseVisualChange {
   ): Promise<Element> {
     let element: Element | null = null;
 
-    if (options.text) {
+    if (!options.container) {
+      throw new ActionableError("Container must be specified for element swipe");
+    }
+
+    if (options.container.text) {
       element = this.elementUtils.findElementByText(
         viewHierarchy,
-        options.text,
-        options.containerElementId,
+        options.container.text,
+        undefined, // No nested container
         true,
         false
       );
-    } else if (options.elementId) {
+    } else if (options.container.elementId) {
       element = this.elementUtils.findElementByResourceId(
         viewHierarchy,
-        options.elementId,
-        options.containerElementId
+        options.container.elementId,
+        undefined // No nested container
       );
     } else {
-      throw new ActionableError("Must specify either text or elementId for element swipe");
+      throw new ActionableError("Container must specify either text or elementId");
     }
 
     // Retry logic similar to TapOnElement
@@ -459,8 +489,8 @@ export class SwipeOn extends BaseVisualChange {
       switch (this.device.platform) {
         case "android":
           const queryOptions = {
-            query: options.text || options.elementId || "",
-            containerElementId: options.containerElementId
+            query: options.container.text || options.container.elementId || "",
+            containerElementId: undefined
           };
           latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(queryOptions);
           break;
@@ -478,10 +508,10 @@ export class SwipeOn extends BaseVisualChange {
     }
 
     if (!element) {
-      if (options.text) {
-        throw new ActionableError(`Element not found with provided text '${options.text}'`);
+      if (options.container.text) {
+        throw new ActionableError(`Element not found with provided text '${options.container.text}'`);
       } else {
-        throw new ActionableError(`Element not found with provided elementId '${options.elementId}'`);
+        throw new ActionableError(`Element not found with provided elementId '${options.container.elementId}'`);
       }
     }
 
@@ -499,15 +529,15 @@ export class SwipeOn extends BaseVisualChange {
     const viewHierarchy = observeResult.viewHierarchy!;
 
     // Try to find container by elementId or text
-    if (options.containerElementId) {
+    if (options.container?.elementId) {
       element = this.elementUtils.findElementByResourceId(
         viewHierarchy,
-        options.containerElementId
+        options.container.elementId
       );
-    } else if (options.containerText) {
+    } else if (options.container?.text) {
       element = this.elementUtils.findElementByText(
         viewHierarchy,
-        options.containerText,
+        options.container.text,
         undefined,
         true,
         false
