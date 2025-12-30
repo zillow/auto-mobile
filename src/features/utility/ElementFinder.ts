@@ -291,6 +291,39 @@ export class ElementFinder {
   }
 
   /**
+   * Find the first scrollable container element in the view hierarchy
+   * @param viewHierarchy - The view hierarchy to search
+   * @returns The first scrollable element found, or null
+   */
+  findScrollableContainer(viewHierarchy: ViewHierarchyResult): Element | null {
+    if (!viewHierarchy) {
+      return null;
+    }
+
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+
+    // Process each root node
+    for (const rootNode of rootNodes) {
+      let foundScrollable: Element | null = null;
+      this.parser.traverseNode(rootNode, (node: any) => {
+        if (foundScrollable) return; // Already found one
+        const nodeProperties = this.parser.extractNodeProperties(node);
+        if (nodeProperties.scrollable === "true" || nodeProperties.scrollable === true) {
+          const parsedNode = this.parser.parseNodeBounds(node);
+          if (parsedNode) {
+            foundScrollable = parsedNode;
+          }
+        }
+      });
+      if (foundScrollable) {
+        return foundScrollable;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Find clickable elements in the view hierarchy
    * @param viewHierarchy - The view hierarchy to search
    * @returns Array of clickable elements

@@ -7,6 +7,7 @@ import { SelectAllText } from "../features/action/SelectAllText";
 import { PressButton } from "../features/action/PressButton";
 import { SwipeOnElement } from "../features/action/SwipeOnElement";
 import { SwipeOnScreen } from "../features/action/SwipeOnScreen";
+import { SwipeOn } from "../features/action/SwipeOn";
 import { Shake } from "../features/action/Shake";
 import { ImeAction } from "../features/action/ImeAction";
 import { RecentApps } from "../features/action/RecentApps";
@@ -98,6 +99,25 @@ export interface ScrollLookForArgs {
   maxTime?: number;
 }
 
+export interface SwipeOnArgs {
+  screen?: boolean;
+  text?: string;
+  elementId?: string;
+  containerElementId?: string;
+  containerText?: string;
+  direction: "up" | "down" | "left" | "right";
+  lookFor?: {
+    text?: string;
+    elementId?: string;
+    maxTime?: number;
+  };
+  speed?: "slow" | "normal" | "fast";
+  duration?: number;
+  scrollMode?: "adb" | "a11y";
+  includeSystemInsets?: boolean;
+  platform: Platform;
+}
+
 export interface ShakeArgs {
   duration?: number;
   intensity?: number;
@@ -174,6 +194,25 @@ export const scrollSchema = z.object({
   }).optional().describe("What we're searching for while scrolling"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
   scrollMode: z.enum(["adb", "a11y"]).optional().describe("Scroll execution mode: 'adb' (default, ~540ms) or 'a11y' (accessibility service, ~50-150ms)"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+});
+
+export const swipeOnSchema = z.object({
+  screen: z.boolean().optional().describe("Swipe on full screen"),
+  text: z.string().optional().describe("Text of the element to swipe on"),
+  elementId: z.string().optional().describe("Resource ID of the element to swipe on"),
+  containerElementId: z.string().optional().describe("Container element ID to restrict the search within"),
+  containerText: z.string().optional().describe("Container text to restrict the search within"),
+  direction: z.enum(["up", "down", "left", "right"]).describe("Direction to swipe"),
+  lookFor: z.object({
+    text: z.string().optional().describe("Text to look for while scrolling"),
+    elementId: z.string().optional().describe("Element ID to look for while scrolling"),
+    maxTime: z.number().optional().describe("Maximum time to spend scrolling (default 15 seconds)")
+  }).optional().describe("Search for element while scrolling - enables scroll-until-visible behavior"),
+  speed: z.enum(["slow", "normal", "fast"]).optional().describe("Swipe speed (slow=600ms, normal=300ms, fast=100ms)"),
+  duration: z.number().optional().describe("Manual duration override in milliseconds"),
+  scrollMode: z.enum(["adb", "a11y"]).optional().describe("Execution mode: 'adb' (default, ~540ms) or 'a11y' (accessibility service, ~50-150ms)"),
+  includeSystemInsets: z.boolean().optional().describe("Include status/navigation bars in screen swipes (default false)"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device")
 });
 
@@ -813,6 +852,55 @@ export function registerInteractionTools() {
     }
   };
 
+  // SwipeOn handler - unified swipe/scroll tool
+  const swipeOnHandler = async (device: BootedDevice, args: SwipeOnArgs, progress?: ProgressCallback) => {
+    const swipeOn = new SwipeOn(device);
+
+    // Convert SwipeOnArgs to SwipeOnOptions
+    const options: import("../models").SwipeOnOptions = {
+      screen: args.screen,
+      text: args.text,
+      elementId: args.elementId,
+      containerElementId: args.containerElementId,
+      containerText: args.containerText,
+      direction: args.direction,
+      lookFor: args.lookFor,
+      speed: args.speed,
+      duration: args.duration,
+      scrollMode: args.scrollMode,
+      includeSystemInsets: args.includeSystemInsets
+    };
+
+    const result = await swipeOn.execute(options, progress);
+
+    // Determine message based on operation type
+    let message = "";
+    if (result.found !== undefined) {
+      // Scroll-until-visible operation
+      if (result.found) {
+        const target = args.lookFor?.text
+          ? `text "${args.lookFor.text}"`
+          : `element with id "${args.lookFor?.elementId}"`;
+        message = `Scrolled until ${target} became visible (${result.scrollIterations} iterations, ${result.elapsedMs}ms)`;
+      } else {
+        message = `Element not found after scrolling`;
+      }
+    } else if (args.screen) {
+      message = `Swiped ${args.direction} on screen`;
+    } else if (args.text) {
+      message = `Swiped ${args.direction} on element with text "${args.text}"`;
+    } else if (args.elementId) {
+      message = `Swiped ${args.direction} on element with id "${args.elementId}"`;
+    } else {
+      message = `Swiped ${args.direction}`;
+    }
+
+    return createJSONToolResponse({
+      message,
+      ...result
+    });
+  };
+
   // Press key handler
   const pressKeyHandler = async (device: BootedDevice, args: PressKeyArgs, progress?: ProgressCallback) => {
     const pressButton = new PressButton(device);
@@ -958,7 +1046,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "swipeOnElement",
-    "Swipe on a specific element",
+    "DEPRECATED: Use 'swipeOn' instead. Swipe on a specific element",
     swipeOnElementSchema,
     swipeOnElementHandler,
     true // Supports progress notifications
@@ -966,7 +1054,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "swipeOnScreen",
-    "Swipe on screen in a specific direction",
+    "DEPRECATED: Use 'swipeOn' instead. Swipe on screen in a specific direction",
     swipeOnScreenSchema,
     swipeOnScreenHandler,
     true // Supports progress notifications
@@ -1015,7 +1103,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "scroll",
-    "Scroll in a direction on a scrollable container, optionally to find an element (supports text and selectors)",
+    "DEPRECATED: Use 'swipeOn' instead. Scroll in a direction on a scrollable container, optionally to find an element (supports text and selectors)",
     scrollSchema,
     scrollHandler,
     true // Supports progress notifications
@@ -1023,9 +1111,17 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "swipe",
-    "Unified scroll command supporting direction and speed (no index support due to reliability)",
+    "DEPRECATED: Use 'swipeOn' instead. Unified scroll command supporting direction and speed (no index support due to reliability)",
     scrollSchema,
     scrollHandler,
+    true // Supports progress notifications
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "swipeOn",
+    "Unified swipe/scroll tool - swipe on screen or elements, with optional scroll-until-visible",
+    swipeOnSchema,
+    swipeOnHandler,
     true // Supports progress notifications
   );
 
