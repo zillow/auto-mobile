@@ -411,7 +411,7 @@ jobs:
           docker build -t auto-mobile:scan .
 
       - name: "Run Trivy vulnerability scanner"
-        uses: aquasecurity/trivy-action@v0.33.1  # Pinned version (was @master which has stability issues)
+        uses: aquasecurity/trivy-action@0.33.1  # Pinned version (was @master which has stability issues)
         with:
           image-ref: "auto-mobile:scan"
           format: "sarif"
