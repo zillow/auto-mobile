@@ -11,8 +11,8 @@
  * GitHub release, and the empty checksum skips verification (not recommended for production).
  */
 
-export const RELEASE_VERSION = "latest";
-export const APK_URL = RELEASE_VERSION === "latest"
+export const RELEASE_VERSION: string = "latest";
+export const APK_URL: string = RELEASE_VERSION === "latest"
   ? `https://github.com/kaeawc/auto-mobile/releases/latest/download/accessibility-service-debug.apk`
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${RELEASE_VERSION}/accessibility-service-debug.apk`;
-export const APK_SHA256_CHECKSUM = ""; // Empty = skip verification (local dev only)
+export const APK_SHA256_CHECKSUM: string = ""; // Empty = skip verification (local dev only)
