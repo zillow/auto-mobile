@@ -9,6 +9,7 @@ import { TapOnElement } from "../features/action/TapOnElement";
 import { PressButton } from "../features/action/PressButton";
 import { TerminateApp } from "../features/action/TerminateApp";
 import { BootedDevice } from "../models";
+import { APK_URL, APK_SHA256_CHECKSUM } from "../constants/release";
 
 const execAsync = promisify(exec);
 
@@ -35,9 +36,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   private adb: AdbClient;
   public static readonly PACKAGE = "dev.jasonpearson.automobile.accessibilityservice";
   public static readonly ACTIVITY = "dev.jasonpearson.automobile.accessibilityservice.MainActivity";
-
-  // TODO: Instead of downloading an APK we should bundle it with the npm package
-  private static readonly APK_URL = "https://github.com/kaeawc/auto-mobile/releases/download/0.0.6/accessibility-service-debug.apk";
+  private static readonly APK_URL = APK_URL;
 
   // Static cache for service availability
   private cachedAvailability: { isAvailable: boolean; timestamp: number } | null = null;
@@ -233,8 +232,8 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
       const actualChecksum = sha256sum.split(" ")[0];
 
-      // Expected checksum for the APK
-      const expectedChecksum = "979fa82f632d004a3f94dd7cd366be2a8bbab55f19d0bfd722f852c3cea674d4";
+      // Expected checksum from release constants
+      const expectedChecksum = APK_SHA256_CHECKSUM;
 
       if (actualChecksum !== expectedChecksum) {
         logger.warn("APK checksum verification failed", {
