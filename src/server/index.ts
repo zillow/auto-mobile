@@ -20,6 +20,7 @@ import { registerConfigurationTools } from "./configurationTools";
 import { registerDeepLinkTools } from "./deepLinkTools";
 import { registerEnvironmentTools } from "./environmentTools";
 import { registerDebugTools } from "./debugTools";
+import { registerNavigationTools } from "./navigationTools";
 
 export interface McpServerOptions {
   debug?: boolean;
@@ -37,6 +38,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerConfigurationTools();
   registerDeepLinkTools();
   registerEnvironmentTools();
+  registerNavigationTools();
 
   // Only register debug tools when --debug flag is passed
   if (options.debug) {

@@ -100,6 +100,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           try {
             val destination = intent.getStringExtra(AutoMobileSDK.EXTRA_DESTINATION) ?: return
             val source = intent.getStringExtra(AutoMobileSDK.EXTRA_SOURCE) ?: return
+            val applicationId = intent.getStringExtra(AutoMobileSDK.EXTRA_APPLICATION_ID)
 
             // Extract arguments (prefixed with "arg_")
             val arguments = mutableMapOf<String, String>()
@@ -120,8 +121,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               }
             }
 
-            Log.d(TAG, "Received navigation event: $destination from $source")
-            navigationEventAccumulator.addEvent(destination, source, arguments, metadata)
+            Log.d(TAG, "Received navigation event: $destination from $source (app: $applicationId)")
+            navigationEventAccumulator.addEvent(destination, source, arguments, metadata, applicationId)
           } catch (e: Exception) {
             Log.e(TAG, "Error handling navigation event broadcast", e)
           }
