@@ -1,6 +1,6 @@
 import { assert } from "chai";
 import { UIStateExtractor } from "../../../src/features/navigation/UIStateExtractor";
-import { ViewHierarchyResult } from "../../../src/models";
+import { ViewHierarchyResult, WindowHierarchy } from "../../../src/models";
 
 describe("UIStateExtractor", () => {
   describe("extract", () => {
@@ -283,6 +283,295 @@ describe("UIStateExtractor", () => {
       assert.equal(result!.selectedElements[0].text, "Media");
     });
   });
+
+  describe("modal extraction", () => {
+    it("should extract dialog modal from windows array", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]",
+          node: {
+            text: "Screen Content",
+            bounds: "[0,0][1080,2400]"
+          }
+        },
+        [
+          {
+            windowId: 123,
+            windowType: "TYPE_APPLICATION_DIALOG",
+            windowLayer: 1,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              text: "Delete Account?",
+              bounds: "[100,800][980,1600]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.isDefined(result!.modalStack);
+      assert.lengthOf(result!.modalStack!, 1);
+      assert.equal(result!.modalStack![0].type, "dialog");
+      assert.equal(result!.modalStack![0].windowId, 123);
+      assert.equal(result!.modalStack![0].layer, 1);
+    });
+
+    it("should extract bottom sheet modal from windows array", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]",
+          node: {
+            text: "Screen Content",
+            bounds: "[0,0][1080,2400]"
+          }
+        },
+        [
+          {
+            windowId: 456,
+            windowType: "TYPE_APPLICATION_PANEL",
+            windowLayer: 2,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              "class": "BottomSheetBehavior",
+              "resource-id": "com.app:id/settings_bottom_sheet",
+              "bounds": "[0,1200][1080,2400]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.isDefined(result!.modalStack);
+      assert.lengthOf(result!.modalStack!, 1);
+      assert.equal(result!.modalStack![0].type, "bottomsheet");
+      assert.equal(result!.modalStack![0].windowId, 456);
+      assert.equal(result!.modalStack![0].identifier, "com.app:id/settings_bottom_sheet");
+    });
+
+    it("should extract popup modal from windows array", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]"
+        },
+        [
+          {
+            windowId: 789,
+            windowType: "TYPE_APPLICATION_POPUP",
+            windowLayer: 1,
+            isActive: true,
+            isFocused: false,
+            hierarchy: {
+              text: "More options",
+              bounds: "[800,100][1080,400]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.isDefined(result!.modalStack);
+      assert.lengthOf(result!.modalStack!, 1);
+      assert.equal(result!.modalStack![0].type, "popup");
+      assert.equal(result!.modalStack![0].identifier, "More options");
+    });
+
+    it("should extract multiple modals and sort by layer", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]"
+        },
+        [
+          {
+            windowId: 3,
+            windowType: "TYPE_APPLICATION_DIALOG",
+            windowLayer: 3,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              text: "Confirm?",
+              bounds: "[100,800][980,1600]"
+            }
+          },
+          {
+            windowId: 2,
+            windowType: "TYPE_APPLICATION_PANEL",
+            windowLayer: 1,
+            isActive: true,
+            isFocused: false,
+            hierarchy: {
+              class: "BottomSheetBehavior",
+              bounds: "[0,1200][1080,2400]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.isDefined(result!.modalStack);
+      assert.lengthOf(result!.modalStack!, 2);
+      // Should be sorted by layer (bottom to top)
+      assert.equal(result!.modalStack![0].layer, 1);
+      assert.equal(result!.modalStack![0].type, "bottomsheet");
+      assert.equal(result!.modalStack![1].layer, 3);
+      assert.equal(result!.modalStack![1].type, "dialog");
+    });
+
+    it("should extract menu modal from windows array", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]"
+        },
+        [
+          {
+            windowId: 999,
+            windowType: "TYPE_APPLICATION_MENU",
+            windowLayer: 2,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              text: "Copy",
+              bounds: "[200,300][400,500]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.isDefined(result!.modalStack);
+      assert.lengthOf(result!.modalStack!, 1);
+      assert.equal(result!.modalStack![0].type, "menu");
+    });
+
+    it("should not extract non-modal windows", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]"
+        },
+        [
+          {
+            windowId: 1,
+            windowType: "TYPE_BASE_APPLICATION",
+            windowLayer: 0,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              text: "Main Content",
+              bounds: "[0,0][1080,2400]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      // Should be undefined because no selected elements or destination, and no modals
+      assert.isUndefined(result);
+    });
+
+    it("should prefer resource-id over text for modal identifier", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]"
+        },
+        [
+          {
+            windowId: 111,
+            windowType: "TYPE_APPLICATION_DIALOG",
+            windowLayer: 1,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              "resource-id": "com.app:id/confirmation_dialog",
+              "text": "Are you sure?",
+              "bounds": "[100,800][980,1600]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.isDefined(result!.modalStack);
+      assert.equal(result!.modalStack![0].identifier, "com.app:id/confirmation_dialog");
+    });
+
+    it("should skip android system IDs for modal identifier", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]"
+        },
+        [
+          {
+            windowId: 222,
+            windowType: "TYPE_APPLICATION_DIALOG",
+            windowLayer: 1,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              "resource-id": "android:id/content",
+              "text": "Dialog Title",
+              "bounds": "[100,800][980,1600]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.isDefined(result!.modalStack);
+      // Should use text instead of android:id
+      assert.equal(result!.modalStack![0].identifier, "Dialog Title");
+    });
+
+    it("should extract modals along with selected elements", () => {
+      const hierarchy = createHierarchyWithWindows(
+        {
+          bounds: "[0,0][1080,2400]",
+          node: {
+            text: "Home",
+            selected: "true",
+            bounds: "[0,0][100,100]"
+          }
+        },
+        [
+          {
+            windowId: 333,
+            windowType: "TYPE_APPLICATION_PANEL",
+            windowLayer: 1,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              class: "BottomSheetBehavior",
+              bounds: "[0,1200][1080,2400]"
+            }
+          }
+        ]
+      );
+
+      const result = UIStateExtractor.extract(hierarchy);
+
+      assert.isDefined(result);
+      assert.lengthOf(result!.selectedElements, 1);
+      assert.equal(result!.selectedElements[0].text, "Home");
+      assert.isDefined(result!.modalStack);
+      assert.lengthOf(result!.modalStack!, 1);
+      assert.equal(result!.modalStack![0].type, "bottomsheet");
+    });
+  });
 });
 
 // Helper function to create ViewHierarchyResult
@@ -290,5 +579,17 @@ function createHierarchy(hierarchy: Record<string, any>): ViewHierarchyResult {
   return {
     hierarchy,
     packageName: "com.test.app"
+  };
+}
+
+// Helper function to create ViewHierarchyResult with windows
+function createHierarchyWithWindows(
+  hierarchy: Record<string, any>,
+  windows: WindowHierarchy[]
+): ViewHierarchyResult {
+  return {
+    hierarchy,
+    packageName: "com.test.app",
+    windows
   };
 }

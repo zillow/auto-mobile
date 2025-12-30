@@ -200,7 +200,7 @@ describe("AccessibilityServiceClient", function() {
     });
 
     it("should handle WebSocket connection failure gracefully", async function() {
-      this.timeout(5000);
+      this.timeout(6000); // Increased to allow for 5000ms WebSocket timeout + cleanup (see issue #68)
 
       // Don't create a server, so connection will fail
 
