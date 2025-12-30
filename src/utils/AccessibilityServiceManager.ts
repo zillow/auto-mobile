@@ -228,22 +228,25 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         throw new Error(`Downloaded APK is too small (${stats.size} bytes), likely invalid`);
       }
 
-      // Perform checksum verification
-      const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
-      const actualChecksum = sha256sum.split(" ")[0];
+      // Perform checksum verification (only if checksum is provided)
+      if (APK_SHA256_CHECKSUM && APK_SHA256_CHECKSUM.length > 0) {
+        const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
+        const actualChecksum = sha256sum.split(" ")[0];
 
-      // Expected checksum from release constants
-      const expectedChecksum = APK_SHA256_CHECKSUM;
+        if (actualChecksum !== APK_SHA256_CHECKSUM) {
+          logger.warn("APK checksum verification failed", {
+            expected: APK_SHA256_CHECKSUM,
+            actual: actualChecksum
+          });
+          throw new Error(`APK checksum verification failed. Expected: ${APK_SHA256_CHECKSUM}, Got: ${actualChecksum}`);
+        }
 
-      if (actualChecksum !== expectedChecksum) {
-        logger.warn("APK checksum verification failed", {
-          expected: expectedChecksum,
-          actual: actualChecksum
+        logger.info("APK checksum verified successfully", { checksum: actualChecksum });
+      } else {
+        logger.warn("APK checksum verification SKIPPED - no checksum provided (development mode)", {
+          apkUrl: AndroidAccessibilityServiceManager.APK_URL
         });
-        throw new Error(`APK checksum verification failed. Expected: ${expectedChecksum}, Got: ${actualChecksum}`);
       }
-
-      logger.info("APK checksum verified successfully", { checksum: actualChecksum });
 
       logger.info("APK downloaded successfully", { path: apkPath, size: stats.size });
       return apkPath;

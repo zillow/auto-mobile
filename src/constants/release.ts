@@ -6,8 +6,13 @@
  *
  * During CI/CD release builds, these values are replaced by the actual release
  * version and APK checksum via scripts/generate-release-constants.js
+ *
+ * For local development, RELEASE_VERSION "latest" fetches from the most recent
+ * GitHub release, and the empty checksum skips verification (not recommended for production).
  */
 
-export const RELEASE_VERSION = "0.0.6";
-export const APK_URL = `https://github.com/kaeawc/auto-mobile/releases/download/v${RELEASE_VERSION}/accessibility-service-debug.apk`;
-export const APK_SHA256_CHECKSUM = "979fa82f632d004a3f94dd7cd366be2a8bbab55f19d0bfd722f852c3cea674d4";
+export const RELEASE_VERSION = "latest";
+export const APK_URL = RELEASE_VERSION === "latest"
+  ? `https://github.com/kaeawc/auto-mobile/releases/latest/download/accessibility-service-debug.apk`
+  : `https://github.com/kaeawc/auto-mobile/releases/download/v${RELEASE_VERSION}/accessibility-service-debug.apk`;
+export const APK_SHA256_CHECKSUM = ""; // Empty = skip verification (local dev only)
