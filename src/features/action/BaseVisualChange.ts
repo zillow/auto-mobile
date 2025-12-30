@@ -182,7 +182,9 @@ export class BaseVisualChange {
     const minTimestamp = options.actionStartTime ?? 0;
 
     perf.serial("finalObserve");
-    const latestObservation = await this.observeScreen.execute(options.queryOptions, perf, true, minTimestamp);
+    // Wait for fresh data from accessibility service (skipWaitForFresh=false)
+    // This ensures we get observation data that reflects the action that just completed
+    const latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp);
     perf.end();
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {

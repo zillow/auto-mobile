@@ -845,10 +845,31 @@ export class AccessibilityServiceClient implements AccessibilityService {
         const updatedAt = this.cachedHierarchy.hierarchy.updatedAt;
 
         // If minTimestamp is set, check if cached data is too old
-        if (minTimestamp > 0 && updatedAt < minTimestamp) {
-          logger.debug(`[ACCESSIBILITY_SERVICE] Cache rejected: updatedAt ${updatedAt} < minTimestamp ${minTimestamp} (stale by ${minTimestamp - updatedAt}ms)`);
-          // Fall through to wait for fresh data or sync
+        // Use BOTH timestamps to handle clock skew between JavaScript and Android
+        // This matches the logic in waitForFreshData()
+        if (minTimestamp > 0) {
+          const receivedAfterAction = this.cachedHierarchy.receivedAt >= minTimestamp;
+          const updatedAfterAction = updatedAt >= minTimestamp;
+
+          // Reject cache only if BOTH timestamps indicate stale data
+          // Accept if EITHER timestamp shows data is fresh (handles clock skew)
+          if (!receivedAfterAction && !updatedAfterAction) {
+            logger.debug(`[ACCESSIBILITY_SERVICE] Cache rejected: receivedAt ${this.cachedHierarchy.receivedAt} < ${minTimestamp} AND updatedAt ${updatedAt} < ${minTimestamp} (stale by ${minTimestamp - Math.max(this.cachedHierarchy.receivedAt, updatedAt)}ms)`);
+            // Fall through to wait for fresh data or sync
+          } else {
+            const isFresh = cacheAge < 1000; // Consider fresh if less than 1 second old
+            const duration = Date.now() - startTime;
+            logger.debug(`[ACCESSIBILITY_SERVICE] Cache accepted in ${duration}ms: receivedAt=${this.cachedHierarchy.receivedAt} (>=${minTimestamp}? ${receivedAfterAction}), updatedAt=${updatedAt} (>=${minTimestamp}? ${updatedAfterAction}), age=${cacheAge}ms, fresh=${isFresh}`);
+
+            return {
+              hierarchy: this.cachedHierarchy.hierarchy,
+              fresh: isFresh,
+              updatedAt: updatedAt,
+              perfTiming: this.cachedHierarchy.perfTiming
+            };
+          }
         } else {
+          // No minTimestamp check, return cache
           const isFresh = cacheAge < 1000; // Consider fresh if less than 1 second old
           const duration = Date.now() - startTime;
           logger.debug(`[ACCESSIBILITY_SERVICE] Cache hit: ${duration}ms (age: ${cacheAge}ms, fresh: ${isFresh}, updatedAt: ${updatedAt})`);
@@ -866,7 +887,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // Also wait if cache was rejected due to minTimestamp
       // IMPORTANT: When cacheRejected is true, we MUST wait for fresh data regardless of skipWaitForFresh
       // because the caller requires data newer than minTimestamp (e.g., after an action like inputText)
-      const cacheRejected = minTimestamp > 0 && this.cachedHierarchy && this.cachedHierarchy.hierarchy.updatedAt < minTimestamp;
+      // Cache is rejected only if BOTH timestamps indicate stale data (to handle clock skew)
+      const cacheRejected = minTimestamp > 0 && this.cachedHierarchy &&
+        this.cachedHierarchy.receivedAt < minTimestamp &&
+        this.cachedHierarchy.hierarchy.updatedAt < minTimestamp;
       const shouldWait = (waitForFresh || cacheRejected) && (!skipWaitForFresh || cacheRejected) && !this.shouldSkipWebSocketWait();
       if (shouldWait) {
         // Use minTimestamp if provided, otherwise use startTime
