@@ -13,11 +13,27 @@
 #
 # When updating versions, also update any associated checksums for security.
 # ==============================================================================
+#
+# PLATFORM SUPPORT: x86_64 ONLY
+# Android SDK and tools are only available for x86_64 architecture.
+# This image will NOT work on ARM64 (Apple Silicon, ARM servers, etc.)
+# ==============================================================================
 
 # ==============================================================================
 # BUILDER STAGE - Contains all build-time dependencies
 # ==============================================================================
-FROM ubuntu:24.04 AS builder
+FROM --platform=linux/amd64 ubuntu:24.04 AS builder
+
+# Metadata labels for Docker Hub
+LABEL org.opencontainers.image.title="AutoMobile" \
+      org.opencontainers.image.description="Android automation MCP server with ADB (x86_64 only)" \
+      org.opencontainers.image.vendor="kaeawc" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/kaeawc/auto-mobile" \
+      org.opencontainers.image.documentation="https://github.com/kaeawc/auto-mobile/blob/main/DOCKER.md" \
+      org.opencontainers.image.platform="linux/amd64" \
+      platform.architecture="x86_64-only" \
+      platform.note="Android SDK requires x86_64; ARM64 not supported"
 
 # Avoid prompts from apt
 ENV DEBIAN_FRONTEND=noninteractive
@@ -77,16 +93,8 @@ RUN mkdir -p /opt/ktfmt \
 # Install lychee (link checker)
 # Check for updates: https://github.com/lycheeverse/lychee/releases
 ENV LYCHEE_VERSION=0.19.1
-RUN ARCH=$(uname -m) \
-    && if [ "$ARCH" = "x86_64" ]; then \
-         LYCHEE_ARCH="x86_64"; \
-       elif [ "$ARCH" = "aarch64" ]; then \
-         LYCHEE_ARCH="aarch64"; \
-       else \
-         echo "Unsupported architecture: $ARCH"; exit 1; \
-       fi \
-    && curl -L -o /tmp/lychee.tar.gz \
-       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-${LYCHEE_ARCH}-unknown-linux-gnu.tar.gz" \
+RUN curl -L -o /tmp/lychee.tar.gz \
+       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-gnu.tar.gz" \
     && tar -xzf /tmp/lychee.tar.gz -C /tmp \
     && mv /tmp/lychee /usr/local/bin/lychee \
     && chmod +x /usr/local/bin/lychee \
@@ -113,18 +121,9 @@ RUN sdkmanager --install \
     "platforms;android-36" \
     "build-tools;35.0.0" \
     "cmdline-tools;latest" \
+    "emulator" \
+    "system-images;android-36;google_apis;x86_64" \
     && sdkmanager --update
-
-# Install emulator and system images (x86_64 only - not available for ARM)
-# Skip on ARM64 architectures as emulator is x86_64 only
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then \
-        sdkmanager --install \
-            "emulator" \
-            "system-images;android-36;google_apis;x86_64"; \
-    else \
-        echo "Skipping emulator installation on $ARCH (emulator only available for x86_64)"; \
-    fi
 
 # Set working directory
 WORKDIR /workspace
@@ -144,7 +143,7 @@ RUN npm run build
 # ==============================================================================
 # RUNTIME STAGE - Minimal image with only runtime dependencies
 # ==============================================================================
-FROM ubuntu:24.04 AS runtime
+FROM --platform=linux/amd64 ubuntu:24.04 AS runtime
 
 # Avoid prompts from apt
 ENV DEBIAN_FRONTEND=noninteractive
@@ -213,7 +212,6 @@ RUN curl -L -o /usr/local/bin/tini "https://github.com/krallin/tini/releases/dow
     && chmod +x /usr/local/bin/tini
 
 # Create a non-root user for running the application
-# Don't hardcode UID to avoid conflicts with existing users
 RUN useradd -m automobile \
     && chown -R automobile:automobile /workspace \
     && mkdir -p /home/automobile/.android \
