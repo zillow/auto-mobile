@@ -66,15 +66,84 @@ jobs:
 
       - name: "Test MCP stdio protocol"
         run: |
+          set -e  # Exit on any error
+
           # Test that the server can receive and respond to MCP initialize
+          echo "Testing MCP stdio protocol..."
+
+          # MCP initialize request
           INIT='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
-          RESPONSE=$(echo "$INIT" | timeout 5 docker run -i --rm auto-mobile:test 2>/dev/null | head -1 || true)
-          echo "Response: $RESPONSE"
-          if echo "$RESPONSE" | grep -q '"jsonrpc":"2.0"'; then
-            echo "✓ MCP stdio protocol test passed"
-          else
-            echo "⚠ MCP stdio test inconclusive (may need more time to initialize)"
+
+          # Run container with timeout, capture both stdout and stderr
+          # Give server 30 seconds to respond (more reasonable than 5)
+          RESPONSE=$(echo "$INIT" | timeout 30 docker run -i --rm auto-mobile:test 2>&1 | head -1)
+
+          echo "Raw response: $RESPONSE"
+
+          # Check if response is empty
+          if [ -z "$RESPONSE" ]; then
+            echo "ERROR: No response received from MCP server"
+            echo "The server did not return any output within 30 seconds"
+            exit 1
           fi
+
+          # Validate JSON structure
+          if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+            echo "ERROR: Response is not valid JSON"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for required JSON-RPC field
+          if ! echo "$RESPONSE" | jq -e '.jsonrpc == "2.0"' >/dev/null 2>&1; then
+            echo "ERROR: Missing or invalid 'jsonrpc' field"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for result field (MCP initialize response should have a result)
+          if ! echo "$RESPONSE" | jq -e '.result' >/dev/null 2>&1; then
+            echo "ERROR: Missing 'result' field in response"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for serverInfo in result
+          if ! echo "$RESPONSE" | jq -e '.result.serverInfo' >/dev/null 2>&1; then
+            echo "ERROR: Missing 'serverInfo' in result"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Check for capabilities in result
+          if ! echo "$RESPONSE" | jq -e '.result.capabilities' >/dev/null 2>&1; then
+            echo "ERROR: Missing 'capabilities' in result"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # Verify serverInfo has expected fields
+          SERVER_NAME=$(echo "$RESPONSE" | jq -r '.result.serverInfo.name')
+          SERVER_VERSION=$(echo "$RESPONSE" | jq -r '.result.serverInfo.version')
+
+          if [ "$SERVER_NAME" != "AutoMobile" ]; then
+            echo "ERROR: Expected serverInfo.name='AutoMobile', got '$SERVER_NAME'"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          if [ "$SERVER_VERSION" != "0.0.1" ]; then
+            echo "ERROR: Expected serverInfo.version='0.0.1', got '$SERVER_VERSION'"
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+
+          # All checks passed!
+          echo "✓ MCP stdio protocol test PASSED"
+          echo "  - Valid JSON-RPC 2.0 response"
+          echo "  - Contains serverInfo: name=$SERVER_NAME, version=$SERVER_VERSION"
+          echo "  - Contains capabilities structure"
+          echo "Test completed successfully!"
 
       - name: "Save Docker image"
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

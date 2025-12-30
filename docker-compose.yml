@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   auto-mobile:
     build:
@@ -8,8 +6,17 @@ services:
     image: auto-mobile:latest
     container_name: auto-mobile
 
-    # Enable privileged mode for ADB access
-    privileged: true
+    # Security: Use specific capabilities instead of privileged mode
+    # ADB USB device access requires the ability to create device nodes (mknod)
+    # Docker provides CAP_MKNOD by default, but we explicitly add it for clarity
+    cap_add:
+      - MKNOD  # Required for creating device nodes in /dev
+
+    # Grant access to USB devices without privileged mode
+    # Major number 189 is for USB devices
+    # 'c' = character device, '*' = all minor numbers, 'rwm' = read/write/mknod
+    device_cgroup_rules:
+      - 'c 189:* rwm'
 
     # Environment variables
     environment:
@@ -29,8 +36,13 @@ services:
       - ~/.android:/home/automobile/.android
       # Mount scratch directory for outputs
       - ./scratch:/workspace/scratch
+      # Mount USB device directory for ADB access to physical devices
+      - /dev/bus/usb:/dev/bus/usb
 
-    # Network mode for ADB access to connected devices
+    # Security Note: host networking bypasses Docker's network isolation
+    # Required for ADB to communicate with devices on the local network
+    # Alternative: Use bridge networking with appropriate port mappings if only
+    # connecting to network-attached devices via TCP/IP (adb connect)
     network_mode: host
 
     # Keep container running
@@ -52,7 +64,18 @@ services:
       dockerfile: Dockerfile
     image: auto-mobile:latest
     container_name: auto-mobile-dev
-    privileged: true
+
+    # Security: Use specific capabilities instead of privileged mode
+    # ADB USB device access requires the ability to create device nodes (mknod)
+    # Docker provides CAP_MKNOD by default, but we explicitly add it for clarity
+    cap_add:
+      - MKNOD  # Required for creating device nodes in /dev
+
+    # Grant access to USB devices without privileged mode
+    # Major number 189 is for USB devices
+    # 'c' = character device, '*' = all minor numbers, 'rwm' = read/write/mknod
+    device_cgroup_rules:
+      - 'c 189:* rwm'
 
     environment:
       - ANDROID_HOME=/opt/android-sdk
@@ -65,7 +88,13 @@ services:
       - node-modules:/workspace/node_modules
       - ~/.android:/home/automobile/.android
       - ./scratch:/workspace/scratch
+      # Mount USB device directory for ADB access to physical devices
+      - /dev/bus/usb:/dev/bus/usb
 
+    # Security Note: host networking bypasses Docker's network isolation
+    # Required for ADB to communicate with devices on the local network
+    # Alternative: Use bridge networking with appropriate port mappings if only
+    # connecting to network-attached devices via TCP/IP (adb connect)
     network_mode: host
     stdin_open: true
     tty: true
