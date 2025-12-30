@@ -51,7 +51,8 @@ fi
 
 # Test 4: Java is installed
 echo -e "\n${YELLOW}Test 4: Checking Java version...${NC}"
-if docker exec "${CONTAINER_NAME}" java -version 2>&1 | grep -q "openjdk.*21"; then
+JAVA_OUTPUT=$(docker exec "${CONTAINER_NAME}" java -version 2>&1)
+if echo "${JAVA_OUTPUT}" | grep -q "openjdk.*21"; then
   echo -e "${GREEN}✓ Java 21 is installed${NC}"
 else
   echo -e "${RED}✗ Java 21 not found${NC}"
@@ -142,8 +143,9 @@ fi
 echo -e "\n${YELLOW}Test 12: Verifying Android SDK components...${NC}"
 SDK_COMPONENTS=("platform-tools" "build-tools;35.0.0" "platforms;android-36")
 ALL_COMPONENTS_OK=true
+SDK_LIST=$(docker exec "${CONTAINER_NAME}" sdkmanager --list_installed 2>/dev/null)
 for component in "${SDK_COMPONENTS[@]}"; do
-  if docker exec "${CONTAINER_NAME}" sdkmanager --list_installed 2>/dev/null | grep -q "${component}"; then
+  if echo "${SDK_LIST}" | grep -q "${component}"; then
     echo -e "${GREEN}  ✓ ${component} is installed${NC}"
   else
     echo -e "${RED}  ✗ ${component} not found${NC}"

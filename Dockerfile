@@ -124,11 +124,11 @@ RUN yes | sdkmanager --licenses || true
 # Install Android SDK components
 # Versions based on android/libs.versions.toml: compileSdk=36, buildTools=35.0.0, targetSdk=36
 # Check for updates: Review android/libs.versions.toml and https://developer.android.com/tools/releases/platforms
+# Note: cmdline-tools already installed manually above, so we skip it here to avoid conflict
 RUN sdkmanager --install \
     "platform-tools" \
     "platforms;android-36" \
     "build-tools;35.0.0" \
-    "cmdline-tools;latest" \
     "emulator" \
     "system-images;android-36;google_apis;x86_64" \
     && sdkmanager --update
