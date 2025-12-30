@@ -1,0 +1,78 @@
+# Docker Quick Start
+
+This project includes Docker support for running AutoMobile in a containerized environment with all required Android development tools.
+
+## Quick Start
+
+```bash
+# Build the image
+docker-compose build
+
+# Run in production mode
+docker-compose up auto-mobile
+
+# Run in development mode (with auto-reload)
+docker-compose up auto-mobile-dev
+```
+
+## What's Included
+
+The Docker image contains:
+- Node.js 24.x
+- Java 21
+- Android SDK (API 36, Build Tools 35.0.0)
+- Platform Tools (ADB)
+- All required development tools (ripgrep, ktfmt, lychee, shellcheck, xmlstarlet)
+
+## Common Commands
+
+```bash
+# Interactive shell
+docker-compose exec auto-mobile bash
+
+# Run tests
+docker-compose exec auto-mobile npm test
+
+# Run linter
+docker-compose exec auto-mobile npm run lint
+
+# Check connected devices
+docker-compose exec auto-mobile adb devices
+
+# Build Android components
+docker-compose exec auto-mobile bash -c "cd android && ./gradlew build"
+```
+
+## Requirements
+
+- Docker Engine 20.10+
+- Docker Compose v2.0+
+- For ADB device access: Privileged mode and host networking (already configured)
+
+## Documentation
+
+For complete documentation, see [docs/docker.md](docs/docker.md)
+
+## Platform Notes
+
+- **Linux**: Full support
+- **macOS**: Limited ADB device access (Docker Desktop limitation)
+- **Windows**: Requires WSL2 with USB passthrough
+- **iOS**: Not supported (requires macOS and Apple hardware)
+
+## Troubleshooting
+
+### ADB not seeing devices?
+1. Ensure device is connected to host: `adb devices`
+2. Restart ADB server: `adb kill-server && adb start-server`
+3. Verify container runs with `--privileged` flag
+
+### Build failing?
+```bash
+# Clean and rebuild
+docker-compose down -v
+docker-compose build --no-cache
+docker-compose up
+```
+
+For more help, see the [full Docker documentation](docs/docker.md).

@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  auto-mobile:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: auto-mobile:latest
+    container_name: auto-mobile
+
+    # Enable privileged mode for ADB access
+    privileged: true
+
+    # Environment variables
+    environment:
+      - ANDROID_HOME=/opt/android-sdk
+      - ANDROID_SDK_ROOT=/opt/android-sdk
+      - NODE_ENV=development
+
+    # Mount volumes
+    volumes:
+      # Mount source code for development (comment out for production)
+      - .:/workspace
+      # Persist Android SDK
+      - android-sdk:/opt/android-sdk
+      # Persist node modules
+      - node-modules:/workspace/node_modules
+      # Mount ADB keys
+      - ~/.android:/home/automobile/.android
+      # Mount scratch directory for outputs
+      - ./scratch:/workspace/scratch
+
+    # Network mode for ADB access to connected devices
+    network_mode: host
+
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+    # Working directory
+    working_dir: /workspace
+
+    # Default command (can be overridden)
+    command: npm start
+
+  # Development service with auto-reload
+  auto-mobile-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: auto-mobile:latest
+    container_name: auto-mobile-dev
+    privileged: true
+
+    environment:
+      - ANDROID_HOME=/opt/android-sdk
+      - ANDROID_SDK_ROOT=/opt/android-sdk
+      - NODE_ENV=development
+
+    volumes:
+      - .:/workspace
+      - android-sdk:/opt/android-sdk
+      - node-modules:/workspace/node_modules
+      - ~/.android:/home/automobile/.android
+      - ./scratch:/workspace/scratch
+
+    network_mode: host
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+
+    # Run in development mode with auto-reload
+    command: npm run dev
+
+volumes:
+  android-sdk:
+    name: auto-mobile-android-sdk
+  node-modules:
+    name: auto-mobile-node-modules

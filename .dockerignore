@@ -1,0 +1,73 @@
+# Git
+.git
+.gitignore
+.github
+
+# Node.js
+node_modules
+npm-debug.log*
+.npm
+.nyc_output/
+coverage
+*.tgz
+
+# Build outputs
+dist
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+test_screenshots
+screenshots/
+.view_hierarchy_cache/
+
+# Local development
+.auto-mobile-config.json
+scratch
+roadmap
+blog
+presentation
+venv
+.cache
+
+# Documentation
+site
+docs/changelog.md
+docs/contributing/index.md
+
+# Docker
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# CI/CD
+.gitlab-ci-local
+.gitlab-ci.yml
+
+# Android build artifacts (if built locally)
+android/build
+android/.gradle
+android/**/build
+android/**/.gradle
+android/local.properties
+*.apk
+*.aab
+
+# Gradle
+.gradle
+build
+gradle-wrapper.jar
+
+# Temporary files
+*.log
+*.tmp
+*.temp
