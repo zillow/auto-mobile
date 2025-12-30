@@ -229,7 +229,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       }
 
       // Perform checksum verification (only if checksum is provided)
-      if (APK_SHA256_CHECKSUM && APK_SHA256_CHECKSUM.length > 0) {
+      if (APK_SHA256_CHECKSUM.length > 0) {
         const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
         const actualChecksum = sha256sum.split(" ")[0];
 
