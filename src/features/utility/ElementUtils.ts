@@ -146,4 +146,8 @@ export class ElementUtils {
   validateElementText(foundElement: { element: Element; text?: string }, expectedText?: string): boolean {
     return this.finder.validateElementText(foundElement, expectedText);
   }
+
+  findScrollableContainer(viewHierarchy: ViewHierarchyResult): Element | null {
+    return this.finder.findScrollableContainer(viewHierarchy);
+  }
 }
