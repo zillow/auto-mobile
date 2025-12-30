@@ -263,6 +263,14 @@ export class NavigateTo {
    * @returns Array of setup actions that were performed
    */
   private async setupUIState(edge: NavigationEdge, platform: string): Promise<string[]> {
+    const requiredState = edge.uiState;
+
+    // Early return if no UI state requirements
+    if (!requiredState?.modalStack?.length && !requiredState?.selectedElements?.length) {
+      logger.debug(`[NAVIGATE_TO] No UI state requirements for edge`);
+      return [];
+    }
+
     const setupActions: string[] = [];
 
     // Get current UI state from a fresh observation
@@ -273,18 +281,22 @@ export class NavigateTo {
     }
 
     // Step 1: Handle modal stack alignment
-    const modalStackActions = await this.setupModalStack(
-      currentState.modalStack || [],
-      edge.uiState?.modalStack || [],
-      platform
-    );
-    setupActions.push(...modalStackActions);
+    if (requiredState.modalStack?.length) {
+      const modalStackActions = await this.setupModalStack(
+        currentState.modalStack || [],
+        requiredState.modalStack,
+        platform
+      );
+      setupActions.push(...modalStackActions);
+    }
 
     // Step 2: Handle selected elements (tabs, menu items, etc.)
-    const requiredState = edge.uiState;
-    if (requiredState?.selectedElements?.length) {
-      // Get current state again after modal stack changes
-      const updatedState = await this.getCurrentUIState(platform);
+    if (requiredState.selectedElements?.length) {
+      // Get current state again after modal stack changes if modals were dismissed
+      const updatedState = setupActions.length > 0
+        ? await this.getCurrentUIState(platform)
+        : currentState;
+
       if (updatedState) {
         const missingElements = this.findMissingSelections(
           requiredState.selectedElements,
