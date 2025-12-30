@@ -18,6 +18,7 @@ import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.TimeProvider
+import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,9 +61,13 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private val timeProvider: TimeProvider = SystemTimeProvider()
   private lateinit var webSocketServer: WebSocketServer
   private lateinit var hierarchyDebouncer: HierarchyDebouncer
+  private val navigationEventAccumulator = NavigationEventAccumulator()
 
   // Job for collecting hierarchy flow results
   private var hierarchyFlowJob: Job? = null
+
+  // Job for collecting navigation event updates
+  private var navigationEventJob: Job? = null
 
   private val commandReceiver =
       object : BroadcastReceiver() {
@@ -85,19 +90,81 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         }
       }
 
+  private val navigationEventReceiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          if (intent == null || intent.action != AutoMobileSDK.ACTION_NAVIGATION_EVENT) {
+            return
+          }
+
+          try {
+            val destination = intent.getStringExtra(AutoMobileSDK.EXTRA_DESTINATION) ?: return
+            val source = intent.getStringExtra(AutoMobileSDK.EXTRA_SOURCE) ?: return
+
+            // Extract arguments (prefixed with "arg_")
+            val arguments = mutableMapOf<String, String>()
+            val metadata = mutableMapOf<String, String>()
+
+            intent.extras?.keySet()?.forEach { key ->
+              when {
+                key.startsWith("arg_") -> {
+                  intent.getStringExtra(key)?.let { value ->
+                    arguments[key.removePrefix("arg_")] = value
+                  }
+                }
+                key.startsWith("meta_") -> {
+                  intent.getStringExtra(key)?.let { value ->
+                    metadata[key.removePrefix("meta_")] = value
+                  }
+                }
+              }
+            }
+
+            Log.d(TAG, "Received navigation event: $destination from $source")
+            navigationEventAccumulator.addEvent(destination, source, arguments, metadata)
+          } catch (e: Exception) {
+            Log.e(TAG, "Error handling navigation event broadcast", e)
+          }
+        }
+      }
+
   override fun onServiceConnected() {
     super.onServiceConnected()
     Log.d(TAG, "onServiceConnected")
 
     try {
       // Register broadcast receiver for commands
-      val filter = IntentFilter().apply { addAction(ACTION_EXTRACT_HIERARCHY) }
+      val commandFilter = IntentFilter().apply { addAction(ACTION_EXTRACT_HIERARCHY) }
 
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        registerReceiver(commandReceiver, filter, RECEIVER_EXPORTED)
+        registerReceiver(commandReceiver, commandFilter, RECEIVER_EXPORTED)
       } else {
-        @SuppressLint("UnspecifiedRegisterReceiverFlag") registerReceiver(commandReceiver, filter)
+        @SuppressLint("UnspecifiedRegisterReceiverFlag") registerReceiver(commandReceiver, commandFilter)
       }
+
+      // Register broadcast receiver for navigation events
+      val navigationFilter = IntentFilter().apply { addAction(AutoMobileSDK.ACTION_NAVIGATION_EVENT) }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerReceiver(navigationEventReceiver, navigationFilter, RECEIVER_EXPORTED)
+      } else {
+        @SuppressLint("UnspecifiedRegisterReceiverFlag") registerReceiver(navigationEventReceiver, navigationFilter)
+      }
+      Log.d(TAG, "Navigation event receiver registered")
+
+      // Initialize the navigation event accumulator
+      navigationEventAccumulator.initialize()
+      Log.d(TAG, "Navigation event accumulator initialized")
+
+      // Subscribe to navigation events and broadcast them
+      navigationEventJob = navigationEventAccumulator.latestEvent
+          .onEach { event ->
+            if (event != null) {
+              Log.d(TAG, "Navigation event: ${event.destination} at ${event.timestamp}")
+              broadcastNavigationEvent(event)
+            }
+          }
+          .launchIn(serviceScope)
 
       // Initialize the smart hierarchy debouncer with structural hash comparison
       hierarchyDebouncer = HierarchyDebouncer(
@@ -168,11 +235,20 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     try {
       unregisterReceiver(commandReceiver)
     } catch (e: Exception) {
-      Log.e(TAG, "Error unregistering receiver", e)
+      Log.e(TAG, "Error unregistering command receiver", e)
+    }
+
+    try {
+      unregisterReceiver(navigationEventReceiver)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error unregistering navigation event receiver", e)
     }
 
     // Cancel hierarchy flow subscription
     hierarchyFlowJob?.cancel()
+
+    // Cancel navigation event flow subscription
+    navigationEventJob?.cancel()
 
     // Reset debouncer
     if (::hierarchyDebouncer.isInitialized) {
@@ -1170,6 +1246,33 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       } catch (e: Exception) {
         Log.e(TAG, "Error broadcasting screenshot", e)
       }
+    }
+  }
+
+  /** Broadcast navigation event to WebSocket clients */
+  private suspend fun broadcastNavigationEvent(event: TimestampedNavigationEvent) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping navigation event broadcast")
+      return
+    }
+
+    try {
+      // Serialize the event to JSON
+      val eventJson = jsonCompact.encodeToString(event)
+
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"navigation_event","timestamp":${System.currentTimeMillis()},"event":""")
+          append(eventJson)
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted navigation event to ${webSocketServer.getConnectionCount()} clients: ${event.destination}")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting navigation event", e)
     }
   }
 }

@@ -64,6 +64,9 @@ kotlin {
 dependencies {
   implementation(libs.androidx.core)
 
+  // AutoMobile SDK for navigation event tracking
+  implementation(projects.autoMobileSdk)
+
   // Compose BOM
   implementation(platform(libs.compose.bom))
   implementation(libs.bundles.compose.ui)

@@ -12,6 +12,7 @@ import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
 import dev.jasonpearson.automobile.experimentation.ExperimentRepository
 import dev.jasonpearson.automobile.playground.navigation.AppNavigation
 import dev.jasonpearson.automobile.playground.navigation.DeepLinkManager
+import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 
 class MainActivity : ComponentActivity() {
@@ -29,6 +30,10 @@ class MainActivity : ComponentActivity() {
     installSplashScreen()
 
     super.onCreate(savedInstanceState)
+
+    // Initialize AutoMobile SDK for navigation tracking
+    AutoMobileSDK.initialize(applicationContext)
+    Log.d(TAG, "AutoMobileSDK initialized")
 
     // Initialize analytics tracking
     val analyticsTracker = AnalyticsTracker.getInstance()

@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
   alias(libs.plugins.android.library)
   alias(libs.plugins.kotlin.android)
+  alias(libs.plugins.compose.compiler)
   alias(libs.plugins.mavenPublish)
 }
 
@@ -29,6 +30,8 @@ android {
     sourceCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
     targetCompatibility = JavaVersion.toVersion(libs.versions.build.java.target.get())
   }
+
+  buildFeatures { compose = true }
 }
 
 kotlin {
@@ -47,6 +50,10 @@ dependencies {
 
   // Kotlin coroutines
   implementation(libs.kotlinx.coroutines)
+
+  // Compose runtime for @Composable support
+  implementation(platform(libs.compose.bom))
+  implementation("androidx.compose.runtime:runtime")
 
   // Navigation3 support for Compose navigation tracking
   implementation(libs.navigation3.runtime)
