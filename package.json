@@ -9,10 +9,10 @@
     "watch": "tsc --watch",
     "build": "tsc && node scripts/build-ios-assets.js && chmod +x dist/src/index.js",
     "clean": "rm -rf dist",
-    "start": "npx tsx src/index.ts --transport streamable",
+    "start": "pnpm exec tsx src/index.ts --transport streamable",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",
     "dev:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port",
-    "dev:stdio": "npx tsx src/index.ts",
+    "dev:stdio": "pnpm exec tsx src/index.ts",
     "dev:sse": "ts-node-dev --respawn --transpile-only src/index.ts --transport sse",
     "dev:streamable": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable",
     "dev:streamable:port": "ts-node-dev --respawn --transpile-only src/index.ts --transport streamable --port",
@@ -22,6 +22,7 @@
     "prepublishOnly": "cp README.md README.md.backup && node scripts/npm/transform-readme.js",
     "postpublish": "mv README.md.backup README.md || true"
   },
+  "packageManager": "pnpm@10.26.2",
   "engines": {
     "node": ">=24"
   },

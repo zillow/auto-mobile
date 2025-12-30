@@ -61,10 +61,10 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
-        run: npm run lint
+        run: pnpm run lint
 
       - name: "Run Tests"
-        run: npm run test
+        run: pnpm run test
 
   junit-runner-unit-tests:
     name: "Run JUnit Runner Unit Tests"

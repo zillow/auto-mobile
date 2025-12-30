@@ -6,17 +6,17 @@ the changes made. At no point should we be writing any JavaScript.
 
 ```bash
 # Compile main source code
-npm run build
+pnpm run build
 
-# Run lint with automatic fixes - do this first before attempting to fix lint errors via editing  
-npm run lint
+# Run lint with automatic fixes - do this first before attempting to fix lint errors via editing
+pnpm run lint
 
 # Run all tests
-npm run test
+pnpm run test
 
 # Run specific tests
-npm run test -- --grep "Name of the test suite or test case"
+pnpm run test -- --grep "Name of the test suite or test case"
 
 # Reinstall MCP server
-npm install
+pnpm install
 ```

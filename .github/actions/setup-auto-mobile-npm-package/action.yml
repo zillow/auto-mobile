@@ -10,11 +10,16 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: "Setup pnpm"
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10.26.2
+
     - name: "Setup Node.js"
       uses: actions/setup-node@v4
       with:
         node-version: "24"
-        cache: "npm"
+        cache: "pnpm"
 
     - name: "Install ripgrep"
       shell: ${{ inputs.shell }}
@@ -25,14 +30,14 @@ runs:
     - name: "Install dependencies"
       shell: ${{ inputs.shell }}
       run: |
-        npm ci
+        pnpm install --frozen-lockfile
 
     - name: "Build AutoMobile"
       shell: ${{ inputs.shell }}
       run: |
-        npm run build
+        pnpm run build
 
     - name: "Globally Install AutoMobile"
       shell: ${{ inputs.shell }}
       run: |
-        npm install -g .
+        pnpm install -g .

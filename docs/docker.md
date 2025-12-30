@@ -161,23 +161,23 @@ docker-compose exec auto-mobile bash
 
 ```bash
 # Run all tests
-docker-compose exec auto-mobile npm test
+docker-compose exec auto-mobile pnpm test
 
 # Run specific test
-docker-compose exec auto-mobile npm run test -- --grep "test name"
+docker-compose exec auto-mobile pnpm run test -- --grep "test name"
 
 # Run tests with coverage
-docker-compose exec auto-mobile npm run test:coverage
+docker-compose exec auto-mobile ppnpm run test:coverage
 ```
 
 ### Linting and Validation
 
 ```bash
 # Run linter
-docker-compose exec auto-mobile npm run lint
+docker-compose exec auto-mobile pnpm run lint
 
 # Run build
-docker-compose exec auto-mobile npm run build
+docker-compose exec auto-mobile pnpm run build
 
 # Validate shell scripts
 docker-compose exec auto-mobile scripts/shellcheck/validate_shell_scripts.sh
@@ -233,7 +233,7 @@ If builds fail with permission errors:
 
 2. **Clear caches**:
    ```bash
-   docker-compose exec auto-mobile npm run clean
+   docker-compose exec auto-mobile pnpm run clean
    docker-compose exec auto-mobile rm -rf node_modules
    docker-compose up --build
    ```
@@ -339,7 +339,7 @@ jobs:
         run: docker build -t auto-mobile:test .
 
       - name: Run tests
-        run: docker run --rm auto-mobile:test npm test
+        run: docker run --rm auto-mobile:test pnpm test
 ```
 
 ### GitLab CI
@@ -351,7 +351,7 @@ test:
     - docker:dind
   script:
     - docker build -t auto-mobile:test .
-    - docker run --rm auto-mobile:test npm test
+    - docker run --rm auto-mobile:test pnpm test
 ```
 
 ## Validation and Testing

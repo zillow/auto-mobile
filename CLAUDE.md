@@ -5,10 +5,10 @@ Node TypeScript MCP server providing Android Debug Bridge (ADB) capabilities thr
 ## Build & Validate
 
 ```bash
-npm run build    # Compile TypeScript
-npm run lint     # Lint with auto-fix (run before manual fixes)
-npm run test     # Run all tests
-npm run test -- --grep "test name"  # Run specific tests
+pnpm run build    # Compile TypeScript
+pnpm run lint     # Lint with auto-fix (run before manual fixes)
+pnpm run test     # Run all tests
+pnpm run test -- --grep "test name"  # Run specific tests
 ```
 
 ## Key Rules

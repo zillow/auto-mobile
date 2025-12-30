@@ -6,7 +6,7 @@ argument-hint: [test name filter]
 
 Run the test suite for AutoMobile.
 
-If an argument is provided, run: `npm run test -- --grep "$ARGUMENTS"`
-Otherwise run: `npm run test`
+If an argument is provided, run: `pnpm run test -- --grep "$ARGUMENTS"`
+Otherwise run: `pnpm run test`
 
 Summarize test results concisely.

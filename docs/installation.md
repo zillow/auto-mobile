@@ -65,7 +65,7 @@ If you have a private npm registry for proxying public npm:
 You can also install it directly as a CLI tool.
 
 ```shell
-npm install -g @kaeawc/auto-mobile@latest
+pnpm install -g @kaeawc/auto-mobile@latest
 
 # Test CLI mode to check installation succeeded
 auto-mobile --cli
