@@ -1,0 +1,204 @@
+# =============================================================================
+# .dockerignore for AutoMobile - Android automation MCP server
+# =============================================================================
+# This file controls what gets copied into the Docker image during build.
+# The Dockerfile copies package*.json first, runs npm ci, then copies the rest.
+# Therefore: block node_modules (rebuilt in container) but allow package*.json
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Version Control
+# -----------------------------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+.github/
+.githooks/
+
+# -----------------------------------------------------------------------------
+# Node.js Dependencies & Build Artifacts
+# -----------------------------------------------------------------------------
+# Node modules are rebuilt inside container via npm ci
+node_modules/
+package-lock.json.bak
+
+# npm artifacts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+.pnp.*
+*.tgz
+
+# Build artifacts (dist/ is rebuilt inside container)
+dist/
+*.tsbuildinfo
+
+# Test coverage
+.nyc_output/
+coverage/
+.coverage/
+
+# -----------------------------------------------------------------------------
+# Development Tools & IDE
+# -----------------------------------------------------------------------------
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo
+*.swn
+*~
+.editorconfig
+.eslintrc*
+eslint.config.*
+.prettierrc*
+.mocharc.*
+
+# -----------------------------------------------------------------------------
+# Operating System Files
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# -----------------------------------------------------------------------------
+# TypeScript & Testing
+# -----------------------------------------------------------------------------
+# Source files (TypeScript gets compiled inside container)
+src/
+test/
+*.ts
+!*.d.ts
+tsconfig*.json
+
+# -----------------------------------------------------------------------------
+# Documentation & Planning (not needed at runtime)
+# -----------------------------------------------------------------------------
+docs/
+*.md
+!package.json
+README*
+CHANGELOG*
+CONTRIBUTING*
+CODE_OF_CONDUCT*
+DISCLAIMER*
+LICENSE*
+CLAUDE.md
+
+# AI and development docs
+docs/ai/
+docs/contributing/
+
+# Local planning/notes
+scratch/
+roadmap/
+blog/
+presentation/
+notes/
+
+# Generated documentation
+site/
+mkdocs.yml
+
+# -----------------------------------------------------------------------------
+# Testing & Quality Assurance
+# -----------------------------------------------------------------------------
+test/
+test_screenshots/
+screenshots/
+.view_hierarchy_cache/
+.event_monitor_cache/
+
+# -----------------------------------------------------------------------------
+# CI/CD Configuration
+# -----------------------------------------------------------------------------
+.github/
+.gitlab-ci.yml
+.gitlab-ci-local/
+.circleci/
+.travis.yml
+azure-pipelines.yml
+.buildkite/
+.semaphore/
+
+# -----------------------------------------------------------------------------
+# Docker Files (no need to copy Docker files into Docker)
+# -----------------------------------------------------------------------------
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+.hadolint.yaml
+
+# -----------------------------------------------------------------------------
+# Android Build Artifacts
+# -----------------------------------------------------------------------------
+# Android source is needed, but not build outputs
+android/build/
+android/.gradle/
+android/**/build/
+android/**/.gradle/
+android/local.properties
+android/**/.cxx/
+android/**/.externalNativeBuild/
+*.apk
+*.aab
+*.dex
+*.class
+
+# Gradle wrapper jar (already in image)
+gradle-wrapper.jar
+
+# -----------------------------------------------------------------------------
+# Local Configuration & Secrets
+# -----------------------------------------------------------------------------
+.auto-mobile-config.json
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+secrets/
+credentials.json
+
+# -----------------------------------------------------------------------------
+# Build & Runtime Artifacts
+# -----------------------------------------------------------------------------
+.gradle/
+build/
+.cache/
+.temp/
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+*.log.*
+venv/
+
+# -----------------------------------------------------------------------------
+# Claude Code Configuration
+# -----------------------------------------------------------------------------
+.claude/
+
+# -----------------------------------------------------------------------------
+# Miscellaneous Development Files
+# -----------------------------------------------------------------------------
+firebender.json
+.config/
+scripts/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old

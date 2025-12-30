@@ -1,0 +1,110 @@
+services:
+  auto-mobile:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: auto-mobile:latest
+    container_name: auto-mobile
+
+    # Security: Use specific capabilities instead of privileged mode
+    # ADB USB device access requires the ability to create device nodes (mknod)
+    # Docker provides CAP_MKNOD by default, but we explicitly add it for clarity
+    cap_add:
+      - MKNOD  # Required for creating device nodes in /dev
+
+    # Grant access to USB devices without privileged mode
+    # Major number 189 is for USB devices
+    # 'c' = character device, '*' = all minor numbers, 'rwm' = read/write/mknod
+    device_cgroup_rules:
+      - 'c 189:* rwm'
+
+    # Environment variables
+    environment:
+      - ANDROID_HOME=/opt/android-sdk
+      - ANDROID_SDK_ROOT=/opt/android-sdk
+      - NODE_ENV=development
+
+    # Mount volumes
+    volumes:
+      # Mount source code for development (comment out for production)
+      - .:/workspace
+      # Persist Android SDK
+      - android-sdk:/opt/android-sdk
+      # Persist node modules
+      - node-modules:/workspace/node_modules
+      # Mount ADB keys
+      - ~/.android:/home/automobile/.android
+      # Mount scratch directory for outputs
+      - ./scratch:/workspace/scratch
+      # Mount USB device directory for ADB access to physical devices
+      - /dev/bus/usb:/dev/bus/usb
+
+    # Security Note: host networking bypasses Docker's network isolation
+    # Required for ADB to communicate with devices on the local network
+    # Alternative: Use bridge networking with appropriate port mappings if only
+    # connecting to network-attached devices via TCP/IP (adb connect)
+    network_mode: host
+
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+    # Working directory
+    working_dir: /workspace
+
+    # Override default command for different transport mode
+    # Default Dockerfile CMD is: node dist/src/index.js (stdio mode)
+    # Override here for streamable mode
+    command: ["npm", "start"]
+
+  # Development service with auto-reload
+  auto-mobile-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: auto-mobile:latest
+    container_name: auto-mobile-dev
+
+    # Security: Use specific capabilities instead of privileged mode
+    # ADB USB device access requires the ability to create device nodes (mknod)
+    # Docker provides CAP_MKNOD by default, but we explicitly add it for clarity
+    cap_add:
+      - MKNOD  # Required for creating device nodes in /dev
+
+    # Grant access to USB devices without privileged mode
+    # Major number 189 is for USB devices
+    # 'c' = character device, '*' = all minor numbers, 'rwm' = read/write/mknod
+    device_cgroup_rules:
+      - 'c 189:* rwm'
+
+    environment:
+      - ANDROID_HOME=/opt/android-sdk
+      - ANDROID_SDK_ROOT=/opt/android-sdk
+      - NODE_ENV=development
+
+    volumes:
+      - .:/workspace
+      - android-sdk:/opt/android-sdk
+      - node-modules:/workspace/node_modules
+      - ~/.android:/home/automobile/.android
+      - ./scratch:/workspace/scratch
+      # Mount USB device directory for ADB access to physical devices
+      - /dev/bus/usb:/dev/bus/usb
+
+    # Security Note: host networking bypasses Docker's network isolation
+    # Required for ADB to communicate with devices on the local network
+    # Alternative: Use bridge networking with appropriate port mappings if only
+    # connecting to network-attached devices via TCP/IP (adb connect)
+    network_mode: host
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+
+    # Run in development mode with auto-reload
+    command: ["npm", "run", "dev"]
+
+volumes:
+  android-sdk:
+    name: auto-mobile-android-sdk
+  node-modules:
+    name: auto-mobile-node-modules

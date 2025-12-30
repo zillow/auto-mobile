@@ -1,0 +1,33 @@
+# Hadolint configuration for Dockerfile linting
+# https://github.com/hadolint/hadolint
+
+# Ignore rules
+ignored:
+  # DL3008: Pin versions in apt-get install - we use latest for base system tools
+  - DL3008
+  # DL3009: Delete apt-cache after installation - we already do this with rm -rf
+  - DL3009
+  # DL3059: Multiple consecutive RUN instructions - optimizing for readability
+  - DL3059
+
+# Trusted registries for base images
+trustedRegistries:
+  - docker.io
+  - gcr.io
+  - ghcr.io
+
+# Override specific rules
+override:
+  error:
+    # Always use COPY instead of ADD
+    - DL3020
+  warning:
+    # Use SHELL to change default shell
+    - DL4005
+  info:
+    # Use JSON notation for CMD and ENTRYPOINT
+    - DL3025
+  style: []
+
+# Allow inline ignores
+inline-ignores: true
