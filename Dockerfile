@@ -4,6 +4,7 @@
 # This Dockerfile pins specific versions for reproducibility and security.
 # Versions should be updated periodically by checking the following sources:
 #
+# - Azul Zulu JDK: https://hub.docker.com/r/azul/zulu-openjdk-alpine
 # - Node.js: https://nodejs.org/en/about/previous-releases (LTS versions)
 # - ktfmt: https://github.com/facebook/ktfmt/releases
 # - lychee: https://github.com/lycheeverse/lychee/releases
@@ -13,57 +14,80 @@
 #
 # When updating versions, also update any associated checksums for security.
 # ==============================================================================
+#
+# PLATFORM SUPPORT: x86_64 ONLY
+# Android SDK and tools are only available for x86_64 architecture.
+# This image will NOT work on ARM64 (Apple Silicon, ARM servers, etc.)
+# ==============================================================================
 
 # ==============================================================================
 # BUILDER STAGE - Contains all build-time dependencies
 # ==============================================================================
-FROM ubuntu:24.04 AS builder
+ARG ZULU_VERSION=21.0.2
+FROM --platform=linux/amd64 azul/zulu-openjdk-alpine:${ZULU_VERSION} AS builder
 
-# Avoid prompts from apt
-ENV DEBIAN_FRONTEND=noninteractive
+# Metadata labels for Docker Hub
+LABEL org.opencontainers.image.title="AutoMobile" \
+      org.opencontainers.image.description="Android automation MCP server with ADB (x86_64 only)" \
+      org.opencontainers.image.vendor="kaeawc" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.source="https://github.com/kaeawc/auto-mobile" \
+      org.opencontainers.image.documentation="https://github.com/kaeawc/auto-mobile/blob/main/DOCKER.md" \
+      org.opencontainers.image.platform="linux/amd64" \
+      platform.architecture="x86_64-only" \
+      platform.note="Android SDK requires x86_64; ARM64 not supported"
+
+# Set environment
+ENV TERM=dumb
+ENV PAGER=cat
 
 # Set up environment variables for Android SDK
 ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/35.0.0
 
-# Use bash with pipefail for better error handling
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Upgrade Alpine from 3.19 to 3.23 to get Node.js 24
+# This upgrades all system packages (musl, OpenSSL, etc.) to v3.23
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories \
+    && echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories \
+    && apk update \
+    && apk upgrade --no-cache
 
-# Install base system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install base system dependencies with Alpine apk
+RUN apk --no-cache add \
     # Build essentials
-    build-essential \
+    bash \
     curl \
     wget \
     git \
     unzip \
     zip \
     tar \
-    # Java 21 (required for Android build tools and ktfmt)
-    openjdk-21-jdk \
+    gzip \
+    # Alpine compatibility layer for glibc (needed for Android tools)
+    gcompat \
     # Development tools
     ripgrep \
     shellcheck \
     xmlstarlet \
     jq \
+    yq \
     # Required for better-sqlite3 and other native modules
     python3 \
-    python3-pip \
+    py3-pip \
     make \
     g++ \
-    # Android emulator dependencies (if needed)
-    libgl1-mesa-dev \
-    libpulse0 \
     # Utilities
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    openssh-client \
+    openssl-dev
 
-# Install Node.js 24.x
-# Check for updates: https://nodejs.org/en/about/previous-releases
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Now that bash is installed, set it as the default shell
+SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
+
+# Install Node.js 24.x for Alpine
+# Alpine 3.23 includes Node.js 24.x in its package repositories
+RUN apk add --no-cache nodejs npm
 
 # Install ktfmt (Kotlin formatter)
 # Check for updates: https://github.com/facebook/ktfmt/releases
@@ -77,16 +101,8 @@ RUN mkdir -p /opt/ktfmt \
 # Install lychee (link checker)
 # Check for updates: https://github.com/lycheeverse/lychee/releases
 ENV LYCHEE_VERSION=0.19.1
-RUN ARCH=$(uname -m) \
-    && if [ "$ARCH" = "x86_64" ]; then \
-         LYCHEE_ARCH="x86_64"; \
-       elif [ "$ARCH" = "aarch64" ]; then \
-         LYCHEE_ARCH="aarch64"; \
-       else \
-         echo "Unsupported architecture: $ARCH"; exit 1; \
-       fi \
-    && curl -L -o /tmp/lychee.tar.gz \
-       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-lychee-v${LYCHEE_VERSION}-${LYCHEE_ARCH}-unknown-linux-gnu.tar.gz" \
+RUN curl -L -o /tmp/lychee.tar.gz \
+       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-x86_64-unknown-linux-musl.tar.gz" \
     && tar -xzf /tmp/lychee.tar.gz -C /tmp \
     && mv /tmp/lychee /usr/local/bin/lychee \
     && chmod +x /usr/local/bin/lychee \
@@ -108,11 +124,11 @@ RUN yes | sdkmanager --licenses || true
 # Install Android SDK components
 # Versions based on android/libs.versions.toml: compileSdk=36, buildTools=35.0.0, targetSdk=36
 # Check for updates: Review android/libs.versions.toml and https://developer.android.com/tools/releases/platforms
+# Note: cmdline-tools already installed manually above, so we skip it here to avoid conflict
 RUN sdkmanager --install \
     "platform-tools" \
     "platforms;android-36" \
     "build-tools;35.0.0" \
-    "cmdline-tools;latest" \
     "emulator" \
     "system-images;android-36;google_apis;x86_64" \
     && sdkmanager --update
@@ -135,41 +151,42 @@ RUN npm run build
 # ==============================================================================
 # RUNTIME STAGE - Minimal image with only runtime dependencies
 # ==============================================================================
-FROM ubuntu:24.04 AS runtime
+FROM --platform=linux/amd64 azul/zulu-openjdk-alpine:${ZULU_VERSION} AS runtime
 
-# Avoid prompts from apt
-ENV DEBIAN_FRONTEND=noninteractive
+# Set environment
+ENV TERM=dumb
+ENV PAGER=cat
 
 # Set up environment variables for Android SDK
 ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV PATH=${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/35.0.0
 
-# Use bash with pipefail for better error handling
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Upgrade Alpine from 3.19 to 3.23 to get Node.js 24
+# This upgrades all system packages (musl, OpenSSL, etc.) to v3.23
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories \
+    && echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories \
+    && apk update \
+    && apk upgrade --no-cache
 
 # Install runtime dependencies only (no build tools)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Node.js runtime dependencies
+RUN apk --no-cache add \
+    # Node.js runtime
+    nodejs \
+    npm \
+    # Runtime utilities
+    bash \
     curl \
     ca-certificates \
-    # Java 21 runtime (required for Android tools and ktfmt)
-    openjdk-21-jre-headless \
-    # Runtime utilities
     ripgrep \
     shellcheck \
     xmlstarlet \
     jq \
-    # Android emulator dependencies (if needed at runtime)
-    libgl1-mesa-dev \
-    libpulse0 \
-    && rm -rf /var/lib/apt/lists/*
+    # Alpine compatibility layer for Android tools
+    gcompat
 
-# Install Node.js 24.x
-# Check for updates: https://nodejs.org/en/about/previous-releases
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Now that bash is installed, set it as the default shell
+SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
 # Copy Android SDK from builder (needed for ADB at runtime)
 COPY --from=builder /opt/android-sdk /opt/android-sdk
@@ -204,7 +221,7 @@ RUN curl -L -o /usr/local/bin/tini "https://github.com/krallin/tini/releases/dow
     && chmod +x /usr/local/bin/tini
 
 # Create a non-root user for running the application
-RUN useradd -m -u 1000 automobile \
+RUN adduser -D automobile \
     && chown -R automobile:automobile /workspace \
     && mkdir -p /home/automobile/.android \
     && chown -R automobile:automobile /home/automobile/.android
