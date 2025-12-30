@@ -39,7 +39,7 @@ describe("NavigateTo", () => {
         action: z.string(),
         platform: z.string()
       }),
-      async (args) => {
+      async args => {
         toolCallLog.push({ toolName: "tapOn", args });
 
         // Simulate navigation by recording a navigation event
@@ -170,7 +170,7 @@ describe("NavigateTo", () => {
 
       navigateTo = new NavigateTo(device, null);
 
-      const result = await navigateTo.execute({
+      await navigateTo.execute({
         targetScreen: "SettingsScreen",
         platform: "android"
       });
@@ -349,7 +349,7 @@ describe("NavigateTo", () => {
 
       navigateTo = new NavigateTo(device, null);
 
-      const result = await navigateTo.execute({
+      await navigateTo.execute({
         targetScreen: "AdvancedScreen",
         platform: "android"
       });

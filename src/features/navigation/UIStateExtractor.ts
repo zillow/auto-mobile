@@ -18,7 +18,7 @@ export class UIStateExtractor {
     let destinationId: string | undefined;
 
     // Traverse the hierarchy to find selected elements and destination
-    this.traverseHierarchy(viewHierarchy.hierarchy, (node) => {
+    this.traverseHierarchy(viewHierarchy.hierarchy, node => {
       // Check for destination ID (resource-id like "navigation.HomeDestination")
       const resourceId = node["resource-id"];
       if (resourceId && resourceId.startsWith("navigation.") && resourceId.endsWith("Destination")) {

@@ -48,8 +48,8 @@ describe("UIStateExtractor", () => {
         bounds: "[0,0][1080,2400]",
         node: {
           "resource-id": "com.app:id/nav_home",
-          selected: "true",
-          bounds: "[0,0][100,100]"
+          "selected": "true",
+          "bounds": "[0,0][100,100]"
         }
       });
 
@@ -65,8 +65,8 @@ describe("UIStateExtractor", () => {
         bounds: "[0,0][1080,2400]",
         node: {
           "content-desc": "Home Tab",
-          selected: "true",
-          bounds: "[0,0][100,100]"
+          "selected": "true",
+          "bounds": "[0,0][100,100]"
         }
       });
 
@@ -130,7 +130,7 @@ describe("UIStateExtractor", () => {
         bounds: "[0,0][1080,2400]",
         node: {
           "resource-id": "navigation.HomeDestination",
-          bounds: "[0,0][1080,2400]"
+          "bounds": "[0,0][1080,2400]"
         }
       });
 
@@ -199,8 +199,8 @@ describe("UIStateExtractor", () => {
         bounds: "[0,0][1080,2400]",
         node: {
           "resource-id": "navigation.SettingsDestination",
-          bounds: "[0,0][1080,2400]",
-          node: {
+          "bounds": "[0,0][1080,2400]",
+          "node": {
             text: "General",
             selected: "true",
             bounds: "[0,0][200,100]"
@@ -248,8 +248,8 @@ describe("UIStateExtractor", () => {
         bounds: "[0,0][1080,2400]",
         node: {
           "resource-id": "navigation.HomeDestination",
-          bounds: "[0,0][1080,2400]",
-          node: {
+          "bounds": "[0,0][1080,2400]",
+          "node": {
             bounds: "[0,294][1080,420]",
             node: [
               {
