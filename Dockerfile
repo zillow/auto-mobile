@@ -86,7 +86,7 @@ RUN ARCH=$(uname -m) \
          echo "Unsupported architecture: $ARCH"; exit 1; \
        fi \
     && curl -L -o /tmp/lychee.tar.gz \
-       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-lychee-v${LYCHEE_VERSION}-${LYCHEE_ARCH}-unknown-linux-gnu.tar.gz" \
+       "https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/lychee-${LYCHEE_ARCH}-unknown-linux-gnu.tar.gz" \
     && tar -xzf /tmp/lychee.tar.gz -C /tmp \
     && mv /tmp/lychee /usr/local/bin/lychee \
     && chmod +x /usr/local/bin/lychee \
