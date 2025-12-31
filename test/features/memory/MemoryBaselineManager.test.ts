@@ -1,0 +1,267 @@
+import { beforeEach, describe, expect, test } from "bun:test";
+import { MemoryBaselineManager } from "../../../src/features/memory/MemoryBaselineManager";
+import type { MemoryBaseline } from "../../../src/db/types";
+import type { MemoryMetrics } from "../../../src/features/memory/MemoryMetricsCollector";
+
+describe("MemoryBaselineManager - Unit Tests", function() {
+  let manager: MemoryBaselineManager;
+
+  beforeEach(function() {
+    manager = new MemoryBaselineManager();
+  });
+
+  describe("exponentialMovingAverage", function() {
+    test("should calculate EMA with alpha 0.3", function() {
+      const oldValue = 100;
+      const newValue = 150;
+      const alpha = 0.3;
+
+      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
+
+      // Expected: 0.3 * 150 + 0.7 * 100 = 45 + 70 = 115
+      expect(result).toBe(115);
+    });
+
+    test("should calculate EMA with alpha 0.5 (simple average)", function() {
+      const oldValue = 100;
+      const newValue = 200;
+      const alpha = 0.5;
+
+      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
+
+      // Expected: 0.5 * 200 + 0.5 * 100 = 100 + 50 = 150
+      expect(result).toBe(150);
+    });
+
+    test("should calculate EMA with alpha 1.0 (full replacement)", function() {
+      const oldValue = 100;
+      const newValue = 200;
+      const alpha = 1.0;
+
+      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
+
+      // Expected: 1.0 * 200 + 0.0 * 100 = 200
+      expect(result).toBe(200);
+    });
+
+    test("should calculate EMA with alpha 0.0 (no change)", function() {
+      const oldValue = 100;
+      const newValue = 200;
+      const alpha = 0.0;
+
+      const result = (manager as any).exponentialMovingAverage(oldValue, newValue, alpha);
+
+      // Expected: 0.0 * 200 + 1.0 * 100 = 100
+      expect(result).toBe(100);
+    });
+  });
+
+  describe("calculateAnomalyMultiplier", function() {
+    test("should calculate multipliers correctly for normal growth", function() {
+      const baseline: MemoryBaseline = {
+        id: 1,
+        device_id: "test-device",
+        package_name: "com.example.app",
+        tool_name: "tapOn",
+        java_heap_baseline_mb: 50,
+        native_heap_baseline_mb: 30,
+        gc_count_baseline: 5,
+        gc_duration_baseline_ms: 100,
+        unreachable_objects_baseline: 100,
+        sample_count: 10,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      const metrics: MemoryMetrics = {
+        preSnapshot: {
+          javaHeapMb: 45,
+          nativeHeapMb: 28,
+          totalPssMb: 100,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        postSnapshot: {
+          javaHeapMb: 100, // 2x baseline
+          nativeHeapMb: 60, // 2x baseline
+          totalPssMb: 200,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        javaHeapGrowthMb: 55,
+        nativeHeapGrowthMb: 32,
+        totalPssGrowthMb: 100,
+        gcEvents: [],
+        gcCount: 10, // 2x baseline
+        gcTotalDurationMs: 200, // 2x baseline
+        unreachableObjects: {
+          count: 200, // 2x baseline
+          sizeKb: 10,
+          raw: "",
+        },
+      };
+
+      const result = manager.calculateAnomalyMultiplier(baseline, metrics);
+
+      expect(result.javaHeapMultiplier).toBe(2.0);
+      expect(result.nativeHeapMultiplier).toBe(2.0);
+      expect(result.gcCountMultiplier).toBe(2.0);
+      expect(result.gcDurationMultiplier).toBe(2.0);
+      expect(result.unreachableObjectsMultiplier).toBe(2.0);
+    });
+
+    test("should handle zero baseline values safely", function() {
+      const baseline: MemoryBaseline = {
+        id: 1,
+        device_id: "test-device",
+        package_name: "com.example.app",
+        tool_name: "tapOn",
+        java_heap_baseline_mb: 0,
+        native_heap_baseline_mb: 0,
+        gc_count_baseline: 0,
+        gc_duration_baseline_ms: 0,
+        unreachable_objects_baseline: 0,
+        sample_count: 1,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      const metrics: MemoryMetrics = {
+        preSnapshot: {
+          javaHeapMb: 0,
+          nativeHeapMb: 0,
+          totalPssMb: 0,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        postSnapshot: {
+          javaHeapMb: 50,
+          nativeHeapMb: 30,
+          totalPssMb: 100,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        javaHeapGrowthMb: 50,
+        nativeHeapGrowthMb: 30,
+        totalPssGrowthMb: 100,
+        gcEvents: [],
+        gcCount: 5,
+        gcTotalDurationMs: 100,
+        unreachableObjects: {
+          count: 50,
+          sizeKb: 5,
+          raw: "",
+        },
+      };
+
+      const result = manager.calculateAnomalyMultiplier(baseline, metrics);
+
+      // When baseline is 0 and current > 0, should return Infinity
+      expect(result.javaHeapMultiplier).toBe(Infinity);
+      expect(result.nativeHeapMultiplier).toBe(Infinity);
+      expect(result.gcCountMultiplier).toBe(Infinity);
+      expect(result.gcDurationMultiplier).toBe(Infinity);
+      expect(result.unreachableObjectsMultiplier).toBe(Infinity);
+    });
+
+    test("should handle zero current values", function() {
+      const baseline: MemoryBaseline = {
+        id: 1,
+        device_id: "test-device",
+        package_name: "com.example.app",
+        tool_name: "tapOn",
+        java_heap_baseline_mb: 50,
+        native_heap_baseline_mb: 30,
+        gc_count_baseline: 5,
+        gc_duration_baseline_ms: 100,
+        unreachable_objects_baseline: 100,
+        sample_count: 10,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      const metrics: MemoryMetrics = {
+        preSnapshot: {
+          javaHeapMb: 50,
+          nativeHeapMb: 30,
+          totalPssMb: 100,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        postSnapshot: {
+          javaHeapMb: 0,
+          nativeHeapMb: 0,
+          totalPssMb: 0,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        javaHeapGrowthMb: -50,
+        nativeHeapGrowthMb: -30,
+        totalPssGrowthMb: -100,
+        gcEvents: [],
+        gcCount: 0,
+        gcTotalDurationMs: 0,
+        unreachableObjects: {
+          count: 0,
+          sizeKb: 0,
+          raw: "",
+        },
+      };
+
+      const result = manager.calculateAnomalyMultiplier(baseline, metrics);
+
+      // All multipliers should be 0
+      expect(result.javaHeapMultiplier).toBe(0);
+      expect(result.nativeHeapMultiplier).toBe(0);
+      expect(result.gcCountMultiplier).toBe(0);
+      expect(result.gcDurationMultiplier).toBe(0);
+      expect(result.unreachableObjectsMultiplier).toBe(0);
+    });
+
+    test("should handle null unreachable objects", function() {
+      const baseline: MemoryBaseline = {
+        id: 1,
+        device_id: "test-device",
+        package_name: "com.example.app",
+        tool_name: "tapOn",
+        java_heap_baseline_mb: 50,
+        native_heap_baseline_mb: 30,
+        gc_count_baseline: 5,
+        gc_duration_baseline_ms: 100,
+        unreachable_objects_baseline: 100,
+        sample_count: 10,
+        last_updated: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      const metrics: MemoryMetrics = {
+        preSnapshot: {
+          javaHeapMb: 45,
+          nativeHeapMb: 28,
+          totalPssMb: 100,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        postSnapshot: {
+          javaHeapMb: 50,
+          nativeHeapMb: 30,
+          totalPssMb: 100,
+          timestamp: Date.now(),
+          raw: "",
+        },
+        javaHeapGrowthMb: 5,
+        nativeHeapGrowthMb: 2,
+        totalPssGrowthMb: 0,
+        gcEvents: [],
+        gcCount: 5,
+        gcTotalDurationMs: 100,
+        unreachableObjects: null,
+      };
+
+      const result = manager.calculateAnomalyMultiplier(baseline, metrics);
+
+      // Unreachable objects multiplier should be 0 when null
+      expect(result.unreachableObjectsMultiplier).toBe(0);
+    });
+  });
+});

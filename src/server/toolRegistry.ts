@@ -5,6 +5,11 @@ import { ActionableError, BootedDevice, SomePlatform } from "../models";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { UIStateExtractor } from "../features/navigation/UIStateExtractor";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
+import { serverConfig } from "../utils/ServerConfig";
+import { MemoryAudit } from "../features/memory/MemoryAudit";
+import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
+import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
+import { logger } from "../utils/logger";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -52,6 +57,23 @@ class ToolRegistryClass {
     this.tools.set(name, { name, description, schema, handler, supportsProgress, requiresDevice: false });
   }
 
+  // Helper: Get foreground app package name
+  private async getForegroundPackageName(device: BootedDevice): Promise<string | null> {
+    try {
+      const adb = new AdbClient(device);
+      const { stdout } = await adb.executeCommand(
+        "shell dumpsys window | grep mCurrentFocus"
+      );
+
+      // Parse: "mCurrentFocus=Window{... u0 com.example.app/com.example.Activity}"
+      const match = stdout.match(/\s+(\S+)\/\S+\}/);
+      return match ? match[1] : null;
+    } catch (error) {
+      logger.warn(`[ToolRegistry] Failed to get foreground package name: ${error}`);
+      return null;
+    }
+  }
+
   // Register a device-aware tool
   registerDeviceAware(
     name: string,
@@ -88,7 +110,47 @@ class ToolRegistryClass {
 
         let response: any | undefined;
         if (device !== undefined) {
-          response = await handler(device, args, progress);
+          // Check if memory performance audit mode is enabled
+          const memPerfAuditEnabled = serverConfig.isMemPerfAuditEnabled();
+
+          if (memPerfAuditEnabled && device.platform === "android") {
+            // Get the foreground app package name
+            const packageName = await this.getForegroundPackageName(device);
+
+            if (packageName) {
+              logger.info(`[ToolRegistry] Running memory audit for ${packageName} during ${name}`);
+
+              // Create memory audit instance
+              const memoryAudit = new MemoryAudit(device);
+              const perf = createGlobalPerformanceTracker();
+
+              // Run the handler within memory audit
+              const auditResult = await memoryAudit.runAudit(
+                packageName,
+                name,
+                args,
+                async () => {
+                  response = await handler(device, args, progress);
+                },
+                perf
+              );
+
+              // If audit failed, throw error with diagnostics
+              if (!auditResult.passed) {
+                const errorMsg = `Memory audit FAILED for ${packageName} during ${name}\n\n${auditResult.diagnostics}`;
+                logger.error(`[ToolRegistry] ${errorMsg}`);
+                throw new ActionableError(errorMsg);
+              }
+
+              logger.info(`[ToolRegistry] Memory audit PASSED for ${packageName} during ${name}`);
+            } else {
+              logger.warn(`[ToolRegistry] Could not determine foreground app, skipping memory audit for ${name}`);
+              response = await handler(device, args, progress);
+            }
+          } else {
+            // Memory audit not enabled or not Android platform, execute normally
+            response = await handler(device, args, progress);
+          }
         }
 
         // After swipeOn executes with lookFor, update the tool call with scroll position

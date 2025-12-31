@@ -54,6 +54,9 @@ function parseArgs(): {
   // Detect UI performance audit mode
   const uiPerfMode = args.includes("--ui-perf-mode");
 
+  // Detect memory performance audit mode
+  const memPerfAuditMode = args.includes("--mem-perf-audit");
+
   // Detect accessibility audit mode
   const a11yAuditMode = args.includes("--accessibility-audit");
   let a11yLevel: string | undefined;
@@ -123,6 +126,7 @@ function parseArgs(): {
     debugPerf,
     debug,
     uiPerfMode,
+    memPerfAuditMode,
     a11yAuditMode,
     a11yLevel,
     a11yFailureMode,
@@ -432,6 +436,12 @@ async function main() {
     if (uiPerfMode) {
       serverConfig.setUiPerfMode(true);
       logger.info("UI performance audit mode enabled (--ui-perf-mode)");
+    }
+
+    // Enable memory performance audit mode if --mem-perf-audit flag is set
+    if (memPerfAuditMode) {
+      serverConfig.setMemPerfAuditMode(true);
+      logger.info("Memory performance audit mode enabled (--mem-perf-audit)");
     }
 
     // Enable accessibility audit mode if --accessibility-audit flag is set

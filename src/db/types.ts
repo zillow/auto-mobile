@@ -145,6 +145,62 @@ export interface AccessibilityBaselinesTable {
   updated_at: string;
 }
 
+// Memory audit tables
+export interface MemoryThresholdsTable {
+  id: Generated<number>;
+  device_id: string;
+  package_name: string;
+  heap_growth_threshold_mb: number;
+  native_heap_growth_threshold_mb: number;
+  gc_count_threshold: number;
+  gc_duration_threshold_ms: number;
+  unreachable_objects_threshold: number;
+  weight: number;
+  created_at: Generated<string>;
+  ttl_hours: number;
+}
+
+export interface MemoryBaselinesTable {
+  id: Generated<number>;
+  device_id: string;
+  package_name: string;
+  tool_name: string;
+  java_heap_baseline_mb: number;
+  native_heap_baseline_mb: number;
+  gc_count_baseline: number;
+  gc_duration_baseline_ms: number;
+  unreachable_objects_baseline: number;
+  sample_count: number;
+  last_updated: string;
+  created_at: Generated<string>;
+}
+
+export interface MemoryAuditResultsTable {
+  id: Generated<number>;
+  device_id: string;
+  session_id: string;
+  package_name: string;
+  tool_name: string;
+  tool_args: string | null;
+  timestamp: string;
+  passed: number;
+  pre_java_heap_mb: number | null;
+  pre_native_heap_mb: number | null;
+  pre_total_pss_mb: number | null;
+  post_java_heap_mb: number | null;
+  post_native_heap_mb: number | null;
+  post_total_pss_mb: number | null;
+  java_heap_growth_mb: number | null;
+  native_heap_growth_mb: number | null;
+  total_pss_growth_mb: number | null;
+  gc_count: number | null;
+  gc_total_duration_ms: number | null;
+  unreachable_objects_count: number | null;
+  violations_json: string | null;
+  diagnostics_json: string | null;
+  created_at: Generated<string>;
+}
+
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
@@ -159,6 +215,9 @@ export interface Database {
   edge_modals: EdgeModalsTable;
   scroll_positions: ScrollPositionsTable;
   accessibility_baselines: AccessibilityBaselinesTable;
+  memory_thresholds: MemoryThresholdsTable;
+  memory_baselines: MemoryBaselinesTable;
+  memory_audit_results: MemoryAuditResultsTable;
 }
 
 // Convenience types for each table
@@ -205,3 +264,15 @@ export type NewScrollPosition = Insertable<ScrollPositionsTable>;
 export type AccessibilityBaseline = Selectable<AccessibilityBaselinesTable>;
 export type NewAccessibilityBaseline = Insertable<AccessibilityBaselinesTable>;
 export type AccessibilityBaselineUpdate = Updateable<AccessibilityBaselinesTable>;
+
+export type MemoryThresholds = Selectable<MemoryThresholdsTable>;
+export type NewMemoryThresholds = Insertable<MemoryThresholdsTable>;
+export type MemoryThresholdsUpdate = Updateable<MemoryThresholdsTable>;
+
+export type MemoryBaseline = Selectable<MemoryBaselinesTable>;
+export type NewMemoryBaseline = Insertable<MemoryBaselinesTable>;
+export type MemoryBaselineUpdate = Updateable<MemoryBaselinesTable>;
+
+export type MemoryAuditResult = Selectable<MemoryAuditResultsTable>;
+export type NewMemoryAuditResult = Insertable<MemoryAuditResultsTable>;
+export type MemoryAuditResultUpdate = Updateable<MemoryAuditResultsTable>;

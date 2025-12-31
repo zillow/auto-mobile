@@ -10,6 +10,7 @@ class ServerConfig {
   private static instance: ServerConfig;
   private _uiPerfModeEnabled: boolean = false;
   private _accessibilityAuditConfig: AccessibilityAuditConfig | null = null;
+  private _memPerfAuditEnabled: boolean = false;
 
   private constructor() {}
 
@@ -38,6 +39,14 @@ class ServerConfig {
 
   isAccessibilityAuditEnabled(): boolean {
     return this._accessibilityAuditConfig !== null;
+  }
+
+  setMemPerfAuditMode(enabled: boolean): void {
+    this._memPerfAuditEnabled = enabled;
+  }
+
+  isMemPerfAuditEnabled(): boolean {
+    return this._memPerfAuditEnabled;
   }
 }
 
