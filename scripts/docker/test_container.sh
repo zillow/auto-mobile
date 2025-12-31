@@ -39,13 +39,13 @@ else
   exit 1
 fi
 
-# Test 3: Node.js is installed with correct version
-echo -e "\n${YELLOW}Test 3: Checking Node.js version...${NC}"
-NODE_VERSION=$(docker exec "${CONTAINER_NAME}" node --version)
-if [[ "${NODE_VERSION}" =~ ^v24\. ]]; then
-  echo -e "${GREEN}✓ Node.js ${NODE_VERSION} is installed${NC}"
+# Test 3: Bun is installed with correct version
+echo -e "\n${YELLOW}Test 3: Checking Bun version...${NC}"
+BUN_VERSION=$(docker exec "${CONTAINER_NAME}" bun --version)
+if [[ "${BUN_VERSION}" =~ ^1\.3\. ]]; then
+  echo -e "${GREEN}✓ Bun ${BUN_VERSION} is installed${NC}"
 else
-  echo -e "${RED}✗ Expected Node.js v24.x, got ${NODE_VERSION}${NC}"
+  echo -e "${RED}✗ Expected Bun 1.3.x, got ${BUN_VERSION}${NC}"
   exit 1
 fi
 
