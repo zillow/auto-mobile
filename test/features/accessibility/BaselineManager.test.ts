@@ -107,9 +107,7 @@ class TestBaselineManager {
   }
 }
 
-// TODO: Re-enable these tests once Kysely compatibility with bun:sqlite is resolved
-// See: https://github.com/oven-sh/bun/issues/4290
-describe.skip("BaselineManager", () => {
+describe("BaselineManager", () => {
   let manager: TestBaselineManager;
 
   beforeEach(async function() {
@@ -267,6 +265,7 @@ describe.skip("BaselineManager", () => {
         .values({
           screen_id: "old_screen",
           violations_json: JSON.stringify([]),
+          created_at: oldDate.toISOString(),
           updated_at: oldDate.toISOString(),
         })
         .execute();

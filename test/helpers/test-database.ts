@@ -3,8 +3,9 @@
  */
 
 import { Database as BunDatabase } from "bun:sqlite";
-import { Kysely, SqliteDialect } from "kysely";
+import { Kysely } from "kysely";
 import type { Database as DatabaseSchema } from "../../src/db/types";
+import { BunSqliteDialect } from "../../src/db/bunSqliteDialect";
 
 /**
  * Creates an in-memory SQLite database for testing
@@ -14,8 +15,8 @@ export async function createTestDatabase(): Promise<Kysely<DatabaseSchema>> {
   const sqliteDb = new BunDatabase(":memory:");
 
   const db = new Kysely<DatabaseSchema>({
-    dialect: new SqliteDialect({
-      database: sqliteDb as any,
+    dialect: new BunSqliteDialect({
+      database: sqliteDb,
     }),
   });
 

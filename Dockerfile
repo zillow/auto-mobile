@@ -76,11 +76,6 @@ RUN apk --no-cache add \
     xmlstarlet \
     jq \
     yq \
-    # Required for better-sqlite3 and other native modules
-    python3 \
-    py3-pip \
-    make \
-    g++ \
     # Utilities
     ca-certificates \
     openssh-client \
