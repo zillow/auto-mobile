@@ -31,7 +31,7 @@ If your favorite MCP client doesn't have that capability yet, copy the following
 
 ### Prerequisites
 
-- Node.js 20 or later
+- Bun 1.3.5 or later
 
 #### Android SDK + Emulator Setup
 
@@ -65,7 +65,7 @@ If you have a private npm registry for proxying public npm:
 You can also install it directly as a CLI tool.
 
 ```shell
-pnpm install -g @kaeawc/auto-mobile@latest
+bun install -g @kaeawc/auto-mobile@latest
 
 # Test CLI mode to check installation succeeded
 auto-mobile --cli
