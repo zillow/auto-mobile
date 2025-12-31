@@ -9,6 +9,7 @@ import { logger } from "./utils/logger";
 import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { runCliCommand } from "./cli";
 import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
+import { serverConfig } from "./utils/ServerConfig";
 
 // Interface for transport configuration
 interface TransportConfig {
@@ -24,6 +25,7 @@ function parseArgs(): {
   transport: TransportConfig;
   debugPerf: boolean;
   debug: boolean;
+  uiPerfMode: boolean;
   } {
   const args = process.argv.slice(2);
 
@@ -42,6 +44,9 @@ function parseArgs(): {
 
   // Detect debug mode to enable debug tools (rawViewHierarchy, debugSearch, bugReport)
   const debug = args.includes("--debug");
+
+  // Detect UI performance audit mode
+  const uiPerfMode = args.includes("--ui-perf-mode");
 
   // Extract CLI-specific arguments (everything after --cli)
   const cliIndex = args.indexOf("--cli");
@@ -86,7 +91,7 @@ function parseArgs(): {
     }
   }
 
-  return { cliMode, cliArgs, transport, debugPerf, debug };
+  return { cliMode, cliArgs, transport, debugPerf, debug, uiPerfMode };
 }
 
 // Create and start Streamable HTTP server
@@ -360,7 +365,7 @@ async function main() {
     await configurationManager.loadFromDisk();
 
     // Parse command line arguments
-    const { cliMode, cliArgs, transport, debugPerf, debug } = parseArgs();
+    const { cliMode, cliArgs, transport, debugPerf, debug, uiPerfMode } = parseArgs();
 
     // Enable performance tracking if --debug-perf flag is set
     if (debugPerf) {
@@ -371,6 +376,12 @@ async function main() {
     // Log when debug mode is enabled
     if (debug) {
       logger.info("Debug tools enabled (--debug)");
+    }
+
+    // Enable UI performance audit mode if --ui-perf-mode flag is set
+    if (uiPerfMode) {
+      serverConfig.setUiPerfMode(true);
+      logger.info("UI performance audit mode enabled (--ui-perf-mode)");
     }
 
     if (cliMode) {

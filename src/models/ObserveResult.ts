@@ -6,6 +6,7 @@ import { ViewHierarchyResult } from "./ViewHierarchyResult";
 import { TimingData } from "../utils/PerformanceTracker";
 import { GfxMetrics } from "./GfxMetrics";
 import { BackStackInfo } from "./BackStack";
+import { PerformanceAuditResult } from "../features/performance/PerformanceAudit";
 
 /**
  * Represents the result of observing the device state
@@ -81,4 +82,10 @@ export interface ObserveResult {
 
   /** Graphics frame metrics from gfxinfo (only present when --debug-perf is enabled) */
   gfxMetrics?: GfxMetrics;
+
+  /**
+   * Performance audit results (when UI performance audit mode is enabled)
+   * Contains validation against thresholds and detailed diagnostics
+   */
+  performanceAudit?: PerformanceAuditResult;
 }
