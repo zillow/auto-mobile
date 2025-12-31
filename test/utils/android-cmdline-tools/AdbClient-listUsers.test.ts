@@ -1,4 +1,4 @@
-import { assert } from "chai";
+
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import type { ExecResult } from "../../../src/models";
 
@@ -50,14 +50,14 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 1);
-      assert.deepEqual(users[0], {
+      expect(users.length, 1);
+      expect(users[0], {
         userId: 0,
         name: "Owner",
         flags: 0x4c13,
         running: true
       });
-      assert.include(lastCommand, "dumpsys user");
+      expect(lastCommand, "dumpsys user");
     });
 
     it("should parse multiple users with work profile from dumpsys output", async () => {
@@ -92,14 +92,14 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 2);
-      assert.deepEqual(users[0], {
+      expect(users.length, 2);
+      expect(users[0], {
         userId: 0,
         name: "Owner",
         flags: 0x4c13,
         running: true
       });
-      assert.deepEqual(users[1], {
+      expect(users[1], {
         userId: 10,
         name: "Work profile",
         flags: 0x30,
@@ -135,9 +135,9 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 2);
-      assert.equal(users[0].running, true);
-      assert.equal(users[1].running, false);
+      expect(users.length, 2);
+      expect(users[0].running, true);
+      expect(users[1].running, false);
     });
 
     it("should handle RUNNING_LOCKED state as running", async () => {
@@ -164,8 +164,8 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 1);
-      assert.equal(users[0].running, true);
+      expect(users.length, 1);
+      expect(users[0].running, true);
     });
 
     it("should use default name for null username when no Owner name is found", async () => {
@@ -190,8 +190,8 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 1);
-      assert.equal(users[0].name, "User 10");
+      expect(users.length, 1);
+      expect(users[0].name, "User 10");
     });
 
     it("should fall back to pm list users when dumpsys parsing fails", async () => {
@@ -228,20 +228,20 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 2);
-      assert.deepEqual(users[0], {
+      expect(users.length, 2);
+      expect(users[0], {
         userId: 0,
         name: "Owner",
         flags: 0x4c13,
         running: true
       });
-      assert.deepEqual(users[1], {
+      expect(users[1], {
         userId: 10,
         name: "Work profile",
         flags: 0x30,
         running: true
       });
-      assert.include(lastCommand, "pm list users");
+      expect(lastCommand, "pm list users");
     });
 
     it("should fall back to pm list users when dumpsys command fails", async () => {
@@ -271,14 +271,14 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 1);
-      assert.deepEqual(users[0], {
+      expect(users.length, 1);
+      expect(users[0], {
         userId: 0,
         name: "Owner",
         flags: 0x4c13,
         running: true
       });
-      assert.include(lastCommand, "pm list users");
+      expect(lastCommand, "pm list users");
     });
   });
 
@@ -310,16 +310,16 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 2);
-      assert.equal(users[0].userId, 0);
-      assert.equal(users[0].name, "Owner");
-      assert.equal(users[0].flags, 0x4c13);
-      assert.equal(users[0].running, true);
+      expect(users.length, 2);
+      expect(users[0].userId, 0);
+      expect(users[0].name, "Owner");
+      expect(users[0].flags, 0x4c13);
+      expect(users[0].running, true);
 
-      assert.equal(users[1].userId, 10);
-      assert.equal(users[1].name, "Work profile");
-      assert.equal(users[1].flags, 0x30);
-      assert.equal(users[1].running, true);
+      expect(users[1].userId, 10);
+      expect(users[1].name, "Work profile");
+      expect(users[1].flags, 0x30);
+      expect(users[1].running, true);
     });
 
     it("should handle users without running status", async () => {
@@ -347,8 +347,8 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 1);
-      assert.equal(users[0].running, false);
+      expect(users.length, 1);
+      expect(users[0].running, false);
     });
 
     it("should return fallback user when both commands fail", async () => {
@@ -359,8 +359,8 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 1);
-      assert.deepEqual(users[0], {
+      expect(users.length, 1);
+      expect(users[0], {
         userId: 0,
         name: "Owner",
         flags: 0x13,
@@ -386,8 +386,8 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 1);
-      assert.deepEqual(users[0], {
+      expect(users.length, 1);
+      expect(users[0], {
         userId: 0,
         name: "Owner",
         flags: 0x13,
@@ -421,9 +421,9 @@ Users:
       adbClient = new AdbClient(null, mockExecAsync, null as any);
       const users = await adbClient.listUsers();
 
-      assert.equal(users.length, 2);
-      assert.equal(users[0].flags, 0x4c13); // 19475 in decimal
-      assert.equal(users[1].flags, 0x1a2b); // 6699 in decimal
+      expect(users.length, 2);
+      expect(users[0].flags, 0x4c13); // 19475 in decimal
+      expect(users[1].flags, 0x1a2b); // 6699 in decimal
     });
   });
 });

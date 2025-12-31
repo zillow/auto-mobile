@@ -2,7 +2,7 @@
  * Test database helper for creating in-memory SQLite databases for tests
  */
 
-import Database from "better-sqlite3";
+import { Database as BunDatabase } from "bun:sqlite";
 import { Kysely, SqliteDialect } from "kysely";
 import type { Database as DatabaseSchema } from "../../src/db/types";
 
@@ -11,11 +11,11 @@ import type { Database as DatabaseSchema } from "../../src/db/types";
  * Runs the accessibility_baselines table migration automatically
  */
 export async function createTestDatabase(): Promise<Kysely<DatabaseSchema>> {
-  const sqliteDb = new Database(":memory:");
+  const sqliteDb = new BunDatabase(":memory:");
 
   const db = new Kysely<DatabaseSchema>({
     dialect: new SqliteDialect({
-      database: sqliteDb,
+      database: sqliteDb as any,
     }),
   });
 
@@ -25,9 +25,7 @@ export async function createTestDatabase(): Promise<Kysely<DatabaseSchema>> {
     .addColumn("id", "integer", col => col.primaryKey().autoIncrement())
     .addColumn("screen_id", "text", col => col.notNull().unique())
     .addColumn("violations_json", "text", col => col.notNull())
-    .addColumn("created_at", "text", col =>
-      col.notNull().defaultTo("datetime('now')")
-    )
+    .addColumn("created_at", "text", col => col.notNull())
     .addColumn("updated_at", "text", col => col.notNull())
     .execute();
 

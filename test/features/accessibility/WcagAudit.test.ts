@@ -3,21 +3,21 @@
  * Tests WCAG violation detection and audit functionality
  */
 
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { WcagAudit } from "../../../src/features/accessibility/WcagAudit";
 import type { Element } from "../../../src/models/Element";
 import type { ViewHierarchyNode } from "../../../src/models/ViewHierarchyResult";
 import type { AccessibilityAuditConfig } from "../../../src/models/AccessibilityAudit";
 
-describe("WcagAudit", function() {
+describe("WcagAudit", () => {
   let audit: WcagAudit;
 
   beforeEach(function() {
     audit = new WcagAudit();
   });
 
-  describe("Missing Content Descriptions", function() {
-    it("should detect clickable elements without text or content-desc", async function() {
+  describe("Missing Content Descriptions", () => {
+    test("should detect clickable elements without text or content-desc", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 100, bottom: 50 },
@@ -38,10 +38,10 @@ describe("WcagAudit", function() {
       const contentDescViolations = result.violations.filter(
         v => v.type === "missing-content-description"
       );
-      expect(contentDescViolations).to.have.lengthOf(1);
+      expect(contentDescViolations).toHaveLength(1);
     });
 
-    it("should NOT flag elements with text", async function() {
+    test("should NOT flag elements with text", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 100, bottom: 50 },
@@ -62,10 +62,10 @@ describe("WcagAudit", function() {
       const contentDescViolations = result.violations.filter(
         v => v.type === "missing-content-description"
       );
-      expect(contentDescViolations).to.have.lengthOf(0);
+      expect(contentDescViolations).toHaveLength(0);
     });
 
-    it("should NOT flag elements with content-desc", async function() {
+    test("should NOT flag elements with content-desc", async () => {
       const elements: Element[] = [
         {
           "bounds": { left: 0, top: 0, right: 100, bottom: 50 },
@@ -86,10 +86,10 @@ describe("WcagAudit", function() {
       const contentDescViolations = result.violations.filter(
         v => v.type === "missing-content-description"
       );
-      expect(contentDescViolations).to.have.lengthOf(0);
+      expect(contentDescViolations).toHaveLength(0);
     });
 
-    it("should NOT flag non-interactive elements without labels", async function() {
+    test("should NOT flag non-interactive elements without labels", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 100, bottom: 50 },
@@ -110,10 +110,10 @@ describe("WcagAudit", function() {
       const contentDescViolations = result.violations.filter(
         v => v.type === "missing-content-description"
       );
-      expect(contentDescViolations).to.have.lengthOf(0);
+      expect(contentDescViolations).toHaveLength(0);
     });
 
-    it("should handle elements with only whitespace text", async function() {
+    test("should handle elements with only whitespace text", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 100, bottom: 50 },
@@ -135,12 +135,12 @@ describe("WcagAudit", function() {
         v => v.type === "missing-content-description"
       );
       // Current implementation treats whitespace as valid text (doesn't trim)
-      expect(contentDescViolations).to.have.lengthOf(0);
+      expect(contentDescViolations).toHaveLength(0);
     });
   });
 
-  describe("Touch Target Size", function() {
-    it("should detect targets smaller than 44x44dp", async function() {
+  describe("Touch Target Size", () => {
+    test("should detect targets smaller than 44x44dp", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 40, bottom: 40 }, // 40x40 < 44x44
@@ -159,10 +159,10 @@ describe("WcagAudit", function() {
       const result = await audit.audit(elements, hierarchy, undefined, "com.test", config);
 
       const sizeViolations = result.violations.filter(v => v.type === "touch-target-too-small");
-      expect(sizeViolations).to.have.lengthOf(1);
+      expect(sizeViolations).toHaveLength(1);
     });
 
-    it("should pass targets at exactly 44x44dp", async function() {
+    test("should pass targets at exactly 44x44dp", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 44, bottom: 44 }, // Exactly 44x44
@@ -181,10 +181,10 @@ describe("WcagAudit", function() {
       const result = await audit.audit(elements, hierarchy, undefined, "com.test", config);
 
       const sizeViolations = result.violations.filter(v => v.type === "touch-target-too-small");
-      expect(sizeViolations).to.have.lengthOf(0);
+      expect(sizeViolations).toHaveLength(0);
     });
 
-    it("should pass targets larger than 44x44dp", async function() {
+    test("should pass targets larger than 44x44dp", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 100, bottom: 50 }, // Larger
@@ -203,10 +203,10 @@ describe("WcagAudit", function() {
       const result = await audit.audit(elements, hierarchy, undefined, "com.test", config);
 
       const sizeViolations = result.violations.filter(v => v.type === "touch-target-too-small");
-      expect(sizeViolations).to.have.lengthOf(0);
+      expect(sizeViolations).toHaveLength(0);
     });
 
-    it("should only check clickable elements", async function() {
+    test("should only check clickable elements", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 20, bottom: 20 }, // Small but not clickable
@@ -225,12 +225,12 @@ describe("WcagAudit", function() {
       const result = await audit.audit(elements, hierarchy, undefined, "com.test", config);
 
       const sizeViolations = result.violations.filter(v => v.type === "touch-target-too-small");
-      expect(sizeViolations).to.have.lengthOf(0);
+      expect(sizeViolations).toHaveLength(0);
     });
   });
 
-  describe("Summary Generation", function() {
-    it("should generate correct summary statistics", async function() {
+  describe("Summary Generation", () => {
+    test("should generate correct summary statistics", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 20, bottom: 20 },
@@ -253,12 +253,12 @@ describe("WcagAudit", function() {
 
       const result = await audit.audit(elements, hierarchy, undefined, "com.test", config);
 
-      expect(result.summary.totalViolations).to.be.greaterThan(0);
-      expect(result.summary.bySeverity.error).to.be.greaterThan(0);
-      expect(result.summary.passed).to.be.false;
+      expect(result.summary.totalViolations).toBeGreaterThan(0);
+      expect(result.summary.bySeverity.error).toBeGreaterThan(0);
+      expect(result.summary.passed).toBe(false);
     });
 
-    it("should handle missing screenshot gracefully", async function() {
+    test("should handle missing screenshot gracefully", async () => {
       const elements: Element[] = [
         {
           bounds: { left: 0, top: 0, right: 100, bottom: 50 },
@@ -276,13 +276,13 @@ describe("WcagAudit", function() {
       // No screenshot provided - should not throw
       const result = await audit.audit(elements, hierarchy, undefined, "com.test", config);
 
-      expect(result).to.not.be.null;
-      expect(result.violations).to.be.an("array");
+      expect(result).not.toBeNull();
+      expect(Array.isArray(result.violations)).toBe(true);
       // Should not have contrast violations without screenshot
       const contrastViolations = result.violations.filter(
         v => v.type === "insufficient-contrast"
       );
-      expect(contrastViolations).to.have.lengthOf(0);
+      expect(contrastViolations).toHaveLength(0);
     });
   });
 });

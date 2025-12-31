@@ -142,6 +142,7 @@ export class WcagAudit {
 
   /**
    * Check text contrast ratios against WCAG standards
+   * Optimized to use batch processing for better performance
    */
   private async checkContrastRatios(
     elements: Element[],
@@ -153,13 +154,15 @@ export class WcagAudit {
     // Filter to text elements only
     const textElements = elements.filter(e => e.text && e.text.trim().length > 0);
 
-    for (const element of textElements) {
-      const result = await this.contrastChecker.checkContrast(
-        screenshotPath,
-        element,
-        wcagLevel as "A" | "AA" | "AAA"
-      );
+    // Use batch processing for optimal performance
+    const results = await this.contrastChecker.checkContrastBatch(
+      screenshotPath,
+      textElements,
+      wcagLevel as "A" | "AA" | "AAA"
+    );
 
+    // Process results and create violations
+    for (const [element, result] of results.entries()) {
       if (result && result.ratio < result.requiredRatio) {
         violations.push({
           type: "insufficient-contrast",
