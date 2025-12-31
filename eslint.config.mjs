@@ -147,6 +147,21 @@ export const baseRules = {
 	"@stylistic/function-call-spacing": 2,
 	"@stylistic/type-annotation-spacing": 2,
 
+	// import rules
+	// Prevent .js/.ts extensions in relative imports (which cause test failures with esbuild-register)
+	// This uses no-restricted-syntax since import/extensions doesn't cleanly support this use case
+	"no-restricted-syntax": [
+		2,
+		{
+			selector: "ImportDeclaration[source.value=/^\\..*\\.js$/]",
+			message: "Do not use .js extension in relative imports. Use extensionless imports instead (e.g., './foo' not './foo.js'). This causes MODULE_NOT_FOUND errors in tests.",
+		},
+		{
+			selector: "ImportDeclaration[source.value=/^\\..*\\.ts$/]",
+			message: "Do not use .ts extension in relative imports. Use extensionless imports instead (e.g., './foo' not './foo.ts').",
+		},
+	],
+
 	// file whitespace
 	"no-multiple-empty-lines": [2, {max: 2, maxEOF: 0}],
 	"no-mixed-spaces-and-tabs": 2,
