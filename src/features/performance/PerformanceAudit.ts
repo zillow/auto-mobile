@@ -1,9 +1,11 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { BootedDevice } from "../../models";
+import { BootedDevice, ScreenSize } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Idle } from "../observe/Idle";
 import { DeviceCapabilitiesDetector, DeviceCapabilities } from "../../utils/DeviceCapabilities";
+import { TouchLatencyTracker } from "./TouchLatencyTracker";
+import { serverConfig } from "../../utils/ServerConfig";
 
 /**
  * Performance metrics collected during audit
@@ -67,12 +69,14 @@ export class PerformanceAudit {
   private device: BootedDevice;
   private idle: Idle;
   private capabilitiesDetector: DeviceCapabilitiesDetector;
+  private touchLatencyTracker: TouchLatencyTracker;
 
   constructor(device: BootedDevice, adb: AdbClient | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
     this.idle = new Idle(device, this.adb);
     this.capabilitiesDetector = new DeviceCapabilitiesDetector(device, this.adb);
+    this.touchLatencyTracker = new TouchLatencyTracker(device, this.adb);
   }
 
   /**
@@ -80,6 +84,7 @@ export class PerformanceAudit {
    */
   async collectMetrics(
     packageName: string,
+    screenSize?: ScreenSize,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<PerformanceMetrics> {
     logger.info(`[PerformanceAudit] Collecting metrics for ${packageName}`);
@@ -92,7 +97,7 @@ export class PerformanceAudit {
     ]);
 
     // Touch latency requires sequential execution after other metrics
-    const touchLatency = await this.measureTouchLatency(packageName, perf);
+    const touchLatency = await this.measureTouchLatency(packageName, screenSize, perf);
 
     const result: PerformanceMetrics = {
       p50Ms: gfxMetrics.p50Ms ?? null,
@@ -262,16 +267,41 @@ export class PerformanceAudit {
   /**
    * Measure touch response latency
    * Injects touch on non-clickable area and measures response time
+   * Only runs when --ui-perf-mode flag is enabled
    */
   private async measureTouchLatency(
     packageName: string,
+    screenSize: ScreenSize | undefined,
     perf: PerformanceTracker
   ): Promise<number | null> {
-    try {
-      // For now, return null - this will be implemented in a follow-up task
-      // TODO: Implement touch latency measurement
-      logger.debug("[PerformanceAudit] Touch latency measurement not yet implemented");
+    // Only measure touch latency when UI performance mode is enabled
+    if (!serverConfig.isUiPerfModeEnabled()) {
+      logger.debug("[PerformanceAudit] Touch latency measurement skipped (--ui-perf-mode not enabled)");
       return null;
+    }
+
+    // Screen size is required for touch latency measurement
+    if (!screenSize) {
+      logger.warn("[PerformanceAudit] Touch latency measurement skipped (screen size not provided)");
+      return null;
+    }
+
+    try {
+      logger.info("[PerformanceAudit] Measuring touch latency with synthetic touches");
+      const result = await perf.track("touchLatencyMeasurement", () =>
+        this.touchLatencyTracker.measureLatency(packageName, screenSize, {
+          sampleCount: 3,
+          maxWaitMs: 200
+        }, perf)
+      );
+
+      if (result.success) {
+        logger.info(`[PerformanceAudit] Touch latency measured: ${result.latencyMs}ms`);
+        return result.latencyMs;
+      } else {
+        logger.warn(`[PerformanceAudit] Touch latency measurement failed: ${result.error}`);
+        return null;
+      }
     } catch (error) {
       logger.warn(`[PerformanceAudit] Failed to measure touch latency: ${error}`);
       return null;
@@ -460,6 +490,7 @@ export class PerformanceAudit {
       cpuUsageThresholdPercent: number;
       touchLatencyThresholdMs: number;
     },
+    screenSize?: ScreenSize,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<PerformanceAuditResult> {
     logger.info(`[PerformanceAudit] Running audit for ${packageName}`);
@@ -468,7 +499,7 @@ export class PerformanceAudit {
     const deviceCapabilities = await this.capabilitiesDetector.getCapabilities();
 
     // Collect metrics
-    const metrics = await this.collectMetrics(packageName, perf);
+    const metrics = await this.collectMetrics(packageName, screenSize, perf);
 
     // Validate against thresholds
     const violations = this.validateMetrics(metrics, thresholds);

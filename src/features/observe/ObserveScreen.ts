@@ -634,6 +634,7 @@ export class ObserveScreen {
         const auditResult = await performanceAudit.runAudit(
           result.activeWindow!.appId,
           thresholds,
+          result.screenSize,
           perf
         );
 

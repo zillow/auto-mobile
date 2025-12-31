@@ -29,9 +29,11 @@ The UI Performance Audit mode monitors Android app performance during `observe` 
    - Pending Application Not Responding states
    - Via `dumpsys activity processes`
 
-5. **Touch Latency** (Planned)
-   - Inject touch events on non-clickable areas
-   - Measure response time
+5. **Touch Latency** (--ui-perf-mode only)
+   - Inject synthetic touch events on non-clickable areas (status bar)
+   - Measure time until frame activity detected via gfxinfo
+   - Uses median of 3 samples for accuracy
+   - Detects UI responsiveness issues
 
 ### Automatic Threshold Detection
 
@@ -88,7 +90,7 @@ When enabled, `observe` tool calls will include a `performanceAudit` field:
       "slowUiThreadCount": 4,
       "frameDeadlineMissedCount": 0,
       "cpuUsagePercent": 65.2,
-      "touchLatencyMs": null,
+      "touchLatencyMs": 28.5,
       "anrDetected": false
     },
     "violations": [
@@ -164,6 +166,12 @@ When enabled, `observe` tool calls will include a `performanceAudit` field:
 - Calculates weighted averages
 - Updates weights based on outcomes
 
+**TouchLatencyTracker** (src/features/performance/TouchLatencyTracker.ts)
+- Injects synthetic touches on safe screen areas
+- Monitors gfxinfo for frame activity changes
+- Calculates median latency from multiple samples
+- Only runs when --ui-perf-mode is enabled
+
 ### Integration Point
 
 Performance audits run during `ObserveScreen.execute()`:
@@ -171,7 +179,7 @@ Performance audits run during `ObserveScreen.execute()`:
 2. If audit enabled and Android device:
    - Detect device capabilities
    - Get/create thresholds
-   - Run audit
+   - Run audit (includes touch latency if --ui-perf-mode enabled)
    - Attach results to observation
    - Update threshold weights
 
@@ -181,12 +189,6 @@ Performance audits run during `ObserveScreen.execute()`:
 - Global configuration management
 - UI/API for threshold customization
 - Enable/disable per device via config
-
-### Touch Latency Testing
-- Identify non-clickable screen areas
-- Inject periodic touch events
-- Measure time to UI response
-- Report latency violations
 
 ### Enhanced Diagnostics
 - Memory pressure detection
@@ -198,7 +200,7 @@ Performance audits run during `ObserveScreen.execute()`:
 
 - Audit adds ~200-500ms to observe calls
 - CPU/ANR checks run in parallel with gfxinfo
-- Touch latency testing (when implemented) adds interaction time
+- Touch latency testing adds ~500-800ms (3 samples × ~200ms each, only when --ui-perf-mode enabled)
 - Database queries cached per session
 - Threshold calculation only on first session access
 
@@ -208,9 +210,24 @@ Performance audits run during `ObserveScreen.execute()`:
 - Requires `dumpsys` access
 - System/launcher apps use simplified checks
 - No audit if no active app window
-- Touch latency not yet implemented
+- Touch latency requires --ui-perf-mode flag and adds overhead
+
+## How Touch Latency Works
+
+When --ui-perf-mode is enabled, touch latency is measured by:
+
+1. **Safe Touch Location Selection**: Selects top-right corner of status bar (95% width, 2% height) to avoid triggering UI interactions
+2. **Baseline Capture**: Resets gfxinfo and captures baseline frame stats
+3. **Touch Injection**: Injects synthetic touch event via `adb shell input tap`
+4. **Response Detection**: Polls gfxinfo every 10ms, watching for frame activity:
+   - Increased missed vsync count
+   - Increased slow UI thread count
+   - Increased frame deadline missed count
+5. **Multiple Samples**: Takes 3 samples and calculates median for accuracy
+6. **Result**: Reports median latency in milliseconds
 
 ## Related Issues
 
 - #36: Initial implementation
 - #67: Global configuration system
+- #85: Touch latency testing implementation
