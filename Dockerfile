@@ -66,6 +66,9 @@ RUN apk --no-cache add \
     gzip \
     # Alpine compatibility layer for glibc (needed for Android tools)
     gcompat \
+    # Required for Bun runtime
+    libstdc++ \
+    libgcc \
     # Development tools
     ripgrep \
     shellcheck \
@@ -183,7 +186,10 @@ RUN apk --no-cache add \
     xmlstarlet \
     jq \
     # Alpine compatibility layer for Android tools
-    gcompat
+    gcompat \
+    # Required for Bun runtime
+    libstdc++ \
+    libgcc
 
 # Now that bash is installed, set it as the default shell
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
