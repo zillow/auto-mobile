@@ -4,7 +4,8 @@ description: Very simple test to launch Clock app
 steps:
   - tool: launchApp
     appId: com.google.android.deskclock
-    label: Launch Clock application
+    clearAppData: true
+    label: Launch Clock application with clean state
 
   - tool: terminateApp
     appId: com.google.android.deskclock

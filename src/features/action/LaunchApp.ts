@@ -292,8 +292,13 @@ export class LaunchApp extends BaseVisualChange {
     const installedApps = await perf.track("checkInstalled", async () => {
       return (new ListInstalledApps(this.device)).execute();
     });
+    logger.info(`[LaunchApp] Found ${installedApps.length} installed app(s)`);
+    logger.info(`[LaunchApp] Looking for package: ${packageName}`);
+    logger.info(`[LaunchApp] Installed apps: ${installedApps.join(", ")}`);
     if (!installedApps.includes(packageName)) {
       logger.error(`[LaunchApp] App ${packageName} is not installed`);
+      logger.error(`[LaunchApp] DEBUG: installedApps.length = ${installedApps.length}`);
+      logger.error(`[LaunchApp] DEBUG: installedApps = [${installedApps.join(", ")}]`);
       perf.end();
       return {
         success: false,

@@ -58,7 +58,9 @@ export class ListInstalledApps {
       const installedApps: InstalledApp[] = [];
 
       // Get all users on the device
+      logger.info("[ListInstalledApps] Getting list of users...");
       const users = await this.adb.listUsers();
+      logger.info(`[ListInstalledApps] Found ${users.length} user(s): ${users.map(u => `${u.userId}:${u.name}`).join(", ")}`);
 
       // Get the current foreground app
       const foregroundApp = await this.adb.getForegroundApp();
@@ -66,15 +68,19 @@ export class ListInstalledApps {
       // List packages for each user
       for (const user of users) {
         try {
+          logger.info(`[ListInstalledApps] Listing packages for user ${user.userId}...`);
           const { stdout } = await this.adb.executeCommand(
             `shell pm list packages --user ${user.userId}`
           );
+          logger.info(`[ListInstalledApps] Got ${stdout.length} chars of output for user ${user.userId}`);
 
           const packages = stdout
             .split("\n")
             .filter(line => line.startsWith("package:"))
             .map(line => line.replace("package:", "").trim())
             .filter(pkg => pkg.length > 0);
+
+          logger.info(`[ListInstalledApps] Found ${packages.length} package(s) for user ${user.userId}`);
 
           for (const packageName of packages) {
             const isForeground = foregroundApp !== null &&

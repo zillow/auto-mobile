@@ -1,0 +1,92 @@
+================================================================================
+[2025-12-31 12:21:41] EXECUTE PLAN - START
+================================================================================
+Device Platform: android
+Device ID: undefined
+Start Step: 0
+Platform Param: android
+
+--------------------------------------------------------------------------------
+Base64 Content Decoding
+--------------------------------------------------------------------------------
+Base64 Length: 328
+Base64 Prefix: LS0tCm5hbWU6IGxhdW5jaC1jbG9jay1hcHAKZGVzY3JpcHRpb2...
+
+Decode Time: 0ms
+Decoded Length: 244
+Decoded Content Preview: ---
+name: launch-clock-app
+description: Very simple test to launch Clock app
+steps:
+  - tool: launchApp
+    appId: com.google.android.deskclock
+    label: Launch Clock application
+
+  - tool: terminate...
+
+--------------------------------------------------------------------------------
+Raw YAML Content
+--------------------------------------------------------------------------------
+---
+name: launch-clock-app
+description: Very simple test to launch Clock app
+steps:
+  - tool: launchApp
+    appId: com.google.android.deskclock
+    label: Launch Clock application
+
+  - tool: terminateApp
+    appId: com.google.android.deskclock
+
+
+--------------------------------------------------------------------------------
+Plan Parsing Result
+--------------------------------------------------------------------------------
+Parse Time: 1ms
+Plan Name: launch-clock-app
+Plan Description: Very simple test to launch Clock app
+Total Steps: 2
+Plan Metadata: {
+  "createdAt": "2025-12-31T12:21:41.309Z",
+  "version": "1.0.0"
+}
+
+--------------------------------------------------------------------------------
+Plan Steps
+--------------------------------------------------------------------------------
+Step 1: launchApp
+
+  Params: {
+  "appId": "com.google.android.deskclock"
+}
+Step 2: terminateApp
+
+  Params: {
+  "appId": "com.google.android.deskclock"
+}
+--------------------------------------------------------------------------------
+Plan Execution Start
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+Plan Execution Result
+--------------------------------------------------------------------------------
+Execution Time: 1277ms
+Total Time: 1278ms
+Success: true
+Executed Steps: 2
+Total Steps: 2
+Failed Step: None
+
+--------------------------------------------------------------------------------
+Final Response
+--------------------------------------------------------------------------------
+{
+  "success": true,
+  "executedSteps": 2,
+  "totalSteps": 2,
+  "platform": "android"
+}
+
+================================================================================
+[2025-12-31 12:21:42] EXECUTE PLAN - COMPLETED SUCCESSFULLY
+================================================================================

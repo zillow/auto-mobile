@@ -21,20 +21,28 @@ const executePlanTool = async (device: BootedDevice, params: {
 }): Promise<any> => {
   try {
     logger.info("=== Starting executePlanTool ===");
-    const yamlContent = params.planContent;
+    logger.info(`Device: ${device.platform} (${device.id}), Start Step: ${params.startStep}`);
+
+    let yamlContent = params.planContent;
     const startStep = params.startStep;
+
+    // Decode base64 if content is base64-encoded
+    if (yamlContent.startsWith("base64:")) {
+      logger.info("=== Decoding base64 plan content ===");
+      const base64Content = yamlContent.substring(7); // Remove "base64:" prefix
+      yamlContent = Buffer.from(base64Content, "base64").toString("utf-8");
+      logger.info(`Base64 content decoded (${yamlContent.length} bytes)`);
+    }
 
     // Parse the plan
     logger.info("=== Parsing plan from YAML ===");
     const plan = importPlanFromYaml(yamlContent);
-    logger.info("=== Plan parsed successfully ===");
-
-    logger.info(`Executing plan '${plan.name}' with ${plan.steps.length} steps on ${device.platform} platform`);
+    logger.info(`Plan parsed successfully: '${plan.name}' with ${plan.steps.length} steps`);
 
     // Execute the plan
     logger.info("=== Starting plan execution ===");
     const result = await executePlan(plan, startStep, params.platform);
-    logger.info("=== Plan execution completed ===");
+    logger.info(`Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
 
     const response: ExecutePlanResult = {
       success: result.success,
@@ -45,12 +53,11 @@ const executePlanTool = async (device: BootedDevice, params: {
       platform: device.platform
     };
 
-    logger.info("=== Creating JSON response ===");
-    const jsonResponse = createJSONToolResponse(response);
     logger.info("=== Returning from executePlanTool ===");
-    return jsonResponse;
+    return createJSONToolResponse(response);
   } catch (error) {
-    logger.info("=== Failed to execute plan ===");
+    logger.error("=== Failed to execute plan ===", error);
+
     const response: ExecutePlanResult = {
       success: false,
       executedSteps: 0,
@@ -58,9 +65,9 @@ const executePlanTool = async (device: BootedDevice, params: {
       error: `${error}`,
       platform: device.platform
     };
-    const jsonResponse = createJSONToolResponse(response);
+
     logger.info("=== Returning error from executePlanTool ===");
-    return jsonResponse;
+    return createJSONToolResponse(response);
   }
 };
 

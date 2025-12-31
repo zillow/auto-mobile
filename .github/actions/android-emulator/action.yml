@@ -38,45 +38,35 @@ runs:
         sudo udevadm control --reload-rules
         sudo udevadm trigger --name-match=kvm
 
-#    - name: Restore AVD cache
-#      id: avd-cache-restore
-#      uses: actions/cache/restore@v4
-#      with:
-#        path: |
-#          ~/.android/avd/*
-#          ~/.android/adb*
-#        key: avd-${{ runner.os }}-${{ inputs.api_level }}
+    - name: AVD cache
+      uses: actions/cache@v4
+      id: avd-cache
+      with:
+        path: |
+          ~/.android/avd/*
+          ~/.android/adb*
+        key: avd-${{ runner.os }}-${{ inputs.api_level }}-${{ inputs.arch }}-${{ inputs.target }}
 
-#    - name: Cache AVD + Snapshot
-#      id: avd-cache-generate
-#      if: steps.avd-cache-restore.outputs.cache-hit != 'true'
-#      uses: reactivecircus/android-emulator-runner@v2
-#      with:
-#        api-level:  ${{ inputs.api_level }}
-#        arch: ${{ inputs.arch }}
-#        target: ${{ inputs.target }}
-#        force-avd-creation: false
-#        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-#        disable-animations: false
-#        script: echo "Generated AVD snapshot for caching."
-
-#    - name: "Save Android SDK Platform Tools"
-#      uses: actions/cache/save@v4
-#      if: steps.avd-cache-generate.outputs.cache-hit == 'true'
-#      with:
-#        path: |
-#          /usr/local/lib/android/sdk/platform-tools
-#          /home/runner/.config/.android/cache
-#        key: avd-${{ runner.os }}-${{ inputs.api_level }}
+    - name: Create AVD and generate snapshot for caching
+      if: steps.avd-cache.outputs.cache-hit != 'true'
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: ${{ inputs.api_level }}
+        arch: ${{ inputs.arch }}
+        target: ${{ inputs.target }}
+        force-avd-creation: false
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: false
+        script: echo "Generated AVD snapshot for caching."
 
     - name: Run Emulator
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level:  ${{ inputs.api_level }}
+        api-level: ${{ inputs.api_level }}
         arch: ${{ inputs.arch }}
         target: ${{ inputs.target }}
-        script:  ${{ inputs.script }}
+        script: ${{ inputs.script }}
         working-directory: ${{ inputs.working-directory }}
-#        force-avd-creation: false
-#        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-#        disable-animations: false
+        force-avd-creation: false
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: false

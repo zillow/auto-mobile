@@ -293,12 +293,13 @@ export class AdbClient implements AdbExecutor {
 
       for (const line of lines) {
         // Match pattern: UserInfo{userId:name:flags} [running]
-        const match = line.match(/UserInfo\{(\d+):([^:]+):(\d+)\}\s*(running)?/);
+        // Note: flags are hexadecimal (e.g., "4c13")
+        const match = line.match(/UserInfo\{(\d+):([^:]+):([0-9a-fA-F]+)\}\s*(running)?/);
         if (match) {
           users.push({
             userId: parseInt(match[1], 10),
             name: match[2],
-            flags: parseInt(match[3], 10),
+            flags: parseInt(match[3], 16), // Parse as hexadecimal
             running: match[4] === "running"
           });
         }
