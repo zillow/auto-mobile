@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it, beforeEach, afterEach } from "mocha";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
@@ -100,8 +99,7 @@ describe("AccessibilityServiceClient", function() {
   }
 
   describe("getLatestHierarchy", function() {
-    it("should return hierarchy data when WebSocket receives fresh data", async function() {
-      this.timeout(5000);
+    test("should return hierarchy data when WebSocket receives fresh data", async function() {
 
       const mockHierarchyData = {
         updatedAt: 1750934583218,
@@ -134,17 +132,16 @@ describe("AccessibilityServiceClient", function() {
 
       const result = await accessibilityServiceClient.getLatestHierarchy(true, 2000);
 
-      expect(result).to.not.be.null;
-      expect(result.hierarchy).to.not.be.null;
-      expect(result.fresh).to.be.true;
-      expect(result.updatedAt).to.equal(1750934583218);
-      expect(result.hierarchy!.updatedAt).to.equal(1750934583218);
-      expect(result.hierarchy!.packageName).to.equal("com.google.android.deskclock");
-      expect(result.hierarchy!.hierarchy.text).to.equal("6:43 AM");
+      expect(result).not.toBeNull();
+      expect(result.hierarchy).not.toBeNull();
+      expect(result.fresh).toBe(true);
+      expect(result.updatedAt).toBe(1750934583218);
+      expect(result.hierarchy!.updatedAt).toBe(1750934583218);
+      expect(result.hierarchy!.packageName).toBe("com.google.android.deskclock");
+      expect(result.hierarchy!.hierarchy.text).toBe("6:43 AM");
     });
 
-    it("should return cached data when not waiting for fresh data", async function() {
-      this.timeout(5000);
+    test("should return cached data when not waiting for fresh data", async function() {
 
       const mockHierarchyData = {
         updatedAt: 1750934583218,
@@ -172,13 +169,13 @@ describe("AccessibilityServiceClient", function() {
       const result = await accessibilityServiceClient.getLatestHierarchy(false, 0);
       const duration = Date.now() - startTime;
 
-      expect(result).to.not.be.null;
-      expect(result.hierarchy).to.not.be.null;
-      expect(result.hierarchy!.hierarchy.text).to.equal("Cached Data");
-      expect(duration).to.be.lessThan(500); // Should be fast since it's cached
+      expect(result).not.toBeNull();
+      expect(result.hierarchy).not.toBeNull();
+      expect(result.hierarchy!.hierarchy.text).toBe("Cached Data");
+      expect(duration).toBeLessThan(500); // Should be fast since it's cached
     });
 
-    it("should timeout when no data received within timeout period", async function() {
+    test("should timeout when no data received within timeout period", async function() {
       // Use FakeWebSocket that connects successfully but sends no data
       // Use delayed mode with 1ms for fast execution
       fakeTimer.setSleepDuration(1);
@@ -194,15 +191,15 @@ describe("AccessibilityServiceClient", function() {
         // Use a short timeout (50ms) to make test run fast
         const result = await testClient.getLatestHierarchy(true, 50);
 
-        expect(result).to.not.be.null;
-        expect(result.hierarchy).to.be.null;
-        expect(result.fresh).to.be.false;
+        expect(result).not.toBeNull();
+        expect(result.hierarchy).toBeNull();
+        expect(result.fresh).toBe(false);
       } finally {
         await testClient.close();
       }
     });
 
-    it("should handle WebSocket connection failure gracefully", async function() {
+    test("should handle WebSocket connection failure gracefully", async function() {
       // Use FakeWebSocket with instant failure and FakeTimer for fast, reliable test execution
       // See issues #68 (timeout race condition) and #72 (cache contamination)
       fakeTimer.setSleepDuration(1);
@@ -217,9 +214,9 @@ describe("AccessibilityServiceClient", function() {
       try {
         const result = await testClient.getLatestHierarchy(true, 1000);
 
-        expect(result).to.not.be.null;
-        expect(result.hierarchy).to.be.null;
-        expect(result.fresh).to.be.false;
+        expect(result).not.toBeNull();
+        expect(result.hierarchy).toBeNull();
+        expect(result.fresh).toBe(false);
       } finally {
         await testClient.close();
       }
@@ -227,7 +224,7 @@ describe("AccessibilityServiceClient", function() {
   });
 
   describe("convertToViewHierarchyResult", function() {
-    it("should convert accessibility hierarchy to ViewHierarchyResult format", function() {
+    test("should convert accessibility hierarchy to ViewHierarchyResult format", function() {
       const accessibilityHierarchy = {
         updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
@@ -260,22 +257,22 @@ describe("AccessibilityServiceClient", function() {
 
       const result = accessibilityServiceClient.convertToViewHierarchyResult(accessibilityHierarchy);
 
-      expect(result).to.exist;
-      expect(result.hierarchy).to.exist;
-      expect(result.hierarchy.text).to.equal("6:43 AM");
-      expect(result.hierarchy["content-desc"]).to.equal("6:43 AM");
-      expect(result.hierarchy.bounds).to.equal("[175,687][692,973]");
-      expect(result.hierarchy.clickable).to.be.undefined;
-      expect(result.hierarchy.enabled).to.equal("true");
+      expect(result).toBeDefined();
+      expect(result.hierarchy).toBeDefined();
+      expect(result.hierarchy.text).toBe("6:43 AM");
+      expect(result.hierarchy["content-desc"]).toBe("6:43 AM");
+      expect(result.hierarchy.bounds).toBe("[175,687][692,973]");
+      expect(result.hierarchy.clickable).toBeUndefined();
+      expect(result.hierarchy.enabled).toBe("true");
 
       // Check child node conversion
-      expect(result.hierarchy.node).to.be.an("object");
-      expect(result.hierarchy.node.text).to.equal("Child Node");
-      expect(result.hierarchy.node.bounds).to.equal("[0,0][100,50]");
-      expect(result.hierarchy.node.clickable).to.equal("true");
+      expect(typeof result.hierarchy.node).toBe("object");
+      expect(result.hierarchy.node.text).toBe("Child Node");
+      expect(result.hierarchy.node.bounds).toBe("[0,0][100,50]");
+      expect(result.hierarchy.node.clickable).toBe("true");
     });
 
-    it("should handle single child node correctly", function() {
+    test("should handle single child node correctly", function() {
       const accessibilityHierarchy = {
         updatedAt: 1750934583218,
         packageName: "com.test.app",
@@ -292,12 +289,12 @@ describe("AccessibilityServiceClient", function() {
 
       const result = accessibilityServiceClient.convertToViewHierarchyResult(accessibilityHierarchy);
 
-      expect(result.hierarchy.node).to.be.an("object"); // Single child should not be in array
-      expect(result.hierarchy.node.text).to.equal("Single Child");
-      expect(result.hierarchy.node.clickable).to.equal("true");
+      expect(typeof result.hierarchy.node).toBe("object"); // Single child should not be in array
+      expect(result.hierarchy.node.text).toBe("Single Child");
+      expect(result.hierarchy.node.clickable).toBe("true");
     });
 
-    it("should handle conversion errors gracefully", function() {
+    test("should handle conversion errors gracefully", function() {
       // Create a hierarchy that will cause conversion issues
       const problematicHierarchy = {
         updatedAt: 1750934583218,
@@ -307,25 +304,23 @@ describe("AccessibilityServiceClient", function() {
 
       const result = accessibilityServiceClient.convertToViewHierarchyResult(problematicHierarchy);
 
-      expect(result).to.exist;
-      expect(result.hierarchy).to.exist;
-      expect(result.hierarchy.error).to.include("Failed to convert accessibility service hierarchy format");
+      expect(result).toBeDefined();
+      expect(result.hierarchy).toBeDefined();
+      expect(result.hierarchy.error).toContain("Failed to convert accessibility service hierarchy format");
     });
   });
 
   describe("getAccessibilityHierarchy", function() {
-    it("should return null when service is not available", async function() {
-      this.timeout(5000);
+    test("should return null when service is not available", async function() {
 
       // Configure service as not available
       fakeAdb.setCommandResponse("pm list packages", { stdout: "", stderr: "" });
 
       const result = await accessibilityServiceClient.getAccessibilityHierarchy();
-      expect(result).to.be.null;
+      expect(result).toBeNull();
     });
 
-    it.skip("should return converted hierarchy when service is available and working", async function() {
-      this.timeout(10000);
+    test.skip("should return converted hierarchy when service is available and working", async function() {
 
       // Configure service as available
       fakeAdb.setCommandResponse("pm list packages", {
@@ -401,14 +396,14 @@ describe("AccessibilityServiceClient", function() {
 
       const result = await accessibilityServiceClient.getAccessibilityHierarchy();
 
-      expect(result).to.not.be.null;
-      expect(result!.hierarchy).to.exist;
-      expect(result!.hierarchy.text).to.equal("Test Text");
-      expect(result!.hierarchy.clickable).to.equal("true");
-      expect(result!.hierarchy.bounds).to.equal("[0,0][100,50]");
+      expect(result).not.toBeNull();
+      expect(result!.hierarchy).toBeDefined();
+      expect(result!.hierarchy.text).toBe("Test Text");
+      expect(result!.hierarchy.clickable).toBe("true");
+      expect(result!.hierarchy.bounds).toBe("[0,0][100,50]");
     });
 
-    it("should return null when hierarchy retrieval fails", async function() {
+    test("should return null when hierarchy retrieval fails", async function() {
       // Configure service as available but WebSocket connection will fail
       fakeAdb.setCommandResponse("pm list packages", {
         stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
@@ -436,7 +431,7 @@ describe("AccessibilityServiceClient", function() {
 
       try {
         const result = await failingClient.getAccessibilityHierarchy();
-        expect(result).to.be.null;
+        expect(result).toBeNull();
       } finally {
         // Clean up the test client
         await failingClient.close();

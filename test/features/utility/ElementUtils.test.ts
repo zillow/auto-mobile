@@ -1,4 +1,4 @@
-import { assert } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { ElementUtils } from "../../../src/features/utility/ElementUtils";
 import { Element } from "../../../src/models";
 import { ObserveResult } from "../../../src/models";
@@ -26,7 +26,7 @@ describe("ElementUtils", () => {
   });
 
   describe("flattenViewHierarchy", () => {
-    it("should flatten a simple view hierarchy", () => {
+    test("should flatten a simple view hierarchy", () => {
       const viewHierarchy = {
         hierarchy: {
           node: {
@@ -58,21 +58,21 @@ describe("ElementUtils", () => {
       const mockObserveResult = createObserveResult(viewHierarchy);
       const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
 
-      assert.lengthOf(result, 3);
-      assert.equal(result[0].index, 0);
-      assert.equal(result[0].text, "Root");
-      assert.equal(result[1].index, 1);
-      assert.equal(result[1].text, "Button 1");
-      assert.equal(result[2].index, 2);
-      assert.equal(result[2].text, "Text View");
+      expect(result.length).toBe(3);
+      expect(result[0].index).toBe(0);
+      expect(result[0].text).toBe("Root");
+      expect(result[1].index).toBe(1);
+      expect(result[1].text).toBe("Button 1");
+      expect(result[2].index).toBe(2);
+      expect(result[2].text).toBe("Text View");
     });
 
-    it("should handle empty view hierarchy", () => {
+    test("should handle empty view hierarchy", () => {
       const result = elementUtils.flattenViewHierarchy(null as any);
-      assert.deepEqual(result, []);
+      expect(result).toEqual([]);
     });
 
-    it("should handle view hierarchy without parseable elements", () => {
+    test("should handle view hierarchy without parseable elements", () => {
       const viewHierarchy = {
         hierarchy: {
           node: {
@@ -86,10 +86,10 @@ describe("ElementUtils", () => {
 
       const mockObserveResult = createObserveResult(viewHierarchy);
       const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
-      assert.deepEqual(result, []);
+      expect(result).toEqual([]);
     });
 
-    it("should prefer text over content-desc", () => {
+    test("should prefer text over content-desc", () => {
       const viewHierarchy = {
         hierarchy: {
           node: {
@@ -106,11 +106,11 @@ describe("ElementUtils", () => {
       const mockObserveResult = createObserveResult(viewHierarchy);
       const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
 
-      assert.lengthOf(result, 1);
-      assert.equal(result[0].text, "Button Text");
+      expect(result.length).toBe(1);
+      expect(result[0].text).toBe("Button Text");
     });
 
-    it("should use content-desc when text is not available", () => {
+    test("should use content-desc when text is not available", () => {
       const viewHierarchy = {
         hierarchy: {
           node: {
@@ -126,8 +126,8 @@ describe("ElementUtils", () => {
       const mockObserveResult = createObserveResult(viewHierarchy);
       const result = elementUtils.flattenViewHierarchy(mockObserveResult.viewHierarchy);
 
-      assert.lengthOf(result, 1);
-      assert.equal(result[0].text, "Image Description");
+      expect(result.length).toBe(1);
+      expect(result[0].text).toBe("Image Description");
     });
   });
 
@@ -159,33 +159,33 @@ describe("ElementUtils", () => {
       }
     };
 
-    it("should find element by valid index", () => {
+    test("should find element by valid index", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchy);
       const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, 1);
 
-      assert.isNotNull(result);
-      assert.deepEqual(result?.element.bounds, { left: 10, top: 10, right: 50, bottom: 50 });
-      assert.equal(result?.text, "Button 1");
+      expect(result).not.toBeNull();
+      expect(result?.element.bounds).toEqual({ left: 10, top: 10, right: 50, bottom: 50 });
+      expect(result?.text).toBe("Button 1");
     });
 
-    it("should return null for invalid index", () => {
+    test("should return null for invalid index", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchy);
       const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, 10);
-      assert.isNull(result);
+      expect(result).toBeNull();
     });
 
-    it("should return null for negative index", () => {
+    test("should return null for negative index", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchy);
       const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, -1);
-      assert.isNull(result);
+      expect(result).toBeNull();
     });
 
-    it("should return null for empty view hierarchy", () => {
+    test("should return null for empty view hierarchy", () => {
       const result = elementUtils.findElementByIndex(null as any, 0);
-      assert.isNull(result);
+      expect(result).toBeNull();
     });
 
-    it("should handle element without text", () => {
+    test("should handle element without text", () => {
       const viewHierarchy = {
         hierarchy: {
           node: {
@@ -200,70 +200,70 @@ describe("ElementUtils", () => {
       const mockObserveResult = createObserveResult(viewHierarchy);
       const result = elementUtils.findElementByIndex(mockObserveResult.viewHierarchy, 0);
 
-      assert.isNotNull(result);
-      assert.isUndefined(result?.text);
+      expect(result).not.toBeNull();
+      expect(result?.text).toBeUndefined();
     });
   });
 
   describe("validateElementText", () => {
-    it("should return true when no expected text is provided", () => {
+    test("should return true when no expected text is provided", () => {
       const foundElement = {
         element: mockElement,
         text: "Some text"
       };
 
       const result = elementUtils.validateElementText(foundElement);
-      assert.isTrue(result);
+      expect(result).toBe(true);
     });
 
-    it("should return true when texts match", () => {
+    test("should return true when texts match", () => {
       const foundElement = {
         element: mockElement,
         text: "Button Text"
       };
 
       const result = elementUtils.validateElementText(foundElement, "Button Text");
-      assert.isTrue(result);
+      expect(result).toBe(true);
     });
 
-    it("should return true for fuzzy text match", () => {
+    test("should return true for fuzzy text match", () => {
       const foundElement = {
         element: mockElement,
         text: "Submit Button"
       };
 
       const result = elementUtils.validateElementText(foundElement, "Button");
-      assert.isTrue(result);
+      expect(result).toBe(true);
     });
 
-    it("should return false when expected text provided but element has no text", () => {
+    test("should return false when expected text provided but element has no text", () => {
       const foundElement = {
         element: mockElement,
         text: undefined
       };
 
       const result = elementUtils.validateElementText(foundElement, "Expected Text");
-      assert.isFalse(result);
+      expect(result).toBe(false);
     });
 
-    it("should return false when texts do not match", () => {
+    test("should return false when texts do not match", () => {
       const foundElement = {
         element: mockElement,
         text: "Button Text"
       };
 
       const result = elementUtils.validateElementText(foundElement, "Different Text");
-      assert.isFalse(result);
+      expect(result).toBe(false);
     });
 
-    it("should handle case insensitive matching", () => {
+    test("should handle case insensitive matching", () => {
       const foundElement = {
         element: mockElement,
         text: "SUBMIT BUTTON"
       };
 
       const result = elementUtils.validateElementText(foundElement, "submit");
-      assert.isTrue(result);
+      expect(result).toBe(true);
     });
   });
 
@@ -328,7 +328,7 @@ describe("ElementUtils", () => {
       }
     };
 
-    it("should find element by text within specified container", () => {
+    test("should find element by text within specified container", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -338,12 +338,12 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNotNull(result);
-      assert.equal(result?.text, "Item 1");
-      assert.deepEqual(result?.bounds, { left: 50, top: 850, right: 1030, bottom: 950 });
+      expect(result).not.toBeNull();
+      expect(result?.text).toBe("Item 1");
+      expect(result?.bounds).toEqual({ left: 50, top: 850, right: 1030, bottom: 950 });
     });
 
-    it("should not find element when it's outside the specified container", () => {
+    test("should not find element when it's outside the specified container", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -353,10 +353,10 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNull(result);
+      expect(result).toBeNull();
     });
 
-    it("should return null when container is not found", () => {
+    test("should return null when container is not found", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -366,10 +366,10 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNull(result);
+      expect(result).toBeNull();
     });
 
-    it("should find element regardless of element type", () => {
+    test("should find element regardless of element type", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -379,12 +379,12 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNotNull(result);
-      assert.equal(result?.text, "Item 2");
-      assert.include(result?.class || "", "EditText");
+      expect(result).not.toBeNull();
+      expect(result?.text).toBe("Item 2");
+      expect(result?.class || "").toContain("EditText");
     });
 
-    it("should find all matching elements including different types", () => {
+    test("should find all matching elements including different types", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -394,11 +394,11 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNotNull(result);
-      assert.include(result?.text || "", "Item");
+      expect(result).not.toBeNull();
+      expect(result?.text || "").toContain("Item");
     });
 
-    it("should handle exact text matching", () => {
+    test("should handle exact text matching", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -408,10 +408,10 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNull(result); // Should not find partial matches
+      expect(result).toBeNull(); // Should not find partial matches
     });
 
-    it("should handle case-sensitive matching", () => {
+    test("should handle case-sensitive matching", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -421,10 +421,10 @@ describe("ElementUtils", () => {
         true // case sensitive
       );
 
-      assert.isNull(result); // Should not find due to case mismatch
+      expect(result).toBeNull(); // Should not find due to case mismatch
     });
 
-    it("should handle case-insensitive matching", () => {
+    test("should handle case-insensitive matching", () => {
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
@@ -434,11 +434,11 @@ describe("ElementUtils", () => {
         false // case-insensitive
       );
 
-      assert.isNotNull(result);
-      assert.equal(result?.text, "Item 1");
+      expect(result).not.toBeNull();
+      expect(result?.text).toBe("Item 1");
     });
 
-    it("should prefer smaller elements when multiple matches exist", () => {
+    test("should prefer smaller elements when multiple matches exist", () => {
       const hierarchyWithMultipleMatches = {
         hierarchy: {
           node: {
@@ -476,12 +476,12 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNotNull(result);
+      expect(result).not.toBeNull();
       // Should return the smaller element
-      assert.deepEqual(result?.bounds, { left: 400, top: 200, right: 680, bottom: 300 });
+      expect(result?.bounds).toEqual({ left: 400, top: 200, right: 680, bottom: 300 });
     });
 
-    it("should handle content-desc attribute", () => {
+    test("should handle content-desc attribute", () => {
       const hierarchyWithContentDesc = {
         hierarchy: {
           node: {
@@ -512,11 +512,11 @@ describe("ElementUtils", () => {
         false
       );
 
-      assert.isNotNull(result);
-      assert.deepEqual(result?.bounds, { left: 100, top: 100, right: 300, bottom: 200 });
+      expect(result).not.toBeNull();
+      expect(result?.bounds).toEqual({ left: 100, top: 100, right: 300, bottom: 200 });
     });
 
-    it("should handle missing required parameters", () => {
+    test("should handle missing required parameters", () => {
       // Missing viewHierarchy
       let result = elementUtils.findElementByText(
         null as any,
@@ -525,7 +525,7 @@ describe("ElementUtils", () => {
         true,
         false
       );
-      assert.isNull(result);
+      expect(result).toBeNull();
 
       // Missing text
       const mockObserveResult = createObserveResult(mockViewHierarchyWithContainer);
@@ -536,10 +536,10 @@ describe("ElementUtils", () => {
         true,
         false
       );
-      assert.isNull(result);
+      expect(result).toBeNull();
     });
 
-    it("should handle nested containers", () => {
+    test("should handle nested containers", () => {
       const nestedHierarchy = {
         hierarchy: {
           node: {
@@ -589,7 +589,7 @@ describe("ElementUtils", () => {
         true,
         false
       );
-      assert.isNotNull(result);
+      expect(result).not.toBeNull();
 
       // Should also find when searching in outer container
       result = elementUtils.findElementByText(
@@ -599,7 +599,7 @@ describe("ElementUtils", () => {
         true,
         false
       );
-      assert.isNotNull(result);
+      expect(result).not.toBeNull();
     });
   });
 });

@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it, beforeEach } from "mocha";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { Window } from "../../../src/features/observe/Window";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { ExecResult } from "../../../src/models/ExecResult";
@@ -25,7 +24,7 @@ describe("Window", () => {
   });
 
   describe("constructor", () => {
-    it("should create instance with provided deviceId and adb", () => {
+    test("should create instance with provided deviceId and adb", () => {
       const mockDevice: BootedDevice = {
         deviceId: "test-device",
         name: "Test Device",
@@ -33,22 +32,22 @@ describe("Window", () => {
       };
       const customAdb = new FakeAdbExecutor();
       const windowInstance = new Window(mockDevice, customAdb as any);
-      expect(windowInstance).to.be.instanceOf(Window);
+      expect(windowInstance).toBeInstanceOf(Window);
     });
 
-    it("should create instance with default values when no parameters provided", () => {
+    test("should create instance with default values when no parameters provided", () => {
       const mockDevice: BootedDevice = {
         deviceId: "default-device",
         name: "Default Device",
         platform: "android"
       };
       const windowInstance = new Window(mockDevice);
-      expect(windowInstance).to.be.instanceOf(Window);
+      expect(windowInstance).toBeInstanceOf(Window);
     });
   });
 
   describe("getActive", () => {
-    it("should parse package name and activity name correctly", async () => {
+    test("should parse package name and activity name correctly", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{12345678 u0 com.example.app/com.example.app.MainActivity}
         mLayoutSeq=123
@@ -64,12 +63,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("com.example.app");
-      expect(result.activityName).to.equal("com.example.app.MainActivity");
-      expect(result.layoutSeqSum).to.equal(123);
+      expect(result.appId).toBe("com.example.app");
+      expect(result.activityName).toBe("com.example.app.MainActivity");
+      expect(result.layoutSeqSum).toBe(123);
     });
 
-    it("should handle multiple layout sequence values", async () => {
+    test("should handle multiple layout sequence values", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{12345678 u0 com.test.app/com.test.MainActivity}
         mLayoutSeq=123
@@ -87,12 +86,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("com.test.app");
-      expect(result.activityName).to.equal("com.test.MainActivity");
-      expect(result.layoutSeqSum).to.equal(1368); // 123 + 456 + 789
+      expect(result.appId).toBe("com.test.app");
+      expect(result.activityName).toBe("com.test.MainActivity");
+      expect(result.layoutSeqSum).toBe(1368); // 123 + 456 + 789
     });
 
-    it("should handle missing window info and return default values", async () => {
+    test("should handle missing window info and return default values", async () => {
       const dumpsysOutput = `
         Some other output without window info
         mLayoutSeq=100
@@ -108,12 +107,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("");
-      expect(result.activityName).to.equal("");
-      expect(result.layoutSeqSum).to.equal(100);
+      expect(result.appId).toBe("");
+      expect(result.activityName).toBe("");
+      expect(result.layoutSeqSum).toBe(100);
     });
 
-    it("should handle missing layout sequence and return zero", async () => {
+    test("should handle missing layout sequence and return zero", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{12345678 u0 com.example.app/com.example.app.MainActivity}
         Some other content without mLayoutSeq
@@ -129,12 +128,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("com.example.app");
-      expect(result.activityName).to.equal("com.example.app.MainActivity");
-      expect(result.layoutSeqSum).to.equal(0);
+      expect(result.appId).toBe("com.example.app");
+      expect(result.activityName).toBe("com.example.app.MainActivity");
+      expect(result.layoutSeqSum).toBe(0);
     });
 
-    it("should handle non-numeric layout sequence values", async () => {
+    test("should handle non-numeric layout sequence values", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{12345678 u0 com.example.app/com.example.app.MainActivity}
         mLayoutSeq=abc
@@ -153,12 +152,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("com.example.app");
-      expect(result.activityName).to.equal("com.example.app.MainActivity");
-      expect(result.layoutSeqSum).to.equal(579); // 123 + 456 (ignores non-numeric values)
+      expect(result.appId).toBe("com.example.app");
+      expect(result.activityName).toBe("com.example.app.MainActivity");
+      expect(result.layoutSeqSum).toBe(579); // 123 + 456 (ignores non-numeric values)
     });
 
-    it("should handle adb command failure gracefully", async () => {
+    test("should handle adb command failure gracefully", async () => {
       // Create a custom fake that throws an error
       const errorFakeAdb = new (class extends FakeAdbExecutor {
         async executeCommand(): Promise<ExecResult> {
@@ -169,12 +168,12 @@ describe("Window", () => {
 
       const result = await windowWithError.getActive(true);
 
-      expect(result.appId).to.equal("");
-      expect(result.activityName).to.equal("");
-      expect(result.layoutSeqSum).to.equal(0);
+      expect(result.appId).toBe("");
+      expect(result.activityName).toBe("");
+      expect(result.layoutSeqSum).toBe(0);
     });
 
-    it("should handle empty dumpsys output", async () => {
+    test("should handle empty dumpsys output", async () => {
       fakeAdb.setDefaultResponse({
         stdout: "",
         stderr: "",
@@ -185,12 +184,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("");
-      expect(result.activityName).to.equal("");
-      expect(result.layoutSeqSum).to.equal(0);
+      expect(result.appId).toBe("");
+      expect(result.activityName).toBe("");
+      expect(result.layoutSeqSum).toBe(0);
     });
 
-    it("should parse Pop-Up Window and extract activity from mActivityRecord", async () => {
+    test("should parse Pop-Up Window and extract activity from mActivityRecord", async () => {
       // Read the actual dumpsys output with Pop-Up Window
       const dumpsysOutput = fs.readFileSync(
         path.join(__dirname, "windowDumps", "active-window-with-popup.log"),
@@ -208,12 +207,12 @@ describe("Window", () => {
       const result = await window.getActive(true);
 
       // Should extract the package and activity from the mActivityRecord line within the Pop-Up Window block
-      expect(result.appId).to.equal("dev.jasonpearson.android.zillowmap");
-      expect(result.activityName).to.equal("dev.jasonpearson.android.appshell.MainTabActivity");
-      expect(result.layoutSeqSum).to.be.greaterThan(0);
+      expect(result.appId).toBe("dev.jasonpearson.android.zillowmap");
+      expect(result.activityName).toBe("dev.jasonpearson.android.appshell.MainTabActivity");
+      expect(result.layoutSeqSum).toBeGreaterThan(0);
     });
 
-    it("should handle Pop-Up Window when imeControlTarget doesn't have package/activity format", async () => {
+    test("should handle Pop-Up Window when imeControlTarget doesn't have package/activity format", async () => {
       const dumpsysOutput = `
         imeLayeringTarget in display# 0 Window{ddf8489 u0 Pop-Up Window}
         imeInputTarget in display# 0 Window{ddf8489 u0 Pop-Up Window}
@@ -240,12 +239,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("dev.jasonpearson.android.zillowmap");
-      expect(result.activityName).to.equal("dev.jasonpearson.android.appshell.MainTabActivity");
-      expect(result.layoutSeqSum).to.equal(258);
+      expect(result.appId).toBe("dev.jasonpearson.android.zillowmap");
+      expect(result.activityName).toBe("dev.jasonpearson.android.appshell.MainTabActivity");
+      expect(result.layoutSeqSum).toBe(258);
     });
 
-    it("should fall back to visible app windows when Pop-Up Window parsing fails", async () => {
+    test("should fall back to visible app windows when Pop-Up Window parsing fails", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{ddf8489 u0 Pop-Up Window}
 
@@ -272,12 +271,12 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("com.example.testapp");
-      expect(result.activityName).to.equal("com.example.MainActivity");
-      expect(result.layoutSeqSum).to.equal(123);
+      expect(result.appId).toBe("com.example.testapp");
+      expect(result.activityName).toBe("com.example.MainActivity");
+      expect(result.layoutSeqSum).toBe(123);
     });
 
-    it("should fall back to BASE_APPLICATION pattern when other methods fail", async () => {
+    test("should fall back to BASE_APPLICATION pattern when other methods fail", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{ddf8489 u0 Pop-Up Window}
 
@@ -302,14 +301,14 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).to.equal("com.example.testapp");
-      expect(result.activityName).to.equal("com.example.MainActivity");
-      expect(result.layoutSeqSum).to.equal(456);
+      expect(result.appId).toBe("com.example.testapp");
+      expect(result.activityName).toBe("com.example.MainActivity");
+      expect(result.layoutSeqSum).toBe(456);
     });
   });
 
   describe("getActiveHash", () => {
-    it("should generate different hashes for different window states", async () => {
+    test("should generate different hashes for different window states", async () => {
       // First UI state with one visible window
       const firstState = `
         Window #1 Window{a1b2c3 statusBar} isVisible=true
@@ -347,10 +346,10 @@ describe("Window", () => {
       const secondHash = await window.getActiveHash();
 
       // Verify that the hashes are different
-      expect(firstHash).to.not.equal(secondHash);
+      expect(firstHash).not.toBe(secondHash);
     });
 
-    it("should generate the same hash for the same window state", async () => {
+    test("should generate the same hash for the same window state", async () => {
       // Same UI state returned twice
       const uiState = `
         Window #1 Window{a1b2c3 statusBar} isVisible=true
@@ -372,10 +371,10 @@ describe("Window", () => {
       const secondHash = await window.getActiveHash();
 
       // Verify that the hashes are the same
-      expect(firstHash).to.equal(secondHash);
+      expect(firstHash).toBe(secondHash);
     });
 
-    it("should ignore invisible windows", async () => {
+    test("should ignore invisible windows", async () => {
       // UI state with a mix of visible and invisible windows
       const uiState = `
         Window #1 Window{a1b2c3 statusBar} isVisible=true
@@ -414,10 +413,10 @@ describe("Window", () => {
       const secondHash = await window.getActiveHash();
 
       // Verify that the hashes are the same since only invisible windows differ
-      expect(firstHash).to.equal(secondHash);
+      expect(firstHash).toBe(secondHash);
     });
 
-    it("should handle transaction sequence changes", async () => {
+    test("should handle transaction sequence changes", async () => {
       // Same windows but different transaction sequence
       const firstState = `
         Window #1 Window{a1b2c3 statusBar} isVisible=true
@@ -453,10 +452,10 @@ describe("Window", () => {
       const secondHash = await window.getActiveHash();
 
       // Verify that the hashes are different due to transaction sequence change
-      expect(firstHash).to.not.equal(secondHash);
+      expect(firstHash).not.toBe(secondHash);
     });
 
-    it("should return consistent hash format", async () => {
+    test("should return consistent hash format", async () => {
       const uiState = `
         imeControlTarget in display# 0 Window{12345678 u0 com.example.app/com.example.app.MainActivity}
         mLayoutSeq=123
@@ -473,7 +472,7 @@ describe("Window", () => {
       const hash = await window.getActiveHash();
 
       // MD5 hash should be 32 characters long and contain only hexadecimal characters
-      expect(hash).to.match(/^[a-f0-9]{32}$/);
+      expect(hash).toMatch(/^[a-f0-9]{32}$/);
     });
   });
 });

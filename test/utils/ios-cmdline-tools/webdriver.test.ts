@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { WebDriverAgent } from "../../../src/utils/ios-cmdline-tools/WebDriverAgent";
 import { BootedDevice, ExecResult } from "../../../src/models";
 
@@ -29,7 +29,7 @@ describe("WebDriverAgent", function() {
   });
 
   describe("isAvailable", function() {
-    it("should return true when Xcode command line tools are available", async function() {
+    test("should return true when Xcode command line tools are available", async function() {
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         if (command.includes("xcrun --version")) {
           return {
@@ -46,10 +46,10 @@ describe("WebDriverAgent", function() {
       webDriverAgent = new WebDriverAgent(null, {}, mockExecAsync);
 
       const available = await webDriverAgent.isAvailable();
-      expect(available).to.be.true;
+      expect(available).toBe(true);
     });
 
-    it("should return false when Xcode command line tools are not available", async function() {
+    test("should return false when Xcode command line tools are not available", async function() {
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         throw new Error("Command not found: xcrun");
       };
@@ -57,12 +57,12 @@ describe("WebDriverAgent", function() {
       webDriverAgent = new WebDriverAgent(null, {}, mockExecAsync);
 
       const available = await webDriverAgent.isAvailable();
-      expect(available).to.be.false;
+      expect(available).toBe(false);
     });
   });
 
   describe("executeCommand", function() {
-    it("should execute shell commands with xcrun prefix", async function() {
+    test("should execute shell commands with xcrun prefix", async function() {
       let executedCommand = "";
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         executedCommand = command;
@@ -78,10 +78,10 @@ describe("WebDriverAgent", function() {
       webDriverAgent = new WebDriverAgent(mockDevice, {}, mockExecAsync);
       await webDriverAgent.executeCommand("simctl list devices");
 
-      expect(executedCommand).to.equal("xcrun simctl list devices");
+      expect(executedCommand).toBe("xcrun simctl list devices");
     });
 
-    it("should handle both shell and HTTP commands", async function() {
+    test("should handle both shell and HTTP commands", async function() {
       // Test that executeCommand properly delegates based on command type
       let lastCommand = "";
       mockExecAsync = async (command: string): Promise<ExecResult> => {
@@ -99,9 +99,9 @@ describe("WebDriverAgent", function() {
 
       // Test shell command - should be prefixed with xcrun
       const shellResult = await webDriverAgent.executeCommand("list devices");
-      expect(lastCommand).to.equal("xcrun list devices");
-      expect(shellResult).to.have.property("stdout");
-      expect(shellResult).to.have.property("toString");
+      expect(lastCommand).toBe("xcrun list devices");
+      expect(shellResult).toHaveProperty("stdout");
+      expect(shellResult).toHaveProperty("toString");
 
       // Test that HTTP commands are identified (they would call makeRequest, but we can't stub private methods)
       // This is tested implicitly by the shell command test above
@@ -109,7 +109,7 @@ describe("WebDriverAgent", function() {
   });
 
   describe("setDevice", function() {
-    it("should set the device correctly", function() {
+    test("should set the device correctly", function() {
       const newDevice: BootedDevice = {
         deviceId: "new-device-id",
         name: "New Device",
@@ -118,7 +118,7 @@ describe("WebDriverAgent", function() {
       };
 
       webDriverAgent.setDevice(newDevice);
-      expect(webDriverAgent.device).to.equal(newDevice);
+      expect(webDriverAgent.device).toBe(newDevice);
     });
   });
 });

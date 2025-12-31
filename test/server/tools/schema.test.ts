@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "mocha";
-import { expect } from "chai";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createMcpServer } from "../../../src/server/index";
 import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
@@ -29,7 +28,7 @@ describe("MCP Tools Schema", () => {
     }
   }
 
-  it("should validate tool schema definitions conform to MCP standards", () => {
+  test("should validate tool schema definitions conform to MCP standards", () => {
     createMcpServer();
 
     const toolDefinitions = ToolRegistry.getToolDefinitions();
@@ -37,30 +36,29 @@ describe("MCP Tools Schema", () => {
     // Each tool should conform to MCP protocol requirements
     toolDefinitions.forEach(tool => {
       // Required MCP tool properties
-      expect(tool).to.have.property("name");
-      expect(tool).to.have.property("description");
-      expect(tool).to.have.property("inputSchema");
+      expect(tool).toHaveProperty("name");
+      expect(tool).toHaveProperty("description");
+      expect(tool).toHaveProperty("inputSchema");
 
       // Type validation
-      expect(typeof tool.name).to.equal("string");
-      expect(typeof tool.description).to.equal("string");
-      expect(typeof tool.inputSchema).to.equal("object");
+      expect(typeof tool.name).toBe("string");
+      expect(typeof tool.description).toBe("string");
+      expect(typeof tool.inputSchema).toBe("object");
 
       // MCP protocol requirements
-      expect(tool.name.length).to.be.greaterThan(0);
-      expect(tool.description.length).to.be.greaterThan(0);
+      expect(tool.name.length).toBeGreaterThan(0);
+      expect(tool.description.length).toBeGreaterThan(0);
 
       // Schema should be a valid JSON Schema-like object
       const schema = tool.inputSchema as any;
-      expect(schema).to.have.property("type");
+      expect(schema).toHaveProperty("type");
       if (schema.type === "object") {
-        expect(schema).to.have.property("properties");
+        expect(schema).toHaveProperty("properties");
       }
     });
   });
 
-  it("given a request that matches valid schema, should return a valid response", async function() {
-    this.timeout(10000);
+  test("given a request that matches valid schema, should return a valid response", async function() {
 
     const { client } = fixture.getContext();
 
@@ -75,7 +73,8 @@ describe("MCP Tools Schema", () => {
     // Test listDeviceImages tool which requires emulator CLI
     const emulatorAvailable = await checkEmulatorAvailable();
     if (!emulatorAvailable) {
-      this.skip(); // Skip test if emulator CLI is not available
+      // Note: Bun does not support dynamic test skipping // Skip test if emulator CLI is not available
+      return;
     }
 
     const result = await client.request({
@@ -88,11 +87,10 @@ describe("MCP Tools Schema", () => {
       }
     }, toolResponseSchema);
 
-    expect(result).to.be.an("object");
+    expect(typeof result).toBe("object");
   });
 
-  it("given a request omits fields that are optional by the schema, should return a valid response", async function() {
-    this.timeout(10000);
+  test("given a request omits fields that are optional by the schema, should return a valid response", async function() {
 
     const { client } = fixture.getContext();
 
@@ -107,7 +105,8 @@ describe("MCP Tools Schema", () => {
     // Test listDeviceImages without optional parameters (listDeviceImages has no required params)
     const emulatorAvailable = await checkEmulatorAvailable();
     if (!emulatorAvailable) {
-      this.skip(); // Skip test if emulator CLI is not available
+      // Note: Bun does not support dynamic test skipping // Skip test if emulator CLI is not available
+      return;
     }
 
     const result = await client.request({
@@ -120,18 +119,18 @@ describe("MCP Tools Schema", () => {
       }
     }, toolResponseSchema);
 
-    expect(result).to.be.an("object");
+    expect(typeof result).toBe("object");
   });
 
-  it("given a request contains fields that are not defined by the schema, should return an error response", async function() {
-    this.timeout(10000);
+  test("given a request contains fields that are not defined by the schema, should return an error response", async function() {
 
     const { client } = fixture.getContext();
 
     // Test with listDeviceImages and unknown parameter to avoid device dependency
     const emulatorAvailable = await checkEmulatorAvailable();
     if (!emulatorAvailable) {
-      this.skip(); // Skip test if emulator CLI is not available
+      // Note: Bun does not support dynamic test skipping // Skip test if emulator CLI is not available
+      return;
     }
 
     try {
@@ -149,18 +148,18 @@ describe("MCP Tools Schema", () => {
 
       // If we reach here without error, the schema allows additional properties
       // This is actually valid behavior - some schemas are permissive
-      expect(result).to.be.an("object");
+      expect(typeof result).toBe("object");
 
     } catch (error: any) {
       // If it fails, it should be due to schema validation
-      expect(error.message).to.satisfy((msg: string) =>
+      const msg = error.message;
+      expect(
         msg.includes("Invalid parameters") || msg.includes("Failed to execute") || msg.includes("Unknown tool")
-      );
+      ).toBe(true);
     }
   });
 
-  it("given a request contains fields that are defined by the schema but have incorrect types, should return an error response", async function() {
-    this.timeout(10000);
+  test("given a request contains fields that are defined by the schema but have incorrect types, should return an error response", async function() {
 
     const { client } = fixture.getContext();
 
@@ -179,12 +178,11 @@ describe("MCP Tools Schema", () => {
       }, z.any());
       expect.fail("Should have thrown an error for incorrect type");
     } catch (error: any) {
-      expect(error.message).to.include("Invalid parameters");
+      expect(error.message).toContain("Invalid parameters");
     }
   });
 
-  it("given a request contains fields that are defined by the schema but have incorrect values, should return an error response", async function() {
-    this.timeout(10000);
+  test("given a request contains fields that are defined by the schema but have incorrect values, should return an error response", async function() {
 
     const { client } = fixture.getContext();
 
@@ -201,7 +199,7 @@ describe("MCP Tools Schema", () => {
       expect.fail("Should have thrown an error for unknown tool");
     } catch (error: any) {
       // This should fail because the tool doesn't exist
-      expect(error.message).to.include("Unknown tool");
+      expect(error.message).toContain("Unknown tool");
     }
   });
 });

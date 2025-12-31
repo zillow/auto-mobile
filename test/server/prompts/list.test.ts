@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "mocha";
-import { expect } from "chai";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 
 describe("MCP Prompts List", () => {
@@ -16,8 +15,7 @@ describe("MCP Prompts List", () => {
     }
   });
 
-  it("given no prompts are registered, endpoint should return an empty list", async function() {
-    this.timeout(5000);
+  test("given no prompts are registered, endpoint should return an empty list", async function() {
 
     const { client } = fixture.getContext();
 
@@ -41,14 +39,13 @@ describe("MCP Prompts List", () => {
     }, listPromptsResponseSchema);
 
     // Verify empty prompts list
-    expect(result).to.be.an("object");
-    expect(result).to.have.property("prompts");
-    expect(result.prompts).to.be.an("array");
-    expect(result.prompts).to.have.length(0);
+    expect(typeof result).toBe("object");
+    expect(result).toHaveProperty("prompts");
+    expect(Array.isArray(result.prompts)).toBe(true);
+    expect(result.prompts).toHaveLength(0);
   });
 
-  it("given a prompt is registered, endpoint should return a list with that prompt", async function() {
-    this.timeout(5000);
+  test("given a prompt is registered, endpoint should return a list with that prompt", async function() {
 
     // For this test, we need to mock or implement a prompt registration
     // Since the current server doesn't have prompt registration functionality,
@@ -102,29 +99,29 @@ describe("MCP Prompts List", () => {
     }, listPromptsResponseSchema);
 
     // Verify prompts list contains the test prompt
-    expect(result).to.be.an("object");
-    expect(result).to.have.property("prompts");
-    expect(result.prompts).to.be.an("array");
-    expect(result.prompts).to.have.length(1);
+    expect(typeof result).toBe("object");
+    expect(result).toHaveProperty("prompts");
+    expect(Array.isArray(result.prompts)).toBe(true);
+    expect(result.prompts).toHaveLength(1);
 
     // Verify the prompt has required properties
     const prompt = result.prompts[0];
-    expect(prompt).to.have.property("name", testPrompt.name);
-    expect(prompt).to.have.property("description", testPrompt.description);
-    expect(prompt).to.have.property("arguments");
-    expect(prompt.arguments).to.be.an("array");
-    expect(prompt.arguments).to.have.length(2);
+    expect(prompt).toHaveProperty("name", testPrompt.name);
+    expect(prompt).toHaveProperty("description", testPrompt.description);
+    expect(prompt).toHaveProperty("arguments");
+    expect(Array.isArray(prompt.arguments)).toBe(true);
+    expect(prompt.arguments).toHaveLength(2);
 
     // Verify the arguments structure
-    expect(prompt.arguments).to.not.be.undefined;
+    expect(prompt.arguments).toBeDefined();
     const arg1 = prompt.arguments![0];
-    expect(arg1).to.have.property("name", "appPackage");
-    expect(arg1).to.have.property("description", "The package name of the app to debug");
-    expect(arg1).to.have.property("required", true);
+    expect(arg1).toHaveProperty("name", "appPackage");
+    expect(arg1).toHaveProperty("description", "The package name of the app to debug");
+    expect(arg1).toHaveProperty("required", true);
 
     const arg2 = prompt.arguments![1];
-    expect(arg2).to.have.property("name", "deviceId");
-    expect(arg2).to.have.property("description", "The device ID to debug on");
-    expect(arg2).to.have.property("required", false);
+    expect(arg2).toHaveProperty("name", "deviceId");
+    expect(arg2).toHaveProperty("description", "The device ID to debug on");
+    expect(arg2).toHaveProperty("required", false);
   });
 });

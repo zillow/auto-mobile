@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "mocha";
-import { expect } from "chai";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 
 describe("MCP Tools Text Response", () => {
@@ -16,8 +15,7 @@ describe("MCP Tools Text Response", () => {
     }
   });
 
-  it.skip("given a tool configured with text response, expect valid JSON structure", async function() {
-    this.timeout(5000);
+  test.skip("given a tool configured with text response, expect valid JSON structure", async function() {
 
     const { client } = fixture.getContext();
 
@@ -41,19 +39,19 @@ describe("MCP Tools Text Response", () => {
     }, toolResponseSchema);
 
     // Verify response structure conforms to MCP text response format
-    expect(result).to.be.an("object");
+    expect(typeof result).toBe("object");
 
     if (result.content) {
-      expect(result.content).to.be.an("array");
+      expect(Array.isArray(result.content)).toBe(true);
 
       result.content.forEach((contentItem: any) => {
-        expect(contentItem).to.have.property("type");
-        expect(typeof contentItem.type).to.equal("string");
+        expect(contentItem).toHaveProperty("type");
+        expect(typeof contentItem.type).toBe("string");
 
         // For text responses, should have text property
         if (contentItem.type === "text") {
-          expect(contentItem).to.have.property("text");
-          expect(typeof contentItem.text).to.equal("string");
+          expect(contentItem).toHaveProperty("text");
+          expect(typeof contentItem.text).toBe("string");
         }
       });
     }
@@ -67,14 +65,14 @@ describe("MCP Tools Text Response", () => {
       }
     }, toolResponseSchema);
 
-    expect(emulatorResult).to.be.an("object");
+    expect(typeof emulatorResult).toBe("object");
 
     if (emulatorResult.content) {
-      expect(emulatorResult.content).to.be.an("array");
+      expect(Array.isArray(emulatorResult.content)).toBe(true);
 
       emulatorResult.content.forEach((contentItem: any) => {
-        expect(contentItem).to.have.property("type");
-        expect(typeof contentItem.type).to.equal("string");
+        expect(contentItem).toHaveProperty("type");
+        expect(typeof contentItem.type).toBe("string");
       });
     }
   });

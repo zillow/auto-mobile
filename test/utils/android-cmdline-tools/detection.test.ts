@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { join } from "path";
 import {
   getTypicalAndroidSdkPaths,
@@ -24,149 +24,154 @@ describe("Android Command Line Tools - Detection", () => {
   });
 
   describe("ANDROID_TOOLS registry", () => {
-    it("should contain all expected tools", () => {
-      expect(ANDROID_TOOLS).to.have.property("apkanalyzer");
-      expect(ANDROID_TOOLS).to.have.property("avdmanager");
-      expect(ANDROID_TOOLS).to.have.property("sdkmanager");
-      expect(ANDROID_TOOLS).to.have.property("lint");
-      expect(ANDROID_TOOLS).to.have.property("screenshot2");
-      expect(ANDROID_TOOLS).to.have.property("d8");
-      expect(ANDROID_TOOLS).to.have.property("r8");
-      expect(ANDROID_TOOLS).to.have.property("resourceshrinker");
-      expect(ANDROID_TOOLS).to.have.property("retrace");
-      expect(ANDROID_TOOLS).to.have.property("profgen");
+    test("should contain all expected tools", () => {
+      expect(ANDROID_TOOLS).toHaveProperty("apkanalyzer");
+      expect(ANDROID_TOOLS).toHaveProperty("avdmanager");
+      expect(ANDROID_TOOLS).toHaveProperty("sdkmanager");
+      expect(ANDROID_TOOLS).toHaveProperty("lint");
+      expect(ANDROID_TOOLS).toHaveProperty("screenshot2");
+      expect(ANDROID_TOOLS).toHaveProperty("d8");
+      expect(ANDROID_TOOLS).toHaveProperty("r8");
+      expect(ANDROID_TOOLS).toHaveProperty("resourceshrinker");
+      expect(ANDROID_TOOLS).toHaveProperty("retrace");
+      expect(ANDROID_TOOLS).toHaveProperty("profgen");
     });
 
-    it("should have valid tool descriptions", () => {
+    test("should have valid tool descriptions", () => {
       Object.values(ANDROID_TOOLS).forEach((tool: any) => {
-        expect(tool.name).to.be.a("string").that.is.not.empty;
-        expect(tool.description).to.be.a("string").that.is.not.empty;
+        expect(typeof tool.name).toBe("string");
+        expect(tool.name.length).toBeGreaterThan(0);
+        expect(typeof tool.description).toBe("string");
+        expect(tool.description.length).toBeGreaterThan(0);
       });
     });
   });
 
   describe("getTypicalAndroidSdkPaths", () => {
-    it("should return macOS paths when platform is darwin", () => {
+    test("should return macOS paths when platform is darwin", () => {
       systemDetection.setPlatform("darwin");
       systemDetection.setHomeDir("/Users/testuser");
 
       const paths = getTypicalAndroidSdkPaths(systemDetection);
 
-      expect(paths).to.include("/Users/testuser/Library/Android/sdk");
-      expect(paths).to.include("/opt/android-sdk");
-      expect(paths).to.include("/usr/local/android-sdk");
+      expect(paths).toContain("/Users/testuser/Library/Android/sdk");
+      expect(paths).toContain("/opt/android-sdk");
+      expect(paths).toContain("/usr/local/android-sdk");
     });
 
-    it("should return Linux paths when platform is linux", () => {
+    test("should return Linux paths when platform is linux", () => {
       systemDetection.setPlatform("linux");
       systemDetection.setHomeDir("/home/testuser");
 
       const paths = getTypicalAndroidSdkPaths(systemDetection);
 
-      expect(paths).to.include("/home/testuser/Android/Sdk");
-      expect(paths).to.include("/opt/android-sdk");
-      expect(paths).to.include("/usr/local/android-sdk");
+      expect(paths).toContain("/home/testuser/Android/Sdk");
+      expect(paths).toContain("/opt/android-sdk");
+      expect(paths).toContain("/usr/local/android-sdk");
     });
 
-    it("should return Windows paths when platform is win32", () => {
+    test("should return Windows paths when platform is win32", () => {
       systemDetection.setPlatform("win32");
       systemDetection.setHomeDir("C:\\Users\\testuser");
 
       const paths = getTypicalAndroidSdkPaths(systemDetection);
 
-      expect(paths).to.include("C:\\Users\\testuser/AppData/Local/Android/Sdk");
-      expect(paths).to.include("C:/Android/Sdk");
-      expect(paths).to.include("C:/android-sdk");
+      expect(paths).toContain("C:\\Users\\testuser/AppData/Local/Android/Sdk");
+      expect(paths).toContain("C:/Android/Sdk");
+      expect(paths).toContain("C:/android-sdk");
     });
 
-    it("should return empty array for unknown platforms", () => {
+    test("should return empty array for unknown platforms", () => {
       systemDetection.setPlatform("unknown");
 
       const paths = getTypicalAndroidSdkPaths(systemDetection);
 
-      expect(paths).to.be.an("array").that.is.empty;
+      expect(Array.isArray(paths)).toBe(true);
+      expect(paths).toHaveLength(0);
     });
   });
 
   describe("getHomebrewAndroidToolsPath", () => {
-    it("should return null for non-macOS platforms", () => {
+    test("should return null for non-macOS platforms", () => {
       systemDetection.setPlatform("linux");
 
       const path = getHomebrewAndroidToolsPath(systemDetection);
 
-      expect(path).to.be.null;
+      expect(path).toBeNull();
     });
 
-    it("should return path when homebrew installation exists on macOS", () => {
+    test("should return path when homebrew installation exists on macOS", () => {
       systemDetection.setPlatform("darwin");
       systemDetection.addExistingFile("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest");
 
       const path = getHomebrewAndroidToolsPath(systemDetection);
 
-      expect(path).to.equal("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest");
+      expect(path).toBe("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest");
     });
 
-    it("should return null when homebrew installation does not exist on macOS", () => {
+    test("should return null when homebrew installation does not exist on macOS", () => {
       systemDetection.setPlatform("darwin");
 
       const path = getHomebrewAndroidToolsPath(systemDetection);
 
-      expect(path).to.be.null;
+      expect(path).toBeNull();
     });
   });
 
   describe("getAndroidSdkFromEnvironment", () => {
-    it("should return ANDROID_HOME path when it exists", () => {
+    test("should return ANDROID_HOME path when it exists", () => {
       systemDetection.setEnvVar("ANDROID_HOME", "/path/to/android-home");
       systemDetection.addExistingFile("/path/to/android-home");
 
       const path = getAndroidSdkFromEnvironment(systemDetection);
 
-      expect(path).to.equal("/path/to/android-home");
+      expect(path).toBe("/path/to/android-home");
     });
 
-    it("should return ANDROID_SDK_ROOT path when ANDROID_HOME does not exist", () => {
+    test("should return ANDROID_SDK_ROOT path when ANDROID_HOME does not exist", () => {
       systemDetection.setEnvVar("ANDROID_HOME", "/nonexistent/path");
       systemDetection.setEnvVar("ANDROID_SDK_ROOT", "/path/to/android-sdk-root");
       systemDetection.addExistingFile("/path/to/android-sdk-root");
 
       const path = getAndroidSdkFromEnvironment(systemDetection);
 
-      expect(path).to.equal("/path/to/android-sdk-root");
+      expect(path).toBe("/path/to/android-sdk-root");
     });
 
-    it("should return null when neither environment variable points to existing path", () => {
+    test("should return null when neither environment variable points to existing path", () => {
       systemDetection.setEnvVar("ANDROID_HOME", "/nonexistent/path1");
       systemDetection.setEnvVar("ANDROID_SDK_ROOT", "/nonexistent/path2");
 
       const path = getAndroidSdkFromEnvironment(systemDetection);
 
-      expect(path).to.be.null;
+      expect(path).toBeNull();
     });
 
-    it("should return null when no environment variables are set", () => {
+    test("should return null when no environment variables are set", () => {
       const path = getAndroidSdkFromEnvironment(systemDetection);
 
-      expect(path).to.be.null;
+      expect(path).toBeNull();
     });
   });
 
   describe("getAvailableToolsInDirectory", () => {
-    it("should return empty array when directory does not exist", () => {
+    test("should return empty array when directory does not exist", () => {
       const tools = getAvailableToolsInDirectory("/nonexistent", systemDetection);
 
-      expect(tools).to.be.an("array").that.is.empty;
+      expect(Array.isArray(tools)).toBe(true);
+      expect(tools).toHaveLength(0);
     });
 
-    it("should return empty array when bin directory does not exist", () => {
+    test("should return empty array when bin directory does not exist", () => {
       systemDetection.addExistingFile("/test/tools");
 
       const tools = getAvailableToolsInDirectory("/test/tools", systemDetection);
 
-      expect(tools).to.be.an("array").that.is.empty;
+      expect(Array.isArray(tools)).toBe(true);
+      expect(tools).toHaveLength(0);
     });
 
-    it("should return available tools when they exist in bin directory", () => {
+    test("should return available tools when they exist in bin directory", () => {
       systemDetection.addExistingFile("/test/tools");
       systemDetection.addExistingFile("/test/tools/bin");
       systemDetection.addExistingFile(join("/test/tools/bin", "apkanalyzer"));
@@ -174,12 +179,12 @@ describe("Android Command Line Tools - Detection", () => {
 
       const tools = getAvailableToolsInDirectory("/test/tools", systemDetection);
 
-      expect(tools).to.include("apkanalyzer");
-      expect(tools).to.include("sdkmanager");
-      expect(tools).to.not.include("avdmanager");
+      expect(tools).toContain("apkanalyzer");
+      expect(tools).toContain("sdkmanager");
+      expect(tools).not.toContain("avdmanager");
     });
 
-    it("should detect Windows .bat files", () => {
+    test("should detect Windows .bat files", () => {
       systemDetection.setPlatform("win32");
       systemDetection.addExistingFile("/test/tools");
       systemDetection.addExistingFile("/test/tools/bin");
@@ -187,17 +192,17 @@ describe("Android Command Line Tools - Detection", () => {
 
       const tools = getAvailableToolsInDirectory("/test/tools", systemDetection);
 
-      expect(tools).to.include("apkanalyzer");
+      expect(tools).toContain("apkanalyzer");
     });
   });
 
   describe("getBestAndroidToolsLocation", () => {
-    it("should return null for empty locations array", () => {
+    test("should return null for empty locations array", () => {
       const best = getBestAndroidToolsLocation([]);
-      expect(best).to.be.null;
+      expect(best).toBeNull();
     });
 
-    it("should prioritize homebrew over other sources", () => {
+    test("should prioritize homebrew over other sources", () => {
       const locations = [
         {
           path: "/typical/path",
@@ -212,10 +217,10 @@ describe("Android Command Line Tools - Detection", () => {
       ];
 
       const best = getBestAndroidToolsLocation(locations);
-      expect(best?.source).to.equal("homebrew");
+      expect(best?.source).toBe("homebrew");
     });
 
-    it("should prioritize locations with more available tools when source is the same", () => {
+    test("should prioritize locations with more available tools when source is the same", () => {
       const locations = [
         {
           path: "/path1",
@@ -230,10 +235,10 @@ describe("Android Command Line Tools - Detection", () => {
       ];
 
       const best = getBestAndroidToolsLocation(locations);
-      expect(best?.path).to.equal("/path2");
+      expect(best?.path).toBe("/path2");
     });
 
-    it("should handle source priority correctly", () => {
+    test("should handle source priority correctly", () => {
       const locations = [
         {
           path: "/path-typical",
@@ -248,10 +253,10 @@ describe("Android Command Line Tools - Detection", () => {
       ];
 
       const best = getBestAndroidToolsLocation(locations);
-      expect(best?.source).to.equal("android_home");
+      expect(best?.source).toBe("android_home");
     });
 
-    it("should handle all source types with correct priority", () => {
+    test("should handle all source types with correct priority", () => {
       const locations = [
         {
           path: "/manual",
@@ -276,12 +281,12 @@ describe("Android Command Line Tools - Detection", () => {
       ];
 
       const best = getBestAndroidToolsLocation(locations);
-      expect(best?.source).to.equal("homebrew");
+      expect(best?.source).toBe("homebrew");
     });
   });
 
   describe("validateRequiredTools", () => {
-    it("should return valid when all required tools are available", () => {
+    test("should return valid when all required tools are available", () => {
       const location = {
         path: "/test/path",
         source: "typical" as const,
@@ -290,11 +295,11 @@ describe("Android Command Line Tools - Detection", () => {
 
       const result = validateRequiredTools(location, ["apkanalyzer", "sdkmanager"]);
 
-      expect(result.valid).to.be.true;
-      expect(result.missing).to.be.empty;
+      expect(result.valid).toBe(true);
+      expect(result.missing).toHaveLength(0);
     });
 
-    it("should return invalid when some required tools are missing", () => {
+    test("should return invalid when some required tools are missing", () => {
       const location = {
         path: "/test/path",
         source: "typical" as const,
@@ -303,13 +308,13 @@ describe("Android Command Line Tools - Detection", () => {
 
       const result = validateRequiredTools(location, ["apkanalyzer", "sdkmanager", "avdmanager"]);
 
-      expect(result.valid).to.be.false;
-      expect(result.missing).to.include("sdkmanager");
-      expect(result.missing).to.include("avdmanager");
-      expect(result.missing).to.not.include("apkanalyzer");
+      expect(result.valid).toBe(false);
+      expect(result.missing).toContain("sdkmanager");
+      expect(result.missing).toContain("avdmanager");
+      expect(result.missing).not.toContain("apkanalyzer");
     });
 
-    it("should handle empty required tools array", () => {
+    test("should handle empty required tools array", () => {
       const location = {
         path: "/test/path",
         source: "typical" as const,
@@ -318,40 +323,41 @@ describe("Android Command Line Tools - Detection", () => {
 
       const result = validateRequiredTools(location, []);
 
-      expect(result.valid).to.be.true;
-      expect(result.missing).to.be.empty;
+      expect(result.valid).toBe(true);
+      expect(result.missing).toHaveLength(0);
     });
   });
 
   describe("detectHomebrewAndroidTools", () => {
-    it("should return null when homebrew path is not available", async () => {
+    test("should return null when homebrew path is not available", async () => {
       systemDetection.setPlatform("linux");
 
       const result = await detectHomebrewAndroidTools(systemDetection);
 
-      expect(result).to.be.null;
+      expect(result).toBeNull();
     });
 
-    it("should return null when no tools are available in homebrew path", async () => {
+    test("should return null when no tools are available in homebrew path", async () => {
       systemDetection.setPlatform("darwin");
       systemDetection.addExistingFile("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest");
 
       const result = await detectHomebrewAndroidTools(systemDetection);
 
-      expect(result).to.be.null;
+      expect(result).toBeNull();
     });
   });
 
   describe("detectAndroidSdkTools", () => {
-    it("should return empty array when no SDK paths are found", async () => {
+    test("should return empty array when no SDK paths are found", async () => {
       systemDetection.setPlatform("unknown");
 
       const result = await detectAndroidSdkTools(systemDetection);
 
-      expect(result).to.be.an("array").that.is.empty;
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(0);
     });
 
-    it("should detect tools from ANDROID_SDK_ROOT environment variable", async () => {
+    test("should detect tools from ANDROID_SDK_ROOT environment variable", async () => {
       systemDetection.setEnvVar("ANDROID_SDK_ROOT", "/android/sdk");
       systemDetection.addExistingFile("/android/sdk");
       systemDetection.addExistingFile("/android/sdk/cmdline-tools/latest");
@@ -361,25 +367,25 @@ describe("Android Command Line Tools - Detection", () => {
 
       const result = await detectAndroidSdkTools(systemDetection);
 
-      expect(result).to.have.length(1);
-      expect(result[0].source).to.equal("android_sdk_root");
-      expect(result[0].path).to.equal("/android/sdk/cmdline-tools/latest");
+      expect(result).toHaveLength(1);
+      expect(result[0].source).toBe("android_sdk_root");
+      expect(result[0].path).toBe("/android/sdk/cmdline-tools/latest");
     });
   });
 
   describe("detectAndroidCommandLineTools", () => {
-    it("should handle errors gracefully and continue detection", async () => {
+    test("should handle errors gracefully and continue detection", async () => {
       systemDetection.setPlatform("darwin");
       systemDetection.setHomeDir("/Users/test");
 
       const result = await detectAndroidCommandLineTools(systemDetection);
 
-      expect(result).to.be.an("array");
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 
   describe("Integration tests", () => {
-    it("should validate required tools correctly", () => {
+    test("should validate required tools correctly", () => {
       const location = {
         path: "/test/path",
         source: "homebrew" as const,
@@ -387,12 +393,12 @@ describe("Android Command Line Tools - Detection", () => {
       };
 
       const validationResult = validateRequiredTools(location, ["sdkmanager", "avdmanager"]);
-      expect(validationResult.valid).to.be.true;
+      expect(validationResult.valid).toBe(true);
 
       const invalidResult = validateRequiredTools(location, ["sdkmanager", "lint", "missing-tool"]);
-      expect(invalidResult.valid).to.be.false;
-      expect(invalidResult.missing).to.include("lint");
-      expect(invalidResult.missing).to.include("missing-tool");
+      expect(invalidResult.valid).toBe(false);
+      expect(invalidResult.missing).toContain("lint");
+      expect(invalidResult.missing).toContain("missing-tool");
     });
   });
 });

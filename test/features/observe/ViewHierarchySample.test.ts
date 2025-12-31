@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it } from "mocha";
+import { beforeEach, describe, expect, test } from "bun:test";
 import path from "path";
 import xml2js from "xml2js";
 import { ViewHierarchy } from "../../../src/features/observe/ViewHierarchy";
@@ -11,7 +10,6 @@ import { AccessibilityServiceClient } from "../../../src/features/observe/Access
 
 describe("ViewHierarchy - Sample Data", function() {
   // Set longer timeout for XML parsing
-  this.timeout(10000);
 
   let viewHierarchy: ViewHierarchy;
   let fakeAdb: FakeAdbExecutor;
@@ -50,7 +48,7 @@ describe("ViewHierarchy - Sample Data", function() {
     return parser.parseStringPromise(cleanedXmlData);
   }
 
-  it("should filter the map screen hierarchy and retain useful elements", async function() {
+  test("should filter the map screen hierarchy and retain useful elements", async function() {
     // Load and parse the map screen XML
     const mapScreenPath = path.join(__dirname, "../../sampleData/viewHierarchy/mapScreen.xml");
     const mapHierarchy = await readAndParseXmlFile(mapScreenPath);
@@ -59,8 +57,8 @@ describe("ViewHierarchy - Sample Data", function() {
     const filteredHierarchy = viewHierarchy.filterViewHierarchy(mapHierarchy);
 
     // Verify that filtering didn't remove all elements
-    expect(filteredHierarchy).to.exist;
-    expect(filteredHierarchy.hierarchy).to.exist;
+    expect(filteredHierarchy).toBeDefined();
+    expect(filteredHierarchy.hierarchy).toBeDefined();
 
     // Count elements in the filtered hierarchy to ensure we have some results
     let elementCount = 0;
@@ -88,7 +86,7 @@ describe("ViewHierarchy - Sample Data", function() {
 
     countElements(filteredHierarchy.hierarchy);
     logger.info(`Map screen filtered hierarchy has ${elementCount} elements`);
-    expect(elementCount).to.be.greaterThan(1, "Filtering should retain some elements");
+    expect(elementCount).toBeGreaterThan(1, "Filtering should retain some elements");
 
     // Check for specific UI elements that should be retained
     // For map screen, we'd expect to find elements like search box, map markers, etc.
@@ -111,10 +109,10 @@ describe("ViewHierarchy - Sample Data", function() {
     });
 
     logger.info(`Has search elements: ${hasSearchElements}, Has map elements: ${hasMapElements}`);
-    expect(hasSearchElements || hasMapElements).to.be.true;
+    expect(hasSearchElements || hasMapElements).toBe(true);
   });
 
-  it("should filter the favorites screen hierarchy and retain useful elements", async function() {
+  test("should filter the favorites screen hierarchy and retain useful elements", async function() {
     // Load and parse the favorites screen XML
     const favoritesScreenPath = path.join(__dirname, "../../sampleData/viewHierarchy/favoritesScreen.xml");
     const favoritesHierarchy = await readAndParseXmlFile(favoritesScreenPath);
@@ -123,8 +121,8 @@ describe("ViewHierarchy - Sample Data", function() {
     const filteredHierarchy = viewHierarchy.filterViewHierarchy(favoritesHierarchy);
 
     // Verify that filtering didn't remove all elements
-    expect(filteredHierarchy).to.exist;
-    expect(filteredHierarchy.hierarchy).to.exist;
+    expect(filteredHierarchy).toBeDefined();
+    expect(filteredHierarchy.hierarchy).toBeDefined();
 
     // Count elements in the filtered hierarchy to ensure we have some results
     let elementCount = 0;
@@ -152,7 +150,7 @@ describe("ViewHierarchy - Sample Data", function() {
 
     countElements(filteredHierarchy.hierarchy);
     logger.info(`Favorites screen filtered hierarchy has ${elementCount} elements`);
-    expect(elementCount).to.be.greaterThan(1, "Filtering should retain some elements");
+    expect(elementCount).toBeGreaterThan(1, "Filtering should retain some elements");
 
     // Check for specific UI elements that should be retained
     // For favorites screen, we'd expect to find elements like "Saved homes", buttons, etc.
@@ -175,10 +173,10 @@ describe("ViewHierarchy - Sample Data", function() {
     });
 
     logger.info(`Has saved homes elements: ${hasSavedHomesElements}, Has button elements: ${hasButtonElements}`);
-    expect(hasSavedHomesElements || hasButtonElements).to.be.true;
+    expect(hasSavedHomesElements || hasButtonElements).toBe(true);
   });
 
-  it("should verify the structure of filtered elements", async function() {
+  test("should verify the structure of filtered elements", async function() {
     const mapScreenPath = path.join(__dirname, "../../sampleData/viewHierarchy/mapScreen.xml");
     const mapHierarchy = await readAndParseXmlFile(mapScreenPath);
 
@@ -205,6 +203,6 @@ describe("ViewHierarchy - Sample Data", function() {
       }
     });
 
-    expect(hasUnwantedProperties).to.be.false, "Filtered hierarchy should not contain unwanted properties";
+    expect(hasUnwantedProperties).toBe(false), "Filtered hierarchy should not contain unwanted properties";
   });
 });

@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it, beforeEach } from "mocha";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { Idle } from "../../../src/features/observe/Idle";
 
 describe("Idle - Unit Tests", function() {
@@ -14,7 +13,7 @@ describe("Idle - Unit Tests", function() {
     const startTime = 1000;
     const hardLimitMs = 10000;
 
-    it("should return idle when touch events have been idle long enough", function() {
+    test("should return idle when touch events have been idle long enough", function() {
       const lastEventTime = 2000;
       const timeoutMs = 500;
       const currentTime = 3000; // 1000ms since last event
@@ -25,16 +24,16 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.getTouchStatus(startTime, lastEventTime, timeoutMs, hardLimitMs);
 
-      expect(result.isIdle).to.be.true;
-      expect(result.shouldContinue).to.be.false;
-      expect(result.currentElapsed).to.equal(2000); // currentTime - startTime
-      expect(result.idleTime).to.equal(1000); // currentTime - lastEventTime
+      expect(result.isIdle).toBe(true);
+      expect(result.shouldContinue).toBe(false);
+      expect(result.currentElapsed).toBe(2000); // currentTime - startTime
+      expect(result.idleTime).toBe(1000); // currentTime - lastEventTime
 
       // Restore original Date.now
       Date.now = originalDateNow;
     });
 
-    it("should return not idle when touch events are recent", function() {
+    test("should return not idle when touch events are recent", function() {
       const lastEventTime = 2800;
       const timeoutMs = 500;
       const currentTime = 3000; // 200ms since last event (< timeoutMs)
@@ -44,15 +43,15 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.getTouchStatus(startTime, lastEventTime, timeoutMs, hardLimitMs);
 
-      expect(result.isIdle).to.be.false;
-      expect(result.shouldContinue).to.be.true;
-      expect(result.currentElapsed).to.equal(2000);
-      expect(result.idleTime).to.equal(200);
+      expect(result.isIdle).toBe(false);
+      expect(result.shouldContinue).toBe(true);
+      expect(result.currentElapsed).toBe(2000);
+      expect(result.idleTime).toBe(200);
 
       Date.now = originalDateNow;
     });
 
-    it("should return shouldContinue false when hard limit is reached", function() {
+    test("should return shouldContinue false when hard limit is reached", function() {
       const lastEventTime = 2800;
       const timeoutMs = 500;
       const currentTime = 12000; // Exceeds hard limit
@@ -62,15 +61,15 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.getTouchStatus(startTime, lastEventTime, timeoutMs, hardLimitMs);
 
-      expect(result.isIdle).to.be.true; // idleTime (9200ms) > timeoutMs (500ms)
-      expect(result.shouldContinue).to.be.false; // currentElapsed (11000ms) > hardLimitMs (10000ms)
-      expect(result.currentElapsed).to.equal(11000);
-      expect(result.idleTime).to.equal(9200);
+      expect(result.isIdle).toBe(true); // idleTime (9200ms) > timeoutMs (500ms)
+      expect(result.shouldContinue).toBe(false); // currentElapsed (11000ms) > hardLimitMs (10000ms)
+      expect(result.currentElapsed).toBe(11000);
+      expect(result.idleTime).toBe(9200);
 
       Date.now = originalDateNow;
     });
 
-    it("should return shouldContinue false when hard limit is reached and not idle", function() {
+    test("should return shouldContinue false when hard limit is reached and not idle", function() {
       const lastEventTime = 11500; // Very recent event
       const timeoutMs = 5000; // Long timeout so it won't be idle
       const currentTime = 12000; // Exceeds hard limit
@@ -80,17 +79,17 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.getTouchStatus(startTime, lastEventTime, timeoutMs, hardLimitMs);
 
-      expect(result.isIdle).to.be.false; // idleTime (500ms) < timeoutMs (5000ms)
-      expect(result.shouldContinue).to.be.false; // !false && false = false (hard limit exceeded)
-      expect(result.currentElapsed).to.equal(11000);
-      expect(result.idleTime).to.equal(500);
+      expect(result.isIdle).toBe(false); // idleTime (500ms) < timeoutMs (5000ms)
+      expect(result.shouldContinue).toBe(false); // !false && false = false (hard limit exceeded)
+      expect(result.currentElapsed).toBe(11000);
+      expect(result.idleTime).toBe(500);
 
       Date.now = originalDateNow;
     });
   });
 
   describe("parseMetrics", function() {
-    it("should parse all metrics from valid gfxinfo output", function() {
+    test("should parse all metrics from valid gfxinfo output", function() {
       const stdout = `
         50th percentile: 8.5ms
         90th percentile: 12.3ms
@@ -103,16 +102,16 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.parseMetrics(stdout);
 
-      expect(result.percentile50th).to.equal(8.5);
-      expect(result.percentile90th).to.equal(12.3);
-      expect(result.percentile95th).to.equal(15.7);
-      expect(result.percentile99th).to.equal(22.1);
-      expect(result.missedVsync).to.equal(5);
-      expect(result.slowUiThread).to.equal(3);
-      expect(result.frameDeadlineMissed).to.equal(2);
+      expect(result.percentile50th).toBe(8.5);
+      expect(result.percentile90th).toBe(12.3);
+      expect(result.percentile95th).toBe(15.7);
+      expect(result.percentile99th).toBe(22.1);
+      expect(result.missedVsync).toBe(5);
+      expect(result.slowUiThread).toBe(3);
+      expect(result.frameDeadlineMissed).toBe(2);
     });
 
-    it("should handle missing metrics gracefully", function() {
+    test("should handle missing metrics gracefully", function() {
       const stdout = `
         50th percentile: 8.5ms
         Number Missed Vsync: 5
@@ -120,16 +119,16 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.parseMetrics(stdout);
 
-      expect(result.percentile50th).to.equal(8.5);
-      expect(result.percentile90th).to.be.null;
-      expect(result.percentile95th).to.be.null;
-      expect(result.percentile99th).to.be.null;
-      expect(result.missedVsync).to.equal(5);
-      expect(result.slowUiThread).to.be.null;
-      expect(result.frameDeadlineMissed).to.be.null;
+      expect(result.percentile50th).toBe(8.5);
+      expect(result.percentile90th).toBeNull();
+      expect(result.percentile95th).toBeNull();
+      expect(result.percentile99th).toBeNull();
+      expect(result.missedVsync).toBe(5);
+      expect(result.slowUiThread).toBeNull();
+      expect(result.frameDeadlineMissed).toBeNull();
     });
 
-    it("should handle integer percentiles", function() {
+    test("should handle integer percentiles", function() {
       const stdout = `
         50th percentile: 8ms
         90th percentile: 12ms
@@ -139,13 +138,13 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.parseMetrics(stdout);
 
-      expect(result.percentile50th).to.equal(8);
-      expect(result.percentile90th).to.equal(12);
-      expect(result.percentile95th).to.equal(15);
-      expect(result.percentile99th).to.equal(22);
+      expect(result.percentile50th).toBe(8);
+      expect(result.percentile90th).toBe(12);
+      expect(result.percentile95th).toBe(15);
+      expect(result.percentile99th).toBe(22);
     });
 
-    it("should return null for invalid numeric values", function() {
+    test("should return null for invalid numeric values", function() {
       const stdout = `
         50th percentile: invalidms
         Number Missed Vsync: notanumber
@@ -153,13 +152,13 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.parseMetrics(stdout);
 
-      expect(result.percentile50th).to.be.null;
-      expect(result.missedVsync).to.be.null;
+      expect(result.percentile50th).toBeNull();
+      expect(result.missedVsync).toBeNull();
     });
   });
 
   describe("calculateDeltas", function() {
-    it("should calculate correct deltas when both current and previous values exist", function() {
+    test("should calculate correct deltas when both current and previous values exist", function() {
       const current = {
         missedVsync: 10,
         slowUiThread: 5,
@@ -173,12 +172,12 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.calculateDeltas(current, previous);
 
-      expect(result.missedVsyncDelta).to.equal(3);
-      expect(result.slowUiThreadDelta).to.equal(3);
-      expect(result.frameDeadlineMissedDelta).to.equal(2);
+      expect(result.missedVsyncDelta).toBe(3);
+      expect(result.slowUiThreadDelta).toBe(3);
+      expect(result.frameDeadlineMissedDelta).toBe(2);
     });
 
-    it("should return zero deltas when previous values are null", function() {
+    test("should return zero deltas when previous values are null", function() {
       const current = {
         missedVsync: 10,
         slowUiThread: 5,
@@ -192,12 +191,12 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.calculateDeltas(current, previous);
 
-      expect(result.missedVsyncDelta).to.equal(0);
-      expect(result.slowUiThreadDelta).to.equal(0);
-      expect(result.frameDeadlineMissedDelta).to.equal(0);
+      expect(result.missedVsyncDelta).toBe(0);
+      expect(result.slowUiThreadDelta).toBe(0);
+      expect(result.frameDeadlineMissedDelta).toBe(0);
     });
 
-    it("should return zero deltas when current values are null", function() {
+    test("should return zero deltas when current values are null", function() {
       const current = {
         missedVsync: null,
         slowUiThread: null,
@@ -211,12 +210,12 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.calculateDeltas(current, previous);
 
-      expect(result.missedVsyncDelta).to.equal(0);
-      expect(result.slowUiThreadDelta).to.equal(0);
-      expect(result.frameDeadlineMissedDelta).to.equal(0);
+      expect(result.missedVsyncDelta).toBe(0);
+      expect(result.slowUiThreadDelta).toBe(0);
+      expect(result.frameDeadlineMissedDelta).toBe(0);
     });
 
-    it("should handle mixed null and valid values", function() {
+    test("should handle mixed null and valid values", function() {
       const current = {
         missedVsync: 10,
         slowUiThread: null,
@@ -230,14 +229,14 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.calculateDeltas(current, previous);
 
-      expect(result.missedVsyncDelta).to.equal(3);
-      expect(result.slowUiThreadDelta).to.equal(0);
-      expect(result.frameDeadlineMissedDelta).to.equal(0);
+      expect(result.missedVsyncDelta).toBe(3);
+      expect(result.slowUiThreadDelta).toBe(0);
+      expect(result.frameDeadlineMissedDelta).toBe(0);
     });
   });
 
   describe("checkStabilityCriteria", function() {
-    it("should return true when all criteria are met", function() {
+    test("should return true when all criteria are met", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
@@ -251,10 +250,10 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
 
-      expect(result).to.be.true;
+      expect(result).toBe(true);
     });
 
-    it("should return false when deltas are non-zero", function() {
+    test("should return false when deltas are non-zero", function() {
       const deltas = {
         missedVsyncDelta: 1,
         slowUiThreadDelta: 0,
@@ -268,10 +267,10 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
 
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
 
-    it("should return false when 50th percentile exceeds threshold", function() {
+    test("should return false when 50th percentile exceeds threshold", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
@@ -285,10 +284,10 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
 
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
 
-    it("should return false when 90th percentile exceeds threshold", function() {
+    test("should return false when 90th percentile exceeds threshold", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
@@ -302,10 +301,10 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
 
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
 
-    it("should return false when 95th percentile exceeds threshold", function() {
+    test("should return false when 95th percentile exceeds threshold", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
@@ -319,10 +318,10 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
 
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
 
-    it("should handle null percentiles as zero", function() {
+    test("should handle null percentiles as zero", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
@@ -336,10 +335,10 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
 
-      expect(result).to.be.true; // null values become 0, which passes thresholds
+      expect(result).toBe(true); // null values become 0, which passes thresholds
     });
 
-    it("should handle fractional percentiles by flooring them", function() {
+    test("should handle fractional percentiles by flooring them", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
@@ -353,68 +352,68 @@ describe("Idle - Unit Tests", function() {
 
       const result = idle.checkStabilityCriteria(deltas, percentiles);
 
-      expect(result).to.be.true;
+      expect(result).toBe(true);
     });
   });
 
   describe("extractMetric", function() {
-    it("should extract valid numeric value", function() {
+    test("should extract valid numeric value", function() {
       const output = "50th percentile: 8.5ms";
       const regex = /50th percentile:\s+(\d+(?:\.\d+)?)ms/;
 
       const result = idle.extractMetric(output, regex);
 
-      expect(result).to.equal(8.5);
+      expect(result).toBe(8.5);
     });
 
-    it("should extract integer value", function() {
+    test("should extract integer value", function() {
       const output = "Number Missed Vsync: 5";
       const regex = /Number Missed Vsync:\s+(\d+)/;
 
       const result = idle.extractMetric(output, regex);
 
-      expect(result).to.equal(5);
+      expect(result).toBe(5);
     });
 
-    it("should return null when regex doesn't match", function() {
+    test("should return null when regex doesn't match", function() {
       const output = "Some other text";
       const regex = /50th percentile:\s+(\d+(?:\.\d+)?)ms/;
 
       const result = idle.extractMetric(output, regex);
 
-      expect(result).to.be.null;
+      expect(result).toBeNull();
     });
 
-    it("should return null when captured value is not a number", function() {
+    test("should return null when captured value is not a number", function() {
       const output = "50th percentile: invalidms";
       const regex = /50th percentile:\s+(\w+)ms/;
 
       const result = idle.extractMetric(output, regex);
 
-      expect(result).to.be.null;
+      expect(result).toBeNull();
     });
 
-    it("should return null when regex match exists but no capture group", function() {
+    test("should return null when regex match exists but no capture group", function() {
       const output = "50th percentile: 8.5ms";
       const regex = /50th percentile:/; // No capture group
 
       const result = idle.extractMetric(output, regex);
 
-      expect(result).to.be.null;
+      expect(result).toBeNull();
     });
 
-    it("should handle zero values correctly", function() {
+    test("should handle zero values correctly", function() {
       const output = "Number Missed Vsync: 0";
       const regex = /Number Missed Vsync:\s+(\d+)/;
 
       const result = idle.extractMetric(output, regex);
 
-      expect(result).to.equal(0);
+      expect(result).toBe(0);
     });
   });
 
   describe("isSystemLauncher", function() {
-    it("should identify Android system UI packages", function() {
+    test("should identify Android system UI packages", function() {
       const systemPackages = [
         "com.android.systemui",
         "com.android.launcher3",
@@ -429,11 +428,11 @@ describe("Idle - Unit Tests", function() {
       systemPackages.forEach(packageName => {
         // Access the private method via any type casting for testing
         const result = (idle as any).isSystemLauncher(packageName);
-        expect(result, `Expected ${packageName} to be identified as system package`).to.be.true;
+        expect(result, `Expected ${packageName} to be identified as system package`).toBe(true);
       });
     });
 
-    it("should not identify regular app packages as system packages", function() {
+    test("should not identify regular app packages as system packages", function() {
       const regularPackages = [
         "com.example.myapp",
         "com.google.android.apps.photos",
@@ -445,11 +444,11 @@ describe("Idle - Unit Tests", function() {
 
       regularPackages.forEach(packageName => {
         const result = (idle as any).isSystemLauncher(packageName);
-        expect(result, `Expected ${packageName} to NOT be identified as system package`).to.be.false;
+        expect(result, `Expected ${packageName} to NOT be identified as system package`).toBe(false);
       });
     });
 
-    it("should handle partial package name matches for launchers", function() {
+    test("should handle partial package name matches for launchers", function() {
       const partialMatches = [
         "com.sec.android.app.launcher.homescreen", // Contains launcher
         "com.miui.home.settings", // Contains miui.home
@@ -458,16 +457,16 @@ describe("Idle - Unit Tests", function() {
 
       partialMatches.forEach(packageName => {
         const result = (idle as any).isSystemLauncher(packageName);
-        expect(result, `Expected ${packageName} to be identified as system package (partial match)`).to.be.true;
+        expect(result, `Expected ${packageName} to be identified as system package (partial match)`).toBe(true);
       });
     });
 
-    it("should handle empty or invalid package names", function() {
+    test("should handle empty or invalid package names", function() {
       const invalidPackages = ["", null, undefined];
 
       invalidPackages.forEach(packageName => {
         const result = (idle as any).isSystemLauncher(packageName);
-        expect(result, `Expected ${packageName} to NOT be identified as system package`).to.be.false;
+        expect(result, `Expected ${packageName} to NOT be identified as system package`).toBe(false);
       });
     });
   });

@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "mocha";
-import { expect } from "chai";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   ListResourcesRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
@@ -19,8 +18,7 @@ describe("MCP Resources List", () => {
     }
   });
 
-  it("given no resources are registered, endpoint should return an empty list", async function() {
-    this.timeout(5000);
+  test("given no resources are registered, endpoint should return an empty list", async function() {
 
     const { client } = fixture.getContext();
 
@@ -41,14 +39,13 @@ describe("MCP Resources List", () => {
     }, listResourcesResponseSchema);
 
     // Verify empty resources list
-    expect(result).to.be.an("object");
-    expect(result).to.have.property("resources");
-    expect(result.resources).to.be.an("array");
-    expect(result.resources).to.have.length(0);
+    expect(typeof result).toBe("object");
+    expect(result).toHaveProperty("resources");
+    expect(Array.isArray(result.resources)).toBe(true);
+    expect(result.resources).toHaveLength(0);
   });
 
-  it("given a resource is registered, endpoint should return a list with that resource", async function() {
-    this.timeout(5000);
+  test("given a resource is registered, endpoint should return a list with that resource", async function() {
 
     // For this test, we need to mock or implement a resource registration
     // Since the current server doesn't have resource registration functionality,
@@ -89,16 +86,16 @@ describe("MCP Resources List", () => {
     }, listResourcesResponseSchema);
 
     // Verify resources list contains the test resource
-    expect(result).to.be.an("object");
-    expect(result).to.have.property("resources");
-    expect(result.resources).to.be.an("array");
-    expect(result.resources).to.have.length(1);
+    expect(typeof result).toBe("object");
+    expect(result).toHaveProperty("resources");
+    expect(Array.isArray(result.resources)).toBe(true);
+    expect(result.resources).toHaveLength(1);
 
     // Verify the resource has required properties
     const resource = result.resources[0];
-    expect(resource).to.have.property("uri", testResource.uri);
-    expect(resource).to.have.property("name", testResource.name);
-    expect(resource).to.have.property("description", testResource.description);
-    expect(resource).to.have.property("mimeType", testResource.mimeType);
+    expect(resource).toHaveProperty("uri", testResource.uri);
+    expect(resource).toHaveProperty("name", testResource.name);
+    expect(resource).toHaveProperty("description", testResource.description);
+    expect(resource).toHaveProperty("mimeType", testResource.mimeType);
   });
 });

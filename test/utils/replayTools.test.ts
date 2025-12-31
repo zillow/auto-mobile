@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import path from "path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { LOG_DIR } from "../../src/utils/constants";
@@ -22,7 +22,7 @@ describe("Replay Tools", () => {
     serverStub = {} as McpServer;
   });
 
-  it("should replay a single tool call", async () => {
+  test("should replay a single tool call", async () => {
     // Prepare test data
     const logFilePath = path.join(LOG_DIR, "test-call.json");
     const toolCall = {
@@ -48,12 +48,12 @@ describe("Replay Tools", () => {
     const result = await replayToolsService.replayToolCall(serverStub, logFilePath);
 
     // Verify results
-    expect(result).to.be.true;
-    expect(handlerWasCalled).to.be.true;
-    expect(handlerParams).to.deep.equal(toolCall.params);
+    expect(result).toBe(true);
+    expect(handlerWasCalled).toBe(true);
+    expect(handlerParams).toEqual(toolCall.params);
   });
 
-  it("should handle file not found when replaying tool call", async () => {
+  test("should handle file not found when replaying tool call", async () => {
     // File system is configured to not have the file by default
     const logFilePath = "nonexistent.json";
     fakeFileSystem.setExists(logFilePath, false);
@@ -62,10 +62,10 @@ describe("Replay Tools", () => {
     const result = await replayToolsService.replayToolCall(serverStub, logFilePath);
 
     // Verify results
-    expect(result).to.be.false;
+    expect(result).toBe(false);
   });
 
-  it("should handle tool not found error", async () => {
+  test("should handle tool not found error", async () => {
     // Prepare test data
     const logFilePath = path.join(LOG_DIR, "test-call.json");
     const toolCall = {
@@ -89,11 +89,11 @@ describe("Replay Tools", () => {
     const result = await replayToolsService.replayToolCall(serverStub, logFilePath);
 
     // Verify results
-    expect(result).to.be.false;
-    expect(handlerWasCalled).to.be.false;
+    expect(result).toBe(false);
+    expect(handlerWasCalled).toBe(false);
   });
 
-  it("should replay a session of tool calls", async () => {
+  test("should replay a session of tool calls", async () => {
     // Prepare test data
     const sessionId = "test-session";
     const sessionFilePath = path.join(LOG_DIR, `session_${sessionId}.json`);
@@ -133,17 +133,17 @@ describe("Replay Tools", () => {
     const result = await replayToolsService.replayToolSession(serverStub, sessionId);
 
     // Verify results
-    expect(result).to.be.true;
-    expect(handlerCalls.length).to.equal(toolCalls.length);
+    expect(result).toBe(true);
+    expect(handlerCalls.length).toBe(toolCalls.length);
 
     // Verify each tool call was correct
     for (let i = 0; i < toolCalls.length; i++) {
-      expect(handlerCalls[i].toolName).to.equal(toolCalls[i].tool);
-      expect(handlerCalls[i].params).to.deep.equal(toolCalls[i].params);
+      expect(handlerCalls[i].toolName).toBe(toolCalls[i].tool);
+      expect(handlerCalls[i].params).toEqual(toolCalls[i].params);
     }
   });
 
-  it("should list all tool logs", async () => {
+  test("should list all tool logs", async () => {
     // Prepare test data
     const logFiles = ["log1.json", "log2.json", "session_abc.json"];
 
@@ -157,13 +157,13 @@ describe("Replay Tools", () => {
     const logs = await replayToolsService.listToolLogs();
 
     // Verify results
-    expect(logs.length).to.equal(logFiles.length);
+    expect(logs.length).toBe(logFiles.length);
     for (let i = 0; i < logFiles.length; i++) {
-      expect(logs[i]).to.equal(path.join(LOG_DIR, logFiles[i]));
+      expect(logs[i]).toBe(path.join(LOG_DIR, logFiles[i]));
     }
   });
 
-  it("should handle directory not found when listing logs", async () => {
+  test("should handle directory not found when listing logs", async () => {
     // Setup fakes - log directory does not exist
     fakeFileSystem.setExists(LOG_DIR, false);
 
@@ -171,6 +171,7 @@ describe("Replay Tools", () => {
     const logs = await replayToolsService.listToolLogs();
 
     // Verify results
-    expect(logs).to.be.an("array").that.is.empty;
+    expect(Array.isArray(logs)).toBe(true);
+    expect(logs).toHaveLength(0);
   });
 });

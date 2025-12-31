@@ -1,7 +1,0 @@
-{
-  "require": "esbuild-register",
-  "extensions": [
-    "ts"
-  ],
-  "spec": "test/**/*.ts"
-}

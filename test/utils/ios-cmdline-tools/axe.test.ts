@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { AxeClient } from "../../../src/utils/ios-cmdline-tools/AxeClient";
 import { BootedDevice, ExecResult } from "../../../src/models";
 
@@ -29,7 +29,7 @@ describe("Axe", function() {
   });
 
   describe("isAvailable", function() {
-    it("should return true when axe is available", async function() {
+    test("should return true when axe is available", async function() {
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         if (command.includes("axe --help")) {
           return {
@@ -46,10 +46,10 @@ describe("Axe", function() {
       axe = new AxeClient(null, mockExecAsync);
 
       const available = await axe.isAvailable();
-      expect(available).to.be.true;
+      expect(available).toBe(true);
     });
 
-    it("should return false when axe is not available", async function() {
+    test("should return false when axe is not available", async function() {
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         throw new Error("Command not found: axe");
       };
@@ -57,12 +57,12 @@ describe("Axe", function() {
       axe = new AxeClient(null, mockExecAsync);
 
       const available = await axe.isAvailable();
-      expect(available).to.be.false;
+      expect(available).toBe(false);
     });
   });
 
   describe("executeCommand", function() {
-    it("should execute axe commands with device UDID", async function() {
+    test("should execute axe commands with device UDID", async function() {
       let executedCommand = "";
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         executedCommand = command;
@@ -78,10 +78,10 @@ describe("Axe", function() {
       axe = new AxeClient(mockDevice, mockExecAsync);
       await axe.executeCommand("describe-ui");
 
-      expect(executedCommand).to.equal("axe describe-ui --udid test-ios-device-id");
+      expect(executedCommand).toBe("axe describe-ui --udid test-ios-device-id");
     });
 
-    it("should execute axe commands without UDID when no device is set", async function() {
+    test("should execute axe commands without UDID when no device is set", async function() {
       let executedCommand = "";
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         executedCommand = command;
@@ -97,12 +97,12 @@ describe("Axe", function() {
       axe = new AxeClient(null, mockExecAsync);
       await axe.executeCommand("describe-ui");
 
-      expect(executedCommand).to.equal("axe describe-ui");
+      expect(executedCommand).toBe("axe describe-ui");
     });
   });
 
   describe("tap", function() {
-    it("should execute tap command with coordinates", async function() {
+    test("should execute tap command with coordinates", async function() {
       let executedCommand = "";
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         executedCommand = command;
@@ -118,7 +118,7 @@ describe("Axe", function() {
       axe = new AxeClient(mockDevice, mockExecAsync);
       await axe.tap(100, 200);
 
-      expect(executedCommand).to.equal("axe tap -x 100 -y 200 --udid test-ios-device-id");
+      expect(executedCommand).toBe("axe tap -x 100 -y 200 --udid test-ios-device-id");
     });
   });
 });

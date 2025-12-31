@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "mocha";
-import { expect } from "chai";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../fixtures/mcpTestFixture";
 
 describe("MCP Server Initialization", () => {
@@ -16,7 +15,7 @@ describe("MCP Server Initialization", () => {
     }
   });
 
-  it("should handle initialize endpoint request", async function() {
+  test("should handle initialize endpoint request", async function() {
     const { client } = fixture.getContext();
 
     // Send initialize request
@@ -48,17 +47,17 @@ describe("MCP Server Initialization", () => {
     }, initializeResponseSchema);
 
     // Verify initialize response structure
-    expect(result).to.be.an("object");
-    expect(result).to.have.property("capabilities");
-    expect(result).to.have.property("serverInfo");
+    expect(typeof result).toBe("object");
+    expect(result).toHaveProperty("capabilities");
+    expect(result).toHaveProperty("serverInfo");
 
     // Verify capabilities structure
-    expect(result.capabilities).to.have.property("resources");
-    expect(result.capabilities).to.have.property("tools");
+    expect(result.capabilities).toHaveProperty("resources");
+    expect(result.capabilities).toHaveProperty("tools");
 
     // Verify server info
-    expect(result.serverInfo).to.have.property("name", "AutoMobile");
-    expect(result.serverInfo).to.have.property("version", "0.0.1");
+    expect(result.serverInfo).toHaveProperty("name", "AutoMobile");
+    expect(result.serverInfo).toHaveProperty("version", "0.0.1");
   });
 
 });

@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it, beforeEach } from "mocha";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { TouchLatencyTracker } from "../../../src/features/performance/TouchLatencyTracker";
 import { BootedDevice, ScreenSize } from "../../../src/models";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
@@ -28,7 +27,7 @@ describe("TouchLatencyTracker - Unit Tests", function() {
   });
 
   describe("selectSafeTouchLocation", function() {
-    it("should select a location in the top-right corner", function() {
+    test("should select a location in the top-right corner", function() {
       adb = new AdbClient(device, async () => ({ stdout: "", stderr: "" }));
       tracker = new TouchLatencyTracker(device, adb);
 
@@ -36,24 +35,24 @@ describe("TouchLatencyTracker - Unit Tests", function() {
       const location = (tracker as any).selectSafeTouchLocation(screenSize);
 
       // Should be at 95% width and 2% height (status bar area)
-      expect(location.x).to.equal(Math.floor(1080 * 0.95)); // 1026
-      expect(location.y).to.equal(Math.floor(1920 * 0.02)); // 38
+      expect(location.x).toBe(Math.floor(1080 * 0.95)); // 1026
+      expect(location.y).toBe(Math.floor(1920 * 0.02)); // 38
     });
 
-    it("should handle different screen sizes", function() {
+    test("should handle different screen sizes", function() {
       adb = new AdbClient(device, async () => ({ stdout: "", stderr: "" }));
       tracker = new TouchLatencyTracker(device, adb);
 
       const smallScreen: ScreenSize = { width: 720, height: 1280 };
       const location = (tracker as any).selectSafeTouchLocation(smallScreen);
 
-      expect(location.x).to.equal(Math.floor(720 * 0.95)); // 684
-      expect(location.y).to.equal(Math.floor(1280 * 0.02)); // 25
+      expect(location.x).toBe(Math.floor(720 * 0.95)); // 684
+      expect(location.y).toBe(Math.floor(1280 * 0.02)); // 25
     });
   });
 
   describe("measureLatency", function() {
-    it("should return successful result when frame activity is detected", async function() {
+    test("should return successful result when frame activity is detected", async function() {
       // Set up fake ADB responses
       let callCount = 0;
 
@@ -110,14 +109,14 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         perf
       );
 
-      expect(result.success).to.be.true;
-      expect(result.latencyMs).to.be.greaterThan(0);
-      expect(result.sampleCount).to.equal(1);
-      expect(result.touchCoordinates.x).to.be.greaterThan(0);
-      expect(result.touchCoordinates.y).to.be.greaterThan(0);
+      expect(result.success).toBe(true);
+      expect(result.latencyMs).toBeGreaterThan(0);
+      expect(result.sampleCount).toBe(1);
+      expect(result.touchCoordinates.x).toBeGreaterThan(0);
+      expect(result.touchCoordinates.y).toBeGreaterThan(0);
     });
 
-    it("should calculate median from multiple samples", async function() {
+    test("should calculate median from multiple samples", async function() {
       let callCount = 0;
 
       adb = new AdbClient(device, async (command: string) => {
@@ -164,12 +163,12 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         perf
       );
 
-      expect(result.success).to.be.true;
-      expect(result.sampleCount).to.equal(3);
-      expect(result.latencyMs).to.be.greaterThan(0);
+      expect(result.success).toBe(true);
+      expect(result.sampleCount).toBe(3);
+      expect(result.latencyMs).toBeGreaterThan(0);
     });
 
-    it("should handle timeout when no frame activity detected", async function() {
+    test("should handle timeout when no frame activity detected", async function() {
       adb = new AdbClient(device, async (command: string) => {
         if (command.includes("dumpsys gfxinfo")) {
           if (command.includes("reset")) {
@@ -201,12 +200,12 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         perf
       );
 
-      expect(result.success).to.be.false;
-      expect(result.sampleCount).to.equal(0);
-      expect(result.error).to.include("No successful measurements");
+      expect(result.success).toBe(false);
+      expect(result.sampleCount).toBe(0);
+      expect(result.error).toContain("No successful measurements");
     });
 
-    it("should detect frame activity via slowUiThread increase", async function() {
+    test("should detect frame activity via slowUiThread increase", async function() {
       let callCount = 0;
 
       adb = new AdbClient(device, async (command: string) => {
@@ -251,11 +250,11 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         perf
       );
 
-      expect(result.success).to.be.true;
-      expect(result.latencyMs).to.be.greaterThan(0);
+      expect(result.success).toBe(true);
+      expect(result.latencyMs).toBeGreaterThan(0);
     });
 
-    it("should detect frame activity via frameDeadlineMissed increase", async function() {
+    test("should detect frame activity via frameDeadlineMissed increase", async function() {
       let callCount = 0;
 
       adb = new AdbClient(device, async (command: string) => {
@@ -300,11 +299,11 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         perf
       );
 
-      expect(result.success).to.be.true;
-      expect(result.latencyMs).to.be.greaterThan(0);
+      expect(result.success).toBe(true);
+      expect(result.latencyMs).toBeGreaterThan(0);
     });
 
-    it("should handle errors gracefully and return error result", async function() {
+    test("should handle errors gracefully and return error result", async function() {
       adb = new AdbClient(device, async (command: string) => {
         throw new Error("ADB connection failed");
       });
@@ -318,8 +317,8 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         perf
       );
 
-      expect(result.success).to.be.false;
-      expect(result.error).to.include("ADB connection failed");
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("ADB connection failed");
     });
   });
 });

@@ -4,10 +4,6 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { LaunchApp } from "../features/action/LaunchApp";
-import { TapOnElement } from "../features/action/TapOnElement";
-import { PressButton } from "../features/action/PressButton";
-import { TerminateApp } from "../features/action/TerminateApp";
 import { BootedDevice } from "../models";
 import { APK_URL, APK_SHA256_CHECKSUM } from "../constants/release";
 
@@ -291,6 +287,12 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   async enable(): Promise<void> {
     try {
       logger.info("Enabling Accessibility Service input method");
+
+      // Use dynamic imports to avoid circular dependency
+      const { TerminateApp } = await import("../features/action/TerminateApp");
+      const { LaunchApp } = await import("../features/action/LaunchApp");
+      const { TapOnElement } = await import("../features/action/TapOnElement");
+      const { PressButton } = await import("../features/action/PressButton");
 
       await new TerminateApp(this.device).execute(AndroidAccessibilityServiceManager.PACKAGE);
 

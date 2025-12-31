@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { GetDeepLinks } from "../../../src/features/utility/GetDeepLinks";
 import { DeepLinkManager } from "../../../src/utils/DeepLinkManager";
 import { DeepLinkResult } from "../../../src/models";
@@ -40,49 +40,49 @@ describe("GetDeepLinks", () => {
   });
 
   describe("constructor", () => {
-    it("should create GetDeepLinks with device ID", () => {
+    test("should create GetDeepLinks with device ID", () => {
       const instance = new GetDeepLinks("test-device");
-      expect(instance).to.be.instanceOf(GetDeepLinks);
+      expect(instance).toBeInstanceOf(GetDeepLinks);
     });
 
-    it("should create GetDeepLinks without device ID", () => {
+    test("should create GetDeepLinks without device ID", () => {
       const instance = new GetDeepLinks();
-      expect(instance).to.be.instanceOf(GetDeepLinks);
+      expect(instance).toBeInstanceOf(GetDeepLinks);
     });
   });
 
   describe("execute", () => {
-    it("should successfully get deep links for a valid app ID", async () => {
+    test("should successfully get deep links for a valid app ID", async () => {
       const result = await getDeepLinks.execute("com.example.app");
 
-      expect(result.success).to.be.true;
-      expect(result.appId).to.equal("com.example.app");
-      expect(result.deepLinks.schemes).to.deep.equal(["https", "myapp"]);
-      expect(result.deepLinks.hosts).to.deep.equal(["example.com", "app.example.com"]);
-      expect(result.deepLinks.intentFilters).to.have.length(1);
-      expect(result.deepLinks.supportedMimeTypes).to.deep.equal(["text/plain"]);
-      expect(result.rawOutput).to.equal("mock output");
+      expect(result.success).toBe(true);
+      expect(result.appId).toBe("com.example.app");
+      expect(result.deepLinks.schemes).toEqual(["https", "myapp"]);
+      expect(result.deepLinks.hosts).toEqual(["example.com", "app.example.com"]);
+      expect(result.deepLinks.intentFilters).toHaveLength(1);
+      expect(result.deepLinks.supportedMimeTypes).toEqual(["text/plain"]);
+      expect(result.rawOutput).toBe("mock output");
     });
 
-    it("should handle empty app ID", async () => {
+    test("should handle empty app ID", async () => {
       const result = await getDeepLinks.execute("");
 
-      expect(result.success).to.be.false;
-      expect(result.error).to.include("App ID cannot be empty");
-      expect(result.deepLinks.schemes).to.be.empty;
-      expect(result.deepLinks.hosts).to.be.empty;
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("App ID cannot be empty");
+      expect(result.deepLinks.schemes).toHaveLength(0);
+      expect(result.deepLinks.hosts).toHaveLength(0);
     });
 
-    it("should handle whitespace-only app ID", async () => {
+    test("should handle whitespace-only app ID", async () => {
       const result = await getDeepLinks.execute("   ");
 
-      expect(result.success).to.be.false;
-      expect(result.error).to.include("App ID cannot be empty");
-      expect(result.deepLinks.schemes).to.be.empty;
-      expect(result.deepLinks.hosts).to.be.empty;
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("App ID cannot be empty");
+      expect(result.deepLinks.schemes).toHaveLength(0);
+      expect(result.deepLinks.hosts).toHaveLength(0);
     });
 
-    it("should handle deep link manager failures", async () => {
+    test("should handle deep link manager failures", async () => {
       // Mock a failing deep link manager
       mockDeepLinkManager.getDeepLinks = async () => {
         throw new Error("Deep link query failed");
@@ -90,13 +90,13 @@ describe("GetDeepLinks", () => {
 
       const result = await getDeepLinks.execute("com.example.app");
 
-      expect(result.success).to.be.false;
-      expect(result.error).to.include("Deep link query failed");
-      expect(result.appId).to.equal("com.example.app");
-      expect(result.deepLinks.schemes).to.be.empty;
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Deep link query failed");
+      expect(result.appId).toBe("com.example.app");
+      expect(result.deepLinks.schemes).toHaveLength(0);
     });
 
-    it("should handle deep link manager returning failure result", async () => {
+    test("should handle deep link manager returning failure result", async () => {
       const failureResult: DeepLinkResult = {
         success: false,
         appId: "com.example.app",
@@ -113,19 +113,19 @@ describe("GetDeepLinks", () => {
 
       const result = await getDeepLinks.execute("com.example.app");
 
-      expect(result.success).to.be.false;
-      expect(result.error).to.equal("Package not found");
-      expect(result.deepLinks.schemes).to.be.empty;
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Package not found");
+      expect(result.deepLinks.schemes).toHaveLength(0);
     });
 
-    it("should log successful execution", async () => {
+    test("should log successful execution", async () => {
       // This test verifies that the method completes without throwing
       // and returns the expected successful result structure
       const result = await getDeepLinks.execute("com.example.app");
 
-      expect(result.success).to.be.true;
-      expect(result.deepLinks.schemes).to.have.length.greaterThan(0);
-      expect(result.deepLinks.hosts).to.have.length.greaterThan(0);
+      expect(result.success).toBe(true);
+      expect(result.deepLinks.schemes.length).toBeGreaterThan(0);
+      expect(result.deepLinks.hosts.length).toBeGreaterThan(0);
     });
   });
 });

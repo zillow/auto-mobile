@@ -1,4 +1,4 @@
-import { assert } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { HomeScreen } from "../../../src/features/action/HomeScreen";
 import { ObserveResult } from "../../../src/models";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
@@ -48,20 +48,20 @@ describe("HomeScreen", () => {
   });
 
   describe("execute", () => {
-    it("should execute hardware navigation using keyevent 3", async () => {
+    test("should execute hardware navigation using keyevent 3", async () => {
       fakeAdb.setCommandResponse("shell input keyevent 3", { stdout: "", stderr: "" });
 
       const result = await homeScreen.execute();
-      assert.isTrue(result.success);
-      assert.equal(result.navigationMethod, "hardware");
-      assert.isDefined(result.observation);
+      expect(result.success).toBe(true);
+      expect(result.navigationMethod).toBe("hardware");
+      expect(result.observation).toBeDefined();
 
       // Verify hardware home button keyevent was executed
       const executedCommands = fakeAdb.getExecutedCommands();
-      assert.isTrue(executedCommands.some(cmd => cmd.includes("shell input keyevent 3")));
+      expect(executedCommands.some(cmd => cmd.includes("shell input keyevent 3"))).toBe(true);
     });
 
-    it("should work with progress callback", async () => {
+    test("should work with progress callback", async () => {
       fakeAdb.setCommandResponse("shell input keyevent 3", { stdout: "", stderr: "" });
 
       const progressCallback = async () => {
@@ -69,36 +69,36 @@ describe("HomeScreen", () => {
       };
       const result = await homeScreen.execute(progressCallback);
 
-      assert.isTrue(result.success);
-      assert.equal(result.navigationMethod, "hardware");
+      expect(result.success).toBe(true);
+      expect(result.navigationMethod).toBe("hardware");
     });
 
-    it("should include observation in result", async () => {
+    test("should include observation in result", async () => {
       fakeAdb.setCommandResponse("shell input keyevent 3", { stdout: "", stderr: "" });
 
       const result = await homeScreen.execute();
 
-      assert.isTrue(result.success);
-      assert.isDefined(result.observation);
-      assert.isDefined(result.observation?.screenSize);
+      expect(result.success).toBe(true);
+      expect(result.observation).toBeDefined();
+      expect(result.observation?.screenSize).toBeDefined();
     });
   });
 
   describe("error handling", () => {
-    it("should propagate errors when hardware navigation fails", async () => {
+    test("should propagate errors when hardware navigation fails", async () => {
       fakeAdb.setCommandResponse("shell input keyevent 3", { stdout: "", stderr: "Hardware failed" });
 
       try {
         await homeScreen.execute();
-        assert.fail("Should have thrown an error");
+        throw new Error("Should have thrown an error");
       } catch (error) {
-        assert.isDefined(error);
+        expect(error).toBeDefined();
       }
     });
   });
 
   describe("multiple devices", () => {
-    it("should work with different device IDs", async () => {
+    test("should work with different device IDs", async () => {
       const homeScreen2 = new HomeScreen("device-2", fakeAdb);
 
       // Set up fakes for the second HomeScreen instance
@@ -119,10 +119,10 @@ describe("HomeScreen", () => {
       const result1 = await homeScreen.execute();
       const result2 = await homeScreen2.execute();
 
-      assert.isTrue(result1.success);
-      assert.isTrue(result2.success);
-      assert.equal(result1.navigationMethod, "hardware");
-      assert.equal(result2.navigationMethod, "hardware");
+      expect(result1.success).toBe(true);
+      expect(result2.success).toBe(true);
+      expect(result1.navigationMethod).toBe("hardware");
+      expect(result2.navigationMethod).toBe("hardware");
     });
   });
 });

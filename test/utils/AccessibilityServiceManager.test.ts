@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it, beforeEach } from "mocha";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { AdbClient } from "../../src/utils/android-cmdline-tools/AdbClient";
@@ -42,27 +41,27 @@ describe("AccessibilityServiceManager", function() {
   });
 
   describe("isInstalled", function() {
-    it("should return true when accessibility service package is installed", async function() {
+    test("should return true when accessibility service package is installed", async function() {
       fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
         stderr: ""
       });
 
       const result = await accessibilityServiceClient.isInstalled();
-      expect(result).to.be.true;
+      expect(result).toBe(true);
     });
 
-    it("should return false when accessibility service package is not installed", async function() {
+    test("should return false when accessibility service package is not installed", async function() {
       fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: "",
         stderr: ""
       });
 
       const result = await accessibilityServiceClient.isInstalled();
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
 
-    it("should return false when ADB command fails", async function() {
+    test("should return false when ADB command fails", async function() {
       // FakeAdbExecutor doesn't throw by default, so we set it to return empty
       fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: "",
@@ -70,44 +69,44 @@ describe("AccessibilityServiceManager", function() {
       });
 
       const result = await accessibilityServiceClient.isInstalled();
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
   });
 
   describe("isEnabled", function() {
-    it("should return true when accessibility service is enabled", async function() {
+    test("should return true when accessibility service is enabled", async function() {
       fakeAdb.setCommandResponse("settings get secure", {
         stdout: `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutomobileAccessibilityService:other.service/SomeService`,
         stderr: ""
       });
 
       const result = await accessibilityServiceClient.isEnabled();
-      expect(result).to.be.true;
+      expect(result).toBe(true);
     });
 
-    it("should return false when accessibility service is not enabled", async function() {
+    test("should return false when accessibility service is not enabled", async function() {
       fakeAdb.setCommandResponse("settings get secure", {
         stdout: "other.service/SomeService",
         stderr: ""
       });
 
       const result = await accessibilityServiceClient.isEnabled();
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
 
-    it("should return false when ADB command fails", async function() {
+    test("should return false when ADB command fails", async function() {
       fakeAdb.setCommandResponse("settings get secure", {
         stdout: "",
         stderr: "Error"
       });
 
       const result = await accessibilityServiceClient.isEnabled();
-      expect(result).to.be.false;
+      expect(result).toBe(false);
     });
   });
 
   describe("isAvailable", function() {
-    it("should return true when service is both installed and enabled", async function() {
+    test("should return true when service is both installed and enabled", async function() {
       fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
         stderr: ""
@@ -118,11 +117,11 @@ describe("AccessibilityServiceManager", function() {
       });
 
       const result = await accessibilityServiceClient.isAvailable();
-      expect(result).to.be.true;
-      expect(fakeAdb.getExecutedCommands().length).to.be.greaterThanOrEqual(2);
+      expect(result).toBe(true);
+      expect(fakeAdb.getExecutedCommands().length).toBeGreaterThanOrEqual(2);
     });
 
-    it("should return false when service is installed but not enabled", async function() {
+    test("should return false when service is installed but not enabled", async function() {
       fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: `package:${AndroidAccessibilityServiceManager.PACKAGE}\n`,
         stderr: ""
@@ -133,11 +132,11 @@ describe("AccessibilityServiceManager", function() {
       });
 
       const result = await accessibilityServiceClient.isAvailable();
-      expect(result).to.be.false;
-      expect(fakeAdb.getExecutedCommands().length).to.be.greaterThanOrEqual(2);
+      expect(result).toBe(false);
+      expect(fakeAdb.getExecutedCommands().length).toBeGreaterThanOrEqual(2);
     });
 
-    it("should return false when service is not installed", async function() {
+    test("should return false when service is not installed", async function() {
       fakeAdb.setCommandResponse(`shell pm list packages | grep ${AndroidAccessibilityServiceManager.PACKAGE}`, {
         stdout: "",
         stderr: ""
@@ -148,8 +147,8 @@ describe("AccessibilityServiceManager", function() {
       });
 
       const result = await accessibilityServiceClient.isAvailable();
-      expect(result).to.be.false;
-      expect(fakeAdb.getExecutedCommands().length).to.be.greaterThanOrEqual(2);
+      expect(result).toBe(false);
+      expect(fakeAdb.getExecutedCommands().length).toBeGreaterThanOrEqual(2);
     });
   });
 });

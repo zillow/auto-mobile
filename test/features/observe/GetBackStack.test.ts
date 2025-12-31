@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it, beforeEach } from "mocha";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { GetBackStack } from "../../../src/features/observe/GetBackStack";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import { ExecResult, BootedDevice } from "../../../src/models";
@@ -30,46 +29,46 @@ describe("GetBackStack", function() {
     getBackStack = new GetBackStack(adb);
   });
 
-  it("should parse activities from dumpsys output", async function() {
+  test("should parse activities from dumpsys output", async function() {
     const result = await getBackStack.execute();
 
-    expect(result).to.exist;
-    expect(result.activities).to.exist;
-    expect(result.activities.length).to.be.at.least(0); // May be 0 if regex doesn't match
-    expect(result.source).to.equal("adb");
+    expect(result).toBeDefined();
+    expect(result.activities).toBeDefined();
+    expect(result.activities.length).toBeGreaterThanOrEqual(0); // May be 0 if regex doesn't match
+    expect(result.source).toBe("adb");
   });
 
-  it("should parse task information", async function() {
+  test("should parse task information", async function() {
     const result = await getBackStack.execute();
 
-    expect(result.tasks).to.exist;
-    expect(result.tasks.length).to.be.greaterThan(0);
-    expect(result.tasks[0].id).to.exist;
+    expect(result.tasks).toBeDefined();
+    expect(result.tasks.length).toBeGreaterThan(0);
+    expect(result.tasks[0].id).toBeDefined();
   });
 
-  it("should calculate back stack depth correctly", async function() {
+  test("should calculate back stack depth correctly", async function() {
     const result = await getBackStack.execute();
 
-    expect(result.depth).to.exist;
-    expect(result.depth).to.be.at.least(0);
+    expect(result.depth).toBeDefined();
+    expect(result.depth).toBeGreaterThanOrEqual(0);
   });
 
-  it("should identify current activity", async function() {
+  test("should identify current activity", async function() {
     const result = await getBackStack.execute();
 
-    expect(result.currentActivity).to.exist;
-    expect(result.currentActivity?.name).to.exist;
-    expect(result.currentActivity?.taskId).to.be.greaterThan(0);
+    expect(result.currentActivity).toBeDefined();
+    expect(result.currentActivity?.name).toBeDefined();
+    expect(result.currentActivity?.taskId).toBeGreaterThan(0);
   });
 
-  it("should include timestamp", async function() {
+  test("should include timestamp", async function() {
     const result = await getBackStack.execute();
 
-    expect(result.capturedAt).to.exist;
-    expect(result.capturedAt).to.be.greaterThan(0);
+    expect(result.capturedAt).toBeDefined();
+    expect(result.capturedAt).toBeGreaterThan(0);
   });
 
-  it("should handle empty back stack", async function() {
+  test("should handle empty back stack", async function() {
     const mockDevice: BootedDevice = {
       name: "test",
       platform: "android",
@@ -85,11 +84,11 @@ describe("GetBackStack", function() {
 
     const result = await getBackStack.execute();
 
-    expect(result.depth).to.equal(0);
-    expect(result.activities).to.have.lengthOf(0);
+    expect(result.depth).toBe(0);
+    expect(result.activities).toHaveLength(0);
   });
 
-  it("should handle errors gracefully", async function() {
+  test("should handle errors gracefully", async function() {
     const mockDevice: BootedDevice = {
       name: "test",
       platform: "android",
@@ -107,9 +106,9 @@ describe("GetBackStack", function() {
 
     const result = await getBackStack.execute();
 
-    expect(result).to.exist;
-    expect(result.partial).to.be.true;
-    expect(result.depth).to.equal(0);
+    expect(result).toBeDefined();
+    expect(result.partial).toBe(true);
+    expect(result.depth).toBe(0);
   });
 });
 

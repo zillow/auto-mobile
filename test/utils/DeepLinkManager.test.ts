@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { DeepLinkManager } from "../../src/utils/DeepLinkManager";
 import { ElementUtils } from "../../src/features/utility/ElementUtils";
 import { ViewHierarchyResult, BootedDevice } from "../../src/models";
@@ -99,19 +99,19 @@ Receiver Resolver Table:
   });
 
   describe("constructor", () => {
-    it("should create DeepLinkManager with device ID", () => {
+    test("should create DeepLinkManager with device ID", () => {
       const manager = new DeepLinkManager(testDevice, fakeAdb);
-      expect(manager).to.be.instanceOf(DeepLinkManager);
+      expect(manager).toBeInstanceOf(DeepLinkManager);
     });
 
-    it("should create DeepLinkManager without device ID", () => {
+    test("should create DeepLinkManager without device ID", () => {
       const manager = new DeepLinkManager(null, fakeAdb);
-      expect(manager).to.be.instanceOf(DeepLinkManager);
+      expect(manager).toBeInstanceOf(DeepLinkManager);
     });
   });
 
   describe("setDeviceId", () => {
-    it("should set device ID", () => {
+    test("should set device ID", () => {
       const newDevice: BootedDevice = {
         name: "new-device",
         platform: "android",
@@ -120,24 +120,24 @@ Receiver Resolver Table:
       deepLinkManager.setDeviceId(newDevice);
 
       // Just verify it doesn't throw
-      expect(deepLinkManager).to.be.instanceOf(DeepLinkManager);
+      expect(deepLinkManager).toBeInstanceOf(DeepLinkManager);
     });
   });
 
   describe("getDeepLinks", () => {
-    it("should successfully get deep links for an app", async () => {
+    test("should successfully get deep links for an app", async () => {
       const result = await deepLinkManager.getDeepLinks("com.example.app");
 
-      expect(result.success).to.be.true;
-      expect(result.appId).to.equal("com.example.app");
-      expect(result.deepLinks.schemes).to.be.an("array");
-      expect(result.deepLinks.hosts).to.be.an("array");
-      expect(result.deepLinks.intentFilters).to.be.an("array");
-      expect(result.deepLinks.supportedMimeTypes).to.be.an("array");
-      expect(result.rawOutput).to.be.a("string");
+      expect(result.success).toBe(true);
+      expect(result.appId).toBe("com.example.app");
+      expect(Array.isArray(result.deepLinks.schemes)).toBe(true);
+      expect(Array.isArray(result.deepLinks.hosts)).toBe(true);
+      expect(Array.isArray(result.deepLinks.intentFilters)).toBe(true);
+      expect(Array.isArray(result.deepLinks.supportedMimeTypes)).toBe(true);
+      expect(typeof result.rawOutput).toBe("string");
     });
 
-    it("should handle ADB command failures", async () => {
+    test("should handle ADB command failures", async () => {
       // Create a new fake executor that will fail
       const failingFake = new FakeAdbExecutor();
       failingFake.setDefaultResponse({
@@ -151,25 +151,25 @@ Receiver Resolver Table:
       const manager = new DeepLinkManager(testDevice, failingFake);
       const result = await manager.getDeepLinks("com.example.app");
 
-      expect(result.success).to.be.false;
-      expect(result.deepLinks.schemes).to.be.empty;
-      expect(result.deepLinks.hosts).to.be.empty;
+      expect(result.success).toBe(false);
+      expect(result.deepLinks.schemes).toHaveLength(0);
+      expect(result.deepLinks.hosts).toHaveLength(0);
     });
 
-    it("should parse deep link information correctly", async () => {
+    test("should parse deep link information correctly", async () => {
       const result = await deepLinkManager.getDeepLinks("com.example.app");
 
-      expect(result.success).to.be.true;
-      expect(result.deepLinks.schemes).to.include("https");
-      expect(result.deepLinks.schemes).to.include("myapp");
-      expect(result.deepLinks.hosts).to.include("example.com");
-      expect(result.deepLinks.hosts).to.include("deep");
-      expect(result.deepLinks.intentFilters).to.have.length.greaterThan(0);
+      expect(result.success).toBe(true);
+      expect(result.deepLinks.schemes).toContain("https");
+      expect(result.deepLinks.schemes).toContain("myapp");
+      expect(result.deepLinks.hosts).toContain("example.com");
+      expect(result.deepLinks.hosts).toContain("deep");
+      expect(result.deepLinks.intentFilters.length).toBeGreaterThan(0);
     });
   });
 
   describe("detectIntentChooser", () => {
-    it("should detect intent chooser with ChooserActivity", () => {
+    test("should detect intent chooser with ChooserActivity", () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -181,10 +181,10 @@ Receiver Resolver Table:
       };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
-      expect(detected).to.be.true;
+      expect(detected).toBe(true);
     });
 
-    it("should detect intent chooser with ResolverActivity", () => {
+    test("should detect intent chooser with ResolverActivity", () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -196,10 +196,10 @@ Receiver Resolver Table:
       };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
-      expect(detected).to.be.true;
+      expect(detected).toBe(true);
     });
 
-    it("should detect intent chooser with 'Choose an app' text", () => {
+    test("should detect intent chooser with 'Choose an app' text", () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -211,10 +211,10 @@ Receiver Resolver Table:
       };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
-      expect(detected).to.be.true;
+      expect(detected).toBe(true);
     });
 
-    it("should detect intent chooser with 'Always' and 'Just once' buttons", () => {
+    test("should detect intent chooser with 'Always' and 'Just once' buttons", () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -236,10 +236,10 @@ Receiver Resolver Table:
       };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
-      expect(detected).to.be.true;
+      expect(detected).toBe(true);
     });
 
-    it("should not detect intent chooser in normal app screens", () => {
+    test("should not detect intent chooser in normal app screens", () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -263,16 +263,16 @@ Receiver Resolver Table:
       };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
-      expect(detected).to.be.false;
+      expect(detected).toBe(false);
     });
 
-    it("should handle malformed view hierarchy", () => {
+    test("should handle malformed view hierarchy", () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {}
       };
 
       const detected = deepLinkManager.detectIntentChooser(viewHierarchy);
-      expect(detected).to.be.false;
+      expect(detected).toBe(false);
     });
   });
 
@@ -299,7 +299,7 @@ Receiver Resolver Table:
       };
     });
 
-    it("should handle intent chooser with 'always' preference", async () => {
+    test("should handle intent chooser with 'always' preference", async () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -319,12 +319,12 @@ Receiver Resolver Table:
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "always");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("always");
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("always");
     });
 
-    it("should handle intent chooser with 'just_once' preference", async () => {
+    test("should handle intent chooser with 'just_once' preference", async () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -352,12 +352,12 @@ Receiver Resolver Table:
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "just_once");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("just_once");
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("just_once");
     });
 
-    it("should handle intent chooser with custom app selection", async () => {
+    test("should handle intent chooser with custom app selection", async () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -387,13 +387,13 @@ Receiver Resolver Table:
         "com.example.customapp"
       );
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("custom");
-      expect(result.appSelected).to.equal("com.example.customapp");
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("custom");
+      expect(result.appSelected).toBe("com.example.customapp");
     });
 
-    it("should return success false when no intent chooser is detected", async () => {
+    test("should return success false when no intent chooser is detected", async () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -425,11 +425,11 @@ Receiver Resolver Table:
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "always");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.false;
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(false);
     });
 
-    it("should return success false when target element not found", async () => {
+    test("should return success false when target element not found", async () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -450,12 +450,12 @@ Receiver Resolver Table:
 
       const result = await deepLinkManager.handleIntentChooser(viewHierarchy, "always");
 
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.true;
-      expect(result.error).to.include("Could not find target element");
+      expect(result.success).toBe(false);
+      expect(result.detected).toBe(true);
+      expect(result.error).toContain("Could not find target element");
     });
 
-    it("should handle ADB command failures during tap", async () => {
+    test("should handle ADB command failures during tap", async () => {
       const viewHierarchy: ViewHierarchyResult = {
         hierarchy: {
           node: {
@@ -488,13 +488,13 @@ Receiver Resolver Table:
 
       const result = await manager.handleIntentChooser(viewHierarchy, "always");
 
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.true;
+      expect(result.success).toBe(false);
+      expect(result.detected).toBe(true);
     });
   });
 
   describe("parsePackageDumpsysOutput", () => {
-    it("should extract schemes and hosts from dumpsys output", () => {
+    test("should extract schemes and hosts from dumpsys output", () => {
       const output = `  Schemes:
       https:
         abcdef123 com.example.app/.MainActivity filter 987654
@@ -513,25 +513,25 @@ Receiver Resolver Table:
 
       const result = (deepLinkManager as any).parsePackageDumpsysOutput("com.example.app", output);
 
-      expect(result.schemes).to.include("https");
-      expect(result.schemes).to.include("myapp");
-      expect(result.hosts).to.include("example.com");
-      expect(result.hosts).to.include("deep");
-      expect(result.intentFilters).to.have.length.greaterThan(0);
+      expect(result.schemes).toContain("https");
+      expect(result.schemes).toContain("myapp");
+      expect(result.hosts).toContain("example.com");
+      expect(result.hosts).toContain("deep");
+      expect(result.intentFilters.length).toBeGreaterThan(0);
     });
 
-    it("should handle empty dumpsys output", () => {
+    test("should handle empty dumpsys output", () => {
       const output = "";
 
       const result = (deepLinkManager as any).parsePackageDumpsysOutput("com.example.app", output);
 
-      expect(result.schemes).to.be.empty;
-      expect(result.hosts).to.be.empty;
-      expect(result.intentFilters).to.be.empty;
-      expect(result.supportedMimeTypes).to.be.empty;
+      expect(result.schemes).toHaveLength(0);
+      expect(result.hosts).toHaveLength(0);
+      expect(result.intentFilters).toHaveLength(0);
+      expect(result.supportedMimeTypes).toHaveLength(0);
     });
 
-    it("should handle dumpsys output without schemes section", () => {
+    test("should handle dumpsys output without schemes section", () => {
       const output = `Package [com.example.app] (12345):
   Non-Data Actions:
       android.intent.action.MAIN:
@@ -541,9 +541,9 @@ Receiver Resolver Table:
 
       const result = (deepLinkManager as any).parsePackageDumpsysOutput("com.example.app", output);
 
-      expect(result.schemes).to.be.empty;
-      expect(result.hosts).to.be.empty;
-      expect(result.intentFilters).to.be.empty;
+      expect(result.schemes).toHaveLength(0);
+      expect(result.hosts).toHaveLength(0);
+      expect(result.intentFilters).toHaveLength(0);
     });
   });
 });

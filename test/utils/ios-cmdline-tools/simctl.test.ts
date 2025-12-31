@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { Simctl } from "../../../src/utils/ios-cmdline-tools/SimCtlClient";
 import { BootedDevice, ExecResult } from "../../../src/models";
 
@@ -29,7 +29,7 @@ describe("Simctl", function() {
   });
 
   describe("isAvailable", function() {
-    it("should return true when simctl is available", async function() {
+    test("should return true when simctl is available", async function() {
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         if (command.includes("xcrun simctl --version")) {
           return {
@@ -46,10 +46,10 @@ describe("Simctl", function() {
       simctl = new Simctl(null, mockExecAsync);
 
       const available = await simctl.isAvailable();
-      expect(available).to.be.true;
+      expect(available).toBe(true);
     });
 
-    it("should return false when simctl is not available", async function() {
+    test("should return false when simctl is not available", async function() {
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         throw new Error("Command not found: xcrun");
       };
@@ -57,12 +57,12 @@ describe("Simctl", function() {
       simctl = new Simctl(null, mockExecAsync);
 
       const available = await simctl.isAvailable();
-      expect(available).to.be.false;
+      expect(available).toBe(false);
     });
   });
 
   describe("executeCommand", function() {
-    it("should execute simctl commands with xcrun prefix", async function() {
+    test("should execute simctl commands with xcrun prefix", async function() {
       let executedCommand = "";
       mockExecAsync = async (command: string): Promise<ExecResult> => {
         executedCommand = command;
@@ -87,7 +87,7 @@ describe("Simctl", function() {
       simctl = new Simctl(mockDevice, mockExecAsync);
       await simctl.executeCommand("list devices");
 
-      expect(executedCommand).to.equal("xcrun simctl list devices");
+      expect(executedCommand).toBe("xcrun simctl list devices");
     });
   });
 });

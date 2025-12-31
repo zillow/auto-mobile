@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { DetectIntentChooser } from "../../../src/features/observe/DetectIntentChooser";
 import { ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import { FakeDeepLinkManager } from "../../fakes/FakeDeepLinkManager";
@@ -71,22 +71,22 @@ describe("DetectIntentChooser", () => {
   });
 
   describe("constructor", () => {
-    it("should create DetectIntentChooser with device ID", () => {
+    test("should create DetectIntentChooser with device ID", () => {
       const instance = new DetectIntentChooser("test-device");
-      expect(instance).to.be.instanceOf(DetectIntentChooser);
+      expect(instance).toBeInstanceOf(DetectIntentChooser);
     });
   });
 
   describe("execute", () => {
-    it("should detect intent chooser when provided with view hierarchy", async () => {
+    test("should detect intent chooser when provided with view hierarchy", async () => {
       const result = await detectIntentChooser.execute();
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.observation).to.equal(mockObserveResult);
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.observation).toBe(mockObserveResult);
     });
 
-    it("should not detect intent chooser in normal app view hierarchy", async () => {
+    test("should not detect intent chooser in normal app view hierarchy", async () => {
       const normalObserveResult = {
         ...mockObserveResult,
         viewHierarchy: {
@@ -112,20 +112,20 @@ describe("DetectIntentChooser", () => {
 
       const result = await detectIntentChooser.execute();
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.false;
-      expect(result.observation).to.equal(normalObserveResult);
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(false);
+      expect(result.observation).toBe(normalObserveResult);
     });
 
-    it("should observe screen when no view hierarchy provided", async () => {
+    test("should observe screen when no view hierarchy provided", async () => {
       const result = await detectIntentChooser.execute();
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true; // mockObserveResult contains ChooserActivity
-      expect(result.observation).to.equal(mockObserveResult);
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true); // mockObserveResult contains ChooserActivity
+      expect(result.observation).toBe(mockObserveResult);
     });
 
-    it("should handle observe screen failure", async () => {
+    test("should handle observe screen failure", async () => {
       // Set failure mode for observation
       fakeObserveScreen.setFailureMode("getMostRecentCachedObserveResult", new Error("Cannot perform action without view hierarchy"));
       fakeObserveScreen.setFailureMode("execute", new Error("Cannot perform action without view hierarchy"));
@@ -134,11 +134,11 @@ describe("DetectIntentChooser", () => {
         await detectIntentChooser.execute();
         expect.fail("Expected an error to be thrown");
       } catch (error) {
-        expect((error as Error).message).to.include("Cannot perform action without view hierarchy");
+        expect((error as Error).message).toContain("Cannot perform action without view hierarchy");
       }
     });
 
-    it("should handle observe screen returning null view hierarchy", async () => {
+    test("should handle observe screen returning null view hierarchy", async () => {
       // Set failure mode for observation
       fakeObserveScreen.setFailureMode("getMostRecentCachedObserveResult", new Error("Cannot perform action without view hierarchy"));
       fakeObserveScreen.setFailureMode("execute", new Error("Cannot perform action without view hierarchy"));
@@ -147,11 +147,11 @@ describe("DetectIntentChooser", () => {
         await detectIntentChooser.execute();
         expect.fail("Expected an error to be thrown");
       } catch (error) {
-        expect((error as Error).message).to.include("Cannot perform action without view hierarchy");
+        expect((error as Error).message).toContain("Cannot perform action without view hierarchy");
       }
     });
 
-    it("should handle deep link manager detection failure", async () => {
+    test("should handle deep link manager detection failure", async () => {
       // For this test, we need to make detectIntentChooser throw
       // Since FakeDeepLinkManager always succeeds, we test the error handling in the feature
       // by verifying the result when detection is false
@@ -159,11 +159,11 @@ describe("DetectIntentChooser", () => {
 
       const result = await detectIntentChooser.execute();
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.false;
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(false);
     });
 
-    it("should detect various intent chooser indicators", async () => {
+    test("should detect various intent chooser indicators", async () => {
       const testCases: ViewHierarchyResult[] = [
         {
           hierarchy: {
@@ -230,12 +230,12 @@ describe("DetectIntentChooser", () => {
         fakeDeepLinkManager.setDefaultIntentChooserDetected(true);
 
         const result = await detectIntentChooser.execute();
-        expect(result.success).to.be.true;
-        expect(result.detected).to.be.true;
+        expect(result.success).toBe(true);
+        expect(result.detected).toBe(true);
       }
     });
 
-    it("should not detect intent chooser in non-chooser screens", async () => {
+    test("should not detect intent chooser in non-chooser screens", async () => {
       const testCases: ViewHierarchyResult[] = [
         {
           hierarchy: {
@@ -275,8 +275,8 @@ describe("DetectIntentChooser", () => {
         fakeDeepLinkManager.setDefaultIntentChooserDetected(false);
 
         const result = await detectIntentChooser.execute();
-        expect(result.success).to.be.true;
-        expect(result.detected).to.be.false;
+        expect(result.success).toBe(true);
+        expect(result.detected).toBe(false);
       }
     });
   });

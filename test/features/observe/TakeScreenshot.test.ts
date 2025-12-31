@@ -1,5 +1,4 @@
-import { expect } from "chai";
-import { describe, it, beforeEach } from "mocha";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
@@ -24,27 +23,27 @@ describe("TakeScreenshot", function() {
       takeScreenshot = new TakeScreenshot(mockDevice, fakeAdb);
     });
 
-    it("should generate correct screenshot path with png format", function() {
+    test("should generate correct screenshot path with png format", function() {
       const timestamp = 1234567890123;
       const options = { format: "png" as const };
 
       const result = takeScreenshot.generateScreenshotPath(timestamp, options);
 
-      expect(result).to.include("screenshot_1234567890123");
-      expect(result).to.match(/screenshot_1234567890123\.png$/);
+      expect(result).toContain("screenshot_1234567890123");
+      expect(result).toMatch(/screenshot_1234567890123\.png$/);
     });
 
-    it("should generate correct screenshot path with webp format", function() {
+    test("should generate correct screenshot path with webp format", function() {
       const timestamp = 1234567890456;
       const options = { format: "webp" as const };
 
       const result = takeScreenshot.generateScreenshotPath(timestamp, options);
 
-      expect(result).to.include("screenshot_1234567890456");
-      expect(result).to.match(/screenshot_1234567890456\.webp$/);
+      expect(result).toContain("screenshot_1234567890456");
+      expect(result).toMatch(/screenshot_1234567890456\.webp$/);
     });
 
-    it("should generate different timestamps for consecutive calls", async function() {
+    test("should generate different timestamps for consecutive calls", async function() {
       const timestamp1 = Date.now();
       const options = { format: "png" as const };
 
@@ -54,10 +53,10 @@ describe("TakeScreenshot", function() {
       const timestamp2 = Date.now();
       const result2 = takeScreenshot.generateScreenshotPath(timestamp2, options);
 
-      expect(result1).to.not.equal(result2);
+      expect(result1).not.toBe(result2);
     });
 
-    it("should use single optimized ADB command for screenshot capture", async function() {
+    test("should use single optimized ADB command for screenshot capture", async function() {
       // Create minimal valid PNG base64 data
       const base64PngData = Buffer.from("fake-png-data").toString("base64");
 
@@ -79,15 +78,15 @@ describe("TakeScreenshot", function() {
 
       // Verify only one ADB command was executed (optimized)
       const executedCommands = testFakeAdb.getExecutedCommands();
-      expect(executedCommands.length).to.equal(1);
+      expect(executedCommands.length).toBe(1);
 
       // Verify the command uses the optimized base64 approach
       const calledCommand = executedCommands[0];
-      expect(calledCommand).to.include("screencap");
-      expect(calledCommand).to.include("base64");
-      expect(calledCommand).to.include("rm"); // Should cleanup temp file in same command
+      expect(calledCommand).toContain("screencap");
+      expect(calledCommand).toContain("base64");
+      expect(calledCommand).toContain("rm"); // Should cleanup temp file in same command
 
-      expect(result.success).to.be.true;
+      expect(result.success).toBe(true);
     });
   });
 

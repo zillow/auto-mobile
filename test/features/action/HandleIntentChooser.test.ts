@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach } from "bun:test";
 import { HandleIntentChooser } from "../../../src/features/action/HandleIntentChooser";
 import { ObserveResult, ViewHierarchyResult } from "../../../src/models";
 import { FakeDeepLinkManager } from "../../fakes/FakeDeepLinkManager";
@@ -73,14 +73,14 @@ describe("HandleIntentChooser", () => {
   });
 
   describe("constructor", () => {
-    it("should create HandleIntentChooser with device ID", () => {
+    test("should create HandleIntentChooser with device ID", () => {
       const instance = new HandleIntentChooser("test-device");
-      expect(instance).to.be.instanceOf(HandleIntentChooser);
+      expect(instance).toBeInstanceOf(HandleIntentChooser);
     });
   });
 
   describe("execute", () => {
-    it("should handle intent chooser with 'always' preference", async () => {
+    test("should handle intent chooser with 'always' preference", async () => {
       // Set up fake to return detected intent chooser
       fakeObserveScreen.setObserveResult(mockObserveResult);
       fakeDeepLinkManager.setDefaultIntentChooserDetected(true);
@@ -92,13 +92,13 @@ describe("HandleIntentChooser", () => {
 
       const result = await handleIntentChooser.execute("always");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("always");
-      expect(result.appSelected).to.be.undefined;
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("always");
+      expect(result.appSelected).toBeUndefined();
     });
 
-    it("should handle intent chooser with 'just_once' preference", async () => {
+    test("should handle intent chooser with 'just_once' preference", async () => {
       const resolverHierarchy = {
         hierarchy: {
           node: {
@@ -125,13 +125,13 @@ describe("HandleIntentChooser", () => {
 
       const result = await handleIntentChooser.execute("just_once");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("just_once");
-      expect(result.appSelected).to.be.undefined;
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("just_once");
+      expect(result.appSelected).toBeUndefined();
     });
 
-    it("should handle intent chooser with custom app selection", async () => {
+    test("should handle intent chooser with custom app selection", async () => {
       const customHierarchy = {
         hierarchy: {
           node: {
@@ -163,36 +163,36 @@ describe("HandleIntentChooser", () => {
 
       const result = await handleIntentChooser.execute("custom", "com.example.customapp");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("custom");
-      expect(result.appSelected).to.equal("com.example.customapp");
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("custom");
+      expect(result.appSelected).toBe("com.example.customapp");
     });
 
-    it("should use default 'just_once' preference when none specified", async () => {
+    test("should use default 'just_once' preference when none specified", async () => {
       fakeObserveScreen.setObserveResult(mockObserveResult);
       fakeDeepLinkManager.setDefaultIntentChooserDetected(true);
 
       const result = await handleIntentChooser.execute();
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("just_once");
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("just_once");
     });
 
-    it("should observe screen when no view hierarchy provided", async () => {
+    test("should observe screen when no view hierarchy provided", async () => {
       fakeObserveScreen.setObserveResult(mockObserveResult);
       fakeDeepLinkManager.setDefaultIntentChooserDetected(true);
 
       const result = await handleIntentChooser.execute("always");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.true;
-      expect(result.action).to.equal("always");
-      expect(result.observation).to.be.not.null;
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(true);
+      expect(result.action).toBe("always");
+      expect(result.observation).not.toBeNull();
     });
 
-    it("should handle no intent chooser detected", async () => {
+    test("should handle no intent chooser detected", async () => {
       const normalHierarchy = {
         hierarchy: {
           node: {
@@ -219,12 +219,12 @@ describe("HandleIntentChooser", () => {
 
       const result = await handleIntentChooser.execute("always");
 
-      expect(result.success).to.be.true;
-      expect(result.detected).to.be.false;
-      expect(result.observation).to.be.not.null;
+      expect(result.success).toBe(true);
+      expect(result.detected).toBe(false);
+      expect(result.observation).not.toBeNull();
     });
 
-    it("should handle observe screen failure", async () => {
+    test("should handle observe screen failure", async () => {
       fakeObserveScreen.setFailureMode("getMostRecentCachedObserveResult", new Error("Cannot perform action without view hierarchy"));
       fakeObserveScreen.setFailureMode("execute", new Error("Cannot perform action without view hierarchy"));
 
@@ -232,11 +232,11 @@ describe("HandleIntentChooser", () => {
         await handleIntentChooser.execute("always");
         expect.fail("Expected an error to be thrown");
       } catch (error) {
-        expect((error as Error).message).to.include("Cannot perform action without view hierarchy");
+        expect((error as Error).message).toContain("Cannot perform action without view hierarchy");
       }
     });
 
-    it("should handle deep link manager failure", async () => {
+    test("should handle deep link manager failure", async () => {
       fakeObserveScreen.setObserveResult(mockObserveResult);
       fakeDeepLinkManager.setIntentChooserResponse("always:none", {
         success: false,
@@ -246,12 +246,12 @@ describe("HandleIntentChooser", () => {
 
       const result = await handleIntentChooser.execute("always");
 
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.true;
-      expect(result.error).to.equal("Handling failed");
+      expect(result.success).toBe(false);
+      expect(result.detected).toBe(true);
+      expect(result.error).toBe("Handling failed");
     });
 
-    it("should handle deep link manager returning failure", async () => {
+    test("should handle deep link manager returning failure", async () => {
       fakeObserveScreen.setObserveResult(mockObserveResult);
       fakeDeepLinkManager.setIntentChooserResponse("always:none", {
         success: false,
@@ -261,12 +261,12 @@ describe("HandleIntentChooser", () => {
 
       const result = await handleIntentChooser.execute("always");
 
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.true;
-      expect(result.error).to.equal("Could not find target element");
+      expect(result.success).toBe(false);
+      expect(result.detected).toBe(true);
+      expect(result.error).toBe("Could not find target element");
     });
 
-    it("should preserve original observation when handling unsuccessful", async () => {
+    test("should preserve original observation when handling unsuccessful", async () => {
       fakeObserveScreen.setObserveResult(mockObserveResult);
       fakeDeepLinkManager.setIntentChooserResponse("always:none", {
         success: false,
@@ -276,10 +276,10 @@ describe("HandleIntentChooser", () => {
 
       const result = await handleIntentChooser.execute("always");
 
-      expect(result.success).to.be.false;
-      expect(result.detected).to.be.true;
-      expect(result.error).to.equal("Target element not found");
-      expect(result.observation).to.be.not.null;
+      expect(result.success).toBe(false);
+      expect(result.detected).toBe(true);
+      expect(result.error).toBe("Target element not found");
+      expect(result.observation).not.toBeNull();
     });
   });
 });

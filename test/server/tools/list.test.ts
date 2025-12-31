@@ -1,5 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "mocha";
-import { expect } from "chai";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createMcpServer } from "../../../src/server/index";
 import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
@@ -21,7 +20,7 @@ describe("MCP Tools List", () => {
     }
   });
 
-  it("given no tools are registered, endpoint should return an empty list", async function() {
+  test("given no tools are registered, endpoint should return an empty list", async function() {
 
     // Create fake registry with no tools registered
     const fakeRegistry = new FakeToolRegistry();
@@ -66,10 +65,10 @@ describe("MCP Tools List", () => {
       }, listToolsResponseSchema);
 
       // Verify empty tools list
-      expect(result).to.be.an("object");
-      expect(result).to.have.property("tools");
-      expect(result.tools).to.be.an("array");
-      expect(result.tools).to.have.length(0);
+      expect(typeof result).toBe("object");
+      expect(result).toHaveProperty("tools");
+      expect(Array.isArray(result.tools)).toBe(true);
+      expect(result.tools).toHaveLength(0);
 
       await client.close();
     } finally {
@@ -78,7 +77,7 @@ describe("MCP Tools List", () => {
     }
   });
 
-  it("given a tool is registered, endpoint should return a list with that tool", async function() {
+  test("given a tool is registered, endpoint should return a list with that tool", async function() {
     const { client } = fixture.getContext();
 
     // Send list_tools request
@@ -97,24 +96,24 @@ describe("MCP Tools List", () => {
     }, listToolsResponseSchema);
 
     // Verify tools list contains registered tools
-    expect(result).to.be.an("object");
-    expect(result).to.have.property("tools");
-    expect(result.tools).to.be.an("array");
-    expect(result.tools.length).to.be.greaterThan(0);
+    expect(typeof result).toBe("object");
+    expect(result).toHaveProperty("tools");
+    expect(Array.isArray(result.tools)).toBe(true);
+    expect(result.tools.length).toBeGreaterThan(0);
 
     // Verify each tool has required properties
     result.tools.forEach(tool => {
-      expect(tool).to.have.property("name");
-      expect(tool).to.have.property("description");
-      expect(tool).to.have.property("inputSchema");
-      expect(typeof tool.name).to.equal("string");
-      expect(typeof tool.description).to.equal("string");
-      expect(typeof tool.inputSchema).to.equal("object");
+      expect(tool).toHaveProperty("name");
+      expect(tool).toHaveProperty("description");
+      expect(tool).toHaveProperty("inputSchema");
+      expect(typeof tool.name).toBe("string");
+      expect(typeof tool.description).toBe("string");
+      expect(typeof tool.inputSchema).toBe("object");
     });
 
     // Verify we have some expected tools (like observe, etc.)
     const toolNames = result.tools.map(tool => tool.name);
-    expect(toolNames).to.include("observe");
-    expect(toolNames).to.include("tapOn");
+    expect(toolNames).toContain("observe");
+    expect(toolNames).toContain("tapOn");
   });
 });

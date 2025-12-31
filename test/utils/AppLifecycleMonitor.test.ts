@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { AppLifecycleMonitor, AppLifecycleEvent } from "../../src/utils/AppLifecycleMonitor";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { AppLifecycleMonitorFactory } from "../../src/utils/factories/AppLifecycleMonitorFactory";
@@ -30,75 +30,75 @@ describe("AppLifecycleMonitor", () => {
   });
 
   describe("singleton pattern", () => {
-    it("should return the same instance", () => {
+    test("should return the same instance", () => {
       const instance1 = AppLifecycleMonitor.getInstance();
       const instance2 = AppLifecycleMonitor.getInstance();
-      expect(instance1).to.equal(instance2);
+      expect(instance1).toBe(instance2);
     });
   });
 
   describe("package tracking", () => {
-    it("should track packages", async () => {
+    test("should track packages", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app");
-      expect(monitor.getTrackedPackages()).to.include("com.example.app");
+      expect(monitor.getTrackedPackages()).toContain("com.example.app");
     });
 
-    it("should untrack packages", async () => {
+    test("should untrack packages", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app");
       await monitor.untrackPackage("test-device", "com.example.app");
-      expect(monitor.getTrackedPackages()).to.not.include("com.example.app");
+      expect(monitor.getTrackedPackages()).not.toContain("com.example.app");
     });
 
-    it("should track multiple packages", async () => {
+    test("should track multiple packages", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app1", { stdout: "", stderr: "" });
       fakeAdb.setCommandResponse("shell pidof com.example.app2", { stdout: "", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app1");
       await monitor.trackPackage("test-device", "com.example.app2");
-      expect(monitor.getTrackedPackages()).to.have.length(2);
-      expect(monitor.getTrackedPackages()).to.include("com.example.app1");
-      expect(monitor.getTrackedPackages()).to.include("com.example.app2");
+      expect(monitor.getTrackedPackages()).toHaveLength(2);
+      expect(monitor.getTrackedPackages()).toContain("com.example.app1");
+      expect(monitor.getTrackedPackages()).toContain("com.example.app2");
     });
   });
 
   describe("isPackageRunning", () => {
-    it("should return true when package is running", async () => {
+    test("should return true when package is running", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
       const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
-      expect(isRunning).to.be.true;
+      expect(isRunning).toBe(true);
     });
 
-    it("should return false when package is not running", async () => {
+    test("should return false when package is not running", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
       const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
-      expect(isRunning).to.be.false;
+      expect(isRunning).toBe(false);
     });
 
-    it("should return false when pidof command fails", async () => {
+    test("should return false when pidof command fails", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "pidof failed" });
 
       const isRunning = await monitor.isPackageRunning("test-device", "com.example.app");
-      expect(isRunning).to.be.false;
+      expect(isRunning).toBe(false);
     });
   });
 
   describe("getRunningPackages", () => {
-    it("should return empty array initially", () => {
-      expect(monitor.getRunningPackages()).to.have.length(0);
+    test("should return empty array initially", () => {
+      expect(monitor.getRunningPackages()).toHaveLength(0);
     });
 
-    it("should return running packages after checkForChanges", async () => {
+    test("should return running packages after checkForChanges", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app");
       await monitor.checkForChanges("test-device");
-      expect(monitor.getRunningPackages()).to.include("com.example.app");
+      expect(monitor.getRunningPackages()).toContain("com.example.app");
     });
   });
 
@@ -119,7 +119,7 @@ describe("AppLifecycleMonitor", () => {
       });
     });
 
-    it("should emit launch event for new package", async () => {
+    test("should emit launch event for new package", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app");
@@ -127,13 +127,13 @@ describe("AppLifecycleMonitor", () => {
       // Explicitly check for changes
       await monitor.checkForChanges("test-device");
 
-      expect(launchEvents).to.have.length(1);
-      expect(launchEvents[0].type).to.equal("launch");
-      expect(launchEvents[0].appId).to.equal("com.example.app");
-      expect(launchEvents[0].metadata?.detectionMethod).to.equal("pidof");
+      expect(launchEvents).toHaveLength(1);
+      expect(launchEvents[0].type).toBe("launch");
+      expect(launchEvents[0].appId).toBe("com.example.app");
+      expect(launchEvents[0].metadata?.detectionMethod).toBe("pidof");
     });
 
-    it("should emit terminate event when package stops", async () => {
+    test("should emit terminate event when package stops", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app");
@@ -150,13 +150,13 @@ describe("AppLifecycleMonitor", () => {
       // Check for changes to detect termination
       await monitor.checkForChanges("test-device");
 
-      expect(terminateEvents).to.have.length(1);
-      expect(terminateEvents[0].type).to.equal("terminate");
-      expect(terminateEvents[0].appId).to.equal("com.example.app");
-      expect(terminateEvents[0].metadata?.detectionMethod).to.equal("pidof");
+      expect(terminateEvents).toHaveLength(1);
+      expect(terminateEvents[0].type).toBe("terminate");
+      expect(terminateEvents[0].appId).toBe("com.example.app");
+      expect(terminateEvents[0].metadata?.detectionMethod).toBe("pidof");
     });
 
-    it("should handle multiple packages", async () => {
+    test("should handle multiple packages", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app1", { stdout: "12345", stderr: "" });
       fakeAdb.setCommandResponse("shell pidof com.example.app2", { stdout: "12345", stderr: "" });
 
@@ -166,44 +166,44 @@ describe("AppLifecycleMonitor", () => {
       // Check for changes to detect launches
       await monitor.checkForChanges("test-device");
 
-      expect(launchEvents).to.have.length(2);
-      expect(launchEvents.map(e => e.appId)).to.include("com.example.app1");
-      expect(launchEvents.map(e => e.appId)).to.include("com.example.app2");
+      expect(launchEvents).toHaveLength(2);
+      expect(launchEvents.map(e => e.appId)).toContain("com.example.app1");
+      expect(launchEvents.map(e => e.appId)).toContain("com.example.app2");
     });
   });
 
   describe("event listener management", () => {
-    it("should add and remove event listeners", () => {
+    test("should add and remove event listeners", () => {
       const listener = async () => {};
 
       monitor.addEventListener("launch", listener);
       monitor.removeEventListener("launch", listener);
 
       // Listeners are managed by EventEmitter, so we just verify no errors
-      expect(monitor.listenerCount("launch")).to.equal(0);
+      expect(monitor.listenerCount("launch")).toBe(0);
     });
   });
 
   describe("checkForChanges", () => {
-    it("should detect package state changes", async () => {
+    test("should detect package state changes", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app");
 
       // Initially package is not running
       await monitor.checkForChanges("test-device");
-      expect(monitor.getRunningPackages()).to.not.include("com.example.app");
+      expect(monitor.getRunningPackages()).not.toContain("com.example.app");
 
       // Package starts running
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
       await monitor.checkForChanges("test-device");
-      expect(monitor.getRunningPackages()).to.include("com.example.app");
+      expect(monitor.getRunningPackages()).toContain("com.example.app");
     });
   });
 
   describe("error handling", () => {
-    it("should handle event emission errors gracefully", async () => {
+    test("should handle event emission errors gracefully", async () => {
       fakeAdb.setCommandResponse("shell pidof com.example.app", { stdout: "12345", stderr: "" });
 
       await monitor.trackPackage("test-device", "com.example.app");
