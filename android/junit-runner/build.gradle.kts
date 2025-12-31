@@ -87,3 +87,12 @@ tasks.configureEach {
     dependsOn("plainJavadocJar")
   }
 }
+
+tasks.withType<Test> {
+  testLogging {
+    // Show standard output and error for tests
+    showStandardStreams = true
+    // Show detailed test events
+    events("passed", "skipped", "failed", "standardOut", "standardError")
+  }
+}

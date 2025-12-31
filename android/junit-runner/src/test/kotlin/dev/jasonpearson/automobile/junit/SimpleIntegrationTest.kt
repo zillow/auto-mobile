@@ -22,7 +22,7 @@ class SimpleIntegrationTest {
     assertEquals("", annotation.prompt)
     assertEquals(0, annotation.maxRetries)
     assertTrue(annotation.aiAssistance)
-    assertEquals(300000L, annotation.timeoutMs)
+    assertEquals(60000L, annotation.timeoutMs)
     assertEquals("auto", annotation.device)
   }
 

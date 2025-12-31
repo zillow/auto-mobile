@@ -453,6 +453,11 @@ async function main() {
       logger.info("Running in CLI mode");
       // logger.enableStdoutLogging();
       await runCliCommand(cliArgs);
+      // CRITICAL: Exit explicitly after CLI command completes to prevent process from hanging
+      // The event loop may have pending operations (ADB connections, file descriptors) that
+      // prevent Node.js from exiting naturally. Force exit with code 0 to ensure clean termination.
+      logger.close();
+      process.exit(0);
     } else if (transport.type === "streamable") {
       // Run as Streamable HTTP server
       logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);

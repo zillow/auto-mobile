@@ -44,7 +44,7 @@ fun `create timer from prompt`() {
 - `prompt`: Natural language description for AI-generated test plan (requires `aiAssistance = true`)
 - `maxRetries`: Maximum retry attempts before AI intervention (default: 0)
 - `aiAssistance`: Enable/disable AI agent recovery on failure (default: true)
-- `timeoutMs`: Maximum execution time per test in milliseconds (default: 300000 - 5 minutes)
+- `timeoutMs`: Maximum execution time per test in milliseconds (default: 60000 - 1 minute)
 - `device`: Target device ID or "auto" for any available device (default: "auto")
 
 ### Plan Generation Logic

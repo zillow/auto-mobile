@@ -126,54 +126,20 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
   private fun executeAutoMobilePlan(planPath: String, annotation: AutoMobileTest, testName: String): ExecutionResult {
     val startTime = System.currentTimeMillis()
-    val debugMode = System.getProperty("automobile.debug", "false").toBoolean()
 
     try {
-      if (debugMode) {
-        println("=== JUNIT RUNNER - START ===")
-        println("Test Class: ${klass.simpleName}")
-        println("Test Method: $testName")
-        println("Plan Path: $planPath")
-        println("Device: ${annotation.device}")
-        println("Timeout: ${annotation.timeoutMs}ms")
-        println("AI Assistance: ${annotation.aiAssistance}")
-      }
-
       // Read the YAML plan content
       val planContent = File(planPath).readText()
 
-      if (debugMode) {
-        println("Plan content length: ${planContent.length} bytes")
-      }
-
       // Base64 encode the plan content to safely pass through command line
       val base64Content = java.util.Base64.getEncoder().encodeToString(planContent.toByteArray())
-
-      if (debugMode) {
-        println("Base64 encoded length: ${base64Content.length} bytes")
-      }
 
       val command = buildAutoMobileExecutePlanCommand(base64Content, annotation)
 
       println("Executing command: ${command.joinToString(" ")}")
 
-      val executionStartTime = System.currentTimeMillis()
       val result = AutoMobileSharedUtils.executeCommand(command, annotation.timeoutMs)
-      val commandExecutionTime = System.currentTimeMillis() - executionStartTime
       val executionTime = System.currentTimeMillis() - startTime
-
-      if (debugMode) {
-        println("=== Execution Result ===")
-        println("Command Execution Time: ${commandExecutionTime}ms")
-        println("Total Execution Time: ${executionTime}ms")
-        println("Exit Code: ${result.exitCode}")
-        println("Output Length: ${result.output.length} bytes")
-        println("Error Output Length: ${result.errorOutput.length} bytes")
-        println("\nAutoMobile CLI output:\n${result.output}")
-        if (result.errorOutput.isNotEmpty()) {
-          println("\nAutoMobile CLI errors:\n${result.errorOutput}")
-        }
-      }
 
       // Write log file for this test execution
       val logFile = writeTestLog(
@@ -189,9 +155,6 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       println("Test output written to: ${logFile.absolutePath}")
 
       val finalResult = if (result.exitCode == 0) {
-        if (debugMode) {
-          println("=== JUNIT RUNNER - COMPLETED SUCCESSFULLY ===")
-        }
         ExecutionResult(
             success = true,
             exitCode = result.exitCode,
@@ -199,9 +162,6 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
             executionTimeMs = executionTime,
             logFile = logFile)
       } else {
-        if (debugMode) {
-          println("=== Execution Failed - Handling Failure ===")
-        }
         handleFailure(
             annotation,
             result.exitCode,
@@ -215,12 +175,6 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     } catch (e: Exception) {
       val executionTime = System.currentTimeMillis() - startTime
       println("Error executing AutoMobile plan: ${e.message}")
-
-      if (debugMode) {
-        println("=== JUNIT RUNNER - FAILED WITH EXCEPTION ===")
-        println("Exception: ${e.message}")
-        e.printStackTrace()
-      }
 
       return ExecutionResult(
           success = false,

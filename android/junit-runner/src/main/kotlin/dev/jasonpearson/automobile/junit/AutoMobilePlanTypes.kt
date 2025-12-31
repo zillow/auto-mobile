@@ -2,7 +2,7 @@ package dev.jasonpearson.automobile.junit
 
 /** Configuration options for AutoMobile plan execution. */
 data class AutoMobilePlanExecutionOptions(
-    val timeoutMs: Long = 300000L, // 5 minutes default
+    val timeoutMs: Long = 60000L, // 1 minute default
     val device: String = "auto",
     val aiAssistance: Boolean = true,
     val maxRetries: Int = 0,

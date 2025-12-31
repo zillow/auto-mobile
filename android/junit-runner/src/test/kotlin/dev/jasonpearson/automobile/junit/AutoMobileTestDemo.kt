@@ -23,7 +23,7 @@ class AutoMobileTestDemo {
     assertNotNull(annotation)
     assertEquals("test-plans/launch-clock.yaml", annotation.plan)
     assertTrue(annotation.aiAssistance)
-    assertEquals(300000L, annotation.timeoutMs)
+    assertEquals(60000L, annotation.timeoutMs)
   }
 
   /** Test that demonstrates advanced configuration setup. */
@@ -87,7 +87,7 @@ class AutoMobileTestDemo {
     assertEquals("", annotation.prompt)
     assertEquals(0, annotation.maxRetries)
     assertTrue(annotation.aiAssistance)
-    assertEquals(300000L, annotation.timeoutMs)
+    assertEquals(60000L, annotation.timeoutMs)
     assertEquals("auto", annotation.device)
   }
 }

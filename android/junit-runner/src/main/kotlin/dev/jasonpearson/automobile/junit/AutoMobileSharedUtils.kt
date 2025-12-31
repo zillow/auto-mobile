@@ -9,6 +9,10 @@ object AutoMobileSharedUtils {
   fun executeCommand(command: List<String>, timeoutMs: Long): CommandResult {
     val process = ProcessBuilder(command).start()
 
+    // CRITICAL FIX: Close stdin immediately to prevent the process from hanging
+    // waiting for input. This is essential for non-interactive CLI tools.
+    process.outputStream.close()
+
     // Read output and error streams concurrently to prevent deadlock
     val outputFuture =
         java.util.concurrent.CompletableFuture.supplyAsync {
@@ -24,6 +28,8 @@ object AutoMobileSharedUtils {
 
     if (!completed) {
       process.destroyForcibly()
+      // Wait a bit to ensure process is destroyed
+      process.waitFor(5, TimeUnit.SECONDS)
       throw RuntimeException("Command execution timed out after ${timeoutMs}ms")
     }
 

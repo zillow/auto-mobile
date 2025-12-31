@@ -24,8 +24,8 @@ annotation class AutoMobileTest(
     /** Enable/disable AI agent recovery on failure. Default: true */
     val aiAssistance: Boolean = true,
 
-    /** Maximum execution time per test in milliseconds. Default: 300000 (5 minutes) */
-    val timeoutMs: Long = 300000L,
+    /** Maximum execution time per test in milliseconds. Default: 60000 (1 minute) */
+    val timeoutMs: Long = 60000L,
 
     /** Target device ID or "auto" for any available device. Default: "auto" */
     val device: String = "auto"
