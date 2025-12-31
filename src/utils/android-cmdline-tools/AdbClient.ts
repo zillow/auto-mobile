@@ -278,14 +278,108 @@ export class AdbClient implements AdbExecutor {
 
   /**
    * List all Android users on the device (personal, work profiles, etc.)
-   * Parses output from "pm list users" command
-   * Example output:
-   *   Users:
-   *     UserInfo{0:Owner:13} running
-   *     UserInfo{10:Work profile:30} running
+   * Uses dumpsys user for structured output parsing
+   * Falls back to pm list users if dumpsys fails
    * @returns Promise with array of Android users
    */
   async listUsers(): Promise<AndroidUser[]> {
+    try {
+      // Try dumpsys user first - provides more structured output
+      const result = await this.executeCommand("shell dumpsys user", undefined, undefined, true);
+      const users = this.parseUsersFromDumpsys(result.stdout);
+
+      if (users.length > 0) {
+        logger.info(`[ADB] Found ${users.length} user(s) via dumpsys: ${users.map(u => `${u.userId}:${u.name}`).join(", ")}`);
+        return users;
+      }
+
+      // If dumpsys parsing failed, fall back to pm list users
+      logger.debug("[ADB] dumpsys user parsing returned no users, falling back to pm list users");
+      return await this.listUsersLegacy();
+    } catch (error) {
+      logger.debug(`[ADB] dumpsys user failed: ${(error as Error).message}, falling back to pm list users`);
+      return await this.listUsersLegacy();
+    }
+  }
+
+  /**
+   * Parse user information from dumpsys user output
+   * Example line: "  UserInfo{0:null:4c13} serialNo=0 isPrimary=true"
+   * Followed by: "    State: RUNNING_UNLOCKED" or "    State: SHUTDOWN"
+   * @param output - Raw dumpsys user output
+   * @returns Array of parsed Android users
+   */
+  private parseUsersFromDumpsys(output: string): AndroidUser[] {
+    const users: AndroidUser[] = [];
+    const lines = output.split("\n");
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Match UserInfo line: UserInfo{userId:name:flags} ...
+      // Note: name can be "null" in dumpsys output, and flags are hexadecimal
+      const userMatch = line.match(/UserInfo\{(\d+):([^:]+):([0-9a-fA-F]+)\}/);
+      if (userMatch) {
+        const userId = parseInt(userMatch[1], 10);
+        let userName = userMatch[2];
+        const flags = parseInt(userMatch[3], 16); // Parse as hexadecimal
+
+        // Look for the State line in the next few lines
+        let running = false;
+        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+          const stateLine = lines[j];
+
+          // If we hit another UserInfo, stop searching
+          if (stateLine.match(/UserInfo\{/)) {
+            break;
+          }
+
+          // Check for State: RUNNING_UNLOCKED or RUNNING_LOCKED
+          if (stateLine.match(/State:\s+(RUNNING_UNLOCKED|RUNNING_LOCKED)/)) {
+            running = true;
+            break;
+          }
+
+          // If we see State: SHUTDOWN, mark as not running
+          if (stateLine.match(/State:\s+SHUTDOWN/)) {
+            running = false;
+            break;
+          }
+        }
+
+        // If name is "null" in dumpsys, try to get the real name from "Owner name:" line
+        if (userName === "null") {
+          // For user 0, look for "Owner name:" line
+          const ownerMatch = output.match(/Owner name:\s+(.+)/);
+          if (ownerMatch && userId === 0) {
+            userName = ownerMatch[1].trim();
+          } else {
+            userName = `User ${userId}`;
+          }
+        }
+
+        users.push({
+          userId,
+          name: userName,
+          flags,
+          running
+        });
+      }
+    }
+
+    return users;
+  }
+
+  /**
+   * Legacy method to list users using pm list users command
+   * Used as fallback when dumpsys user is not available or fails
+   * Example output:
+   *   Users:
+   *     UserInfo{0:Owner:4c13} running
+   *     UserInfo{10:Work profile:30} running
+   * @returns Promise with array of Android users
+   */
+  private async listUsersLegacy(): Promise<AndroidUser[]> {
     try {
       const result = await this.executeCommand("shell pm list users", undefined, undefined, true);
       const lines = result.stdout.split("\n");
@@ -305,15 +399,28 @@ export class AdbClient implements AdbExecutor {
         }
       }
 
-      logger.info(`[ADB] Found ${users.length} user(s): ${users.map(u => `${u.userId}:${u.name}`).join(", ")}`);
-      return users;
+      if (users.length > 0) {
+        logger.info(`[ADB] Found ${users.length} user(s) via pm: ${users.map(u => `${u.userId}:${u.name}`).join(", ")}`);
+        return users;
+      }
+
+      // If still no users found, log the raw output for debugging
+      logger.warn(`[ADB] Failed to parse users from pm list users. Raw output: ${result.stdout.substring(0, 200)}`);
+
+      // Return primary user as last resort fallback
+      return [{
+        userId: 0,
+        name: "Owner",
+        flags: 0x13,
+        running: true
+      }];
     } catch (error) {
-      logger.warn(`[ADB] Failed to list users: ${(error as Error).message}`);
+      logger.warn(`[ADB] Failed to list users via pm: ${(error as Error).message}`);
       // Return primary user as fallback
       return [{
         userId: 0,
         name: "Owner",
-        flags: 13,
+        flags: 0x13,
         running: true
       }];
     }
