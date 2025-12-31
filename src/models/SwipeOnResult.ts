@@ -1,5 +1,6 @@
 import { ObserveResult } from "./ObserveResult";
 import { Element } from "./Element";
+import { ToolDebugInfo } from "../utils/DebugContextBuilder";
 
 /**
  * Result of a swipeOn operation
@@ -36,4 +37,7 @@ export interface SwipeOnResult {
   a11yTotalTimeMs?: number;
   a11yGestureTimeMs?: number;
   fallbackReason?: string;
+
+  // Debug information (when debug mode is enabled)
+  debug?: ToolDebugInfo;
 }

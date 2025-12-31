@@ -17,6 +17,7 @@ import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
+import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 
 /**
  * Command to tap on UI element containing specified text
@@ -290,7 +291,28 @@ export class TapOnElement extends BaseVisualChange {
       );
     } catch (error) {
       perf.end();
-      throw new ActionableError(`Failed to perform tap on element: ${error}`);
+
+      // Build debug context if debug mode is enabled
+      const debugContext = await buildElementSearchDebugContext(
+        this.device,
+        {
+          text: options.text,
+          resourceId: options.elementId,
+          containerElementId: options.containerElementId
+        }
+      );
+
+      // Return error result with debug info instead of throwing
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        action: options.action,
+        error: `Failed to perform tap on element: ${errorMessage}`,
+        element: {
+          bounds: { left: 0, top: 0, right: 0, bottom: 0 }
+        } as Element,
+        ...(debugContext ? { debug: { elementSearch: debugContext } } : {})
+      };
     }
   }
 

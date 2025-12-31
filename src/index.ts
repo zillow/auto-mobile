@@ -9,6 +9,7 @@ import { logger } from "./utils/logger";
 import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { runCliCommand } from "./cli";
 import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
+import { setDebugModeEnabled } from "./utils/debug";
 import { serverConfig } from "./utils/ServerConfig";
 
 // Interface for transport configuration
@@ -421,9 +422,10 @@ async function main() {
       logger.info("Performance timing enabled (--debug-perf)");
     }
 
-    // Log when debug mode is enabled
+    // Enable debug mode if --debug flag is set
     if (debug) {
-      logger.info("Debug tools enabled (--debug)");
+      setDebugModeEnabled(true);
+      logger.info("Debug mode enabled (--debug)");
     }
 
     // Enable UI performance audit mode if --ui-perf-mode flag is set

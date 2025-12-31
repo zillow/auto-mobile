@@ -1,5 +1,6 @@
 import { Element } from "./Element";
 import { ObserveResult } from "./ObserveResult";
+import { ToolDebugInfo } from "../utils/DebugContextBuilder";
 
 /**
  * Result of a tap on text operation
@@ -10,4 +11,5 @@ export interface TapOnElementResult {
   element: Element;
   observation?: ObserveResult;
   error?: string;
+  debug?: ToolDebugInfo;
 }

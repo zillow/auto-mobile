@@ -17,6 +17,7 @@ import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
+import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 
 /**
  * Unified command to swipe on screen or elements, with optional scroll-until-visible functionality
@@ -93,7 +94,32 @@ export class SwipeOn extends BaseVisualChange {
       }
     } catch (error) {
       perf.end();
-      throw new ActionableError(`Failed to perform swipeOn: ${error}`);
+
+      // Build debug context if debug mode is enabled and we have search criteria
+      const debugContext = options.lookFor || options.container
+        ? await buildElementSearchDebugContext(
+          this.device,
+          {
+            text: options.lookFor?.text,
+            resourceId: options.lookFor?.elementId || options.container?.elementId,
+            containerElementId: options.container?.elementId
+          }
+        )
+        : undefined;
+
+      // Return error result with debug info instead of throwing
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        error: `Failed to perform swipeOn: ${errorMessage}`,
+        targetType: options.container ? "element" : "screen",
+        x1: 0,
+        y1: 0,
+        x2: 0,
+        y2: 0,
+        duration: 0,
+        ...(debugContext ? { debug: { elementSearch: debugContext } } : {})
+      };
     }
   }
 
