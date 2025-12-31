@@ -65,7 +65,7 @@ runs:
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
-        java-version: '23'
+        java-version: '21'
 
     - name: "Set up jemalloc"
       if: ${{ inputs.malloc-replacement == 'jemalloc' }}
@@ -74,6 +74,16 @@ runs:
     - name: "Set up tcmalloc"
       if: ${{ inputs.malloc-replacement == 'tcmalloc' }}
       uses: kaeawc/setup-tcmalloc@v0.0.1
+
+    - name: "Sanitize artifact name"
+      id: sanitize-name
+      shell: ${{ inputs.shell }}
+      if: success() || failure()
+      run: |
+        # Remove or replace non-alphanumeric characters (keeping hyphens and underscores)
+        sanitized_name=$(echo "${{ inputs.gradle-tasks }}" | sed 's/[^a-zA-Z0-9_-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+        echo "sanitized_name=$sanitized_name" >> $GITHUB_OUTPUT
+        echo "Sanitized name: $sanitized_name"
 
     - name: "Print Java Flags & version"
       if: ${{ inputs.debug == 'true' }}
@@ -149,27 +159,27 @@ runs:
         build-scan-terms-of-use-agree: 'yes'
         validate-wrappers: true
 
-    - name: "Restore Android SDK Platform Tools"
-      id: cache-android-platform-tools
+    - name: "Restore Android SDK Cache"
+      id: cache-android-sdk
       uses: actions/cache/restore@v4
       with:
         path: |
-          /usr/local/lib/android/sdk/platform-tools
-          /home/runner/.config/.android/cache
-        key: v2-${{ runner.os }}-android-platform-tools
+          ~/.android
+          ~/.config
+        key: v4-${{ runner.os }}-android-sdk
 
-    - name: "Setup Android SDK"
-      if: steps.cache-android-platform-tools.outputs.cache-hit != 'true'
+    - name: Setup Android SDK
+      if: steps.cache-android-sdk.outputs.cache-hit != 'true'
       uses: android-actions/setup-android@v3.2.2
 
-    - name: "Save Android SDK Platform Tools"
+    - name: "Save Android SDK Cache"
       uses: actions/cache/save@v4
-      if: steps.cache-android-platform-tools.outputs.cache-hit != 'true'
+      if: steps.cache-android-sdk.outputs.cache-hit != 'true'
       with:
         path: |
-          /usr/local/lib/android/sdk/platform-tools
-          /home/runner/.config/.android/cache
-        key: v2-${{ runner.os }}-android-platform-tools
+          ~/.android
+          ~/.config
+        key: v4-${{ runner.os }}-android-sdk
 
     - name: "Run Tasks via Gradle"
       shell: ${{ inputs.shell }}
@@ -204,3 +214,11 @@ runs:
         else
           touch build/reports/config-cache-report.html
         fi
+
+    - name: "Store Config Cache Report"
+      uses: actions/upload-artifact@v4.4.0
+      if: success()
+      with:
+        name: config-cache-report-${{ steps.sanitize-name.outputs.sanitized_name }}
+        path: |
+          ${{ inputs.gradle-project-directory }}/build/reports/config-cache-report.html
