@@ -61,10 +61,10 @@ jobs:
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
-        run: pnpm run lint
+        run: bun run lint
 
       - name: "Run Tests"
-        run: pnpm run test
+        run: bun run test
 
   junit-runner-unit-tests:
     name: "Run JUnit Runner Unit Tests"
@@ -223,7 +223,7 @@ jobs:
       - name: "Extract version from package.json"
         id: package-version
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION=$(bun -p "require('./package.json').version")
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Extracted version: ${VERSION}"
 

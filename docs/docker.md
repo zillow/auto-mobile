@@ -6,7 +6,7 @@ This guide covers how to use Docker to run AutoMobile with all required Android 
 
 The Docker setup provides a complete Android development environment with:
 
-- **Node.js 24.x** - Runtime for the MCP server
+- **Bun 1.3.5** - All-in-one JavaScript runtime and package manager
 - **Java 21** - Required for Android build tools and ktfmt
 - **Android SDK** - Latest SDK with platform tools and build tools
   - Platform Tools (includes ADB)
@@ -161,23 +161,23 @@ docker-compose exec auto-mobile bash
 
 ```bash
 # Run all tests
-docker-compose exec auto-mobile pnpm test
+docker-compose exec auto-mobile bun test
 
 # Run specific test
-docker-compose exec auto-mobile pnpm run test -- --grep "test name"
+docker-compose exec auto-mobile bun run test -- --grep "test name"
 
 # Run tests with coverage
-docker-compose exec auto-mobile ppnpm run test:coverage
+docker-compose exec auto-mobile bun run test:coverage
 ```
 
 ### Linting and Validation
 
 ```bash
 # Run linter
-docker-compose exec auto-mobile pnpm run lint
+docker-compose exec auto-mobile bun run lint
 
 # Run build
-docker-compose exec auto-mobile pnpm run build
+docker-compose exec auto-mobile bun run build
 
 # Validate shell scripts
 docker-compose exec auto-mobile scripts/shellcheck/validate_shell_scripts.sh
@@ -233,7 +233,7 @@ If builds fail with permission errors:
 
 2. **Clear caches**:
    ```bash
-   docker-compose exec auto-mobile pnpm run clean
+   docker-compose exec auto-mobile bun run clean
    docker-compose exec auto-mobile rm -rf node_modules
    docker-compose up --build
    ```
@@ -339,7 +339,7 @@ jobs:
         run: docker build -t auto-mobile:test .
 
       - name: Run tests
-        run: docker run --rm auto-mobile:test pnpm test
+        run: docker run --rm auto-mobile:test bun test
 ```
 
 ### GitLab CI
@@ -351,7 +351,7 @@ test:
     - docker:dind
   script:
     - docker build -t auto-mobile:test .
-    - docker run --rm auto-mobile:test pnpm test
+    - docker run --rm auto-mobile:test bun test
 ```
 
 ## Validation and Testing

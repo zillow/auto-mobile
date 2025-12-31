@@ -19,17 +19,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 10.26.2
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
+          bun-version: 1.3.5
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -48,8 +41,8 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Install Node dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Make gradlew executable
         run: chmod +x android/gradlew
@@ -82,16 +75,16 @@ jobs:
         run: |
           RELEASE_VERSION="${{ steps.version.outputs.version }}" \
           APK_SHA256_CHECKSUM="${{ steps.checksum.outputs.checksum }}" \
-          node scripts/generate-release-constants.js
+          bun scripts/generate-release-constants.js
 
       - name: Run tests
-        run: pnpm run test
+        run: bun run test
 
       - name: Run lint
-        run: pnpm run lint
+        run: bun run lint
 
       - name: Build TypeScript with injected checksum
-        run: pnpm run build
+        run: bun run build
 
       - name: Create release notes
         id: release_notes
@@ -121,7 +114,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Publish to npm
-        run: pnpm publish
+        run: bun publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

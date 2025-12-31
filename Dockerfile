@@ -5,7 +5,7 @@
 # Versions should be updated periodically by checking the following sources:
 #
 # - Azul Zulu JDK: https://hub.docker.com/r/azul/zulu-openjdk-alpine
-# - Node.js: https://nodejs.org/en/about/previous-releases (LTS versions)
+# - Bun: https://github.com/oven-sh/bun/releases
 # - ktfmt: https://github.com/facebook/ktfmt/releases
 # - lychee: https://github.com/lycheeverse/lychee/releases
 # - tini: https://github.com/krallin/tini/releases
@@ -85,13 +85,12 @@ RUN apk --no-cache add \
 # Now that bash is installed, set it as the default shell
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
-# Install Node.js 24.x for Alpine
-# Alpine 3.23 includes Node.js 24.x in its package repositories
-RUN apk add --no-cache nodejs npm
-
-# Install pnpm directly via npm
-# Alpine's npm doesn't include corepack, and corepack has signature verification issues
-RUN npm install -g pnpm@10.26.2
+# Install Bun - all-in-one JavaScript runtime and package manager
+# Check for updates: https://github.com/oven-sh/bun/releases
+ENV BUN_VERSION=1.3.5
+RUN curl -fsSL "https://bun.sh/install" | bash -s "bun-v${BUN_VERSION}" \
+    && mv /root/.bun/bin/bun /usr/local/bin/bun \
+    && chmod +x /usr/local/bin/bun
 
 # Install ktfmt (Kotlin formatter)
 # Check for updates: https://github.com/facebook/ktfmt/releases
@@ -141,16 +140,16 @@ RUN sdkmanager --install \
 WORKDIR /workspace
 
 # Copy package files first for better caching
-COPY package.json pnpm-lock.yaml .npmrc ./
+COPY package.json bun.lock ./
 
-# Install Node.js dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with Bun
+RUN bun install --frozen-lockfile
 
 # Copy the rest of the application
 COPY . .
 
 # Build the application
-RUN pnpm run build
+RUN bun run build
 
 # ==============================================================================
 # RUNTIME STAGE - Minimal image with only runtime dependencies
@@ -175,9 +174,6 @@ RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositor
 
 # Install runtime dependencies only (no build tools)
 RUN apk --no-cache add \
-    # Node.js runtime
-    nodejs \
-    npm \
     # Runtime utilities
     bash \
     curl \
@@ -192,9 +188,11 @@ RUN apk --no-cache add \
 # Now that bash is installed, set it as the default shell
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
-# Install pnpm directly via npm in runtime stage
-# Alpine's npm doesn't include corepack, and corepack has signature verification issues
-RUN npm install -g pnpm@10.26.2
+# Install Bun in runtime stage
+ENV BUN_VERSION=1.3.5
+RUN curl -fsSL "https://bun.sh/install" | bash -s "bun-v${BUN_VERSION}" \
+    && mv /root/.bun/bin/bun /usr/local/bin/bun \
+    && chmod +x /usr/local/bin/bun
 
 # Copy Android SDK from builder (needed for ADB at runtime)
 COPY --from=builder /opt/android-sdk /opt/android-sdk
@@ -211,8 +209,7 @@ WORKDIR /workspace
 
 # Copy package files and node_modules from builder
 COPY --from=builder /workspace/package.json ./
-COPY --from=builder /workspace/pnpm-lock.yaml ./
-COPY --from=builder /workspace/.npmrc ./
+COPY --from=builder /workspace/bun.lock ./
 COPY --from=builder /workspace/node_modules ./node_modules
 
 # Copy built application from builder
@@ -240,8 +237,7 @@ RUN adduser -D automobile \
 USER automobile
 
 # Verify runtime installations
-RUN node --version \
-    && pnpm --version \
+RUN bun --version \
     && java -version \
     && adb version \
     && sdkmanager --list_installed \
@@ -255,5 +251,5 @@ RUN node --version \
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
 
 # Default command - Run MCP server in stdio mode (default)
-# For other transports, override with: docker run ... pnpm run dev:sse
-CMD ["node", "dist/src/index.js"]
+# For other transports, override with: docker run ... bun run dev:sse
+CMD ["bun", "dist/src/index.js"]
