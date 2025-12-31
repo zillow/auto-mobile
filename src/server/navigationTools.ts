@@ -3,7 +3,7 @@ import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { ActionableError, BootedDevice } from "../models";
 import { NavigateTo, NavigateToOptions } from "../features/navigation/NavigateTo";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
-import { MonkeyNavigate, MonkeyNavigateOptions } from "../features/navigation/MonkeyNavigate";
+import { Explore, ExploreOptions } from "../features/navigation/Explore";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
 
@@ -17,7 +17,7 @@ export const getNavigationGraphSchema = z.object({
   platform: z.enum(["android", "ios"]).default("android")
 });
 
-export const monkeyNavigateSchema = z.object({
+export const exploreSchema = z.object({
   maxInteractions: z.number().optional().describe("Maximum number of interactions to perform (default: 50)"),
   timeoutMs: z.number().optional().describe("Maximum time in milliseconds (default: 300000 - 5 minutes)"),
   strategy: z.enum(["breadth-first", "depth-first", "weighted"]).optional().describe("Exploration strategy (default: weighted)"),
@@ -39,7 +39,7 @@ export interface GetNavigationGraphArgs {
   platform: Platform;
 }
 
-export interface MonkeyNavigateArgs extends MonkeyNavigateOptions {
+export interface ExploreArgs extends ExploreOptions {
   platform: Platform;
 }
 
@@ -131,15 +131,15 @@ export function registerNavigationTools() {
     getNavigationGraphHandler
   );
 
-  // MonkeyNavigate handler
-  const monkeyNavigateHandler = async (
+  // Explore handler
+  const exploreHandler = async (
     device: BootedDevice,
-    args: MonkeyNavigateArgs,
+    args: ExploreArgs,
     progress?: ProgressCallback
   ) => {
     try {
-      const monkeyNavigate = new MonkeyNavigate(device);
-      const options: MonkeyNavigateOptions = {
+      const explore = new Explore(device);
+      const options: ExploreOptions = {
         maxInteractions: args.maxInteractions,
         timeoutMs: args.timeoutMs,
         strategy: args.strategy,
@@ -148,27 +148,28 @@ export function registerNavigationTools() {
         mode: args.mode,
         packageName: args.packageName
       };
-      const result = await monkeyNavigate.execute(options, progress);
+      const result = await explore.execute(options, progress);
 
       return createJSONToolResponse({
-        message: `Monkey navigation completed: ${result.interactionsPerformed} interactions, ${result.screensDiscovered} new screens discovered, ${result.coverage.percentage}% coverage`,
+        message: `Exploration completed: ${result.interactionsPerformed} interactions, ${result.screensDiscovered} new screens discovered, ${result.coverage.percentage}% coverage`,
         ...result
       });
     } catch (error) {
-      throw new ActionableError(`Failed to execute monkey navigation: ${error}`);
+      throw new ActionableError(`Failed to execute exploration: ${error}`);
     }
   };
 
   ToolRegistry.registerDeviceAware(
-    "monkeyNavigate",
-    "Automatically explore the app by intelligently selecting and interacting with navigation elements. " +
+    "explore",
+    "Perpetually explore until all navigation destinations have been reached by " +
+    "automatically exploring the app and intelligently selecting and interacting with navigation elements. " +
     "Builds a comprehensive navigation graph by prioritizing likely navigation elements (buttons, tabs, menus), " +
     "avoiding redundant interactions, and efficiently covering unexplored screens. " +
     "Supports breadth-first, depth-first, and weighted exploration strategies. " +
     "Automatically detects and handles common blockers like permission dialogs and login screens. " +
     "Default: 50 interactions, weighted strategy, 5-minute timeout.",
-    monkeyNavigateSchema,
-    monkeyNavigateHandler,
+    exploreSchema,
+    exploreHandler,
     true // supports progress
   );
 }

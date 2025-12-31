@@ -10,19 +10,19 @@ import { TapOnElement } from "../action/TapOnElement";
 import { ElementParser } from "../utility/ElementParser";
 
 /**
- * Exploration strategies for monkeyNavigate
+ * Exploration strategies for explore
  */
 export type ExplorationStrategy = "breadth-first" | "depth-first" | "weighted";
 
 /**
- * Exploration modes for monkeyNavigate
+ * Exploration modes for explore
  */
 export type ExplorationMode = "discover" | "validate" | "hybrid";
 
 /**
- * Options for MonkeyNavigate execution
+ * Options for Explore execution
  */
-export interface MonkeyNavigateOptions {
+export interface ExploreOptions {
   /** Maximum number of interactions to perform */
   maxInteractions?: number;
 
@@ -59,9 +59,9 @@ export interface ElementSelectionStats {
 }
 
 /**
- * Result of MonkeyNavigate execution
+ * Result of Explore execution
  */
-export interface MonkeyNavigateResult {
+export interface ExploreResult {
   success: boolean;
   error?: string;
   interactionsPerformed: number;
@@ -92,11 +92,12 @@ interface TrackedElement {
 }
 
 /**
- * MonkeyNavigate implements intelligent app navigation exploration.
- * It automatically discovers navigation paths by prioritizing likely navigation elements,
+ * Explore implements intelligent app navigation exploration.
+ * Perpetually explores until all navigation destinations have been reached by
+ * automatically discovering navigation paths, prioritizing likely navigation elements,
  * avoiding redundant interactions, and efficiently covering unexplored screens.
  */
-export class MonkeyNavigate extends BaseVisualChange {
+export class Explore extends BaseVisualChange {
   private navigationManager: NavigationGraphManager;
   private exploredElements: Map<string, TrackedElement>;
   private interactionCount: number = 0;
@@ -127,26 +128,26 @@ export class MonkeyNavigate extends BaseVisualChange {
   }
 
   /**
-   * Execute monkey navigation exploration
+   * Execute exploration
    */
   async execute(
-    options: MonkeyNavigateOptions = {},
+    options: ExploreOptions = {},
     progress?: ProgressCallback
-  ): Promise<MonkeyNavigateResult> {
+  ): Promise<ExploreResult> {
     const perf = createGlobalPerformanceTracker();
-    perf.serial("monkeyNavigate");
+    perf.serial("explore");
     const startTime = Date.now();
 
     try {
       // Set defaults
-      const maxInteractions = options.maxInteractions ?? MonkeyNavigate.DEFAULT_MAX_INTERACTIONS;
-      const timeoutMs = options.timeoutMs ?? MonkeyNavigate.DEFAULT_TIMEOUT_MS;
+      const maxInteractions = options.maxInteractions ?? Explore.DEFAULT_MAX_INTERACTIONS;
+      const timeoutMs = options.timeoutMs ?? Explore.DEFAULT_TIMEOUT_MS;
       const strategy = options.strategy ?? "weighted";
       const mode = options.mode ?? "hybrid";
-      const resetInterval = options.resetInterval ?? MonkeyNavigate.DEFAULT_RESET_INTERVAL;
+      const resetInterval = options.resetInterval ?? Explore.DEFAULT_RESET_INTERVAL;
 
       if (progress) {
-        await progress(0, maxInteractions, "Starting monkey navigation exploration...");
+        await progress(0, maxInteractions, "Starting exploration...");
       }
 
       // Capture initial graph state
@@ -167,7 +168,7 @@ export class MonkeyNavigate extends BaseVisualChange {
 
         // Check for safety conditions
         if (this.shouldBreakForSafety(observation)) {
-          logger.warn("[MonkeyNavigate] Safety condition triggered, stopping exploration");
+          logger.warn("[Explore] Safety condition triggered, stopping exploration");
           break;
         }
 
@@ -186,7 +187,7 @@ export class MonkeyNavigate extends BaseVisualChange {
         );
 
         if (!nextElement) {
-          logger.info("[MonkeyNavigate] No suitable element found, attempting back navigation");
+          logger.info("[Explore] No suitable element found, attempting back navigation");
           await this.handleDeadEnd(progress);
           continue;
         }
@@ -226,7 +227,7 @@ export class MonkeyNavigate extends BaseVisualChange {
       return this.generateReport(initialGraph, startTime);
     } catch (error) {
       perf.end();
-      throw new ActionableError(`Failed to execute monkey navigation: ${error}`);
+      throw new ActionableError(`Failed to execute exploration: ${error}`);
     }
   }
 
@@ -241,12 +242,12 @@ export class MonkeyNavigate extends BaseVisualChange {
     const elapsed = Date.now() - startTime;
 
     if (this.interactionCount >= maxInteractions) {
-      logger.info(`[MonkeyNavigate] Reached max interactions: ${maxInteractions}`);
+      logger.info(`[Explore] Reached max interactions: ${maxInteractions}`);
       return false;
     }
 
     if (elapsed >= timeoutMs) {
-      logger.info(`[MonkeyNavigate] Reached timeout: ${timeoutMs}ms`);
+      logger.info(`[Explore] Reached timeout: ${timeoutMs}ms`);
       return false;
     }
 
@@ -258,14 +259,14 @@ export class MonkeyNavigate extends BaseVisualChange {
    */
   private shouldBreakForSafety(observation: ObserveResult): boolean {
     // Check for consecutive backs
-    if (this.consecutiveBackCount >= MonkeyNavigate.MAX_CONSECUTIVE_BACKS) {
-      logger.warn("[MonkeyNavigate] Too many consecutive backs");
+    if (this.consecutiveBackCount >= Explore.MAX_CONSECUTIVE_BACKS) {
+      logger.warn("[Explore] Too many consecutive backs");
       return true;
     }
 
     // Check for screen stuck (no changes)
-    if (this.consecutiveNoChangeCount >= MonkeyNavigate.MAX_CONSECUTIVE_NO_CHANGE) {
-      logger.warn("[MonkeyNavigate] Screen appears stuck (no changes detected)");
+    if (this.consecutiveNoChangeCount >= Explore.MAX_CONSECUTIVE_NO_CHANGE) {
+      logger.warn("[Explore] Screen appears stuck (no changes detected)");
       return true;
     }
 
@@ -273,8 +274,8 @@ export class MonkeyNavigate extends BaseVisualChange {
     const currentScreen = this.navigationManager.getCurrentScreen();
     if (currentScreen) {
       const loopCount = this.loopDetection.get(currentScreen) ?? 0;
-      if (loopCount >= MonkeyNavigate.MAX_LOOP_ITERATIONS) {
-        logger.warn(`[MonkeyNavigate] Detected loop on screen: ${currentScreen}`);
+      if (loopCount >= Explore.MAX_LOOP_ITERATIONS) {
+        logger.warn(`[Explore] Detected loop on screen: ${currentScreen}`);
         return true;
       }
     }
@@ -639,7 +640,7 @@ export class MonkeyNavigate extends BaseVisualChange {
 
       return tapResult.success;
     } catch (error) {
-      logger.warn(`[MonkeyNavigate] Failed to interact with element: ${error}`);
+      logger.warn(`[Explore] Failed to interact with element: ${error}`);
       return false;
     }
   }
@@ -661,20 +662,20 @@ export class MonkeyNavigate extends BaseVisualChange {
 
     // Check for permission dialogs
     if (this.isPermissionDialog(elements)) {
-      logger.info("[MonkeyNavigate] Detected permission dialog, attempting to dismiss");
+      logger.info("[Explore] Detected permission dialog, attempting to dismiss");
       return await this.handlePermissionDialog(elements, progress);
     }
 
     // Check for login/signup screens
     if (this.isLoginScreen(elements)) {
-      logger.info("[MonkeyNavigate] Detected login screen, skipping by going back");
+      logger.info("[Explore] Detected login screen, skipping by going back");
       await this.handleDeadEnd(progress);
       return true;
     }
 
     // Check for app rating/review dialogs
     if (this.isRatingDialog(elements)) {
-      logger.info("[MonkeyNavigate] Detected rating dialog, attempting to dismiss");
+      logger.info("[Explore] Detected rating dialog, attempting to dismiss");
       return await this.dismissDialog(elements, progress);
     }
 
@@ -768,7 +769,7 @@ export class MonkeyNavigate extends BaseVisualChange {
           await new Promise(resolve => setTimeout(resolve, 1000));
           return true;
         } catch (error) {
-          logger.warn(`[MonkeyNavigate] Failed to handle permission dialog: ${error}`);
+          logger.warn(`[Explore] Failed to handle permission dialog: ${error}`);
         }
       }
     }
@@ -806,7 +807,7 @@ export class MonkeyNavigate extends BaseVisualChange {
           await new Promise(resolve => setTimeout(resolve, 1000));
           return true;
         } catch (error) {
-          logger.warn(`[MonkeyNavigate] Failed to dismiss dialog: ${error}`);
+          logger.warn(`[Explore] Failed to dismiss dialog: ${error}`);
         }
       }
     }
@@ -834,7 +835,7 @@ export class MonkeyNavigate extends BaseVisualChange {
       // Wait briefly for navigation
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
-      logger.warn(`[MonkeyNavigate] Failed to navigate back: ${error}`);
+      logger.warn(`[Explore] Failed to navigate back: ${error}`);
     }
   }
 
@@ -860,7 +861,7 @@ export class MonkeyNavigate extends BaseVisualChange {
       // Reset consecutive back count
       this.consecutiveBackCount = 0;
     } catch (error) {
-      logger.warn(`[MonkeyNavigate] Failed to reset to home: ${error}`);
+      logger.warn(`[Explore] Failed to reset to home: ${error}`);
     }
   }
 
@@ -892,7 +893,7 @@ export class MonkeyNavigate extends BaseVisualChange {
   private generateReport(
     initialGraph: ExportedGraph,
     startTime: number
-  ): MonkeyNavigateResult {
+  ): ExploreResult {
     const finalGraph = this.navigationManager.exportGraph();
     const screensDiscovered = finalGraph.nodes.length - initialGraph.nodes.length;
     const edgesAdded = finalGraph.edges.length - initialGraph.edges.length;
