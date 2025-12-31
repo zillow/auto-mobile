@@ -3,7 +3,7 @@
  * Uses screenshot pixel analysis to determine text/background contrast ratios
  */
 
-import { Jimp } from "jimp";
+import { Jimp, intToRGBA } from "jimp";
 import { Element } from "../../models/Element";
 import { WcagLevel } from "../../models/AccessibilityAudit";
 
@@ -91,7 +91,7 @@ export class ContrastChecker {
       for (let y = centerY - sampleSize; y <= centerY + sampleSize; y++) {
         if (x >= left && x < right && y >= top && y < bottom) {
           try {
-            const pixel = Jimp.intToRGBA(image.getPixelColor(x, y));
+            const pixel = intToRGBA(image.getPixelColor(x, y));
             colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
           } catch (e) {
             // Skip invalid pixels
@@ -118,7 +118,7 @@ export class ContrastChecker {
     for (let x = left; x < right; x += 3) {
       for (let y = top; y < top + edgeSampleSize; y++) {
         try {
-          const pixel = Jimp.intToRGBA(image.getPixelColor(x, y));
+          const pixel = intToRGBA(image.getPixelColor(x, y));
           colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
         } catch (e) {
           // Skip
@@ -126,7 +126,7 @@ export class ContrastChecker {
       }
       for (let y = bottom - edgeSampleSize; y < bottom; y++) {
         try {
-          const pixel = Jimp.intToRGBA(image.getPixelColor(x, y));
+          const pixel = intToRGBA(image.getPixelColor(x, y));
           colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
         } catch (e) {
           // Skip
@@ -138,7 +138,7 @@ export class ContrastChecker {
     for (let y = top; y < bottom; y += 3) {
       for (let x = left; x < left + edgeSampleSize; x++) {
         try {
-          const pixel = Jimp.intToRGBA(image.getPixelColor(x, y));
+          const pixel = intToRGBA(image.getPixelColor(x, y));
           colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
         } catch (e) {
           // Skip
@@ -146,7 +146,7 @@ export class ContrastChecker {
       }
       for (let x = right - edgeSampleSize; x < right; x++) {
         try {
-          const pixel = Jimp.intToRGBA(image.getPixelColor(x, y));
+          const pixel = intToRGBA(image.getPixelColor(x, y));
           colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
         } catch (e) {
           // Skip
@@ -160,7 +160,7 @@ export class ContrastChecker {
       for (let x = Math.max(0, left - margin); x < left; x++) {
         for (let y = top; y < bottom; y += 3) {
           try {
-            const pixel = Jimp.intToRGBA(image.getPixelColor(x, y));
+            const pixel = intToRGBA(image.getPixelColor(x, y));
             colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
           } catch (e) {
             // Skip

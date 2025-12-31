@@ -6,7 +6,7 @@ node_modules
 /venv
 /test_screenshots
 .view_hierarchy_cache/
-screenshots/
+/screenshots
 **/.DS_Store
 .nyc_output/
 npm-debug.log*
