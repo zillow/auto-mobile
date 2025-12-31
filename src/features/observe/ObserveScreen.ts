@@ -16,7 +16,7 @@ import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../ut
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
-import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { PerformanceTracker, NoOpPerformanceTracker, processTimingData } from "../../utils/PerformanceTracker";
 import { PerformanceAudit } from "../performance/PerformanceAudit";
 import { ThresholdManager } from "../performance/ThresholdManager";
 import { DeviceCapabilitiesDetector } from "../../utils/DeviceCapabilities";
@@ -698,10 +698,14 @@ export class ObserveScreen {
 
       perf.end();
 
-      // Attach performance timing if enabled
+      // Attach performance timing if enabled (with filtering and truncation)
       const timings = perf.getTimings();
-      if (timings) {
-        result.perfTiming = timings;
+      const processedTimings = processTimingData(timings);
+      if (processedTimings) {
+        result.perfTiming = processedTimings.data;
+        if (processedTimings.truncated) {
+          result.perfTimingTruncated = true;
+        }
       }
 
       logger.debug("Observe command completed");

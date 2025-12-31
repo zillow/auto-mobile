@@ -80,6 +80,9 @@ export interface ObserveResult {
   /** Performance timing data (only present when --debug-perf is enabled) */
   perfTiming?: TimingData;
 
+  /** Indicates if performance timing data was truncated due to size limits */
+  perfTimingTruncated?: boolean;
+
   /** Graphics frame metrics from gfxinfo (only present when --debug-perf is enabled) */
   gfxMetrics?: GfxMetrics;
 

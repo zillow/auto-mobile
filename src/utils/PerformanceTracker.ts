@@ -348,3 +348,208 @@ export function isDebugPerfEnabled(): boolean {
 export function createGlobalPerformanceTracker(): PerformanceTracker {
   return createPerformanceTracker(debugPerfEnabled);
 }
+
+/**
+ * Maximum size for performance timing data in bytes (can be configured)
+ * Default: 50KB - reasonable limit that won't bloat MCP responses
+ */
+let maxPerfTimingSizeBytes = 50 * 1024; // 50KB
+
+/**
+ * Set the maximum size for performance timing data
+ */
+export function setMaxPerfTimingSizeBytes(sizeBytes: number): void {
+  maxPerfTimingSizeBytes = sizeBytes;
+}
+
+/**
+ * Get the current maximum size for performance timing data
+ */
+export function getMaxPerfTimingSizeBytes(): number {
+  return maxPerfTimingSizeBytes;
+}
+
+/**
+ * Result of processing timing data with filtering and truncation
+ */
+export interface ProcessedTimingData {
+  data: TimingData;
+  truncated?: boolean;
+}
+
+/**
+ * Recursively filter out timing entries with 0ms duration
+ */
+function filterZeroTimings(timings: TimingData): TimingData {
+  if (Array.isArray(timings)) {
+    // Filter array entries
+    return timings
+      .filter(entry => entry.durationMs > 0)
+      .map(entry => ({
+        ...entry,
+        children: entry.children ? filterZeroTimings(entry.children) : undefined
+      }))
+      .filter(entry => {
+        // Also remove entries that have no children after filtering
+        if (entry.children) {
+          const hasChildren = Array.isArray(entry.children)
+            ? entry.children.length > 0
+            : Object.keys(entry.children).length > 0;
+          return hasChildren;
+        }
+        return true;
+      });
+  } else {
+    // Filter object entries
+    const filtered: Record<string, TimingEntry> = {};
+    for (const [key, entry] of Object.entries(timings)) {
+      if (entry.durationMs > 0) {
+        const filteredEntry: TimingEntry = {
+          ...entry,
+          children: entry.children ? filterZeroTimings(entry.children) : undefined
+        };
+
+        // Only include if has children after filtering or has no children
+        if (filteredEntry.children) {
+          const hasChildren = Array.isArray(filteredEntry.children)
+            ? filteredEntry.children.length > 0
+            : Object.keys(filteredEntry.children).length > 0;
+          if (hasChildren) {
+            filtered[key] = filteredEntry;
+          }
+        } else {
+          filtered[key] = filteredEntry;
+        }
+      }
+    }
+    return filtered;
+  }
+}
+
+/**
+ * Estimate the JSON size of timing data in bytes
+ */
+function estimateTimingDataSize(timings: TimingData): number {
+  return JSON.stringify(timings).length;
+}
+
+/**
+ * Collect all timing entries with their paths for sorting and removal
+ */
+interface TimingPath {
+  path: string[];
+  entry: TimingEntry;
+  parent: TimingData;
+  key: string | number;
+}
+
+function collectTimingPaths(timings: TimingData, parentPath: string[] = []): TimingPath[] {
+  const paths: TimingPath[] = [];
+
+  if (Array.isArray(timings)) {
+    timings.forEach((entry, index) => {
+      paths.push({
+        path: [...parentPath, entry.name],
+        entry,
+        parent: timings,
+        key: index
+      });
+      if (entry.children) {
+        paths.push(...collectTimingPaths(entry.children, [...parentPath, entry.name]));
+      }
+    });
+  } else {
+    for (const [key, entry] of Object.entries(timings)) {
+      paths.push({
+        path: [...parentPath, key],
+        entry,
+        parent: timings,
+        key
+      });
+      if (entry.children) {
+        paths.push(...collectTimingPaths(entry.children, [...parentPath, key]));
+      }
+    }
+  }
+
+  return paths;
+}
+
+/**
+ * Remove a timing entry from its parent
+ */
+function removeTimingEntry(parent: TimingData, key: string | number): void {
+  if (Array.isArray(parent)) {
+    parent.splice(key as number, 1);
+  } else {
+    delete parent[key as string];
+  }
+}
+
+/**
+ * Truncate timing data by removing smallest duration entries until under size limit
+ */
+function truncateTimingData(timings: TimingData, maxSizeBytes: number): ProcessedTimingData {
+  // Make a deep copy to avoid mutating the original
+  const workingCopy = JSON.parse(JSON.stringify(timings)) as TimingData;
+
+  let currentSize = estimateTimingDataSize(workingCopy);
+  if (currentSize <= maxSizeBytes) {
+    return { data: workingCopy };
+  }
+
+  let truncated = false;
+
+  // Keep removing smallest timings until we're under the limit
+  while (currentSize > maxSizeBytes) {
+    // Collect all timing paths
+    const paths = collectTimingPaths(workingCopy);
+
+    if (paths.length === 0) {
+      // Nothing left to remove
+      break;
+    }
+
+    // Sort by duration (ascending) - smallest first
+    paths.sort((a, b) => a.entry.durationMs - b.entry.durationMs);
+
+    // Remove the smallest timing
+    const smallest = paths[0];
+    removeTimingEntry(smallest.parent, smallest.key);
+    truncated = true;
+
+    // Recalculate size
+    currentSize = estimateTimingDataSize(workingCopy);
+  }
+
+  return {
+    data: workingCopy,
+    truncated: truncated ? true : undefined
+  };
+}
+
+/**
+ * Process timing data by filtering zero-duration entries and truncating if needed
+ * @param timings - Raw timing data from performance tracker
+ * @returns Processed timing data with optional truncation flag
+ */
+export function processTimingData(timings: TimingData | null): ProcessedTimingData | null {
+  if (!timings) {
+    return null;
+  }
+
+  // First, filter out 0ms timings
+  const filtered = filterZeroTimings(timings);
+
+  // Check if empty after filtering
+  const isEmpty = Array.isArray(filtered)
+    ? filtered.length === 0
+    : Object.keys(filtered).length === 0;
+
+  if (isEmpty) {
+    return null;
+  }
+
+  // Then truncate if needed
+  return truncateTimingData(filtered, maxPerfTimingSizeBytes);
+}
