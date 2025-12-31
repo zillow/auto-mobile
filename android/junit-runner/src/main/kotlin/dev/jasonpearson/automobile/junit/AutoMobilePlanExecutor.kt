@@ -140,7 +140,15 @@ internal object AutoMobilePlanExecutor {
       planContent: String,
       options: AutoMobilePlanExecutionOptions
   ): List<String> {
-    val command = mutableListOf("npx", "auto-mobile", "--cli")
+    val command = mutableListOf<String>()
+
+    // Check for local development version first
+    val localAutoMobile = java.io.File("../../dist/src/index.js").absoluteFile
+    if (localAutoMobile.exists()) {
+      command.addAll(listOf("bun", localAutoMobile.absolutePath, "--cli"))
+    } else {
+      command.addAll(listOf("bunx", "auto-mobile", "--cli"))
+    }
 
     command.add("executePlan")
     command.addAll(listOf("--planContent", planContent))

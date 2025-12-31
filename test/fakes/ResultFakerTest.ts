@@ -1,28 +1,28 @@
-import { assert } from "chai";
+import { expect, describe, it } from "bun:test";
 import { ResultFaker } from "./ResultFaker";
 
 describe("ResultFaker", () => {
   it("should generate fake element bounds", () => {
     const bounds = ResultFaker.elementBounds();
-    assert.isNumber(bounds.left);
-    assert.isNumber(bounds.top);
-    assert.isNumber(bounds.right);
-    assert.isNumber(bounds.bottom);
+    expect(bounds.left).toBeTypeOf("number");
+    expect(bounds.top).toBeTypeOf("number");
+    expect(bounds.right).toBeTypeOf("number");
+    expect(bounds.bottom).toBeTypeOf("number");
   });
 
   it("should generate fake elements", () => {
     const element = ResultFaker.element();
-    assert.isObject(element);
-    assert.isObject(element.bounds);
+    expect(element).toBeTypeOf("object");
+    expect(element.bounds).toBeTypeOf("object");
   });
 
   it("should generate fake active window info with proper capitalization", () => {
     const info = ResultFaker.activeWindowInfo();
-    assert.isString(info.appId);
-    assert.isString(info.activityName);
+    expect(info.appId).toBeTypeOf("string");
+    expect(info.activityName).toBeTypeOf("string");
 
     // Validate the activity name format
-    assert.match(info.activityName, /^com\..*\.activities\.[A-Z].*Activity$/);
+    expect(info.activityName).toMatch(/^com\..*\.activities\.[A-Z].*Activity$/);
   });
 
   it("should respect overrides in activeWindowInfo", () => {
@@ -34,7 +34,7 @@ describe("ResultFaker", () => {
       activityName: customActivity
     });
 
-    assert.equal(info.appId, customPackage);
-    assert.equal(info.activityName, customActivity);
+    expect(info.appId).toBe(customPackage);
+    expect(info.activityName).toBe(customActivity);
   });
 });

@@ -21,7 +21,7 @@ console.log("Building with Bun...");
 const result = await Bun.build({
   entrypoints: ["./src/index.ts"],
   outdir: "./dist/src",
-  target: "node",
+  target: "bun",
   format: "esm",
   sourcemap: "external",
   minify: false,

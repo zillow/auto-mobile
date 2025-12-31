@@ -15,7 +15,7 @@ class AutoMobileRunnerTest {
   @After
   fun cleanUp() {
     // Reset system properties after each test to avoid interference
-    System.clearProperty("automobile.use.npx")
+    System.clearProperty("automobile.use.bunx")
     System.clearProperty("automobile.debug")
   }
 
@@ -46,26 +46,28 @@ class AutoMobileRunnerTest {
   }
 
   @Test
-  fun testBuildAutoMobileCommandWithNpx() {
-    System.setProperty("automobile.use.npx", "true")
+  fun testBuildAutoMobileCommandWithBunx() {
+    System.setProperty("automobile.use.bunx", "true")
 
     val runner = AutoMobileRunner(TestTargetClass::class.java)
     val method = TestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
 
     val command = runner.invokeBuildAutoMobileCommand("/path/to/plan.yaml", annotation)
+    val commandStr = command.joinToString(" ")
 
-    assertTrue(command.contains("npx"))
-    assertTrue(command.contains("auto-mobile"))
-    assertTrue(command.contains("--cli"))
-    assertTrue(command.contains("test"))
-    assertTrue(command.contains("run"))
-    assertTrue(command.contains("/path/to/plan.yaml"))
+    // When use.bunx=true, should use bunx (or bun if local dist exists)
+    assertTrue("Command $commandStr should contain 'bun' or 'bunx'",
+        commandStr.contains("bun") || commandStr.contains("bunx"))
+    assertTrue("Command $commandStr should contain '--cli'", commandStr.contains("--cli"))
+    assertTrue("Command $commandStr should contain 'test'", commandStr.contains("test"))
+    assertTrue("Command $commandStr should contain 'run'", commandStr.contains("run"))
+    assertTrue("Command $commandStr should contain plan path", commandStr.contains("/path/to/plan.yaml"))
   }
 
   @Test
-  fun testBuildAutoMobileCommandWithoutNpx() {
-    System.setProperty("automobile.use.npx", "false")
+  fun testBuildAutoMobileCommandWithoutBunx() {
+    System.setProperty("automobile.use.bunx", "false")
 
     val runner = AutoMobileRunner(TestTargetClass::class.java)
     val method = TestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
@@ -81,7 +83,7 @@ class AutoMobileRunnerTest {
     assertTrue(
         "Command $commandStr should contain plan path", commandStr.contains("/path/to/plan.yaml"))
     assertFalse(
-        "Command $commandStr should NOT contain 'npx' when disabled", commandStr.contains("npx"))
+        "Command $commandStr should NOT contain 'bunx' when disabled", commandStr.contains("bunx"))
   }
 
   @Test

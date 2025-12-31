@@ -49,11 +49,11 @@ class SimpleIntegrationTest {
   @Test
   fun testSystemPropertyDefaults() {
     // Test that system properties have sensible defaults
-    val useNpx = System.getProperty("automobile.use.npx", "true").toBoolean()
+    val useBunx = System.getProperty("automobile.use.bunx", "true").toBoolean()
     val debugMode = System.getProperty("automobile.debug", "false").toBoolean()
     val ciMode = System.getProperty("automobile.ci.mode", "false").toBoolean()
 
-    assertTrue("Default should be true for npx usage", useNpx)
+    assertTrue("Default should be true for bunx usage", useBunx)
     assertFalse("Default should be false for debug", debugMode)
     assertFalse("Default should be false for CI mode", ciMode)
   }

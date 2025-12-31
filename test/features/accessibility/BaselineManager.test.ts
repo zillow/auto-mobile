@@ -3,7 +3,7 @@
  * Tests baseline CRUD operations and database interactions
  */
 
-import { expect, describe, test, beforeEach, afterEach } from "bun:test";
+import { expect, describe, it, beforeEach, afterEach } from "bun:test";
 import type { WcagViolation } from "../../../src/models/AccessibilityAudit";
 import { createTestDatabase, destroyTestDatabase } from "../../helpers/test-database";
 import type { Kysely } from "kysely";
@@ -107,7 +107,7 @@ class TestBaselineManager {
   }
 }
 
-describe("BaselineManager", () => {
+describe("BaselineManager", function() {
   let manager: TestBaselineManager;
 
   beforeEach(async function() {
@@ -121,7 +121,7 @@ describe("BaselineManager", () => {
     await destroyTestDatabase(testDb);
   });
 
-  describe("CRUD Operations", () => {
+  describe("CRUD Operations", function() {
     const mockViolations: WcagViolation[] = [
       {
         type: "missing-content-description",
@@ -148,7 +148,7 @@ describe("BaselineManager", () => {
       },
     ];
 
-    test("should save baseline to database", async () => {
+    it("should save baseline to database", async function() {
       const screenId = "com.example.app.MainActivity";
 
       await manager.saveBaseline(screenId, mockViolations);
@@ -160,7 +160,7 @@ describe("BaselineManager", () => {
       expect(baseline!.violations[0].fingerprint).toBe("abc123");
     });
 
-    test("should retrieve baseline by screen ID", async () => {
+    it("should retrieve baseline by screen ID", async function() {
       const screenId = "com.example.app.SettingsActivity";
 
       await manager.saveBaseline(screenId, mockViolations);
@@ -171,7 +171,7 @@ describe("BaselineManager", () => {
       expect(baseline!.violations).toEqual(mockViolations);
     });
 
-    test("should update existing baseline", async () => {
+    it("should update existing baseline", async function() {
       const screenId = "com.example.app.MainActivity";
 
       // Save initial baseline
@@ -200,7 +200,7 @@ describe("BaselineManager", () => {
       expect(baseline!.violations[0].fingerprint).toBe("ghi789");
     });
 
-    test("should delete baseline", async () => {
+    it("should delete baseline", async function() {
       const screenId = "com.example.app.MainActivity";
 
       await manager.saveBaseline(screenId, mockViolations);
@@ -210,7 +210,7 @@ describe("BaselineManager", () => {
       expect(baseline).toBeNull();
     });
 
-    test("should list all baselines", async () => {
+    it("should list all baselines", async function() {
       await manager.saveBaseline("screen1", mockViolations.slice(0, 1));
       await manager.saveBaseline("screen2", mockViolations.slice(1, 2));
       await manager.saveBaseline("screen3", mockViolations);
@@ -219,12 +219,10 @@ describe("BaselineManager", () => {
       expect(baselines).toHaveLength(3);
 
       const screenIds = baselines.map(b => b.screenId);
-      expect(screenIds).toContain("screen1");
-      expect(screenIds).toContain("screen2");
-      expect(screenIds).toContain("screen3");
+      expect(screenIds).toEqual(expect.arrayContaining(["screen1", "screen2", "screen3"]));
     });
 
-    test("should clear all baselines", async () => {
+    it("should clear all baselines", async function() {
       await manager.saveBaseline("screen1", mockViolations);
       await manager.saveBaseline("screen2", mockViolations);
       await manager.saveBaseline("screen3", mockViolations);
@@ -236,13 +234,13 @@ describe("BaselineManager", () => {
     });
   });
 
-  describe("Filtering", () => {
-    test("should handle empty baseline", async () => {
+  describe("Filtering", function() {
+    it("should handle empty baseline", async function() {
       const baseline = await manager.getBaseline("nonexistent");
       expect(baseline).toBeNull();
     });
 
-    test("should handle baseline with empty violations array", async () => {
+    it("should handle baseline with empty violations array", async function() {
       const screenId = "com.example.app.EmptyScreen";
 
       await manager.saveBaseline(screenId, []);
@@ -253,8 +251,8 @@ describe("BaselineManager", () => {
     });
   });
 
-  describe("Cleanup", () => {
-    test("should cleanup old baselines", async () => {
+  describe("Cleanup", function() {
+    it("should cleanup old baselines", async function() {
       // Create a baseline with an old updated_at timestamp
       const now = new Date();
       const oldDate = new Date(now.getTime() - 31 * 24 * 60 * 60 * 1000); // 31 days ago
@@ -286,7 +284,7 @@ describe("BaselineManager", () => {
       expect(recentBaseline).not.toBeNull();
     });
 
-    test("should return 0 when no baselines to cleanup", async () => {
+    it("should return 0 when no baselines to cleanup", async function() {
       await manager.saveBaseline("recent_screen", []);
 
       const deletedCount = await manager.cleanupOldBaselines(30);
@@ -295,8 +293,8 @@ describe("BaselineManager", () => {
     });
   });
 
-  describe("Data Integrity", () => {
-    test("should preserve violation structure in JSON serialization", async () => {
+  describe("Data Integrity", function() {
+    it("should preserve violation structure in JSON serialization", async function() {
       const screenId = "test_screen";
       const violations: WcagViolation[] = [
         {
@@ -326,7 +324,7 @@ describe("BaselineManager", () => {
       expect(baseline!.violations[0].details).toEqual(violations[0].details);
     });
 
-    test("should handle special characters in screen IDs", async () => {
+    it("should handle special characters in screen IDs", async function() {
       const screenId = "com.example/MainActivity:Fragment@123";
 
       await manager.saveBaseline(screenId, []);
@@ -336,7 +334,7 @@ describe("BaselineManager", () => {
       expect(baseline!.screenId).toBe(screenId);
     });
 
-    test("should store and retrieve updated_at timestamp", async () => {
+    it("should store and retrieve updated_at timestamp", async function() {
       const screenId = "test_screen";
       const beforeSave = new Date();
 

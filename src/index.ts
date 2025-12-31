@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -413,6 +413,7 @@ async function main() {
       debugPerf,
       debug,
       uiPerfMode,
+      memPerfAuditMode,
       a11yAuditMode,
       a11yLevel,
       a11yFailureMode,
@@ -494,6 +495,7 @@ async function main() {
 }
 
 main().catch(err => {
+  console.error("Fatal error in main():", err);
   logger.error("Fatal error in main():", err);
   logger.close();
   process.exit(1);

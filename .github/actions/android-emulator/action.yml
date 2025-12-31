@@ -21,7 +21,7 @@ inputs:
     required: "true"
   target:
     description: "System image target"
-    default: "default"
+    default: "google_apis"
     required: "true"
   working-directory:
     description: "Working directory"
