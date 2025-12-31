@@ -26,6 +26,11 @@ function parseArgs(): {
   debugPerf: boolean;
   debug: boolean;
   uiPerfMode: boolean;
+  a11yAuditMode: boolean;
+  a11yLevel?: string;
+  a11yFailureMode?: string;
+  a11yMinSeverity?: string;
+  a11yUseBaseline: boolean;
   } {
   const args = process.argv.slice(2);
 
@@ -47,6 +52,13 @@ function parseArgs(): {
 
   // Detect UI performance audit mode
   const uiPerfMode = args.includes("--ui-perf-mode");
+
+  // Detect accessibility audit mode
+  const a11yAuditMode = args.includes("--accessibility-audit");
+  let a11yLevel: string | undefined;
+  let a11yFailureMode: string | undefined;
+  let a11yMinSeverity: string | undefined;
+  let a11yUseBaseline = false;
 
   // Extract CLI-specific arguments (everything after --cli)
   const cliIndex = args.indexOf("--cli");
@@ -88,10 +100,34 @@ function parseArgs(): {
         logger.warn(`Invalid host: ${host}. Using default: ${transport.host}`);
         i++; // Skip the invalid argument
       }
+    } else if (arg === "--a11y-level") {
+      // Accessibility audit options
+      a11yLevel = args[i + 1];
+      i++;
+    } else if (arg === "--a11y-failure-mode") {
+      a11yFailureMode = args[i + 1];
+      i++;
+    } else if (arg === "--a11y-min-severity") {
+      a11yMinSeverity = args[i + 1];
+      i++;
+    } else if (arg === "--a11y-use-baseline") {
+      a11yUseBaseline = true;
     }
   }
 
-  return { cliMode, cliArgs, transport, debugPerf, debug, uiPerfMode };
+  return {
+    cliMode,
+    cliArgs,
+    transport,
+    debugPerf,
+    debug,
+    uiPerfMode,
+    a11yAuditMode,
+    a11yLevel,
+    a11yFailureMode,
+    a11yMinSeverity,
+    a11yUseBaseline,
+  };
 }
 
 // Create and start Streamable HTTP server
@@ -365,7 +401,19 @@ async function main() {
     await configurationManager.loadFromDisk();
 
     // Parse command line arguments
-    const { cliMode, cliArgs, transport, debugPerf, debug, uiPerfMode } = parseArgs();
+    const {
+      cliMode,
+      cliArgs,
+      transport,
+      debugPerf,
+      debug,
+      uiPerfMode,
+      a11yAuditMode,
+      a11yLevel,
+      a11yFailureMode,
+      a11yMinSeverity,
+      a11yUseBaseline,
+    } = parseArgs();
 
     // Enable performance tracking if --debug-perf flag is set
     if (debugPerf) {
@@ -382,6 +430,22 @@ async function main() {
     if (uiPerfMode) {
       serverConfig.setUiPerfMode(true);
       logger.info("UI performance audit mode enabled (--ui-perf-mode)");
+    }
+
+    // Enable accessibility audit mode if --accessibility-audit flag is set
+    if (a11yAuditMode) {
+      const level = (a11yLevel as "A" | "AA" | "AAA" | undefined) || "AA";
+      const failureMode = (a11yFailureMode as "report" | "threshold" | "strict" | undefined) || "report";
+      const minSeverity = (a11yMinSeverity as "error" | "warning" | "info" | undefined) || (failureMode === "strict" ? "error" : "warning");
+
+      serverConfig.setAccessibilityAuditConfig({
+        level,
+        failureMode,
+        useBaseline: a11yUseBaseline,
+        minSeverity,
+      });
+
+      logger.info(`Accessibility audit mode enabled (level: ${level}, failure mode: ${failureMode}, baseline: ${a11yUseBaseline})`);
     }
 
     if (cliMode) {

@@ -21,6 +21,8 @@ import { PerformanceAudit } from "../performance/PerformanceAudit";
 import { ThresholdManager } from "../performance/ThresholdManager";
 import { DeviceCapabilitiesDetector } from "../../utils/DeviceCapabilities";
 import { serverConfig } from "../../utils/ServerConfig";
+import { WcagAudit } from "../accessibility/WcagAudit";
+import { Element } from "../../models/Element";
 
 /**
  * Interface for cached observe result
@@ -664,6 +666,119 @@ export class ObserveScreen {
   }
 
   /**
+   * Run accessibility audit if enabled
+   * Checks --accessibility-audit CLI flag to enable/disable
+   * @param result - ObserveResult to attach audit results to
+   * @param perf - Performance tracker
+   */
+  private async runAccessibilityAudit(
+    result: ObserveResult,
+    perf: PerformanceTracker
+  ): Promise<void> {
+    // Check if accessibility audit is enabled via CLI flag
+    const auditConfig = serverConfig.getAccessibilityAuditConfig();
+
+    if (!auditConfig) {
+      return;
+    }
+
+    // Only run on Android for now
+    if (this.device.platform !== "android") {
+      logger.debug("[AccessibilityAudit] Skipping audit, only Android is supported");
+      return;
+    }
+
+    // Need view hierarchy and elements
+    if (!result.viewHierarchy?.hierarchy || !result.elements) {
+      logger.debug("[AccessibilityAudit] Skipping audit, no view hierarchy or elements available");
+      return;
+    }
+
+    // Need active window for screen ID
+    if (!result.activeWindow?.appId) {
+      logger.debug("[AccessibilityAudit] Skipping audit, no active app");
+      return;
+    }
+
+    try {
+      await perf.track("accessibilityAudit", async () => {
+        logger.info(`[AccessibilityAudit] Running WCAG ${auditConfig.level} audit for ${result.activeWindow?.appId}`);
+
+        // Initialize audit
+        const wcagAudit = new WcagAudit();
+
+        // Flatten all elements for audit
+        const allElements: Element[] = [
+          ...(result.elements?.clickable || []),
+          ...(result.elements?.scrollable || []),
+          ...(result.elements?.text || []),
+        ];
+
+        // Get screenshot path if available (from TakeScreenshot cache)
+        const screenshotPath = await this.getLatestScreenshotPath();
+
+        // Run the audit
+        const auditResult = await wcagAudit.audit(
+          allElements,
+          result.viewHierarchy!.hierarchy,
+          screenshotPath,
+          result.activeWindow!.appId,
+          auditConfig
+        );
+
+        // Attach audit result to observe result
+        result.accessibilityAudit = auditResult;
+
+        if (!auditResult.summary.passed) {
+          logger.warn(
+            `[AccessibilityAudit] Accessibility audit FAILED with ${auditResult.violations.length} violations (${auditResult.summary.bySeverity.error} errors, ${auditResult.summary.bySeverity.warning} warnings)`
+          );
+        } else {
+          logger.info("[AccessibilityAudit] Accessibility audit PASSED");
+        }
+      });
+    } catch (error) {
+      logger.error(`[AccessibilityAudit] Failed to run accessibility audit: ${error}`);
+      // Don't fail the entire observation if audit fails
+    }
+  }
+
+  /**
+   * Get the latest screenshot path from cache
+   */
+  private async getLatestScreenshotPath(): Promise<string | undefined> {
+    try {
+      const cacheDir = path.join("/tmp/auto-mobile", "screenshots");
+      if (!fs.existsSync(cacheDir)) {
+        return undefined;
+      }
+
+      const files = await readdirAsync(cacheDir);
+      const pngFiles = files.filter(f => f.endsWith(".png"));
+
+      if (pngFiles.length === 0) {
+        return undefined;
+      }
+
+      // Sort by modification time (most recent first)
+      const fileStats = await Promise.all(
+        pngFiles.map(async f => {
+          const fullPath = path.join(cacheDir, f);
+          const stat = await statAsync(fullPath);
+          return { path: fullPath, mtime: stat.mtime };
+        })
+      );
+
+      fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+      return fileStats[0]?.path;
+    } catch (error) {
+      logger.warn(`[AccessibilityAudit] Failed to get latest screenshot: ${error}`);
+      return undefined;
+    }
+  }
+
+  /**
    * Execute the observe command
    * @param queryOptions - ViewHierarchyQueryOptions to pass to viewHierarchy.getViewHierarchy
    * @param perf - Performance tracker for timing data
@@ -693,6 +808,9 @@ export class ObserveScreen {
 
       // Run performance audit if enabled
       await this.runPerformanceAudit(result, perf);
+
+      // Run accessibility audit if enabled
+      await this.runAccessibilityAudit(result, perf);
 
       // Cache the result for future use
       await perf.track("cacheResult", () => this.cacheObserveResult(result));

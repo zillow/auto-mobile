@@ -7,6 +7,7 @@ import { TimingData } from "../utils/PerformanceTracker";
 import { GfxMetrics } from "./GfxMetrics";
 import { BackStackInfo } from "./BackStack";
 import { PerformanceAuditResult } from "../features/performance/PerformanceAudit";
+import { AccessibilityAuditResult } from "./AccessibilityAudit";
 
 /**
  * Represents the result of observing the device state
@@ -91,4 +92,10 @@ export interface ObserveResult {
    * Contains validation against thresholds and detailed diagnostics
    */
   performanceAudit?: PerformanceAuditResult;
+
+  /**
+   * Accessibility audit results (when accessibility audit mode is enabled)
+   * Contains WCAG 2.1 violation detection and compliance checking
+   */
+  accessibilityAudit?: AccessibilityAuditResult;
 }

@@ -136,6 +136,15 @@ export interface ScrollPositionsTable {
   created_at: Generated<string>;
 }
 
+// Accessibility baseline tables
+export interface AccessibilityBaselinesTable {
+  id: Generated<number>;
+  screen_id: string;
+  violations_json: string; // JSON blob of WcagViolation[]
+  created_at: Generated<string>;
+  updated_at: string;
+}
+
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
@@ -149,6 +158,7 @@ export interface Database {
   node_modals: NodeModalsTable;
   edge_modals: EdgeModalsTable;
   scroll_positions: ScrollPositionsTable;
+  accessibility_baselines: AccessibilityBaselinesTable;
 }
 
 // Convenience types for each table
@@ -191,3 +201,7 @@ export type NewEdgeModal = Insertable<EdgeModalsTable>;
 
 export type ScrollPosition = Selectable<ScrollPositionsTable>;
 export type NewScrollPosition = Insertable<ScrollPositionsTable>;
+
+export type AccessibilityBaseline = Selectable<AccessibilityBaselinesTable>;
+export type NewAccessibilityBaseline = Insertable<AccessibilityBaselinesTable>;
+export type AccessibilityBaselineUpdate = Updateable<AccessibilityBaselinesTable>;
