@@ -17,6 +17,7 @@ This is a fork of the original source at []
   tool calls with a fast [observations](docs/features/mcp-server/observation.md) to drive the
   [interaction loop](docs/features/mcp-server/interaction-loop.md).
 - 🧪 **[Test Execution](docs/features/test-execution/index.md)** - Run tests locally or on CI without extra infrastructure.
+- ⚡ **[UI Performance Audit](docs/features/ui-performance-audit.md)** - Automated detection of jank, poor FPS, and rendering issues during automation.
 
 All together you get a system that looks like this:
 
