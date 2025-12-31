@@ -21,13 +21,13 @@ export class DefaultPathOptimizer implements PathOptimizer {
   /**
    * Determine if we should use back button to reach target screen.
    */
-  public shouldUseBackButton(
+  public async shouldUseBackButton(
     currentScreen: string,
     targetScreen: string,
     currentBackStackDepth: number
-  ): BackButtonRecommendation {
+  ): Promise<BackButtonRecommendation> {
     // Get the target node
-    const targetNode = this.navigationGraph.getNode(targetScreen);
+    const targetNode = await this.navigationGraph.getNode(targetScreen);
     if (!targetNode) {
       return {
         shouldUseBack: false,
@@ -59,7 +59,7 @@ export class DefaultPathOptimizer implements PathOptimizer {
 
     // Find if there's a known forward path from target to current
     // If yes, then back navigation should work
-    const pathResult: PathResult = this.navigationGraph.findPath(targetScreen);
+    const pathResult: PathResult = await this.navigationGraph.findPath(targetScreen);
     const hasForwardPath = pathResult.found && pathResult.path.length > 0;
 
     if (!hasForwardPath) {
@@ -112,9 +112,9 @@ export class DefaultPathOptimizer implements PathOptimizer {
   /**
    * Check if two screens are in the same task (same app task).
    */
-  public areInSameTask(screen1: string, screen2: string): boolean {
-    const node1 = this.navigationGraph.getNode(screen1);
-    const node2 = this.navigationGraph.getNode(screen2);
+  public async areInSameTask(screen1: string, screen2: string): Promise<boolean> {
+    const node1 = await this.navigationGraph.getNode(screen1);
+    const node2 = await this.navigationGraph.getNode(screen2);
 
     if (!node1 || !node2) {
       return false;
@@ -130,13 +130,13 @@ export class DefaultPathOptimizer implements PathOptimizer {
   /**
    * Get navigation recommendation for reaching a target screen.
    */
-  public getNavigationRecommendation(
+  public async getNavigationRecommendation(
     targetScreen: string,
     currentScreen: string,
     currentBackStackDepth: number
-  ): NavigationRecommendation {
+  ): Promise<NavigationRecommendation> {
     // Check if we can use back button
-    const backResult = this.shouldUseBackButton(
+    const backResult = await this.shouldUseBackButton(
       currentScreen,
       targetScreen,
       currentBackStackDepth
@@ -151,7 +151,7 @@ export class DefaultPathOptimizer implements PathOptimizer {
     }
 
     // Check if we have a known forward path
-    const pathResult = this.navigationGraph.findPath(targetScreen);
+    const pathResult = await this.navigationGraph.findPath(targetScreen);
 
     if (pathResult.found) {
       return {

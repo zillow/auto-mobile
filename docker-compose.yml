@@ -34,6 +34,8 @@ services:
       - node-modules:/workspace/node_modules
       # Mount ADB keys
       - ~/.android:/home/automobile/.android
+      # Mount AutoMobile database directory
+      - ~/.auto-mobile:/home/automobile/.auto-mobile
       # Mount scratch directory for outputs
       - ./scratch:/workspace/scratch
       # Mount USB device directory for ADB access to physical devices
@@ -87,6 +89,7 @@ services:
       - android-sdk:/opt/android-sdk
       - node-modules:/workspace/node_modules
       - ~/.android:/home/automobile/.android
+      - ~/.auto-mobile:/home/automobile/.auto-mobile
       - ./scratch:/workspace/scratch
       # Mount USB device directory for ADB access to physical devices
       - /dev/bus/usb:/dev/bus/usb

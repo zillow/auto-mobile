@@ -267,17 +267,23 @@ describe("Explore", () => {
         "class": "android.widget.Button",
         "resource-id": "com.test:id/settings_btn"
       });
+      // Set hierarchyDepth for button (deeper in the hierarchy)
+      (buttonElement as any).hierarchyDepth = 8;
 
       const tabElement = createMockElement({
         "text": "Profile",
         "class": "android.widget.TabLayout",
         "resource-id": "com.test:id/tab_profile"
       });
+      // Set hierarchyDepth for tab (closer to root, should score higher)
+      (tabElement as any).hierarchyDepth = 2;
 
       const buttonScore = (explore as any).calculateNavigationScore(buttonElement);
       const tabScore = (explore as any).calculateNavigationScore(tabElement);
 
-      // Tab should score higher than button
+      // Tab should score higher than button due to being closer to root
+      // Button: 5 (clickable) + max(0, 25 - 8*2) = 5 + 9 = 14
+      // Tab: 5 (clickable) + max(0, 25 - 2*2) = 5 + 21 = 26
       assert.isAbove(tabScore, buttonScore);
       assert.isAbove(buttonScore, 0);
     });

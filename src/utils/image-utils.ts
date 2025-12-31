@@ -3,9 +3,8 @@ export {
   Image,
   ImageBatch,
   SharpImageTransformer,
-  ImageOptions,
-  ImageMetadata,
 } from "./image/ImageTransformer";
+export type { ImageOptions, ImageMetadata } from "./image/ImageTransformer";
 export { ImageCache } from "./image/ImageCache";
 
 // Import for the interface implementation

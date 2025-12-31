@@ -5,6 +5,7 @@ import { ImageCache } from "./ImageCache";
 
 const DEFAULT_JPEG_QUALITY = 75;
 
+// Note: These interfaces are re-exported from image-utils.ts
 export interface ImageOptions {
   format?: "jpg" | "png" | "webp";
   quality?: number; // 1-100, for jpg and webp

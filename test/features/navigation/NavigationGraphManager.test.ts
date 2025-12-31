@@ -3,19 +3,28 @@ import {
   NavigationGraphManager,
   NavigationEvent
 } from "../../../src/features/navigation/NavigationGraphManager";
+import { runMigrations } from "../../helpers/database";
 
 describe("NavigationGraphManager", () => {
   let manager: NavigationGraphManager;
 
-  beforeEach(() => {
+  before(async () => {
+    // Run database migrations once before all tests
+    await runMigrations();
+  });
+
+  beforeEach(async () => {
     // Reset singleton between tests
     NavigationGraphManager.resetInstance();
     manager = NavigationGraphManager.getInstance();
-    // Set up a test app
-    manager.setCurrentApp("com.test.app");
+    // Set up a test app and clear any existing data
+    await manager.setCurrentApp("com.test.app");
+    await manager.clearCurrentGraph();
+    // Re-set app after clearing (clearCurrentGraph sets currentScreen to null)
+    await manager.setCurrentApp("com.test.app");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     NavigationGraphManager.resetInstance();
   });
 
@@ -26,52 +35,52 @@ describe("NavigationGraphManager", () => {
       assert.strictEqual(instance1, instance2);
     });
 
-    it("should reset instance correctly", () => {
+    it("should reset instance correctly", async () => {
       const instance1 = NavigationGraphManager.getInstance();
-      instance1.setCurrentApp("com.test.app");
-      instance1.recordNavigationEvent(createEvent("Screen1"));
+      await instance1.setCurrentApp("com.test.app");
+      await instance1.recordNavigationEvent(createEvent("Screen1"));
 
       NavigationGraphManager.resetInstance();
 
       const instance2 = NavigationGraphManager.getInstance();
       assert.isNull(instance2.getCurrentAppId());
-      assert.deepEqual(instance2.getKnownScreens(), []);
+      assert.deepEqual(await instance2.getKnownScreens(), []);
     });
   });
 
   describe("setCurrentApp", () => {
-    it("should set the current app", () => {
-      manager.setCurrentApp("com.example.app");
+    it("should set the current app", async () => {
+      await manager.setCurrentApp("com.example.app");
       assert.equal(manager.getCurrentAppId(), "com.example.app");
     });
 
-    it("should create separate graphs for different apps", () => {
-      manager.setCurrentApp("com.app1");
-      manager.recordNavigationEvent(createEvent("Screen1"));
+    it("should create separate graphs for different apps", async () => {
+      await manager.setCurrentApp("com.app1");
+      await manager.recordNavigationEvent(createEvent("Screen1"));
 
-      manager.setCurrentApp("com.app2");
-      manager.recordNavigationEvent(createEvent("Screen2"));
+      await manager.setCurrentApp("com.app2");
+      await manager.recordNavigationEvent(createEvent("Screen2"));
 
       // App2 should only know Screen2
-      assert.deepEqual(manager.getKnownScreens(), ["Screen2"]);
+      assert.deepEqual(await manager.getKnownScreens(), ["Screen2"]);
 
       // Switch back to app1
-      manager.setCurrentApp("com.app1");
-      assert.deepEqual(manager.getKnownScreens(), ["Screen1"]);
+      await manager.setCurrentApp("com.app1");
+      assert.deepEqual(await manager.getKnownScreens(), ["Screen1"]);
     });
   });
 
   describe("recordNavigationEvent", () => {
-    it("should record a navigation event and create a node", () => {
+    it("should record a navigation event and create a node", async () => {
       const event = createEvent("HomeScreen");
-      manager.recordNavigationEvent(event);
+      await manager.recordNavigationEvent(event);
 
-      const screens = manager.getKnownScreens();
+      const screens = await manager.getKnownScreens();
       assert.deepEqual(screens, ["HomeScreen"]);
       assert.equal(manager.getCurrentScreen(), "HomeScreen");
     });
 
-    it("should auto-set current app from applicationId in event", () => {
+    it("should auto-set current app from applicationId in event", async () => {
       NavigationGraphManager.resetInstance();
       const freshManager = NavigationGraphManager.getInstance();
 
@@ -81,81 +90,81 @@ describe("NavigationGraphManager", () => {
       // Record event with applicationId
       const event = createEvent("HomeScreen");
       event.applicationId = "com.auto.detected.app";
-      freshManager.recordNavigationEvent(event);
+      await freshManager.recordNavigationEvent(event);
 
       // App should be auto-set
       assert.equal(freshManager.getCurrentAppId(), "com.auto.detected.app");
-      assert.deepEqual(freshManager.getKnownScreens(), ["HomeScreen"]);
+      assert.deepEqual(await freshManager.getKnownScreens(), ["HomeScreen"]);
     });
 
-    it("should switch apps when applicationId changes", () => {
-      manager.recordNavigationEvent(createEventWithApp("Screen1", "com.app1"));
+    it("should switch apps when applicationId changes", async () => {
+      await manager.recordNavigationEvent(createEventWithApp("Screen1", "com.app1"));
       assert.equal(manager.getCurrentAppId(), "com.app1");
-      assert.deepEqual(manager.getKnownScreens(), ["Screen1"]);
+      assert.deepEqual(await manager.getKnownScreens(), ["Screen1"]);
 
       // Switch to different app
-      manager.recordNavigationEvent(createEventWithApp("Screen2", "com.app2"));
+      await manager.recordNavigationEvent(createEventWithApp("Screen2", "com.app2"));
       assert.equal(manager.getCurrentAppId(), "com.app2");
-      assert.deepEqual(manager.getKnownScreens(), ["Screen2"]);
+      assert.deepEqual(await manager.getKnownScreens(), ["Screen2"]);
 
       // Original app's graph should still exist
-      manager.setCurrentApp("com.app1");
-      assert.deepEqual(manager.getKnownScreens(), ["Screen1"]);
+      await manager.setCurrentApp("com.app1");
+      assert.deepEqual(await manager.getKnownScreens(), ["Screen1"]);
     });
 
-    it("should update node on revisit", () => {
+    it("should update node on revisit", async () => {
       const event1 = createEvent("HomeScreen", 1000);
-      manager.recordNavigationEvent(event1);
+      await manager.recordNavigationEvent(event1);
 
       const event2 = createEvent("HomeScreen", 2000);
-      manager.recordNavigationEvent(event2);
+      await manager.recordNavigationEvent(event2);
 
-      const node = manager.getNode("HomeScreen");
+      const node = await manager.getNode("HomeScreen");
       assert.isDefined(node);
       assert.equal(node!.visitCount, 2);
       assert.equal(node!.firstSeenAt, 1000);
       assert.equal(node!.lastSeenAt, 2000);
     });
 
-    it("should create edge when navigating between screens", () => {
-      manager.recordNavigationEvent(createEvent("Screen1", 1000));
-      manager.recordNavigationEvent(createEvent("Screen2", 2000));
+    it("should create edge when navigating between screens", async () => {
+      await manager.recordNavigationEvent(createEvent("Screen1", 1000));
+      await manager.recordNavigationEvent(createEvent("Screen2", 2000));
 
-      const edges = manager.getEdgesFrom("Screen1");
+      const edges = await manager.getEdgesFrom("Screen1");
       assert.lengthOf(edges, 1);
       assert.equal(edges[0].from, "Screen1");
       assert.equal(edges[0].to, "Screen2");
       assert.equal(edges[0].edgeType, "unknown"); // No tool call recorded
     });
 
-    it("should not create edge for same screen navigation", () => {
-      manager.recordNavigationEvent(createEvent("Screen1", 1000));
-      manager.recordNavigationEvent(createEvent("Screen1", 2000));
+    it("should not create edge for same screen navigation", async () => {
+      await manager.recordNavigationEvent(createEvent("Screen1", 1000));
+      await manager.recordNavigationEvent(createEvent("Screen1", 2000));
 
-      const edges = manager.getEdgesFrom("Screen1");
+      const edges = await manager.getEdgesFrom("Screen1");
       assert.lengthOf(edges, 0);
     });
   });
 
   describe("recordToolCall", () => {
-    it("should record a tool call", () => {
+    it("should record a tool call", async () => {
       manager.recordToolCall("tapOn", { text: "Button" });
 
-      const stats = manager.getStats();
+      const stats = await manager.getStats();
       assert.equal(stats.toolCallHistorySize, 1);
     });
 
-    it("should correlate tool call with navigation event", () => {
+    it("should correlate tool call with navigation event", async () => {
       const now = Date.now();
 
       // Record tool call
       manager.recordToolCall("tapOn", { text: "Settings" });
 
       // Navigation event occurs 500ms after tool call
-      manager.recordNavigationEvent(createEvent("Screen1", now));
-      manager.recordNavigationEvent(createEvent("SettingsScreen", now + 500));
+      await manager.recordNavigationEvent(createEvent("Screen1", now));
+      await manager.recordNavigationEvent(createEvent("SettingsScreen", now + 500));
 
-      const edges = manager.getEdgesFrom("Screen1");
+      const edges = await manager.getEdgesFrom("Screen1");
       assert.lengthOf(edges, 1);
       assert.equal(edges[0].edgeType, "tool");
       assert.isDefined(edges[0].interaction);
@@ -163,23 +172,23 @@ describe("NavigationGraphManager", () => {
       assert.deepEqual(edges[0].interaction!.args, { text: "Settings" });
     });
 
-    it("should not correlate tool call outside correlation window", () => {
+    it("should not correlate tool call outside correlation window", async () => {
       const now = Date.now();
 
       // Record tool call
       manager.recordToolCall("tapOn", { text: "Settings" });
 
       // Navigation event occurs 3000ms after tool call (outside 2000ms window)
-      manager.recordNavigationEvent(createEvent("Screen1", now));
-      manager.recordNavigationEvent(createEvent("SettingsScreen", now + 3000));
+      await manager.recordNavigationEvent(createEvent("Screen1", now));
+      await manager.recordNavigationEvent(createEvent("SettingsScreen", now + 3000));
 
-      const edges = manager.getEdgesFrom("Screen1");
+      const edges = await manager.getEdgesFrom("Screen1");
       assert.lengthOf(edges, 1);
       assert.equal(edges[0].edgeType, "unknown");
       assert.isUndefined(edges[0].interaction);
     });
 
-    it("should use most recent tool call within window", () => {
+    it("should use most recent tool call within window", async () => {
       const now = Date.now();
 
       // Record multiple tool calls
@@ -187,48 +196,48 @@ describe("NavigationGraphManager", () => {
       manager.recordToolCall("tapOn", { text: "Second" });
 
       // Navigation event
-      manager.recordNavigationEvent(createEvent("Screen1", now));
-      manager.recordNavigationEvent(createEvent("Screen2", now + 500));
+      await manager.recordNavigationEvent(createEvent("Screen1", now));
+      await manager.recordNavigationEvent(createEvent("Screen2", now + 500));
 
-      const edges = manager.getEdgesFrom("Screen1");
+      const edges = await manager.getEdgesFrom("Screen1");
       assert.lengthOf(edges, 1);
       assert.equal(edges[0].interaction!.args.text, "Second");
     });
   });
 
   describe("findPath", () => {
-    it("should find path when already on target screen", () => {
-      manager.recordNavigationEvent(createEvent("HomeScreen"));
+    it("should find path when already on target screen", async () => {
+      await manager.recordNavigationEvent(createEvent("HomeScreen"));
 
-      const result = manager.findPath("HomeScreen");
+      const result = await manager.findPath("HomeScreen");
       assert.isTrue(result.found);
       assert.lengthOf(result.path, 0);
       assert.equal(result.startScreen, "HomeScreen");
       assert.equal(result.targetScreen, "HomeScreen");
     });
 
-    it("should find direct path to adjacent screen", () => {
-      manager.recordNavigationEvent(createEvent("Screen1", 1000));
-      manager.recordNavigationEvent(createEvent("Screen2", 2000));
+    it("should find direct path to adjacent screen", async () => {
+      await manager.recordNavigationEvent(createEvent("Screen1", 1000));
+      await manager.recordNavigationEvent(createEvent("Screen2", 2000));
       // Go back to Screen1 to test path finding
-      manager.recordNavigationEvent(createEvent("Screen1", 3000));
+      await manager.recordNavigationEvent(createEvent("Screen1", 3000));
 
-      const result = manager.findPath("Screen2");
+      const result = await manager.findPath("Screen2");
       assert.isTrue(result.found);
       assert.lengthOf(result.path, 1);
       assert.equal(result.path[0].from, "Screen1");
       assert.equal(result.path[0].to, "Screen2");
     });
 
-    it("should find multi-hop path", () => {
+    it("should find multi-hop path", async () => {
       // Create navigation: Home -> Settings -> Advanced
-      manager.recordNavigationEvent(createEvent("Home", 1000));
-      manager.recordNavigationEvent(createEvent("Settings", 2000));
-      manager.recordNavigationEvent(createEvent("Advanced", 3000));
+      await manager.recordNavigationEvent(createEvent("Home", 1000));
+      await manager.recordNavigationEvent(createEvent("Settings", 2000));
+      await manager.recordNavigationEvent(createEvent("Advanced", 3000));
       // Go back to Home
-      manager.recordNavigationEvent(createEvent("Home", 4000));
+      await manager.recordNavigationEvent(createEvent("Home", 4000));
 
-      const result = manager.findPath("Advanced");
+      const result = await manager.findPath("Advanced");
       assert.isTrue(result.found);
       assert.lengthOf(result.path, 2);
       assert.equal(result.path[0].from, "Home");
@@ -237,27 +246,27 @@ describe("NavigationGraphManager", () => {
       assert.equal(result.path[1].to, "Advanced");
     });
 
-    it("should return not found when no path exists", () => {
-      manager.recordNavigationEvent(createEvent("Screen1"));
+    it("should return not found when no path exists", async () => {
+      await manager.recordNavigationEvent(createEvent("Screen1"));
 
-      const result = manager.findPath("UnknownScreen");
+      const result = await manager.findPath("UnknownScreen");
       assert.isFalse(result.found);
       assert.lengthOf(result.path, 0);
     });
 
-    it("should return not found when no current screen", () => {
+    it("should return not found when no current screen", async () => {
       NavigationGraphManager.resetInstance();
       const freshManager = NavigationGraphManager.getInstance();
-      freshManager.setCurrentApp("com.test.app");
+      await freshManager.setCurrentApp("com.test.app");
 
-      const result = freshManager.findPath("SomeScreen");
+      const result = await freshManager.findPath("SomeScreen");
       assert.isFalse(result.found);
     });
   });
 
   describe("getStats", () => {
-    it("should return correct stats for empty graph", () => {
-      const stats = manager.getStats();
+    it("should return correct stats for empty graph", async () => {
+      const stats = await manager.getStats();
       assert.equal(stats.nodeCount, 0);
       assert.equal(stats.edgeCount, 0);
       assert.isNull(stats.currentScreen);
@@ -266,12 +275,12 @@ describe("NavigationGraphManager", () => {
       assert.equal(stats.toolCallHistorySize, 0);
     });
 
-    it("should return correct stats after navigation", () => {
+    it("should return correct stats after navigation", async () => {
       manager.recordToolCall("tapOn", { text: "Settings" });
-      manager.recordNavigationEvent(createEvent("Home", Date.now()));
-      manager.recordNavigationEvent(createEvent("Settings", Date.now() + 100));
+      await manager.recordNavigationEvent(createEvent("Home", Date.now()));
+      await manager.recordNavigationEvent(createEvent("Settings", Date.now() + 100));
 
-      const stats = manager.getStats();
+      const stats = await manager.getStats();
       assert.equal(stats.nodeCount, 2);
       assert.equal(stats.edgeCount, 1);
       assert.equal(stats.currentScreen, "Settings");
@@ -281,19 +290,19 @@ describe("NavigationGraphManager", () => {
   });
 
   describe("exportGraph", () => {
-    it("should export empty graph correctly", () => {
-      const exported = manager.exportGraph();
+    it("should export empty graph correctly", async () => {
+      const exported = await manager.exportGraph();
       assert.equal(exported.appId, "com.test.app");
       assert.lengthOf(exported.nodes, 0);
       assert.lengthOf(exported.edges, 0);
       assert.isNull(exported.currentScreen);
     });
 
-    it("should export populated graph correctly", () => {
-      manager.recordNavigationEvent(createEvent("Home", 1000));
-      manager.recordNavigationEvent(createEvent("Settings", 2000));
+    it("should export populated graph correctly", async () => {
+      await manager.recordNavigationEvent(createEvent("Home", 1000));
+      await manager.recordNavigationEvent(createEvent("Settings", 2000));
 
-      const exported = manager.exportGraph();
+      const exported = await manager.exportGraph();
       assert.equal(exported.appId, "com.test.app");
       assert.lengthOf(exported.nodes, 2);
       assert.lengthOf(exported.edges, 1);
@@ -306,41 +315,41 @@ describe("NavigationGraphManager", () => {
   });
 
   describe("clearCurrentGraph", () => {
-    it("should clear the current app's graph", () => {
-      manager.recordNavigationEvent(createEvent("Screen1"));
-      manager.recordNavigationEvent(createEvent("Screen2"));
+    it("should clear the current app's graph", async () => {
+      await manager.recordNavigationEvent(createEvent("Screen1"));
+      await manager.recordNavigationEvent(createEvent("Screen2"));
 
-      manager.clearCurrentGraph();
+      await manager.clearCurrentGraph();
 
       // After clearing and re-setting app, should have empty graph
-      manager.setCurrentApp("com.test.app");
-      assert.deepEqual(manager.getKnownScreens(), []);
+      await manager.setCurrentApp("com.test.app");
+      assert.deepEqual(await manager.getKnownScreens(), []);
     });
   });
 
   describe("clearAllGraphs", () => {
-    it("should clear all graphs", () => {
-      manager.setCurrentApp("app1");
-      manager.recordNavigationEvent(createEvent("Screen1"));
+    it("should clear all graphs", async () => {
+      await manager.setCurrentApp("app1");
+      await manager.recordNavigationEvent(createEvent("Screen1"));
 
-      manager.setCurrentApp("app2");
-      manager.recordNavigationEvent(createEvent("Screen2"));
+      await manager.setCurrentApp("app2");
+      await manager.recordNavigationEvent(createEvent("Screen2"));
 
-      manager.clearAllGraphs();
+      await manager.clearAllGraphs();
 
       assert.isNull(manager.getCurrentAppId());
-      assert.deepEqual(manager.getKnownScreens(), []);
+      assert.deepEqual(await manager.getKnownScreens(), []);
     });
   });
 
   describe("getEdgesTo", () => {
-    it("should return edges leading to a screen", () => {
-      manager.recordNavigationEvent(createEvent("Home", 1000));
-      manager.recordNavigationEvent(createEvent("Settings", 2000));
-      manager.recordNavigationEvent(createEvent("Home", 3000));
-      manager.recordNavigationEvent(createEvent("Settings", 4000));
+    it("should return edges leading to a screen", async () => {
+      await manager.recordNavigationEvent(createEvent("Home", 1000));
+      await manager.recordNavigationEvent(createEvent("Settings", 2000));
+      await manager.recordNavigationEvent(createEvent("Home", 3000));
+      await manager.recordNavigationEvent(createEvent("Settings", 4000));
 
-      const edges = manager.getEdgesTo("Settings");
+      const edges = await manager.getEdgesTo("Settings");
       assert.lengthOf(edges, 2);
       edges.forEach(e => assert.equal(e.to, "Settings"));
     });
@@ -382,18 +391,23 @@ function createEventWithApp(
 describe("NavigationGraphManager - Scroll Position", () => {
   let manager: NavigationGraphManager;
 
-  beforeEach(() => {
+  before(async () => {
+    // Run database migrations once before all tests
+    await runMigrations();
+  });
+
+  beforeEach(async () => {
     // Get singleton and clear
     manager = NavigationGraphManager.getInstance();
-    manager.clearAllGraphs();
-    manager.setCurrentApp("com.test.scrollapp");
+    await manager.clearAllGraphs();
+    await manager.setCurrentApp("com.test.scrollapp");
   });
 
-  afterEach(() => {
-    manager.clearAllGraphs();
+  afterEach(async () => {
+    await manager.clearAllGraphs();
   });
 
-  it("should update scroll position on most recent swipeOn tool call", () => {
+  it("should update scroll position on most recent swipeOn tool call", async () => {
     // Record a swipeOn tool call
     manager.recordToolCall("swipeOn", {
       direction: "down",
@@ -407,11 +421,11 @@ describe("NavigationGraphManager - Scroll Position", () => {
     });
 
     // Record navigation event to correlate
-    manager.recordNavigationEvent(createEvent("Settings"));
-    manager.recordNavigationEvent(createEvent("AdvancedSettings"));
+    await manager.recordNavigationEvent(createEvent("Settings"));
+    await manager.recordNavigationEvent(createEvent("AdvancedSettings"));
 
     // Check that the edge has scroll position
-    const edges = manager.getEdgesFrom("Settings");
+    const edges = await manager.getEdgesFrom("Settings");
     assert.lengthOf(edges, 1);
     assert.isDefined(edges[0].uiState);
     assert.isDefined(edges[0].uiState!.scrollPosition);
@@ -419,7 +433,7 @@ describe("NavigationGraphManager - Scroll Position", () => {
     assert.equal(edges[0].uiState!.scrollPosition!.direction, "down");
   });
 
-  it("should update existing uiState with scroll position", () => {
+  it("should update existing uiState with scroll position", async () => {
     // Record a swipeOn tool call with existing UI state
     const existingUIState = {
       selectedElements: [{ text: "Settings Tab" }],
@@ -437,11 +451,11 @@ describe("NavigationGraphManager - Scroll Position", () => {
     });
 
     // Record navigation event
-    manager.recordNavigationEvent(createEvent("Settings"));
-    manager.recordNavigationEvent(createEvent("AdvancedSettings"));
+    await manager.recordNavigationEvent(createEvent("Settings"));
+    await manager.recordNavigationEvent(createEvent("AdvancedSettings"));
 
     // Check that both selected elements and scroll position exist
-    const edges = manager.getEdgesFrom("Settings");
+    const edges = await manager.getEdgesFrom("Settings");
     assert.lengthOf(edges, 1);
     assert.isDefined(edges[0].uiState);
     assert.lengthOf(edges[0].uiState!.selectedElements, 1);
@@ -450,7 +464,7 @@ describe("NavigationGraphManager - Scroll Position", () => {
     assert.equal(edges[0].uiState!.scrollPosition!.targetElement.text, "Advanced Settings");
   });
 
-  it("should handle scroll position with container and speed", () => {
+  it("should handle scroll position with container and speed", async () => {
     manager.recordToolCall("swipeOn", {
       direction: "up",
       lookFor: { text: "Item" },
@@ -465,10 +479,10 @@ describe("NavigationGraphManager - Scroll Position", () => {
       speed: "slow"
     });
 
-    manager.recordNavigationEvent(createEvent("Home"));
-    manager.recordNavigationEvent(createEvent("Details"));
+    await manager.recordNavigationEvent(createEvent("Home"));
+    await manager.recordNavigationEvent(createEvent("Details"));
 
-    const edges = manager.getEdgesFrom("Home");
+    const edges = await manager.getEdgesFrom("Home");
     assert.lengthOf(edges, 1);
     const scrollPos = edges[0].uiState!.scrollPosition!;
     assert.equal(scrollPos.targetElement.text, "Item");
@@ -491,7 +505,7 @@ describe("NavigationGraphManager - Scroll Position", () => {
     // No assertion needed, just verify it doesn't crash
   });
 
-  it("should update most recent swipeOn when multiple exist", () => {
+  it("should update most recent swipeOn when multiple exist", async () => {
     // Record multiple swipeOn calls
     manager.recordToolCall("swipeOn", {
       direction: "down",
@@ -509,10 +523,10 @@ describe("NavigationGraphManager - Scroll Position", () => {
       direction: "up"
     });
 
-    manager.recordNavigationEvent(createEvent("Screen1"));
-    manager.recordNavigationEvent(createEvent("Screen2"));
+    await manager.recordNavigationEvent(createEvent("Screen1"));
+    await manager.recordNavigationEvent(createEvent("Screen2"));
 
-    const edges = manager.getEdgesFrom("Screen1");
+    const edges = await manager.getEdgesFrom("Screen1");
     assert.lengthOf(edges, 1);
     assert.equal(edges[0].uiState!.scrollPosition!.targetElement.text, "Second");
   });

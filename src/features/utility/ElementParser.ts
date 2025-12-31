@@ -94,44 +94,45 @@ export class ElementParser {
   /**
    * Traverse the view hierarchy and process each node with a provided function
    * @param node - The node to start traversal from
-   * @param callback - Function to process each node
+   * @param callback - Function to process each node (receives node and depth)
+   * @param depth - Current depth in the hierarchy (0 = root)
    */
-  traverseNode(node: any, callback: (node: any) => void): void {
+  traverseNode(node: any, callback: (node: any, depth: number) => void, depth: number = 0): void {
     if (!node) {return;}
 
-    // Process the current node
-    callback(node);
+    // Process the current node with its depth
+    callback(node, depth);
 
-    // Traverse child nodes
+    // Traverse child nodes with incremented depth
     if (node.node) {
       const children = node.node;
       if (Array.isArray(children)) {
         for (const child of children) {
-          this.traverseNode(child, callback);
+          this.traverseNode(child, callback, depth + 1);
         }
       } else if (typeof children === "object") {
-        this.traverseNode(children, callback);
+        this.traverseNode(children, callback, depth + 1);
       }
     }
   }
 
   /**
-   * Flatten the view hierarchy into a linear array of elements with indices
+   * Flatten the view hierarchy into a linear array of elements with indices and depth
    * @param viewHierarchy - The view hierarchy to flatten
-   * @returns Array of elements with their indices
+   * @returns Array of elements with their indices and depth in hierarchy
    */
-  flattenViewHierarchy(viewHierarchy: ViewHierarchyResult): Array<{ element: Element; index: number; text?: string }> {
+  flattenViewHierarchy(viewHierarchy: ViewHierarchyResult): Array<{ element: Element; index: number; depth: number; text?: string }> {
     if (!viewHierarchy) {
       return [];
     }
 
-    const flattenedElements: Array<{ element: Element; index: number; text?: string }> = [];
+    const flattenedElements: Array<{ element: Element; index: number; depth: number; text?: string }> = [];
     const rootNodes = this.extractRootNodes(viewHierarchy);
     let currentIndex = 0;
 
     // Process each root node
     for (const rootNode of rootNodes) {
-      this.traverseNode(rootNode, (node: any) => {
+      this.traverseNode(rootNode, (node: any, depth: number) => {
         const parsedNode = this.parseNodeBounds(node);
         if (parsedNode) {
           const nodeProperties = this.extractNodeProperties(node);
@@ -140,6 +141,7 @@ export class ElementParser {
           flattenedElements.push({
             element: parsedNode,
             index: currentIndex,
+            depth: depth,
             text: accessibilityText
           });
           currentIndex++;

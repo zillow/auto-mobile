@@ -1,5 +1,7 @@
 import { logger } from "../../utils/logger";
 import { BackStackInfo } from "../../models";
+import { NavigationRepository } from "../../db/navigationRepository";
+import type { NavigationEdge as DBNavigationEdge } from "../../db/types";
 import {
   NavigationGraph,
   NavigationEvent,
@@ -10,11 +12,12 @@ import {
   ToolCallInteraction,
   ExportedGraph,
   UIState,
-  ScrollPosition
+  ScrollPosition,
+  SelectedElement,
 } from "../../utils/interfaces/NavigationGraph";
 
 // Re-export types for convenience
-export {
+export type {
   NavigationGraph,
   NavigationEvent,
   NavigationNode,
@@ -23,35 +26,31 @@ export {
   PathResult,
   ToolCallInteraction,
   ExportedGraph,
-  UIState
+  UIState,
 };
 
 /**
- * Internal graph data structure.
- */
-interface InternalNavigationGraph {
-  nodes: Map<string, NavigationNode>;
-  edges: NavigationEdge[];
-  currentScreen: string | null;
-  toolCallHistory: ToolCallInteraction[];
-}
-
-/**
- * Manages the in-memory navigation graph for an app.
+ * Manages the navigation graph with SQLite persistence.
  * Tracks screen visits and correlates navigation events with tool calls.
  */
 export class NavigationGraphManager implements NavigationGraph {
   private static instance: NavigationGraphManager | null = null;
 
-  private graphs: Map<string, InternalNavigationGraph> = new Map(); // Per-app graphs
+  private repository: NavigationRepository;
   private currentAppId: string | null = null;
+  private currentScreen: string | null = null;
+
+  // Tool call history kept in memory for correlation (transient data)
+  private toolCallHistory: ToolCallInteraction[] = [];
 
   // Correlation window: tool call must occur 0-2000ms before navigation event
   private readonly TOOL_CALL_CORRELATION_WINDOW_MS = 2000;
   // Keep tool calls for 10 seconds
   private readonly TOOL_CALL_HISTORY_TTL_MS = 10000;
 
-  private constructor() {}
+  private constructor() {
+    this.repository = new NavigationRepository();
+  }
 
   /**
    * Get the singleton instance of NavigationGraphManager.
@@ -72,19 +71,19 @@ export class NavigationGraphManager implements NavigationGraph {
 
   /**
    * Set the current app being navigated.
-   * This allows tracking separate graphs per app.
+   * Creates the app record in the database if it doesn't exist.
    */
-  public setCurrentApp(appId: string): void {
-    this.currentAppId = appId;
-    if (!this.graphs.has(appId)) {
-      this.graphs.set(appId, {
-        nodes: new Map(),
-        edges: [],
-        currentScreen: null,
-        toolCallHistory: []
-      });
-      logger.info(`[NAVIGATION_GRAPH] Created new graph for app: ${appId}`);
+  public async setCurrentApp(appId: string): Promise<void> {
+    if (this.currentAppId === appId) {
+      return;
     }
+
+    this.currentAppId = appId;
+    this.currentScreen = null;
+
+    // Ensure app exists in database
+    await this.repository.getOrCreateApp(appId);
+    logger.info(`[NAVIGATION_GRAPH] Set current app: ${appId}`);
   }
 
   /**
@@ -95,49 +94,39 @@ export class NavigationGraphManager implements NavigationGraph {
   }
 
   /**
-   * Get or create the graph for the current app.
-   */
-  private getGraph(): InternalNavigationGraph | null {
-    if (!this.currentAppId) {
-      return null;
-    }
-    return this.graphs.get(this.currentAppId) || null;
-  }
-
-  /**
    * Record back stack information for the current screen.
    * Updates the current node with back stack depth and task ID.
    */
-  public recordBackStack(backStack: BackStackInfo): void {
-    const graph = this.getGraph();
-    if (!graph || !graph.currentScreen) {
-      logger.debug(`[NAVIGATION_GRAPH] Cannot record back stack - no current screen`);
+  public async recordBackStack(backStack: BackStackInfo): Promise<void> {
+    if (!this.currentAppId || !this.currentScreen) {
+      logger.debug(`[NAVIGATION_GRAPH] Cannot record back stack - no current app or screen`);
       return;
     }
 
-    const node = graph.nodes.get(graph.currentScreen);
-    if (node) {
-      node.backStackDepth = backStack.depth;
-      node.taskId = backStack.currentTaskId;
-      logger.debug(
-        `[NAVIGATION_GRAPH] Updated back stack for ${graph.currentScreen}: ` +
-        `depth=${backStack.depth}, taskId=${backStack.currentTaskId}`
-      );
-    }
+    await this.repository.updateNodeBackStack(
+      this.currentAppId,
+      this.currentScreen,
+      backStack.depth,
+      backStack.currentTaskId
+    );
+
+    logger.debug(
+      `[NAVIGATION_GRAPH] Updated back stack for ${this.currentScreen}: ` +
+      `depth=${backStack.depth}, taskId=${backStack.currentTaskId}`
+    );
   }
 
   /**
    * Record a navigation event from WebSocket.
    * If the event contains an applicationId, automatically sets/switches the current app.
    */
-  public recordNavigationEvent(event: NavigationEvent): void {
+  public async recordNavigationEvent(event: NavigationEvent): Promise<void> {
     // Auto-set current app from navigation event if provided
     if (event.applicationId && event.applicationId !== this.currentAppId) {
-      this.setCurrentApp(event.applicationId);
+      await this.setCurrentApp(event.applicationId);
     }
 
-    const graph = this.getGraph();
-    if (!graph) {
+    if (!this.currentAppId) {
       logger.warn(`[NAVIGATION_GRAPH] Cannot record event - no current app set`);
       return;
     }
@@ -145,106 +134,170 @@ export class NavigationGraphManager implements NavigationGraph {
     const screenName = event.destination;
     const timestamp = event.timestamp;
 
+    // Get or create node and update visit count
+    const node = await this.repository.getOrCreateNode(
+      this.currentAppId,
+      screenName,
+      timestamp
+    );
+
     // Get modal stack from the most recent tool call (if any)
-    const recentToolCall = this.findCorrelatedToolCall(graph, timestamp);
+    const recentToolCall = this.findCorrelatedToolCall(timestamp);
     const currentModalStack = recentToolCall?.uiState?.modalStack;
 
-    // Update or create node
-    if (!graph.nodes.has(screenName)) {
-      graph.nodes.set(screenName, {
-        screenName,
-        firstSeenAt: timestamp,
-        lastSeenAt: timestamp,
-        visitCount: 1,
-        modalStack: currentModalStack
-      });
-      const modalInfo = currentModalStack?.length
-        ? ` with ${currentModalStack.length} modal(s)`
-        : "";
-      logger.info(`[NAVIGATION_GRAPH] New screen discovered: ${screenName}${modalInfo}`);
-    } else {
-      const node = graph.nodes.get(screenName)!;
-      node.lastSeenAt = timestamp;
-      node.visitCount++;
-      // Update modal stack to the latest observed state
-      node.modalStack = currentModalStack;
-      logger.debug(`[NAVIGATION_GRAPH] Screen revisited: ${screenName} (visit #${node.visitCount})`);
+    // Update node modals if present
+    if (currentModalStack && currentModalStack.length > 0) {
+      const modalIds = currentModalStack.map(m => m.identifier || `${m.type}-${m.layer}`);
+      await this.repository.setNodeModals(node.id, modalIds);
+
+      logger.info(
+        `[NAVIGATION_GRAPH] Screen ${screenName} has ${modalIds.length} modal(s)`
+      );
     }
 
     // Create edge from previous screen to current screen
-    if (graph.currentScreen && graph.currentScreen !== screenName) {
-      const interaction = this.findCorrelatedToolCall(graph, timestamp);
-      const fromNode = graph.nodes.get(graph.currentScreen);
-      const toNode = graph.nodes.get(screenName);
+    if (this.currentScreen && this.currentScreen !== screenName) {
+      const interaction = this.findCorrelatedToolCall(timestamp);
 
-      const edge: NavigationEdge = {
-        from: graph.currentScreen,
-        to: screenName,
-        interaction,
-        timestamp,
-        edgeType: interaction ? "tool" : "unknown",
-        uiState: interaction?.uiState,
-        fromModalStack: fromNode?.modalStack,
-        toModalStack: toNode?.modalStack
-      };
+      const toolName = interaction?.toolName || null;
+      const toolArgs = interaction?.args || null;
 
-      graph.edges.push(edge);
+      const edge = await this.repository.createEdge(
+        this.currentAppId,
+        this.currentScreen,
+        screenName,
+        toolName,
+        toolArgs,
+        timestamp
+      );
 
-      if (interaction) {
-        const uiStateInfo = interaction.uiState?.selectedElements.length
-          ? ` (requires: ${interaction.uiState.selectedElements.map(e => e.text || e.resourceId).join(", ")})`
-          : "";
-        const modalInfo = this.formatModalStackChange(fromNode?.modalStack, toNode?.modalStack);
-        logger.info(
-          `[NAVIGATION_GRAPH] Edge added: ${graph.currentScreen} → ${screenName} via ${interaction.toolName}${uiStateInfo}${modalInfo}`
+      // Store UI elements if present in interaction
+      if (interaction?.uiState?.selectedElements) {
+        await this.storeUIElements(
+          edge.id,
+          interaction.uiState.selectedElements,
+          timestamp
         );
-      } else {
-        logger.info(
-          `[NAVIGATION_GRAPH] Edge added: ${graph.currentScreen} → ${screenName} (unknown interaction)`
+      }
+
+      // Store modal stacks for from/to
+      const fromNode = await this.repository.getNode(this.currentAppId, this.currentScreen);
+      if (fromNode) {
+        const fromModals = await this.repository.getNodeModals(fromNode.id);
+        if (fromModals.length > 0) {
+          await this.repository.setEdgeModals(edge.id, "from", fromModals);
+        }
+      }
+
+      if (currentModalStack && currentModalStack.length > 0) {
+        const toModalIds = currentModalStack.map(
+          m => m.identifier || `${m.type}-${m.layer}`
+        );
+        await this.repository.setEdgeModals(edge.id, "to", toModalIds);
+      }
+
+      // Store scroll position if present
+      if (interaction?.uiState?.scrollPosition) {
+        await this.storeScrollPosition(
+          edge.id,
+          interaction.uiState.scrollPosition,
+          timestamp
         );
       }
     }
 
-    graph.currentScreen = screenName;
+    this.currentScreen = screenName;
+    await this.repository.touchApp(this.currentAppId);
   }
 
   /**
-   * Format modal stack change for logging.
+   * Store UI elements used in an edge transition.
    */
-  private formatModalStackChange(from: any[] | undefined, to: any[] | undefined): string {
-    if (!from && !to) {
-      return "";
+  private async storeUIElements(
+    edgeId: number,
+    selectedElements: SelectedElement[],
+    timestamp: number
+  ): Promise<void> {
+    if (!this.currentAppId || selectedElements.length === 0) {
+      return;
     }
-    if (!from && to) {
-      return ` [modals: 0 → ${to.length}]`;
+
+    const elementIds: number[] = [];
+
+    for (const selected of selectedElements) {
+      const element = await this.repository.getOrCreateUIElement(
+        this.currentAppId,
+        {
+          text: selected.text,
+          resourceId: selected.resourceId,
+          contentDescription: selected.contentDesc,
+        },
+        timestamp
+      );
+      elementIds.push(element.id);
     }
-    if (from && !to) {
-      return ` [modals: ${from.length} → 0]`;
+
+    await this.repository.linkUIElementsToEdge(edgeId, elementIds);
+  }
+
+  /**
+   * Store scroll position for an edge.
+   */
+  private async storeScrollPosition(
+    edgeId: number,
+    scrollPosition: ScrollPosition,
+    timestamp: number
+  ): Promise<void> {
+    if (!this.currentAppId) {
+      return;
     }
-    if (from && to && from.length !== to.length) {
-      return ` [modals: ${from.length} → ${to.length}]`;
+
+    // Store the target element
+    const targetElement = await this.repository.getOrCreateUIElement(
+      this.currentAppId,
+      {
+        text: scrollPosition.targetElement.text,
+        resourceId: scrollPosition.targetElement.resourceId,
+        contentDescription: scrollPosition.targetElement.contentDesc,
+      },
+      timestamp
+    );
+
+    // Store the container element if present
+    let containerElementId: number | undefined;
+    if (scrollPosition.container) {
+      const containerElement = await this.repository.getOrCreateUIElement(
+        this.currentAppId,
+        {
+          text: scrollPosition.container.text,
+          resourceId: scrollPosition.container.resourceId,
+          contentDescription: scrollPosition.container.contentDesc,
+        },
+        timestamp
+      );
+      containerElementId = containerElement.id;
     }
-    return "";
+
+    await this.repository.setScrollPosition(
+      edgeId,
+      targetElement.id,
+      scrollPosition.direction,
+      containerElementId,
+      scrollPosition.speed
+    );
   }
 
   /**
    * Record a tool call for correlation with future navigation events.
    */
   public recordToolCall(toolName: string, args: Record<string, any>, uiState?: UIState): void {
-    const graph = this.getGraph();
-    if (!graph) {
-      // Store in a temporary buffer if no app is set yet
-      logger.debug(`[NAVIGATION_GRAPH] Tool call recorded without app context: ${toolName}`);
-      return;
-    }
-
     const timestamp = Date.now();
 
-    graph.toolCallHistory.push({
+    this.toolCallHistory.push({
       toolName,
       args,
       timestamp,
-      uiState
+      uiState,
     });
 
     const uiStateInfo = uiState?.selectedElements.length
@@ -256,7 +309,7 @@ export class NavigationGraphManager implements NavigationGraph {
     logger.debug(`[NAVIGATION_GRAPH] Tool call recorded: ${toolName} at ${timestamp}${uiStateInfo}${modalInfo}`);
 
     // Clean up old tool calls
-    this.cleanupToolCallHistory(graph);
+    this.cleanupToolCallHistory();
   }
 
   /**
@@ -264,14 +317,13 @@ export class NavigationGraphManager implements NavigationGraph {
    * This is called after a swipeOn with lookFor completes successfully.
    */
   public updateScrollPosition(scrollPosition: ScrollPosition): void {
-    const graph = this.getGraph();
-    if (!graph || graph.toolCallHistory.length === 0) {
-      logger.debug(`[NAVIGATION_GRAPH] Cannot update scroll position: no graph or tool calls`);
+    if (this.toolCallHistory.length === 0) {
+      logger.debug(`[NAVIGATION_GRAPH] Cannot update scroll position: no tool calls`);
       return;
     }
 
     // Find the most recent swipeOn tool call
-    const recentSwipeOn = [...graph.toolCallHistory]
+    const recentSwipeOn = [...this.toolCallHistory]
       .reverse()
       .find(tc => tc.toolName === "swipeOn");
 
@@ -284,7 +336,7 @@ export class NavigationGraphManager implements NavigationGraph {
     if (!recentSwipeOn.uiState) {
       recentSwipeOn.uiState = {
         selectedElements: [],
-        scrollPosition
+        scrollPosition,
       };
     } else {
       recentSwipeOn.uiState.scrollPosition = scrollPosition;
@@ -292,19 +344,19 @@ export class NavigationGraphManager implements NavigationGraph {
 
     logger.debug(
       `[NAVIGATION_GRAPH] Updated scroll position for swipeOn: ` +
-      `target=${scrollPosition.targetElement.text || scrollPosition.targetElement.resourceId}, ` +
-      `direction=${scrollPosition.direction}`
+        `target=${scrollPosition.targetElement.text || scrollPosition.targetElement.resourceId}, ` +
+        `direction=${scrollPosition.direction}`
     );
   }
 
   /**
    * Remove tool calls older than TTL.
    */
-  private cleanupToolCallHistory(graph: InternalNavigationGraph): void {
+  private cleanupToolCallHistory(): void {
     const cutoff = Date.now() - this.TOOL_CALL_HISTORY_TTL_MS;
-    const before = graph.toolCallHistory.length;
-    graph.toolCallHistory = graph.toolCallHistory.filter(tc => tc.timestamp >= cutoff);
-    const removed = before - graph.toolCallHistory.length;
+    const before = this.toolCallHistory.length;
+    this.toolCallHistory = this.toolCallHistory.filter(tc => tc.timestamp >= cutoff);
+    const removed = before - this.toolCallHistory.length;
     if (removed > 0) {
       logger.debug(`[NAVIGATION_GRAPH] Cleaned up ${removed} old tool calls`);
     }
@@ -314,12 +366,9 @@ export class NavigationGraphManager implements NavigationGraph {
    * Find a tool call that likely caused a navigation event.
    * Looks for tool calls within the correlation window BEFORE the navigation event.
    */
-  private findCorrelatedToolCall(
-    graph: InternalNavigationGraph,
-    navigationTimestamp: number
-  ): ToolCallInteraction | undefined {
+  private findCorrelatedToolCall(navigationTimestamp: number): ToolCallInteraction | undefined {
     // Look for tool calls within correlation window BEFORE navigation event
-    const candidates = graph.toolCallHistory.filter(tc => {
+    const candidates = this.toolCallHistory.filter(tc => {
       const timeDiff = navigationTimestamp - tc.timestamp;
       return timeDiff >= 0 && timeDiff <= this.TOOL_CALL_CORRELATION_WINDOW_MS;
     });
@@ -332,48 +381,49 @@ export class NavigationGraphManager implements NavigationGraph {
     const mostRecent = candidates[candidates.length - 1];
     logger.debug(
       `[NAVIGATION_GRAPH] Correlated tool call: ${mostRecent.toolName} ` +
-      `(${navigationTimestamp - mostRecent.timestamp}ms before navigation)`
+        `(${navigationTimestamp - mostRecent.timestamp}ms before navigation)`
     );
     return mostRecent;
   }
 
   /**
-   * Get the current screen name.
+   * Get the current screen name (runtime state).
    */
   public getCurrentScreen(): string | null {
-    const graph = this.getGraph();
-    return graph?.currentScreen || null;
+    return this.currentScreen;
   }
 
   /**
    * Find the shortest path from current screen to target screen using BFS.
    */
-  public findPath(targetScreen: string): PathResult {
-    const graph = this.getGraph();
-
-    if (!graph || !graph.currentScreen) {
+  public async findPath(targetScreen: string): Promise<PathResult> {
+    if (!this.currentAppId || !this.currentScreen) {
       return {
         found: false,
         path: [],
         startScreen: "",
-        targetScreen
+        targetScreen,
       };
     }
 
-    const startScreen = graph.currentScreen;
+    const startScreen = this.currentScreen;
 
     if (startScreen === targetScreen) {
       return {
         found: true,
         path: [],
         startScreen,
-        targetScreen
+        targetScreen,
       };
     }
 
+    // Get all edges for BFS
+    const dbEdges = await this.repository.getEdges(this.currentAppId);
+    const edges = await this.convertDBEdgesToNavigationEdges(dbEdges);
+
     // BFS to find shortest path
     const queue: Array<{ screen: string; path: NavigationEdge[] }> = [
-      { screen: startScreen, path: [] }
+      { screen: startScreen, path: [] },
     ];
     const visited = new Set<string>([startScreen]);
 
@@ -381,7 +431,7 @@ export class NavigationGraphManager implements NavigationGraph {
       const { screen, path } = queue.shift()!;
 
       // Find all edges from current screen
-      const outgoingEdges = graph.edges.filter(e => e.from === screen);
+      const outgoingEdges = edges.filter(e => e.from === screen);
 
       for (const edge of outgoingEdges) {
         if (edge.to === targetScreen) {
@@ -390,7 +440,7 @@ export class NavigationGraphManager implements NavigationGraph {
             found: true,
             path: [...path, edge],
             startScreen,
-            targetScreen
+            targetScreen,
           };
         }
 
@@ -398,7 +448,7 @@ export class NavigationGraphManager implements NavigationGraph {
           visited.add(edge.to);
           queue.push({
             screen: edge.to,
-            path: [...path, edge]
+            path: [...path, edge],
           });
         }
       }
@@ -409,115 +459,265 @@ export class NavigationGraphManager implements NavigationGraph {
       found: false,
       path: [],
       startScreen,
-      targetScreen
+      targetScreen,
     };
+  }
+
+  /**
+   * Convert database edges to NavigationEdge format.
+   */
+  private async convertDBEdgesToNavigationEdges(
+    dbEdges: DBNavigationEdge[]
+  ): Promise<NavigationEdge[]> {
+    const edges: NavigationEdge[] = [];
+
+    for (const dbEdge of dbEdges) {
+      const edge: NavigationEdge = {
+        from: dbEdge.from_screen,
+        to: dbEdge.to_screen,
+        timestamp: dbEdge.timestamp,
+        edgeType: dbEdge.tool_name ? "tool" : "unknown",
+      };
+
+      if (dbEdge.tool_name) {
+        edge.interaction = {
+          toolName: dbEdge.tool_name,
+          args: dbEdge.tool_args ? JSON.parse(dbEdge.tool_args) : {},
+          timestamp: dbEdge.timestamp,
+        };
+
+        // Load UI elements
+        const uiElements = await this.repository.getUIElementsForEdge(dbEdge.id);
+        if (uiElements.length > 0) {
+          edge.interaction.uiState = {
+            selectedElements: uiElements.map(el => ({
+              text: el.text || undefined,
+              resourceId: el.resource_id || undefined,
+              contentDesc: el.content_description || undefined,
+            })),
+          };
+        }
+
+        // Load scroll position
+        const scrollPos = await this.repository.getScrollPosition(dbEdge.id);
+        if (scrollPos) {
+          // Initialize uiState if not already present
+          if (!edge.interaction.uiState) {
+            edge.interaction.uiState = {
+              selectedElements: [],
+            };
+          }
+          edge.interaction.uiState.scrollPosition = {
+            targetElement: {
+              text: scrollPos.targetElement.text || undefined,
+              resourceId: scrollPos.targetElement.resource_id || undefined,
+              contentDesc: scrollPos.targetElement.content_description || undefined,
+            },
+            direction: scrollPos.direction as "up" | "down" | "left" | "right",
+            speed: scrollPos.speed as "slow" | "normal" | "fast" | undefined,
+          };
+
+          // Add container if present
+          if (scrollPos.containerElement) {
+            edge.interaction.uiState.scrollPosition.container = {
+              text: scrollPos.containerElement.text || undefined,
+              resourceId: scrollPos.containerElement.resource_id || undefined,
+              contentDesc: scrollPos.containerElement.content_description || undefined,
+            };
+          }
+        }
+
+        // Copy interaction.uiState to edge.uiState for backward compatibility
+        if (edge.interaction.uiState) {
+          edge.uiState = edge.interaction.uiState;
+        }
+      }
+
+      // Load modal stacks
+      const fromModals = await this.repository.getEdgeModals(dbEdge.id, "from");
+      const toModals = await this.repository.getEdgeModals(dbEdge.id, "to");
+
+      if (fromModals.length > 0) {
+        edge.fromModalStack = fromModals.map((id, layer) => ({
+          type: "overlay" as const,
+          identifier: id,
+          layer,
+        }));
+      }
+
+      if (toModals.length > 0) {
+        edge.toModalStack = toModals.map((id, layer) => ({
+          type: "overlay" as const,
+          identifier: id,
+          layer,
+        }));
+      }
+
+      edges.push(edge);
+    }
+
+    return edges;
   }
 
   /**
    * Get all known screen names.
    */
-  public getKnownScreens(): string[] {
-    const graph = this.getGraph();
-    if (!graph) {
+  public async getKnownScreens(): Promise<string[]> {
+    if (!this.currentAppId) {
       return [];
     }
-    return Array.from(graph.nodes.keys());
+
+    const nodes = await this.repository.getNodes(this.currentAppId);
+    return nodes.map(n => n.screen_name);
   }
 
   /**
    * Get a specific node by screen name.
    */
-  public getNode(screenName: string): NavigationNode | undefined {
-    const graph = this.getGraph();
-    return graph?.nodes.get(screenName);
+  public async getNode(screenName: string): Promise<NavigationNode | undefined> {
+    if (!this.currentAppId) {
+      return undefined;
+    }
+
+    const dbNode = await this.repository.getNode(this.currentAppId, screenName);
+    if (!dbNode) {
+      return undefined;
+    }
+
+    const modals = await this.repository.getNodeModals(dbNode.id);
+
+    return {
+      screenName: dbNode.screen_name,
+      firstSeenAt: dbNode.first_seen_at,
+      lastSeenAt: dbNode.last_seen_at,
+      visitCount: dbNode.visit_count,
+      backStackDepth: dbNode.back_stack_depth ?? undefined,
+      taskId: dbNode.task_id ?? undefined,
+      modalStack: modals.length > 0
+        ? modals.map((id, layer) => ({
+          type: "overlay" as const,
+          identifier: id,
+          layer,
+        }))
+        : undefined,
+    };
   }
 
   /**
    * Get all edges from a specific screen.
    */
-  public getEdgesFrom(screenName: string): NavigationEdge[] {
-    const graph = this.getGraph();
-    if (!graph) {
+  public async getEdgesFrom(screenName: string): Promise<NavigationEdge[]> {
+    if (!this.currentAppId) {
       return [];
     }
-    return graph.edges.filter(e => e.from === screenName);
+
+    const dbEdges = await this.repository.getEdgesFrom(this.currentAppId, screenName);
+    return this.convertDBEdgesToNavigationEdges(dbEdges);
   }
 
   /**
    * Get all edges to a specific screen.
    */
-  public getEdgesTo(screenName: string): NavigationEdge[] {
-    const graph = this.getGraph();
-    if (!graph) {
+  public async getEdgesTo(screenName: string): Promise<NavigationEdge[]> {
+    if (!this.currentAppId) {
       return [];
     }
-    return graph.edges.filter(e => e.to === screenName);
+
+    const dbEdges = await this.repository.getEdgesTo(this.currentAppId, screenName);
+    return this.convertDBEdgesToNavigationEdges(dbEdges);
   }
 
   /**
    * Get graph statistics for debugging.
    */
-  public getStats(): NavigationGraphStats {
-    const graph = this.getGraph();
-    if (!graph) {
+  public async getStats(): Promise<NavigationGraphStats> {
+    if (!this.currentAppId) {
       return {
         nodeCount: 0,
         edgeCount: 0,
         currentScreen: null,
         knownEdgeCount: 0,
         unknownEdgeCount: 0,
-        toolCallHistorySize: 0
+        toolCallHistorySize: 0,
       };
     }
 
+    const stats = await this.repository.getStats(this.currentAppId);
+
     return {
-      nodeCount: graph.nodes.size,
-      edgeCount: graph.edges.length,
-      currentScreen: graph.currentScreen,
-      knownEdgeCount: graph.edges.filter(e => e.edgeType === "tool").length,
-      unknownEdgeCount: graph.edges.filter(e => e.edgeType === "unknown").length,
-      toolCallHistorySize: graph.toolCallHistory.length
+      nodeCount: stats.nodeCount,
+      edgeCount: stats.edgeCount,
+      currentScreen: this.currentScreen,
+      knownEdgeCount: stats.toolEdgeCount,
+      unknownEdgeCount: stats.unknownEdgeCount,
+      toolCallHistorySize: this.toolCallHistory.length,
     };
   }
 
   /**
    * Clear the graph for the current app.
    */
-  public clearCurrentGraph(): void {
+  public async clearCurrentGraph(): Promise<void> {
     if (this.currentAppId) {
-      this.graphs.delete(this.currentAppId);
+      await this.repository.clearAppGraph(this.currentAppId);
+      this.currentScreen = null;
       logger.info(`[NAVIGATION_GRAPH] Cleared graph for app: ${this.currentAppId}`);
     }
   }
 
   /**
    * Clear all graphs.
+   * Note: This only clears the current app's data since we use app-specific storage.
    */
-  public clearAllGraphs(): void {
-    this.graphs.clear();
+  public async clearAllGraphs(): Promise<void> {
+    await this.clearCurrentGraph();
     this.currentAppId = null;
+    this.currentScreen = null;
+    this.toolCallHistory = [];
     logger.info(`[NAVIGATION_GRAPH] Cleared all navigation graphs`);
   }
 
   /**
    * Export the current graph for debugging/visualization.
    */
-  public exportGraph(): ExportedGraph {
-    const graph = this.getGraph();
-    if (!graph) {
+  public async exportGraph(): Promise<ExportedGraph> {
+    if (!this.currentAppId) {
       return {
-        appId: this.currentAppId,
+        appId: null,
         nodes: [],
         edges: [],
-        currentScreen: null
+        currentScreen: null,
       };
     }
 
+    const dbNodes = await this.repository.getNodes(this.currentAppId);
+    const dbEdges = await this.repository.getEdges(this.currentAppId);
+
+    const nodes: NavigationNode[] = [];
+    for (const dbNode of dbNodes) {
+      const modals = await this.repository.getNodeModals(dbNode.id);
+      nodes.push({
+        screenName: dbNode.screen_name,
+        firstSeenAt: dbNode.first_seen_at,
+        lastSeenAt: dbNode.last_seen_at,
+        visitCount: dbNode.visit_count,
+        modalStack: modals.length > 0
+          ? modals.map((id, layer) => ({
+            type: "overlay" as const,
+            identifier: id,
+            layer,
+          }))
+          : undefined,
+      });
+    }
+
+    const edges = await this.convertDBEdgesToNavigationEdges(dbEdges);
+
     return {
       appId: this.currentAppId,
-      nodes: Array.from(graph.nodes.values()),
-      edges: [...graph.edges],
-      currentScreen: graph.currentScreen
+      nodes,
+      edges,
+      currentScreen: this.currentScreen,
     };
   }
 }

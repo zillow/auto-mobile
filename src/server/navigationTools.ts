@@ -82,8 +82,8 @@ export function registerNavigationTools() {
   ) => {
     try {
       const manager = NavigationGraphManager.getInstance();
-      const stats = manager.getStats();
-      const graph = manager.exportGraph();
+      const stats = await manager.getStats();
+      const graph = await manager.exportGraph();
 
       return createJSONToolResponse({
         message: `Navigation graph for app: ${graph.appId || "none"}`,

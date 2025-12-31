@@ -39,7 +39,7 @@ export interface PathOptimizer {
     currentScreen: string,
     targetScreen: string,
     currentBackStackDepth: number
-  ): BackButtonRecommendation;
+  ): Promise<BackButtonRecommendation>;
 
   /**
    * Check if two screens are in the same Android task.
@@ -48,7 +48,7 @@ export interface PathOptimizer {
    * @param screen2 - Second screen name
    * @returns True if screens are in the same task
    */
-  areInSameTask(screen1: string, screen2: string): boolean;
+  areInSameTask(screen1: string, screen2: string): Promise<boolean>;
 
   /**
    * Get overall navigation recommendation for reaching a target screen.
@@ -62,5 +62,5 @@ export interface PathOptimizer {
     targetScreen: string,
     currentScreen: string,
     currentBackStackDepth: number
-  ): NavigationRecommendation;
+  ): Promise<NavigationRecommendation>;
 }

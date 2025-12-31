@@ -238,7 +238,9 @@ RUN curl -L -o /usr/local/bin/tini "https://github.com/krallin/tini/releases/dow
 RUN adduser -D automobile \
     && chown -R automobile:automobile /workspace \
     && mkdir -p /home/automobile/.android \
-    && chown -R automobile:automobile /home/automobile/.android
+    && mkdir -p /home/automobile/.auto-mobile \
+    && chown -R automobile:automobile /home/automobile/.android \
+    && chown -R automobile:automobile /home/automobile/.auto-mobile
 
 # Switch to non-root user
 USER automobile

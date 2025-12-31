@@ -27,12 +27,12 @@ export class SmartNavigationHelper {
    *
    * @deprecated Use DefaultPathOptimizer instance instead
    */
-  public static shouldUseBackButton(
+  public static async shouldUseBackButton(
     currentScreen: string,
     targetScreen: string,
     currentBackStackDepth: number
-  ): BackButtonRecommendation {
-    return SmartNavigationHelper.getOptimizer().shouldUseBackButton(
+  ): Promise<BackButtonRecommendation> {
+    return await SmartNavigationHelper.getOptimizer().shouldUseBackButton(
       currentScreen,
       targetScreen,
       currentBackStackDepth
@@ -44,8 +44,8 @@ export class SmartNavigationHelper {
    *
    * @deprecated Use DefaultPathOptimizer instance instead
    */
-  public static areInSameTask(screen1: string, screen2: string): boolean {
-    return SmartNavigationHelper.getOptimizer().areInSameTask(screen1, screen2);
+  public static async areInSameTask(screen1: string, screen2: string): Promise<boolean> {
+    return await SmartNavigationHelper.getOptimizer().areInSameTask(screen1, screen2);
   }
 
   /**
@@ -53,12 +53,12 @@ export class SmartNavigationHelper {
    *
    * @deprecated Use DefaultPathOptimizer instance instead
    */
-  public static getNavigationRecommendation(
+  public static async getNavigationRecommendation(
     targetScreen: string,
     currentScreen: string,
     currentBackStackDepth: number
-  ): NavigationRecommendation {
-    return SmartNavigationHelper.getOptimizer().getNavigationRecommendation(
+  ): Promise<NavigationRecommendation> {
+    return await SmartNavigationHelper.getOptimizer().getNavigationRecommendation(
       targetScreen,
       currentScreen,
       currentBackStackDepth

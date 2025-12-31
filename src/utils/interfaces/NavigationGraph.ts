@@ -164,13 +164,13 @@ export interface BackStackInfo {
  */
 export interface NavigationGraph {
   /** Set the current app being navigated */
-  setCurrentApp(appId: string): void;
+  setCurrentApp(appId: string): Promise<void>;
 
   /** Get the current app ID */
   getCurrentAppId(): string | null;
 
   /** Record a navigation event from WebSocket */
-  recordNavigationEvent(event: NavigationEvent): void;
+  recordNavigationEvent(event: NavigationEvent): Promise<void>;
 
   /** Record back stack information for the current screen */
   recordBackStack(backStack: BackStackInfo): void;
@@ -182,29 +182,29 @@ export interface NavigationGraph {
   getCurrentScreen(): string | null;
 
   /** Find the shortest path from current screen to target */
-  findPath(targetScreen: string): PathResult;
+  findPath(targetScreen: string): Promise<PathResult>;
 
   /** Get all known screen names */
-  getKnownScreens(): string[];
+  getKnownScreens(): Promise<string[]>;
 
   /** Get a specific node by screen name */
-  getNode(screenName: string): NavigationNode | undefined;
+  getNode(screenName: string): Promise<NavigationNode | undefined>;
 
   /** Get all edges from a specific screen */
-  getEdgesFrom(screenName: string): NavigationEdge[];
+  getEdgesFrom(screenName: string): Promise<NavigationEdge[]>;
 
   /** Get all edges to a specific screen */
-  getEdgesTo(screenName: string): NavigationEdge[];
+  getEdgesTo(screenName: string): Promise<NavigationEdge[]>;
 
   /** Get graph statistics */
-  getStats(): NavigationGraphStats;
+  getStats(): Promise<NavigationGraphStats>;
 
   /** Clear the graph for the current app */
-  clearCurrentGraph(): void;
+  clearCurrentGraph(): Promise<void>;
 
   /** Clear all graphs */
-  clearAllGraphs(): void;
+  clearAllGraphs(): Promise<void>;
 
   /** Export the current graph for debugging */
-  exportGraph(): ExportedGraph;
+  exportGraph(): Promise<ExportedGraph>;
 }

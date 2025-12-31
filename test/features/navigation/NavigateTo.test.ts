@@ -4,6 +4,7 @@ import { NavigationGraphManager } from "../../../src/features/navigation/Navigat
 import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { BootedDevice } from "../../../src/models";
 import { z } from "zod";
+import { runMigrations } from "../../helpers/database";
 
 describe("NavigateTo", () => {
   let navigateTo: NavigateTo;
@@ -13,7 +14,12 @@ describe("NavigateTo", () => {
   // Map of text -> screen to simulate navigation when tools are called
   let navigationMap: Map<string, string>;
 
-  beforeEach(() => {
+  before(async () => {
+    // Run database migrations once before all tests
+    await runMigrations();
+  });
+
+  beforeEach(async () => {
     // Reset singleton
     NavigationGraphManager.resetInstance();
     ToolRegistry.clearTools();
@@ -45,7 +51,7 @@ describe("NavigateTo", () => {
         // Simulate navigation by recording a navigation event
         const targetScreen = navigationMap.get(args.text);
         if (targetScreen) {
-          NavigationGraphManager.getInstance().recordNavigationEvent({
+          await NavigationGraphManager.getInstance().recordNavigationEvent({
             destination: targetScreen,
             source: "TEST",
             arguments: {},
@@ -61,7 +67,7 @@ describe("NavigateTo", () => {
 
     // Set up navigation graph with test data
     const manager = NavigationGraphManager.getInstance();
-    manager.setCurrentApp("com.test.app");
+    await manager.setCurrentApp("com.test.app");
   });
 
   afterEach(() => {
@@ -85,7 +91,7 @@ describe("NavigateTo", () => {
 
     it("should return success when already on target screen", async () => {
       const manager = NavigationGraphManager.getInstance();
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -108,7 +114,7 @@ describe("NavigateTo", () => {
 
     it("should return error when no path exists", async () => {
       const manager = NavigationGraphManager.getInstance();
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -141,7 +147,7 @@ describe("NavigateTo", () => {
       manager.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
 
       // Record navigation: Home -> Settings
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -149,7 +155,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "SettingsScreen",
         source: "TEST",
         arguments: {},
@@ -159,7 +165,7 @@ describe("NavigateTo", () => {
       });
 
       // Go back to Home to test navigation
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -189,7 +195,7 @@ describe("NavigateTo", () => {
       navigationMap.set("Profile", "ProfileScreen");
 
       manager.recordToolCall("tapOn", { text: "Profile", action: "tap", platform: "android" });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -197,7 +203,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "ProfileScreen",
         source: "TEST",
         arguments: {},
@@ -205,7 +211,7 @@ describe("NavigateTo", () => {
         timestamp: now + 100,
         sequenceNumber: 1
       });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -235,7 +241,7 @@ describe("NavigateTo", () => {
       navigationMap.set("Step1", "Screen2");
 
       manager.recordToolCall("tapOn", { text: "Step1", action: "tap", platform: "android" });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "Screen1",
         source: "TEST",
         arguments: {},
@@ -243,7 +249,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "Screen2",
         source: "TEST",
         arguments: {},
@@ -251,7 +257,7 @@ describe("NavigateTo", () => {
         timestamp: now + 100,
         sequenceNumber: 1
       });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "Screen1",
         source: "TEST",
         arguments: {},
@@ -277,7 +283,7 @@ describe("NavigateTo", () => {
 
     it("should return duration in result", async () => {
       const manager = NavigationGraphManager.getInstance();
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -310,7 +316,7 @@ describe("NavigateTo", () => {
 
       // Create path: Home -> Settings -> Advanced
       manager.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},
@@ -318,7 +324,7 @@ describe("NavigateTo", () => {
         timestamp: now,
         sequenceNumber: 0
       });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "SettingsScreen",
         source: "TEST",
         arguments: {},
@@ -328,7 +334,7 @@ describe("NavigateTo", () => {
       });
 
       manager.recordToolCall("tapOn", { text: "Advanced", action: "tap", platform: "android" });
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "AdvancedScreen",
         source: "TEST",
         arguments: {},
@@ -338,7 +344,7 @@ describe("NavigateTo", () => {
       });
 
       // Go back to Home
-      manager.recordNavigationEvent({
+      await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
         arguments: {},

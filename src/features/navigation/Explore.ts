@@ -7,6 +7,7 @@ import { logger } from "../../utils/logger";
 import { NavigationGraphManager } from "./NavigationGraphManager";
 import { ExportedGraph } from "../../utils/interfaces/NavigationGraph";
 import { TapOnElement } from "../action/TapOnElement";
+import { SwipeOnElement } from "../action/SwipeOnElement";
 import { ElementParser } from "../utility/ElementParser";
 
 /**
@@ -77,6 +78,7 @@ export interface ExploreResult {
   elementSelections?: ElementSelectionStats[];
   observation?: ObserveResult;
   durationMs: number;
+  stopReason?: string;
 }
 
 /**
@@ -107,12 +109,14 @@ export class Explore extends BaseVisualChange {
   private consecutiveNoChangeCount: number = 0;
   private loopDetection: Map<string, number> = new Map();
   private elementParser: ElementParser;
+  private stopReason: string = "";
+  private previousScreen: string | null = null;
 
   // Constants for safety limits
   private static readonly MAX_CONSECUTIVE_BACKS = 5;
-  private static readonly MAX_CONSECUTIVE_NO_CHANGE = 10;
+  private static readonly MAX_CONSECUTIVE_NO_CHANGE = 40; // Increased to allow more exploration
   private static readonly MAX_LOOP_ITERATIONS = 3;
-  private static readonly DEFAULT_MAX_INTERACTIONS = 50;
+  private static readonly DEFAULT_MAX_INTERACTIONS = 200; // Increased to allow thorough exploration
   private static readonly DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private static readonly DEFAULT_RESET_INTERVAL = 15;
 
@@ -146,12 +150,23 @@ export class Explore extends BaseVisualChange {
       const mode = options.mode ?? "hybrid";
       const resetInterval = options.resetInterval ?? Explore.DEFAULT_RESET_INTERVAL;
 
+      // Reset exploration state for fresh run
+      this.exploredElements.clear();
+      this.loopDetection.clear();
+      this.elementSelections = [];
+      this.explorationPath = [];
+      this.interactionCount = 0;
+      this.consecutiveBackCount = 0;
+      this.consecutiveNoChangeCount = 0;
+      this.stopReason = "";
+      this.previousScreen = null;
+
       if (progress) {
         await progress(0, maxInteractions, "Starting exploration...");
       }
 
       // Capture initial graph state
-      const initialGraph = this.navigationManager.exportGraph();
+      const initialGraph = await this.navigationManager.exportGraph();
       const initialNodeCount = initialGraph.nodes.length;
 
       // Main exploration loop
@@ -207,9 +222,37 @@ export class Explore extends BaseVisualChange {
           this.consecutiveNoChangeCount++;
         }
 
+        // Update loop detection - only increment when navigating back to a previously visited screen
+        if (interactionSuccess) {
+          const newScreen = this.navigationManager.getCurrentScreen();
+
+          // Check if we navigated to a different screen
+          if (this.previousScreen !== null && newScreen && newScreen !== this.previousScreen) {
+            // We changed screens - check if we've been to this screen before
+            const visitCount = this.loopDetection.get(newScreen) ?? 0;
+            if (visitCount > 0) {
+              // We're returning to a previously visited screen - increment loop counter
+              this.loopDetection.set(newScreen, visitCount + 1);
+              logger.debug(`[Explore] Returning to screen ${newScreen}, visit count: ${visitCount + 1}`);
+            } else {
+              // First visit to this screen - initialize counter
+              this.loopDetection.set(newScreen, 1);
+            }
+          } else if (newScreen && this.previousScreen === null) {
+            // First screen we're tracking
+            this.loopDetection.set(newScreen, 1);
+          }
+
+          // Update previous screen for next iteration
+          if (newScreen) {
+            this.previousScreen = newScreen;
+          }
+        }
+
         // Report progress
         if (progress) {
-          const currentNodeCount = this.navigationManager.exportGraph().nodes.length;
+          const currentGraph = await this.navigationManager.exportGraph();
+          const currentNodeCount = currentGraph.nodes.length;
           await progress(
             this.interactionCount,
             maxInteractions,
@@ -224,7 +267,7 @@ export class Explore extends BaseVisualChange {
       }
 
       perf.end();
-      return this.generateReport(initialGraph, startTime);
+      return await this.generateReport(initialGraph, startTime);
     } catch (error) {
       perf.end();
       throw new ActionableError(`Failed to execute exploration: ${error}`);
@@ -242,12 +285,14 @@ export class Explore extends BaseVisualChange {
     const elapsed = Date.now() - startTime;
 
     if (this.interactionCount >= maxInteractions) {
-      logger.info(`[Explore] Reached max interactions: ${maxInteractions}`);
+      this.stopReason = `Reached max interactions limit (${maxInteractions})`;
+      logger.info(`[Explore] ${this.stopReason}`);
       return false;
     }
 
     if (elapsed >= timeoutMs) {
-      logger.info(`[Explore] Reached timeout: ${timeoutMs}ms`);
+      this.stopReason = `Reached timeout limit (${timeoutMs}ms)`;
+      logger.info(`[Explore] ${this.stopReason}`);
       return false;
     }
 
@@ -260,13 +305,15 @@ export class Explore extends BaseVisualChange {
   private shouldBreakForSafety(observation: ObserveResult): boolean {
     // Check for consecutive backs
     if (this.consecutiveBackCount >= Explore.MAX_CONSECUTIVE_BACKS) {
-      logger.warn("[Explore] Too many consecutive backs");
+      this.stopReason = `Too many consecutive back navigations (${Explore.MAX_CONSECUTIVE_BACKS})`;
+      logger.warn(`[Explore] ${this.stopReason}`);
       return true;
     }
 
     // Check for screen stuck (no changes)
     if (this.consecutiveNoChangeCount >= Explore.MAX_CONSECUTIVE_NO_CHANGE) {
-      logger.warn("[Explore] Screen appears stuck (no changes detected)");
+      this.stopReason = `Screen appears stuck - no changes detected after ${Explore.MAX_CONSECUTIVE_NO_CHANGE} interactions`;
+      logger.warn(`[Explore] ${this.stopReason}`);
       return true;
     }
 
@@ -275,7 +322,8 @@ export class Explore extends BaseVisualChange {
     if (currentScreen) {
       const loopCount = this.loopDetection.get(currentScreen) ?? 0;
       if (loopCount >= Explore.MAX_LOOP_ITERATIONS) {
-        logger.warn(`[Explore] Detected loop on screen: ${currentScreen}`);
+        this.stopReason = `Detected navigation loop on screen: ${currentScreen}`;
+        logger.warn(`[Explore] ${this.stopReason}`);
         return true;
       }
     }
@@ -298,15 +346,19 @@ export class Explore extends BaseVisualChange {
         return null;
       }
 
-      // Extract navigation elements from view hierarchy
+      // Extract both navigation elements and scrollable containers
       const navigationElements = this.extractNavigationElements(viewHierarchy);
+      const scrollableContainers = this.extractScrollableContainers(viewHierarchy);
 
-      if (navigationElements.length === 0) {
+      // Combine all interaction candidates
+      const allCandidates = [...navigationElements, ...scrollableContainers];
+
+      if (allCandidates.length === 0) {
         return null;
       }
 
       // Filter out exhausted elements
-      const unexhaustedElements = this.filterUnexhaustedElements(navigationElements);
+      const unexhaustedElements = this.filterUnexhaustedElements(allCandidates);
 
       if (unexhaustedElements.length === 0) {
         return null;
@@ -331,14 +383,95 @@ export class Explore extends BaseVisualChange {
   private extractNavigationElements(viewHierarchy: any): Element[] {
     const flatElements = this.elementParser.flattenViewHierarchy(viewHierarchy);
     const navigationElements: Element[] = [];
+    const targetPackage = viewHierarchy.packageName;
 
-    for (const { element } of flatElements) {
+    for (const { element, depth } of flatElements) {
       if (this.isNavigationCandidate(element)) {
-        navigationElements.push(element);
+        // Filter by package name if available (keep only elements from target app)
+        if (targetPackage && element.package && element.package !== targetPackage) {
+          continue;
+        }
+
+        // Enrich element with properties from child nodes (for Compose UI)
+        const enrichedElement = this.enrichElementWithChildProperties(element);
+
+        // Store depth information for scoring
+        (enrichedElement as any).hierarchyDepth = depth;
+
+        navigationElements.push(enrichedElement);
       }
     }
 
     return navigationElements;
+  }
+
+  /**
+   * Enrich element with properties from child nodes (for Compose UI elements)
+   */
+  private enrichElementWithChildProperties(element: Element): Element {
+    const enriched = { ...element };
+
+    // For Compose elements, text and className might be on child nodes
+    if ((element as any).node) {
+      const children = Array.isArray((element as any).node) ? (element as any).node : [(element as any).node];
+
+      for (const child of children) {
+        // Extract text from first child with text
+        if (!enriched.text && child.text) {
+          enriched.text = child.text;
+        }
+
+        // Extract className from first child with className
+        if (!enriched["class"] && child.className) {
+          enriched["class"] = child.className;
+        }
+
+        // Extract content-desc from first child with content-desc
+        if (!enriched["content-desc"] && child["content-desc"]) {
+          enriched["content-desc"] = child["content-desc"];
+        }
+      }
+    }
+
+    return enriched;
+  }
+
+  /**
+   * Extract scrollable containers for swiping
+   */
+  private extractScrollableContainers(viewHierarchy: any): Element[] {
+    const flatElements = this.elementParser.flattenViewHierarchy(viewHierarchy);
+    const scrollableContainers: Element[] = [];
+    const targetPackage = viewHierarchy.packageName;
+
+    for (const { element, depth } of flatElements) {
+      // Must be scrollable
+      const isScrollable = element.scrollable === true || (element.scrollable as any) === "true";
+      if (!isScrollable) {
+        continue;
+      }
+
+      // Filter by package name if available
+      if (targetPackage && element.package && element.package !== targetPackage) {
+        continue;
+      }
+
+      // Must have reasonable size for scrolling
+      if (element.bounds) {
+        const width = element.bounds.right - element.bounds.left;
+        const height = element.bounds.bottom - element.bounds.top;
+        if (width < 50 || height < 50) {
+          continue;
+        }
+      }
+
+      // Store depth information for scoring
+      (element as any).hierarchyDepth = depth;
+
+      scrollableContainers.push(element);
+    }
+
+    return scrollableContainers;
   }
 
   /**
@@ -388,56 +521,25 @@ export class Explore extends BaseVisualChange {
   private calculateNavigationScore(element: Element): number {
     let score = 0;
 
-    const className = element["class"]?.toLowerCase() ?? "";
-    const text = element.text?.toLowerCase() ?? "";
-    const resourceId = element["resource-id"]?.toLowerCase() ?? "";
-    const contentDesc = element["content-desc"]?.toLowerCase() ?? "";
+    const clickable = element.clickable === true || (element.clickable as any) === "true";
+    const scrollable = element.scrollable === true || (element.scrollable as any) === "true";
 
-    // Element type weights
-    if (className.includes("button")) {
-      score += 10;
-    }
-    if (className.includes("tab")) {
-      score += 15;
-    }
-    if (className.includes("menuitem")) {
-      score += 12;
-    }
-    if (className.includes("imagebutton")) {
-      score += 8;
-    }
-
-    // Text analysis - navigation keywords
-    const navKeywords = ["settings", "profile", "menu", "more", "details", "open", "next", "continue", "back", "close"];
-    for (const keyword of navKeywords) {
-      if (text.includes(keyword) || contentDesc.includes(keyword)) {
-        score += 8;
-        break;
-      }
-    }
-
-    // Resource ID patterns
-    if (resourceId.includes("nav_")) {
-      score += 10;
-    }
-    if (resourceId.includes("menu_")) {
-      score += 8;
-    }
-    if (resourceId.includes("tab_")) {
-      score += 12;
-    }
-    if (resourceId.includes("btn_")) {
+    // Clickable bonus - clickable elements are more likely to be interactive
+    if (clickable) {
       score += 5;
     }
 
-    // Penalize likely non-navigation elements
-    const nonNavKeywords = ["like", "share", "favorite", "heart", "star"];
-    for (const keyword of nonNavKeywords) {
-      if (text.includes(keyword) || contentDesc.includes(keyword)) {
-        score -= 5;
-        break;
-      }
+    // Scrollable bonus - scrollable containers can reveal new content
+    if (scrollable) {
+      score += 3;
     }
+
+    // Hierarchy depth bonus - linear function where closer to root = higher score
+    // Formula: max(0, 25 - depth * 2)
+    // depth 0: +25, depth 3: +19, depth 6: +13, depth 10: +5, depth 12+: 0
+    const depth = (element as any).hierarchyDepth ?? 99;
+    const depthBonus = Math.max(0, 25 - depth * 2);
+    score += depthBonus;
 
     return Math.max(0, score);
   }
@@ -619,26 +721,43 @@ export class Explore extends BaseVisualChange {
       tracked.lastInteractionScreen = currentScreen;
       this.exploredElements.set(elementKey, tracked);
 
-      // Update loop detection
-      const loopCount = this.loopDetection.get(currentScreen) ?? 0;
-      this.loopDetection.set(currentScreen, loopCount + 1);
+      // Check if element is scrollable - perform swipe instead of tap
+      const isScrollable = element.scrollable === true || (element.scrollable as any) === "true";
 
-      // Perform tap interaction
-      const tapOn = new TapOnElement(this.device, this.adb, this.axe);
+      if (isScrollable) {
+        // Perform swipe on scrollable container
+        logger.info(`[Explore] Swiping on scrollable container: ${element["resource-id"] || element["class"]}`);
+        const swipeOn = new SwipeOnElement(this.device, this.adb, this.axe);
 
-      const tapResult = await tapOn.execute(
-        {
-          text: element.text,
-          elementId: element["resource-id"],
-          action: "tap"
-        },
-        progress
-      );
+        const swipeResult = await swipeOn.execute(
+          element,
+          "up",
+          { duration: 600 }, // Slow swipe
+          progress
+        );
 
-      // Reset consecutive back count since we did a tap
-      this.consecutiveBackCount = 0;
+        // Reset consecutive back count since we did a swipe
+        this.consecutiveBackCount = 0;
 
-      return tapResult.success;
+        return swipeResult.success;
+      } else {
+        // Perform tap interaction
+        const tapOn = new TapOnElement(this.device, this.adb, this.axe);
+
+        const tapResult = await tapOn.execute(
+          {
+            text: element.text,
+            elementId: element["resource-id"],
+            action: "tap"
+          },
+          progress
+        );
+
+        // Reset consecutive back count since we did a tap
+        this.consecutiveBackCount = 0;
+
+        return tapResult.success;
+      }
     } catch (error) {
       logger.warn(`[Explore] Failed to interact with element: ${error}`);
       return false;
@@ -890,11 +1009,11 @@ export class Explore extends BaseVisualChange {
   /**
    * Generate final report
    */
-  private generateReport(
+  private async generateReport(
     initialGraph: ExportedGraph,
     startTime: number
-  ): ExploreResult {
-    const finalGraph = this.navigationManager.exportGraph();
+  ): Promise<ExploreResult> {
+    const finalGraph = await this.navigationManager.exportGraph();
     const screensDiscovered = finalGraph.nodes.length - initialGraph.nodes.length;
     const edgesAdded = finalGraph.edges.length - initialGraph.edges.length;
 
@@ -917,7 +1036,8 @@ export class Explore extends BaseVisualChange {
         percentage: Math.round(coveragePercentage * 100) / 100
       },
       elementSelections: this.elementSelections,
-      durationMs: Date.now() - startTime
+      durationMs: Date.now() - startTime,
+      stopReason: this.stopReason || "Exploration completed successfully"
     };
   }
 }

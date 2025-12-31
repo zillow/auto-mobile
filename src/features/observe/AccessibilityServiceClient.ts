@@ -635,7 +635,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
   /**
    * Handle incoming WebSocket message
    */
-  private handleWebSocketMessage(data: WebSocket.Data): void {
+  private async handleWebSocketMessage(data: WebSocket.Data): Promise<void> {
     try {
       const message: WebSocketMessage = JSON.parse(data.toString());
 
@@ -786,7 +786,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
             `[ACCESSIBILITY_SERVICE] Navigation event: ${event.destination} ` +
             `(source: ${event.source}, app: ${event.applicationId || "unknown"}, timestamp: ${event.timestamp})`
           );
-          NavigationGraphManager.getInstance().recordNavigationEvent(event);
+          await NavigationGraphManager.getInstance().recordNavigationEvent(event);
         }
       }
     } catch (error) {

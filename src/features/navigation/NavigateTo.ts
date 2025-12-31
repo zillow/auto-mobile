@@ -165,14 +165,15 @@ export class NavigateTo {
       }
 
       // Find path to target
-      const pathResult = this.navigationManager.findPath(targetScreen);
+      const pathResult = await this.navigationManager.findPath(targetScreen);
 
       if (!pathResult.found) {
         perf.end();
+        const knownScreens = await this.navigationManager.getKnownScreens();
         return {
           success: false,
           error: `No known path from "${currentScreen}" to "${targetScreen}". ` +
-            `Known screens: ${this.navigationManager.getKnownScreens().join(", ") || "none"}`,
+            `Known screens: ${knownScreens.join(", ") || "none"}`,
           currentScreen,
           targetScreen,
           stepsExecuted: 0,
