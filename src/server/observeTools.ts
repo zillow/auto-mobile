@@ -6,6 +6,7 @@ import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
+import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 
 // Schema definitions
 export const observeSchema = z.object({
@@ -24,6 +25,16 @@ export function registerObserveTools() {
       const perf = createGlobalPerformanceTracker();
       const observeScreen = new ObserveScreen(device);
       const result = await observeScreen.execute(undefined, perf);
+
+      // Record back stack information in navigation graph if available
+      if (result.backStack && result.activeWindow?.appId) {
+        const navGraph = NavigationGraphManager.getInstance();
+        // Only record if we have a current app and screen
+        if (navGraph.getCurrentAppId() === result.activeWindow.appId && navGraph.getCurrentScreen()) {
+          navGraph.recordBackStack(result.backStack);
+        }
+      }
+
       return createJSONToolResponse(result);
     } catch (error) {
       throw new ActionableError(`Failed to execute observe: ${error}`);

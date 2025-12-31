@@ -1,4 +1,5 @@
 import { logger } from "../../utils/logger";
+import { BackStackInfo } from "../../models";
 import {
   NavigationGraph,
   NavigationEvent,
@@ -101,6 +102,28 @@ export class NavigationGraphManager implements NavigationGraph {
       return null;
     }
     return this.graphs.get(this.currentAppId) || null;
+  }
+
+  /**
+   * Record back stack information for the current screen.
+   * Updates the current node with back stack depth and task ID.
+   */
+  public recordBackStack(backStack: BackStackInfo): void {
+    const graph = this.getGraph();
+    if (!graph || !graph.currentScreen) {
+      logger.debug(`[NAVIGATION_GRAPH] Cannot record back stack - no current screen`);
+      return;
+    }
+
+    const node = graph.nodes.get(graph.currentScreen);
+    if (node) {
+      node.backStackDepth = backStack.depth;
+      node.taskId = backStack.currentTaskId;
+      logger.debug(
+        `[NAVIGATION_GRAPH] Updated back stack for ${graph.currentScreen}: ` +
+        `depth=${backStack.depth}, taskId=${backStack.currentTaskId}`
+      );
+    }
   }
 
   /**

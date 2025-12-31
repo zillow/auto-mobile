@@ -95,6 +95,10 @@ export interface NavigationNode {
   visitCount: number;
   /** Modal stack state when this node was recorded */
   modalStack?: ModalState[];
+  /** Back stack depth when this node was last observed (number of screens that can be popped) */
+  backStackDepth?: number;
+  /** Task ID when this node was last observed */
+  taskId?: number;
 }
 
 /**
@@ -147,6 +151,14 @@ export interface ExportedGraph {
 }
 
 /**
+ * Represents back stack information
+ */
+export interface BackStackInfo {
+  depth: number;
+  currentTaskId?: number;
+}
+
+/**
  * Interface for navigation graph management.
  * Allows for easy mocking in tests.
  */
@@ -159,6 +171,9 @@ export interface NavigationGraph {
 
   /** Record a navigation event from WebSocket */
   recordNavigationEvent(event: NavigationEvent): void;
+
+  /** Record back stack information for the current screen */
+  recordBackStack(backStack: BackStackInfo): void;
 
   /** Record a tool call for correlation */
   recordToolCall(toolName: string, args: Record<string, any>, uiState?: UIState): void;
