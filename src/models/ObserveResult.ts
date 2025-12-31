@@ -5,6 +5,7 @@ import { ActiveWindowInfo } from "./ActiveWindowInfo";
 import { ViewHierarchyResult } from "./ViewHierarchyResult";
 import { TimingData } from "../utils/PerformanceTracker";
 import { GfxMetrics } from "./GfxMetrics";
+import { BackStackInfo } from "./BackStack";
 
 /**
  * Represents the result of observing the device state
@@ -65,6 +66,12 @@ export interface ObserveResult {
    * This indicates which user profile the current foreground app is running in
    */
   userId?: number;
+
+  /**
+   * Back stack information (Android only)
+   * Includes activity stack depth, task information, and navigation state
+   */
+  backStack?: BackStackInfo;
 
   /** Error message if observation failed partially or completely */
   error?: string;

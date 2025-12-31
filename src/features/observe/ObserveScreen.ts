@@ -7,6 +7,7 @@ import { ViewHierarchy } from "./ViewHierarchy";
 import { Window } from "./Window";
 import { TakeScreenshot } from "./TakeScreenshot";
 import { GetDumpsysWindow } from "./GetDumpsysWindow";
+import { GetBackStack } from "./GetBackStack";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { DeepLinkManager } from "../../utils/DeepLinkManager";
 import fs from "fs-extra";
@@ -36,6 +37,7 @@ export class ObserveScreen {
   private window: Window;
   private screenshotUtil: TakeScreenshot;
   private dumpsysWindow: GetDumpsysWindow;
+  private backStack: GetBackStack;
   private adb: AdbClient;
   private axe: AxeClient;
   private webdriver: WebDriverAgent;
@@ -81,6 +83,7 @@ export class ObserveScreen {
     this.window = new Window(device, this.adb);
     this.screenshotUtil = new TakeScreenshot(device, this.adb);
     this.dumpsysWindow = new GetDumpsysWindow(device, this.adb);
+    this.backStack = new GetBackStack(this.adb);
     this.deepLinkManager = new DeepLinkManager(device);
 
     // Ensure observe result cache directory exists
@@ -152,6 +155,23 @@ export class ObserveScreen {
       }
     } catch (error) {
       logger.warn("Failed to get wakefulness state:", error);
+    }
+  }
+
+  /**
+   * Collect back stack information (Android only)
+   * @param result - ObserveResult to update
+   * @param perf - Performance tracker for timing data
+   */
+  public async collectBackStack(result: ObserveResult, perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<void> {
+    try {
+      const backStackStart = Date.now();
+      const backStackInfo = await this.backStack.execute(perf);
+      result.backStack = backStackInfo;
+      logger.debug(`Back stack retrieval took ${Date.now() - backStackStart}ms`);
+    } catch (error) {
+      logger.warn("Failed to get back stack:", error);
+      this.appendError(result, "Failed to retrieve back stack information");
     }
   }
 
@@ -291,6 +311,7 @@ export class ObserveScreen {
           perf.track("systemInsets", () => this.collectSystemInsets(dumpsysWindow, result)),
           perf.track("rotation", () => this.collectRotationInfo(dumpsysWindow, result)),
           perf.track("wakefulness", () => this.collectWakefulness(result)),
+          perf.track("backStack", () => this.collectBackStack(result, perf)),
         ]);
 
         // Run view hierarchy separately to avoid perf tracker race condition

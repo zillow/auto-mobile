@@ -13,6 +13,7 @@ import { ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGra
 import { ProgressCallback } from "../../server/toolRegistry";
 import { UIStateExtractor } from "./UIStateExtractor";
 import { ObserveScreen } from "../observe/ObserveScreen";
+import { SmartNavigationHelper } from "./SmartNavigationHelper";
 
 /**
  * Options for the navigateTo tool.
@@ -82,6 +83,72 @@ export class NavigateTo {
           stepsExecuted: 0,
           durationMs: Date.now() - startTime
         };
+      }
+
+      // Check if we should use smart back button navigation
+      // Get current screen's back stack depth from the last observation
+      const currentNode = this.navigationManager.getNode(currentScreen);
+      const currentBackStackDepth = currentNode?.backStackDepth ?? 0;
+
+      if (currentBackStackDepth > 0) {
+        const backNavResult = SmartNavigationHelper.shouldUseBackButton(
+          currentScreen,
+          targetScreen,
+          currentBackStackDepth
+        );
+
+        if (backNavResult.shouldUseBack) {
+          logger.info(
+            `[NAVIGATE_TO] Using smart back button navigation: ` +
+            `${backNavResult.backPresses} back presses. Reason: ${backNavResult.reason}`
+          );
+
+          // Execute back button presses
+          const executedPath: string[] = [];
+          for (let i = 0; i < backNavResult.backPresses; i++) {
+            if (progress) {
+              await progress(
+                i,
+                backNavResult.backPresses,
+                `Pressing back button (${i + 1}/${backNavResult.backPresses})`
+              );
+            }
+
+            await this.pressBack();
+            executedPath.push("pressButton(back)");
+
+            // Small delay between presses to allow screen transitions
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+
+          // Wait for target screen
+          const reached = await this.waitForScreen(targetScreen, NavigateTo.STEP_TIMEOUT_MS);
+
+          if (progress) {
+            await progress(
+              backNavResult.backPresses,
+              backNavResult.backPresses,
+              reached ? `Arrived at ${targetScreen}` : `Waiting for ${targetScreen}`
+            );
+          }
+
+          perf.end();
+          return {
+            success: reached,
+            message: reached
+              ? `Successfully navigated to "${targetScreen}" using back button`
+              : `Pressed back ${backNavResult.backPresses} times but did not reach "${targetScreen}"`,
+            currentScreen: this.navigationManager.getCurrentScreen(),
+            targetScreen,
+            stepsExecuted: executedPath.length,
+            path: executedPath,
+            durationMs: Date.now() - startTime
+          };
+        } else {
+          logger.debug(
+            `[NAVIGATE_TO] Not using back button navigation. Reason: ${backNavResult.reason}`
+          );
+        }
       }
 
       // Find path to target
