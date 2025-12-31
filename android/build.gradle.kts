@@ -36,7 +36,7 @@ plugins.withId(libs.plugins.mavenPublish.get().pluginId) {
 
 val gradleWorkerJvmArgs = providers.gradleProperty("org.gradle.testWorker.jvmargs").get()
 
-allprojects {
+subprojects {
   tasks.withType<Test>().configureEach { jvmArgs(gradleWorkerJvmArgs) }
 
   tasks.withType<KotlinCompile>().configureEach {
