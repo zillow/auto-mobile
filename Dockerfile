@@ -24,7 +24,8 @@
 # BUILDER STAGE - Contains all build-time dependencies
 # ==============================================================================
 ARG ZULU_VERSION=21.0.2
-FROM --platform=linux/amd64 azul/zulu-openjdk-alpine:${ZULU_VERSION} AS builder
+ARG PLATFORM=linux/amd64
+FROM --platform=${PLATFORM} azul/zulu-openjdk-alpine:${ZULU_VERSION} AS builder
 
 # Metadata labels for Docker Hub
 LABEL org.opencontainers.image.title="AutoMobile" \
@@ -157,7 +158,7 @@ RUN bun run build
 # ==============================================================================
 # RUNTIME STAGE - Minimal image with only runtime dependencies
 # ==============================================================================
-FROM --platform=linux/amd64 azul/zulu-openjdk-alpine:${ZULU_VERSION} AS runtime
+FROM --platform=${PLATFORM} azul/zulu-openjdk-alpine:${ZULU_VERSION} AS runtime
 
 # Set environment
 ENV TERM=dumb

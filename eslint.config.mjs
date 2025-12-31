@@ -174,7 +174,7 @@ const languageOptions = {
 
 export default [
 	{
-    ignores: ["ios/**/*", "android/**/*"],
+    ignores: ["ios/**/*", "android/**/*", "scratch/**/*"],
   },
   {
 		files: ["**/*.ts"],

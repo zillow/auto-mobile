@@ -15,6 +15,8 @@ import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClien
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
+import { TakeScreenshot } from "../observe/TakeScreenshot";
 
 /**
  * Command to tap on UI element containing specified text
@@ -23,18 +25,21 @@ export class TapOnElement extends BaseVisualChange {
   private webdriver: WebDriverAgent;
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
+  private visionConfig: VisionFallbackConfig;
   private static readonly MAX_ATTEMPTS = 5;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
     axe: AxeClient | null = null,
-    webdriver: WebDriverAgent | null = null
+    webdriver: WebDriverAgent | null = null,
+    visionConfig?: VisionFallbackConfig
   ) {
     super(device, adb, axe);
     this.elementUtils = new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.webdriver = webdriver || new WebDriverAgent(device);
+    this.visionConfig = visionConfig || DEFAULT_VISION_CONFIG;
   }
 
   /**
@@ -54,7 +59,12 @@ export class TapOnElement extends BaseVisualChange {
     };
   }
 
-  async handleElementResult(element: Element | null, options: TapOnElementOptions, attempt: number): Promise<Element> {
+  async handleElementResult(
+    element: Element | null,
+    options: TapOnElementOptions,
+    attempt: number,
+    observeResult?: ObserveResult
+  ): Promise<Element> {
     if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
       const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
       await new Promise(resolve => setTimeout(resolve, delayNextAttempt));
@@ -82,8 +92,73 @@ export class TapOnElement extends BaseVisualChange {
         return await this.findElementToTap(
           options,
           latestViewHierarchy,
-          attempt + 1
+          attempt + 1,
+          observeResult
         );
+      }
+    }
+
+    // Vision fallback: Try Claude vision API if all retries exhausted
+    if (!element && attempt >= TapOnElement.MAX_ATTEMPTS && this.visionConfig.enabled && observeResult) {
+      logger.info("🔍 Element not found after retries, trying vision fallback...");
+
+      try {
+        // Take a screenshot for vision analysis
+        const screenshot = new TakeScreenshot(this.device, this.adb);
+        const screenshotResult = await screenshot.execute({});
+
+        if (!screenshotResult.success || !screenshotResult.path) {
+          logger.error("Failed to capture screenshot for vision fallback");
+          throw new Error("Screenshot capture failed");
+        }
+
+        const visionFallback = new VisionFallback(this.visionConfig);
+        const visionResult = await visionFallback.analyzeAndSuggest(
+          screenshotResult.path,
+          observeResult.viewHierarchy as any, // ViewNode type
+          {
+            text: options.text,
+            resourceId: options.elementId,
+            description: `Interactive element for tapping (action: ${options.action})`,
+          }
+        );
+
+        // If high confidence navigation steps provided, throw error with steps
+        if (visionResult.confidence === "high" && visionResult.navigationSteps && visionResult.navigationSteps.length > 0) {
+          const stepsText = visionResult.navigationSteps
+            .map((step, i) => `${i + 1}. ${step.description}`)
+            .join("\n");
+
+          throw new ActionableError(
+            `Element not found, but AI suggests these steps:\n${stepsText}\n\n` +
+            `(Cost: $${visionResult.costUsd.toFixed(4)}, Confidence: ${visionResult.confidence})`
+          );
+        }
+
+        // If alternative selectors found, throw error with suggestions
+        if (visionResult.alternativeSelectors && visionResult.alternativeSelectors.length > 0) {
+          const suggestions = visionResult.alternativeSelectors
+            .map(alt => `- ${alt.type}: "${alt.value}" (${alt.reasoning})`)
+            .join("\n");
+
+          throw new ActionableError(
+            `Element not found. AI suggests trying:\n${suggestions}\n\n` +
+            `(Cost: $${visionResult.costUsd.toFixed(4)}, Confidence: ${visionResult.confidence})`
+          );
+        }
+
+        // Otherwise, throw detailed error with vision insights
+        throw new ActionableError(
+          `Element not found. ${visionResult.reason || "No clear path found."}\n\n` +
+          `(Cost: $${visionResult.costUsd.toFixed(4)}, Confidence: ${visionResult.confidence})`
+        );
+
+      } catch (error) {
+        if (error instanceof ActionableError) {
+          throw error;
+        }
+        logger.error("Vision fallback failed:", error);
+        // Fall through to standard error
       }
     }
 
@@ -98,7 +173,12 @@ export class TapOnElement extends BaseVisualChange {
     return element;
   }
 
-  async findElementToTap(options: TapOnElementOptions, viewHierarchy: ViewHierarchyResult, attempt: number = 0): Promise<Element> {
+  async findElementToTap(
+    options: TapOnElementOptions,
+    viewHierarchy: ViewHierarchyResult,
+    attempt: number = 0,
+    observeResult?: ObserveResult
+  ): Promise<Element> {
     if (options.text) {
       // Find the UI element that contains the text
       const element = this.elementUtils.findElementByText(
@@ -109,7 +189,7 @@ export class TapOnElement extends BaseVisualChange {
         false,
       );
 
-      return await this.handleElementResult(element, options, attempt);
+      return await this.handleElementResult(element, options, attempt, observeResult);
     } else if (options.elementId) {
       // Find the UI element that matches the id
       const element = this.elementUtils.findElementByResourceId(
@@ -118,7 +198,7 @@ export class TapOnElement extends BaseVisualChange {
         options.containerElementId,
       );
 
-      return await this.handleElementResult(element, options, attempt);
+      return await this.handleElementResult(element, options, attempt, observeResult);
     } else {
       throw new ActionableError(`tapOn requires non-blank text or elementId to interact with`);
     }
@@ -150,7 +230,7 @@ export class TapOnElement extends BaseVisualChange {
           }
 
           const element = await perf.track("findElement", () =>
-            this.findElementToTap(options, viewHierarchy)
+            this.findElementToTap(options, viewHierarchy, 0, observeResult)
           );
           const tapPoint = this.elementUtils.getElementCenter(element);
 

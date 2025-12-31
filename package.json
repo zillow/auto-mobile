@@ -61,6 +61,8 @@
     "access": "public"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@huggingface/transformers": "^3.8.1",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "@types/js-yaml": "^4.0.9",
     "@types/uuid": "^11.0.0",
@@ -71,6 +73,7 @@
     "jimp": "^1.6.0",
     "js-yaml": "^4.1.1",
     "kysely": "^0.28.9",
+    "onnxruntime-node": "^1.23.2",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "sharp": "^0.34.5",
