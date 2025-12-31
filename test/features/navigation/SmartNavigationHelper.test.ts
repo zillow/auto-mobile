@@ -13,6 +13,7 @@ describe("SmartNavigationHelper", function() {
 
   afterEach(function() {
     NavigationGraphManager.resetInstance();
+    SmartNavigationHelper.resetOptimizer();
   });
 
   describe("shouldUseBackButton", function() {
