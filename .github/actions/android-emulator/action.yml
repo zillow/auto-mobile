@@ -1,6 +1,6 @@
 #file: noinspection YAMLSchemaValidation
-name: "gradle-task-run"
-description: ""
+name: "android-emulator"
+description: "Run Android Emulator with AVD snapshot caching for optimized CI performance"
 inputs:
   shell:
     description: "The shell to use for any steps that use shells"
@@ -68,5 +68,5 @@ runs:
         script: ${{ inputs.script }}
         working-directory: ${{ inputs.working-directory }}
         force-avd-creation: false
-        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: false
