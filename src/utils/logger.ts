@@ -119,6 +119,52 @@ const checkAndRotateLog = async (): Promise<void> => {
   }
 };
 
+// Sensitive environment variable keys to filter from logs
+const SENSITIVE_ENV_KEYS = new Set([
+  "PASSWORD",
+  "TOKEN",
+  "SECRET",
+  "KEY",
+  "CREDENTIAL",
+  "AUTH",
+  "API_KEY",
+  "PRIVATE_KEY",
+  "ACCESS_TOKEN",
+  "REFRESH_TOKEN",
+  "CLIENT_SECRET",
+  "DATABASE_URL",
+  "DB_PASSWORD",
+  "GITHUB_TOKEN",
+  "NPM_TOKEN",
+  "AWS_SECRET_ACCESS_KEY",
+]);
+
+// Function to safely stringify objects while filtering sensitive data
+const safeStringify = (obj: any): string => {
+  if (typeof obj !== "object" || obj === null) {
+    return String(obj);
+  }
+
+  return JSON.stringify(obj, (_key, value) => {
+    if (typeof value === "object" && value !== null) {
+      // Filter sensitive environment-like keys
+      const filtered: any = {};
+      for (const [k, v] of Object.entries(value)) {
+        if (!SENSITIVE_ENV_KEYS.has(k.toUpperCase())) {
+          filtered[k] = v;
+        }
+      }
+      return filtered;
+    }
+    return value;
+  });
+};
+
+// Function to sanitize log message to prevent log injection
+const sanitizeMessage = (message: string): string => {
+  return message.replace(/[\r\n\t]/g, " ");
+};
+
 // Function to write to log file
 const writeToLogFile = async (level: string, message: string, args: any[]) => {
   try {
@@ -126,15 +172,16 @@ const writeToLogFile = async (level: string, message: string, args: any[]) => {
     await checkAndRotateLog();
 
     const timestamp = new Date().toISOString();
-    let logMessage = `${timestamp} [${level}] ${message}`;
+    const sanitizedMessage = sanitizeMessage(message);
+    let logMessage = `${timestamp} [${level}] ${sanitizedMessage}`;
 
     if (args.length > 0) {
-      // Handle objects by converting them to strings
+      // Handle objects by converting them to strings, filtering sensitive data
       const argsStr = args.map(arg => {
         if (typeof arg === "object") {
-          return JSON.stringify(arg);
+          return safeStringify(arg);
         }
-        return String(arg);
+        return sanitizeMessage(String(arg));
       }).join(" ");
       logMessage += ` ${argsStr}`;
     }

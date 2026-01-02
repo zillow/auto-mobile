@@ -78,6 +78,13 @@ export class ObserveScreen {
     return mostRecentEntry?.observeResult;
   }
 
+  /**
+   * Clear the in-memory cache (for testing purposes).
+   */
+  static clearCache(): void {
+    ObserveScreen.observeResultCache.clear();
+  }
+
   constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null, webdriver: WebDriverAgent | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);

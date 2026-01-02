@@ -1,10 +1,26 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
+import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
+import * as fs from "fs/promises";
+import * as path from "path";
 
 describe("MCP Resources Read", () => {
   let fixture: McpTestFixture;
 
   beforeEach(async () => {
+    // Clear both in-memory and disk caches from previous tests
+    ObserveScreen.clearCache();
+
+    const cacheDir = path.join("/tmp/auto-mobile", "observe_results");
+    try {
+      const files = await fs.readdir(cacheDir);
+      for (const file of files) {
+        await fs.unlink(path.join(cacheDir, file));
+      }
+    } catch {
+      // Cache directory might not exist, which is fine
+    }
+
     fixture = new McpTestFixture();
     await fixture.setup();
   });

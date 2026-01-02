@@ -248,7 +248,10 @@ export class Daemon {
       version: DAEMON_VERSION,
     };
 
-    await writeFile(PID_FILE_PATH, JSON.stringify(pidData, null, 2), "utf-8");
+    await writeFile(PID_FILE_PATH, JSON.stringify(pidData, null, 2), {
+      encoding: "utf-8",
+      mode: 0o600,
+    });
     logger.info(`PID file written to ${PID_FILE_PATH}`);
   }
 
