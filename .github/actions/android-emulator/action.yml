@@ -61,7 +61,17 @@ runs:
         force-avd-creation: false
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: false
-        script: echo "Generated AVD snapshot for caching."
+        script: |
+          echo "=========================================="
+          echo "AVD CREATION DEBUG"
+          echo "=========================================="
+          echo "Emulator version: $(emulator -version 2>/dev/null || echo 'unknown')"
+          echo "Android SDK tools location: $ANDROID_HOME"
+          ls -la "$ANDROID_HOME" 2>/dev/null || echo "ANDROID_HOME not found"
+          echo "AVD directory: $ANDROID_AVD_HOME"
+          ls -la "$ANDROID_AVD_HOME" 2>/dev/null || echo "ANDROID_AVD_HOME not found"
+          echo ""
+          echo "Generated AVD snapshot for caching."
 
     - name: Run Emulator
       uses: reactivecircus/android-emulator-runner@v2.35.0
@@ -69,16 +79,7 @@ runs:
         api-level: ${{ inputs.api_level }}
         arch: ${{ inputs.arch }}
         target: ${{ inputs.target }}
-        script: |
-          if [ -n "${{ inputs.accessibility-apk-path }}" ]; then
-            if [ ! -f "${{ inputs.accessibility-apk-path }}" ]; then
-              echo "Accessibility APK not found at ${{ inputs.accessibility-apk-path }}"
-              exit 1
-            fi
-            echo "Installing accessibility service APK from ${{ inputs.accessibility-apk-path }}"
-            adb install -r "${{ inputs.accessibility-apk-path }}"
-          fi
-          ${{ inputs.script }}
+        script: ../scripts/android/run-emulator-tests.sh "${{ inputs.accessibility-apk-path }}" "${{ inputs.script }}"
         working-directory: ${{ inputs.working-directory }}
         force-avd-creation: false
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none

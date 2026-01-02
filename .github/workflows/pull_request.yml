@@ -157,14 +157,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: accessibility-service-apk
-          path: ./apk
+          path: android/accessibility-service/build/outputs/apk/debug
 
       # Run AutoMobile tests that require emulator
       - uses: ./.github/actions/android-emulator
         with:
           script: "./gradlew :junit-runner:test"
           working-directory: './android/'
-          accessibility-apk-path: ./apk/accessibility-service-debug.apk
+          accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
 
       - name: "Upload Test Results"
         if: always()
