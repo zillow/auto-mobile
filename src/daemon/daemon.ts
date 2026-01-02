@@ -32,6 +32,7 @@ export class Daemon {
   private port: number;
   private host: string;
   private debug: boolean;
+  private healthCheckTimer: NodeJS.Timeout | null = null;
 
   constructor(options: DaemonOptions = {}) {
     this.port = options.port || DEFAULT_DAEMON_PORT;
@@ -61,6 +62,9 @@ export class Daemon {
 
     // Setup shutdown handlers
     this.setupShutdownHandlers();
+
+    // Start health check timer (every 30 seconds)
+    this.startHealthCheckTimer();
 
     logger.info(
       `Daemon started: PID ${process.pid}, socket ${SOCKET_PATH}, HTTP port ${this.port}`
@@ -266,6 +270,82 @@ export class Daemon {
   }
 
   /**
+   * Start periodic health checks
+   */
+  private startHealthCheckTimer(): void {
+    const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+    const MAX_FAILED_CHECKS = 3; // Allow 3 consecutive failures before taking action
+    let failedCheckCount = 0;
+
+    this.healthCheckTimer = setInterval(async () => {
+      try {
+        // Check if HTTP server is responsive
+        if (!this.httpServer) {
+          logger.warn("Health check failed: HTTP server not initialized");
+          failedCheckCount++;
+        } else if (!this.httpServer.listening) {
+          logger.warn("Health check failed: HTTP server not listening");
+          failedCheckCount++;
+        } else {
+          // Check if socket server is active
+          if (!this.socketServer || !this.socketServer.isListening()) {
+            logger.warn("Health check failed: Socket server not listening");
+            failedCheckCount++;
+          } else {
+            // Health check passed
+            failedCheckCount = 0;
+            logger.debug("Health check passed");
+          }
+        }
+
+        // If too many failures, attempt recovery
+        if (failedCheckCount >= MAX_FAILED_CHECKS) {
+          logger.error(`Health check failed ${failedCheckCount} times, attempting recovery...`);
+          await this.attemptRecovery();
+          failedCheckCount = 0;
+        }
+      } catch (error) {
+        logger.warn(`Health check error: ${error}`);
+        failedCheckCount++;
+      }
+    }, HEALTH_CHECK_INTERVAL);
+
+    // Keep timer alive even if there are no other references
+    this.healthCheckTimer.unref();
+  }
+
+  /**
+   * Attempt to recover daemon components
+   */
+  private async attemptRecovery(): Promise<void> {
+    try {
+      logger.info("Attempting daemon recovery...");
+
+      // Try to restart socket server if it's not responding
+      if (this.socketServer && !this.socketServer.isListening()) {
+        logger.info("Restarting socket server...");
+        try {
+          await this.socketServer.close();
+        } catch (error) {
+          logger.warn(`Error closing socket server during recovery: ${error}`);
+        }
+
+        // Recreate socket server
+        const mcpEndpoint = `http://${this.host}:${this.port}${MCP_STREAMABLE_PATH}`;
+        this.socketServer = new UnixSocketServer(SOCKET_PATH, mcpEndpoint);
+        try {
+          await this.socketServer.start();
+          logger.info("Socket server restarted successfully");
+        } catch (error) {
+          logger.error(`Failed to restart socket server: ${error}`);
+        }
+      }
+    } catch (error) {
+      logger.error(`Recovery attempt failed: ${error}`);
+    }
+  }
+
+  /**
    * Setup graceful shutdown handlers
    */
   private setupShutdownHandlers(): void {
@@ -284,6 +364,12 @@ export class Daemon {
    */
   async stop(): Promise<void> {
     logger.info("Stopping daemon...");
+
+    // Clear health check timer
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
+    }
 
     // Close Unix socket server
     if (this.socketServer) {

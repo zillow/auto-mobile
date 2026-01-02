@@ -2,6 +2,7 @@ import { ToolRegistry } from "../server/toolRegistry";
 import { logger } from "../utils/logger";
 import { ActionableError } from "../models";
 import { DaemonClient, DaemonUnavailableError } from "../daemon/client";
+import { DaemonManager } from "../daemon/manager";
 
 // Import all tool registration functions
 import { registerObserveTools } from "../server/observeTools";
@@ -59,24 +60,67 @@ function parseCliArgs(args: string[]): { toolName: string; params: Record<string
   return { toolName, params };
 }
 
+/**
+ * Ensure daemon is running, starting it if necessary
+ * with a timeout for startup
+ */
+async function ensureDaemonRunning(timeout: number = 10000): Promise<void> {
+  const available = await DaemonClient.isAvailable();
+  if (available) {
+    return; // Daemon already running and responsive
+  }
+
+  logger.debug("Daemon not available, attempting to start...");
+
+  const manager = new DaemonManager();
+  try {
+    await manager.start();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new ActionableError(
+      `Failed to start daemon: ${message}. ` +
+      `Try running: auto-mobile --daemon restart`
+    );
+  }
+}
+
+/**
+ * Execute tool via daemon (mandatory - no fallback)
+ * Daemon must be available or this will throw
+ */
 async function runToolViaDaemon(
   toolName: string,
   params: Record<string, any>
-): Promise<any | null> {
+): Promise<any> {
+  // Ensure daemon is running before attempting to call
+  await ensureDaemonRunning();
+
   const client = new DaemonClient();
 
   try {
-    return await client.callTool(toolName, params);
+    const result = await client.callTool(toolName, params);
+    if (result === null) {
+      throw new ActionableError(
+        "Daemon returned null result. This may indicate a daemon connectivity issue. " +
+        "Try: auto-mobile --daemon restart"
+      );
+    }
+    return result;
   } catch (error) {
     if (error instanceof DaemonUnavailableError) {
-      logger.info("Daemon unavailable, falling back to local CLI execution");
-      return null;
+      throw new ActionableError(
+        `Daemon became unavailable during tool execution: ${error.message}. ` +
+        `Try: auto-mobile --daemon restart`
+      );
     }
     if (error instanceof ActionableError) {
       throw error;
     }
     const message = error instanceof Error ? error.message : String(error);
-    throw new ActionableError(message);
+    throw new ActionableError(
+      `Error calling daemon: ${message}. ` +
+      `Try: auto-mobile --daemon restart`
+    );
   }
 }
 
@@ -141,43 +185,10 @@ export async function runCliCommand(args: string[]): Promise<void> {
     // Parse tool name and parameters
     const { toolName, params } = parseCliArgs(args);
 
+    // All tool execution goes through daemon (mandatory)
+    logger.debug(`Executing tool via daemon: ${toolName}`);
     const daemonResult = await runToolViaDaemon(toolName, params);
-    if (daemonResult !== null) {
-      handleToolResult(daemonResult, toolName);
-      return;
-    }
-
-    // Fall back to local CLI execution
-    initializeCliTools();
-
-    // Get the tool from registry
-    const tool = ToolRegistry.getTool(toolName);
-    if (!tool) {
-      throw new ActionableError(`Unknown tool: ${toolName}. Use '--cli help' to see available tools.`);
-    }
-
-    // Validate parameters
-    let parsedParams;
-    try {
-      parsedParams = tool.schema.parse(params);
-    } catch (error) {
-      throw new ActionableError(`Invalid parameters for tool ${toolName}: ${error}`);
-    }
-
-    // Create a simple progress callback for CLI
-    const progressCallback = tool.supportsProgress
-      ? async (progress: number, total?: number, message?: string) => {
-        const percentage = total ? Math.round((progress / total) * 100) : progress;
-        const msg = message ? ` - ${message}` : "";
-        console.log(`Progress: ${percentage}%${msg}`);
-      }
-      : undefined;
-
-    logger.info(`Executing tool: ${toolName} with params:`, parsedParams);
-
-    // Execute the tool
-    const result = await tool.handler(parsedParams, progressCallback);
-    handleToolResult(result, toolName);
+    handleToolResult(daemonResult, toolName);
 
   } catch (error) {
     if (error instanceof ActionableError) {

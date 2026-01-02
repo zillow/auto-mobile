@@ -10,6 +10,12 @@ import {
   DAEMON_SHUTDOWN_TIMEOUT_MS,
 } from "./constants";
 import { DaemonStatus, PidFileData, DaemonOptions } from "./types";
+import {
+  getDaemonHealthReport,
+  formatHealthReport,
+  runSocketDiagnostics,
+  formatSocketDiagnostics,
+} from "./debugTools";
 
 /**
  * Daemon Manager
@@ -32,6 +38,24 @@ export class DaemonManager {
         `Daemon already running (PID ${status.pid}, port ${status.port})`
       );
       return;
+    }
+
+    // Clean up stale socket and PID files from previous sessions
+    if (existsSync(SOCKET_PATH)) {
+      logger.debug("Removing stale socket file");
+      try {
+        await unlink(SOCKET_PATH);
+      } catch (error) {
+        logger.warn(`Failed to remove stale socket file: ${error}`);
+      }
+    }
+    if (existsSync(PID_FILE_PATH)) {
+      logger.debug("Removing stale PID file");
+      try {
+        await unlink(PID_FILE_PATH);
+      } catch (error) {
+        logger.warn(`Failed to remove stale PID file: ${error}`);
+      }
     }
 
     console.log("Starting AutoMobile daemon...");
@@ -320,6 +344,35 @@ export async function runDaemonCommand(
         break;
       }
 
+      case "health": {
+        const report = await getDaemonHealthReport();
+        console.log(formatHealthReport(report));
+
+        // Exit with error code if daemon is not healthy
+        if (!report.daemonRunning || !report.socketConnectable) {
+          process.exit(1);
+        }
+        break;
+      }
+
+      case "diagnose": {
+        console.log("Running daemon diagnostics...\n");
+
+        // Run health check
+        const healthReport = await getDaemonHealthReport();
+        console.log(formatHealthReport(healthReport));
+
+        // Run socket diagnostics
+        const socketDiag = await runSocketDiagnostics();
+        console.log(formatSocketDiagnostics(socketDiag));
+
+        // Exit with error code if issues found
+        if (healthReport.recommendations.length > 0 || socketDiag.issues.length > 0) {
+          process.exit(1);
+        }
+        break;
+      }
+
       default:
         console.error(`Unknown daemon command: ${command}`);
         console.log("\nAvailable commands:");
@@ -327,6 +380,8 @@ export async function runDaemonCommand(
         console.log("  stop      Stop the daemon");
         console.log("  status    Check daemon status");
         console.log("  restart   Restart the daemon");
+        console.log("  health    Check daemon health");
+        console.log("  diagnose  Run full diagnostics");
         process.exit(1);
     }
   } catch (error) {

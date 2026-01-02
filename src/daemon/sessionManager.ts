@@ -1,0 +1,327 @@
+import { logger } from "../utils/logger";
+
+/**
+ * Session Cache Data
+ *
+ * Stores data that can be reused across multiple tool calls
+ * within the same test session, reducing redundant API calls.
+ */
+export interface SessionCacheData {
+  lastHierarchy?: string;      // Last observed view hierarchy
+  lastScreenshot?: string;     // Base64 encoded last screenshot
+  lastObserveTime?: number;    // Timestamp of last hierarchy observation
+  customData?: Record<string, any>; // Custom data set by tools
+}
+
+/**
+ * Session Record
+ *
+ * Represents a single test session with an assigned device.
+ * Each JUnitRunner test process gets a unique session UUID.
+ */
+export interface Session {
+  sessionId: string;           // UUID provided by JUnitRunner
+  assignedDevice: string;      // Device ID this session is using
+  createdAt: number;           // Timestamp when session was created
+  lastUsedAt: number;          // Last activity timestamp
+  expiresAt: number;           // When session will expire (for cleanup)
+  cacheData: SessionCacheData; // Cached data for this session
+}
+
+/**
+ * Session Manager
+ *
+ * Manages test session lifecycle:
+ * - Create sessions with device assignment
+ * - Track cache data per session
+ * - Release sessions and free up devices
+ * - Auto-cleanup expired sessions
+ *
+ * This enables parallel tests to each have their own device
+ * while sharing centralized state in the daemon.
+ */
+export class SessionManager {
+  private sessions: Map<string, Session> = new Map();
+  private sessionDeviceMap: Map<string, string> = new Map(); // sessionId -> deviceId
+  private deviceSessionMap: Map<string, string> = new Map(); // deviceId -> sessionId (reverse lookup)
+  private cleanupTimer: NodeJS.Timeout | null = null;
+
+  // Session timeout: 30 minutes
+  private readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+
+  // Cleanup interval: every 5 minutes
+  private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+  constructor() {
+    // Start periodic cleanup of expired sessions
+    this.startCleanupTimer();
+  }
+
+  /**
+   * Create a new session with an assigned device
+   *
+   * This is called by the daemon when a session UUID is first used.
+   * The DevicePool will assign an available device to this session.
+   */
+  async createSession(
+    sessionId: string,
+    assignedDevice: string
+  ): Promise<Session> {
+    if (this.sessions.has(sessionId)) {
+      logger.warn(`Session ${sessionId} already exists, returning existing session`);
+      return this.sessions.get(sessionId)!;
+    }
+
+    const now = Date.now();
+    const session: Session = {
+      sessionId,
+      assignedDevice,
+      createdAt: now,
+      lastUsedAt: now,
+      expiresAt: now + this.SESSION_TIMEOUT_MS,
+      cacheData: {},
+    };
+
+    this.sessions.set(sessionId, session);
+    this.sessionDeviceMap.set(sessionId, assignedDevice);
+    this.deviceSessionMap.set(assignedDevice, sessionId);
+
+    logger.info(`Created session ${sessionId} with device ${assignedDevice}`);
+    return session;
+  }
+
+  /**
+   * Get existing session
+   */
+  getSession(sessionId: string): Session | null {
+    const session = this.sessions.get(sessionId);
+    if (session && this.isSessionExpired(session)) {
+      logger.info(`Session ${sessionId} has expired, removing`);
+      this.removeSession(sessionId);
+      return null;
+    }
+    return session || null;
+  }
+
+  /**
+   * Get or create session with device assignment
+   *
+   * Automatically creates a session if it doesn't exist.
+   * Called when --session-uuid is provided to a CLI command.
+   */
+  async getOrCreateSession(
+    sessionId: string,
+    devicePool: Map<string, string> // deviceId -> sessionId map from DevicePool
+  ): Promise<Session> {
+    const existing = this.getSession(sessionId);
+    if (existing) {
+      // Update last used time
+      existing.lastUsedAt = Date.now();
+      return existing;
+    }
+
+    // Need to create new session - find available device
+    // This is done by DevicePool, so we throw here
+    // (DevicePool should call createSession directly)
+    throw new Error(
+      `Session ${sessionId} not found. ` +
+      `Must be created by DevicePool with device assignment.`
+    );
+  }
+
+  /**
+   * Get device assigned to a session
+   */
+  getDeviceForSession(sessionId: string): string | null {
+    const session = this.getSession(sessionId);
+    if (!session) {
+      return null;
+    }
+    return session.assignedDevice;
+  }
+
+  /**
+   * Release a session and free its device
+   *
+   * Called when a test completes or times out.
+   * Returns the device ID so DevicePool can mark it as available.
+   */
+  async releaseSession(sessionId: string): Promise<string | null> {
+    const session = this.getSession(sessionId);
+    if (!session) {
+      logger.warn(`Cannot release session ${sessionId}: not found`);
+      return null;
+    }
+
+    const deviceId = session.assignedDevice;
+    this.removeSession(sessionId);
+    logger.info(`Released session ${sessionId}, freeing device ${deviceId}`);
+
+    return deviceId;
+  }
+
+  /**
+   * Update session cache data
+   *
+   * Allows tools to store data (screenshots, hierarchies) that can be
+   * reused by other tools in the same session without re-fetching.
+   */
+  updateSessionCache(
+    sessionId: string,
+    updates: Partial<SessionCacheData>
+  ): void {
+    const session = this.getSession(sessionId);
+    if (!session) {
+      logger.warn(`Cannot update cache for session ${sessionId}: not found`);
+      return;
+    }
+
+    session.cacheData = {
+      ...session.cacheData,
+      ...updates,
+    };
+    session.lastUsedAt = Date.now();
+
+    logger.debug(`Updated cache for session ${sessionId}`);
+  }
+
+  /**
+   * Get session cache data
+   */
+  getSessionCache(sessionId: string): SessionCacheData | null {
+    const session = this.getSession(sessionId);
+    if (!session) {
+      return null;
+    }
+
+    // Update last used time when accessing cache
+    session.lastUsedAt = Date.now();
+
+    return session.cacheData;
+  }
+
+  /**
+   * Clear session cache (for specific key or all)
+   */
+  clearSessionCache(sessionId: string, key?: string): void {
+    const session = this.getSession(sessionId);
+    if (!session) {
+      return;
+    }
+
+    if (key) {
+      delete session.cacheData[key as keyof SessionCacheData];
+    } else {
+      session.cacheData = {};
+    }
+
+    logger.debug(
+      `Cleared cache for session ${sessionId}${key ? ` (key: ${key})` : " (all)"}`
+    );
+  }
+
+  /**
+   * Get count of active sessions
+   */
+  getActiveSessionCount(): number {
+    return this.sessions.size;
+  }
+
+  /**
+   * Get all active sessions
+   */
+  getAllSessions(): Session[] {
+    return Array.from(this.sessions.values()).filter(
+      s => !this.isSessionExpired(s)
+    );
+  }
+
+  /**
+   * Get all devices currently assigned to sessions
+   */
+  getAssignedDevices(): Set<string> {
+    return new Set(
+      Array.from(this.sessions.values())
+        .filter(s => !this.isSessionExpired(s))
+        .map(s => s.assignedDevice)
+    );
+  }
+
+  /**
+   * Check if session is expired
+   */
+  private isSessionExpired(session: Session): boolean {
+    return Date.now() > session.expiresAt;
+  }
+
+  /**
+   * Remove session from all maps
+   */
+  private removeSession(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      this.deviceSessionMap.delete(session.assignedDevice);
+    }
+    this.sessions.delete(sessionId);
+    this.sessionDeviceMap.delete(sessionId);
+  }
+
+  /**
+   * Start periodic cleanup of expired sessions
+   */
+  private startCleanupTimer(): void {
+    this.cleanupTimer = setInterval(() => {
+      const expiredSessions: string[] = [];
+
+      for (const [sessionId, session] of this.sessions) {
+        if (this.isSessionExpired(session)) {
+          expiredSessions.push(sessionId);
+        }
+      }
+
+      if (expiredSessions.length > 0) {
+        logger.info(
+          `Cleaning up ${expiredSessions.length} expired sessions: ` +
+          expiredSessions.join(", ")
+        );
+
+        for (const sessionId of expiredSessions) {
+          this.removeSession(sessionId);
+        }
+      }
+    }, this.CLEANUP_INTERVAL_MS);
+
+    // Allow process to exit even if timer is running
+    this.cleanupTimer.unref();
+  }
+
+  /**
+   * Stop cleanup timer (called on daemon shutdown)
+   */
+  stopCleanupTimer(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+  }
+
+  /**
+   * Get statistics for monitoring
+   */
+  getStats(): {
+    totalSessions: number;
+    activeSessions: number;
+    expiredSessions: number;
+    assignedDevices: number;
+    } {
+    const activeSessions = this.getAllSessions().length;
+    const expiredSessions = this.sessions.size - activeSessions;
+
+    return {
+      totalSessions: this.sessions.size,
+      activeSessions,
+      expiredSessions,
+      assignedDevices: this.getAssignedDevices().size,
+    };
+  }
+}

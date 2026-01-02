@@ -260,6 +260,13 @@ export class UnixSocketServer {
   }
 
   /**
+   * Check if socket server is listening
+   */
+  isListening(): boolean {
+    return this.server !== null && this.server.listening;
+  }
+
+  /**
    * Stop the Unix socket server
    */
   async close(): Promise<void> {
