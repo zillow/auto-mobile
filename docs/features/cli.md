@@ -6,6 +6,20 @@
 auto-mobile --cli help
 ```
 
+## Daemon Mode
+
+Start the background daemon to keep a warm MCP server across CLI invocations:
+
+```bash
+auto-mobile --daemon start
+auto-mobile --daemon status
+auto-mobile --daemon stop
+auto-mobile --daemon restart
+```
+
+When the daemon is running, CLI tool calls are forwarded through the local socket.
+If the daemon is unavailable, the CLI falls back to direct execution.
+
 ```shell
 AutoMobile CLI - Android Device Automation
 

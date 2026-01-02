@@ -11,6 +11,8 @@ import { runCliCommand } from "./cli";
 import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
 import { setDebugModeEnabled } from "./utils/debug";
 import { serverConfig } from "./utils/ServerConfig";
+import { runDaemonCommand } from "./daemon/manager";
+import { startDaemon } from "./daemon/daemon";
 
 // Interface for transport configuration
 interface TransportConfig {
@@ -27,11 +29,15 @@ function parseArgs(): {
   debugPerf: boolean;
   debug: boolean;
   uiPerfMode: boolean;
+  memPerfAuditMode: boolean;
   a11yAuditMode: boolean;
   a11yLevel?: string;
   a11yFailureMode?: string;
   a11yMinSeverity?: string;
   a11yUseBaseline: boolean;
+  daemonMode: boolean;
+  daemonCommand?: string;
+  daemonArgs: string[];
   } {
   const args = process.argv.slice(2);
 
@@ -44,6 +50,16 @@ function parseArgs(): {
 
   // Detect CLI mode based on command line flag
   const cliMode = args.includes("--cli");
+
+  // Detect daemon mode (internal daemon process)
+  const daemonMode = args.includes("--daemon-mode");
+
+  // Detect daemon management command
+  const daemonCommandIndex = args.indexOf("--daemon");
+  const daemonCommand =
+    daemonCommandIndex >= 0 ? args[daemonCommandIndex + 1] : undefined;
+  const daemonArgs =
+    daemonCommandIndex >= 0 ? args.slice(daemonCommandIndex + 2) : [];
 
   // Detect debug-perf mode for performance timing output
   const debugPerf = args.includes("--debug-perf");
@@ -132,6 +148,9 @@ function parseArgs(): {
     a11yFailureMode,
     a11yMinSeverity,
     a11yUseBaseline,
+    daemonMode,
+    daemonCommand,
+    daemonArgs,
   };
 }
 
@@ -419,6 +438,9 @@ async function main() {
       a11yFailureMode,
       a11yMinSeverity,
       a11yUseBaseline,
+      daemonMode,
+      daemonCommand,
+      daemonArgs,
     } = parseArgs();
 
     // Enable performance tracking if --debug-perf flag is set
@@ -459,6 +481,21 @@ async function main() {
       });
 
       logger.info(`Accessibility audit mode enabled (level: ${level}, failure mode: ${failureMode}, baseline: ${a11yUseBaseline})`);
+    }
+
+    if (daemonMode) {
+      await startDaemon({
+        port: transport.port,
+        host: transport.host,
+        debug,
+        debugPerf,
+      });
+      return;
+    }
+
+    if (daemonCommand) {
+      await runDaemonCommand(daemonCommand, daemonArgs);
+      return;
     }
 
     if (cliMode) {

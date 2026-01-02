@@ -53,7 +53,7 @@ runs:
 
     - name: Create AVD and generate snapshot for caching
       if: steps.avd-cache.outputs.cache-hit != 'true'
-      uses: reactivecircus/android-emulator-runner@v2
+      uses: reactivecircus/android-emulator-runner@v2.35.0
       with:
         api-level: ${{ inputs.api_level }}
         arch: ${{ inputs.arch }}
@@ -64,7 +64,7 @@ runs:
         script: echo "Generated AVD snapshot for caching."
 
     - name: Run Emulator
-      uses: reactivecircus/android-emulator-runner@v2
+      uses: reactivecircus/android-emulator-runner@v2.35.0
       with:
         api-level: ${{ inputs.api_level }}
         arch: ${{ inputs.arch }}

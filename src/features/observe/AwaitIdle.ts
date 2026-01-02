@@ -195,26 +195,14 @@ export class AwaitIdle {
 
     try {
       while (true) {
-        const timeoutCheck = this.checkUiStabilityTimeout(
-          state.lastNonIdleTime,
-          state.startTime,
-          timeoutMs,
-        );
-
-        logger.info(`[AwaitIdle] Checking stability: ${timeoutCheck.elapsedTime}ms elapsed of ${timeoutMs}ms timeout`);
-
-        if (timeoutCheck.isStable) {
-          logger.info(`[AwaitIdle] UI stable after ${timeoutCheck.elapsedTime}ms (stable for ${timeoutCheck.stableTime}ms)`);
-          isStable = true;
-          break;
-        }
-
-        if (!timeoutCheck.shouldContinue) {
+        // Check for overall timeout before polling
+        const elapsedTime = Date.now() - initState.startTime;
+        if (elapsedTime >= timeoutMs) {
           logger.info(`[AwaitIdle] Timeout waiting for UI stability after ${timeoutMs}ms`);
           break;
         }
 
-        // Process single stability check with timing
+        // Process single stability check with timing - check criteria FIRST
         pollCount++;
         const checkResult = await perf.track(`gfxinfoPoll_${pollCount}`, async () => {
           return this.processSingleUiStabilityCheck(packageName, state);
@@ -226,7 +214,20 @@ export class AwaitIdle {
         finalMetrics.slowUiThreadCount = state.prevSlowUiThread;
         finalMetrics.frameDeadlineMissedCount = state.prevFrameDeadlineMissed;
 
-        logger.info(`[AwaitIdle] Waiting for stability: ${timeoutCheck.stableTime}ms/${this.stabilityThresholdMs}ms`);
+        // Now check if we've been stable (criteria passing) for required duration
+        const timeoutCheck = this.checkUiStabilityTimeout(
+          state.lastNonIdleTime,
+          initState.startTime,
+          timeoutMs,
+        );
+
+        logger.info(`[AwaitIdle] Checking stability: ${timeoutCheck.elapsedTime}ms elapsed of ${timeoutMs}ms timeout, stable for ${timeoutCheck.stableTime}ms/${this.stabilityThresholdMs}ms`);
+
+        if (timeoutCheck.isStable) {
+          logger.info(`[AwaitIdle] UI stable after ${timeoutCheck.elapsedTime}ms (stable for ${timeoutCheck.stableTime}ms)`);
+          isStable = true;
+          break;
+        }
 
         // Wait before checking again
         await new Promise(resolve => setTimeout(resolve, this.pollIntervalMs));

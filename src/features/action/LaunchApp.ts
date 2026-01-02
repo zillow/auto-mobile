@@ -161,14 +161,15 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean,
     activityName?: string,
     foregroundCheckMode: ForegroundCheckMode = "single",
-    userId?: number
+    userId?: number,
+    skipUiStability?: boolean
   ): Promise<LaunchAppResult> {
     logger.info("execute");
     switch (this.device.platform) {
       case "ios":
         return this.executeiOS(packageName, clearAppData, coldBoot);
       case "android":
-        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName, foregroundCheckMode, userId);
+        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName, foregroundCheckMode, userId, skipUiStability);
       default:
         throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
     }
@@ -253,7 +254,8 @@ export class LaunchApp extends BaseVisualChange {
     coldBoot: boolean,
     activityName?: string,
     foregroundCheckMode: ForegroundCheckMode = "single",
-    userId?: number
+    userId?: number,
+    skipUiStability?: boolean
   ): Promise<LaunchAppResult> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("launchApp");
@@ -386,7 +388,8 @@ export class LaunchApp extends BaseVisualChange {
       {
         changeExpected: false,
         perf,
-        skipPreviousObserve: didTerminateOrClear
+        skipPreviousObserve: didTerminateOrClear,
+        skipUiStability: skipUiStability ?? false
       }
     );
   }

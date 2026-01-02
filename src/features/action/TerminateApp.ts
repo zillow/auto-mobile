@@ -27,6 +27,7 @@ export class TerminateApp extends BaseVisualChange {
     options?: {
       progress?: ProgressCallback;
       skipObservation?: boolean;
+      skipUiStability?: boolean;
       userId?: number;
     }
   ): Promise<TerminateAppResult> {
@@ -126,6 +127,7 @@ export class TerminateApp extends BaseVisualChange {
       {
         changeExpected: false,
         progress: options?.progress,
+        skipUiStability: options?.skipUiStability,
         perf
       }
     );

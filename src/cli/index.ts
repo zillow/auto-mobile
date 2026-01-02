@@ -1,6 +1,7 @@
 import { ToolRegistry } from "../server/toolRegistry";
 import { logger } from "../utils/logger";
 import { ActionableError } from "../models";
+import { DaemonClient, DaemonUnavailableError } from "../daemon/client";
 
 // Import all tool registration functions
 import { registerObserveTools } from "../server/observeTools";
@@ -58,20 +59,77 @@ function parseCliArgs(args: string[]): { toolName: string; params: Record<string
   return { toolName, params };
 }
 
+async function runToolViaDaemon(
+  toolName: string,
+  params: Record<string, any>
+): Promise<any | null> {
+  const client = new DaemonClient();
+
+  try {
+    return await client.callTool(toolName, params);
+  } catch (error) {
+    if (error instanceof DaemonUnavailableError) {
+      logger.info("Daemon unavailable, falling back to local CLI execution");
+      return null;
+    }
+    if (error instanceof ActionableError) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new ActionableError(message);
+  }
+}
+
+function handleToolResult(result: any, toolName: string): void {
+  console.log(JSON.stringify(result, null, 2));
+
+  // Check if the result indicates failure and exit with code 1
+  // Handle both direct result format and MCP content format
+  let actualResult = result;
+  if (result && typeof result === "object" && "content" in result && Array.isArray(result.content)) {
+    // MCP format - extract from content array
+    if (result.content.length > 0 && result.content[0].type === "text") {
+      try {
+        actualResult = JSON.parse(result.content[0].text);
+      } catch {
+        // If parsing fails, keep the original result
+        actualResult = result;
+      }
+    }
+  }
+
+  if (actualResult && typeof actualResult === "object" && actualResult.success === false) {
+    // Write error message to STDERR
+    if (actualResult.error) {
+      console.error(actualResult.error);
+    }
+
+    // Special handling for executePlan tool
+    if (toolName === "executePlan") {
+      console.error(`Executed ${actualResult.executedSteps} of ${actualResult.totalSteps} steps`);
+      if (actualResult.failedStep) {
+        console.error(`Failed at step ${actualResult.failedStep.stepIndex + 1}: ${actualResult.failedStep.tool}`);
+        console.error(`Step error: ${actualResult.failedStep.error}`);
+      }
+    }
+
+    process.exit(1);
+  }
+}
+
 // Main CLI command runner
 export async function runCliCommand(args: string[]): Promise<void> {
   try {
-    // Initialize tool registry
-    initializeCliTools();
-
     if (args.length === 0) {
       // Show help with available tools
+      initializeCliTools();
       showHelp();
       return;
     }
 
     // Handle special commands
     if (args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
+      initializeCliTools();
       if (args.length > 1) {
         showToolHelp(args[1]);
       } else {
@@ -82,6 +140,15 @@ export async function runCliCommand(args: string[]): Promise<void> {
 
     // Parse tool name and parameters
     const { toolName, params } = parseCliArgs(args);
+
+    const daemonResult = await runToolViaDaemon(toolName, params);
+    if (daemonResult !== null) {
+      handleToolResult(daemonResult, toolName);
+      return;
+    }
+
+    // Fall back to local CLI execution
+    initializeCliTools();
 
     // Get the tool from registry
     const tool = ToolRegistry.getTool(toolName);
@@ -110,42 +177,7 @@ export async function runCliCommand(args: string[]): Promise<void> {
 
     // Execute the tool
     const result = await tool.handler(parsedParams, progressCallback);
-
-    // Output the result
-    console.log(JSON.stringify(result, null, 2));
-
-    // Check if the result indicates failure and exit with code 1
-    // Handle both direct result format and MCP content format
-    let actualResult = result;
-    if (result && typeof result === "object" && "content" in result && Array.isArray(result.content)) {
-      // MCP format - extract from content array
-      if (result.content.length > 0 && result.content[0].type === "text") {
-        try {
-          actualResult = JSON.parse(result.content[0].text);
-        } catch {
-          // If parsing fails, keep the original result
-          actualResult = result;
-        }
-      }
-    }
-
-    if (actualResult && typeof actualResult === "object" && actualResult.success === false) {
-      // Write error message to STDERR
-      if (actualResult.error) {
-        console.error(actualResult.error);
-      }
-
-      // Special handling for executePlan tool
-      if (toolName === "executePlan") {
-        console.error(`Executed ${actualResult.executedSteps} of ${actualResult.totalSteps} steps`);
-        if (actualResult.failedStep) {
-          console.error(`Failed at step ${actualResult.failedStep.stepIndex + 1}: ${actualResult.failedStep.tool}`);
-          console.error(`Step error: ${actualResult.failedStep.error}`);
-        }
-      }
-
-      process.exit(1);
-    }
+    handleToolResult(result, toolName);
 
   } catch (error) {
     if (error instanceof ActionableError) {
