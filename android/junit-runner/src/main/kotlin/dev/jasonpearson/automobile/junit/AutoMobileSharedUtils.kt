@@ -4,7 +4,10 @@ import java.util.concurrent.TimeUnit
 
 /** Shared utilities for AutoMobile tests. */
 object AutoMobileSharedUtils {
-  val deviceChecker = DeviceAvailabilityChecker()
+  // Phase 5: Lazy device checker initialization
+  val deviceChecker: DeviceAvailabilityChecker by lazy {
+    DeviceAvailabilityChecker()
+  }
 
   fun executeCommand(command: List<String>, timeoutMs: Long): CommandResult {
     val process = ProcessBuilder(command).start()
@@ -71,7 +74,7 @@ class DeviceAvailabilityChecker {
 
       val result = executeCommand(command, 5000) // 5 second timeout
 
-      val debugMode = System.getProperty("automobile.debug", "false").toBoolean()
+      val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
       if (debugMode) {
         println("Device check output:\n${result.output}")
         if (result.errorOutput.isNotEmpty()) {
@@ -130,7 +133,8 @@ class DeviceAvailabilityChecker {
             ?: throw IllegalStateException("ANDROID_HOME environment variable is not set")
 
     // Validate the path to prevent command injection
-    if (androidHome.contains(Regex("[;&|`\$()<>\\s]"))) {
+    // Phase 6: Use cached regex to avoid repeated compilation
+    if (androidHome.contains(RegexCache.getRegex("[;&|`\$()<>\\s]"))) {
       throw IllegalStateException("ANDROID_HOME contains invalid characters")
     }
 

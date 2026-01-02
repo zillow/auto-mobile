@@ -17,6 +17,10 @@ class AutoMobileRunnerTest {
     // Reset system properties after each test to avoid interference
     System.clearProperty("automobile.use.bunx")
     System.clearProperty("automobile.debug")
+    // Clear cached properties and plans to ensure fresh reads
+    SystemPropertyCache.clear()
+    PlanCache.clear()
+    RegexCache.clear()  // Phase 6: Clear regex cache for test isolation
   }
 
   @Test
