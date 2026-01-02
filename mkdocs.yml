@@ -78,6 +78,7 @@ nav:
       - 'MCP Server':
           - 'Overview': features/mcp-server/index.md
           - 'Actions': features/mcp-server/actions.md
+          - 'Resources': features/mcp-server/resources.md
           - 'Observation': features/mcp-server/observation.md
           - 'Interaction Loop': features/mcp-server/interaction-loop.md
       - 'Test Authoring':

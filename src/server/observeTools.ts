@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
+import { ResourceRegistry } from "./resourceRegistry";
+import { RESOURCE_URIS } from "./observationResources";
 import { ActionableError } from "../models/ActionableError";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
@@ -34,6 +36,12 @@ export function registerObserveTools() {
           navGraph.recordBackStack(result.backStack);
         }
       }
+
+      // Notify MCP clients that observation resources have been updated
+      await ResourceRegistry.notifyResourcesUpdated([
+        RESOURCE_URIS.LATEST_OBSERVATION,
+        RESOURCE_URIS.LATEST_SCREENSHOT
+      ]);
 
       return createJSONToolResponse(result);
     } catch (error) {

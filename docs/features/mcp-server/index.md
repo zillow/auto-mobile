@@ -1,8 +1,9 @@
 # Features - MCP Server
 
-AutoMobile's MCP makes its various [actions](actions.md) available as tool calls and automatically performs
-[observations](observation.md) within an [interaction loop](interaction-loop.md). This is a simple overview diagram,
-for more detail see the [full MCP server system design](system-design.md).
+AutoMobile's MCP makes its various [actions](actions.md) available as tool calls, exposes device state through
+[resources](resources.md), and automatically performs [observations](observation.md) within an
+[interaction loop](interaction-loop.md). This is a simple overview diagram, for more detail see the
+[full MCP server system design](system-design.md).
 
 ```mermaid
 stateDiagram-v2

@@ -1,14 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   ListToolsRequestSchema,
-  CallToolRequestSchema,
-  ListResourcesRequestSchema
+  CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
 
 // Import the tool registry
 import { ToolRegistry } from "./toolRegistry";
+
+// Import the resource registry
+import { ResourceRegistry } from "./resourceRegistry";
 
 // Import all tool registration functions
 import { registerObserveTools } from "./observeTools";
@@ -21,6 +23,9 @@ import { registerDeepLinkTools } from "./deepLinkTools";
 import { registerEnvironmentTools } from "./environmentTools";
 import { registerDebugTools } from "./debugTools";
 import { registerNavigationTools } from "./navigationTools";
+
+// Import resource registration functions
+import { registerObservationResources } from "./observationResources";
 
 export interface McpServerOptions {
   debug?: boolean;
@@ -39,6 +44,9 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDeepLinkTools();
   registerEnvironmentTools();
   registerNavigationTools();
+
+  // Register all resources
+  registerObservationResources();
 
   // Only register debug tools when --debug flag is passed
   if (options.debug) {
@@ -60,6 +68,9 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   // Register all tools with the server
   ToolRegistry.registerWithServer(server);
 
+  // Register all resources with the server
+  ResourceRegistry.registerWithServer(server);
+
   // Register tool definitions using the lower-level interface
   server.server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
@@ -72,22 +83,6 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   const PingRequestSchema = require("@modelcontextprotocol/sdk/types.js").PingRequestSchema;
   server.server.setRequestHandler(PingRequestSchema, async () => {
     return {};
-  });
-
-  // Register resources list handler (currently returns empty list since no resources are implemented)
-  server.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-    return {
-      resources: []
-    };
-  });
-
-  // Register resource templates list handler (currently returns empty list since no templates are implemented)
-  // Note: Using runtime access since TypeScript import has issues
-  const ListResourceTemplatesRequestSchema = require("@modelcontextprotocol/sdk/types.js").ListResourceTemplatesRequestSchema;
-  server.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-    return {
-      resourceTemplates: []
-    };
   });
 
   // Register prompts list handler (currently returns empty list since no prompts are implemented)
