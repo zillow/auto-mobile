@@ -16,6 +16,8 @@ import {
   runSocketDiagnostics,
   formatSocketDiagnostics,
 } from "./debugTools";
+import { DaemonClient } from "./client";
+import { DaemonState } from "./daemonState";
 
 /**
  * Daemon Manager
@@ -373,15 +375,118 @@ export async function runDaemonCommand(
         break;
       }
 
+      case "available-devices": {
+        // Check if running in daemon process
+        if (DaemonState.getInstance().isInitialized()) {
+          // Running inside daemon process
+          const pool = DaemonState.getInstance().getDevicePool();
+          const idleDevices = pool.getIdleDevices();
+          console.log(JSON.stringify({ availableDevices: idleDevices.length }));
+        } else {
+          // Running from CLI - query daemon via socket
+          const client = new DaemonClient();
+          try {
+            await client.connect();
+            const result = await client.callTool("daemon_available_devices", {});
+            console.log(JSON.stringify(result));
+            await client.close();
+          } catch (error) {
+            throw new ActionableError(
+              `Failed to query available devices: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+        break;
+      }
+
+      case "session-info": {
+        if (args.length === 0) {
+          throw new ActionableError("session-info requires a session ID argument");
+        }
+        const sessionId = args[0];
+
+        // Check if running in daemon process
+        if (DaemonState.getInstance().isInitialized()) {
+          // Running inside daemon process
+          const manager = DaemonState.getInstance().getSessionManager();
+          const session = manager.getSession(sessionId);
+          if (!session) {
+            throw new ActionableError(`Session not found: ${sessionId}`);
+          }
+          console.log(JSON.stringify({
+            sessionId: session.sessionId,
+            assignedDevice: session.assignedDevice,
+            createdAt: session.createdAt,
+            lastUsedAt: session.lastUsedAt,
+            expiresAt: session.expiresAt,
+            cacheSize: JSON.stringify(session.cacheData).length,
+          }));
+        } else {
+          // Running from CLI - query daemon via socket
+          const client = new DaemonClient();
+          try {
+            await client.connect();
+            const result = await client.callTool("daemon_session_info", { sessionId });
+            console.log(JSON.stringify(result));
+            await client.close();
+          } catch (error) {
+            throw new ActionableError(
+              `Failed to get session info: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+        break;
+      }
+
+      case "release-session": {
+        if (args.length === 0) {
+          throw new ActionableError("release-session requires a session ID argument");
+        }
+        const sessionId = args[0];
+
+        // Check if running in daemon process
+        if (DaemonState.getInstance().isInitialized()) {
+          // Running inside daemon process
+          const manager = DaemonState.getInstance().getSessionManager();
+          const pool = DaemonState.getInstance().getDevicePool();
+          const session = manager.getSession(sessionId);
+          if (!session) {
+            throw new ActionableError(`Session not found: ${sessionId}`);
+          }
+          const deviceId = session.assignedDevice;
+          manager.releaseSession(sessionId);
+          pool.releaseDevice(deviceId);
+          console.log(`Session ${sessionId} released`);
+          console.log(`Device ${deviceId} is now available`);
+        } else {
+          // Running from CLI - query daemon via socket
+          const client = new DaemonClient();
+          try {
+            await client.connect();
+            await client.callTool("daemon_release_session", { sessionId });
+            console.log(`Session ${sessionId} released`);
+            await client.close();
+          } catch (error) {
+            throw new ActionableError(
+              `Failed to release session: ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+        }
+        break;
+      }
+
       default:
         console.error(`Unknown daemon command: ${command}`);
         console.log("\nAvailable commands:");
-        console.log("  start     Start the daemon");
-        console.log("  stop      Stop the daemon");
-        console.log("  status    Check daemon status");
-        console.log("  restart   Restart the daemon");
-        console.log("  health    Check daemon health");
-        console.log("  diagnose  Run full diagnostics");
+        console.log("  start                 Start the daemon");
+        console.log("  stop                  Stop the daemon");
+        console.log("  status                Check daemon status");
+        console.log("  restart               Restart the daemon");
+        console.log("  health                Check daemon health");
+        console.log("  diagnose              Run full diagnostics");
+        console.log("  available-devices     Query number of available devices");
+        console.log("  session-info <id>     Get information about a session");
+        console.log("  release-session <id>  Release a session and free its device");
         process.exit(1);
     }
   } catch (error) {

@@ -5,21 +5,22 @@ import { LaunchApp } from "../features/action/LaunchApp";
 import { TerminateApp } from "../features/action/TerminateApp";
 import { InstallApp } from "../features/action/InstallApp";
 import { createJSONToolResponse } from "../utils/toolUtils";
+import { addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const packageNameSchema = z.object({
+export const packageNameSchema = addSessionUuidToSchema(z.object({
   appId: z.string().describe("App package ID of the app"),
-});
+}));
 
-export const launchAppSchema = z.object({
+export const launchAppSchema = addSessionUuidToSchema(z.object({
   appId: z.string().describe("App package ID of the app"),
   clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false"),
   coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default false"),
-});
+}));
 
-export const installAppSchema = z.object({
+export const installAppSchema = addSessionUuidToSchema(z.object({
   apkPath: z.string().describe("Path to the APK file to install"),
-});
+}));
 
 // Export interfaces for type safety
 export interface AppActionArgs {

@@ -6,18 +6,19 @@ import { NavigationGraphManager } from "../features/navigation/NavigationGraphMa
 import { Explore, ExploreOptions } from "../features/navigation/Explore";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
+import { addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const navigateToSchema = z.object({
+export const navigateToSchema = addSessionUuidToSchema(z.object({
   targetScreen: z.string().describe("The destination screen name to navigate to"),
   platform: z.enum(["android", "ios"]).default("android")
-});
+}));
 
-export const getNavigationGraphSchema = z.object({
+export const getNavigationGraphSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).default("android")
-});
+}));
 
-export const exploreSchema = z.object({
+export const exploreSchema = addSessionUuidToSchema(z.object({
   maxInteractions: z.number().optional().describe("Maximum number of interactions to perform (default: 50)"),
   timeoutMs: z.number().optional().describe("Maximum time in milliseconds (default: 300000 - 5 minutes)"),
   strategy: z.enum(["breadth-first", "depth-first", "weighted"]).optional().describe("Exploration strategy (default: weighted)"),
@@ -26,7 +27,7 @@ export const exploreSchema = z.object({
   mode: z.enum(["discover", "validate", "hybrid"]).optional().describe("Exploration mode (default: hybrid)"),
   packageName: z.string().optional().describe("Package name to limit exploration to"),
   platform: z.enum(["android", "ios"]).default("android")
-});
+}));
 
 
 // Export interfaces for type safety

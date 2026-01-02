@@ -10,6 +10,8 @@ import { MemoryAudit } from "../features/memory/MemoryAudit";
 import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { logger } from "../utils/logger";
+import { DaemonState } from "../daemon/daemonState";
+import { createToolExecutionContext, updateSessionCache } from "./ToolExecutionContext";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -84,8 +86,20 @@ class ToolRegistryClass {
   ): void {
     // Create a wrapper that handles device ID injection
     const wrappedHandler: ToolHandler = async (args: any, progress?: ProgressCallback) => {
-      // Check if args contains a deviceId
-      const providedDeviceId = args.deviceId;
+      // Check for session UUID and create execution context
+      let providedDeviceId = args.deviceId;
+      const sessionUuid = args.sessionUuid;
+
+      // If session UUID provided, resolve device from session
+      if (sessionUuid && DaemonState.getInstance().isInitialized()) {
+        const sessionManager = DaemonState.getInstance().getSessionManager();
+        const devicePool = DaemonState.getInstance().getDevicePool();
+        const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool);
+        if (context.deviceId && !providedDeviceId) {
+          providedDeviceId = context.deviceId;
+        }
+      }
+
       // Extract platform from args, default to "android" for backward compatibility
       const platform: SomePlatform = args.platform || "either";
 
@@ -158,6 +172,26 @@ class ToolRegistryClass {
           const scrollPosition = UIStateExtractor.createScrollPosition(args);
           if (scrollPosition) {
             NavigationGraphManager.getInstance().updateScrollPosition(scrollPosition);
+          }
+        }
+
+        // Update session cache if sessionUuid provided
+        if (sessionUuid && DaemonState.getInstance().isInitialized()) {
+          const sessionManager = DaemonState.getInstance().getSessionManager();
+          const devicePool = DaemonState.getInstance().getDevicePool();
+          const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool);
+
+          // Cache observation data for certain tools to reduce API calls
+          if (name === "observe" && response?.viewHierarchy) {
+            await updateSessionCache(context, "lastHierarchy", response.viewHierarchy);
+          }
+          if (name === "observe" && response?.screenshot) {
+            await updateSessionCache(context, "lastScreenshot", response.screenshot);
+          }
+
+          // Update last action timestamp for interaction tools
+          if (["tapOn", "swipeOn", "scroll", "inputText", "clearText", "pressButton"].includes(name)) {
+            await updateSessionCache(context, "lastActionTime", Date.now());
           }
         }
 

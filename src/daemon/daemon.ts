@@ -4,6 +4,9 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createMcpServer } from "../server";
 import { logger } from "../utils/logger";
 import { UnixSocketServer } from "./socketServer";
+import { SessionManager } from "./sessionManager";
+import { DevicePool } from "./devicePool";
+import { DaemonState } from "./daemonState";
 import {
   DEFAULT_DAEMON_PORT,
   SOCKET_PATH,
@@ -33,11 +36,17 @@ export class Daemon {
   private host: string;
   private debug: boolean;
   private healthCheckTimer: NodeJS.Timeout | null = null;
+  private sessionManager: SessionManager;
+  private devicePool: DevicePool;
 
   constructor(options: DaemonOptions = {}) {
     this.port = options.port || DEFAULT_DAEMON_PORT;
     this.host = options.host || "localhost";
     this.debug = options.debug || false;
+    this.sessionManager = new SessionManager();
+    this.devicePool = new DevicePool(this.sessionManager);
+    // Initialize singleton for daemon state access
+    DaemonState.getInstance().initialize(this.sessionManager, this.devicePool);
   }
 
   /**
@@ -404,6 +413,20 @@ export class Daemon {
 
     logger.info("Daemon stopped");
     logger.close();
+  }
+
+  /**
+   * Get the SessionManager instance
+   */
+  getSessionManager(): SessionManager {
+    return this.sessionManager;
+  }
+
+  /**
+   * Get the DevicePool instance
+   */
+  getDevicePool(): DevicePool {
+    return this.devicePool;
   }
 }
 

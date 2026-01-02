@@ -9,15 +9,16 @@ import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
+import { addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const observeSchema = z.object({
+export const observeSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
-});
+}));
 
-export const listAppsSchema = z.object({
+export const listAppsSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
-});
+}));
 
 // Register tools (this will be called when this file is imported)
 export function registerObserveTools() {

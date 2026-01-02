@@ -24,17 +24,29 @@ export function initializeCliTools(): void {
   registerPlanTools();
 }
 
-// Parse CLI arguments into tool name and parameters
-function parseCliArgs(args: string[]): { toolName: string; params: Record<string, any> } {
+// Parse CLI arguments into tool name, session UUID, and parameters
+function parseCliArgs(args: string[]): { toolName: string; sessionUuid?: string; params: Record<string, any> } {
   if (args.length === 0) {
-    throw new ActionableError("No tool name provided. Usage: --cli <tool-name> [--param value ...]");
+    throw new ActionableError("No tool name provided. Usage: --cli [--session-uuid <uuid>] <tool-name> [--param value ...]");
   }
 
-  const toolName = args[0];
+  let toolNameIndex = 0;
+  let sessionUuid: string | undefined;
+
+  // Check for --session-uuid parameter before tool name
+  if (args[0] === "--session-uuid") {
+    if (args.length < 3) {
+      throw new ActionableError("--session-uuid requires a value and a tool name");
+    }
+    sessionUuid = args[1];
+    toolNameIndex = 2;
+  }
+
+  const toolName = args[toolNameIndex];
   const params: Record<string, any> = {};
 
   // Parse remaining arguments as key-value pairs
-  for (let i = 1; i < args.length; i += 2) {
+  for (let i = toolNameIndex + 1; i < args.length; i += 2) {
     const key = args[i];
     const value = args[i + 1];
 
@@ -57,7 +69,7 @@ function parseCliArgs(args: string[]): { toolName: string; params: Record<string
     }
   }
 
-  return { toolName, params };
+  return { toolName, sessionUuid, params };
 }
 
 /**
@@ -182,8 +194,14 @@ export async function runCliCommand(args: string[]): Promise<void> {
       return;
     }
 
-    // Parse tool name and parameters
-    const { toolName, params } = parseCliArgs(args);
+    // Parse tool name, session UUID, and parameters
+    const { toolName, sessionUuid, params } = parseCliArgs(args);
+
+    // Add session UUID to params if provided
+    if (sessionUuid) {
+      params.sessionUuid = sessionUuid;
+      logger.debug(`Using session UUID: ${sessionUuid}`);
+    }
 
     // All tool execution goes through daemon (mandatory)
     logger.debug(`Executing tool via daemon: ${toolName}`);
@@ -210,7 +228,7 @@ function showHelp(): void {
 AutoMobile CLI - Android Device Automation
 
 Usage:
-  auto-mobile --cli <tool-name> [--param value ...]
+  auto-mobile --cli [--session-uuid <uuid>] <tool-name> [--param value ...]
   auto-mobile --cli help [tool-name]
 
 Examples:
@@ -218,9 +236,12 @@ Examples:
   auto-mobile --cli observe
   auto-mobile --cli tapOn --text "Submit"
   auto-mobile --cli startDevice --avdName "pixel_7_api_34"
+  auto-mobile --cli --session-uuid abc-123-uuid observe
+  auto-mobile --cli --session-uuid $SESSION_UUID tapOn --text "Submit"
 
 Options:
-  help [tool-name]    Show help for a specific tool
+  help [tool-name]              Show help for a specific tool
+  --session-uuid <uuid>         Associate tool execution with a session (optional)
 
 Parameters:
   Parameters are passed as --key value pairs
@@ -228,6 +249,10 @@ Parameters:
   Boolean values: --flag true or --flag false
   Numbers: --count 5
   Objects: --options '{"key": "value"}'
+
+Session-based Execution:
+  When using --session-uuid, the tool will be executed on the device assigned to that session.
+  This allows multiple tool calls to target the same device in parallel.
 `);
 
   // Show categorized tools

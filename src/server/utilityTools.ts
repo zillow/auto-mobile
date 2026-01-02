@@ -6,9 +6,10 @@ import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { BootedDevice, Platform } from "../models";
+import { addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const enableDemoModeSchema = z.object({
+export const enableDemoModeSchema = addSessionUuidToSchema(z.object({
   time: z.string().optional().describe("Time to display in statusbar in HHMM format (e.g., 1000 for 10:00)"),
   batteryLevel: z.number().min(0).max(100).optional().describe("Battery level percentage (0-100)"),
   batteryPlugged: z.boolean().optional().describe("Whether the device appears to be charging"),
@@ -17,16 +18,16 @@ export const enableDemoModeSchema = z.object({
   mobileSignalLevel: z.number().min(0).max(4).optional().describe("Mobile signal strength (0-4)"),
   hideNotifications: z.boolean().optional().describe("Whether to hide notification icons"),
   platform: z.enum(["android", "ios"]).describe("Target platform")
-});
+}));
 
-export const disableDemoModeSchema = z.object({
+export const disableDemoModeSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
-});
+}));
 
-export const setActiveDeviceSchema = z.object({
+export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
   deviceId: z.string().describe("The device ID to set as active"),
   platform: z.enum(["android", "ios"]).describe("Target platform")
-});
+}));
 
 // Export interfaces for type safety
 export interface EnableDemoModeArgs {

@@ -23,6 +23,7 @@ import { registerDeepLinkTools } from "./deepLinkTools";
 import { registerEnvironmentTools } from "./environmentTools";
 import { registerDebugTools } from "./debugTools";
 import { registerNavigationTools } from "./navigationTools";
+import { registerDaemonTools } from "./daemonTools";
 
 // Import resource registration functions
 import { registerObservationResources } from "./observationResources";
@@ -44,6 +45,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDeepLinkTools();
   registerEnvironmentTools();
   registerNavigationTools();
+  registerDaemonTools();
 
   // Register all resources
   registerObservationResources();
