@@ -180,6 +180,44 @@ jobs:
           check_name: "JUnit Runner Emulator Test Report"
           report_paths: '**/build/test-results/**/*.xml'
 
+  playground-automobile-emulator-tests:
+    name: "Run Playground Automobile Emulator Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build-android-accessibility-service
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Download Accessibility Service APK"
+        uses: actions/download-artifact@v4
+        with:
+          name: accessibility-service-apk
+          path: android/accessibility-service/build/outputs/apk/debug
+
+      # Run AutoMobile tests that require emulator
+      - uses: ./.github/actions/android-emulator
+        with:
+          script: "./gradlew :playground:app:test"
+          working-directory: './android/'
+          accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+
+      - name: "Upload Test Results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playground-automobile-emulator-test-results
+          path: android/playground/app/build/reports/tests/test/
+
+      - name: "Publish Test Report"
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          check_name: "Playground Automobile Emulator Test Report"
+          report_paths: '**/build/test-results/**/*.xml'
+
   android-accessibility-service-unit-tests:
     name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest

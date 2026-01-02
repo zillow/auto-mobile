@@ -1,0 +1,12 @@
+---
+name: test-plan
+description: Basic test plan for Playground Automobile tests
+steps:
+  - tool: launchApp
+    appId: dev.jasonpearson.automobile.playground
+    clearAppData: true
+    label: Launch Playground app with clean state
+
+  - tool: terminateApp
+    appId: dev.jasonpearson.automobile.playground
+    label: Terminate Playground app
