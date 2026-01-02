@@ -27,6 +27,10 @@ inputs:
     description: "Working directory"
     default: "./"
     required: "true"
+  accessibility-apk-path:
+    description: "Optional path to accessibility service APK to install before running the script"
+    default: ""
+    required: "false"
 
 runs:
   using: "composite"
@@ -65,7 +69,16 @@ runs:
         api-level: ${{ inputs.api_level }}
         arch: ${{ inputs.arch }}
         target: ${{ inputs.target }}
-        script: ${{ inputs.script }}
+        script: |
+          if [ -n "${{ inputs.accessibility-apk-path }}" ]; then
+            if [ ! -f "${{ inputs.accessibility-apk-path }}" ]; then
+              echo "Accessibility APK not found at ${{ inputs.accessibility-apk-path }}"
+              exit 1
+            fi
+            echo "Installing accessibility service APK from ${{ inputs.accessibility-apk-path }}"
+            adb install -r "${{ inputs.accessibility-apk-path }}"
+          fi
+          ${{ inputs.script }}
         working-directory: ${{ inputs.working-directory }}
         force-avd-creation: false
         emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
