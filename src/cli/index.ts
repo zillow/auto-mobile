@@ -11,6 +11,7 @@ import { registerAppTools } from "../server/appTools";
 import { registerUtilityTools } from "../server/utilityTools";
 import { registerDeviceTools } from "../server/deviceTools";
 import { registerPlanTools } from "../server/planTools";
+import { registerDoctorTools } from "../server/doctorTools";
 
 // Initialize tool registry for CLI mode
 export function initializeCliTools(): void {
@@ -22,6 +23,7 @@ export function initializeCliTools(): void {
   registerUtilityTools();
   registerDeviceTools();
   registerPlanTools();
+  registerDoctorTools();
 }
 
 // Parse CLI arguments into tool name, session UUID, and parameters
@@ -45,29 +47,35 @@ function parseCliArgs(args: string[]): { toolName: string; sessionUuid?: string;
   const toolName = args[toolNameIndex];
   const params: Record<string, any> = {};
 
-  // Parse remaining arguments as key-value pairs
-  for (let i = toolNameIndex + 1; i < args.length; i += 2) {
+  // Parse remaining arguments as key-value pairs or boolean flags
+  for (let i = toolNameIndex + 1; i < args.length; i++) {
     const key = args[i];
-    const value = args[i + 1];
 
     if (!key.startsWith("--")) {
       throw new ActionableError(`Invalid parameter format: ${key}. Parameters must start with --`);
-    }
-
-    if (value === undefined) {
-      throw new ActionableError(`Missing value for parameter: ${key}`);
     }
 
     // Remove '--' prefix and convert kebab-case to camelCase
     // e.g., --session-uuid -> sessionUuid
     const paramName = key.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
-    // Try to parse as JSON, fallback to string
-    try {
-      params[paramName] = JSON.parse(value);
-    } catch {
-      // If not valid JSON, treat as string
-      params[paramName] = value;
+    const nextArg = args[i + 1];
+
+    // Check if this is a boolean flag (no value or next arg is also a flag)
+    if (nextArg === undefined || nextArg.startsWith("--")) {
+      // Boolean flag without value - treat as true
+      params[paramName] = true;
+    } else {
+      // Key-value pair
+      i++; // Skip the value in the next iteration
+
+      // Try to parse as JSON, fallback to string
+      try {
+        params[paramName] = JSON.parse(nextArg);
+      } catch {
+        // If not valid JSON, treat as string
+        params[paramName] = nextArg;
+      }
     }
   }
 
@@ -141,6 +149,72 @@ async function runToolViaDaemon(
   }
 }
 
+/**
+ * Run the doctor command with daemon fallback to direct execution
+ */
+async function runDoctorCommand(params: Record<string, any>): Promise<void> {
+  const jsonOutput = params.json === true;
+
+  // Try daemon first
+  try {
+    logger.debug("Attempting to run doctor via daemon");
+    const daemonResult = await runToolViaDaemon("doctor", params);
+    handleDoctorResult(daemonResult, jsonOutput);
+    return;
+  } catch (error) {
+    logger.debug(`Daemon not available for doctor, falling back to direct execution: ${error}`);
+  }
+
+  // Fallback to direct execution
+  const { runDoctor, formatConsoleOutput, formatJsonOutput } = await import("../doctor");
+  const report = await runDoctor({
+    android: params.android,
+    ios: params.ios,
+  });
+
+  if (jsonOutput) {
+    console.log(formatJsonOutput(report));
+  } else {
+    console.log(formatConsoleOutput(report, process.stdout.isTTY ?? true));
+  }
+
+  // Exit with error code if any failures
+  if (report.summary.failed > 0) {
+    process.exit(1);
+  }
+}
+
+/**
+ * Handle doctor command result from daemon
+ */
+function handleDoctorResult(result: any, jsonOutput: boolean): void {
+  // Extract the report from MCP response format
+  let report = result;
+  if (result && typeof result === "object" && "content" in result && Array.isArray(result.content)) {
+    if (result.content.length > 0 && result.content[0].type === "text") {
+      try {
+        report = JSON.parse(result.content[0].text);
+      } catch {
+        // Keep original result
+      }
+    }
+  }
+
+  if (jsonOutput) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    // Use the formatter for console output
+    import("../doctor").then(({ formatConsoleOutput }) => {
+      console.log(formatConsoleOutput(report, process.stdout.isTTY ?? true));
+    });
+  }
+
+  // Exit with error code if any failures
+  if (report && report.summary && report.summary.failed > 0) {
+    process.exit(1);
+  }
+}
+
 function handleToolResult(result: any, toolName: string): void {
   console.log(JSON.stringify(result, null, 2));
 
@@ -206,6 +280,12 @@ export async function runCliCommand(args: string[]): Promise<void> {
     if (sessionUuid) {
       params.sessionUuid = sessionUuid;
       logger.debug(`Using session UUID: ${sessionUuid}`);
+    }
+
+    // Special handling for doctor command - try daemon first, fallback to direct
+    if (toolName === "doctor") {
+      await runDoctorCommand(params);
+      return;
     }
 
     // All tool execution goes through daemon (mandatory)

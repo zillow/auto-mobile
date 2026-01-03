@@ -1,0 +1,248 @@
+/**
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { existsSync } from "node:fs";
+import { CheckResult } from "../types";
+import { getAndroidSdkFromEnvironment } from "../../utils/android-cmdline-tools/detection";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
+import { logger } from "../../utils/logger";
+
+/**
+ * Check ANDROID_HOME environment variable
+ */
+export async function checkAndroidHome(): Promise<CheckResult> {
+  const androidHome = getAndroidSdkFromEnvironment();
+
+  if (androidHome) {
+    return {
+      name: "ANDROID_HOME",
+      status: "pass",
+      message: `Android SDK found`,
+      value: androidHome,
+    };
+  }
+
+  return {
+    name: "ANDROID_HOME",
+    status: "fail",
+    message: "ANDROID_HOME or ANDROID_SDK_ROOT not set or path does not exist",
+    recommendation: "Set ANDROID_HOME to your Android SDK installation path. " +
+      "Example: export ANDROID_HOME=$HOME/Library/Android/sdk",
+  };
+}
+
+/**
+ * Check JAVA_HOME environment variable
+ */
+export async function checkJavaHome(): Promise<CheckResult> {
+  const javaHome = process.env.JAVA_HOME;
+
+  if (!javaHome) {
+    return {
+      name: "JAVA_HOME",
+      status: "warn",
+      message: "JAVA_HOME environment variable not set",
+      recommendation: "Set JAVA_HOME to your Java installation. " +
+        "Example: export JAVA_HOME=$(/usr/libexec/java_home)",
+    };
+  }
+
+  if (!existsSync(javaHome)) {
+    return {
+      name: "JAVA_HOME",
+      status: "warn",
+      message: `JAVA_HOME is set but path does not exist: ${javaHome}`,
+      recommendation: "Update JAVA_HOME to a valid Java installation path",
+    };
+  }
+
+  return {
+    name: "JAVA_HOME",
+    status: "pass",
+    message: "Java home directory found",
+    value: javaHome,
+  };
+}
+
+/**
+ * Check ADB installation and get path
+ */
+export async function checkAdbInstallation(): Promise<CheckResult> {
+  try {
+    const adb = new AdbClient();
+    const baseCommand = await adb.getBaseCommand();
+
+    // Extract just the ADB path (remove any device flags)
+    const adbPath = baseCommand.split(" ")[0];
+
+    return {
+      name: "ADB Installation",
+      status: "pass",
+      message: "ADB is available",
+      value: adbPath,
+    };
+  } catch (error) {
+    return {
+      name: "ADB Installation",
+      status: "fail",
+      message: `ADB not found: ${error instanceof Error ? error.message : String(error)}`,
+      recommendation: "Install Android SDK Platform-Tools. " +
+        "Via Homebrew: brew install android-platform-tools",
+    };
+  }
+}
+
+/**
+ * Check ADB version
+ */
+export async function checkAdbVersion(): Promise<CheckResult> {
+  try {
+    const adb = new AdbClient();
+    const result = await adb.executeCommand("--version", undefined, undefined, true);
+
+    // Parse version from output like "Android Debug Bridge version 35.0.0"
+    const versionMatch = result.stdout.match(/Android Debug Bridge version (\d+\.\d+\.\d+)/);
+    const version = versionMatch ? versionMatch[1] : "unknown";
+
+    return {
+      name: "ADB Version",
+      status: "pass",
+      message: `Version ${version}`,
+      value: version,
+    };
+  } catch (error) {
+    return {
+      name: "ADB Version",
+      status: "warn",
+      message: `Could not determine ADB version: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Check Android emulator availability
+ */
+export async function checkEmulator(): Promise<CheckResult> {
+  try {
+    const emulator = new AndroidEmulatorClient();
+    // Try to list AVDs - this will fail if emulator is not available
+    await emulator.listAvds();
+
+    return {
+      name: "Android Emulator",
+      status: "pass",
+      message: "Emulator is available",
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // Check if it's a "not found" error
+    if (errorMsg.includes("not found") || errorMsg.includes("ENOENT")) {
+      return {
+        name: "Android Emulator",
+        status: "warn",
+        message: "Emulator not found",
+        recommendation: "Install Android Emulator via SDK Manager or Homebrew: " +
+          "brew install android-emulator",
+      };
+    }
+
+    return {
+      name: "Android Emulator",
+      status: "warn",
+      message: `Emulator check failed: ${errorMsg}`,
+    };
+  }
+}
+
+/**
+ * Check connected Android devices
+ */
+export async function checkConnectedDevices(): Promise<CheckResult> {
+  try {
+    const adb = new AdbClient();
+    const devices = await adb.getBootedAndroidDevices();
+
+    if (devices.length === 0) {
+      return {
+        name: "Connected Devices",
+        status: "warn",
+        message: "No Android devices connected",
+        value: 0,
+        recommendation: "Connect a device via USB or start an emulator",
+      };
+    }
+
+    const deviceNames = devices.map(d => d.deviceId).join(", ");
+    return {
+      name: "Connected Devices",
+      status: "pass",
+      message: `${devices.length} device(s) connected: ${deviceNames}`,
+      value: devices.length,
+    };
+  } catch (error) {
+    return {
+      name: "Connected Devices",
+      status: "warn",
+      message: `Could not list devices: ${error instanceof Error ? error.message : String(error)}`,
+      value: 0,
+    };
+  }
+}
+
+/**
+ * Check available AVDs
+ */
+export async function checkAvailableAvds(): Promise<CheckResult> {
+  try {
+    const emulator = new AndroidEmulatorClient();
+    const avds = await emulator.listAvds();
+
+    if (avds.length === 0) {
+      return {
+        name: "Available AVDs",
+        status: "warn",
+        message: "No AVDs found",
+        value: 0,
+        recommendation: "Create an AVD using Android Studio or avdmanager",
+      };
+    }
+
+    const avdNames = avds.map(a => a.name).join(", ");
+    return {
+      name: "Available AVDs",
+      status: "pass",
+      message: `${avds.length} AVD(s) available: ${avdNames}`,
+      value: avds.length,
+    };
+  } catch (error) {
+    logger.debug(`Failed to list AVDs: ${error}`);
+    return {
+      name: "Available AVDs",
+      status: "skip",
+      message: "Could not list AVDs (emulator may not be installed)",
+      value: 0,
+    };
+  }
+}
+
+/**
+ * Run all Android checks
+ */
+export async function runAndroidChecks(): Promise<CheckResult[]> {
+  const results: CheckResult[] = [];
+
+  // Run checks sequentially to avoid overwhelming the system
+  results.push(await checkAndroidHome());
+  results.push(await checkJavaHome());
+  results.push(await checkAdbInstallation());
+  results.push(await checkAdbVersion());
+  results.push(await checkEmulator());
+  results.push(await checkConnectedDevices());
+  results.push(await checkAvailableAvds());
+
+  return results;
+}
