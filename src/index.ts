@@ -13,6 +13,44 @@ import { setDebugModeEnabled } from "./utils/debug";
 import { serverConfig } from "./utils/ServerConfig";
 import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
+import { execSync } from "node:child_process";
+
+// Detect port from git branch name for worktree isolation
+// e.g., work/164-feature-name -> port 9164
+function detectPortFromBranch(): number {
+  const basePort = 9000;
+
+  // Check environment variable first (explicit override)
+  const envPort = process.env.AUTO_MOBILE_PORT;
+  if (envPort) {
+    const port = parseInt(envPort, 10);
+    if (!isNaN(port) && port > 0 && port < 65536) {
+      return port;
+    }
+  }
+
+  try {
+    const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"]
+    }).trim();
+
+    // Extract issue number from branch name patterns:
+    // work/164-feature-name, feature/164-name, fix/164, issue-164, etc.
+    const match = branch.match(/\b(\d{1,4})\b/);
+    if (match) {
+      const issueNumber = parseInt(match[1], 10);
+      // Keep port in valid range (9001-9999 for issue numbers 1-999)
+      if (issueNumber > 0 && issueNumber < 1000) {
+        return basePort + issueNumber;
+      }
+    }
+  } catch {
+    // Not in a git repo or git not available, use default
+  }
+
+  return basePort;
+}
 
 // Interface for transport configuration
 interface TransportConfig {
@@ -42,9 +80,10 @@ function parseArgs(): {
   const args = process.argv.slice(2);
 
   // Default transport configuration
+  // Port is auto-detected from git branch for worktree isolation
   const transport: TransportConfig = {
     type: "stdio",
-    port: 9000,
+    port: detectPortFromBranch(),
     host: "localhost"
   };
 
@@ -154,10 +193,28 @@ function parseArgs(): {
   };
 }
 
+// Format uptime in human-readable form
+function formatUptime(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  }
+  return `${seconds}s`;
+}
+
 // Create and start Streamable HTTP server
 async function startStreamableServer(transport: TransportConfig, debug: boolean): Promise<void> {
   const server = createHttpServer();
   const transports = new Map<string, StreamableHTTPServerTransport>();
+
+  // Server instance tracking for health checks and restart detection
+  const serverInstanceId = randomUUID();
+  const serverStartTime = Date.now();
 
   server.on("request", async (req, res) => {
     // CORS headers for development
@@ -172,6 +229,37 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
     }
 
     const url = new URL(req.url!, `http://${req.headers.host}`);
+
+    // Health check endpoint for connection status and restart detection
+    if (url.pathname === "/health" || url.pathname === "/auto-mobile/health") {
+      const uptimeMs = Date.now() - serverStartTime;
+      let branch: string | undefined;
+      try {
+        branch = execSync("git rev-parse --abbrev-ref HEAD", {
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"]
+        }).trim();
+      } catch {
+        // Not in git repo
+      }
+      const health = {
+        status: "ok",
+        server: "AutoMobile",
+        version: "0.0.6",
+        instanceId: serverInstanceId,
+        port: transport.port,
+        branch,
+        uptime: {
+          ms: uptimeMs,
+          human: formatUptime(uptimeMs)
+        },
+        activeSessions: transports.size,
+        transport: "streamable"
+      };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(health, null, 2));
+      return;
+    }
 
     if (url.pathname === "/auto-mobile/streamable") {
       // Get session ID from header
@@ -236,9 +324,16 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
 
         await mcpServer.connect(streamableTransport);
       } else {
-        // Invalid session
+        // Session not found - likely server restarted
+        logger.warn(`Session not found: ${sessionId}. Server may have restarted. Active sessions: ${transports.size}`);
         res.writeHead(404, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "Session not found" }));
+        res.end(JSON.stringify({
+          error: "Session not found",
+          message: "The session may have expired or the server was restarted. Please reinitialize the connection.",
+          hint: "If using mcp-remote, restart the MCP client to establish a new session.",
+          serverInstanceId,
+          activeSessions: transports.size
+        }));
         return;
       }
 
