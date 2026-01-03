@@ -18,7 +18,7 @@ describe("MCP Templates List", () => {
     }
   });
 
-  test("given no templates are registered, endpoint should return an empty list", async function() {
+  test("should return registered resource templates including emulator template", async function() {
 
     const { client } = fixture.getContext();
 
@@ -38,11 +38,18 @@ describe("MCP Templates List", () => {
       params: {}
     }, listResourceTemplatesResponseSchema);
 
-    // Verify empty resource templates list
+    // Verify resource templates list contains the emulator template
     expect(typeof result).toBe("object");
     expect(result).toHaveProperty("resourceTemplates");
     expect(Array.isArray(result.resourceTemplates)).toBe(true);
-    expect(result.resourceTemplates).toHaveLength(0);
+    expect(result.resourceTemplates.length).toBeGreaterThanOrEqual(1);
+
+    // Verify booted devices template is present
+    const bootedDevicesTemplate = result.resourceTemplates.find(
+      (t: any) => t.uriTemplate === "automobile://devices/booted/{platform}"
+    );
+    expect(bootedDevicesTemplate).toBeDefined();
+    expect(bootedDevicesTemplate?.name).toBe("Platform-specific Booted Devices");
   });
 
   test("given a template is registered, endpoint should return a list with that template", async function() {

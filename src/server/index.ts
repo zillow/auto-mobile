@@ -28,6 +28,8 @@ import { registerPlanTools } from "./planTools";
 
 // Import resource registration functions
 import { registerObservationResources } from "./observationResources";
+import { registerBootedDeviceResources } from "./bootedDeviceResources";
+import { registerDeviceImageResources } from "./deviceImageResources";
 
 export interface McpServerOptions {
   debug?: boolean;
@@ -51,6 +53,8 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
 
   // Register all resources
   registerObservationResources();
+  registerBootedDeviceResources();
+  registerDeviceImageResources();
 
   // Only register debug tools when --debug flag is passed
   if (options.debug) {

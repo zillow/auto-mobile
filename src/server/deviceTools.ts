@@ -3,6 +3,7 @@ import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
+import { notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
@@ -122,6 +123,9 @@ export function registerDeviceTools() {
         await progress(100, 100, "Device is ready for use");
       }
 
+      // Notify that booted device resources have changed
+      await notifyBootedDeviceResourcesUpdated();
+
       return createJSONToolResponse({
         message: `${args.device.platform} '${args.device.name}' started and is ready`,
         name: readyDevice.name,
@@ -140,6 +144,10 @@ export function registerDeviceTools() {
     try {
       const deviceUtils = new MultiPlatformDeviceManager();
       await deviceUtils.killDevice(args.device);
+
+      // Notify that booted device resources have changed
+      await notifyBootedDeviceResourcesUpdated();
+
       return createJSONToolResponse({
         message: `${args.device.platform} '${args.device.name}' shutdown successfully`,
         udid: args.device.name,

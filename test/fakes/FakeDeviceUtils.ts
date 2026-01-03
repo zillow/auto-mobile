@@ -5,13 +5,13 @@ import {
   SomePlatform,
   Platform,
 } from "../../src/models";
-import { DeviceUtils } from "../../src/utils/interfaces/DeviceUtils";
+import { PlatformDeviceManager } from "../../src/utils/deviceUtils";
 
 /**
- * Fake implementation of DeviceUtils for testing
+ * Fake implementation of PlatformDeviceManager for testing
  * Allows configuring device states and asserting operations
  */
-export class FakeDeviceUtils implements DeviceUtils {
+export class FakeDeviceUtils implements PlatformDeviceManager {
   private deviceImages: Map<Platform, DeviceInfo[]> = new Map();
   private bootedDevices: Map<Platform, BootedDevice[]> = new Map();
   private runningDeviceNames: Set<string> = new Set();
