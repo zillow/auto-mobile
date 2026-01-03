@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { readFile, unlink } from "node:fs/promises";
-import { existsSync, openSync, closeSync } from "node:fs";
+import { existsSync, openSync, closeSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { logger } from "../utils/logger";
@@ -80,9 +80,11 @@ export class DaemonManager {
       args.push("--debug-perf");
     }
 
-    // Create log file for daemon output
-    const logPath = join(tmpdir(), `auto-mobile-daemon-${process.getuid()}.log`);
-    const logFd = openSync(logPath, "w");
+    // Create secure temp directory with random suffix to prevent symlink attacks
+    const tempDir = mkdtempSync(join(tmpdir(), "auto-mobile-daemon-"));
+    const logPath = join(tempDir, "daemon.log");
+    // Open with restricted permissions (0o600 = owner read/write only)
+    const logFd = openSync(logPath, "w", 0o600);
 
     const daemonProcess = spawn(bunExe, [scriptPath, ...args], {
       detached: true,
