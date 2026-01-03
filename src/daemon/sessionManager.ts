@@ -108,25 +108,45 @@ export class SessionManager {
    *
    * Automatically creates a session if it doesn't exist.
    * Called when --session-uuid is provided to a CLI command.
+   *
+   * @param sessionId - The session UUID
+   * @param devicePool - DevicePool instance for automatic device assignment
    */
   async getOrCreateSession(
     sessionId: string,
-    devicePool: Map<string, string> // deviceId -> sessionId map from DevicePool
+    devicePool?: import("./devicePool").DevicePool
   ): Promise<Session> {
     const existing = this.getSession(sessionId);
     if (existing) {
+      logger.info(`[SessionManager] Found existing session ${sessionId} with device ${existing.assignedDevice}`);
       // Update last used time
       existing.lastUsedAt = Date.now();
+      existing.expiresAt = Date.now() + this.SESSION_TIMEOUT_MS;
       return existing;
     }
 
-    // Need to create new session - find available device
-    // This is done by DevicePool, so we throw here
-    // (DevicePool should call createSession directly)
-    throw new Error(
-      `Session ${sessionId} not found. ` +
-      `Must be created by DevicePool with device assignment.`
-    );
+    logger.info(`[SessionManager] Creating new session ${sessionId}, calling devicePool.assignDeviceToSession()`);
+
+    // Need to create new session - assign device from pool
+    if (!devicePool) {
+      throw new Error(
+        `Session ${sessionId} not found and no device pool provided for auto-assignment.`
+      );
+    }
+
+    // DevicePool will call createSession() with assigned device
+    await devicePool.assignDeviceToSession(sessionId);
+
+    // Session now exists, return it
+    const session = this.getSession(sessionId);
+    if (!session) {
+      throw new Error(
+        `Session ${sessionId} creation failed after device assignment`
+      );
+    }
+
+    logger.info(`[SessionManager] Successfully created session ${sessionId} with device ${session.assignedDevice}`);
+    return session;
   }
 
   /**

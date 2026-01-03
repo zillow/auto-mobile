@@ -484,8 +484,10 @@ async function main() {
     }
 
     if (daemonMode) {
+      // Check if --port was explicitly passed, otherwise let daemon use its default
+      const explicitPort = process.argv.includes("--port");
       await startDaemon({
-        port: transport.port,
+        port: explicitPort ? transport.port : undefined,
         host: transport.host,
         debug,
         debugPerf,

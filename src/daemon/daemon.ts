@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "../server";
 import { logger } from "../utils/logger";
+import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
 import { UnixSocketServer } from "./socketServer";
 import { SessionManager } from "./sessionManager";
 import { DevicePool } from "./devicePool";
@@ -62,9 +63,20 @@ export class Daemon {
     await this.startHttpServer();
 
     // Start Unix socket server
+    logger.info(`Daemon host: "${this.host}", port: ${this.port}`);
+    logger.info(`MCP_STREAMABLE_PATH: "${MCP_STREAMABLE_PATH}"`);
     const mcpEndpoint = `http://${this.host}:${this.port}${MCP_STREAMABLE_PATH}`;
+    logger.info(`Creating UnixSocketServer with endpoint: "${mcpEndpoint}"`);
     this.socketServer = new UnixSocketServer(SOCKET_PATH, mcpEndpoint);
+    logger.info("Starting Unix socket server...");
     await this.socketServer.start();
+    logger.info("Unix socket server started");
+
+    // Initialize device pool with discovered devices (async in background)
+    // Don't await to avoid blocking daemon startup
+    this.initializeDevicePool().catch(error => {
+      logger.error(`Failed to initialize device pool in background: ${error}`);
+    });
 
     // Write PID file
     await this.writePidFile();
@@ -84,12 +96,15 @@ export class Daemon {
    * Find an available port in the configured range
    */
   private async findAvailablePort(preferredPort: number): Promise<number> {
-    for (
-      let port = preferredPort;
-      port <= DAEMON_PORT_RANGE_END && port >= DAEMON_PORT_RANGE_START;
-      port++
-    ) {
-      if (await this.isPortAvailable(port)) {
+    // Try preferred port first (faster path)
+    if (await this.isPortAvailable(preferredPort)) {
+      return preferredPort;
+    }
+
+    // If preferred port fails, try a few alternatives
+    for (let i = 1; i <= 3; i++) {
+      const port = preferredPort + i;
+      if (port <= DAEMON_PORT_RANGE_END && await this.isPortAvailable(port)) {
         return port;
       }
     }
@@ -105,13 +120,35 @@ export class Daemon {
   private async isPortAvailable(port: number): Promise<boolean> {
     return new Promise(resolve => {
       const testServer = createHttpServer();
+      let resolved = false;
+
+      // Timeout safety - prevent hanging forever
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          testServer.close(() => {
+            // Ignore error in close
+          });
+          resolve(false); // Assume port is unavailable if timeout
+        }
+      }, 1000); // 1s timeout per port check
+
       testServer.once("error", () => {
-        resolve(false);
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve(false);
+        }
       });
+
       testServer.listen(port, this.host, () => {
-        testServer.close(() => {
-          resolve(true);
-        });
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          testServer.close(() => {
+            resolve(true);
+          });
+        }
       });
     });
   }
@@ -351,6 +388,30 @@ export class Daemon {
       }
     } catch (error) {
       logger.error(`Recovery attempt failed: ${error}`);
+    }
+  }
+
+  /**
+   * Initialize device pool with discovered devices
+   */
+  private async initializeDevicePool(): Promise<void> {
+    try {
+      const deviceManager = new MultiPlatformDeviceManager();
+      const bootedDevices = await deviceManager.getBootedDevices("android");
+
+      const deviceIds = bootedDevices.map(d => d.deviceId);
+
+      if (deviceIds.length > 0) {
+        await this.devicePool.initializeWithDevices(deviceIds);
+        logger.info(`Device pool initialized with ${deviceIds.length} devices: ${deviceIds.join(", ")}`);
+      } else {
+        logger.warn("No devices detected during daemon startup. Device pool is empty.");
+        logger.warn("Start an emulator or connect a physical device before creating sessions.");
+      }
+    } catch (error) {
+      logger.error(`Failed to initialize device pool: ${error}`);
+      // Continue daemon startup even if device discovery fails
+      // Tools will handle "no devices" errors when sessions are created
     }
   }
 

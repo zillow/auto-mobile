@@ -37,10 +37,5 @@ steps:
     label: Confirm alarm time selection
     action: "tap"
 
-  - tool: tapOn
-    text: "Delete"
-    label: Confirm alarm time selection
-    action: "tap"
-
   - tool: terminateApp
     appId: com.google.android.deskclock

@@ -1,5 +1,7 @@
 import { logger } from "../utils/logger";
 import { SessionManager } from "./sessionManager";
+import { ActionableError } from "../models";
+import { Mutex } from "async-mutex";
 
 /**
  * Pooled Device Status
@@ -33,6 +35,7 @@ export interface PooledDevice {
 export class DevicePool {
   private devices: Map<string, PooledDevice> = new Map();
   private sessionManager: SessionManager;
+  private assignmentMutex = new Mutex();
 
   // Max consecutive errors before marking device as failed
   private readonly MAX_DEVICE_ERRORS = 5;
@@ -108,31 +111,47 @@ export class DevicePool {
    *
    * Called when a new session is created or when a session needs to pick a device.
    * Returns the device ID assigned to the session.
+   *
+   * Uses mutex to ensure atomic device assignment and prevent race conditions
+   * when multiple tests run in parallel.
    */
   async assignDeviceToSession(sessionId: string): Promise<string> {
-    // Find first idle device
-    const device = Array.from(this.devices.values()).find(d => d.status === "idle");
+    // Use mutex to ensure only one caller at a time can assign a device
+    // This prevents race conditions where two tests could grab the same device
+    return await this.assignmentMutex.runExclusive(async () => {
+      // Find first idle device
+      const device = Array.from(this.devices.values()).find(d => d.status === "idle");
 
-    if (!device) {
-      throw new Error(
-        `No available devices to assign to session ${sessionId}. ` +
-        `All ${this.devices.size} devices are currently in use.`
-      );
-    }
+      if (!device) {
+        const stats = this.getStats();
+        throw new ActionableError(
+          `No available devices to assign to session ${sessionId}.\n` +
+          `Device pool status:\n` +
+          `  Total devices: ${stats.total}\n` +
+          `  Idle: ${stats.idle}\n` +
+          `  Assigned: ${stats.assigned}\n` +
+          `  Error: ${stats.error}\n\n` +
+          `Suggestions:\n` +
+          `  - Wait for another session to complete and release its device\n` +
+          `  - Start additional emulators or connect more physical devices\n` +
+          `  - Check device pool status: auto-mobile --daemon available-devices`
+        );
+      }
 
-    // Assign to session
-    device.sessionId = sessionId;
-    device.status = "busy";
-    device.lastUsedAt = Date.now();
-    device.assignmentCount++;
-    device.errorCount = 0; // Reset errors on successful assignment
+      // Assign to session
+      device.sessionId = sessionId;
+      device.status = "busy";
+      device.lastUsedAt = Date.now();
+      device.assignmentCount++;
+      device.errorCount = 0; // Reset errors on successful assignment
 
-    // Create session in SessionManager
-    await this.sessionManager.createSession(sessionId, device.id);
+      // Create session in SessionManager
+      await this.sessionManager.createSession(sessionId, device.id);
 
-    logger.info(`Assigned device ${device.id} to session ${sessionId}`);
+      logger.info(`Assigned device ${device.id} to session ${sessionId}`);
 
-    return device.id;
+      return device.id;
+    });
   }
 
   /**

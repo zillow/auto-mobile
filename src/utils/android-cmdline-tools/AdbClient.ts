@@ -164,7 +164,9 @@ export class AdbClient implements AdbExecutor {
     const fullCommand = `${baseCommand} ${command}`;
     const startTime = Date.now();
 
-    logger.info(`[ADB] Executing command: ${fullCommand}`);
+    // Log which device is receiving this command for parallel execution debugging
+    const deviceInfo = this.device ? `[DEVICE:${this.device.deviceId}]` : "[NO-DEVICE]";
+    logger.info(`[ADB] ${deviceInfo} Executing: ${command.length > 80 ? command.substring(0, 80) + "..." : command}`);
 
     // Use Promise.race to implement timeout if specified
     if (timeoutMs) {

@@ -90,21 +90,29 @@ class ToolRegistryClass {
       let providedDeviceId = args.deviceId;
       const sessionUuid = args.sessionUuid;
 
+      logger.info(`[ToolRegistry] Tool ${name} called, sessionUuid=${sessionUuid}, daemonInitialized=${DaemonState.getInstance().isInitialized()}`);
+
       // If session UUID provided, resolve device from session
       if (sessionUuid && DaemonState.getInstance().isInitialized()) {
+        logger.info(`[ToolRegistry] Entering session-based device assignment for ${sessionUuid}`);
         const sessionManager = DaemonState.getInstance().getSessionManager();
         const devicePool = DaemonState.getInstance().getDevicePool();
         const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool);
         if (context.deviceId && !providedDeviceId) {
           providedDeviceId = context.deviceId;
+          logger.info(`[ToolRegistry] Resolved device from session: ${providedDeviceId}`);
         }
+      } else if (sessionUuid) {
+        logger.warn(`[ToolRegistry] SessionUuid provided but DaemonState not initialized!`);
       }
 
       // Extract platform from args, default to "android" for backward compatibility
       const platform: SomePlatform = args.platform || "either";
 
       // Ensure device is ready and get the device ID
+      logger.info(`[ToolRegistry] ${name}: Resolving device for platform=${platform}, providedDeviceId=${providedDeviceId}`);
       const device = await this.deviceSessionManager.ensureDeviceReady(platform, providedDeviceId);
+      logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
 
       try {
         // Record tool call for navigation graph correlation
@@ -167,6 +175,13 @@ class ToolRegistryClass {
           }
         }
 
+        // Log tool response for debugging
+        if (response && typeof response === "object") {
+          if ("success" in response) {
+            logger.info(`[ToolRegistry] ${name} result: success=${response.success}${response.success === false ? `, error=${response.error || "unknown"}` : ""}`);
+          }
+        }
+
         // After swipeOn executes with lookFor, update the tool call with scroll position
         if (name === "swipeOn" && args.lookFor && response?.success && response?.found) {
           const scrollPosition = UIStateExtractor.createScrollPosition(args);
@@ -201,6 +216,26 @@ class ToolRegistryClass {
           throw error;
         }
         throw new ActionableError(`Failed to execute tool ${name}: ${error}`);
+      } finally {
+        // Auto-release session after executePlan completes
+        // This frees the device immediately for parallel test execution
+        if (sessionUuid && name === "executePlan" && DaemonState.getInstance().isInitialized()) {
+          try {
+            const sessionManager = DaemonState.getInstance().getSessionManager();
+            const devicePool = DaemonState.getInstance().getDevicePool();
+            const session = sessionManager.getSession(sessionUuid);
+            if (session) {
+              const deviceId = session.assignedDevice;
+              sessionManager.releaseSession(sessionUuid);
+              await devicePool.releaseDevice(deviceId);
+              logger.info(`Auto-released session ${sessionUuid} and freed device ${deviceId} after executePlan`);
+            }
+          } catch (releaseError) {
+            // Don't fail the tool if session release fails
+            // Session will be cleaned up by timeout mechanism
+            logger.warn(`Failed to auto-release session ${sessionUuid}: ${releaseError}`);
+          }
+        }
       }
     };
 

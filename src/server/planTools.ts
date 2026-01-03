@@ -10,18 +10,23 @@ import { Platform } from "../models";
 const executePlanSchema = z.object({
   planContent: z.string().describe("YAML plan content to execute directly"),
   startStep: z.number().default(0).describe("Step index to start execution from (0-based). If not provided or negative, starts from step 0. Will error if beyond range."),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  // Framework parameters for device management (optional)
+  sessionUuid: z.string().optional().describe("Session UUID for parallel test execution"),
+  deviceId: z.string().optional().describe("Specific device ID to use")
 });
 
 // Execute plan from YAML file or content
 const executePlanTool = async (device: BootedDevice, params: {
   planContent: string;
   startStep: number;
-  platform: Platform
+  platform: Platform;
+  sessionUuid?: string;
+  deviceId?: string;
 }): Promise<any> => {
   try {
     logger.info("=== Starting executePlanTool ===");
-    logger.info(`Device: ${device.platform} (${device.id}), Start Step: ${params.startStep}`);
+    logger.info(`Device: ${device.platform} (${device.deviceId}), Start Step: ${params.startStep}, SessionUUID: ${params.sessionUuid}`);
 
     let yamlContent = params.planContent;
     const startStep = params.startStep;
@@ -39,9 +44,9 @@ const executePlanTool = async (device: BootedDevice, params: {
     const plan = importPlanFromYaml(yamlContent);
     logger.info(`Plan parsed successfully: '${plan.name}' with ${plan.steps.length} steps`);
 
-    // Execute the plan
-    logger.info("=== Starting plan execution ===");
-    const result = await executePlan(plan, startStep, params.platform);
+    // Execute the plan with device context
+    logger.info(`=== Starting plan execution on device ${device.deviceId} ===`);
+    const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid);
     logger.info(`Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
 
     const response: ExecutePlanResult = {

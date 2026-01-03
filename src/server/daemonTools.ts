@@ -13,20 +13,30 @@ export function registerDaemonTools(): void {
   // Available Devices Tool
   ToolRegistry.register(
     "daemon_available_devices",
-    "Query the number of available devices in the daemon pool",
+    "Query number of available devices in daemon pool",
     z.object({}).strict(),
     async () => {
-      try {
-        const pool = DaemonState.getInstance().getDevicePool();
-        const idleDevices = pool.getIdleDevices();
+      const state = DaemonState.getInstance();
+      const devicePool = state.getDevicePool();
+
+      if (!devicePool) {
         return createJSONToolResponse({
-          availableDevices: idleDevices.length,
+          message: "Daemon not running or device pool not initialized",
+          availableDevices: 0,
+          totalDevices: 0,
         });
-      } catch (error) {
-        throw new ActionableError(
-          `Failed to query available devices: ${error instanceof Error ? error.message : String(error)}`
-        );
       }
+
+      const stats = devicePool.getStats();
+
+      return createJSONToolResponse({
+        message: `Device pool status: ${stats.idle} idle, ${stats.assigned} assigned, ${stats.error} error (${stats.total} total)`,
+        availableDevices: stats.idle,
+        totalDevices: stats.total,
+        assignedDevices: stats.assigned,
+        errorDevices: stats.error,
+        stats: stats,
+      });
     }
   );
 

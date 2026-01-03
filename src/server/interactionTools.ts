@@ -97,7 +97,9 @@ export interface RotateArgs {
 export const shakeSchema = z.object({
   duration: z.number().optional().describe("Duration of the shake in milliseconds (default: 1000)"),
   intensity: z.number().optional().describe("Intensity of the shake acceleration (default: 100)"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const tapOnSchema = z.object({
@@ -105,7 +107,10 @@ export const tapOnSchema = z.object({
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action to perform on the element"),
   text: z.string().optional().describe("Text to tap on"),
   id: z.string().optional().describe("Element ID to tap on"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  // Framework parameters for device management (optional)
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const dragAndDropSchema = z.object({
@@ -133,72 +138,101 @@ export const swipeOnSchema = z.object({
     text: z.string().optional().describe("Text to look for"),
   }).optional().describe("Swipe until we find a match"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  // Framework parameters for device management (optional)
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const clearTextSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const selectAllTextSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const pressButtonSchema = z.object({
   button: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
     .describe("The button to press"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const openSystemTraySchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const pressKeySchema = z.object({
   key: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
     .describe("The key to press"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const stopAppSchema = z.object({
   appId: z.string().describe("App package ID to stop"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const clearStateSchema = z.object({
   appId: z.string().describe("App package ID to clear state for"),
   clearKeychain: z.boolean().optional().describe("Also clear iOS keychain (iOS only)"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const inputTextSchema = z.object({
   text: z.string().describe("Text to input to the device"),
   imeAction: z.enum(["done", "next", "search", "send", "go", "previous"]).optional()
     .describe("Optional IME action to perform after text input"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const openLinkSchema = z.object({
   url: z.string().describe("URL to open in the default browser"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const imeActionSchema = z.object({
   action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action to perform"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const recentAppsSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const homeScreenSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const rotateSchema = z.object({
   orientation: z.enum(["portrait", "landscape"]).describe("The orientation to set"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 // Register tools

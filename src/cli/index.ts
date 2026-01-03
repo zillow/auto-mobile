@@ -58,7 +58,9 @@ function parseCliArgs(args: string[]): { toolName: string; sessionUuid?: string;
       throw new ActionableError(`Missing value for parameter: ${key}`);
     }
 
-    const paramName = key.slice(2); // Remove '--' prefix
+    // Remove '--' prefix and convert kebab-case to camelCase
+    // e.g., --session-uuid -> sessionUuid
+    const paramName = key.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 
     // Try to parse as JSON, fallback to string
     try {
@@ -133,6 +135,9 @@ async function runToolViaDaemon(
       `Error calling daemon: ${message}. ` +
       `Try: auto-mobile --daemon restart`
     );
+  } finally {
+    // Always close the client connection to prevent connection leaks
+    await client.close();
   }
 }
 
@@ -207,6 +212,9 @@ export async function runCliCommand(args: string[]): Promise<void> {
     logger.debug(`Executing tool via daemon: ${toolName}`);
     const daemonResult = await runToolViaDaemon(toolName, params);
     handleToolResult(daemonResult, toolName);
+
+    // Note: Session cleanup for executePlan now happens automatically on the daemon side
+    // See toolRegistry.ts registerDeviceAware() finally block
 
   } catch (error) {
     if (error instanceof ActionableError) {

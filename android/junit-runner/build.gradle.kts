@@ -89,6 +89,9 @@ tasks.configureEach {
 }
 
 tasks.withType<Test> {
+  // Enable parallel test execution across multiple devices
+  maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
+
   testLogging {
     // Show standard output and error for tests
     showStandardStreams = true

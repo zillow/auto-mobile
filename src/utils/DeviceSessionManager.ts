@@ -31,7 +31,7 @@ export interface DeviceSessionManager {
 
   /**
    * Ensure a device is ready for the specified platform and return its ID
-   * Throws an error if both Android and iOS devices are connected
+   * Throws an error if both Android and iOS devices are connected when auto-detecting platform
    */
   ensureDeviceReady(platform: SomePlatform, providedDeviceId?: string): Promise<BootedDevice>;
 
@@ -173,9 +173,11 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
   /**
    * Ensure a device is ready for the specified platform and return its ID
-   * Throws an error if both Android and iOS devices are connected
+   * Throws an error if both Android and iOS devices are connected when auto-detecting platform
    */
   public async ensureDeviceReady(platform: SomePlatform, providedDeviceId?: string): Promise<BootedDevice> {
+    logger.info(`[DeviceSessionManager] ensureDeviceReady called with platform=${platform}, providedDeviceId=${providedDeviceId}`);
+
     // Detect all connected devices
     const connectedPlatforms = await this.detectConnectedPlatforms();
     logger.info(`Found ${connectedPlatforms.length} connectedPlatform devices`);
@@ -183,13 +185,6 @@ export class DeviceSessionManager implements DeviceSessionManager {
     logger.info(`Found ${androidDevices.length} android devices`);
     const iosDevices = connectedPlatforms.filter(device => device.platform === "ios");
     logger.info(`Found ${iosDevices.length} ios devices`);
-
-    // Check if both platforms have devices - this is not allowed
-    if (androidDevices.length > 0 && iosDevices.length > 0) {
-      throw new ActionableError(
-        "Both Android and iOS devices are connected. Please disconnect devices from one platform to continue."
-      );
-    }
 
     // Get devices for the requested platform
     let platformDevices: BootedDevice[] = [];
@@ -204,6 +199,13 @@ export class DeviceSessionManager implements DeviceSessionManager {
         resolvedPlatform = "ios";
         break;
       default:
+        // Only check for mixed platforms when auto-detecting (not explicitly specified)
+        if (androidDevices.length > 0 && iosDevices.length > 0) {
+          throw new ActionableError(
+            "Both Android and iOS devices are connected. Please disconnect devices from one platform to continue."
+          );
+        }
+
         if (androidDevices.length > 0) {
           platformDevices = androidDevices;
           resolvedPlatform = "android";
@@ -228,13 +230,16 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
       await this.verifyDevice(providedDeviceId, resolvedPlatform);
       this.setCurrentDevice(providedDevice, resolvedPlatform);
+      logger.info(`[DeviceSessionManager] Using provided device: ${providedDeviceId}`);
       return providedDevice;
     }
 
     // If we have a current device for the requested platform, verify it's still ready
     if (this.currentDevice && this.currentPlatform === platform) {
+      logger.info(`[DeviceSessionManager] Found current device: ${this.currentDevice.deviceId}, verifying readiness`);
       try {
         await this.verifyDevice(this.currentDevice.deviceId, platform);
+        logger.info(`[DeviceSessionManager] Using current device: ${this.currentDevice.deviceId}`);
         return this.currentDevice;
       } catch (error) {
         logger.warn(`Current device ${this.currentDevice} is no longer ready: ${error}`);
@@ -244,8 +249,10 @@ export class DeviceSessionManager implements DeviceSessionManager {
     }
 
     // No device set - find or start one for the requested platform
+    logger.info(`[DeviceSessionManager] No current device, finding or starting device for platform ${resolvedPlatform}`);
     const device = await this.findOrStartDevice(resolvedPlatform);
     this.setCurrentDevice(device, resolvedPlatform);
+    logger.info(`[DeviceSessionManager] Using device from findOrStartDevice: ${device.deviceId}`);
     return device;
   }
 

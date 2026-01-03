@@ -3,6 +3,9 @@ package dev.jasonpearson.automobile.junit
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.jvm.java
 import org.junit.runner.notification.Failure
 import org.junit.runner.notification.RunNotifier
@@ -38,6 +41,68 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
     // Proceed with normal execution if devices are available
     super.run(notifier)
+  }
+
+  override fun getChildren(): List<FrameworkMethod> {
+    return super.getChildren()
+  }
+
+  override fun childrenInvoker(notifier: RunNotifier): org.junit.runners.model.Statement {
+    // Get max parallel forks from system property, default to number of available processors
+    val maxParallelForks = SystemPropertyCache.get("junit.parallel.forks",
+      Runtime.getRuntime().availableProcessors().toString()).toIntOrNull() ?: 2
+
+    val children = getChildren()
+
+    println("AutoMobileRunner: childrenInvoker called with ${children.size} children, maxParallelForks=$maxParallelForks")
+
+    // Only parallelize if we have multiple children and parallelism is enabled
+    if (children.size <= 1 || maxParallelForks <= 1) {
+      println("AutoMobileRunner: Using SEQUENTIAL execution (children=${children.size}, forks=$maxParallelForks)")
+      // Fall back to sequential execution
+      return super.childrenInvoker(notifier)
+    }
+
+    println("AutoMobileRunner: Using PARALLEL execution with $maxParallelForks threads")
+
+    // Return a Statement that executes children in parallel
+    return object : org.junit.runners.model.Statement() {
+      override fun evaluate() {
+        // Create thread pool for parallel execution
+        val executor = Executors.newFixedThreadPool(maxParallelForks.coerceAtMost(children.size))
+
+        try {
+          // Submit each test method for parallel execution
+          val futures = children.map { child ->
+            executor.submit {
+              println("[${Thread.currentThread().name}] Starting test: ${describeChild(child).methodName}")
+              // Synchronize notifier access to ensure thread safety
+              runChild(child, SynchronizedRunNotifier(notifier))
+              println("[${Thread.currentThread().name}] Finished test: ${describeChild(child).methodName}")
+            }
+          }
+
+          // Wait for all test methods to complete and collect any exceptions
+          val exceptions = mutableListOf<Throwable>()
+          futures.forEach { future ->
+            try {
+              future.get()
+            } catch (e: Exception) {
+              // Collect exceptions to report after all tests complete
+              exceptions.add(e.cause ?: e)
+            }
+          }
+
+          // If any test failed, throw the first exception
+          if (exceptions.isNotEmpty()) {
+            throw exceptions.first()
+          }
+        } finally {
+          executor.shutdown()
+          executor.awaitTermination(1, TimeUnit.HOURS)
+        }
+      }
+    }
   }
 
   override fun runChild(method: FrameworkMethod, notifier: RunNotifier) {
@@ -148,8 +213,12 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       val base64Content = java.util.Base64.getEncoder().encodeToString(planContent.toByteArray())
       PerformanceTracker.measure("Base64 encoding", base64Start)
 
+      // Generate unique session UUID for this test execution to enable proper device assignment
+      val sessionUuid = UUID.randomUUID().toString()
+      println("[${Thread.currentThread().name}] Generated session UUID: $sessionUuid for test: $testName")
+
       val cmdBuildStart = System.currentTimeMillis()
-      val command = buildAutoMobileExecutePlanCommand(base64Content, annotation)
+      val command = buildAutoMobileExecutePlanCommand(base64Content, annotation, sessionUuid)
       PerformanceTracker.measure("Command building", cmdBuildStart)
 
       // Gate verbose output behind debug mode
@@ -215,11 +284,12 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
   private fun buildAutoMobileExecutePlanCommand(
       base64PlanContent: String,
-      annotation: AutoMobileTest
+      annotation: AutoMobileTest,
+      sessionUuid: String
   ): List<String> {
     // Phase 8: Pre-sized ArrayList to avoid list resizing overhead
-    // Typical command has 8-10 elements depending on options
-    val command = ArrayList<String>(12)
+    // Typical command has 10-12 elements depending on options (including session UUID)
+    val command = ArrayList<String>(14)
 
     // Prefer local development version first (cached to avoid repeated filesystem checks)
     if (localAutoMobileExists()) {
@@ -235,7 +305,8 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
 
     // Use cached system properties to avoid repeated reads
-    val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
+    // Enable debug mode by default for comprehensive logging during parallel execution
+    val debugMode = SystemPropertyCache.getBoolean("automobile.debug", true)
 
     command.add("executePlan")
     // Phase 8: Direct adds with inline string building instead of intermediate list allocation
@@ -243,6 +314,10 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     command.add("base64:$base64PlanContent")
     command.add("--platform")
     command.add("android")
+
+    // Add session UUID to enable proper device assignment in parallel execution
+    command.add("--session-uuid")
+    command.add(sessionUuid)
 
     if (annotation.device != "auto") {
       command.add("--device")
@@ -501,5 +576,46 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
             .forEach { it.delete() }
       }
     }
+  }
+}
+
+/**
+ * Thread-safe wrapper for RunNotifier to ensure synchronized access from parallel test threads.
+ */
+private class SynchronizedRunNotifier(private val delegate: RunNotifier) : RunNotifier() {
+
+  @Synchronized
+  override fun fireTestStarted(description: org.junit.runner.Description) {
+    delegate.fireTestStarted(description)
+  }
+
+  @Synchronized
+  override fun fireTestFinished(description: org.junit.runner.Description) {
+    delegate.fireTestFinished(description)
+  }
+
+  @Synchronized
+  override fun fireTestFailure(failure: Failure) {
+    delegate.fireTestFailure(failure)
+  }
+
+  @Synchronized
+  override fun fireTestAssumptionFailed(failure: Failure) {
+    delegate.fireTestAssumptionFailed(failure)
+  }
+
+  @Synchronized
+  override fun fireTestIgnored(description: org.junit.runner.Description) {
+    delegate.fireTestIgnored(description)
+  }
+
+  @Synchronized
+  override fun addListener(listener: org.junit.runner.notification.RunListener) {
+    delegate.addListener(listener)
+  }
+
+  @Synchronized
+  override fun removeListener(listener: org.junit.runner.notification.RunListener) {
+    delegate.removeListener(listener)
   }
 }

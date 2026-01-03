@@ -33,6 +33,10 @@ export class UnixSocketServer {
   constructor(socketPath: string = SOCKET_PATH, mcpEndpoint: string) {
     this.socketPath = socketPath;
     this.mcpEndpoint = mcpEndpoint;
+    logger.info(`UnixSocketServer initialized with endpoint: "${mcpEndpoint}"`);
+    if (!mcpEndpoint) {
+      logger.error("ERROR: mcpEndpoint is empty or undefined!");
+    }
   }
 
   /**
@@ -153,12 +157,16 @@ export class UnixSocketServer {
           result,
         };
       } catch (error) {
-        logger.error(`Error forwarding request to MCP server:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : "no stack";
+        logger.error(`Error forwarding request to MCP server: ${errorMessage}`);
+        logger.error(`Error stack: ${errorStack}`);
+        logger.error(`Full error: ${JSON.stringify(error)}`);
         return {
           id: request.id,
           type: "mcp_response",
           success: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
         };
       }
     });
@@ -168,9 +176,12 @@ export class UnixSocketServer {
    * Create an MCP client connected to the HTTP server
    */
   private async createMcpClient(): Promise<Client> {
-    const transport = new StreamableHTTPClientTransport({
-      endpoint: this.mcpEndpoint,
-    });
+    logger.info(`Creating MCP client with endpoint: "${this.mcpEndpoint}"`);
+    if (!this.mcpEndpoint) {
+      logger.error(`ERROR: mcpEndpoint is empty or undefined when creating client!`);
+      throw new Error("mcpEndpoint is not set");
+    }
+    const transport = new StreamableHTTPClientTransport(this.mcpEndpoint);
 
     const client = new Client(
       {

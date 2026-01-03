@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { readFile, unlink } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, openSync, closeSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { logger } from "../utils/logger";
 import { ActionableError } from "../models";
 import {
@@ -78,10 +80,17 @@ export class DaemonManager {
       args.push("--debug-perf");
     }
 
+    // Create log file for daemon output
+    const logPath = join(tmpdir(), `auto-mobile-daemon-${process.getuid()}.log`);
+    const logFd = openSync(logPath, "w");
+
     const daemonProcess = spawn(bunExe, [scriptPath, ...args], {
       detached: true,
-      stdio: "ignore", // Don't pipe stdio
+      stdio: ["ignore", logFd, logFd], // Write stdout/stderr to log file
     });
+
+    // Close our reference to the log file (daemon process still has it open)
+    closeSync(logFd);
 
     // Unref so parent process can exit
     daemonProcess.unref();
@@ -99,6 +108,7 @@ export class DaemonManager {
       `Daemon started successfully (PID ${newStatus.pid}, port ${newStatus.port})`
     );
     console.log(`Socket: ${newStatus.socketPath}`);
+    console.log(`Logs: ${logPath}`);
   }
 
   /**

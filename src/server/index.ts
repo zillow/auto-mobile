@@ -24,6 +24,7 @@ import { registerEnvironmentTools } from "./environmentTools";
 import { registerDebugTools } from "./debugTools";
 import { registerNavigationTools } from "./navigationTools";
 import { registerDaemonTools } from "./daemonTools";
+import { registerPlanTools } from "./planTools";
 
 // Import resource registration functions
 import { registerObservationResources } from "./observationResources";
@@ -46,6 +47,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerEnvironmentTools();
   registerNavigationTools();
   registerDaemonTools();
+  registerPlanTools();
 
   // Register all resources
   registerObservationResources();
