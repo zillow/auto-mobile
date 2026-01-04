@@ -289,6 +289,27 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
 
       // Check if this is an initialization request
       const isInitializeRequest = parsedBody && typeof parsedBody === "object" && true && "method" in parsedBody && parsedBody.method === "initialize";
+      const sendJsonRpcError = (message: string, error?: unknown) => {
+        if (res.headersSent) {
+          return;
+        }
+        const id =
+          parsedBody &&
+          typeof parsedBody === "object" &&
+          "id" in parsedBody
+            ? parsedBody.id
+            : null;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32603,
+            message,
+            data: error instanceof Error ? error.message : undefined
+          }
+        }));
+      };
 
       if (sessionId && transports.has(sessionId)) {
         // Use existing transport
@@ -304,7 +325,14 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
         });
 
         // Create and connect MCP server
-        const mcpServer = createMcpServer({ debug });
+        let mcpServer;
+        try {
+          mcpServer = createMcpServer({ debug });
+        } catch (error) {
+          logger.error("Failed to create MCP server:", error);
+          sendJsonRpcError("Server error", error);
+          return;
+        }
 
         // Setup cleanup handlers
         streamableTransport.onclose = () => {
@@ -321,7 +349,15 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
           }
         };
 
-        await mcpServer.connect(streamableTransport);
+        try {
+          logger.info("Connecting MCP server to Streamable HTTP transport");
+          await mcpServer.connect(streamableTransport);
+          logger.info("MCP server connected to Streamable HTTP transport");
+        } catch (error) {
+          logger.error("MCP server connect failed:", error);
+          sendJsonRpcError("Server error", error);
+          return;
+        }
       } else {
         // Session not found - likely server restarted
         logger.warn(`Session not found: ${sessionId}. Server may have restarted. Active sessions: ${transports.size}`);
@@ -337,7 +373,12 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
       }
 
       // Let the transport handle the request
-      await streamableTransport.handleRequest(req, res, parsedBody);
+      try {
+        await streamableTransport.handleRequest(req, res, parsedBody);
+      } catch (error) {
+        logger.error("Streamable HTTP request handling failed:", error);
+        sendJsonRpcError("Server error", error);
+      }
 
     } else {
       // 404 for unknown paths
@@ -613,9 +654,22 @@ async function main() {
     } else {
       // Run as MCP server with STDIO transport (default)
       const stdioTransport = new StdioServerTransport();
-      const server = createMcpServer({ debug });
-      await server.connect(stdioTransport);
-      logger.info("AutoMobile MCP server running on stdio");
+      let server;
+      try {
+        server = createMcpServer({ debug });
+      } catch (error) {
+        logger.error("Failed to create MCP server:", error);
+        throw error;
+      }
+      try {
+        logger.info("Connecting MCP server to stdio transport");
+        await server.connect(stdioTransport);
+        logger.info("MCP server connected to stdio transport");
+        logger.info("AutoMobile MCP server running on stdio");
+      } catch (error) {
+        logger.error("MCP server connect failed:", error);
+        throw error;
+      }
     }
   } catch (err) {
     logger.error("Error initializing server:", err);

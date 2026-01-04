@@ -3,15 +3,41 @@
 Whether you want to contribute to AutoMobile or just want to run the MCP directly from source, this guide will set you
 up for the development environment maintainers use.
 
-## Build from Source
+## Quick Setup (Recommended)
 
-If you're about to build AutoMobile from source for the very first time after cloning you should do the following:
+The easiest way to set up a worktree for development is to use the setup script:
+
+```shell
+# Full setup: build, link, and configure Claude Code
+./scripts/setup-worktree.sh
+
+# Setup and immediately start hot-reload dev server
+./scripts/setup-worktree.sh --dev
+
+# Clean up worktree-specific artifacts
+./scripts/setup-worktree.sh --clean
+```
+
+This script:
+1. Installs dependencies if needed
+2. Builds the project
+3. Creates a unique executable for this worktree (e.g., `auto-mobile-186` for issue #186)
+4. Configures `.claude/settings.local.json` for Claude Code to use this worktree's build
+
+After running the script, restart Claude Code to pick up the new MCP server configuration.
+
+## Manual Setup
+
+If you prefer to set up manually:
 
 ```shell
 bun install
 bun run build
-bun install -g
+bun link
 ```
+
+Note: `bun link` registers the package globally, but only one worktree can be linked at a time.
+For multiple worktrees, use the setup script which creates unique executables per worktree.
 
 ## Hot Reload Development
 
@@ -97,35 +123,59 @@ Response:
 
 ## MCP Client Configuration
 
-### Option 1: Native HTTP (Recommended for Claude Code)
+The setup script automatically creates `.claude/settings.local.json` with the correct configuration.
+If you need to configure manually, here are the options:
 
-Claude Code and other modern MCP clients support direct HTTP connections without needing mcp-remote:
+### Option 1: Direct Executable (Created by setup script)
 
-**Claude Code** (`~/.claude/claude_desktop_config.json` or project `.mcp.json`):
+The setup script creates a worktree-specific executable and configures it in `.claude/settings.local.json`:
+
 ```json
 {
   "mcpServers": {
-    "AutoMobile-dev": {
-      "type": "url",
-      "url": "http://localhost:9000/auto-mobile/streamable"
+    "auto-mobile": {
+      "type": "stdio",
+      "command": "/Users/you/.bun/bin/auto-mobile-186",
+      "args": ["--debug-perf", "--debug"],
+      "env": {
+        "ANDROID_HOME": "/path/to/Android/sdk"
+      }
     }
   }
 }
 ```
 
-### Option 2: Using mcp-remote
+### Option 2: Streamable HTTP (Best for Hot Reload)
+
+For hot-reload development with `bun run dev`, use HTTP transport. Add to your project's
+`.claude/settings.local.json`:
+
+```json
+{
+  "mcpServers": {
+    "auto-mobile": {
+      "type": "url",
+      "url": "http://localhost:9186/auto-mobile/streamable"
+    }
+  }
+}
+```
+
+Replace `9186` with your worktree's port (9000 + issue number).
+
+### Option 3: Using mcp-remote
 
 For MCP clients that only support stdio transport, use mcp-remote as a proxy:
 
 ```json
 {
   "mcpServers": {
-    "AutoMobile-dev": {
+    "auto-mobile": {
       "command": "npx",
       "args": [
         "-y",
         "mcp-remote",
-        "http://localhost:9000/auto-mobile/streamable"
+        "http://localhost:9186/auto-mobile/streamable"
       ]
     }
   }
@@ -133,6 +183,43 @@ For MCP clients that only support stdio transport, use mcp-remote as a proxy:
 ```
 
 ![firebender-mcp-server-setup.png](../img/firebender-mcp-server-setup-dev.png)
+
+## Git Hooks for Automatic Setup
+
+You can configure git hooks to automatically run the setup script when checking out a worktree.
+
+### Post-Checkout Hook
+
+Create `.git/hooks/post-checkout` (or add to existing):
+
+```bash
+#!/bin/bash
+# Auto-setup worktree after checkout
+
+# Only run for branch checkouts (not file checkouts)
+if [ "$3" = "1" ]; then
+    if [ -f "./scripts/setup-worktree.sh" ]; then
+        echo "Running worktree setup..."
+        ./scripts/setup-worktree.sh
+    fi
+fi
+```
+
+Make it executable:
+```bash
+chmod +x .git/hooks/post-checkout
+```
+
+### For Worktrees
+
+For git worktrees, hooks are shared from the main repository. You can also use a global git hook
+or run the setup script manually after creating a new worktree:
+
+```bash
+git worktree add ../work-123-my-feature origin/main
+cd ../work-123-my-feature
+./scripts/setup-worktree.sh
+```
 
 ## Troubleshooting
 
