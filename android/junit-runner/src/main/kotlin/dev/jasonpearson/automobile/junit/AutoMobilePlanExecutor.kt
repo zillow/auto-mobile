@@ -1,10 +1,18 @@
 package dev.jasonpearson.automobile.junit
 
 import java.io.File
+import java.util.UUID
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Internal executor class that handles the actual execution of AutoMobile plans with parameter
- * substitution and CLI integration.
+ * substitution and daemon socket integration.
  */
 internal object AutoMobilePlanExecutor {
 
@@ -113,52 +121,70 @@ internal object AutoMobilePlanExecutor {
       options: AutoMobilePlanExecutionOptions
   ): InternalExecutionResult {
 
-    val command = buildExecutePlanCommand(planContent, options)
+    val json = Json { ignoreUnknownKeys = true }
+    val sessionUuid = UUID.randomUUID().toString()
 
-    if (options.debugMode) {
-      println("Executing command: ${command.joinToString(" ")}")
+    val args = mutableMapOf<String, JsonElement>(
+        "planContent" to JsonPrimitive("base64:" + java.util.Base64.getEncoder().encodeToString(planContent.toByteArray())),
+        "platform" to JsonPrimitive("android"),
+        "startStep" to JsonPrimitive(0),
+        "sessionUuid" to JsonPrimitive(sessionUuid)
+    )
+
+    if (options.device != "auto") {
+      args["deviceId"] = JsonPrimitive(options.device)
     }
 
-    val result = AutoMobileSharedUtils.executeCommand(command, options.timeoutMs)
+    if (options.debugMode) {
+      println("Executing plan via daemon socket: executePlan")
+    }
+
+    val response = DaemonSocketClientManager.callTool("executePlan", JsonObject(args), options.timeoutMs)
+    val outputPayload = response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
+    val parsed = parseDaemonToolResult(response, json)
 
     if (options.debugMode) {
-      println("Command output:\n${result.output}")
-      if (result.errorOutput.isNotEmpty()) {
-        println("Command errors:\n${result.errorOutput}")
+      println("Daemon response:\n$outputPayload")
+      if (!response.error.isNullOrBlank()) {
+        println("Daemon error: ${response.error}")
       }
-      println("Exit code: ${result.exitCode}")
     }
 
-    return if (result.exitCode == 0) {
-      InternalExecutionResult(success = true, exitCode = result.exitCode, output = result.output)
+    return if (response.success && parsed.success) {
+      InternalExecutionResult(success = true, exitCode = 0, output = outputPayload)
     } else {
-      handleFailure(result, options)
+      handleFailure(
+          CommandResult(1, outputPayload, response.error ?: parsed.errorMessage),
+          options)
     }
   }
 
-  private fun buildExecutePlanCommand(
-      planContent: String,
-      options: AutoMobilePlanExecutionOptions
-  ): List<String> {
-    val command = mutableListOf<String>()
-
-    // Check for local development version first
-    val localAutoMobile = java.io.File("../../dist/src/index.js").absoluteFile
-    if (localAutoMobile.exists()) {
-      command.addAll(listOf("bun", localAutoMobile.absolutePath, "--cli"))
-    } else {
-      command.addAll(listOf("bunx", "auto-mobile", "--cli"))
+  private fun parseDaemonToolResult(response: DaemonResponse, json: Json): ParsedToolResult {
+    if (!response.success) {
+      return ParsedToolResult(false, response.error ?: "Daemon returned failure")
     }
 
-    command.add("executePlan")
-    command.addAll(listOf("--planContent", planContent))
-    command.addAll(listOf("--platform", "android"))
-
-    if (options.device != "auto") {
-      command.addAll(listOf("--device", options.device))
+    val resultElement = response.result ?: return ParsedToolResult(false, "Daemon returned empty result")
+    val resultObject = resultElement.jsonObject
+    val contentArray = resultObject["content"]
+    if (contentArray is JsonArray && contentArray.isNotEmpty()) {
+      val first = contentArray[0].jsonObject
+      val type = first["type"]?.jsonPrimitive?.content
+      if (type == "text") {
+        val text = first["text"]?.jsonPrimitive?.content
+        if (text != null) {
+          val parsed = json.parseToJsonElement(text).jsonObject
+          val success = parsed["success"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+          if (success == false) {
+            val errorMessage = parsed["error"]?.jsonPrimitive?.content ?: "AutoMobile plan failed"
+            return ParsedToolResult(false, errorMessage)
+          }
+          return ParsedToolResult(true, "")
+        }
+      }
     }
 
-    return command
+    return ParsedToolResult(false, "Unexpected daemon response format")
   }
 
   private fun handleFailure(
@@ -173,7 +199,7 @@ internal object AutoMobilePlanExecutor {
           exitCode = result.exitCode,
           output = result.output,
           errorMessage =
-              "AutoMobile CLI failed with exit code ${result.exitCode}" +
+              "AutoMobile plan execution failed with exit code ${result.exitCode}" +
                   if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else "")
     }
 
@@ -185,7 +211,7 @@ internal object AutoMobilePlanExecutor {
         exitCode = result.exitCode,
         output = result.output,
         errorMessage =
-            "AutoMobile CLI failed with exit code ${result.exitCode}" +
+            "AutoMobile plan execution failed with exit code ${result.exitCode}" +
                 if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else "",
         aiRecoveryAttempted = false,
         aiRecoverySuccessful = false)
@@ -198,5 +224,10 @@ internal object AutoMobilePlanExecutor {
       val errorMessage: String = "",
       val aiRecoveryAttempted: Boolean = false,
       val aiRecoverySuccessful: Boolean = false
+  )
+
+  private data class ParsedToolResult(
+      val success: Boolean,
+      val errorMessage: String
   )
 }

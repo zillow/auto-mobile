@@ -7,6 +7,13 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.jvm.java
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.runner.notification.Failure
 import org.junit.runner.notification.RunNotifier
 import org.junit.runners.BlockJUnit4ClassRunner
@@ -15,8 +22,8 @@ import org.junit.runners.model.FrameworkMethod
 /**
  * Custom JUnit runner for executing AutoMobile YAML test plans.
  *
- * This runner detects @AutoMobileTest annotations, executes the specified YAML plans using the
- * AutoMobile CLI (via npx), and provides AI-assisted failure recovery. When no plan is provided but
+ * This runner detects @AutoMobileTest annotations, executes the specified YAML plans via the
+ * AutoMobile daemon socket, and provides AI-assisted failure recovery. When no plan is provided but
  * a prompt is specified with AI assistance enabled, it generates a YAML plan from the prompt using
  * the AI agent via AutoMobile MCP server.
  */
@@ -211,6 +218,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
   private fun executeAutoMobilePlan(planPath: String, annotation: AutoMobileTest, testName: String): ExecutionResult {
     val startTime = System.currentTimeMillis()
+    val json = Json { ignoreUnknownKeys = true }
 
     try {
       // Read the YAML plan content (with caching for repeated plans)
@@ -231,32 +239,34 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       val sessionUuid = UUID.randomUUID().toString()
       println("[${Thread.currentThread().name}] Generated session UUID: $sessionUuid for test: $testName")
 
-      val cmdBuildStart = System.currentTimeMillis()
-      val command = buildAutoMobileExecutePlanCommand(base64Content, annotation, sessionUuid)
-      PerformanceTracker.measure("Command building", cmdBuildStart)
+      val requestBuildStart = System.currentTimeMillis()
+      val daemonRequestArgs = buildDaemonExecutePlanArgs(base64Content, annotation, sessionUuid)
+      PerformanceTracker.measure("Daemon request build", requestBuildStart)
 
-      // Gate verbose output behind debug mode
       val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
       if (debugMode) {
-        println("Executing command: ${command.joinToString(" ")}")
+        println("Executing via daemon socket: executePlan")
       }
 
       val execStart = System.currentTimeMillis()
-      val result = AutoMobileSharedUtils.executeCommand(command, annotation.timeoutMs)
-      PerformanceTracker.measure("Command execution", execStart)
+      val response = DaemonSocketClientManager.callTool("executePlan", daemonRequestArgs, annotation.timeoutMs)
+      PerformanceTracker.measure("Daemon request execution", execStart)
 
       val executionTime = System.currentTimeMillis() - startTime
+
+      val outputPayload = response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
+      val parseResult = parseDaemonToolResult(response, json)
 
       // Write log file for this test execution
       val logWriteStart = System.currentTimeMillis()
       val logFile = writeTestLog(
           testName = testName,
           className = klass.simpleName,
-          stdout = result.output,
-          stderr = result.errorOutput,
-          exitCode = result.exitCode,
+          stdout = outputPayload,
+          stderr = response.error ?: "",
+          exitCode = if (response.success && parseResult.success) 0 else 1,
           executionTimeMs = executionTime,
-          success = result.exitCode == 0,
+          success = response.success && parseResult.success,
           performanceMeasurements = PerformanceTracker.getMeasurements()
       )
       PerformanceTracker.measure("Log file write", logWriteStart)
@@ -266,19 +276,19 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         println("Test output written to: ${logFile.absolutePath}")
       }
 
-      val finalResult = if (result.exitCode == 0) {
+      val finalResult = if (response.success && parseResult.success) {
         ExecutionResult(
             success = true,
-            exitCode = result.exitCode,
-            output = result.output,
+            exitCode = 0,
+            output = outputPayload,
             executionTimeMs = executionTime,
             logFile = logFile)
       } else {
         handleFailure(
             annotation,
-            result.exitCode,
-            result.output,
-            result.errorOutput,
+            1,
+            outputPayload,
+            response.error ?: parseResult.errorMessage,
             executionTime,
             logFile)
       }
@@ -296,53 +306,52 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
   }
 
-  private fun buildAutoMobileExecutePlanCommand(
+  private fun buildDaemonExecutePlanArgs(
       base64PlanContent: String,
       annotation: AutoMobileTest,
       sessionUuid: String
-  ): List<String> {
-    // Phase 8: Pre-sized ArrayList to avoid list resizing overhead
-    // Typical command has 10-12 elements depending on options (including session UUID)
-    val command = ArrayList<String>(14)
-
-    // Prefer local development version first (cached to avoid repeated filesystem checks)
-    if (localAutoMobileExists()) {
-      // Phase 8: Direct adds instead of addAll(listOf(...)) to reduce allocations
-      command.add("bun")
-      command.add(localAutoMobilePath)
-      command.add("--cli")
-    } else {
-      // Use bunx for package execution (bunx caches resolution)
-      command.add("bunx")
-      command.add("auto-mobile")
-      command.add("--cli")
-    }
-
-    // Use cached system properties to avoid repeated reads
-    // Enable debug mode by default for comprehensive logging during parallel execution
-    val debugMode = SystemPropertyCache.getBoolean("automobile.debug", true)
-
-    command.add("executePlan")
-    // Phase 8: Direct adds with inline string building instead of intermediate list allocation
-    command.add("--planContent")
-    command.add("base64:$base64PlanContent")
-    command.add("--platform")
-    command.add("android")
-
-    // Add session UUID to enable proper device assignment in parallel execution
-    command.add("--session-uuid")
-    command.add(sessionUuid)
+  ): JsonObject {
+    val values = mutableMapOf<String, kotlinx.serialization.json.JsonElement>(
+        "planContent" to JsonPrimitive("base64:$base64PlanContent"),
+        "platform" to JsonPrimitive("android"),
+        "startStep" to JsonPrimitive(0),
+        "sessionUuid" to JsonPrimitive(sessionUuid)
+    )
 
     if (annotation.device != "auto") {
-      command.add("--device")
-      command.add(annotation.device)
+      values["deviceId"] = JsonPrimitive(annotation.device)
     }
 
-    if (debugMode) {
-      command.add("--debug")
+    return JsonObject(values)
+  }
+
+  private fun parseDaemonToolResult(response: DaemonResponse, json: Json): ParsedToolResult {
+    if (!response.success) {
+      return ParsedToolResult(false, response.error ?: "Daemon returned failure")
     }
 
-    return command
+    val resultElement = response.result ?: return ParsedToolResult(false, "Daemon returned empty result")
+
+    val resultObject = resultElement.jsonObject
+    val contentArray = resultObject["content"]
+    if (contentArray is JsonArray && contentArray.isNotEmpty()) {
+      val first = contentArray[0].jsonObject
+      val type = first["type"]?.jsonPrimitive?.content
+      if (type == "text") {
+        val text = first["text"]?.jsonPrimitive?.content
+        if (text != null) {
+          val parsed = json.parseToJsonElement(text).jsonObject
+          val success = parsed["success"]?.jsonPrimitive?.content?.toBooleanStrictOrNull()
+          if (success == false) {
+            val errorMessage = parsed["error"]?.jsonPrimitive?.content ?: "AutoMobile plan failed"
+            return ParsedToolResult(false, errorMessage)
+          }
+          return ParsedToolResult(true, "")
+        }
+      }
+    }
+
+    return ParsedToolResult(false, "Unexpected daemon response format")
   }
 
   private fun handleFailure(
@@ -362,7 +371,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
           exitCode = exitCode,
           output = output,
           errorMessage = buildString {
-            append("AutoMobile CLI failed with exit code ")
+            append("AutoMobile plan execution failed with exit code ")
             append(exitCode)
             if (errorOutput.isNotEmpty()) {
               append("\nErrors: ")
@@ -394,7 +403,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
           exitCode = exitCode,
           output = output,
           errorMessage = buildString {
-            append("AutoMobile CLI failed and AI recovery unsuccessful")
+            append("AutoMobile plan execution failed and AI recovery unsuccessful")
             if (errorOutput.isNotEmpty()) {
               append("\nErrors: ")
               append(errorOutput)
@@ -416,51 +425,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
   }
 
-  /** Build AutoMobile command - used by tests via reflection */
-  private fun buildAutoMobileCommand(planPath: String, annotation: AutoMobileTest): List<String> {
-    // Phase 8: Pre-sized ArrayList to avoid list resizing
-    val command = ArrayList<String>(10)
-    val useBunx = SystemPropertyCache.getBoolean("automobile.use.bunx", true)
-
-    // Check for local development version first (cached to avoid repeated filesystem checks)
-    if (localAutoMobileExists()) {
-      // Phase 8: Direct adds instead of addAll(listOf(...))
-      command.add("bun")
-      command.add(localAutoMobilePath)
-      command.add("--cli")
-    } else if (useBunx) {
-      command.add("bunx")
-      command.add("auto-mobile")
-      command.add("--cli")
-    } else {
-      command.add("auto-mobile")
-      command.add("--cli")
-    }
-
-    command.add("test")
-    command.add("run")
-    command.add(planPath)
-
-    if (annotation.device != "auto") {
-      command.add("--device")
-      command.add(annotation.device)
-    }
-
-    val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
-    if (debugMode) {
-      command.add("--debug")
-    }
-
-    return command
-  }
-
-  // Cached local AutoMobile file check to avoid repeated filesystem operations
-  private fun localAutoMobileExists(): Boolean = localAutoMobileExistsCache ?: File(localAutoMobilePath).exists().also { localAutoMobileExistsCache = it }
-
-  private val localAutoMobilePath: String
-    get() = File("../../dist/src/index.js").absolutePath
-
-  private var localAutoMobileExistsCache: Boolean? = null
+  
 
   private data class ExecutionResult(
       val success: Boolean,
@@ -471,6 +436,11 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       val aiRecoveryAttempted: Boolean = false,
       val aiRecoverySuccessful: Boolean = false,
       val logFile: File? = null
+  )
+
+  private data class ParsedToolResult(
+      val success: Boolean,
+      val errorMessage: String
   )
 
   class AutoMobileTestException(message: String) : Exception(message)

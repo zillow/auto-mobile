@@ -4,7 +4,7 @@ package dev.jasonpearson.automobile.junit
  * Annotation to mark a test method for execution with AutoMobile YAML plans.
  *
  * The JUnitRunner will detect this annotation and execute the specified YAML plan using the
- * AutoMobile CLI with optional AI-assisted failure recovery.
+ * AutoMobile daemon execution with optional AI-assisted failure recovery.
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)

@@ -1,7 +1,7 @@
 # AutoMobile JUnitRunner
 
 A custom JUnit runner that seamlessly integrates AutoMobile YAML test plans with JUnit test execution, providing
-intelligent failure recovery through AI agent intervention.
+intelligent failure recovery through AI agent intervention and fast daemon socket execution.
 
 ## Features
 
@@ -11,6 +11,7 @@ intelligent failure recovery through AI agent intervention.
 - AI-assisted failure recovery (when enabled)
 - Support for both existing YAML plans and dynamic plan generation from prompts
 - Configurable test execution timeouts and device targeting
+- Long-lived AutoMobile daemon with Unix socket IPC for low overhead per test
 
 ### Plan Execution Methods
 
@@ -63,11 +64,10 @@ When using prompt-based testing:
 
 - `automobile.mcp.server`: MCP server URL (default: `ws://localhost:3000`)
 - `automobile.mcp.max.iterations`: Maximum AI agent iterations (default: `10`)
-- `automobile.cli.path`: Path to AutoMobile CLI (default: uses npx)
-- `automobile.use.npx`: Use npx instead of global installation (default: true)
 - `automobile.debug`: Enable debug logging (default: false)
 - `automobile.ci.mode`: Disable AI assistance in CI environments (default: false)
 - `automobile.plan.max.age.ms`: Max age for generated plans in milliseconds (default: 3600000 - 1 hour)
+- `automobile.daemon.startup.timeout.ms`: Daemon startup timeout in milliseconds (default: 10000)
 
 #### Generated Plans Directory Structure
 
@@ -90,7 +90,7 @@ The runner connects to the AutoMobile MCP server and uses an AI agent to iterati
 2. **AI Agent Session**: Starts AI agent session with the prompt as the goal
 3. **Iterative Exploration**: AI agent uses AutoMobile MCP tools to explore and discover steps
 4. **Plan Generation**: AI agent generates YAML plan based on iterative learning
-5. **Plan Execution**: Generated plan is executed via AutoMobile CLI
+5. **Plan Execution**: Generated plan is executed via AutoMobile daemon socket IPC
 
 **Configuration:**
 
@@ -98,7 +98,7 @@ The runner connects to the AutoMobile MCP server and uses an AI agent to iterati
 - `automobile.mcp.max.iterations`: Maximum AI agent iterations (default: `10`)
 
 **Note**: The AI agent generates plans through iterative exploration using the AutoMobile MCP server, not through direct
-CLI commands.
+direct plan execution commands.
 
 ## Examples
 
@@ -168,7 +168,7 @@ class MixedTests {
 - Basic YAML plan execution via JUnit annotations
 - Prompt-based plan generation framework
 - Generated plan caching and age management
-- CLI integration for plan execution
+- Daemon socket execution for plan runs
 - Configuration via system properties
 - Proper error handling and logging
 
@@ -191,6 +191,7 @@ class MixedTests {
 - Java 11+
 - JUnit 4 or 5
 - AutoMobile MCP server
+- AutoMobile daemon (auto-mobile package via bun/bunx)
 - Access to Android devices/emulators
 
 ## Installation
@@ -203,12 +204,10 @@ dependencies {
 }
 ```
 
-Ensure AutoMobile CLI is available:
+Ensure AutoMobile daemon dependencies are available:
 
 ```bash
-# Option 1: Global installation
+# Ensure bun is installed; the daemon is launched via bun/bunx.
+# The runner will start the daemon automatically when needed.
 npm install -g auto-mobile
-
-# Option 2: npx (automatic fallback)
-# No installation required - uses npx automatically
 ```

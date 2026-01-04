@@ -3,6 +3,8 @@ package dev.jasonpearson.automobile.junit
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Unit tests for the AutoMobileRunner.
@@ -15,7 +17,6 @@ class AutoMobileRunnerTest {
   @After
   fun cleanUp() {
     // Reset system properties after each test to avoid interference
-    System.clearProperty("automobile.use.bunx")
     System.clearProperty("automobile.debug")
     // Clear cached properties and plans to ensure fresh reads
     SystemPropertyCache.clear()
@@ -50,69 +51,27 @@ class AutoMobileRunnerTest {
   }
 
   @Test
-  fun testBuildAutoMobileCommandWithBunx() {
-    System.setProperty("automobile.use.bunx", "true")
-
+  fun testBuildDaemonExecutePlanArgsIncludesDefaults() {
     val runner = AutoMobileRunner(TestTargetClass::class.java)
     val method = TestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
+    val args = runner.invokeBuildDaemonExecutePlanArgs("Zm9v", annotation, "session-123")
 
-    val command = runner.invokeBuildAutoMobileCommand("/path/to/plan.yaml", annotation)
-    val commandStr = command.joinToString(" ")
-
-    // When use.bunx=true, should use bunx (or bun if local dist exists)
-    assertTrue("Command $commandStr should contain 'bun' or 'bunx'",
-        commandStr.contains("bun") || commandStr.contains("bunx"))
-    assertTrue("Command $commandStr should contain '--cli'", commandStr.contains("--cli"))
-    assertTrue("Command $commandStr should contain 'test'", commandStr.contains("test"))
-    assertTrue("Command $commandStr should contain 'run'", commandStr.contains("run"))
-    assertTrue("Command $commandStr should contain plan path", commandStr.contains("/path/to/plan.yaml"))
+    assertEquals("base64:Zm9v", args["planContent"]?.jsonPrimitive?.content)
+    assertEquals("android", args["platform"]?.jsonPrimitive?.content)
+    assertEquals(0, args["startStep"]?.jsonPrimitive?.content?.toInt())
+    assertEquals("session-123", args["sessionUuid"]?.jsonPrimitive?.content)
+    assertNull("deviceId should be omitted when device=auto", args["deviceId"])
   }
 
   @Test
-  fun testBuildAutoMobileCommandWithoutBunx() {
-    System.setProperty("automobile.use.bunx", "false")
-
-    val runner = AutoMobileRunner(TestTargetClass::class.java)
-    val method = TestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
-    val annotation = method.getAnnotation(AutoMobileTest::class.java)
-
-    val command = runner.invokeBuildAutoMobileCommand("/path/to/plan.yaml", annotation)
-    val commandStr = command.joinToString(" ")
-
-    assertTrue(
-        "Command $commandStr should contain 'auto-mobile'", commandStr.contains("auto-mobile"))
-    assertTrue("Command $commandStr should contain 'test'", commandStr.contains("test"))
-    assertTrue("Command $commandStr should contain 'run'", commandStr.contains("run"))
-    assertTrue(
-        "Command $commandStr should contain plan path", commandStr.contains("/path/to/plan.yaml"))
-    assertFalse(
-        "Command $commandStr should NOT contain 'bunx' when disabled", commandStr.contains("bunx"))
-  }
-
-  @Test
-  fun testBuildAutoMobileCommandWithSpecificDevice() {
+  fun testBuildDaemonExecutePlanArgsWithDevice() {
     val runner = AutoMobileRunner(TestTargetClass::class.java)
     val method = TestTargetClass::class.java.getMethod("testWithSpecificDevice")
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
+    val args = runner.invokeBuildDaemonExecutePlanArgs("Zm9v", annotation, "session-456")
 
-    val command = runner.invokeBuildAutoMobileCommand("/path/to/plan.yaml", annotation)
-
-    assertTrue(command.contains("--device"))
-    assertTrue(command.contains("emulator-5554"))
-  }
-
-  @Test
-  fun testBuildAutoMobileCommandWithDebugMode() {
-    System.setProperty("automobile.debug", "true")
-
-    val runner = AutoMobileRunner(TestTargetClass::class.java)
-    val method = TestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
-    val annotation = method.getAnnotation(AutoMobileTest::class.java)
-
-    val command = runner.invokeBuildAutoMobileCommand("/path/to/plan.yaml", annotation)
-
-    assertTrue(command.contains("--debug"))
+    assertEquals("emulator-5554", args["deviceId"]?.jsonPrimitive?.content)
   }
 }
 
@@ -142,16 +101,16 @@ fun AutoMobileRunner.invokeGetPlanPath(annotation: AutoMobileTest): String {
   return method.invoke(this, annotation) as String
 }
 
-fun AutoMobileRunner.invokeBuildAutoMobileCommand(
-    planPath: String,
-    annotation: AutoMobileTest
-): List<String> {
-  val method =
-      this::class
-          .java
-          .getDeclaredMethod(
-              "buildAutoMobileCommand", String::class.java, AutoMobileTest::class.java)
+fun AutoMobileRunner.invokeBuildDaemonExecutePlanArgs(
+    base64PlanContent: String,
+    annotation: AutoMobileTest,
+    sessionUuid: String
+): JsonObject {
+  val method = this::class.java.getDeclaredMethod(
+      "buildDaemonExecutePlanArgs",
+      String::class.java,
+      AutoMobileTest::class.java,
+      String::class.java)
   method.isAccessible = true
-  @Suppress("UNCHECKED_CAST")
-  return method.invoke(this, planPath, annotation) as List<String>
+  return method.invoke(this, base64PlanContent, annotation, sessionUuid) as JsonObject
 }

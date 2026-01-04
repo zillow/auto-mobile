@@ -13,7 +13,7 @@ object AutoMobileSharedUtils {
     val process = ProcessBuilder(command).start()
 
     // CRITICAL FIX: Close stdin immediately to prevent the process from hanging
-    // waiting for input. This is essential for non-interactive CLI tools.
+    // waiting for input. This is essential for non-interactive command execution.
     process.outputStream.close()
 
     // Read output and error streams concurrently to prevent deadlock
@@ -40,7 +40,7 @@ object AutoMobileSharedUtils {
     val output = outputFuture.get(5, TimeUnit.SECONDS)
     val errorOutput = errorFuture.get(5, TimeUnit.SECONDS)
 
-    // Write CLI errors to STDERR so they appear in test logs
+    // Write process errors to STDERR so they appear in test logs
     if (errorOutput.isNotEmpty()) {
       System.err.print(errorOutput)
     }
