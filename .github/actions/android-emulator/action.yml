@@ -35,6 +35,18 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: "zulu"
+        java-version: "21"
+
+    - name: Verify Java version
+      shell: ${{ inputs.shell }}
+      run: |
+        java -version
+        java -XshowSettings:properties -version 2>&1 | awk -F= '/java.specification.version/ {gsub(/ /,"",$2); if ($2+0 < 21) {print "Java 21+ is required"; exit 1}}'
+
     - name: Enable KVM group perms
       shell: ${{ inputs.shell }}
       run: |
