@@ -9,9 +9,6 @@ stateDiagram-v2
     RequestHandler: Request Handler
     DeviceSessionManager: Device Session Manager
     InteractionLoop: Interaction Loop
-    AuthorTest: Author Test
-  
-  
     InitialObserve: Observe
     FinalObserve: Observe
     MoreActions?: More Actions?
@@ -26,8 +23,6 @@ stateDiagram-v2
         RequestHandler --> DeviceSessionManager
         InteractionLoop --> RequestHandler: 🖼️ Processed Results 
         DeviceSessionManager --> InteractionLoop: 📱
-        RequestHandler --> AuthorTest: on App Stopped
-    
     state InteractionLoop {
         InitialObserve --> ExecuteActions
         ExecuteActions --> FinalObserve

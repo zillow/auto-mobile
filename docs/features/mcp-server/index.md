@@ -11,15 +11,12 @@ stateDiagram-v2
   RequestHandler: Request Handler
   DeviceSessionManager: Device Session Manager
   InteractionLoop: Interaction Loop
-  AuthorTest: Author Test
 
   Agent --> RequestHandler
   RequestHandler --> Agent
   RequestHandler --> DeviceSessionManager
   InteractionLoop --> RequestHandler: 🖼️ Processed Results
   DeviceSessionManager --> InteractionLoop: 📱
-  RequestHandler --> AuthorTest: on App Stopped
-
 ```
 
 ## Configuration

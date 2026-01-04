@@ -1,8 +1,7 @@
 # Test Execution - JUnitRunner
 
-Add this test Gradle dependency to all Android apps and libraries in your codebase. You could opt to only add it to some
-modules, but AutoMobile's automatic test authoring will still attempt to place tests in the module it thinks most closely
-matches the UI being tested.
+Add this test Gradle dependency to all Android apps and libraries in your codebase. You can also add it only to the
+modules that cover the UI you want to test.
 
 ```gradle
 testImplementation("dev.jasonpearson.automobile.junitrunner:x.y.z")

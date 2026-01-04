@@ -54,7 +54,6 @@ navigation3 = "1.0.0"              # Used in playground app
 
 # Kotlin ecosystem
 kotlinx-serialization-json = "1.9.0"
-kotlin-poet = "2.2.0"
 appcompat = "1.7.1"
 material = "1.13.0"
 lifecycleViewmodelNavigation3Android = "2.10.0"
@@ -90,8 +89,6 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "build-kotlin-coroutines" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "build-kotlin-datetime" }
 kotlinx-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
-kotlin-poet = { module = "com.squareup:kotlinpoet", version.ref = "kotlin-poet" }
-
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }

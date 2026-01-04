@@ -8,7 +8,6 @@ The first platform supported is Android with plans to extend to iOS.
 **How do I get started?**
 
 - [Installation](installation.md) - Install AutoMobile in your environment or IDE
-- [Test Authoring](features/test-authoring/index.md) - Automatically write tests
 - [Test Execution](features/test-execution/index.md) - Run tests locally or on CI
 
 ```mermaid
@@ -17,15 +16,12 @@ stateDiagram-v2
     RequestHandler: Request Handler
     DeviceSessionManager: Device Session Manager
     InteractionLoop: Interaction Loop
-    AuthorTest: Author Test
     
     Agent --> RequestHandler
     RequestHandler --> Agent
     RequestHandler --> DeviceSessionManager
     InteractionLoop --> RequestHandler: 🖼️ Processed Results 
     DeviceSessionManager --> InteractionLoop: 📱
-    RequestHandler --> AuthorTest: on App Stopped
-    
 ```
 
 **Additional Resources**

@@ -81,9 +81,6 @@ nav:
           - 'Resources': features/mcp-server/resources.md
           - 'Observation': features/mcp-server/observation.md
           - 'Interaction Loop': features/mcp-server/interaction-loop.md
-      - 'Test Authoring':
-          - 'Overview': features/test-authoring/index.md
-          - 'Plan Syntax': features/test-authoring/plan-syntax.md
       - 'Test Execution':
           - 'Overview': features/test-execution/index.md
           - 'JUnitRunner': features/test-execution/junitrunner.md

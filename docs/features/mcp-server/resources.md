@@ -1,6 +1,6 @@
 # Features - MCP Server - Resources
 
-AutoMobile exposes MCP resources that provide direct access to the current device state for test authoring and debugging workflows.
+AutoMobile exposes MCP resources that provide direct access to the current device state for automation and debugging workflows.
 
 ## Available Resources
 

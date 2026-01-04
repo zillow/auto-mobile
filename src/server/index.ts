@@ -36,7 +36,7 @@ export interface McpServerOptions {
 }
 
 export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
-  // Get configuration, device session, and test authoring managers
+  // Get configuration and device session managers
 
   // Register all tool categories
   registerObserveTools();
