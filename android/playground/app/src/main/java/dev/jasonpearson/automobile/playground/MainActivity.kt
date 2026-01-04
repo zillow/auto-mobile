@@ -13,6 +13,7 @@ import dev.jasonpearson.automobile.experimentation.ExperimentRepository
 import dev.jasonpearson.automobile.playground.navigation.AppNavigation
 import dev.jasonpearson.automobile.playground.navigation.DeepLinkManager
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
+import dev.jasonpearson.automobile.sdk.EnableComposeObservableApi
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 
 class MainActivity : ComponentActivity() {
@@ -70,6 +71,7 @@ class MainActivity : ComponentActivity() {
   private fun setComposeContent() {
     Log.d(TAG, "setComposeContent() called with pendingDeepLink: $pendingDeepLink")
     setContent {
+      EnableComposeObservableApi()
       AutoMobileTheme(experimentRepository = experimentRepository) {
         AppNavigation(
             deepLinkUri = pendingDeepLink,

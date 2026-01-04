@@ -28,6 +28,7 @@ export * from "./LaunchAppResult";
 export * from "./LongPressResult";
 export * from "./NavigateToResult";
 export * from "./ObserveResult";
+export * from "./Recomposition";
 export * from "./OpenURLResult";
 export * from "./PinchResult";
 export * from "./Point";

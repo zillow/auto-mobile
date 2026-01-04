@@ -41,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jasonpearson.automobile.design.system.components.AutoMobileLogo
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import kotlinx.coroutines.launch
 
 sealed class OnboardingPage {
@@ -57,6 +58,7 @@ sealed class OnboardingPage {
 /** Main onboarding screen with pager and navigation controls. */
 @Composable
 fun OnboardingScreen(onFinish: () -> Unit) {
+  TrackRecomposition(id = "screen.onboarding", composableName = "OnboardingScreen") {
   val pages: List<OnboardingPage> =
       listOf(
           OnboardingPage.Drawable(
@@ -153,6 +155,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 }
           }
     }
+  }
   }
 }
 

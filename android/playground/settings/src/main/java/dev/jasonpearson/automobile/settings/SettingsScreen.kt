@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import dev.jasonpearson.automobile.settings.ui.EmailEditBottomSheet
 import dev.jasonpearson.automobile.settings.ui.ExperimentsSection
 import dev.jasonpearson.automobile.settings.ui.ProfileTopAppBar
@@ -62,6 +63,7 @@ fun StatisticItem(label: String, value: String) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit = {}) {
+  TrackRecomposition(id = "screen.settings", composableName = "SettingsScreen") {
   val context = LocalContext.current
   val viewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
   val experiments by viewModel.experiments.collectAsStateWithLifecycle()
@@ -205,11 +207,11 @@ fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit 
                                     contentDescription = "Logout",
                                     modifier = Modifier.padding(end = 8.dp))
                                 Text("Logout")
-                              }
-                        }
-                  }
-            }
-      }
+              }
+        }
+  }
+  }
+}
 
   // Email editing bottom sheet
   if (isEditingEmail) {
@@ -221,6 +223,7 @@ fun SettingsScreen(onLogout: () -> Unit, onGuestModeNavigateToLogin: () -> Unit 
           viewModel.saveEmail(tempEmail)
           isEditingEmail = false
         })
+  }
   }
 }
 

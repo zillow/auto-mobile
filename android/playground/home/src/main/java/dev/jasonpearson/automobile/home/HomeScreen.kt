@@ -30,6 +30,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
 import dev.jasonpearson.automobile.discover.DiscoverVideoScreen
 import dev.jasonpearson.automobile.settings.SettingsScreen
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 
 data class BottomNavItem(val label: String, val icon: ImageVector, val route: String)
@@ -44,6 +45,7 @@ fun HomeScreen(
     onLogout: () -> Unit = {},
     onGuestModeNavigateToLogin: () -> Unit = {}
 ) {
+  TrackRecomposition(id = "screen.home", composableName = "HomeScreen") {
   var bottomNavSelection by remember { mutableIntStateOf(initialSelectedTab) }
   HomeScreenCore(
       modifier = modifier,
@@ -54,6 +56,7 @@ fun HomeScreen(
       onNavigateToSlides = onNavigateToSlides,
       onLogout = onLogout,
       onGuestModeNavigateToLogin = onGuestModeNavigateToLogin)
+  }
 }
 
 @Composable

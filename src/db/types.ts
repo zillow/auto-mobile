@@ -201,6 +201,28 @@ export interface MemoryAuditResultsTable {
   created_at: Generated<string>;
 }
 
+// Recomposition metrics tables
+export interface RecompositionMetricsTable {
+  id: Generated<number>;
+  device_id: string;
+  session_id: string;
+  package_name: string;
+  composable_id: string;
+  composable_name: string | null;
+  resource_id: string | null;
+  test_tag: string | null;
+  total_count: number;
+  skip_count: number;
+  rolling_1s_avg: number | null;
+  duration_ms: number | null;
+  likely_cause: string | null;
+  parent_chain_json: string | null;
+  stable_annotated: number | null;
+  remembered_count: number | null;
+  timestamp: string;
+  created_at: Generated<string>;
+}
+
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
@@ -218,6 +240,7 @@ export interface Database {
   memory_thresholds: MemoryThresholdsTable;
   memory_baselines: MemoryBaselinesTable;
   memory_audit_results: MemoryAuditResultsTable;
+  recomposition_metrics: RecompositionMetricsTable;
 }
 
 // Convenience types for each table
@@ -276,3 +299,7 @@ export type MemoryBaselineUpdate = Updateable<MemoryBaselinesTable>;
 export type MemoryAuditResult = Selectable<MemoryAuditResultsTable>;
 export type NewMemoryAuditResult = Insertable<MemoryAuditResultsTable>;
 export type MemoryAuditResultUpdate = Updateable<MemoryAuditResultsTable>;
+
+export type RecompositionMetrics = Selectable<RecompositionMetricsTable>;
+export type NewRecompositionMetrics = Insertable<RecompositionMetricsTable>;
+export type RecompositionMetricsUpdate = Updateable<RecompositionMetricsTable>;

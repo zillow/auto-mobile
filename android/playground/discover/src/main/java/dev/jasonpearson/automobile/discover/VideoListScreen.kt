@@ -35,10 +35,12 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
 import dev.jasonpearson.automobile.mediaplayer.VideoData
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 
 /** MEDIA screen content displaying a scrollable list of videos */
 @Composable
 fun VideoListScreen(onNavigateToVideoPlayer: (String) -> Unit) {
+  TrackRecomposition(id = "screen.videoList", composableName = "VideoListScreen") {
   LazyColumn(
       modifier = Modifier.fillMaxSize(),
       contentPadding = PaddingValues(16.dp),
@@ -47,6 +49,7 @@ fun VideoListScreen(onNavigateToVideoPlayer: (String) -> Unit) {
           VideoCard(video = video, onClick = { onNavigateToVideoPlayer(video.id) })
         }
       }
+  }
 }
 
 @Composable

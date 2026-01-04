@@ -56,11 +56,13 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import dev.jasonpearson.automobile.storage.AnalyticsRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TapScreen() {
+  TrackRecomposition(id = "screen.tap", composableName = "TapScreen") {
   // Analytics tracking
   val context = LocalContext.current
   val analyticsRepository = remember { AnalyticsRepository(context) }
@@ -116,8 +118,9 @@ fun TapScreen() {
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium)
-              }
-        }
+  }
+  }
+}
 
         // Button varieties
         Card(

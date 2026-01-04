@@ -16,6 +16,7 @@ import { ActionableError, BootedDevice, ViewHierarchyResult } from "../models";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
+import { RecompositionTracker } from "../features/performance/RecompositionTracker";
 
 // Type definitions for better TypeScript support
 export interface ClearTextArgs {
@@ -386,6 +387,7 @@ const isSystemTrayOpen = (viewHierarchy?: ViewHierarchyResult): boolean => {
 export function registerInteractionTools() {
   // Tap on handler
   const tapOnHandler = async (device: BootedDevice, args: TapOnArgs, progress?: ProgressCallback) => {
+    RecompositionTracker.getInstance().recordInteraction();
     const tapOnTextCommand = new TapOnElement(device);
     const result = await tapOnTextCommand.execute({
       containerElementId: args.containerElementId,
@@ -437,6 +439,7 @@ export function registerInteractionTools() {
 
   // Press button handler
   const pressButtonHandler = async (device: BootedDevice, args: PressButtonArgs, progress?: ProgressCallback) => {
+    RecompositionTracker.getInstance().recordInteraction();
     try {
       const pressButton = new PressButton(device);
       const result = await pressButton.execute(args.button, progress); // observe = true
@@ -490,6 +493,7 @@ export function registerInteractionTools() {
 
   // SwipeOn handler - unified swipe/scroll tool
   const swipeOnHandler = async (device: BootedDevice, args: SwipeOnArgs, progress?: ProgressCallback) => {
+    RecompositionTracker.getInstance().recordInteraction();
     const swipeOn = new SwipeOn(device);
 
     // Convert SwipeOnArgs to SwipeOnOptions
@@ -535,6 +539,7 @@ export function registerInteractionTools() {
 
   // Press key handler
   const pressKeyHandler = async (device: BootedDevice, args: PressKeyArgs, progress?: ProgressCallback) => {
+    RecompositionTracker.getInstance().recordInteraction();
     const pressButton = new PressButton(device);
     const result = await pressButton.execute(args.key, progress);
 
@@ -547,6 +552,7 @@ export function registerInteractionTools() {
 
   // Input text handler
   const inputTextHandler = async (device: BootedDevice, args: InputTextArgs) => {
+    RecompositionTracker.getInstance().recordInteraction();
     const inputText = new InputText(device);
     const result = await inputText.execute(args.text, args.imeAction);
     return createJSONToolResponse({

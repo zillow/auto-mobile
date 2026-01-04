@@ -22,6 +22,7 @@ import { DeviceCapabilitiesDetector } from "../../utils/DeviceCapabilities";
 import { serverConfig } from "../../utils/ServerConfig";
 import { WcagAudit } from "../accessibility/WcagAudit";
 import { Element } from "../../models/Element";
+import { RecompositionTracker } from "../performance/RecompositionTracker";
 
 /**
  * Interface for cached observe result
@@ -201,6 +202,10 @@ export class ObserveScreen {
     minTimestamp: number = 0
   ): Promise<void> {
     try {
+      if (this.device.platform === "android") {
+        await this.viewHierarchy.configureRecompositionTracking(serverConfig.isUiPerfDebugModeEnabled(), perf);
+      }
+
       const viewHierarchyStart = Date.now();
       const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
       logger.debug("Accessibility service availability cached as: true");
@@ -838,6 +843,9 @@ export class ObserveScreen {
       // Collect all data components with parallelization
       // Note: collectAllData tracks its phases internally, so we just call it directly
       await this.collectAllData(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
+
+      // Attach recomposition metrics if enabled
+      await RecompositionTracker.getInstance().processObservation(result, this.device);
 
       // Run performance audit if enabled
       await this.runPerformanceAudit(result, perf);

@@ -51,6 +51,7 @@ data class UIElementInfo(
     @SerialName("input-type") val inputType: String? = null, // Input type for text fields
     @SerialName("actions") val actions: List<String>? = null, // Available accessibility actions
     @SerialName("extras") val extras: Map<String, String>? = null, // Custom extras from semantics
+    val recomposition: RecompositionEntry? = null,
 
     // Use JsonElement to allow flexible structure matching test expectations
     val node: JsonElement? = null

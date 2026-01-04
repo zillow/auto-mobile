@@ -66,6 +66,7 @@ function parseArgs(): {
   debugPerf: boolean;
   debug: boolean;
   uiPerfMode: boolean;
+  uiPerfDebug: boolean;
   memPerfAuditMode: boolean;
   a11yAuditMode: boolean;
   a11yLevel?: string;
@@ -107,6 +108,7 @@ function parseArgs(): {
 
   // Detect UI performance audit mode
   const uiPerfMode = args.includes("--ui-perf-mode");
+  const uiPerfDebug = args.includes("--ui-perf-debug");
 
   // Detect memory performance audit mode
   const memPerfAuditMode = args.includes("--mem-perf-audit");
@@ -180,6 +182,7 @@ function parseArgs(): {
     debugPerf,
     debug,
     uiPerfMode,
+    uiPerfDebug,
     memPerfAuditMode,
     a11yAuditMode,
     a11yLevel,
@@ -563,6 +566,7 @@ async function main() {
       debugPerf,
       debug,
       uiPerfMode,
+      uiPerfDebug,
       memPerfAuditMode,
       a11yAuditMode,
       a11yLevel,
@@ -590,6 +594,12 @@ async function main() {
     if (uiPerfMode) {
       serverConfig.setUiPerfMode(true);
       logger.info("UI performance audit mode enabled (--ui-perf-mode)");
+    }
+
+    // Enable UI performance debug mode if --ui-perf-debug flag is set
+    if (uiPerfDebug) {
+      serverConfig.setUiPerfDebugMode(true);
+      logger.info("UI performance debug mode enabled (--ui-perf-debug)");
     }
 
     // Enable memory performance audit mode if --mem-perf-audit flag is set

@@ -24,6 +24,7 @@ import dev.jasonpearson.automobile.discover.ui.GridImage
 import dev.jasonpearson.automobile.discover.ui.ReorderableGrid
 import dev.jasonpearson.automobile.discover.ui.SwipeCard
 import dev.jasonpearson.automobile.discover.ui.SwipeableCard
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,6 +80,7 @@ class SwipeScreenViewModel : ViewModel() {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SwipeScreen(viewModel: SwipeScreenViewModel = viewModel()) {
+  TrackRecomposition(id = "screen.swipe", composableName = "SwipeScreen") {
   val swipeCards by viewModel.swipeCards.collectAsState()
   val gridImages by viewModel.gridImages.collectAsState()
 
@@ -113,6 +115,7 @@ fun SwipeScreen(viewModel: SwipeScreenViewModel = viewModel()) {
               onReorder = { fromIndex, toIndex -> viewModel.reorderGridImages(fromIndex, toIndex) })
         }
       }
+  }
 }
 
 @Preview(showBackground = true)

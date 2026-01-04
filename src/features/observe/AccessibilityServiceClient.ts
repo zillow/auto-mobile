@@ -2,7 +2,7 @@ import WebSocket from "ws";
 import { randomBytes } from "crypto";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { BootedDevice, ViewHierarchyResult } from "../../models";
+import { BootedDevice, RecompositionNodeInfo, ViewHierarchyResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -25,6 +25,7 @@ interface AccessibilityNode {
     text?: string;
     "content-desc"?: string;
     "resource-id"?: string;
+    "test-tag"?: string;
     className?: string;
     packageName?: string;
     bounds?: {
@@ -44,6 +45,8 @@ interface AccessibilityNode {
     selected?: string;
     "long-clickable"?: string;
   accessible?: number;
+  extras?: Record<string, string>;
+  recomposition?: RecompositionNodeInfo;
   node?: AccessibilityNode | AccessibilityNode[];
 }
 
@@ -194,6 +197,14 @@ export interface AccessibilityService {
     skipWaitForFresh?: boolean,
     minTimestamp?: number
   ): Promise<ViewHierarchyResult | null>;
+
+  /**
+   * Enable or disable recomposition tracking on the accessibility service.
+   */
+  setRecompositionTrackingEnabled(
+    enabled: boolean,
+    perf?: PerformanceTracker
+  ): Promise<void>;
 
   /**
    * Get the latest hierarchy from cache or wait for fresh data
@@ -402,6 +413,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private portForwardingSetup: boolean = false;
   private lastWebSocketTimeout: number = 0;
   private static readonly WEBSOCKET_TIMEOUT_COOLDOWN_MS = 5000; // Skip WebSocket wait for 5 seconds after timeout
+  private recompositionTrackingConfigured: boolean = false;
+  private recompositionTrackingEnabled: boolean = false;
 
   // Screenshot handling
   private pendingScreenshotResolve: ((result: ScreenshotResult) => void) | null = null;
@@ -1183,6 +1196,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
     if (node["resource-id"]) {
       converted["resource-id"] = node["resource-id"];
     }
+    if (node["test-tag"]) {
+      converted["test-tag"] = node["test-tag"];
+    }
     if (node.className) {
       converted.className = node.className;
     }
@@ -1223,6 +1239,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
     // Preserve the accessible property if it exists
     if ((node as any).accessible !== undefined) {
       converted.accessible = (node as any).accessible;
+    }
+    if (node.extras) {
+      converted.extras = node.extras;
+    }
+    if (node.recomposition) {
+      converted.recomposition = node.recomposition;
     }
 
     // Convert bounds from object format to string format to match XML parser output
@@ -1386,6 +1408,48 @@ export class AccessibilityServiceClient implements AccessibilityService {
   }
 
   /**
+   * Configure recomposition tracking on the accessibility service.
+   */
+  async setRecompositionTrackingEnabled(
+    enabled: boolean,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<void> {
+    if (this.recompositionTrackingConfigured && this.recompositionTrackingEnabled === enabled) {
+      return;
+    }
+
+    const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+    if (!connected) {
+      logger.debug("[ACCESSIBILITY_SERVICE] Skipping recomposition tracking config; WebSocket not connected");
+      return;
+    }
+
+    const sent = this.sendRecompositionTrackingRequest(enabled);
+    if (sent) {
+      this.recompositionTrackingConfigured = true;
+      this.recompositionTrackingEnabled = enabled;
+      logger.info(`[ACCESSIBILITY_SERVICE] Recomposition tracking ${enabled ? "enabled" : "disabled"}`);
+    }
+  }
+
+  private sendRecompositionTrackingRequest(enabled: boolean): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Cannot send recomposition config - WebSocket not connected");
+      return false;
+    }
+
+    try {
+      const requestId = `recomp_${Date.now()}_${generateSecureId()}`;
+      const message = JSON.stringify({ type: "set_recomposition_tracking", requestId, enabled });
+      this.ws.send(message);
+      return true;
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to send recomposition config: ${error}`);
+      return false;
+    }
+  }
+
+  /**
    * Request hierarchy synchronously via WebSocket message
    * Triggers extraction on device which pushes result via WebSocket
    * Falls back to ADB broadcast if WebSocket send fails
@@ -1459,6 +1523,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
         });
         this.portForwardingSetup = false;
       }
+
+      this.recompositionTrackingConfigured = false;
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Error during cleanup: ${error}`);
     }

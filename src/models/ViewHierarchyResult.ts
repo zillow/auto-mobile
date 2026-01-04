@@ -1,4 +1,5 @@
 import { ElementBounds } from "./ElementBounds";
+import { RecompositionMetrics, RecompositionNodeInfo } from "./Recomposition";
 
 /**
  * Represents the ViewHierarchy dump result from a device.
@@ -43,4 +44,8 @@ export interface ViewHierarchyNode {
   $: NodeAttributes;
   node?: ViewHierarchyNode[];
   bounds?: ElementBounds;
+  recomposition?: RecompositionNodeInfo;
+  recompositionMetrics?: RecompositionMetrics;
+  "test-tag"?: string;
+  extras?: Record<string, string>;
 }

@@ -55,6 +55,7 @@ import dev.jasonpearson.automobile.slides.components.VideoPlayerSlideItem
 import dev.jasonpearson.automobile.slides.components.VisualizationSlideItem
 import dev.jasonpearson.automobile.slides.data.getAllSlides
 import dev.jasonpearson.automobile.slides.model.SlideContent
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import kotlinx.coroutines.launch
 
 /**
@@ -69,6 +70,7 @@ fun SlidesScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: (() -> Unit)? = null
 ) {
+  TrackRecomposition(id = "screen.slides", composableName = "SlidesScreen") {
   val context = LocalContext.current
   val configuration = LocalConfiguration.current
   val themeManager = remember(context) { SlidesThemeManager(context) }
@@ -193,6 +195,7 @@ fun SlidesScreen(
                   .size(height = 2.dp, width = 0.dp)
                   .windowInsetsPadding(WindowInsets.navigationBars))
     }
+  }
   }
 }
 

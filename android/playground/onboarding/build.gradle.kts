@@ -47,6 +47,7 @@ dependencies {
   // Storage module
   implementation(projects.playground.storage)
   implementation(projects.playground.experimentation)
+  implementation(projects.autoMobileSdk)
 
   // Design system module
   implementation(projects.playground.design.assets)

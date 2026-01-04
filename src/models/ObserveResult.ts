@@ -8,6 +8,7 @@ import { GfxMetrics } from "./GfxMetrics";
 import { BackStackInfo } from "./BackStack";
 import { PerformanceAuditResult } from "../features/performance/PerformanceAudit";
 import { AccessibilityAuditResult } from "./AccessibilityAudit";
+import { RecompositionSummary } from "./Recomposition";
 
 /**
  * Represents the result of observing the device state
@@ -115,4 +116,9 @@ export interface ObserveResult {
     /** Optional warning when freshness could not be guaranteed */
     warning?: string;
   };
+
+  /**
+   * Compose recomposition summary (when ui-perf-debug is enabled)
+   */
+  recompositionSummary?: RecompositionSummary;
 }

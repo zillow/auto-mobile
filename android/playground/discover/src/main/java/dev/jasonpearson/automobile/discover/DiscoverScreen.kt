@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,6 +30,7 @@ fun DiscoverVideoScreen(
     onNavigateToVideoPlayer: (String) -> Unit,
     initialSelectedSubTab: Int? = null
 ) {
+  TrackRecomposition(id = "screen.discover", composableName = "DiscoverVideoScreen") {
   val tabs: Map<String, @Composable () -> Unit> =
       mapOf(
           "Tap" to { TapScreen() },
@@ -65,6 +67,7 @@ fun DiscoverVideoScreen(
           }
         }
       }
+  }
 }
 
 @Preview(

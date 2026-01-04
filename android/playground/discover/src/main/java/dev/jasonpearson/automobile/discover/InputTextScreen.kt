@@ -47,9 +47,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 
 @Composable
 fun InputTextScreen() {
+  TrackRecomposition(id = "screen.inputText", composableName = "InputTextScreen") {
   // State for various text fields
   var basicText by remember { mutableStateOf("") }
   var emailText by remember { mutableStateOf("") }
@@ -393,6 +395,7 @@ fun InputTextScreen() {
               }
         }
       }
+  }
 }
 
 @Preview(showBackground = true)

@@ -23,7 +23,7 @@ import kotlinx.serialization.json.jsonArray
  * Component responsible for parsing AccessibilityNodeInfo trees and converting them into
  * UIElementInfo objects for automated testing.
  */
-class ViewHierarchyExtractor {
+class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore? = null) {
 
   companion object {
     private const val TAG = "ViewHierarchyExtractor"
@@ -388,6 +388,9 @@ class ViewHierarchyExtractor {
       var inputType: String? = null
       var actions: List<String>? = null
 
+      val extrasMap = extractExtras(node)
+      val testTag = extractTestTag(extrasMap)
+
       // Check direct APIs if available
       if (Build.VERSION.SDK_INT >= 30) {
         stateDescription = node.stateDescription?.toString()
@@ -517,6 +520,14 @@ class ViewHierarchyExtractor {
         rawContentDesc
       }
 
+      val recompositionEntry =
+          if (recompositionStore?.isEnabled() == true &&
+              recompositionStore.isForPackage(node.packageName?.toString())) {
+            recompositionStore.findMatch(extrasMap)
+          } else {
+            null
+          }
+
       val elementInfo =
           UIElementInfo(
               text = text,
@@ -538,6 +549,7 @@ class ViewHierarchyExtractor {
               longClickable = if (node.isLongClickable) "true" else null,
               node = nodeElement,
               stateDescription = stateDescription,
+              testTag = testTag,
               hintText = hintText,
               errorMessage = errorMessage,
               tooltipText = tooltipText,
@@ -548,6 +560,8 @@ class ViewHierarchyExtractor {
               rangeInfo = rangeInfo,
               inputType = inputType,
               actions = actions,
+              extras = extrasMap,
+              recomposition = recompositionEntry,
           )
 
       if (childCount == 0 && !meetsFilterCriteria(elementInfo, textFilter)) {
@@ -704,6 +718,42 @@ class ViewHierarchyExtractor {
     }
   }
 
+  private fun extractExtras(node: AccessibilityNodeInfo): Map<String, String>? {
+    val extras = node.extras ?: return null
+    val keys = extras.keySet()
+    if (keys.isNullOrEmpty()) return null
+
+    val map = mutableMapOf<String, String>()
+    for (key in keys) {
+      val value = extras.get(key)
+      if (value != null) {
+        map[key] = value.toString()
+      }
+    }
+    return if (map.isEmpty()) null else map
+  }
+
+  private fun extractTestTag(extras: Map<String, String>?): String? {
+    if (extras.isNullOrEmpty()) return null
+
+    val candidates =
+        listOf(
+            "androidx.compose.ui.semantics.testTag",
+            "androidx.compose.ui.semantics.TestTag",
+            "androidx.compose.ui.testTag",
+            "testTag",
+            "test-tag")
+
+    for (key in candidates) {
+      val value = extras[key]
+      if (!value.isNullOrBlank()) {
+        return value
+      }
+    }
+
+    return extras.entries.firstOrNull { it.key.contains("testtag", ignoreCase = true) }?.value
+  }
+
   /** Check if element meets filter criteria (matches test expectations) */
   private fun meetsFilterCriteria(element: UIElementInfo, textFilter: String? = null): Boolean {
     // String filter criteria
@@ -736,7 +786,7 @@ class ViewHierarchyExtractor {
             !element.collectionInfo.isNullOrBlank() ||
             !element.collectionItemInfo.isNullOrBlank() ||
             !element.rangeInfo.isNullOrBlank() ||
-            !element.inputType.isNullOrBlank() ||
+        !element.inputType.isNullOrBlank() ||
             !element.actions.isNullOrEmpty() ||
             !element.extras.isNullOrEmpty()
 

@@ -81,6 +81,17 @@ export class ViewHierarchy {
     }
   }
 
+  async configureRecompositionTracking(
+    enabled: boolean,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<void> {
+    if (this.device.platform !== "android") {
+      return;
+    }
+
+    await this.accessibilityServiceClient.setRecompositionTrackingEnabled(enabled, perf);
+  }
+
   /**
    * Parse bounds string to ElementBounds object
    * @param boundsStr - Bounds string in format "[left,top][right,bottom]"
@@ -1072,7 +1083,10 @@ export class ViewHierarchy {
       (props["resource-id"] && props["resource-id"] !== "") ||
       (props.text && props.text !== "") ||
       (props.contentDesc && props.contentDesc !== "") ||
-      (props["content-desc"] && props["content-desc"] !== "")
+      (props["content-desc"] && props["content-desc"] !== "") ||
+      (props["test-tag"] && props["test-tag"] !== "") ||
+      props.recomposition ||
+      props.recompositionMetrics
     );
   }
 
@@ -1355,7 +1369,22 @@ export class ViewHierarchy {
 
   cleanNodeProperties(node: any): any {
     const result: any = {};
-    const allowedProperties = ["text", "resourceId", "resource-id", "contentDesc", "content-desc", "clickable", "scrollable", "enabled", "bounds", "accessible"];
+    const allowedProperties = [
+      "text",
+      "resourceId",
+      "resource-id",
+      "contentDesc",
+      "content-desc",
+      "clickable",
+      "scrollable",
+      "enabled",
+      "bounds",
+      "accessible",
+      "test-tag",
+      "extras",
+      "recomposition",
+      "recompositionMetrics"
+    ];
 
     if (node["$"]) {
       const cleanedProps: any = {};

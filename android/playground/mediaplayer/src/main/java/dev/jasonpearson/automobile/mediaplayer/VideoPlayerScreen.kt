@@ -56,6 +56,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 
 sealed class VideoResource {
   data class UriVideo(val uri: Uri) : VideoResource()
@@ -111,6 +112,7 @@ fun VideoPlayerScreen(
     onNavigateBack: () -> Unit,
     viewModel: MediaPlayerViewModel = viewModel()
 ) {
+  TrackRecomposition(id = "screen.videoPlayer", composableName = "VideoPlayerScreen") {
   val context = LocalContext.current
   val activity = LocalActivity.current
   val player by viewModel.playerState.collectAsState()
@@ -213,6 +215,7 @@ fun VideoPlayerScreen(
                 fontWeight = FontWeight.Bold)
           }
     }
+  }
   }
 }
 

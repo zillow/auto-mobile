@@ -54,6 +54,7 @@ dependencies {
   implementation(projects.playground.experimentation)
   implementation(projects.playground.design.system)
   implementation(projects.playground.storage)
+  implementation(projects.autoMobileSdk)
 
   // Kotlin coroutines
   implementation(libs.kotlinx.coroutines)

@@ -53,10 +53,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
+  TrackRecomposition(id = "screen.chat", composableName = "ChatScreen") {
   val messages by viewModel.messages.collectAsState()
   val listState = rememberLazyListState()
   var messageText by remember { mutableStateOf("") }
@@ -128,6 +130,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
           }
         },
         modifier = Modifier.fillMaxWidth())
+  }
   }
 }
 

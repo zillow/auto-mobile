@@ -9,6 +9,7 @@ import type {
 class ServerConfig {
   private static instance: ServerConfig;
   private _uiPerfModeEnabled: boolean = false;
+  private _uiPerfDebugEnabled: boolean = false;
   private _accessibilityAuditConfig: AccessibilityAuditConfig | null = null;
   private _memPerfAuditEnabled: boolean = false;
 
@@ -27,6 +28,14 @@ class ServerConfig {
 
   isUiPerfModeEnabled(): boolean {
     return this._uiPerfModeEnabled;
+  }
+
+  setUiPerfDebugMode(enabled: boolean): void {
+    this._uiPerfDebugEnabled = enabled;
+  }
+
+  isUiPerfDebugModeEnabled(): boolean {
+    return this._uiPerfDebugEnabled;
   }
 
   setAccessibilityAuditConfig(config: AccessibilityAuditConfig | null): void {

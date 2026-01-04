@@ -40,7 +40,8 @@ data class WebSocketRequest(
     // Action parameters (IME or node actions)
     val action: String? = null,  // IME action: done, next, search, send, go, previous; node action: long_click
     // Stale check parameters
-    val sinceTimestamp: Long? = null  // For request_hierarchy_if_stale: extract only if no events since this timestamp
+    val sinceTimestamp: Long? = null,  // For request_hierarchy_if_stale: extract only if no events since this timestamp
+    val enabled: Boolean? = null
 )
 
 /**
@@ -58,7 +59,8 @@ class WebSocketServer(
     private val onRequestSetText: ((requestId: String?, text: String, resourceId: String?) -> Unit)? = null,
     private val onRequestImeAction: ((requestId: String?, action: String) -> Unit)? = null,
     private val onRequestSelectAll: ((requestId: String?) -> Unit)? = null,
-    private val onRequestAction: ((requestId: String?, action: String, resourceId: String?) -> Unit)? = null
+    private val onRequestAction: ((requestId: String?, action: String, resourceId: String?) -> Unit)? = null,
+    private val onSetRecompositionTracking: ((enabled: Boolean) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "WebSocketServer"
@@ -322,6 +324,15 @@ class WebSocketServer(
                         onRequestAction?.invoke(request.requestId, action, request.resourceId)
                     } else {
                         Log.w(TAG, "Action request missing required action")
+                    }
+                }
+                "set_recomposition_tracking" -> {
+                    val enabled = request.enabled
+                    if (enabled != null) {
+                        Log.d(TAG, "Received recomposition tracking toggle: $enabled")
+                        onSetRecompositionTracking?.invoke(enabled)
+                    } else {
+                        Log.w(TAG, "set_recomposition_tracking missing enabled flag")
                     }
                 }
                 else -> {

@@ -31,6 +31,7 @@ import dev.jasonpearson.automobile.design.system.components.AutoMobileText
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileDimensions
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
 import dev.jasonpearson.automobile.login.R
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import dev.jasonpearson.automobile.login.data.LoginRepository
 import kotlinx.coroutines.delay
 
@@ -160,6 +161,7 @@ fun LoginScreenCore(
  */
 @Composable
 fun LoginScreen(userPreferences: Any, onNavigateToHome: () -> Unit, onGuestMode: () -> Unit = {}) {
+  TrackRecomposition(id = "screen.login", composableName = "LoginScreen") {
   val context = LocalContext.current
   val viewModelFactory = remember { LoginViewModelFactory(LoginRepository(context)) }
 
@@ -240,5 +242,6 @@ fun LoginScreenPreviewComposable() {
           onLoginError = { /* Preview login error */ },
           onGuestMode = { /* Preview guest mode */ })
     }
+  }
   }
 }

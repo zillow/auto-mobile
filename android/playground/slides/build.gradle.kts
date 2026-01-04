@@ -61,6 +61,7 @@ dependencies {
 
   implementation(projects.playground.design.system)
   implementation(projects.playground.experimentation)
+  implementation(projects.autoMobileSdk)
 
   // Compose dependencies
   implementation(platform(libs.compose.bom))

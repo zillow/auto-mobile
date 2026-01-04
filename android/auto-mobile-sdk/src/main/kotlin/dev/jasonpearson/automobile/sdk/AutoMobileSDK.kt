@@ -42,6 +42,10 @@ object AutoMobileSDK {
     const val EXTRA_SOURCE = "source"
     const val EXTRA_TIMESTAMP = "timestamp"
     const val EXTRA_APPLICATION_ID = "application_id"
+    const val ACTION_RECOMPOSITION_CONTROL = "dev.jasonpearson.automobile.sdk.RECOMPOSITION_CONTROL"
+    const val ACTION_RECOMPOSITION_SNAPSHOT = "dev.jasonpearson.automobile.sdk.RECOMPOSITION_SNAPSHOT"
+    const val EXTRA_RECOMPOSITION_ENABLED = "enabled"
+    const val EXTRA_RECOMPOSITION_SNAPSHOT = "snapshot_json"
 
     /**
      * Initialize the SDK with application context.
@@ -51,6 +55,7 @@ object AutoMobileSDK {
      */
     fun initialize(context: Context) {
         this.context = context.applicationContext
+        RecompositionTracker.initialize(this.context!!)
     }
 
     /**

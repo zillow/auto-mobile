@@ -53,13 +53,14 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.media3.common.util.UnstableApi
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import kotlinx.coroutines.delay
 
 /** Main media player screen with image and video components. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MediaPlayerScreen() {
-
+  TrackRecomposition(id = "screen.mediaPlayer", composableName = "MediaPlayerScreen") {
   var selectedMediaType by remember { mutableStateOf(MediaType.IMAGE) }
 
   Scaffold(
@@ -107,6 +108,7 @@ fun MediaPlayerScreen() {
               }
             }
       }
+  }
 }
 
 /** Fullscreen media player with auto-hiding controls. */
