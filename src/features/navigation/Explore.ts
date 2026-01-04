@@ -111,6 +111,8 @@ export class Explore extends BaseVisualChange {
   private elementParser: ElementParser;
   private stopReason: string = "";
   private previousScreen: string | null = null;
+  private targetPackageName: string | null = null;
+  private consecutiveOutOfAppCount: number = 0;
 
   // Constants for safety limits
   private static readonly MAX_CONSECUTIVE_BACKS = 5;
@@ -119,6 +121,7 @@ export class Explore extends BaseVisualChange {
   private static readonly DEFAULT_MAX_INTERACTIONS = 200; // Increased to allow thorough exploration
   private static readonly DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private static readonly DEFAULT_RESET_INTERVAL = 15;
+  private static readonly MAX_OUT_OF_APP_ATTEMPTS = 5;
 
   constructor(
     device: BootedDevice,
@@ -160,6 +163,8 @@ export class Explore extends BaseVisualChange {
       this.consecutiveNoChangeCount = 0;
       this.stopReason = "";
       this.previousScreen = null;
+      this.consecutiveOutOfAppCount = 0;
+      this.targetPackageName = options.packageName?.trim() || null;
 
       if (progress) {
         await progress(0, maxInteractions, "Starting exploration...");
@@ -173,6 +178,37 @@ export class Explore extends BaseVisualChange {
       while (this.shouldContinue(maxInteractions, timeoutMs, startTime)) {
         // Get current screen state
         const observation = await this.observeScreen.execute();
+
+        const viewHierarchy = observation.viewHierarchy;
+        if (viewHierarchy && !viewHierarchy.hierarchy.error) {
+          const elements = this.extractAllElements(viewHierarchy);
+          if (this.isPermissionDialog(elements)) {
+            logger.info("[Explore] Detected permission dialog, attempting to dismiss");
+            await this.handlePermissionDialog(elements, progress);
+            continue;
+          }
+        }
+
+        if (!this.targetPackageName) {
+          this.targetPackageName = this.getObservationPackageName(observation);
+          if (this.targetPackageName) {
+            logger.info(`[Explore] Defaulting to foreground package: ${this.targetPackageName}`);
+          }
+        }
+
+        if (this.targetPackageName) {
+          const enforcement = await this.enforceTargetApp(
+            observation,
+            this.targetPackageName,
+            progress
+          );
+          if (enforcement === "handled") {
+            continue;
+          }
+          if (enforcement === "stop") {
+            break;
+          }
+        }
 
         // Check for blocker screens (auth, permissions, etc.) and handle them
         const blockerHandled = await this.detectAndHandleBlockers(observation, progress);
@@ -375,6 +411,50 @@ export class Explore extends BaseVisualChange {
           return this.selectWeighted(unexhaustedElements, mode);
       }
     });
+  }
+
+  private getObservationPackageName(observation: ObserveResult): string | null {
+    const packageName =
+      observation.viewHierarchy?.packageName ??
+      observation.activeWindow?.appId ??
+      null;
+
+    if (!packageName) {
+      return null;
+    }
+
+    const trimmed = packageName.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private async enforceTargetApp(
+    observation: ObserveResult,
+    targetPackageName: string,
+    progress?: ProgressCallback
+  ): Promise<"ok" | "handled" | "stop"> {
+    const currentPackage = this.getObservationPackageName(observation);
+
+    if (!currentPackage || currentPackage === targetPackageName) {
+      this.consecutiveOutOfAppCount = 0;
+      return "ok";
+    }
+
+    this.consecutiveOutOfAppCount++;
+    logger.warn(
+      `[Explore] Foreground package '${currentPackage}' is outside target '${targetPackageName}', attempting to return`
+    );
+
+    await this.handleDeadEnd(progress);
+
+    if (this.consecutiveOutOfAppCount >= Explore.MAX_OUT_OF_APP_ATTEMPTS) {
+      this.stopReason =
+        `Left target app (${targetPackageName}) and could not return after ` +
+        `${Explore.MAX_OUT_OF_APP_ATTEMPTS} attempts`;
+      logger.warn(`[Explore] ${this.stopReason}`);
+      return "stop";
+    }
+
+    return "handled";
   }
 
   /**
