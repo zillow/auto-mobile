@@ -98,4 +98,21 @@ export interface ObserveResult {
    * Contains WCAG 2.1 violation detection and compliance checking
    */
   accessibilityAudit?: AccessibilityAuditResult;
+
+  /**
+   * Freshness metadata for the observation
+   * Helps agents understand if the data reflects a recent interaction
+   */
+  freshness?: {
+    /** Minimum timestamp requested for freshness (milliseconds since epoch, device time if available) */
+    requestedAfter?: number;
+    /** Actual timestamp of the observation (milliseconds since epoch) */
+    actualTimestamp?: number;
+    /** Whether actualTimestamp satisfied requestedAfter (or true when no request was made) */
+    isFresh: boolean;
+    /** How stale the observation was in milliseconds, if stale */
+    staleDurationMs?: number;
+    /** Optional warning when freshness could not be guaranteed */
+    warning?: string;
+  };
 }

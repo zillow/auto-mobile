@@ -397,6 +397,23 @@ export class ObserveScreen {
   }
 
   /**
+   * Resolve observation timestamp in milliseconds (device time if available).
+   */
+  private resolveObservationTimestampMs(result: ObserveResult): number | undefined {
+    const candidate = result.viewHierarchy?.updatedAt ?? result.updatedAt;
+    if (typeof candidate === "number" && !Number.isNaN(candidate)) {
+      return candidate;
+    }
+    if (typeof candidate === "string") {
+      const parsed = Date.parse(candidate);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Get the most recent cached observe result from memory or disk cache
    * @returns Promise<ObserveResult> - The most recent cached observe result
    */
@@ -832,6 +849,21 @@ export class ObserveScreen {
       await perf.track("cacheResult", () => this.cacheObserveResult(result));
 
       perf.end();
+
+      const requestedAfter = minTimestamp > 0 ? minTimestamp : undefined;
+      const actualTimestamp = this.resolveObservationTimestampMs(result);
+      const isFresh = requestedAfter === undefined
+        ? true
+        : actualTimestamp !== undefined && actualTimestamp >= requestedAfter;
+      const staleDurationMs = requestedAfter !== undefined && actualTimestamp !== undefined && actualTimestamp < requestedAfter
+        ? requestedAfter - actualTimestamp
+        : undefined;
+      result.freshness = {
+        requestedAfter,
+        actualTimestamp,
+        isFresh,
+        staleDurationMs
+      };
 
       // Attach performance timing if enabled (with filtering and truncation)
       const timings = perf.getTimings();

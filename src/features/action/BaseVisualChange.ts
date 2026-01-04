@@ -8,6 +8,7 @@ import { ActionableError, BootedDevice, GfxMetrics, ObserveResult } from "../../
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { NodeCryptoService } from "../../utils/crypto";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -97,8 +98,16 @@ export class BaseVisualChange {
       }
     }
 
-    // Record the action start time - used to ensure final observe returns fresh data
-    const actionStartTime = Date.now();
+    // Record the action start time (device time if available) to ensure fresh data
+    const actionStartTime = await perf.track("getActionStartTime", async () => {
+      if (this.device.platform !== "android") {
+        return Date.now();
+      }
+      if (typeof this.adb.getDeviceTimestampMs === "function") {
+        return this.adb.getDeviceTimestampMs();
+      }
+      return Date.now();
+    });
 
     const blockResult = await perf.track("executeBlock", async () => {
       return block(previousObserveResult!);
@@ -180,12 +189,46 @@ export class BaseVisualChange {
     // Use actionStartTime as minTimestamp to ensure we get data captured after the action
     // This prevents returning stale cached data from before the action was executed
     const minTimestamp = options.actionStartTime ?? 0;
+    const retryDelaysMs = [50, 100, 200, 400];
+    const previousHash = this.hashViewHierarchy(previousObserveResult?.viewHierarchy);
 
     perf.serial("finalObserve");
     // Wait for fresh data from accessibility service (skipWaitForFresh=false)
     // This ensures we get observation data that reflects the action that just completed
-    const latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp);
+    let latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp);
     perf.end();
+
+    const shouldRetry = (observation: ObserveResult): boolean => {
+      const isFresh = observation.freshness?.isFresh ?? true;
+      if (minTimestamp > 0 && !isFresh) {
+        return true;
+      }
+      if (!options.changeExpected) {
+        return false;
+      }
+      const currentHash = this.hashViewHierarchy(observation.viewHierarchy);
+      return !!previousHash && !!currentHash && previousHash === currentHash;
+    };
+
+    for (let attempt = 0; attempt < retryDelaysMs.length && shouldRetry(latestObservation); attempt++) {
+      const delayMs = retryDelaysMs[attempt];
+      logger.info(`[BaseVisualChange] Observation appears stale/unchanged, retrying in ${delayMs}ms (attempt ${attempt + 1}/${retryDelaysMs.length})`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      perf.serial(`finalObserve_retry_${attempt + 1}`);
+      latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp);
+      perf.end();
+    }
+
+    if (shouldRetry(latestObservation)) {
+      const warning = minTimestamp > 0
+        ? "Observation may be stale after interaction"
+        : "Observation may not reflect expected visual change";
+      latestObservation.freshness = {
+        ...latestObservation.freshness,
+        warning
+      };
+      logger.warn(`[BaseVisualChange] ${warning}`);
+    }
 
     if (options.changeExpected && latestObservation.viewHierarchy && previousObserveResult && previousObserveResult?.viewHierarchy) {
       blockResult.success = latestObservation.viewHierarchy !== previousObserveResult.viewHierarchy;
@@ -218,5 +261,17 @@ export class BaseVisualChange {
     blockResult.observation = latestObservation;
 
     return blockResult;
+  }
+
+  private hashViewHierarchy(viewHierarchy?: ObserveResult["viewHierarchy"]): string | null {
+    if (!viewHierarchy) {
+      return null;
+    }
+    try {
+      return NodeCryptoService.generateCacheKey(JSON.stringify(viewHierarchy));
+    } catch (error) {
+      logger.debug(`[BaseVisualChange] Failed to hash view hierarchy: ${error}`);
+      return null;
+    }
   }
 }

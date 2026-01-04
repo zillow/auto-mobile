@@ -807,6 +807,35 @@ export class AccessibilityServiceClient implements AccessibilityService {
   }
 
   /**
+   * Determine whether cached data satisfies a minTimestamp requirement.
+   * Prefers device timestamp (updatedAt) when available; falls back to receivedAt otherwise.
+   */
+  private evaluateMinTimestamp(
+    cachedHierarchy: CachedHierarchy,
+    minTimestamp: number,
+    useDeviceTimestamp: boolean
+  ): {
+    isFresh: boolean;
+    updatedAt?: number;
+    updatedAfter: boolean;
+    receivedAfter: boolean;
+    usesUpdatedAt: boolean;
+  } {
+    const updatedAt = cachedHierarchy.hierarchy.updatedAt;
+    const hasUpdatedAt = typeof updatedAt === "number" && !Number.isNaN(updatedAt);
+    const shouldUseUpdatedAt = useDeviceTimestamp && hasUpdatedAt;
+    const updatedAfter = shouldUseUpdatedAt ? updatedAt >= minTimestamp : false;
+    const receivedAfter = !shouldUseUpdatedAt ? cachedHierarchy.receivedAt >= minTimestamp : false;
+    return {
+      isFresh: shouldUseUpdatedAt ? updatedAfter : receivedAfter,
+      updatedAt,
+      updatedAfter,
+      receivedAfter,
+      usesUpdatedAt: shouldUseUpdatedAt
+    };
+  }
+
+  /**
    * Get the latest hierarchy from cache or wait for fresh data
    * @param waitForFresh - If true, wait up to timeout for fresh data
    * @param timeout - Maximum time to wait for fresh data in milliseconds
@@ -849,18 +878,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
         // Use BOTH timestamps to handle clock skew between JavaScript and Android
         // This matches the logic in waitForFreshData()
         if (minTimestamp > 0) {
-          const receivedAfterAction = this.cachedHierarchy.receivedAt >= minTimestamp;
-          const updatedAfterAction = updatedAt >= minTimestamp;
+          const freshness = this.evaluateMinTimestamp(this.cachedHierarchy, minTimestamp, true);
 
-          // Reject cache only if BOTH timestamps indicate stale data
-          // Accept if EITHER timestamp shows data is fresh (handles clock skew)
-          if (!receivedAfterAction && !updatedAfterAction) {
-            logger.debug(`[ACCESSIBILITY_SERVICE] Cache rejected: receivedAt ${this.cachedHierarchy.receivedAt} < ${minTimestamp} AND updatedAt ${updatedAt} < ${minTimestamp} (stale by ${minTimestamp - Math.max(this.cachedHierarchy.receivedAt, updatedAt)}ms)`);
+          if (!freshness.isFresh) {
+            const staleReference = freshness.usesUpdatedAt ? freshness.updatedAt : this.cachedHierarchy.receivedAt;
+            logger.debug(`[ACCESSIBILITY_SERVICE] Cache rejected: ${freshness.usesUpdatedAt ? "updatedAt" : "receivedAt"} ${staleReference} < ${minTimestamp}`);
             // Fall through to wait for fresh data or sync
           } else {
             const isFresh = cacheAge < 1000; // Consider fresh if less than 1 second old
             const duration = Date.now() - startTime;
-            logger.debug(`[ACCESSIBILITY_SERVICE] Cache accepted in ${duration}ms: receivedAt=${this.cachedHierarchy.receivedAt} (>=${minTimestamp}? ${receivedAfterAction}), updatedAt=${updatedAt} (>=${minTimestamp}? ${updatedAfterAction}), age=${cacheAge}ms, fresh=${isFresh}`);
+            logger.debug(
+              `[ACCESSIBILITY_SERVICE] Cache accepted in ${duration}ms: ` +
+              `receivedAt=${this.cachedHierarchy.receivedAt}, ` +
+              `updatedAt=${updatedAt}, age=${cacheAge}ms, fresh=${isFresh}`
+            );
 
             return {
               hierarchy: this.cachedHierarchy.hierarchy,
@@ -890,15 +921,17 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // because the caller requires data newer than minTimestamp (e.g., after an action like inputText)
       // Cache is rejected only if BOTH timestamps indicate stale data (to handle clock skew)
       const cacheRejected = minTimestamp > 0 && this.cachedHierarchy &&
-        this.cachedHierarchy.receivedAt < minTimestamp &&
-        this.cachedHierarchy.hierarchy.updatedAt < minTimestamp;
+        !this.evaluateMinTimestamp(this.cachedHierarchy, minTimestamp, true).isFresh;
       const shouldWait = (waitForFresh || cacheRejected) && (!skipWaitForFresh || cacheRejected) && !this.shouldSkipWebSocketWait();
       if (shouldWait) {
         // Use minTimestamp if provided, otherwise use startTime
         const waitMinTimestamp = minTimestamp > 0 ? minTimestamp : startTime;
+        const useDeviceTimestamp = minTimestamp > 0;
         logger.debug(`[ACCESSIBILITY_SERVICE] Waiting up to ${timeout}ms for fresh hierarchy data (must be newer than ${waitMinTimestamp})`);
 
-        const freshData = await perf.track("waitForFresh", () => this.waitForFreshData(timeout, waitMinTimestamp));
+        const freshData = await perf.track("waitForFresh", () =>
+          this.waitForFreshData(timeout, waitMinTimestamp, useDeviceTimestamp)
+        );
         const duration = Date.now() - startTime;
 
         if (freshData) {
@@ -955,7 +988,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
    * @param minTimestamp - Minimum timestamp the data must have (request start time)
    * @returns CachedHierarchy if fresh data received, null on timeout or screen off
    */
-  private async waitForFreshData(timeout: number, minTimestamp: number): Promise<CachedHierarchy | null> {
+  private async waitForFreshData(
+    timeout: number,
+    minTimestamp: number,
+    useDeviceTimestamp: boolean
+  ): Promise<CachedHierarchy | null> {
     const startTime = this.timer.now();
     const checkInterval = 50; // Check every 50ms
     const screenCheckInterval = 1000; // Check screen state every 1 second
@@ -971,12 +1008,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
         // Check if we received data that was updated AFTER our request started
         // This ensures we get fresh pushed data, not stale cached data
         if (this.cachedHierarchy) {
-          const receivedAfterRequest = this.cachedHierarchy.receivedAt > minTimestamp;
-          const updatedAfterRequest = this.cachedHierarchy.hierarchy.updatedAt > minTimestamp;
+          const freshness = this.evaluateMinTimestamp(this.cachedHierarchy, minTimestamp, useDeviceTimestamp);
 
-          if (receivedAfterRequest || updatedAfterRequest) {
+          if (freshness.isFresh) {
             this.timer.clearInterval(intervalId);
-            logger.debug(`[ACCESSIBILITY_SERVICE] Fresh data received: receivedAt=${this.cachedHierarchy.receivedAt} (>${minTimestamp}? ${receivedAfterRequest}), updatedAt=${this.cachedHierarchy.hierarchy.updatedAt} (>${minTimestamp}? ${updatedAfterRequest})`);
+            logger.debug(`[ACCESSIBILITY_SERVICE] Fresh data received: receivedAt=${this.cachedHierarchy.receivedAt}, updatedAt=${this.cachedHierarchy.hierarchy.updatedAt}`);
             resolve(this.cachedHierarchy);
             return;
           }

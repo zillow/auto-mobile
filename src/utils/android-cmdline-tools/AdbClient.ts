@@ -195,6 +195,37 @@ export class AdbClient implements AdbExecutor {
   }
 
   /**
+   * Get device time in milliseconds since epoch.
+   * Falls back to host time if the device timestamp cannot be retrieved.
+   */
+  async getDeviceTimestampMs(): Promise<number> {
+    try {
+      const result = await this.executeCommand("shell date +%s%3N");
+      const trimmed = result.stdout.trim();
+      const parsed = parseInt(trimmed, 10);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    } catch (error) {
+      logger.debug(`[ADB] Failed to read device time with ms precision: ${error}`);
+    }
+
+    try {
+      const result = await this.executeCommand("shell date +%s");
+      const trimmed = result.stdout.trim();
+      const parsed = parseInt(trimmed, 10);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        return parsed * 1000;
+      }
+    } catch (error) {
+      logger.debug(`[ADB] Failed to read device time in seconds: ${error}`);
+    }
+
+    logger.debug("[ADB] Falling back to host time for device timestamp");
+    return Date.now();
+  }
+
+  /**
    * Internal implementation of command execution
    * @param command - The ADB command to execute
    * @param timeoutMs - Optional timeout in milliseconds
