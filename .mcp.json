@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "auto-mobile": {
+      "command": "bun",
+      "args": ["run", "src/index.ts"]
+    }
+  }
+}
