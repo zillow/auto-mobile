@@ -34,6 +34,10 @@ export class AdbClient implements AdbExecutor {
   private static readonly DEVICE_LIST_CACHE_TTL = 5000; // 5 seconds
   private static readonly MAX_ADB_RETRIES = 3;
 
+  // Static cache for ADB path detection (shared across instances)
+  private static adbPathCache: { path: string, timestamp: number } | null = null;
+  private static readonly ADB_PATH_CACHE_TTL = 60000; // 1 minute - ADB path rarely changes
+
   /**
    * Create an AdbClient instance
    * @param device - Optional device
@@ -71,7 +75,32 @@ export class AdbClient implements AdbExecutor {
    * Get the ADB path asynchronously via detection
    */
   private async getAdbPath(): Promise<string> {
-    // Try to find via Android command line tools detection
+    // 1. Try environment variables first (fastest path)
+    const envPath = this.getFallbackAdbPath();
+    if (envPath !== "adb") {
+      // We got a path from environment variables, verify it exists
+      try {
+        await this.execAsync(`${envPath} version`);
+        logger.debug(`Using ADB from environment: ${envPath}`);
+        return envPath;
+      } catch {
+        logger.debug(`ADB path from environment not working: ${envPath}`);
+      }
+    }
+
+    // 2. Try to find via `which adb` (works in CI environments where adb is in PATH)
+    try {
+      const whichResult = await this.execAsync("which adb");
+      const adbFromPath = whichResult.stdout.trim();
+      if (adbFromPath) {
+        logger.debug(`Found ADB via which: ${adbFromPath}`);
+        return adbFromPath;
+      }
+    } catch {
+      logger.debug("ADB not found via 'which adb'");
+    }
+
+    // 3. Try Android command line tools detection (slower, more comprehensive)
     try {
       const locations = await detectAndroidCommandLineTools();
       const bestLocation = getBestAndroidToolsLocation(locations);
@@ -92,7 +121,9 @@ export class AdbClient implements AdbExecutor {
       logger.debug(`Failed to detect ADB path via Android tools detection: ${error}`);
     }
 
-    return this.getFallbackAdbPath();
+    // 4. Final fallback - just use "adb" and hope it's in PATH
+    logger.debug("Using fallback ADB path: adb");
+    return "adb";
   }
 
   /**
@@ -104,8 +135,21 @@ export class AdbClient implements AdbExecutor {
       return this.adbPath;
     }
 
-    // Update cached path if needed
+    // Check static cache first
+    if (AdbClient.adbPathCache) {
+      const cacheAge = Date.now() - AdbClient.adbPathCache.timestamp;
+      if (cacheAge < AdbClient.ADB_PATH_CACHE_TTL) {
+        this.adbPath = AdbClient.adbPathCache.path;
+        return this.adbPath;
+      }
+    }
+
+    // Detect and cache the path
     const detectedPath = await this.getAdbPath();
+    AdbClient.adbPathCache = {
+      path: detectedPath,
+      timestamp: Date.now()
+    };
     this.adbPath = detectedPath;
     return this.adbPath;
   }

@@ -49,12 +49,26 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
   override fun childrenInvoker(notifier: RunNotifier): org.junit.runners.model.Statement {
     // Get max parallel forks from system property, default to number of available processors
-    val maxParallelForks = SystemPropertyCache.get("junit.parallel.forks",
+    val configuredForks = SystemPropertyCache.get("junit.parallel.forks",
       Runtime.getRuntime().availableProcessors().toString()).toIntOrNull() ?: 2
+
+    // Limit parallelism to the number of available devices to prevent contention
+    // This ensures tests don't compete for limited device resources
+    val deviceCount = AutoMobileSharedUtils.deviceChecker.getDeviceCount()
+    val maxParallelForks = if (deviceCount > 0) {
+      val effectiveForks = configuredForks.coerceAtMost(deviceCount)
+      if (effectiveForks < configuredForks) {
+        println("AutoMobileRunner: Limiting parallelism from $configuredForks to $effectiveForks (only $deviceCount device(s) available)")
+      }
+      effectiveForks
+    } else {
+      // No devices detected - fall back to configured value (tests may fail or be skipped)
+      configuredForks
+    }
 
     val children = getChildren()
 
-    println("AutoMobileRunner: childrenInvoker called with ${children.size} children, maxParallelForks=$maxParallelForks")
+    println("AutoMobileRunner: childrenInvoker called with ${children.size} children, maxParallelForks=$maxParallelForks, deviceCount=$deviceCount")
 
     // Only parallelize if we have multiple children and parallelism is enabled
     if (children.size <= 1 || maxParallelForks <= 1) {

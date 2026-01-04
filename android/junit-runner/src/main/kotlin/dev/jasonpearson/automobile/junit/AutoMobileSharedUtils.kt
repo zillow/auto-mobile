@@ -57,7 +57,7 @@ data class CommandResult(val exitCode: Int, val output: String, val errorOutput:
  * devices via adb.
  */
 class DeviceAvailabilityChecker {
-  @Volatile private var devicesAvailable = false
+  @Volatile private var deviceCount = 0
 
   @Volatile private var checkComplete = false
 
@@ -85,16 +85,14 @@ class DeviceAvailabilityChecker {
 
       if (result.exitCode == 0) {
         // Parse adb devices output to count connected devices
-        val deviceCount =
+        deviceCount =
             result.output
                 .lines()
                 .drop(1) // Skip the "List of devices attached" header
                 .filter { line -> line.trim().isNotEmpty() && line.contains("\t") }
                 .size
 
-        devicesAvailable = deviceCount > 0
-
-        if (devicesAvailable) {
+        if (deviceCount > 0) {
           println("Found $deviceCount connected device(s)")
           println("Device availability check completed successfully")
         } else {
@@ -104,12 +102,12 @@ class DeviceAvailabilityChecker {
         checkComplete = true
       } else {
         println("Warning: Device check failed with exit code ${result.exitCode}")
-        devicesAvailable = false
+        deviceCount = 0
         checkComplete = true
       }
     } catch (e: Exception) {
       println("Error during device availability check: ${e.message}")
-      devicesAvailable = false
+      deviceCount = 0
       checkComplete = true
     }
   }
@@ -118,7 +116,18 @@ class DeviceAvailabilityChecker {
     if (!checkComplete) {
       checkDeviceAvailability()
     }
-    return devicesAvailable
+    return deviceCount > 0
+  }
+
+  /**
+   * Get the number of connected Android devices.
+   * This can be used to limit parallelism to match available devices.
+   */
+  fun getDeviceCount(): Int {
+    if (!checkComplete) {
+      checkDeviceAvailability()
+    }
+    return deviceCount
   }
 
   private fun executeCommand(command: List<String>, timeoutMs: Long): CommandResult {

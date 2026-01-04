@@ -1,14 +1,17 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { SessionManager } from "../../../src/daemon/sessionManager";
 import { DevicePool } from "../../../src/daemon/devicePool";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("Parallel Execution Across Multiple Devices", function() {
   let sessionManager: SessionManager;
   let devicePool: DevicePool;
+  let fakeTimer: FakeTimer;
 
   beforeEach(async function() {
     sessionManager = new SessionManager();
-    devicePool = new DevicePool(sessionManager);
+    fakeTimer = new FakeTimer();
+    devicePool = new DevicePool(sessionManager, fakeTimer);
     await devicePool.initializeWithDevices(["device-1", "device-2", "device-3"]);
   });
 
@@ -54,7 +57,10 @@ describe("Parallel Execution Across Multiple Devices", function() {
       expect(devicePool.getAssignedDevices().length).toBe(3);
     });
 
-    test("should throw error when exceeding device capacity", async function() {
+    test("should throw error when exceeding device capacity after timeout", async function() {
+      // Use manual mode so we can control time advancement
+      fakeTimer.setManualMode();
+
       // Assign devices to all three sessions
       const session1Id = "session-uuid-1";
       const session2Id = "session-uuid-2";
@@ -65,13 +71,23 @@ describe("Parallel Execution Across Multiple Devices", function() {
       await devicePool.assignDeviceToSession(session2Id);
       await devicePool.assignDeviceToSession(session3Id);
 
-      // Attempting a fourth session should fail
-      try {
-        await devicePool.assignDeviceToSession(session4Id);
-        expect.unreachable("Should have thrown an error");
-      } catch (error) {
-        expect((error as Error).message).toContain("No available devices");
+      // Attempting a fourth session should wait, then fail after timeout
+      let error: Error | null = null;
+      const assignPromise = devicePool.assignDeviceToSession(session4Id).catch(e => {
+        error = e as Error;
+      });
+
+      // Advance time past the 60 second timeout with multiple iterations
+      for (let i = 0; i < 70; i++) {
+        fakeTimer.advanceTime(1000);
+        await new Promise(resolve => setImmediate(resolve));
+        if (error) {break;}
       }
+
+      await assignPromise;
+
+      expect(error).not.toBeNull();
+      expect(error!.message).toContain("Timed out waiting for device");
     });
   });
 

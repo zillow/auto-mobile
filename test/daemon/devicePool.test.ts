@@ -1,14 +1,17 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { DevicePool } from "../../src/daemon/devicePool";
 import { SessionManager } from "../../src/daemon/sessionManager";
+import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("DevicePool", () => {
   let devicePool: DevicePool;
   let sessionManager: SessionManager;
+  let fakeTimer: FakeTimer;
 
   beforeEach(() => {
     sessionManager = new SessionManager();
-    devicePool = new DevicePool(sessionManager);
+    fakeTimer = new FakeTimer();
+    devicePool = new DevicePool(sessionManager, fakeTimer);
   });
 
   describe("initializeWithDevices", () => {
@@ -56,16 +59,59 @@ describe("DevicePool", () => {
       expect(device?.errorCount).toBe(0);
     });
 
-    test("should throw error when no devices available", async () => {
+    test("should throw error when no devices available after timeout", async () => {
+      // Use manual mode so we can control time advancement
+      fakeTimer.setManualMode();
+
       await devicePool.initializeWithDevices(["emulator-5554"]);
       await devicePool.assignDeviceToSession("session-1");
-      try {
-        await devicePool.assignDeviceToSession("session-2");
-        expect.unreachable("Should have thrown error");
-      } catch (error) {
-        expect(error instanceof Error).toBe(true);
-        expect((error as Error).message).toContain("No available devices");
+
+      // Start the second assignment (will wait for a device)
+      let error: Error | null = null;
+      const assignPromise = devicePool.assignDeviceToSession("session-2").catch(e => {
+        error = e as Error;
+      });
+
+      // Advance time past the 60 second timeout with multiple iterations
+      // Each iteration advances time, resolves any pending sleeps, and yields
+      for (let i = 0; i < 70; i++) {
+        fakeTimer.advanceTime(1000); // Advance 1 second at a time
+        await new Promise(resolve => setImmediate(resolve));
+        if (error) {break;}
       }
+
+      await assignPromise;
+
+      expect(error).not.toBeNull();
+      expect(error!.message).toContain("Timed out waiting for device");
+    });
+
+    test("should wait and succeed when device becomes available", async () => {
+      // Use manual mode so we can control time advancement
+      fakeTimer.setManualMode();
+
+      await devicePool.initializeWithDevices(["emulator-5554"]);
+      const device1 = await devicePool.assignDeviceToSession("session-1");
+
+      // Start the second assignment (will wait for a device)
+      const assignPromise = devicePool.assignDeviceToSession("session-2");
+
+      // Advance time a few iterations
+      for (let i = 0; i < 5; i++) {
+        fakeTimer.advanceTime(1000);
+        await new Promise(resolve => setImmediate(resolve));
+      }
+
+      // Release the device
+      await devicePool.releaseDevice(device1);
+
+      // Advance time to allow the retry
+      fakeTimer.advanceTime(1000);
+      await new Promise(resolve => setImmediate(resolve));
+
+      // Now the assignment should succeed
+      const device2 = await assignPromise;
+      expect(device2).toBe("emulator-5554");
     });
 
     test("should assign different devices to different sessions", async () => {
