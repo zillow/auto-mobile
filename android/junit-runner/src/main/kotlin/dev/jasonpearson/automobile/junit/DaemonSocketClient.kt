@@ -76,7 +76,7 @@ internal object DaemonSocketClientManager {
 }
 
 internal object DaemonSocketPaths {
-  private const val DEFAULT_DAEMON_STARTUP_TIMEOUT_MS = 10000L
+  private const val DEFAULT_DAEMON_STARTUP_TIMEOUT_MS = 30000L
   private var localAutoMobileExistsCache: Boolean? = null
   private val localAutoMobilePath: String
     get() = File("../../dist/src/index.js").absolutePath
@@ -307,3 +307,25 @@ internal data class DaemonResponse(
 )
 
 internal class DaemonUnavailableException(message: String) : Exception(message)
+
+/**
+ * Interface for checking daemon connectivity.
+ * Allows for easy testing with fakes.
+ */
+internal interface DaemonConnectivityChecker {
+  fun isDaemonAlive(): Boolean
+  fun waitForDaemon(timeoutMs: Long): Boolean
+}
+
+/**
+ * Default implementation that checks actual daemon socket connectivity.
+ */
+internal class DefaultDaemonConnectivityChecker : DaemonConnectivityChecker {
+  override fun isDaemonAlive(): Boolean {
+    return DaemonSocketClient.isAvailable(DaemonSocketPaths.socketPath())
+  }
+
+  override fun waitForDaemon(timeoutMs: Long): Boolean {
+    return DaemonSocketClient.waitForAvailability(DaemonSocketPaths.socketPath(), timeoutMs)
+  }
+}

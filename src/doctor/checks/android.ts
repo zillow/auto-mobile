@@ -73,10 +73,7 @@ export async function checkJavaHome(): Promise<CheckResult> {
 export async function checkAdbInstallation(): Promise<CheckResult> {
   try {
     const adb = new AdbClient();
-    const baseCommand = await adb.getBaseCommand();
-
-    // Extract just the ADB path (remove any device flags)
-    const adbPath = baseCommand.split(" ")[0];
+    const adbPath = await adb.getAdbPathOnly();
 
     return {
       name: "ADB Installation",

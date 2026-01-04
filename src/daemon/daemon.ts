@@ -19,6 +19,7 @@ import { DaemonOptions, PidFileData } from "./types";
 import { writeFile, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { PID_FILE_PATH, DAEMON_VERSION } from "./constants";
+import { executionTracker } from "../server/executionTracker";
 
 /**
  * Main daemon process
@@ -37,6 +38,7 @@ export class Daemon {
   private host: string;
   private debug: boolean;
   private healthCheckTimer: NodeJS.Timeout | null = null;
+  private heartbeatMonitorTimer: NodeJS.Timeout | null = null;
   private sessionManager: SessionManager;
   private devicePool: DevicePool;
 
@@ -86,6 +88,7 @@ export class Daemon {
 
     // Start health check timer (every 30 seconds)
     this.startHealthCheckTimer();
+    this.startHeartbeatMonitor();
 
     logger.info(
       `Daemon started: PID ${process.pid}, socket ${SOCKET_PATH}, HTTP port ${this.port}`
@@ -180,6 +183,44 @@ export class Daemon {
 
       const url = new URL(req.url!, `http://${req.headers.host}`);
 
+      if (url.pathname === "/heartbeat") {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+
+        let body = "";
+        req.on("data", chunk => {
+          body += chunk.toString();
+        });
+
+        await new Promise<void>(resolve => {
+          req.on("end", resolve);
+        });
+
+        let payload: { sessionId?: string } | null = null;
+        try {
+          payload = JSON.parse(body);
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid JSON" }));
+          return;
+        }
+
+        const sessionId = payload?.sessionId;
+        if (!sessionId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Missing sessionId" }));
+          return;
+        }
+
+        this.sessionManager.recordHeartbeat(sessionId);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok" }));
+        return;
+      }
+
       if (url.pathname === MCP_STREAMABLE_PATH) {
         // Get session ID from header
         const sessionId = req.headers["mcp-session-id"] as string | undefined;
@@ -241,10 +282,12 @@ export class Daemon {
           streamableTransport = this.transports.get(sessionId)!;
         } else if (isInitializeRequest || !sessionId) {
           // Create new transport for initialization or when no session ID
+          const sessionContext: { sessionId?: string } = {};
           streamableTransport = new StreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: newSessionId => {
               this.transports.set(newSessionId, streamableTransport);
+              sessionContext.sessionId = newSessionId;
               logger.info(
                 `Streamable HTTP session initialized: ${newSessionId}`
               );
@@ -254,7 +297,7 @@ export class Daemon {
           // Create and connect MCP server
           let mcpServer;
           try {
-            mcpServer = createMcpServer({ debug: this.debug });
+            mcpServer = createMcpServer({ debug: this.debug, sessionContext });
           } catch (error) {
             logger.error("Failed to create MCP server:", error);
             sendJsonRpcError("Server error", error);
@@ -262,21 +305,23 @@ export class Daemon {
           }
 
           // Setup cleanup handlers
-          streamableTransport.onclose = () => {
+          streamableTransport.onclose = async () => {
             if (streamableTransport.sessionId) {
+              const cancelled = await executionTracker.cancelSessionExecutions(streamableTransport.sessionId);
               this.transports.delete(streamableTransport.sessionId);
               logger.info(
-                `Streamable HTTP session closed: ${streamableTransport.sessionId}`
+                `Streamable HTTP session closed: ${streamableTransport.sessionId} (cancelled ${cancelled} executions)`
               );
             }
           };
 
-          streamableTransport.onerror = error => {
+          streamableTransport.onerror = async error => {
             if (streamableTransport.sessionId) {
               logger.error(
                 `Streamable HTTP transport error for session ${streamableTransport.sessionId}:`,
                 error
               );
+              await executionTracker.cancelSessionExecutions(streamableTransport.sessionId);
               this.transports.delete(streamableTransport.sessionId);
             }
           };
@@ -402,6 +447,38 @@ export class Daemon {
   }
 
   /**
+   * Start periodic heartbeat checks to cancel stale sessions
+   */
+  private startHeartbeatMonitor(): void {
+    const HEARTBEAT_CHECK_INTERVAL_MS = 10000;
+
+    this.heartbeatMonitorTimer = setInterval(async () => {
+      const now = Date.now();
+      const sessions = this.sessionManager.getAllSessions();
+
+      for (const session of sessions) {
+        const timeoutMs = session.heartbeatTimeoutMs ?? SessionManager.DEFAULT_HEARTBEAT_TIMEOUT_MS;
+        const lastHeartbeat = session.lastHeartbeat ?? session.lastUsedAt;
+        if (now - lastHeartbeat > timeoutMs) {
+          logger.warn(`Session ${session.sessionId} heartbeat timeout, cancelling`);
+          await this.cancelAndReleaseSession(session.sessionId);
+        }
+      }
+    }, HEARTBEAT_CHECK_INTERVAL_MS);
+
+    this.heartbeatMonitorTimer.unref();
+  }
+
+  private async cancelAndReleaseSession(sessionId: string): Promise<void> {
+    const cancelled = await executionTracker.cancelSessionUuidExecutions(sessionId);
+    const deviceId = await this.sessionManager.releaseSession(sessionId);
+    if (deviceId) {
+      await this.devicePool.releaseDevice(deviceId);
+    }
+    logger.info(`Cancelled session ${sessionId} (${cancelled} executions) and released device ${deviceId ?? "unknown"}`);
+  }
+
+  /**
    * Attempt to recover daemon components
    */
   private async attemptRecovery(): Promise<void> {
@@ -480,6 +557,10 @@ export class Daemon {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
       this.healthCheckTimer = null;
+    }
+    if (this.heartbeatMonitorTimer) {
+      clearInterval(this.heartbeatMonitorTimer);
+      this.heartbeatMonitorTimer = null;
     }
 
     // Close Unix socket server

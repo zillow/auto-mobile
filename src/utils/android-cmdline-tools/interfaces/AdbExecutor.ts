@@ -17,7 +17,8 @@ export interface AdbExecutor {
     command: string,
     timeoutMs?: number,
     maxBuffer?: number,
-    noRetry?: boolean
+    noRetry?: boolean,
+    signal?: AbortSignal
   ): Promise<ExecResult>;
 
   /**

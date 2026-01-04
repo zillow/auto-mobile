@@ -24,12 +24,12 @@ class WebSocketServerTest {
 
     private lateinit var server: WebSocketServer
     private lateinit var testScope: TestScope
-    private val testPort = 8766 // Use different port to avoid conflicts
 
     @Before
     fun setUp() {
         testScope = TestScope()
-        server = WebSocketServer(port = testPort, scope = testScope)
+        // Use port 0 to let OS assign an available port, avoiding conflicts when tests run in parallel
+        server = WebSocketServer(port = 0, scope = testScope)
     }
 
     @After

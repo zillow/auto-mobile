@@ -130,7 +130,8 @@ export class FakeAdbExecutor implements AdbExecutor {
     command: string,
     timeoutMs?: number,
     maxBuffer?: number,
-    noRetry?: boolean
+    noRetry?: boolean,
+    _signal?: AbortSignal
   ): Promise<ExecResult> {
     this.executedCommands.push(command);
 

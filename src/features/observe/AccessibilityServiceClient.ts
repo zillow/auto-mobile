@@ -8,6 +8,7 @@ import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilitySer
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { NavigationGraphManager, NavigationEvent } from "../navigation/NavigationGraphManager";
+import { throwIfAborted } from "../../utils/toolUtils";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -911,7 +912,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
     timeout: number = 100,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
-    minTimestamp: number = 0
+    minTimestamp: number = 0,
+    signal?: AbortSignal
   ): Promise<AccessibilityHierarchyResponse> {
     const startTime = Date.now();
 
@@ -986,13 +988,14 @@ export class AccessibilityServiceClient implements AccessibilityService {
         !this.evaluateMinTimestamp(this.cachedHierarchy, minTimestamp, true).isFresh;
       const shouldWait = (waitForFresh || cacheRejected) && (!skipWaitForFresh || cacheRejected) && !this.shouldSkipWebSocketWait();
       if (shouldWait) {
+        throwIfAborted(signal);
         // Use minTimestamp if provided, otherwise use startTime
         const waitMinTimestamp = minTimestamp > 0 ? minTimestamp : startTime;
         const useDeviceTimestamp = minTimestamp > 0;
         logger.debug(`[ACCESSIBILITY_SERVICE] Waiting up to ${timeout}ms for fresh hierarchy data (must be newer than ${waitMinTimestamp})`);
 
         const freshData = await perf.track("waitForFresh", () =>
-          this.waitForFreshData(timeout, waitMinTimestamp, useDeviceTimestamp)
+          this.waitForFreshData(timeout, waitMinTimestamp, useDeviceTimestamp, signal)
         );
         const duration = Date.now() - startTime;
 
@@ -1053,7 +1056,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private async waitForFreshData(
     timeout: number,
     minTimestamp: number,
-    useDeviceTimestamp: boolean
+    useDeviceTimestamp: boolean,
+    signal?: AbortSignal
   ): Promise<CachedHierarchy | null> {
     const startTime = this.timer.now();
     const checkInterval = 50; // Check every 50ms
@@ -1065,6 +1069,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
     return new Promise(resolve => {
       const intervalId = this.timer.setInterval(() => {
+        if (signal?.aborted) {
+          this.timer.clearInterval(intervalId);
+          resolve(null);
+          return;
+        }
         const elapsed = this.timer.now() - startTime;
 
         // Check if we received data that was updated AFTER our request started
@@ -1094,7 +1103,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
           screenCheckInProgress = true;
           lastScreenCheck = now;
 
-          this.adb.isScreenOn().then(isOn => {
+          this.adb.isScreenOn(signal).then(isOn => {
             screenCheckInProgress = false;
             if (!isOn) {
               this.timer.clearInterval(intervalId);
@@ -1273,13 +1282,15 @@ export class AccessibilityServiceClient implements AccessibilityService {
     queryOptions?: ViewHierarchyQueryOptions,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
-    minTimestamp: number = 0
+    minTimestamp: number = 0,
+    signal?: AbortSignal
   ): Promise<ViewHierarchyResult | null> {
     const startTime = Date.now();
 
     perf.serial("a11yService");
 
     try {
+      throwIfAborted(signal);
       // Check if service is available
       const available = await perf.track("checkAvailable", () =>
         AndroidAccessibilityServiceManager.getInstance(this.device, this.adb).isAvailable()
@@ -1293,7 +1304,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // Get hierarchy from WebSocket service (wait for fresh data on first request, unless skipped)
       const waitForFresh = !skipWaitForFresh && (this.cachedHierarchy === null || !this.cachedHierarchy.fresh);
       const response = await perf.track("getHierarchy", () =>
-        this.getLatestHierarchy(waitForFresh, 100, perf, skipWaitForFresh, minTimestamp)
+        this.getLatestHierarchy(waitForFresh, 100, perf, skipWaitForFresh, minTimestamp, signal)
       );
 
       let hierarchyData = response.hierarchy;
@@ -1307,7 +1318,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
         logger.info(`[ACCESSIBILITY_SERVICE] WebSocket returned ${hierarchyData ? "stale" : "no"} data (fresh=${isFresh}), syncing for fresh data`);
 
         const syncResult = await perf.track("syncRequest", () =>
-          this.requestHierarchySync(perf)
+          this.requestHierarchySync(perf, signal)
         );
 
         if (syncResult) {
@@ -1457,7 +1468,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
    * @returns Promise with hierarchy and perfTiming, or null if failed
    */
   async requestHierarchySync(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
   ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null> {
     const startTime = Date.now();
 
@@ -1475,7 +1487,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
         const uuid = `sync_${Date.now()}_${generateSecureId()}`;
         await perf.track("sendBroadcast", async () => {
           await this.adb.executeCommand(
-            `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid}"`
+            `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid}"`,
+            undefined,
+            undefined,
+            undefined,
+            signal
           );
         });
       }
@@ -1484,7 +1500,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // The Android service calls broadcastHierarchyUpdate() after extraction
       // Use 10 second timeout to handle long animations (switch toggles can trigger 10+ concurrent extractions)
       const freshData = await perf.track("waitForPush", () =>
-        this.waitForFreshData(10000, startTime)
+        this.waitForFreshData(10000, startTime, signal)
       );
 
       if (freshData) {

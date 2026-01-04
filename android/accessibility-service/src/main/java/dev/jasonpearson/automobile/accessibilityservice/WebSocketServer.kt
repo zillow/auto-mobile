@@ -258,6 +258,25 @@ class WebSocketServer(
     fun isRunning(): Boolean = server != null
 
     /**
+     * Get the actual port the server is listening on.
+     * Useful when port 0 is specified to let the OS assign an available port.
+     * Returns null if server is not running.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun getActualPort(): Int? {
+        val srv = server ?: return null
+        return try {
+            val engine = (srv as EmbeddedServer<CIOApplicationEngine, *>).engine
+            runBlocking {
+                engine.resolvedConnectors().firstOrNull()?.port ?: port
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not get actual port, returning configured port", e)
+            port
+        }
+    }
+
+    /**
      * Handle incoming client message
      */
     private fun handleClientMessage(message: String) {

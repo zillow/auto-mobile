@@ -1,6 +1,7 @@
 /**
  * Utility functions for tool handlers
  */
+import { OPERATION_CANCELLED_MESSAGE } from "./constants";
 
 /**
  * Interface for tool response formatter
@@ -78,3 +79,9 @@ export class DefaultToolResponseFormatter implements ToolResponseFormatter {
 // Export convenience functions for backward compatibility
 export const createJSONToolResponse = DefaultToolResponseFormatter.createJSONToolResponse;
 export const createImageToolResponse = DefaultToolResponseFormatter.createImageToolResponse;
+
+export const throwIfAborted = (signal?: AbortSignal): void => {
+  if (signal?.aborted) {
+    throw new Error(OPERATION_CANCELLED_MESSAGE);
+  }
+};

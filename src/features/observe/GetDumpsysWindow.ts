@@ -31,7 +31,8 @@ export class GetDumpsysWindow {
    * @returns Promise with cached rotation value or executes fresh command
    */
   public async execute(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
   ): Promise<ExecResult> {
     // Check memory cache first
     const memoryCached = GetDumpsysWindow.memoryCache.get(this.device.deviceId);
@@ -52,7 +53,7 @@ export class GetDumpsysWindow {
     }
 
     // No valid cache found, refresh and return
-    return await this.refresh(perf);
+    return await this.refresh(perf, signal);
   }
 
   /**
@@ -61,10 +62,11 @@ export class GetDumpsysWindow {
    * @returns Promise with fresh rotation value
    */
   public async refresh(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
   ): Promise<ExecResult> {
     const result = await perf.track("adbDumpsysWindow", () =>
-      this.adb.executeCommand("shell dumpsys window")
+      this.adb.executeCommand("shell dumpsys window", undefined, undefined, undefined, signal)
     );
     const timestamp = Date.now();
     const cacheEntry = { data: result, timestamp };

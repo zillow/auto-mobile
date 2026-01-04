@@ -179,7 +179,10 @@ export class GetBackStack {
    * @param perf - Optional performance tracker
    * @returns Promise with BackStackInfo
    */
-  async execute(perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<BackStackInfo> {
+  async execute(
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
+  ): Promise<BackStackInfo> {
     const startTime = Date.now();
 
     try {
@@ -187,7 +190,7 @@ export class GetBackStack {
 
       // Execute dumpsys activity activities
       const dumpsysOutput = await perf.track("dumpsysActivities", () =>
-        this.adb.executeCommand("shell dumpsys activity activities")
+        this.adb.executeCommand("shell dumpsys activity activities", undefined, undefined, undefined, signal)
       );
 
       // Parse activities, tasks, and current activity in parallel

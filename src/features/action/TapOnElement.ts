@@ -18,6 +18,7 @@ import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
+import { throwIfAborted } from "../../utils/toolUtils";
 
 /**
  * Command to tap on UI element containing specified text
@@ -64,7 +65,8 @@ export class TapOnElement extends BaseVisualChange {
     element: Element | null,
     options: TapOnElementOptions,
     attempt: number,
-    observeResult?: ObserveResult
+    observeResult?: ObserveResult,
+    signal?: AbortSignal
   ): Promise<Element> {
     if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
       const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
@@ -79,7 +81,7 @@ export class TapOnElement extends BaseVisualChange {
             query: options.text || options.elementId || "",
             containerElementId: options.containerElementId
           };
-          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(queryOptions);
+          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(queryOptions, undefined, false, 0, signal);
           break;
         case "ios":
           latestViewHierarchy = await this.webdriver.getViewHierarchy(this.device);
@@ -94,7 +96,8 @@ export class TapOnElement extends BaseVisualChange {
           options,
           latestViewHierarchy,
           attempt + 1,
-          observeResult
+          observeResult,
+          signal
         );
       }
     }
@@ -106,7 +109,7 @@ export class TapOnElement extends BaseVisualChange {
       try {
         // Take a screenshot for vision analysis
         const screenshot = new TakeScreenshot(this.device, this.adb);
-        const screenshotResult = await screenshot.execute({});
+        const screenshotResult = await screenshot.execute({}, signal);
 
         if (!screenshotResult.success || !screenshotResult.path) {
           logger.error("Failed to capture screenshot for vision fallback");
@@ -178,7 +181,8 @@ export class TapOnElement extends BaseVisualChange {
     options: TapOnElementOptions,
     viewHierarchy: ViewHierarchyResult,
     attempt: number = 0,
-    observeResult?: ObserveResult
+    observeResult?: ObserveResult,
+    signal?: AbortSignal
   ): Promise<Element> {
     if (options.text) {
       // Find the UI element that contains the text
@@ -190,7 +194,7 @@ export class TapOnElement extends BaseVisualChange {
         false,
       );
 
-      return await this.handleElementResult(element, options, attempt, observeResult);
+      return await this.handleElementResult(element, options, attempt, observeResult, signal);
     } else if (options.elementId) {
       // Find the UI element that matches the id
       const element = this.elementUtils.findElementByResourceId(
@@ -199,7 +203,7 @@ export class TapOnElement extends BaseVisualChange {
         options.containerElementId,
       );
 
-      return await this.handleElementResult(element, options, attempt, observeResult);
+      return await this.handleElementResult(element, options, attempt, observeResult, signal);
     } else {
       throw new ActionableError(`tapOn requires non-blank text or elementId to interact with`);
     }
@@ -211,7 +215,11 @@ export class TapOnElement extends BaseVisualChange {
    * @param progress - Optional progress callback
    * @returns Result of the command
    */
-  async execute(options: TapOnElementOptions, progress?: ProgressCallback): Promise<TapOnElementResult> {
+  async execute(
+    options: TapOnElementOptions,
+    progress?: ProgressCallback,
+    signal?: AbortSignal
+  ): Promise<TapOnElementResult> {
     if (!options.action) {
       return this.createErrorResult(options.action, "tap on action is required");
     }
@@ -221,10 +229,12 @@ export class TapOnElement extends BaseVisualChange {
     let previousObserveResult: ObserveResult | null = null;
 
     try {
+      throwIfAborted(signal);
       // Tap on the calculated point using observedChange
       const result = await this.observedInteraction(
         async (observeResult: ObserveResult) => {
           previousObserveResult = observeResult;
+          throwIfAborted(signal);
 
           const viewHierarchy = observeResult.viewHierarchy;
           if (!viewHierarchy) {
@@ -233,7 +243,7 @@ export class TapOnElement extends BaseVisualChange {
           }
 
           const element = await perf.track("findElement", () =>
-            this.findElementToTap(options, viewHierarchy, 0, observeResult)
+            this.findElementToTap(options, viewHierarchy, 0, observeResult, signal)
           );
           const tapPoint = this.elementUtils.getElementCenter(element);
           const action = options.action;
@@ -267,7 +277,15 @@ export class TapOnElement extends BaseVisualChange {
           await perf.track("executeTap", async () => {
             switch (this.device.platform) {
               case "android":
-                await this.executeAndroidTap(options.action, tapPoint.x, tapPoint.y, longPressDuration, element, dragTarget);
+                await this.executeAndroidTap(
+                  options.action,
+                  tapPoint.x,
+                  tapPoint.y,
+                  longPressDuration,
+                  element,
+                  dragTarget,
+                  signal
+                );
                 break;
               case "ios":
                 await this.executeiOSTap(options.action, tapPoint.x, tapPoint.y, longPressDuration, dragTarget);
@@ -293,7 +311,8 @@ export class TapOnElement extends BaseVisualChange {
           changeExpected: false,
           timeoutMs: 800, // Reduce timeout for faster execution
           progress,
-          perf
+          perf,
+          signal
         }
       );
       if (options.action === "longPress" || options.action === "longPressDrag") {
@@ -346,21 +365,22 @@ export class TapOnElement extends BaseVisualChange {
     y: number,
     durationMs: number,
     element: Element,
-    dragTarget?: { x: number; y: number } | null
+    dragTarget?: { x: number; y: number } | null,
+    signal?: AbortSignal
   ): Promise<void> {
     if (action === "tap") {
-      await this.adb.executeCommand(`shell input tap ${x} ${y}`);
+      await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
     } else if (action === "longPress") {
-      await this.executeAndroidLongPress(x, y, durationMs, element?.["resource-id"]);
+      await this.executeAndroidLongPress(x, y, durationMs, element?.["resource-id"], signal);
     } else if (action === "longPressDrag") {
       if (!dragTarget) {
         throw new ActionableError("longPressDrag requires a dragTo target");
       }
-      await this.executeAndroidLongPressDrag(x, y, dragTarget.x, dragTarget.y, durationMs);
+      await this.executeAndroidLongPressDrag(x, y, dragTarget.x, dragTarget.y, durationMs, signal);
     } else if (action === "doubleTap") {
-      await this.adb.executeCommand(`shell input tap ${x} ${y}`);
+      await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
       await new Promise(resolve => setTimeout(resolve, 200));
-      await this.adb.executeCommand(`shell input tap ${x} ${y}`);
+      await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
     }
   }
 
@@ -451,8 +471,10 @@ export class TapOnElement extends BaseVisualChange {
     x: number,
     y: number,
     durationMs: number,
-    resourceId?: string
+    resourceId?: string,
+    signal?: AbortSignal
   ): Promise<void> {
+    throwIfAborted(signal);
     if (resourceId) {
       try {
         const result = await this.accessibilityService.requestAction("long_click", resourceId);
@@ -466,10 +488,10 @@ export class TapOnElement extends BaseVisualChange {
     }
 
     try {
-      await this.adb.executeCommand(`shell input touchscreen swipe ${x} ${y} ${x} ${y} ${durationMs}`);
+      await this.adb.executeCommand(`shell input touchscreen swipe ${x} ${y} ${x} ${y} ${durationMs}`, undefined, undefined, undefined, signal);
     } catch (error) {
       logger.warn(`[TapOnElement] touch input swipe failed, falling back to input swipe: ${error}`);
-      await this.adb.executeCommand(`shell input swipe ${x} ${y} ${x} ${y} ${durationMs}`);
+      await this.adb.executeCommand(`shell input swipe ${x} ${y} ${x} ${y} ${durationMs}`, undefined, undefined, undefined, signal);
     }
   }
 
@@ -478,13 +500,15 @@ export class TapOnElement extends BaseVisualChange {
     startY: number,
     endX: number,
     endY: number,
-    durationMs: number
+    durationMs: number,
+    signal?: AbortSignal
   ): Promise<void> {
+    throwIfAborted(signal);
     try {
-      await this.adb.executeCommand(`shell input touchscreen swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`);
+      await this.adb.executeCommand(`shell input touchscreen swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`, undefined, undefined, undefined, signal);
     } catch (error) {
       logger.warn(`[TapOnElement] touch input swipe failed, falling back to input swipe: ${error}`);
-      await this.adb.executeCommand(`shell input swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`);
+      await this.adb.executeCommand(`shell input swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`, undefined, undefined, undefined, signal);
     }
   }
 

@@ -23,11 +23,11 @@ export const listAppsSchema = addSessionUuidToSchema(z.object({
 // Register tools (this will be called when this file is imported)
 export function registerObserveTools() {
   // Observe handler
-  const observeHandler = async (device: BootedDevice) => {
+  const observeHandler = async (device: BootedDevice, _args: unknown, _progress?: unknown, signal?: AbortSignal) => {
     try {
       const perf = createGlobalPerformanceTracker();
       const observeScreen = new ObserveScreen(device);
-      const result = await observeScreen.execute(undefined, perf);
+      const result = await observeScreen.execute(undefined, perf, true, 0, signal);
 
       // Record back stack information in navigation graph if available
       if (result.backStack && result.activeWindow?.appId) {

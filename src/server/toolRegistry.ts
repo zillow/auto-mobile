@@ -20,12 +20,12 @@ export interface ProgressCallback {
 
 // Interface for tool handlers
 export interface ToolHandler<T = any> {
-  (args: T, progress?: ProgressCallback): Promise<any>; // Using any since the actual type varies between text and image responses
+  (args: T, progress?: ProgressCallback, signal?: AbortSignal): Promise<any>; // Using any since the actual type varies between text and image responses
 }
 
 // Interface for device-aware tool handlers
 export interface DeviceAwareToolHandler<T = any> {
-    (device: BootedDevice, args: T, progress?: ProgressCallback): Promise<any>;
+    (device: BootedDevice, args: T, progress?: ProgressCallback, signal?: AbortSignal): Promise<any>;
 }
 
 // Interface for a registered tool
@@ -85,7 +85,7 @@ class ToolRegistryClass {
     supportsProgress: boolean = false
   ): void {
     // Create a wrapper that handles device ID injection
-    const wrappedHandler: ToolHandler = async (args: any, progress?: ProgressCallback) => {
+    const wrappedHandler: ToolHandler = async (args: any, progress?: ProgressCallback, signal?: AbortSignal) => {
       // Check for session UUID and create execution context
       let providedDeviceId = args.deviceId;
       const sessionUuid = args.sessionUuid;
@@ -152,7 +152,7 @@ class ToolRegistryClass {
                 name,
                 args,
                 async () => {
-                  response = await handler(device, args, progress);
+                  response = await handler(device, args, progress, signal);
                 },
                 perf
               );
@@ -167,11 +167,11 @@ class ToolRegistryClass {
               logger.info(`[ToolRegistry] Memory audit PASSED for ${packageName} during ${name}`);
             } else {
               logger.warn(`[ToolRegistry] Could not determine foreground app, skipping memory audit for ${name}`);
-              response = await handler(device, args, progress);
+              response = await handler(device, args, progress, signal);
             }
           } else {
             // Memory audit not enabled or not Android platform, execute normally
-            response = await handler(device, args, progress);
+            response = await handler(device, args, progress, signal);
           }
         }
 

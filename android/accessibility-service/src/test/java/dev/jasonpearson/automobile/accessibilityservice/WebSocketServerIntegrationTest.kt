@@ -46,13 +46,21 @@ class WebSocketServerIntegrationTest {
 
   private lateinit var server: WebSocketServer
   private lateinit var testScope: CoroutineScope
-  private val testPort = 8767 // Use different port to avoid conflicts
   private val json = Json { ignoreUnknownKeys = true }
 
   @Before
   fun setUp() {
     testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    server = WebSocketServer(port = testPort, scope = testScope)
+    // Use port 0 to let OS assign an available port, avoiding conflicts when tests run in parallel
+    server = WebSocketServer(port = 0, scope = testScope)
+  }
+
+  /**
+   * Get the actual port the server is listening on.
+   * Must be called after server.start().
+   */
+  private fun getServerPort(): Int {
+    return server.getActualPort() ?: error("Server not running or port not available")
   }
 
   @After
@@ -122,7 +130,7 @@ class WebSocketServerIntegrationTest {
       client.webSocket(
         method = HttpMethod.Get,
         host = "localhost",
-        port = testPort,
+        port = getServerPort(),
         path = "/ws"
       ) {
         // Then - connection established
@@ -156,7 +164,7 @@ class WebSocketServerIntegrationTest {
         client.webSocket(
           method = HttpMethod.Get,
           host = "localhost",
-          port = testPort,
+          port = getServerPort(),
           path = "/ws"
         ) {
           // Receive and discard connection message
@@ -205,7 +213,7 @@ class WebSocketServerIntegrationTest {
         client.webSocket(
           method = HttpMethod.Get,
           host = "localhost",
-          port = testPort,
+          port = getServerPort(),
           path = "/ws"
         ) {
           incoming.receive() // Discard connection message
@@ -266,7 +274,7 @@ class WebSocketServerIntegrationTest {
     // When
     val client = HttpClient(CIO)
     client.use { client ->
-      val response = client.get("http://localhost:$testPort/health")
+      val response = client.get("http://localhost:${getServerPort()}/health")
 
       // Then
       assertEquals("Health check should return OK", HttpStatusCode.OK, response.status)
@@ -285,7 +293,7 @@ class WebSocketServerIntegrationTest {
         client.webSocket(
           method = HttpMethod.Get,
           host = "localhost",
-          port = testPort,
+          port = getServerPort(),
           path = "/ws"
         ) {
           incoming.receive() // Connection message

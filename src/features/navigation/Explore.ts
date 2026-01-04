@@ -9,6 +9,8 @@ import { ExportedGraph } from "../../utils/interfaces/NavigationGraph";
 import { TapOnElement } from "../action/TapOnElement";
 import { SwipeOnElement } from "../action/SwipeOnElement";
 import { ElementParser } from "../utility/ElementParser";
+import { throwIfAborted } from "../../utils/toolUtils";
+import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 
 /**
  * Exploration strategies for explore
@@ -65,6 +67,7 @@ export interface ElementSelectionStats {
 export interface ExploreResult {
   success: boolean;
   error?: string;
+  cancelled?: boolean;
   interactionsPerformed: number;
   screensDiscovered: number;
   edgesAdded: number;
@@ -139,7 +142,8 @@ export class Explore extends BaseVisualChange {
    */
   async execute(
     options: ExploreOptions = {},
-    progress?: ProgressCallback
+    progress?: ProgressCallback,
+    signal?: AbortSignal
   ): Promise<ExploreResult> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("explore");
@@ -176,8 +180,12 @@ export class Explore extends BaseVisualChange {
 
       // Main exploration loop
       while (this.shouldContinue(maxInteractions, timeoutMs, startTime)) {
+        if (signal?.aborted) {
+          this.stopReason = OPERATION_CANCELLED_MESSAGE;
+          break;
+        }
         // Get current screen state
-        const observation = await this.observeScreen.execute();
+        const observation = await this.observeScreen.execute(undefined, perf, true, 0, signal);
 
         const viewHierarchy = observation.viewHierarchy;
         if (viewHierarchy && !viewHierarchy.hierarchy.error) {
@@ -244,11 +252,13 @@ export class Explore extends BaseVisualChange {
         }
 
         // Perform interaction
+        throwIfAborted(signal);
         const interactionSuccess = await this.performInteraction(
           nextElement,
           observation,
           progress,
-          perf
+          perf,
+          signal
         );
 
         if (interactionSuccess) {
@@ -303,7 +313,7 @@ export class Explore extends BaseVisualChange {
       }
 
       perf.end();
-      return await this.generateReport(initialGraph, startTime);
+      return await this.generateReport(initialGraph, startTime, signal?.aborted === true);
     } catch (error) {
       perf.end();
       throw new ActionableError(`Failed to execute exploration: ${error}`);
@@ -781,7 +791,8 @@ export class Explore extends BaseVisualChange {
     element: Element,
     observation: ObserveResult,
     progress?: ProgressCallback,
-    perf?: PerformanceTracker
+    perf?: PerformanceTracker,
+    signal?: AbortSignal
   ): Promise<boolean> {
     const elementKey = this.getElementKey(element);
     const currentScreen = this.navigationManager.getCurrentScreen() ?? "unknown";
@@ -813,7 +824,8 @@ export class Explore extends BaseVisualChange {
           element,
           "up",
           { duration: 600 }, // Slow swipe
-          progress
+          progress,
+          signal
         );
 
         // Reset consecutive back count since we did a swipe
@@ -830,7 +842,8 @@ export class Explore extends BaseVisualChange {
             elementId: element["resource-id"],
             action: "tap"
           },
-          progress
+          progress,
+          signal
         );
 
         // Reset consecutive back count since we did a tap
@@ -1091,7 +1104,8 @@ export class Explore extends BaseVisualChange {
    */
   private async generateReport(
     initialGraph: ExportedGraph,
-    startTime: number
+    startTime: number,
+    cancelled: boolean
   ): Promise<ExploreResult> {
     const finalGraph = await this.navigationManager.exportGraph();
     const screensDiscovered = finalGraph.nodes.length - initialGraph.nodes.length;
@@ -1105,6 +1119,7 @@ export class Explore extends BaseVisualChange {
 
     return {
       success: true,
+      cancelled,
       interactionsPerformed: this.interactionCount,
       screensDiscovered,
       edgesAdded,

@@ -13,6 +13,7 @@ import { serverConfig } from "./utils/ServerConfig";
 import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
 import { execSync } from "node:child_process";
+import { executionTracker } from "./server/executionTracker";
 
 // Detect port from git branch name for worktree isolation
 // e.g., work/164-feature-name -> port 9164
@@ -319,10 +320,12 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
         streamableTransport = transports.get(sessionId)!;
       } else if (isInitializeRequest || !sessionId) {
         // Create new transport for initialization or when no session ID
+        const sessionContext: { sessionId?: string } = {};
         streamableTransport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: newSessionId => {
             transports.set(newSessionId, streamableTransport);
+            sessionContext.sessionId = newSessionId;
             logger.info(`Streamable HTTP session initialized: ${newSessionId}`);
           }
         });
@@ -330,7 +333,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
         // Create and connect MCP server
         let mcpServer;
         try {
-          mcpServer = createMcpServer({ debug });
+          mcpServer = createMcpServer({ debug, sessionContext });
         } catch (error) {
           logger.error("Failed to create MCP server:", error);
           sendJsonRpcError("Server error", error);
@@ -338,16 +341,18 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
         }
 
         // Setup cleanup handlers
-        streamableTransport.onclose = () => {
+        streamableTransport.onclose = async () => {
           if (streamableTransport.sessionId) {
+            const cancelled = await executionTracker.cancelSessionExecutions(streamableTransport.sessionId);
             transports.delete(streamableTransport.sessionId);
-            logger.info(`Streamable HTTP session closed: ${streamableTransport.sessionId}`);
+            logger.info(`Streamable HTTP session closed: ${streamableTransport.sessionId} (cancelled ${cancelled} executions)`);
           }
         };
 
-        streamableTransport.onerror = error => {
+        streamableTransport.onerror = async error => {
           if (streamableTransport.sessionId) {
             logger.error(`Streamable HTTP transport error for session ${streamableTransport.sessionId}:`, error);
+            await executionTracker.cancelSessionExecutions(streamableTransport.sessionId);
             transports.delete(streamableTransport.sessionId);
           }
         };
@@ -449,16 +454,18 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
       sessions.set(sessionId, sseTransport);
 
       // Create MCP server instance for this session
-      const mcpServer = createMcpServer({ debug });
+      const mcpServer = createMcpServer({ debug, sessionContext: { sessionId } });
 
       // Handle cleanup when connection closes
-      sseTransport.onclose = () => {
+      sseTransport.onclose = async () => {
+        const cancelled = await executionTracker.cancelSessionExecutions(sessionId);
         sessions.delete(sessionId);
-        logger.info(`SSE session closed: ${sessionId}`);
+        logger.info(`SSE session closed: ${sessionId} (cancelled ${cancelled} executions)`);
       };
 
-      sseTransport.onerror = error => {
+      sseTransport.onerror = async error => {
         logger.error(`SSE transport error for session ${sessionId}:`, error);
+        await executionTracker.cancelSessionExecutions(sessionId);
         sessions.delete(sessionId);
       };
 

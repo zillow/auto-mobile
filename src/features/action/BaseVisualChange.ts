@@ -9,6 +9,7 @@ import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { NodeCryptoService } from "../../utils/crypto";
+import { throwIfAborted } from "../../utils/toolUtils";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -24,6 +25,7 @@ export interface ObservedChangeOptions {
   perf?: PerformanceTracker;
   skipPreviousObserve?: boolean;
   skipUiStability?: boolean;
+  signal?: AbortSignal;
 }
 
 export class BaseVisualChange {
@@ -70,6 +72,7 @@ export class BaseVisualChange {
     if (progress) {
       await progress(0, 100, "Preparing to execute action...");
     }
+    throwIfAborted(options.signal);
 
     // Fetch cached view hierarchy (skip if we just terminated/cleared the app)
     let previousObserveResult: ObserveResult | null = null;
@@ -83,13 +86,13 @@ export class BaseVisualChange {
         previousObserveResult = await perf.track("getPreviousObserve", async () => {
           const cached = await this.observeScreen.getMostRecentCachedObserveResult();
           if (!cached?.viewHierarchy || cached.viewHierarchy.hierarchy.error) {
-            return this.observeScreen.execute(options.queryOptions);
+            return this.observeScreen.execute(options.queryOptions, perf, true, 0, options.signal);
           }
           return cached;
         });
       } catch {
         previousObserveResult = await perf.track("getPreviousObserveFallback", async () => {
-          return this.observeScreen.execute(options.queryOptions);
+          return this.observeScreen.execute(options.queryOptions, perf, true, 0, options.signal);
         });
       }
 
@@ -110,6 +113,7 @@ export class BaseVisualChange {
     });
 
     const blockResult = await perf.track("executeBlock", async () => {
+      throwIfAborted(options.signal);
       return block(previousObserveResult!);
     });
 
@@ -154,9 +158,9 @@ export class BaseVisualChange {
       if (packageName.trim() !== "") {
         perf.serial("uiStability");
         if (initState !== null) {
-          gfxMetrics = await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState, perf);
+          gfxMetrics = await this.awaitIdle.waitForUiStabilityWithState(packageName, timeoutMs, initState, perf, options.signal);
         } else {
-          gfxMetrics = await this.awaitIdle.waitForUiStability(packageName, timeoutMs, perf);
+          gfxMetrics = await this.awaitIdle.waitForUiStability(packageName, timeoutMs, perf, options.signal);
         }
         perf.end();
       }
@@ -195,7 +199,7 @@ export class BaseVisualChange {
     perf.serial("finalObserve");
     // Wait for fresh data from accessibility service (skipWaitForFresh=false)
     // This ensures we get observation data that reflects the action that just completed
-    let latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp);
+    let latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp, options.signal);
     perf.end();
 
     const shouldRetry = (observation: ObserveResult): boolean => {
@@ -215,7 +219,7 @@ export class BaseVisualChange {
       logger.info(`[BaseVisualChange] Observation appears stale/unchanged, retrying in ${delayMs}ms (attempt ${attempt + 1}/${retryDelaysMs.length})`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
       perf.serial(`finalObserve_retry_${attempt + 1}`);
-      latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp);
+      latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp, options.signal);
       perf.end();
     }
 

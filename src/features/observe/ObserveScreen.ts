@@ -1,4 +1,5 @@
 import { logger } from "../../utils/logger";
+import { throwIfAborted } from "../../utils/toolUtils";
 import { BootedDevice, ExecResult, ObserveResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { GetScreenSize } from "./GetScreenSize";
@@ -158,9 +159,9 @@ export class ObserveScreen {
    * Collect wakefulness state (Android only)
    * @param result - ObserveResult to update
    */
-  public async collectWakefulness(result: ObserveResult): Promise<void> {
+  public async collectWakefulness(result: ObserveResult, signal?: AbortSignal): Promise<void> {
     try {
-      const wakefulness = await this.adb.getWakefulness();
+      const wakefulness = await this.adb.getWakefulness(signal);
       if (wakefulness) {
         result.wakefulness = wakefulness;
       }
@@ -174,10 +175,14 @@ export class ObserveScreen {
    * @param result - ObserveResult to update
    * @param perf - Performance tracker for timing data
    */
-  public async collectBackStack(result: ObserveResult, perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<void> {
+  public async collectBackStack(
+    result: ObserveResult,
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
+  ): Promise<void> {
     try {
       const backStackStart = Date.now();
-      const backStackInfo = await this.backStack.execute(perf);
+      const backStackInfo = await this.backStack.execute(perf, signal);
       result.backStack = backStackInfo;
       logger.debug(`Back stack retrieval took ${Date.now() - backStackStart}ms`);
     } catch (error) {
@@ -199,7 +204,8 @@ export class ObserveScreen {
     queryOptions?: ViewHierarchyQueryOptions,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
-    minTimestamp: number = 0
+    minTimestamp: number = 0,
+    signal?: AbortSignal
   ): Promise<void> {
     try {
       if (this.device.platform === "android") {
@@ -207,7 +213,7 @@ export class ObserveScreen {
       }
 
       const viewHierarchyStart = Date.now();
-      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
+      const viewHierarchy = await this.viewHierarchy.getViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
       logger.debug("Accessibility service availability cached as: true");
 
       if (viewHierarchy) {
@@ -307,7 +313,8 @@ export class ObserveScreen {
     queryOptions?: ViewHierarchyQueryOptions,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
-    minTimestamp: number = 0
+    minTimestamp: number = 0,
+    signal?: AbortSignal
   ): Promise<void> {
     switch (this.device.platform) {
       case "android":
@@ -315,7 +322,7 @@ export class ObserveScreen {
         // Note: We no longer call collectActiveWindow here - packageName comes from accessibility service
         perf.serial("phase1_initial");
 
-        const dumpsysWindow = await perf.track("dumpsysWindow", () => this.dumpsysWindow.execute());
+        const dumpsysWindow = await perf.track("dumpsysWindow", () => this.dumpsysWindow.execute(perf, signal));
         perf.end();
 
         // Phase 2: Parallel - quick operations using shared dumpsys data
@@ -325,13 +332,13 @@ export class ObserveScreen {
           perf.track("screenSize", () => this.collectScreenSize(dumpsysWindow, result)),
           perf.track("systemInsets", () => this.collectSystemInsets(dumpsysWindow, result)),
           perf.track("rotation", () => this.collectRotationInfo(dumpsysWindow, result)),
-          perf.track("wakefulness", () => this.collectWakefulness(result)),
-          perf.track("backStack", () => this.collectBackStack(result, perf)),
+          perf.track("wakefulness", () => this.collectWakefulness(result, signal)),
+          perf.track("backStack", () => this.collectBackStack(result, perf, signal)),
         ]);
 
         // Run view hierarchy separately to avoid perf tracker race condition
         // (it creates nested serial blocks that conflict with parallel tracking)
-        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
+        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
 
         // Note: Offscreen filtering is now done in the Android accessibility service (Kotlin)
         // for better performance (avoids serializing/transferring filtered data)
@@ -359,7 +366,7 @@ export class ObserveScreen {
 
         await Promise.all([
           perf.track("screenSize", () => this.collectScreenSize({} as ExecResult, result)),
-          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp),
+          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal),
         ]);
 
         // Filter out completely offscreen nodes to reduce hierarchy size
@@ -828,11 +835,13 @@ export class ObserveScreen {
     queryOptions?: ViewHierarchyQueryOptions,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = true, // Default to true for direct observe tool requests
-    minTimestamp: number = 0
+    minTimestamp: number = 0,
+    signal?: AbortSignal
   ): Promise<ObserveResult> {
     try {
       logger.debug(`Executing observe command (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
       const startTime = Date.now();
+      throwIfAborted(signal);
 
       // Create base result object with timestamp
       const result = this.createBaseResult();
@@ -842,7 +851,7 @@ export class ObserveScreen {
 
       // Collect all data components with parallelization
       // Note: collectAllData tracks its phases internally, so we just call it directly
-      await this.collectAllData(result, queryOptions, perf, skipWaitForFresh, minTimestamp);
+      await this.collectAllData(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
 
       // Attach recomposition metrics if enabled
       await RecompositionTracker.getInstance().processObservation(result, this.device);

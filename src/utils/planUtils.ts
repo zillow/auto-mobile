@@ -51,7 +51,10 @@ export interface PlanUtils {
   executePlan(
     plan: Plan,
     startStep: number,
-    platform?: string
+    platform?: string,
+    deviceId?: string,
+    sessionUuid?: string,
+    signal?: AbortSignal
   ): Promise<PlanExecutionResult>;
 }
 

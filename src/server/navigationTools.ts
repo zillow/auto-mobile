@@ -136,7 +136,8 @@ export function registerNavigationTools() {
   const exploreHandler = async (
     device: BootedDevice,
     args: ExploreArgs,
-    progress?: ProgressCallback
+    progress?: ProgressCallback,
+    signal?: AbortSignal
   ) => {
     try {
       const explore = new Explore(device);
@@ -149,7 +150,7 @@ export function registerNavigationTools() {
         mode: args.mode,
         packageName: args.packageName
       };
-      const result = await explore.execute(options, progress);
+      const result = await explore.execute(options, progress, signal);
 
       return createJSONToolResponse({
         message: `Exploration completed: ${result.interactionsPerformed} interactions, ${result.screensDiscovered} new screens discovered, ${result.coverage.percentage}% coverage`,

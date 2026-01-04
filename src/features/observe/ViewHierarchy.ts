@@ -514,13 +514,14 @@ export class ViewHierarchy {
     queryOptions?: ViewHierarchyQueryOptions,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
-    minTimestamp: number = 0
+    minTimestamp: number = 0,
+    signal?: AbortSignal
   ): Promise<ViewHierarchyResult> {
     switch (this.device.platform) {
       case "ios":
         return this.getiOSViewHierarchy(perf);
       case "android":
-        return this.getAndroidViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
+        return this.getAndroidViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
       default:
         throw new Error("Unsupported platform");
     }
@@ -562,7 +563,8 @@ export class ViewHierarchy {
     queryOptions?: ViewHierarchyQueryOptions,
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
-    minTimestamp: number = 0
+    minTimestamp: number = 0,
+    signal?: AbortSignal
   ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
     logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
@@ -571,7 +573,7 @@ export class ViewHierarchy {
 
     // First try accessibility service if available and not skipped
     try {
-      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp);
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
       if (accessibilityHierarchy) {
         perf.end();
         const accessibilityDuration = Date.now() - startTime;
@@ -585,7 +587,7 @@ export class ViewHierarchy {
     try {
       // Get fresh view hierarchy via uiautomator
       const viewHierarchy = await perf.track("uiautomatorFallback", () =>
-        this._getViewHierarchyWithoutCache()
+        this._getViewHierarchyWithoutCache(signal)
       );
       const freshDuration = Date.now() - startTime;
       logger.debug(`[VIEW_HIERARCHY] Fresh hierarchy fetched in ${freshDuration}ms`);
@@ -614,14 +616,14 @@ export class ViewHierarchy {
           err.message.includes("cat:") ||
           err.message.includes("No such file or directory"))) {
         logger.debug("[VIEW_HIERARCHY] Specific ADB error detected, calling _getViewHierarchyWithoutCache to get its specific error message.");
-        return await this._getViewHierarchyWithoutCache();
+        return await this._getViewHierarchyWithoutCache(signal);
       }
 
       // If screenshot-related error, fall back to getting view hierarchy without cache
       // (this might also lead to one of the specific errors above if _getViewHierarchyWithoutCache fails)
       if (err instanceof Error && err.message.includes("screenshot")) {
         logger.debug("[VIEW_HIERARCHY] Screenshot error detected, falling back to view hierarchy without cache");
-        const fallbackResult = await this._getViewHierarchyWithoutCache();
+        const fallbackResult = await this._getViewHierarchyWithoutCache(signal);
         // If the fallback result has a specific error message, preserve it
         if (fallbackResult.hierarchy && (fallbackResult.hierarchy as any).error) {
           return fallbackResult;
@@ -755,12 +757,18 @@ export class ViewHierarchy {
    * Execute uiautomator dump command and get XML content (optimized version)
    * @returns Promise with XML data string
    */
-  public async executeUiAutomatorDump(): Promise<string> {
+  public async executeUiAutomatorDump(signal?: AbortSignal): Promise<string> {
     // Optimized: Use /data/local/tmp which is more reliable than /sdcard
     const tempFile = "/data/local/tmp/window_dump.xml";
 
     // Use shell subcommand to ensure atomicity and avoid separate rm command
-    const result = await this.adb.executeCommand(`shell "(uiautomator dump ${tempFile} >/dev/null 2>&1 && cat ${tempFile}; rm -f ${tempFile}) 2>/dev/null"`);
+    const result = await this.adb.executeCommand(
+      `shell "(uiautomator dump ${tempFile} >/dev/null 2>&1 && cat ${tempFile}; rm -f ${tempFile}) 2>/dev/null"`,
+      undefined,
+      undefined,
+      undefined,
+      signal
+    );
 
     // Check for any error indicators in stderr and throw if found
     if (result.stderr) {
@@ -1142,12 +1150,12 @@ export class ViewHierarchy {
    * Retrieve the view hierarchy of the current screen without using cache
    * @returns Promise with parsed XML view hierarchy
    */
-  async _getViewHierarchyWithoutCache(): Promise<ViewHierarchyResult> {
+  async _getViewHierarchyWithoutCache(signal?: AbortSignal): Promise<ViewHierarchyResult> {
     const dumpStart = Date.now();
 
     try {
       // Run uiautomator dump
-      const xmlData = await this.executeUiAutomatorDump();
+      const xmlData = await this.executeUiAutomatorDump(signal);
 
       logger.debug(`uiautomator dump took ${Date.now() - dumpStart}ms`);
 

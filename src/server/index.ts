@@ -5,6 +5,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
+import { executionTracker } from "./executionTracker";
+import { runWithAbortSignal } from "../utils/AbortContext";
 
 // Import the tool registry
 import { ToolRegistry } from "./toolRegistry";
@@ -33,6 +35,7 @@ import { registerAppResources } from "./appResources";
 
 export interface McpServerOptions {
   debug?: boolean;
+  sessionContext?: { sessionId?: string };
 }
 
 export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
@@ -128,6 +131,17 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
       throw new ActionableError(`Invalid parameters for tool ${name}: ${error}`);
     }
 
+    const sessionId = options.sessionContext?.sessionId;
+    const rawSessionUuid =
+      toolParams &&
+      typeof toolParams === "object" &&
+      "sessionUuid" in toolParams
+        ? (toolParams as { sessionUuid?: string }).sessionUuid
+        : undefined;
+    const sessionUuid = typeof rawSessionUuid === "string" ? rawSessionUuid : undefined;
+
+    const execution = executionTracker.startExecution(name, sessionId, sessionUuid);
+
     // Create progress callback if tool supports progress
     const progressCallback = tool.supportsProgress
       ? async (progress: number, total?: number, message?: string) => {
@@ -148,7 +162,14 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
       }
       : undefined;
 
-    return await tool.handler(parsedParams, progressCallback);
+    try {
+      return await runWithAbortSignal(
+        execution.abortController.signal,
+        () => tool.handler(parsedParams, progressCallback, execution.abortController.signal)
+      );
+    } finally {
+      executionTracker.endExecution(execution.id);
+    }
   });
 
   return server;

@@ -7,7 +7,7 @@ export interface RegisteredTool {
   name: string;
   description: string;
   schema: any;
-  handler: (args: any) => Promise<any>;
+  handler: (args: any, progress?: (progress: number, total?: number, message?: string) => Promise<void>, signal?: AbortSignal) => Promise<any>;
   supportsProgress?: boolean;
   requiresDevice?: boolean;
 }

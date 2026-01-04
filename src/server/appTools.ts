@@ -99,10 +99,10 @@ export function registerAppTools(
   };
 
   // Install app handler
-  const installAppHandler = async (device: BootedDevice, args: InstallAppArgs) => {
+  const installAppHandler = async (device: BootedDevice, args: InstallAppArgs, _progress?: unknown, signal?: AbortSignal) => {
     try {
       const installApp = new InstallApp(device);
-      const result = await installApp.execute(args.apkPath);
+      const result = await installApp.execute(args.apkPath, undefined, signal);
 
       return createJSONToolResponse({
         message: `Installed app from ${args.apkPath}`,

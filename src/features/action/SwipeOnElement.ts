@@ -34,7 +34,8 @@ export class SwipeOnElement extends BaseVisualChange {
     element: Element,
     direction: "up" | "down" | "left" | "right",
     options: GestureOptions = {},
-    progress?: ProgressCallback
+    progress?: ProgressCallback,
+    signal?: AbortSignal
   ): Promise<SwipeResult> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("swipeOnElement");
@@ -84,7 +85,8 @@ export class SwipeOnElement extends BaseVisualChange {
         changeExpected: false,
         timeoutMs: 500,
         progress,
-        perf
+        perf,
+        signal
       }
     );
   }

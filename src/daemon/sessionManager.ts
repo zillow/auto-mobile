@@ -26,6 +26,8 @@ export interface Session {
   lastUsedAt: number;          // Last activity timestamp
   expiresAt: number;           // When session will expire (for cleanup)
   cacheData: SessionCacheData; // Cached data for this session
+  lastHeartbeat: number;       // Timestamp of last heartbeat
+  heartbeatTimeoutMs: number;  // Heartbeat timeout for this session
 }
 
 /**
@@ -51,6 +53,8 @@ export class SessionManager {
 
   // Cleanup interval: every 5 minutes
   private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+
+  static readonly DEFAULT_HEARTBEAT_TIMEOUT_MS = 60 * 1000;
 
   constructor() {
     // Start periodic cleanup of expired sessions
@@ -80,6 +84,8 @@ export class SessionManager {
       lastUsedAt: now,
       expiresAt: now + this.SESSION_TIMEOUT_MS,
       cacheData: {},
+      lastHeartbeat: now,
+      heartbeatTimeoutMs: SessionManager.DEFAULT_HEARTBEAT_TIMEOUT_MS,
     };
 
     this.sessions.set(sessionId, session);
@@ -201,6 +207,7 @@ export class SessionManager {
       ...updates,
     };
     session.lastUsedAt = Date.now();
+    session.lastHeartbeat = Date.now();
 
     logger.debug(`Updated cache for session ${sessionId}`);
   }
@@ -216,8 +223,24 @@ export class SessionManager {
 
     // Update last used time when accessing cache
     session.lastUsedAt = Date.now();
+    session.lastHeartbeat = Date.now();
 
     return session.cacheData;
+  }
+
+  /**
+   * Record a heartbeat for a session
+   */
+  recordHeartbeat(sessionId: string): void {
+    const session = this.getSession(sessionId);
+    if (!session) {
+      logger.warn(`Cannot record heartbeat for session ${sessionId}: not found`);
+      return;
+    }
+    const now = Date.now();
+    session.lastHeartbeat = now;
+    session.lastUsedAt = now;
+    session.expiresAt = now + this.SESSION_TIMEOUT_MS;
   }
 
   /**

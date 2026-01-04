@@ -199,10 +199,11 @@ describe("AccessibilityServiceManager", function() {
         }
 
         if (strippedCommand.includes("pull")) {
-          const match = strippedCommand.match(/pull\s+"[^"]+"\s+"([^"]+)"/);
-          if (match?.[1]) {
-            await fs.mkdir(path.dirname(match[1]), { recursive: true });
-            await fs.writeFile(match[1], apkContent);
+          const match = strippedCommand.match(/pull\s+(".*?"|\S+)\s+(".*?"|\S+)/);
+          const localPathRaw = match?.[2]?.replace(/^"(.*)"$/, "$1");
+          if (localPathRaw) {
+            await fs.mkdir(path.dirname(localPathRaw), { recursive: true });
+            await fs.writeFile(localPathRaw, apkContent);
           }
           return createExecResult("", "");
         }

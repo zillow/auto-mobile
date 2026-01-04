@@ -29,6 +29,10 @@ import org.junit.runners.model.FrameworkMethod
  */
 class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(klass) {
 
+  // Use companion object for testability - allows tests to inject a fake connectivity checker
+  private val connectivityChecker: DaemonConnectivityChecker
+    get() = testConnectivityChecker ?: DefaultDaemonConnectivityChecker()
+
   // Phase 4: Lazy initialization of AutoMobileAgent (only initialized if AI assistance needed)
   private val agent: AutoMobileAgent
     get() = LazyInitializer.getAgent()
@@ -249,8 +253,17 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       }
 
       val execStart = System.currentTimeMillis()
-      val response = DaemonSocketClientManager.callTool("executePlan", daemonRequestArgs, annotation.timeoutMs)
+      val heartbeat = DaemonHeartbeat.start(sessionUuid)
+      val response = try {
+        DaemonSocketClientManager.callTool("executePlan", daemonRequestArgs, annotation.timeoutMs)
+      } finally {
+        heartbeat.close()
+      }
       PerformanceTracker.measure("Daemon request execution", execStart)
+
+      // Verify daemon is still alive after test execution
+      // This helps detect if the daemon crashed or was killed by heartbeat timeout
+      verifyDaemonHealth(testName)
 
       val executionTime = System.currentTimeMillis() - startTime
 
@@ -425,7 +438,21 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
   }
 
-  
+  /**
+   * Verify the daemon is still alive after test execution.
+   * This helps detect if the daemon crashed or was killed by heartbeat timeout.
+   * Logs a warning if the daemon is not responding, which aids debugging.
+   */
+  private fun verifyDaemonHealth(testName: String) {
+    val checker = connectivityChecker
+    if (!checker.isDaemonAlive()) {
+      println("[WARNING] Daemon is no longer responding after test: $testName")
+      println("[WARNING] This may indicate the daemon crashed or was killed by heartbeat timeout.")
+      println("[WARNING] Subsequent tests may fail. Consider increasing heartbeat timeout or checking daemon logs.")
+    }
+  }
+
+
 
   private data class ExecutionResult(
       val success: Boolean,
@@ -446,6 +473,13 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   class AutoMobileTestException(message: String) : Exception(message)
 
   companion object {
+    /**
+     * Injectable connectivity checker for testing.
+     * Set this to a fake implementation before running tests to verify daemon health check behavior.
+     */
+    @JvmStatic
+    internal var testConnectivityChecker: DaemonConnectivityChecker? = null
+
     private val LOG_DIR = File("scratch/test-logs").apply {
       if (!exists()) {
         mkdirs()

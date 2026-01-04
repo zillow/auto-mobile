@@ -3,6 +3,7 @@ import { logger } from "../../utils/logger";
 import { Idle } from "./Idle";
 import { BootedDevice, GfxMetrics } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { throwIfAborted } from "../../utils/toolUtils";
 
 export class AwaitIdle {
   private adb: AdbClient;
@@ -167,7 +168,8 @@ export class AwaitIdle {
       prevFrameDeadlineMissed: number | null;
       firstGfxInfoLog: boolean;
     },
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
   ): Promise<GfxMetrics | null> {
     logger.info(`[AwaitIdle] Continuing UI stability wait with existing state for package: ${packageName}`);
 
@@ -197,6 +199,7 @@ export class AwaitIdle {
       while (true) {
         // Check for overall timeout before polling
         const elapsedTime = Date.now() - initState.startTime;
+        throwIfAborted(signal);
         if (elapsedTime >= timeoutMs) {
           logger.info(`[AwaitIdle] Timeout waiting for UI stability after ${timeoutMs}ms`);
           break;
@@ -239,7 +242,7 @@ export class AwaitIdle {
     // Get final gfxinfo to capture percentiles
     try {
       const finalGfxInfo = await perf.track("finalGfxinfo", async () => {
-        return this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName}`);
+        return this.adb.executeCommand(`shell dumpsys gfxinfo ${packageName}`, undefined, undefined, undefined, signal);
       });
       const metrics = this.idle.parseMetrics(finalGfxInfo.stdout);
       finalMetrics.percentile50thMs = metrics.percentile50th;
@@ -280,13 +283,14 @@ export class AwaitIdle {
   async waitForUiStability(
     packageName: string,
     timeoutMs: number,
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
   ): Promise<GfxMetrics | null> {
 
     logger.info(`[AwaitIdle] Waiting for UI stability for package: ${packageName} with timeoutMs: ${timeoutMs}`);
     const state = await perf.track("initUiStabilityTracking", async () => {
       return this.initializeUiStabilityTracking(packageName, timeoutMs);
     });
-    return this.waitForUiStabilityWithState(packageName, timeoutMs, state, perf);
+    return this.waitForUiStabilityWithState(packageName, timeoutMs, state, perf, signal);
   }
 }

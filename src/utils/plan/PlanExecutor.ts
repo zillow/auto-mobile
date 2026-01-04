@@ -4,6 +4,7 @@ import { ToolRegistry } from "../../server/toolRegistry";
 import { ActionableError } from "../../models";
 import { isDebugModeEnabled } from "../debug";
 import { ExecutePlanStepDebugInfo } from "../../models/ExecutePlanResult";
+import { throwIfAborted } from "../toolUtils";
 
 /**
  * Interface for plan execution
@@ -25,6 +26,7 @@ export interface PlanExecutor {
     platform?: string,
     deviceId?: string,
     sessionUuid?: string,
+    signal?: AbortSignal,
   ): Promise<PlanExecutionResult>;
 }
 
@@ -47,7 +49,8 @@ export class DefaultPlanExecutor implements PlanExecutor {
     startStep: number,
     platform?: string,
     deviceId?: string,
-    sessionUuid?: string
+    sessionUuid?: string,
+    signal?: AbortSignal
   ): Promise<PlanExecutionResult> {
     let executedSteps = 0;
     const debugMode = isDebugModeEnabled();
@@ -75,6 +78,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
       logger.info(`Starting plan execution from step ${startStep}`);
 
       for (let i = startStep; i < plan.steps.length; i++) {
+        throwIfAborted(signal);
         const step = plan.steps[i];
         const stepStartTime = debugMode ? Date.now() : 0;
         const stepLabel = step.label || step.params?.label || JSON.stringify(step.params).substring(0, 50);
@@ -142,7 +146,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
 
           // Execute the tool
           logger.info(`[PLAN_STEP_${i + 1}] Calling ${step.tool} with params: ${JSON.stringify(parsedParams).substring(0, 200)}`);
-          const response = await tool.handler(parsedParams);
+          const response = await tool.handler(parsedParams, undefined, signal);
           logger.info(`[PLAN_STEP_${i + 1}] ${step.tool} completed. Response success: ${response?.success !== false ? "true" : "FALSE"}`);
 
           // Check if the response indicates failure

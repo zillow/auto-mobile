@@ -23,7 +23,7 @@ const executePlanTool = async (device: BootedDevice, params: {
   platform: Platform;
   sessionUuid?: string;
   deviceId?: string;
-}): Promise<any> => {
+}, _progress?: unknown, signal?: AbortSignal): Promise<any> => {
   try {
     logger.info("=== Starting executePlanTool ===");
     logger.info(`Device: ${device.platform} (${device.deviceId}), Start Step: ${params.startStep}, SessionUUID: ${params.sessionUuid}`);
@@ -46,7 +46,7 @@ const executePlanTool = async (device: BootedDevice, params: {
 
     // Execute the plan with device context
     logger.info(`=== Starting plan execution on device ${device.deviceId} ===`);
-    const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid);
+    const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal);
     logger.info(`Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
 
     const response: ExecutePlanResult = {

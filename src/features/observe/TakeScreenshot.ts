@@ -107,7 +107,8 @@ export class TakeScreenshot {
    * @returns Promise with screenshot result including success status and path if successful
    */
   async execute(
-    options: ScreenshotOptions = { format: "png" }
+    options: ScreenshotOptions = { format: "png" },
+    signal?: AbortSignal
   ): Promise<ScreenshotResult> {
     const startTime = Date.now();
     logger.info(`[SCREENSHOT] *** Starting screenshot capture with startTime: ${startTime}, format: ${options.format} ***`);
@@ -117,7 +118,7 @@ export class TakeScreenshot {
       const finalPath = this.generateScreenshotPath(startTime, options);
 
       // Capture screenshot with fallback
-      const captureResult = await this.captureScreenshot(finalPath, options);
+      const captureResult = await this.captureScreenshot(finalPath, options, signal);
       const totalDuration = Date.now() - startTime;
 
       logger.info(`[SCREENSHOT] *** Screenshot capture completed: success=${captureResult.success}, total execute time: ${totalDuration}ms ***`);
@@ -141,14 +142,15 @@ export class TakeScreenshot {
    */
   private async captureScreenshot(
     finalPath: string,
-    options: ScreenshotOptions = { format: "png" }
+    options: ScreenshotOptions = { format: "png" },
+    signal?: AbortSignal
   ): Promise<ScreenshotResult> {
 
     logger.info(`[SCREENSHOT] Starting screenshot capture with format: ${options.format}`);
 
     switch (this.device.platform) {
       case "android":
-        return await this.captureAndroidScreenshot(finalPath, options);
+        return await this.captureAndroidScreenshot(finalPath, options, signal);
       case "ios":
         return await this.captureiOSScreenshot(finalPath);
       default:
@@ -164,19 +166,20 @@ export class TakeScreenshot {
    */
   private async captureAndroidScreenshot(
     finalPath: string,
-    options: ScreenshotOptions = { format: "png" }
+    options: ScreenshotOptions = { format: "png" },
+    signal?: AbortSignal
   ): Promise<ScreenshotResult> {
 
     logger.info(`[SCREENSHOT] Starting screenshot capture with format: ${options.format}`);
 
     // Try base64 approach first (faster for smaller screenshots)
     try {
-      return await this.captureScreenshotBase64(finalPath, options);
+      return await this.captureScreenshotBase64(finalPath, options, signal);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       if (errorMessage.includes("maxBuffer") || errorMessage.includes("stdout") || errorMessage.includes("buffer")) {
         logger.info(`[SCREENSHOT] Base64 approach failed (${errorMessage}), falling back to file pull approach`);
-        return await this.captureScreenshotFilePull(finalPath, options);
+        return await this.captureScreenshotFilePull(finalPath, options, signal);
       } else {
         // For other errors, don't fallback
         throw err;
@@ -206,7 +209,8 @@ export class TakeScreenshot {
    */
   private async captureScreenshotBase64(
     finalPath: string,
-    options: ScreenshotOptions = { format: "png" }
+    options: ScreenshotOptions = { format: "png" },
+    signal?: AbortSignal
   ): Promise<ScreenshotResult> {
     const startTime = Date.now();
     logger.info(`[SCREENSHOT] Trying base64 approach`);
@@ -218,7 +222,7 @@ export class TakeScreenshot {
     const command = `shell "screencap -p ${tempFile} && base64 ${tempFile} && rm ${tempFile}"`;
     // Use larger maxBuffer (50MB) to handle high-resolution screenshots
     const maxBuffer = 50 * 1024 * 1024; // 50MB
-    const result = await this.adb.executeCommand(command, undefined, maxBuffer);
+    const result = await this.adb.executeCommand(command, undefined, maxBuffer, undefined, signal);
     const cmdDuration = Date.now() - cmdStartTime;
     logger.info(`[SCREENSHOT] Combined ADB command took ${cmdDuration}ms`);
 
@@ -276,7 +280,8 @@ export class TakeScreenshot {
    */
   private async captureScreenshotFilePull(
     finalPath: string,
-    options: ScreenshotOptions = { format: "png" }
+    options: ScreenshotOptions = { format: "png" },
+    signal?: AbortSignal
   ): Promise<ScreenshotResult> {
     const startTime = Date.now();
     logger.info(`[SCREENSHOT] Using file pull approach`);
@@ -288,19 +293,19 @@ export class TakeScreenshot {
       const tempLocalFile = `${finalPath}.temp`;
 
       // Step 1: Take screenshot on device
-      const screencapResult = await this.adb.executeCommand(`shell screencap -p ${tempFile}`);
+      const screencapResult = await this.adb.executeCommand(`shell screencap -p ${tempFile}`, undefined, undefined, undefined, signal);
       if (screencapResult.stderr && screencapResult.stderr.includes("error")) {
         throw new Error(`Screencap failed: ${screencapResult.stderr}`);
       }
 
       // Step 2: Pull file from device to local filesystem
-      const pullResult = await this.adb.executeCommand(`pull ${tempFile} ${tempLocalFile}`);
+      const pullResult = await this.adb.executeCommand(`pull ${tempFile} ${tempLocalFile}`, undefined, undefined, undefined, signal);
       if (pullResult.stderr && pullResult.stderr.includes("error")) {
         throw new Error(`Failed to pull screenshot: ${pullResult.stderr}`);
       }
 
       // Step 3: Clean up temp file on device
-      await this.adb.executeCommand(`shell rm ${tempFile}`);
+      await this.adb.executeCommand(`shell rm ${tempFile}`, undefined, undefined, undefined, signal);
 
       const cmdDuration = Date.now() - cmdStartTime;
       logger.info(`[SCREENSHOT] Screenshot capture and pull took ${cmdDuration}ms`);
