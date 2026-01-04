@@ -221,6 +221,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           },
           onRequestSelectAll = { requestId ->
             performSelectAll(requestId)
+          },
+          onRequestAction = { requestId, action, resourceId ->
+            performNodeAction(requestId, action, resourceId)
           }
       )
       webSocketServer.start()
@@ -919,6 +922,93 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
+   * Perform a node action using AccessibilityService.
+   * Supports actions like long_click on a specific resource-id.
+   */
+  private fun performNodeAction(requestId: String?, action: String, resourceId: String?) {
+    val startTime = System.currentTimeMillis()
+    Log.d(TAG, "performNodeAction: action='$action' resourceId=$resourceId")
+    perfProvider.serial("performNodeAction")
+
+    try {
+      perfProvider.startOperation("findNode")
+      val targetNode = if (resourceId != null) {
+        findNodeByResourceId(rootInActiveWindow, resourceId)
+      } else {
+        rootInActiveWindow?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+      }
+      perfProvider.endOperation("findNode")
+
+      if (targetNode == null) {
+        perfProvider.end()
+        val errorTime = System.currentTimeMillis()
+        val error = if (resourceId != null) {
+          "No node found with resource-id: $resourceId"
+        } else {
+          "No focused node found for action"
+        }
+        Log.w(TAG, error)
+        serviceScope.launch {
+          broadcastActionResult(requestId, action, false, error, errorTime - startTime)
+        }
+        return
+      }
+
+      val actionId = when (action) {
+        "long_click" -> android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK
+        "click" -> android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK
+        "focus" -> android.view.accessibility.AccessibilityNodeInfo.ACTION_FOCUS
+        else -> null
+      }
+
+      if (actionId == null) {
+        perfProvider.end()
+        targetNode.recycle()
+        val errorTime = System.currentTimeMillis()
+        val error = "Unsupported action: $action"
+        Log.w(TAG, error)
+        serviceScope.launch {
+          broadcastActionResult(requestId, action, false, error, errorTime - startTime)
+        }
+        return
+      }
+
+      perfProvider.startOperation("performAction")
+      val success = targetNode.performAction(actionId)
+      targetNode.recycle()
+      perfProvider.endOperation("performAction")
+      perfProvider.end()
+
+      Log.d(TAG, "Action completed: action=$action success=$success")
+
+      if (success) {
+        val freshHierarchy = hierarchyDebouncer.extractAfterQuiescence(
+          quiescenceMs = 50L,
+          maxWaitMs = 500L,
+          pollIntervalMs = 10L
+        )
+        if (freshHierarchy != null) {
+          kotlinx.coroutines.runBlocking {
+            broadcastHierarchyUpdate(freshHierarchy, sync = true)
+          }
+        }
+      }
+
+      val totalTime = System.currentTimeMillis() - startTime
+      kotlinx.coroutines.runBlocking {
+        broadcastActionResult(requestId, action, success, if (success) null else "performAction returned false", totalTime)
+      }
+    } catch (e: Exception) {
+      perfProvider.end()
+      val errorTime = System.currentTimeMillis()
+      Log.e(TAG, "Error performing node action", e)
+      kotlinx.coroutines.runBlocking {
+        broadcastActionResult(requestId, action, false, e.message, errorTime - startTime)
+      }
+    }
+  }
+
+  /**
    * Find the next focusable node after the given node in document order.
    */
   private fun findNextFocusableNode(
@@ -1201,6 +1291,44 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.d(TAG, "Broadcasted select all result to ${webSocketServer.getConnectionCount()} clients")
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting select all result", e)
+    }
+  }
+
+  /** Broadcast action result to WebSocket clients */
+  private suspend fun broadcastActionResult(
+    requestId: String?,
+    action: String,
+    success: Boolean,
+    error: String?,
+    totalTimeMs: Long
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping action result broadcast")
+      return
+    }
+
+    try {
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"action_result","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","action":"$action"""")
+          append(""","success":$success""")
+          append(""","totalTimeMs":$totalTimeMs""")
+          if (error != null) {
+            append(""","error":"$error"""")
+          }
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted action result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting action result", e)
     }
   }
 

@@ -10,5 +10,16 @@ export interface TapOnElementOptions {
   containerElementId?: string;
 
   // Action to perform
-  action: "tap" | "doubleTap" | "longPress" | "focus";
+  action: "tap" | "doubleTap" | "longPress" | "longPressDrag" | "focus";
+
+  // Optional duration for long press actions (milliseconds)
+  duration?: number;
+
+  // Drag target for long press drag
+  dragTo?: {
+    x?: number;
+    y?: number;
+    text?: string;
+    elementId?: string;
+  };
 }

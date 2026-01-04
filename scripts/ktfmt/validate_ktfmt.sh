@@ -119,26 +119,49 @@ get_touched_files() {
 declare -a files_to_process
 errors=""
 
+supports_mapfile=false
+if builtin help mapfile >/dev/null 2>&1; then
+    supports_mapfile=true
+fi
+
 if [[ -n "$ONLY_CHANGED_SINCE_SHA" ]]; then
     echo -e "${YELLOW}Processing files changed since SHA: $ONLY_CHANGED_SINCE_SHA${NC}"
 
     # Get list of changed files since SHA
-    mapfile -t changed_files < <(get_changed_files_since_sha "$ONLY_CHANGED_SINCE_SHA")
-    files_to_process=("${changed_files[@]}")
+    if [[ "$supports_mapfile" == "true" ]]; then
+        mapfile -t changed_files < <(get_changed_files_since_sha "$ONLY_CHANGED_SINCE_SHA")
+        files_to_process=("${changed_files[@]}")
+    else
+        while IFS= read -r file; do
+            files_to_process+=("$file")
+        done < <(get_changed_files_since_sha "$ONLY_CHANGED_SINCE_SHA")
+    fi
 
 elif [[ "${ONLY_TOUCHED_FILES}" == "true" ]]; then
     echo -e "${YELLOW}Processing only touched/staged files${NC}"
 
     # Get list of touched files
-    mapfile -t touched_files < <(get_touched_files)
-    files_to_process=("${touched_files[@]}")
+    if [[ "$supports_mapfile" == "true" ]]; then
+        mapfile -t touched_files < <(get_touched_files)
+        files_to_process=("${touched_files[@]}")
+    else
+        while IFS= read -r file; do
+            files_to_process+=("$file")
+        done < <(get_touched_files)
+    fi
 
 else
     echo -e "${YELLOW}Processing all Kotlin files in the project${NC}"
 
     # Get all Kotlin files
-    mapfile -t all_files < <(find_all_kotlin_files)
-    files_to_process=("${all_files[@]}")
+    if [[ "$supports_mapfile" == "true" ]]; then
+        mapfile -t all_files < <(find_all_kotlin_files)
+        files_to_process=("${all_files[@]}")
+    else
+        while IFS= read -r file; do
+            files_to_process+=("$file")
+        done < <(find_all_kotlin_files)
+    fi
 fi
 
 # Check if we have files to process

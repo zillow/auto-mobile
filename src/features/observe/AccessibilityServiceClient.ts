@@ -143,6 +143,17 @@ export interface A11ySelectAllResult {
 }
 
 /**
+ * Interface for accessibility action result
+ */
+export interface A11yActionResult {
+  success: boolean;
+  action: string;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
  * Interface for cached hierarchy with metadata
  */
 interface CachedHierarchy {
@@ -314,6 +325,22 @@ export interface AccessibilityService {
   ): Promise<A11ySelectAllResult>;
 
   /**
+   * Request a node action (e.g., long_click) via the accessibility service
+   *
+   * @param action - Action name (e.g., long_click)
+   * @param resourceId - Optional resource-id to target a specific element
+   * @param timeoutMs - Maximum time to wait for action completion in milliseconds
+   * @param perf - Optional performance tracker for timing
+   * @returns Promise<A11yActionResult> - The action result with timing information
+   */
+  requestAction(
+    action: string,
+    resourceId?: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yActionResult>;
+
+  /**
    * Request a screenshot from the accessibility service
    *
    * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
@@ -395,6 +422,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Select all handling
   private pendingSelectAllResolve: ((result: A11ySelectAllResult) => void) | null = null;
   private pendingSelectAllRequestId: string | null = null;
+
+  // Action handling
+  private pendingActionResolve: ((result: A11yActionResult) => void) | null = null;
+  private pendingActionRequestId: string | null = null;
 
   // WebSocket factory for testing
   private webSocketFactory: (url: string) => WebSocket;
@@ -773,6 +804,24 @@ export class AccessibilityServiceClient implements AccessibilityService {
           success: selectAllMessage.success,
           totalTimeMs: selectAllMessage.totalTimeMs,
           error: selectAllMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle action result
+      if (message.type === "action_result" && this.pendingActionResolve) {
+        const actionMessage = message as any;
+        const perfTiming = actionMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Action result (requestId: ${actionMessage.requestId}, action: ${actionMessage.action}, success: ${actionMessage.success}, totalTimeMs: ${actionMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingActionResolve;
+        this.pendingActionResolve = null;
+        this.pendingActionRequestId = null;
+        resolve({
+          success: actionMessage.success,
+          action: actionMessage.action,
+          totalTimeMs: actionMessage.totalTimeMs,
+          error: actionMessage.error,
           perfTiming
         });
       }
@@ -1869,6 +1918,97 @@ export class AccessibilityServiceClient implements AccessibilityService {
       logger.warn(`[ACCESSIBILITY_SERVICE] Select all request failed after ${duration}ms: ${error}`);
       return {
         success: false,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request a node action via the accessibility service.
+   *
+   * @param action - The action name (e.g., long_click)
+   * @param resourceId - Optional resource-id to target a specific element
+   * @param timeoutMs - Maximum time to wait for action completion in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11yActionResult> - The action result with timing information
+   */
+  async requestAction(
+    action: string,
+    resourceId?: string,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yActionResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for action");
+        return {
+          success: false,
+          action,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send action request
+      const requestId = `action_${Date.now()}_${generateSecureId()}`;
+      this.pendingActionRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the action result
+      const actionPromise = new Promise<A11yActionResult>(resolve => {
+        this.pendingActionResolve = resolve;
+
+        // Set up timeout
+        this.timer.setTimeout(() => {
+          if (this.pendingActionResolve === resolve) {
+            this.pendingActionResolve = null;
+            this.pendingActionRequestId = null;
+            resolve({
+              success: false,
+              action,
+              totalTimeMs: Date.now() - startTime,
+              error: `Action timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_action",
+          requestId,
+          action,
+          resourceId
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForAction", () => actionPromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Action completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, action=${result.action}`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Action failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Action request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        action,
         totalTimeMs: duration,
         error: `${error}`
       };

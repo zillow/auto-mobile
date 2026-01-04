@@ -9,4 +9,7 @@ export interface LongPressResult {
   y: number;
   observation?: ObserveResult;
   error?: string;
+  pressRecognized?: boolean;
+  contextMenuOpened?: boolean;
+  selectionStarted?: boolean;
 }

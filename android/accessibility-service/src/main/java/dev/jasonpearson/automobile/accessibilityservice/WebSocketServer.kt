@@ -37,8 +37,8 @@ data class WebSocketRequest(
     // Text input parameters
     val text: String? = null,
     val resourceId: String? = null,  // Optional: target specific element by resource-id
-    // IME action parameters
-    val action: String? = null,  // IME action: done, next, search, send, go, previous
+    // Action parameters (IME or node actions)
+    val action: String? = null,  // IME action: done, next, search, send, go, previous; node action: long_click
     // Stale check parameters
     val sinceTimestamp: Long? = null  // For request_hierarchy_if_stale: extract only if no events since this timestamp
 )
@@ -57,7 +57,8 @@ class WebSocketServer(
     private val onRequestSwipe: ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? = null,
     private val onRequestSetText: ((requestId: String?, text: String, resourceId: String?) -> Unit)? = null,
     private val onRequestImeAction: ((requestId: String?, action: String) -> Unit)? = null,
-    private val onRequestSelectAll: ((requestId: String?) -> Unit)? = null
+    private val onRequestSelectAll: ((requestId: String?) -> Unit)? = null,
+    private val onRequestAction: ((requestId: String?, action: String, resourceId: String?) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "WebSocketServer"
@@ -313,6 +314,15 @@ class WebSocketServer(
                 "request_select_all" -> {
                     Log.d(TAG, "Received select_all request (requestId: ${request.requestId})")
                     onRequestSelectAll?.invoke(request.requestId)
+                }
+                "request_action" -> {
+                    Log.d(TAG, "Received action request (requestId: ${request.requestId})")
+                    val action = request.action
+                    if (action != null) {
+                        onRequestAction?.invoke(request.requestId, action, request.resourceId)
+                    } else {
+                        Log.w(TAG, "Action request missing required action")
+                    }
                 }
                 else -> {
                     Log.d(TAG, "Unknown message type: ${request.type}")

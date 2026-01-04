@@ -218,11 +218,13 @@ export class TapOnElement extends BaseVisualChange {
 
     const perf = createGlobalPerformanceTracker();
     perf.serial("tapOnElement");
+    let previousObserveResult: ObserveResult | null = null;
 
     try {
       // Tap on the calculated point using observedChange
-      return await this.observedInteraction(
+      const result = await this.observedInteraction(
         async (observeResult: ObserveResult) => {
+          previousObserveResult = observeResult;
 
           const viewHierarchy = observeResult.viewHierarchy;
           if (!viewHierarchy) {
@@ -234,8 +236,13 @@ export class TapOnElement extends BaseVisualChange {
             this.findElementToTap(options, viewHierarchy, 0, observeResult)
           );
           const tapPoint = this.elementUtils.getElementCenter(element);
+          const action = options.action;
+          const longPressDuration = this.getLongPressDuration(options, this.device.platform);
+          const dragTarget = action === "longPressDrag"
+            ? this.resolveDragTarget(options, viewHierarchy)
+            : null;
 
-          if (options.action === "focus") {
+          if (action === "focus") {
             // Check if element is already focused
             const isFocused = this.elementUtils.isElementFocused(element);
 
@@ -260,10 +267,10 @@ export class TapOnElement extends BaseVisualChange {
           await perf.track("executeTap", async () => {
             switch (this.device.platform) {
               case "android":
-                await this.executeAndroidTap(options.action, tapPoint.x, tapPoint.y);
+                await this.executeAndroidTap(options.action, tapPoint.x, tapPoint.y, longPressDuration, element, dragTarget);
                 break;
               case "ios":
-                await this.executeiOSTap(options.action, tapPoint.x, tapPoint.y);
+                await this.executeiOSTap(options.action, tapPoint.x, tapPoint.y, longPressDuration, dragTarget);
                 break;
               default:
                 throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
@@ -289,6 +296,14 @@ export class TapOnElement extends BaseVisualChange {
           perf
         }
       );
+      if (options.action === "longPress" || options.action === "longPressDrag") {
+        const metadata = this.detectLongPressMetadata(previousObserveResult, result.observation);
+        return {
+          ...result,
+          ...metadata
+        };
+      }
+      return result;
     } catch (error) {
       perf.end();
 
@@ -321,12 +336,27 @@ export class TapOnElement extends BaseVisualChange {
    * @param action - The tap action to perform
    * @param x - X coordinate
    * @param y - Y coordinate
+   * @param durationMs - Long press duration in milliseconds
+   * @param element - Target element
+   * @param dragTarget - Optional drag target
    */
-  private async executeAndroidTap(action: string, x: number, y: number): Promise<void> {
+  private async executeAndroidTap(
+    action: string,
+    x: number,
+    y: number,
+    durationMs: number,
+    element: Element,
+    dragTarget?: { x: number; y: number } | null
+  ): Promise<void> {
     if (action === "tap") {
       await this.adb.executeCommand(`shell input tap ${x} ${y}`);
     } else if (action === "longPress") {
-      await this.adb.executeCommand(`shell input swipe ${x} ${y} ${x} ${y} 1000`);
+      await this.executeAndroidLongPress(x, y, durationMs, element?.["resource-id"]);
+    } else if (action === "longPressDrag") {
+      if (!dragTarget) {
+        throw new ActionableError("longPressDrag requires a dragTo target");
+      }
+      await this.executeAndroidLongPressDrag(x, y, dragTarget.x, dragTarget.y, durationMs);
     } else if (action === "doubleTap") {
       await this.adb.executeCommand(`shell input tap ${x} ${y}`);
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -339,18 +369,218 @@ export class TapOnElement extends BaseVisualChange {
    * @param action - The tap action to perform
    * @param x - X coordinate
    * @param y - Y coordinate
+   * @param durationMs - Long press duration in milliseconds
+   * @param dragTarget - Optional drag target
    */
-  private async executeiOSTap(action: string, x: number, y: number): Promise<void> {
+  private async executeiOSTap(
+    action: string,
+    x: number,
+    y: number,
+    durationMs: number,
+    dragTarget?: { x: number; y: number } | null
+  ): Promise<void> {
     if (action === "tap") {
       await this.axe.tap(x, y);
     } else if (action === "longPress") {
       // iOS long press is implemented as a tap with longer duration
-      await this.axe.tap(x, y, 1000);
+      await this.axe.tap(x, y, durationMs);
+    } else if (action === "longPressDrag") {
+      if (!dragTarget) {
+        throw new ActionableError("longPressDrag requires a dragTo target");
+      }
+      await this.axe.tap(x, y, durationMs);
+      await this.axe.swipe(x, y, dragTarget.x, dragTarget.y);
     } else if (action === "doubleTap") {
       // iOS double tap - perform two quick taps
       await this.axe.tap(x, y);
       await new Promise(resolve => setTimeout(resolve, 200));
       await this.axe.tap(x, y);
     }
+  }
+
+  private getLongPressDuration(options: TapOnElementOptions, platform: "android" | "ios"): number {
+    if (typeof options.duration === "number" && options.duration > 0) {
+      return options.duration;
+    }
+    return platform === "android" ? 500 : 1000;
+  }
+
+  private resolveDragTarget(
+    options: TapOnElementOptions,
+    viewHierarchy: ViewHierarchyResult
+  ): { x: number; y: number } {
+    const dragTo = options.dragTo;
+    if (!dragTo) {
+      throw new ActionableError("longPressDrag requires a dragTo target");
+    }
+
+    if (typeof dragTo.x === "number" && typeof dragTo.y === "number") {
+      return { x: dragTo.x, y: dragTo.y };
+    }
+
+    if (dragTo.text) {
+      const targetElement = this.elementUtils.findElementByText(
+        viewHierarchy,
+        dragTo.text,
+        options.containerElementId,
+        true,
+        false
+      );
+      if (!targetElement) {
+        throw new ActionableError(`Drag target not found with provided text '${dragTo.text}'`);
+      }
+      return this.elementUtils.getElementCenter(targetElement);
+    }
+
+    if (dragTo.elementId) {
+      const targetElement = this.elementUtils.findElementByResourceId(
+        viewHierarchy,
+        dragTo.elementId,
+        options.containerElementId
+      );
+      if (!targetElement) {
+        throw new ActionableError(`Drag target not found with provided elementId '${dragTo.elementId}'`);
+      }
+      return this.elementUtils.getElementCenter(targetElement);
+    }
+
+    throw new ActionableError("Drag target must include coordinates, text, or elementId");
+  }
+
+  private async executeAndroidLongPress(
+    x: number,
+    y: number,
+    durationMs: number,
+    resourceId?: string
+  ): Promise<void> {
+    if (resourceId) {
+      try {
+        const result = await this.accessibilityService.requestAction("long_click", resourceId);
+        if (result.success) {
+          return;
+        }
+        logger.warn(`[TapOnElement] Accessibility long click failed: ${result.error}`);
+      } catch (error) {
+        logger.warn(`[TapOnElement] Accessibility long click error: ${error}`);
+      }
+    }
+
+    try {
+      await this.adb.executeCommand(`shell input touchscreen swipe ${x} ${y} ${x} ${y} ${durationMs}`);
+    } catch (error) {
+      logger.warn(`[TapOnElement] touch input swipe failed, falling back to input swipe: ${error}`);
+      await this.adb.executeCommand(`shell input swipe ${x} ${y} ${x} ${y} ${durationMs}`);
+    }
+  }
+
+  private async executeAndroidLongPressDrag(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+    durationMs: number
+  ): Promise<void> {
+    try {
+      await this.adb.executeCommand(`shell input touchscreen swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`);
+    } catch (error) {
+      logger.warn(`[TapOnElement] touch input swipe failed, falling back to input swipe: ${error}`);
+      await this.adb.executeCommand(`shell input swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`);
+    }
+  }
+
+  private detectLongPressMetadata(
+    previousObservation: ObserveResult | null,
+    currentObservation?: ObserveResult
+  ): {
+    pressRecognized: boolean;
+    contextMenuOpened: boolean;
+    selectionStarted: boolean;
+  } {
+    const previousHierarchy = previousObservation?.viewHierarchy;
+    const currentHierarchy = currentObservation?.viewHierarchy;
+    const contextMenuOpened = this.detectContextMenuOpened(previousHierarchy, currentHierarchy);
+    const selectionStarted = this.detectSelectionStarted(currentHierarchy);
+    const windowChange = this.detectNewWindow(previousHierarchy, currentHierarchy);
+
+    return {
+      pressRecognized: contextMenuOpened || selectionStarted || windowChange,
+      contextMenuOpened,
+      selectionStarted
+    };
+  }
+
+  private detectContextMenuOpened(
+    previousHierarchy?: ViewHierarchyResult,
+    currentHierarchy?: ViewHierarchyResult
+  ): boolean {
+    if (!currentHierarchy?.windows || currentHierarchy.windows.length === 0) {
+      return false;
+    }
+    const previousWindowTypes = new Set(
+      (previousHierarchy?.windows || []).map(window => window.windowType.toLowerCase())
+    );
+
+    return currentHierarchy.windows.some(window => {
+      const windowType = window.windowType.toLowerCase();
+      const isMenu = windowType.includes("menu") || windowType.includes("popup");
+      return isMenu && !previousWindowTypes.has(windowType);
+    });
+  }
+
+  private detectNewWindow(
+    previousHierarchy?: ViewHierarchyResult,
+    currentHierarchy?: ViewHierarchyResult
+  ): boolean {
+    const previousWindows = previousHierarchy?.windows || [];
+    const currentWindows = currentHierarchy?.windows || [];
+    if (currentWindows.length === 0) {
+      return false;
+    }
+    const previousSignatures = new Set(
+      previousWindows.map(window => `${window.windowId}:${window.windowType}:${window.windowLayer}`)
+    );
+    return currentWindows.some(window =>
+      !previousSignatures.has(`${window.windowId}:${window.windowType}:${window.windowLayer}`)
+    );
+  }
+
+  private detectSelectionStarted(currentHierarchy?: ViewHierarchyResult): boolean {
+    if (!currentHierarchy) {
+      return false;
+    }
+
+    const roots = this.elementUtils.extractRootNodes(currentHierarchy);
+    let selectionFound = false;
+    const selectionKeyPairs: Array<[string, string]> = [
+      ["textSelectionStart", "textSelectionEnd"],
+      ["selectionStart", "selectionEnd"]
+    ];
+
+    for (const root of roots) {
+      this.elementUtils.traverseNode(root, (node: any) => {
+        if (selectionFound) {
+          return;
+        }
+        const props = this.elementUtils.extractNodeProperties(node);
+        for (const [startKey, endKey] of selectionKeyPairs) {
+          const startValue = props?.[startKey] ?? props?.[startKey.toLowerCase()];
+          const endValue = props?.[endKey] ?? props?.[endKey.toLowerCase()];
+          if (startValue === undefined || endValue === undefined) {
+            continue;
+          }
+          const startNumeric = typeof startValue === "string" ? parseInt(startValue, 10) : Number(startValue);
+          const endNumeric = typeof endValue === "string" ? parseInt(endValue, 10) : Number(endValue);
+          if (!Number.isNaN(startNumeric) && !Number.isNaN(endNumeric) && endNumeric > startNumeric) {
+            selectionFound = true;
+            return;
+          }
+        }
+      });
+      if (selectionFound) {
+        break;
+      }
+    }
+
+    return selectionFound;
   }
 }

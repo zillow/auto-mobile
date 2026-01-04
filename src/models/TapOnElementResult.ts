@@ -12,4 +12,7 @@ export interface TapOnElementResult {
   observation?: ObserveResult;
   error?: string;
   debug?: ToolDebugInfo;
+  pressRecognized?: boolean;
+  contextMenuOpened?: boolean;
+  selectionStarted?: boolean;
 }

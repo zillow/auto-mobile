@@ -32,6 +32,7 @@ fun DiscoverVideoScreen(
   val tabs: Map<String, @Composable () -> Unit> =
       mapOf(
           "Tap" to { TapScreen() },
+          "Long Press" to { LongPressScreen() },
           "Swipe" to { SwipeScreen() },
           "Media" to { VideoListScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer) },
           "Text" to { InputTextScreen() },

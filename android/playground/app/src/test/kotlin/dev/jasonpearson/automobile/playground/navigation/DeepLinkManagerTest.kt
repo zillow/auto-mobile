@@ -146,12 +146,13 @@ class DeepLinkManagerTest {
   @Test
   fun testGetAllDeepLinks() {
     val allLinks = DeepLinkManager.getAllDeepLinks()
-    assertEquals(13, allLinks.size)
+    assertEquals(14, allLinks.size)
 
     val linkUrls = allLinks.map { it.second }
     assertTrue(linkUrls.contains("automobile://playground/onboarding"))
     assertTrue(linkUrls.contains("automobile://playground/login"))
     assertTrue(linkUrls.contains("automobile://playground/home"))
+    assertTrue(linkUrls.contains("automobile://playground/long_press"))
     assertTrue(linkUrls.contains("automobile://playground/video_player/sample123"))
     assertTrue(linkUrls.contains("automobile://playground/slides/0"))
     assertTrue(linkUrls.contains("automobile://playground/slides/3"))

@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:android/playground/settings/src/test/java/dev/jasonpearson/automobile/settings/ExampleUnitTest.kt
 package dev.jasonpearson.automobile.settings
-========
-package dev.jasonpearson.automobile.discover
->>>>>>>> main:android/playground/discover/src/test/java/dev/jasonpearson/automobile/discover/ExampleUnitTest.kt
 
 import org.junit.Assert.*
 import org.junit.Test

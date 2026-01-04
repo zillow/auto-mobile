@@ -55,7 +55,14 @@ export interface TapOnArgs {
   containerElementId?: string;
   text?: string;
   id?: string;
-  action: "tap" | "doubleTap" | "longPress" | "focus";
+  action: "tap" | "doubleTap" | "longPress" | "longPressDrag" | "focus";
+  duration?: number;
+  dragTo?: {
+    x?: number;
+    y?: number;
+    text?: string;
+    elementId?: string;
+  };
   platform: Platform;
 }
 
@@ -105,9 +112,16 @@ export const shakeSchema = z.object({
 
 export const tapOnSchema = z.object({
   containerElementId: z.string().optional().describe("Container element ID to restrict the search within"),
-  action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action to perform on the element"),
+  action: z.enum(["tap", "doubleTap", "longPress", "longPressDrag", "focus"]).describe("Action to perform on the element"),
   text: z.string().optional().describe("Text to tap on"),
   id: z.string().optional().describe("Element ID to tap on"),
+  duration: z.number().optional().describe("Long press duration in milliseconds"),
+  dragTo: z.object({
+    x: z.number().optional().describe("Drag target X coordinate"),
+    y: z.number().optional().describe("Drag target Y coordinate"),
+    text: z.string().optional().describe("Text of the drag target element"),
+    elementId: z.string().optional().describe("Element ID of the drag target element"),
+  }).optional().describe("Drag target for long press drag action"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   // Framework parameters for device management (optional)
   sessionUuid: z.string().optional(),
@@ -378,6 +392,8 @@ export function registerInteractionTools() {
       text: args.text,
       elementId: args.id,
       action: args.action,
+      duration: args.duration,
+      dragTo: args.dragTo,
     }, progress);
 
     return createJSONToolResponse({
