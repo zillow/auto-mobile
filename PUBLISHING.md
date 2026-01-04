@@ -41,6 +41,7 @@ npm publish --access public
 
 - `prepublishOnly` temporarily rewrites `README.md` via `scripts/npm/transform-readme.js`.
 - `postpublish` restores `README.md` from the backup.
+- Release workflow updates `src/constants/release.ts` using `scripts/generate-release-constants.sh` with `RELEASE_VERSION` set.
 
 ## Troubleshooting
 

@@ -1,11 +1,15 @@
 /**
  * Release constants - DO NOT EDIT MANUALLY
  *
- * This file contains release-specific constants that are updated automatically
- * during the release process. The values below are defaults for local development.
+ * This file contains release-specific constants that are updated automatically.
+ * The values below are defaults for local development.
  *
- * During CI/CD release builds, these values are replaced by the actual release
- * version and APK checksum via scripts/generate-release-constants.js
+ * The APK checksum is updated by the merge workflow when the accessibility
+ * service APK changes. The release workflow verifies the checksum matches
+ * the built APK before publishing.
+ *
+ * During CI/CD release builds, the release version is replaced via
+ * scripts/generate-release-constants.sh
  *
  * For local development, RELEASE_VERSION "latest" fetches from the most recent
  * GitHub release, and the empty checksum skips verification (not recommended for production).
