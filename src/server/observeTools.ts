@@ -59,9 +59,12 @@ export function registerObserveTools() {
       // For iOS, return simple package names
       if (device.platform === "android") {
         const apps = await listInstalledApps.executeDetailed();
+        const profileAppCount = Object.values(apps.profiles).reduce((count, profileApps) => count + profileApps.length, 0);
+        const profileCount = Object.keys(apps.profiles).length;
         return createJSONToolResponse({
-          message: `Listed ${apps.length} app installation(s) across all user profiles`,
-          apps
+          message: `Listed ${profileAppCount} user app(s) across ${profileCount} profile(s); ${apps.system.length} system app(s) deduped`,
+          profiles: apps.profiles,
+          system: apps.system
         });
       } else {
         const apps = await listInstalledApps.execute();
@@ -85,7 +88,7 @@ export function registerObserveTools() {
 
   ToolRegistry.registerDeviceAware(
     "listApps",
-    "List all apps installed on the device. For Android, returns detailed info including userId (0=personal, 10+=work profile), foreground status, and recent status. For iOS, returns package names only.",
+    "List all apps installed on the device. For Android, returns user apps grouped by profile and system apps under a separate key with profile coverage. For iOS, returns package names only.",
     listAppsSchema,
     listAppsHandler
   );
