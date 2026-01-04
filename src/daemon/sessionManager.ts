@@ -54,7 +54,7 @@ export class SessionManager {
   // Cleanup interval: every 5 minutes
   private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
-  static readonly DEFAULT_HEARTBEAT_TIMEOUT_MS = 60 * 1000;
+  static readonly DEFAULT_HEARTBEAT_TIMEOUT_MS = 10 * 1000;
 
   constructor() {
     // Start periodic cleanup of expired sessions
