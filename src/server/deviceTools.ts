@@ -136,6 +136,9 @@ export function registerDeviceTools() {
         platform: args.device.platform
       });
     } catch (error) {
+      if (error instanceof ActionableError) {
+        throw error;
+      }
       throw new ActionableError(`Failed to start ${args.device.platform} device: ${error}`);
     }
   };

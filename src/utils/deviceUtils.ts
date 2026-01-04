@@ -130,6 +130,13 @@ export class MultiPlatformDeviceManager implements PlatformDeviceManager {
   async startDevice(
     device: DeviceInfo
   ): Promise<ChildProcess> {
+    const isRunning = await this.isDeviceImageRunning(device);
+    if (isRunning) {
+      throw new ActionableError(
+        `${device.platform} device '${device.name}' is already running`
+      );
+    }
+
     switch (device.platform) {
       case "android":
         return this.emulator.startEmulator(device.name);
