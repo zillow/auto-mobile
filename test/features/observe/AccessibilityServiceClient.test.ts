@@ -4,8 +4,11 @@ import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import { BootedDevice } from "../../../src/models";
-import WebSocket from "ws";
-import { createInstantFailureWebSocketFactory, createSuccessWebSocketFactory } from "../../fakes/FakeWebSocket";
+import {
+  FakeWebSocket,
+  createInstantFailureWebSocketFactory,
+  createSuccessWebSocketFactory
+} from "../../fakes/FakeWebSocket";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("AccessibilityServiceClient", function() {
@@ -14,7 +17,6 @@ describe("AccessibilityServiceClient", function() {
   let testDevice: BootedDevice;
   let adbClient: AdbClient;
   let fakeTimer: FakeTimer;
-  let mockWebSocketServer: WebSocket.Server | null = null;
   const serverPort: number = 8765;
 
   beforeEach(async function() {
@@ -49,7 +51,12 @@ describe("AccessibilityServiceClient", function() {
     AndroidAccessibilityServiceManager.resetInstances();
     AccessibilityServiceClient.resetInstances();
 
-    accessibilityServiceClient = AccessibilityServiceClient.getInstance(testDevice, adbClient);
+    accessibilityServiceClient = AccessibilityServiceClient.createForTesting(
+      testDevice,
+      adbClient,
+      createSuccessWebSocketFactory(),
+      fakeTimer
+    );
     AndroidAccessibilityServiceManager.getInstance(testDevice, adbClient).clearAvailabilityCache();
 
     // Clear any cached hierarchy data to prevent cache contamination between tests (issue #72)
@@ -61,46 +68,25 @@ describe("AccessibilityServiceClient", function() {
     if (accessibilityServiceClient) {
       await accessibilityServiceClient.close();
     }
-
-    // Close mock server and wait for it to fully close
-    if (mockWebSocketServer) {
-      await new Promise<void>(resolve => {
-        mockWebSocketServer!.close(() => {
-          resolve();
-        });
-      });
-      mockWebSocketServer = null;
-    }
-
-    // Give a small delay for port to be fully released
-    await new Promise(resolve => setTimeout(resolve, 100));
   });
 
-  /**
-   * Helper to create a mock WebSocket server
-   */
-  function createWebSocketServer(onConnection?: (ws: WebSocket) => void): Promise<void> {
-    return new Promise(resolve => {
-      mockWebSocketServer = new WebSocket.Server({ port: serverPort });
+  const createCapturingWebSocketFactory = (): {
+    factory: (url: string) => FakeWebSocket;
+    getSocket: () => FakeWebSocket | null;
+  } => {
+    let socket: FakeWebSocket | null = null;
 
-      mockWebSocketServer.on("connection", ws => {
-        // Send connection confirmation
-        ws.send(JSON.stringify({ type: "connected", id: 1 }));
-
-        if (onConnection) {
-          onConnection(ws);
-        }
-      });
-
-      mockWebSocketServer.on("listening", () => {
-        resolve();
-      });
-    });
-  }
+    return {
+      factory: (url: string) => {
+        socket = new FakeWebSocket(url, "none");
+        return socket;
+      },
+      getSocket: () => socket
+    };
+  };
 
   describe("getLatestHierarchy", function() {
     test("should return hierarchy data when WebSocket receives fresh data", async function() {
-
       const mockHierarchyData = {
         updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
@@ -119,30 +105,39 @@ describe("AccessibilityServiceClient", function() {
         }
       };
 
-      await createWebSocketServer(ws => {
-        // Send hierarchy update shortly after connection
-        setTimeout(() => {
-          ws.send(JSON.stringify({
-            type: "hierarchy_update",
-            timestamp: Date.now(),
-            data: mockHierarchyData
-          }));
-        }, 100);
-      });
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory
+      );
 
-      const result = await accessibilityServiceClient.getLatestHierarchy(true, 2000);
+      try {
+        const resultPromise = testClient.getLatestHierarchy(true, 2000);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        const socket = getSocket();
+        expect(socket).not.toBeNull();
+        socket!.simulateMessage(JSON.stringify({
+          type: "hierarchy_update",
+          timestamp: Date.now(),
+          data: mockHierarchyData
+        }));
 
-      expect(result).not.toBeNull();
-      expect(result.hierarchy).not.toBeNull();
-      expect(result.fresh).toBe(true);
-      expect(result.updatedAt).toBe(1750934583218);
-      expect(result.hierarchy!.updatedAt).toBe(1750934583218);
-      expect(result.hierarchy!.packageName).toBe("com.google.android.deskclock");
-      expect(result.hierarchy!.hierarchy.text).toBe("6:43 AM");
+        const result = await resultPromise;
+
+        expect(result).not.toBeNull();
+        expect(result.hierarchy).not.toBeNull();
+        expect(result.fresh).toBe(true);
+        expect(result.updatedAt).toBe(1750934583218);
+        expect(result.hierarchy!.updatedAt).toBe(1750934583218);
+        expect(result.hierarchy!.packageName).toBe("com.google.android.deskclock");
+        expect(result.hierarchy!.hierarchy.text).toBe("6:43 AM");
+      } finally {
+        await testClient.close();
+      }
     });
 
     test("should return cached data when not waiting for fresh data", async function() {
-
       const mockHierarchyData = {
         updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
@@ -152,27 +147,38 @@ describe("AccessibilityServiceClient", function() {
         }
       };
 
-      await createWebSocketServer(ws => {
-        // Send hierarchy update immediately
-        ws.send(JSON.stringify({
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory
+      );
+
+      try {
+        // First call to populate cache
+        const firstResultPromise = testClient.getLatestHierarchy(true, 2000);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        const socket = getSocket();
+        expect(socket).not.toBeNull();
+        socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
           timestamp: Date.now(),
           data: mockHierarchyData
         }));
-      });
+        await firstResultPromise;
 
-      // First call to populate cache
-      await accessibilityServiceClient.getLatestHierarchy(true, 2000);
+        // Second call should return cached data immediately
+        const startTime = Date.now();
+        const result = await testClient.getLatestHierarchy(false, 0);
+        const duration = Date.now() - startTime;
 
-      // Second call should return cached data immediately
-      const startTime = Date.now();
-      const result = await accessibilityServiceClient.getLatestHierarchy(false, 0);
-      const duration = Date.now() - startTime;
-
-      expect(result).not.toBeNull();
-      expect(result.hierarchy).not.toBeNull();
-      expect(result.hierarchy!.hierarchy.text).toBe("Cached Data");
-      expect(duration).toBeLessThan(500); // Should be fast since it's cached
+        expect(result).not.toBeNull();
+        expect(result.hierarchy).not.toBeNull();
+        expect(result.hierarchy!.hierarchy.text).toBe("Cached Data");
+        expect(duration).toBeLessThan(500); // Should be fast since it's cached
+      } finally {
+        await testClient.close();
+      }
     });
 
     test("should timeout when no data received within timeout period", async function() {

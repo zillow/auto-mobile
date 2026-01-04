@@ -3,6 +3,7 @@ import { FakeDeviceUtils } from "../../fakes/FakeDeviceUtils";
 import { FakeAvdManager } from "../../fakes/FakeAvdManager";
 import {
   createDeviceImageResourcesHandler,
+  setDeviceImageResourcesDependencies,
   resetDeviceImageResourcesDependencies,
   DeviceImagesResourceContent
 } from "../../../src/server/deviceImageResources";
@@ -16,6 +17,10 @@ describe("Device Image Resources with Fakes", () => {
   beforeEach(() => {
     fakeDeviceUtils = new FakeDeviceUtils();
     fakeAvdManager = new FakeAvdManager();
+    setDeviceImageResourcesDependencies({
+      deviceManager: fakeDeviceUtils,
+      avdManager: fakeAvdManager
+    });
   });
 
   afterEach(() => {

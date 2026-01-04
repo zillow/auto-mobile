@@ -2,12 +2,16 @@ import { expect, describe, test, beforeEach } from "bun:test";
 import { Rotate } from "../../../src/features/action/Rotate";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
-import { ExecResult, BootedDevice } from "../../../src/models";
+import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
+import { FakeWindow } from "../../fakes/FakeWindow";
+import { ExecResult, BootedDevice, ObserveResult } from "../../../src/models";
 
 describe("Rotate", () => {
   let rotate: Rotate;
   let fakeAdb: FakeAdbExecutor;
   let fakeAwaitIdle: FakeAwaitIdle;
+  let fakeObserveScreen: FakeObserveScreen;
+  let fakeWindow: FakeWindow;
   let mockDevice: BootedDevice;
 
   // Helper function to create mock ExecResult
@@ -17,6 +21,14 @@ describe("Rotate", () => {
     toString: () => stdout,
     trim: () => stdout.trim(),
     includes: (searchString: string) => stdout.includes(searchString)
+  });
+
+  // Helper function to create mock ObserveResult
+  const createObserveResult = (): ObserveResult => ({
+    timestamp: Date.now(),
+    screenSize: { width: 1080, height: 1920 },
+    systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+    viewHierarchy: { node: {} }
   });
 
 
@@ -29,21 +41,32 @@ describe("Rotate", () => {
       source: "local"
     };
 
-    // Create fake for ADB
+    // Create fakes for testing
     fakeAdb = new FakeAdbExecutor();
-
-    // Create fake for AwaitIdle
     fakeAwaitIdle = new FakeAwaitIdle();
+    fakeObserveScreen = new FakeObserveScreen();
+    fakeWindow = new FakeWindow();
 
-    // Set default responses for common commands
+    // Configure default responses
+    fakeWindow.setCachedActiveWindow(null);
+    fakeWindow.setActiveWindow({ appId: "com.test.app", activityName: "MainActivity", layoutSeqSum: 123 });
+
+    // Set up default observe screen responses with valid viewHierarchy
+    // Use a factory to create different objects on each call (avoids BaseVisualChange
+    // comparing same object references and overriding success to false)
+    fakeObserveScreen.setObserveResult(() => createObserveResult());
+
+    // Set default responses for common ADB commands
     fakeAdb.setCommandResponse("shell settings get system user_rotation", createExecResult("0"));
     fakeAdb.setCommandResponse("shell settings get system accelerometer_rotation", createExecResult("1"));
 
     // Instantiate Rotate with fake ADB
     rotate = new Rotate(mockDevice, fakeAdb);
 
-    // Inject the fake AwaitIdle to avoid real delays
+    // Inject all fakes to avoid real device operations
     (rotate as any).awaitIdle = fakeAwaitIdle;
+    (rotate as any).observeScreen = fakeObserveScreen;
+    (rotate as any).window = fakeWindow;
   });
 
   describe("getCurrentOrientation", () => {

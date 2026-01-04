@@ -88,8 +88,9 @@ export function createDeviceImageResourcesHandler(
   getDeviceImagesByPlatform: (params: Record<string, string>) => Promise<ResourceContent>;
   getDeviceImagesForPlatforms: (platforms: Platform[]) => Promise<DeviceImagesResourceContent>;
 } {
-  const deviceManager = deps?.deviceManager ?? new MultiPlatformDeviceManager();
-  const avdManager = deps?.avdManager ?? new AvdManagerService();
+  const fallbackDeps = getDependencies();
+  const deviceManager = deps?.deviceManager ?? fallbackDeps.deviceManager;
+  const avdManager = deps?.avdManager ?? fallbackDeps.avdManager;
 
   const getDeviceImagesForPlatformsImpl = async (platforms: Platform[]): Promise<DeviceImagesResourceContent> => {
     const images: DeviceImageInfo[] = [];

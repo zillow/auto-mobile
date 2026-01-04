@@ -12,7 +12,8 @@ import { RecentApps } from "../features/action/RecentApps";
 import { HomeScreen } from "../features/action/HomeScreen";
 import { Rotate } from "../features/action/Rotate";
 import { OpenURL } from "../features/action/OpenURL";
-import { ActionableError, BootedDevice } from "../models";
+import { ActionableError, BootedDevice, ViewHierarchyResult } from "../models";
+import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
 
@@ -235,6 +236,138 @@ export const rotateSchema = z.object({
   deviceId: z.string().optional()
 });
 
+const SYSTEM_TRAY_PACKAGE = "com.android.systemui";
+const SYSTEM_TRAY_RESOURCE_ID_HINTS = [
+  "notification_panel",
+  "notification_stack",
+  "notification_stack_scroller",
+  "status_bar_expanded",
+  "quick_settings",
+  "quick_settings_panel",
+  "quick_settings_container",
+  "qs_panel",
+  "qs_frame",
+  "qs_header",
+  "shade_header",
+  "expanded_status_bar"
+];
+const SYSTEM_TRAY_CLASS_HINTS = [
+  "NotificationPanel",
+  "NotificationShade",
+  "NotificationStack",
+  "QSPanel",
+  "QuickSettings",
+  "StatusBarExpanded"
+];
+
+const getNodeProperties = (node: any): Record<string, any> | null => {
+  if (!node || typeof node !== "object") {
+    return null;
+  }
+  if ("$" in node && node.$) {
+    return node.$ as Record<string, any>;
+  }
+  return node as Record<string, any>;
+};
+
+const nodeHasSystemTrayHint = (node: any): boolean => {
+  const props = getNodeProperties(node);
+  if (!props) {
+    return false;
+  }
+
+  const resourceId = String(props["resource-id"] ?? props.resourceId ?? "");
+  const className = String(props.className ?? props.class ?? "");
+  const packageName = String(props.packageName ?? props.package ?? "");
+  const isSystemUi = packageName === SYSTEM_TRAY_PACKAGE || resourceId.includes(SYSTEM_TRAY_PACKAGE);
+
+  if (!isSystemUi) {
+    return false;
+  }
+
+  const matchesResourceId = SYSTEM_TRAY_RESOURCE_ID_HINTS.some(hint => resourceId.includes(hint));
+  const matchesClassName = SYSTEM_TRAY_CLASS_HINTS.some(hint => className.includes(hint));
+
+  return matchesResourceId || matchesClassName;
+};
+
+const traverseForSystemTray = (node: any): boolean => {
+  if (!node) {
+    return false;
+  }
+
+  if (nodeHasSystemTrayHint(node)) {
+    return true;
+  }
+
+  const children = node.node;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      if (traverseForSystemTray(child)) {
+        return true;
+      }
+    }
+  } else if (children && typeof children === "object") {
+    if (traverseForSystemTray(children)) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const getHierarchyRoots = (viewHierarchy: ViewHierarchyResult): any[] => {
+  if (!viewHierarchy?.hierarchy || (viewHierarchy.hierarchy as any).error) {
+    return [];
+  }
+
+  const hierarchy: any = viewHierarchy.hierarchy;
+  if (hierarchy.node) {
+    return Array.isArray(hierarchy.node) ? hierarchy.node : [hierarchy.node];
+  }
+  if (hierarchy.hierarchy) {
+    return [hierarchy.hierarchy];
+  }
+
+  return [hierarchy];
+};
+
+const isSystemTrayOpen = (viewHierarchy?: ViewHierarchyResult): boolean => {
+  if (!viewHierarchy) {
+    return false;
+  }
+
+  const rootNodes = getHierarchyRoots(viewHierarchy);
+  for (const rootNode of rootNodes) {
+    if (traverseForSystemTray(rootNode)) {
+      return true;
+    }
+  }
+
+  if (!viewHierarchy.windows || viewHierarchy.windows.length === 0) {
+    return false;
+  }
+
+  for (const window of viewHierarchy.windows) {
+    if (!window.hierarchy) {
+      continue;
+    }
+
+    const windowHierarchy: any = window.hierarchy;
+    const windowRoots = windowHierarchy.node
+      ? (Array.isArray(windowHierarchy.node) ? windowHierarchy.node : [windowHierarchy.node])
+      : [windowHierarchy];
+
+    for (const rootNode of windowRoots) {
+      if (traverseForSystemTray(rootNode)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
 // Register tools
 export function registerInteractionTools() {
   // Tap on handler
@@ -305,6 +438,20 @@ export function registerInteractionTools() {
   // Open system tray handler
   const openSystemTrayHandler = async (device: BootedDevice, args: OpenSystemTrayArgs, progress?: ProgressCallback) => {
     try {
+      if (args.platform === "android") {
+        const observeScreen = new ObserveScreen(device);
+        const observation = await observeScreen.execute();
+
+        if (isSystemTrayOpen(observation.viewHierarchy)) {
+          return createJSONToolResponse({
+            message: "System tray already open; no swipe needed",
+            observation,
+            success: true,
+            skipped: true
+          });
+        }
+      }
+
       const swipeOn = new SwipeOn(device);
 
       const options: import("../models").SwipeOnOptions = {
