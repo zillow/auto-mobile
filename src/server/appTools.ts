@@ -6,6 +6,8 @@ import { TerminateApp } from "../features/action/TerminateApp";
 import { InstallApp } from "../features/action/InstallApp";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { addSessionUuidToSchema } from "./toolSchemaHelpers";
+import { invalidateInstalledAppsCache, notifyInstalledAppResourceUpdated } from "./appResources";
+import { logger } from "../utils/logger";
 
 // Schema definitions
 export const packageNameSchema = addSessionUuidToSchema(z.object({
@@ -61,6 +63,13 @@ export function registerAppTools(
       });
     } catch (error) {
       throw new ActionableError(`Failed to launch app: ${error}`);
+    } finally {
+      try {
+        invalidateInstalledAppsCache(device.deviceId);
+        await notifyInstalledAppResourceUpdated(device.deviceId);
+      } catch (error) {
+        logger.warn(`[AppTools] Failed to refresh app resources after launch: ${error}`);
+      }
     }
   };
 
@@ -79,6 +88,13 @@ export function registerAppTools(
       });
     } catch (error) {
       throw new ActionableError(`Failed to terminate app: ${error}`);
+    } finally {
+      try {
+        invalidateInstalledAppsCache(device.deviceId);
+        await notifyInstalledAppResourceUpdated(device.deviceId);
+      } catch (error) {
+        logger.warn(`[AppTools] Failed to refresh app resources after terminate: ${error}`);
+      }
     }
   };
 
@@ -94,6 +110,13 @@ export function registerAppTools(
       });
     } catch (error) {
       throw new ActionableError(`Failed to install app: ${error}`);
+    } finally {
+      try {
+        invalidateInstalledAppsCache(device.deviceId);
+        await notifyInstalledAppResourceUpdated(device.deviceId);
+      } catch (error) {
+        logger.warn(`[AppTools] Failed to refresh app resources after install: ${error}`);
+      }
     }
   };
 

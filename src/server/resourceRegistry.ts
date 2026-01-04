@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Resource, ResourceTemplate, ReadResourceRequestSchema, ListResourcesRequestSchema, ListResourceTemplatesRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { logger } from "../utils/logger";
 
 // Interface for resource content handlers
 export interface ResourceHandler {
@@ -122,6 +123,11 @@ class ResourceRegistryClass {
     return this.resources.get(uri);
   }
 
+  // Unregister a resource by URI
+  unregister(uri: string): void {
+    this.resources.delete(uri);
+  }
+
   // Get resources in MCP format for ListResources response
   getResourceDefinitions(): Resource[] {
     return Array.from(this.resources.values()).map(resource => ({
@@ -210,6 +216,22 @@ class ResourceRegistryClass {
   async notifyResourcesUpdated(uris: string[]): Promise<void> {
     for (const uri of uris) {
       await this.notifyResourceUpdated(uri);
+    }
+  }
+
+  // Send notification that the resource list has changed
+  async notifyResourceListChanged(): Promise<void> {
+    if (!this.server) {
+      return;
+    }
+
+    try {
+      await this.server.server.notification({
+        method: "notifications/resources/list_changed",
+        params: {}
+      });
+    } catch (error) {
+      logger.warn(`[ResourceRegistry] Failed to notify resource list change: ${error}`);
     }
   }
 
