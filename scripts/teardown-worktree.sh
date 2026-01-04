@@ -4,7 +4,7 @@
 #
 # Removes worktree-specific artifacts:
 # - Unique executable symlink (~/.bun/bin/auto-mobile-{issue})
-# - MCP config (.mcp.json)
+# - MCP config (.mcp.local.json)
 # - Build artifacts (dist/)
 #
 # Usage:
@@ -92,7 +92,7 @@ main() {
     worktree_id=$(get_worktree_id)
     local bin_name="auto-mobile-${worktree_id}"
     local bin_path="${HOME}/.bun/bin/${bin_name}"
-    local mcp_file="${PROJECT_ROOT}/.mcp.json"
+    local mcp_file="${PROJECT_ROOT}/.mcp.local.json"
 
     echo ""
     log_info "Tearing down AutoMobile worktree (ID: ${worktree_id})..."

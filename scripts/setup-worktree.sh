@@ -136,7 +136,7 @@ setup_claude_settings() {
     local bin_name="$1"
     local port
     port=$(get_port)
-    local mcp_file="${PROJECT_ROOT}/.mcp.json"
+    local mcp_file="${PROJECT_ROOT}/.mcp.local.json"
 
     # Detect ANDROID_HOME
     local android_home="${ANDROID_HOME:-}"
@@ -149,7 +149,7 @@ setup_claude_settings() {
         fi
     fi
 
-    # Create .mcp.json (project-level MCP config)
+    # Create .mcp.local.json (worktree-local MCP config)
     cat > "${mcp_file}" << EOF
 {
   "mcpServers": {
@@ -168,13 +168,6 @@ EOF
     log_success "Created MCP config: ${mcp_file}"
     log_info "  MCP server: ${bin_name} (stdio)"
     log_info "  Streamable port: ${port} (run 'bun run dev' for hot reload)"
-
-    # Add .mcp.json to .gitignore if not already there
-    local gitignore="${PROJECT_ROOT}/.gitignore"
-    if ! grep -q "^\.mcp\.json$" "${gitignore}" 2>/dev/null; then
-        echo ".mcp.json" >> "${gitignore}"
-        log_info "Added .mcp.json to .gitignore"
-    fi
 }
 
 # Clean up worktree-specific artifacts
@@ -183,7 +176,7 @@ clean_worktree() {
     worktree_id=$(get_worktree_id)
     local bin_name="auto-mobile-${worktree_id}"
     local bin_path="${HOME}/.bun/bin/${bin_name}"
-    local mcp_file="${PROJECT_ROOT}/.mcp.json"
+    local mcp_file="${PROJECT_ROOT}/.mcp.local.json"
 
     log_info "Cleaning worktree artifacts..."
 
@@ -245,7 +238,7 @@ print_status() {
     echo -e "  ${GREEN}${bin_name}${NC}  Run MCP server directly"
     echo ""
     echo -e "${YELLOW}Claude Code:${NC}"
-    echo -e "  MCP config: ${BLUE}.mcp.json${NC}"
+    echo -e "  MCP config: ${BLUE}.mcp.local.json${NC}"
     echo -e "  Restart Claude Code to pick up the new MCP server."
     echo ""
 }
