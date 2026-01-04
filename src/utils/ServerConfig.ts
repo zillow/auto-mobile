@@ -13,6 +13,7 @@ class ServerConfig {
   private _accessibilityAuditConfig: AccessibilityAuditConfig | null = null;
   private _memPerfAuditEnabled: boolean = false;
   private _strictAwaitEnabled: boolean = false;
+  private _predictiveUiEnabled: boolean = false;
 
   private constructor() {}
 
@@ -65,6 +66,14 @@ class ServerConfig {
 
   isStrictAwaitEnabled(): boolean {
     return this._strictAwaitEnabled;
+  }
+
+  setPredictiveUiEnabled(enabled: boolean): void {
+    this._predictiveUiEnabled = enabled;
+  }
+
+  isPredictiveUiEnabled(): boolean {
+    return this._predictiveUiEnabled;
   }
 }
 
