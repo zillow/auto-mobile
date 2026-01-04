@@ -103,7 +103,7 @@ describe("Explore", () => {
     } as Element;
   }
 
-  function createMockObservation(nodes: any[] = []): ObserveResult {
+  function createMockObservation(nodes: any[] = [], packageName: string = "com.test.app"): ObserveResult {
     const defaultNodes = nodes.length > 0 ? nodes : [
       createMockViewHierarchyNode({
         "text": "Settings",
@@ -120,7 +120,7 @@ describe("Explore", () => {
         hierarchy: {
           node: defaultNodes
         },
-        packageName: "com.test.app"
+        packageName
       }
     } as ObserveResult;
   }
@@ -475,6 +475,75 @@ describe("Explore", () => {
       assert.exists(result.durationMs);
       assert.isNumber(result.durationMs);
       expect(result.durationMs).toBeGreaterThan(0);
+    });
+  });
+
+  describe("foreground app enforcement", () => {
+    test("should default to initial foreground package when packageName is not provided", async () => {
+      const outOfAppLimit = (Explore as any).MAX_OUT_OF_APP_ATTEMPTS ?? 5;
+      const backPresses: string[] = [];
+      const adbWithTracking = {
+        executeCommand: async (cmd: string) => {
+          if (cmd.includes("KEYCODE_BACK")) {
+            backPresses.push(cmd);
+          }
+          return "";
+        }
+      } as AdbClient;
+
+      explore = new Explore(device, adbWithTracking);
+      (explore as any).handleDeadEnd = async () => {
+        backPresses.push("back");
+      };
+
+      let observeCount = 0;
+      (explore as any).observeScreen = {
+        execute: async () => {
+          observeCount++;
+          if (observeCount === 1) {
+            return createMockObservation([], "com.test.app");
+          }
+          return createMockObservation([], "com.android.settings");
+        }
+      };
+
+      const result = await explore.execute({
+        maxInteractions: 50,
+        timeoutMs: 5000
+      });
+
+      expect(result.stopReason).toContain("com.test.app");
+      expect(backPresses.length).toBe(outOfAppLimit);
+    });
+
+    test("should attempt to return to provided package when navigation leaves app", async () => {
+      const outOfAppLimit = (Explore as any).MAX_OUT_OF_APP_ATTEMPTS ?? 5;
+      const backPresses: string[] = [];
+      const adbWithTracking = {
+        executeCommand: async (cmd: string) => {
+          if (cmd.includes("KEYCODE_BACK")) {
+            backPresses.push(cmd);
+          }
+          return "";
+        }
+      } as AdbClient;
+
+      explore = new Explore(device, adbWithTracking);
+      (explore as any).handleDeadEnd = async () => {
+        backPresses.push("back");
+      };
+      (explore as any).observeScreen = {
+        execute: async () => createMockObservation([], "com.android.settings")
+      };
+
+      const result = await explore.execute({
+        maxInteractions: 50,
+        timeoutMs: 5000,
+        packageName: "com.test.app"
+      });
+
+      expect(result.stopReason).toContain("com.test.app");
+      expect(backPresses.length).toBe(outOfAppLimit);
     });
   });
 
