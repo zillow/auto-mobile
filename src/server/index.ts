@@ -29,6 +29,7 @@ import { registerDoctorTools } from "./doctorTools";
 import { registerObservationResources } from "./observationResources";
 import { registerBootedDeviceResources } from "./bootedDeviceResources";
 import { registerDeviceImageResources } from "./deviceImageResources";
+import { registerAppResources } from "./appResources";
 
 export interface McpServerOptions {
   debug?: boolean;
@@ -53,6 +54,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerObservationResources();
   registerBootedDeviceResources();
   registerDeviceImageResources();
+  registerAppResources();
 
   // Only register debug tools when --debug flag is passed
   if (options.debug) {

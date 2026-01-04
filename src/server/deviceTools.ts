@@ -4,6 +4,7 @@ import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
 import { notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
+import { syncInstalledAppResources } from "./appResources";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
@@ -125,6 +126,7 @@ export function registerDeviceTools() {
 
       // Notify that booted device resources have changed
       await notifyBootedDeviceResourcesUpdated();
+      await syncInstalledAppResources();
 
       return createJSONToolResponse({
         message: `${args.device.platform} '${args.device.name}' started and is ready`,
@@ -150,6 +152,7 @@ export function registerDeviceTools() {
 
       // Notify that booted device resources have changed
       await notifyBootedDeviceResourcesUpdated();
+      await syncInstalledAppResources();
 
       return createJSONToolResponse({
         message: `${args.device.platform} '${args.device.name}' shutdown successfully`,

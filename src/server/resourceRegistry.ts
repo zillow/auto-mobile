@@ -122,6 +122,11 @@ class ResourceRegistryClass {
     return this.resources.get(uri);
   }
 
+  // Unregister a resource by URI
+  unregister(uri: string): void {
+    this.resources.delete(uri);
+  }
+
   // Get resources in MCP format for ListResources response
   getResourceDefinitions(): Resource[] {
     return Array.from(this.resources.values()).map(resource => ({
@@ -211,6 +216,18 @@ class ResourceRegistryClass {
     for (const uri of uris) {
       await this.notifyResourceUpdated(uri);
     }
+  }
+
+  // Send notification that the resource list has changed
+  async notifyResourceListChanged(): Promise<void> {
+    if (!this.server) {
+      return;
+    }
+
+    await this.server.server.notification({
+      method: "notifications/resources/list_changed",
+      params: {}
+    });
   }
 
   // Clear all registered resources and templates (for testing)
