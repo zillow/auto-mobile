@@ -37,7 +37,7 @@ interface AppsCacheEntry {
 const APPS_CACHE_TTL_MS = 60000;
 const appCacheByDeviceId = new Map<string, AppsCacheEntry>();
 const registeredDeviceResources = new Map<string, string>();
-let deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager();
+const deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager();
 
 function userProfileForUserId(userId: number): "personal" | "work" {
   return userId >= 10 ? "work" : "personal";

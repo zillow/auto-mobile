@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Resource, ResourceTemplate, ReadResourceRequestSchema, ListResourcesRequestSchema, ListResourceTemplatesRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { logger } from "../utils/logger";
 
 // Interface for resource content handlers
 export interface ResourceHandler {
@@ -224,10 +225,14 @@ class ResourceRegistryClass {
       return;
     }
 
-    await this.server.server.notification({
-      method: "notifications/resources/list_changed",
-      params: {}
-    });
+    try {
+      await this.server.server.notification({
+        method: "notifications/resources/list_changed",
+        params: {}
+      });
+    } catch (error) {
+      logger.warn(`[ResourceRegistry] Failed to notify resource list change: ${error}`);
+    }
   }
 
   // Clear all registered resources and templates (for testing)
