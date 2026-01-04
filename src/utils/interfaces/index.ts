@@ -59,7 +59,6 @@ export {
 } from "./Axe";
 // Re-export from co-located interfaces
 export { DeviceSelector } from "../DeviceSelectorService";
-export { ConfigurationManager } from "../ConfigurationManager";
 export { Logger, LogLevel } from "../logger";
 // Element utilities - split into focused classes (Phase 3.2)
 export { ElementFinder } from "../../features/utility/ElementFinder";

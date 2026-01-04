@@ -6,7 +6,6 @@ import { createServer as createHttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./server";
 import { logger } from "./utils/logger";
-import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { runCliCommand } from "./cli";
 import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
 import { setDebugModeEnabled } from "./utils/debug";
@@ -515,10 +514,6 @@ process.on("unhandledRejection", (reason, promise) => {
 
 async function main() {
   try {
-    // Initialize configuration manager to load configuration from disk
-    const configurationManager = ConfigurationManager.getInstance();
-    await configurationManager.loadFromDisk();
-
     // Parse command line arguments
     const {
       cliMode,

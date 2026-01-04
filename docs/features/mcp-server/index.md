@@ -48,3 +48,5 @@ A lot of MCP clients configure MCP servers through JSON, this sample will work w
   }
 }
 ```
+
+Configuration is provided via CLI flags and environment variables; MCP does not expose configuration tool calls.
