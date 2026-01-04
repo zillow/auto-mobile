@@ -24,6 +24,7 @@ import { serverConfig } from "../../utils/ServerConfig";
 import { WcagAudit } from "../accessibility/WcagAudit";
 import { Element } from "../../models/Element";
 import { RecompositionTracker } from "../performance/RecompositionTracker";
+import { PredictiveUIState } from "./PredictiveUIState";
 
 /**
  * Interface for cached observe result
@@ -48,6 +49,7 @@ export class ObserveScreen {
   private adb: AdbClient;
   private axe: AxeClient;
   private webdriver: WebDriverAgent;
+  private predictiveUIState: PredictiveUIState;
 
   // Static cache for observe results
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
@@ -97,6 +99,7 @@ export class ObserveScreen {
     this.screenshotUtil = new TakeScreenshot(device, this.adb);
     this.dumpsysWindow = new GetDumpsysWindow(device, this.adb);
     this.backStack = new GetBackStack(this.adb);
+    this.predictiveUIState = new PredictiveUIState();
 
     // Ensure observe result cache directory exists
     if (!fs.existsSync(ObserveScreen.observeResultCacheDir)) {
@@ -861,6 +864,17 @@ export class ObserveScreen {
 
       // Run accessibility audit if enabled
       await this.runAccessibilityAudit(result, perf);
+
+      if (serverConfig.isPredictiveUiEnabled()) {
+        try {
+          const predictions = await this.predictiveUIState.generate(result);
+          if (predictions) {
+            result.predictions = predictions;
+          }
+        } catch (error) {
+          logger.warn(`[PredictiveUIState] Failed to generate predictions: ${error}`);
+        }
+      }
 
       // Cache the result for future use
       await perf.track("cacheResult", () => this.cacheObserveResult(result));

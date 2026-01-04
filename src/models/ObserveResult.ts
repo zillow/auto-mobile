@@ -10,6 +10,44 @@ import { PerformanceAuditResult } from "../features/performance/PerformanceAudit
 import { AccessibilityAuditResult } from "./AccessibilityAudit";
 import { RecompositionSummary } from "./Recomposition";
 
+export interface PredictionTarget {
+  text?: string;
+  elementId?: string;
+  contentDesc?: string;
+  container?: {
+    text?: string;
+    elementId?: string;
+    contentDesc?: string;
+  };
+  lookFor?: {
+    text?: string;
+    elementId?: string;
+    contentDesc?: string;
+  };
+}
+
+export interface PredictedAction {
+  action: string;
+  target: PredictionTarget;
+  predictedScreen: string;
+  predictedElements?: string[];
+}
+
+export interface InteractablePrediction {
+  elementId?: string;
+  elementText?: string;
+  elementContentDesc?: string;
+  predictedOutcome?: {
+    screenName: string;
+    basedOn: "navigation_graph";
+  };
+}
+
+export interface Predictions {
+  likelyActions: PredictedAction[];
+  interactableElements: InteractablePrediction[];
+}
+
 /**
  * Represents the result of observing the device state
  */
@@ -121,4 +159,9 @@ export interface ObserveResult {
    * Compose recomposition summary (when ui-perf-debug is enabled)
    */
   recompositionSummary?: RecompositionSummary;
+
+  /**
+   * Predictive UI state derived from navigation graph (when enabled)
+   */
+  predictions?: Predictions;
 }

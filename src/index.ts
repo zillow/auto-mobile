@@ -75,6 +75,7 @@ function parseArgs(): {
   a11yFailureMode?: string;
   a11yMinSeverity?: string;
   a11yUseBaseline: boolean;
+  predictiveUi: boolean;
   daemonMode: boolean;
   daemonCommand?: string;
   daemonArgs: string[];
@@ -124,6 +125,7 @@ function parseArgs(): {
   let a11yFailureMode: string | undefined;
   let a11yMinSeverity: string | undefined;
   let a11yUseBaseline = false;
+  const predictiveUi = args.includes("--predictive") || args.includes("--predictive-ui");
 
   // Extract CLI-specific arguments (everything after --cli)
   const cliIndex = args.indexOf("--cli");
@@ -195,6 +197,7 @@ function parseArgs(): {
     a11yFailureMode,
     a11yMinSeverity,
     a11yUseBaseline,
+    predictiveUi,
     daemonMode,
     daemonCommand,
     daemonArgs,
@@ -586,6 +589,7 @@ async function main() {
       a11yFailureMode,
       a11yMinSeverity,
       a11yUseBaseline,
+      predictiveUi,
       daemonMode,
       daemonCommand,
       daemonArgs,
@@ -624,6 +628,11 @@ async function main() {
     if (strictAwait) {
       serverConfig.setStrictAwaitEnabled(true);
       logger.info("Strict await mode enabled (--strict-await)");
+    }
+
+    if (predictiveUi) {
+      serverConfig.setPredictiveUiEnabled(true);
+      logger.info("Predictive UI mode enabled (--predictive/--predictive-ui)");
     }
 
     // Enable accessibility audit mode if --accessibility-audit flag is set
