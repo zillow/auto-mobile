@@ -1,11 +1,8 @@
 package dev.jasonpearson.automobile.junit
 
 import ai.koog.agents.core.agent.AIAgent
+import ai.koog.agents.core.tools.SimpleTool
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.core.tools.annotations.LLMDescription
-import ai.koog.agents.core.tools.annotations.Tool as ToolAnnotation
-import ai.koog.agents.core.tools.reflect.ToolSet
-import ai.koog.agents.core.tools.reflect.asTools
 import ai.koog.prompt.executor.clients.anthropic.AnthropicModels
 import ai.koog.prompt.executor.clients.google.GoogleModels
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
@@ -433,39 +430,50 @@ class AutoMobileAgent(
     }
   }
 
-  // Dynamic AutoMobile MCP Tools using ToolSet pattern
-  class AutoMobileMCPTools(private val mcpClient: MCPClient) : ToolSet {
-    private val availableTools: List<MCPToolDefinition> by lazy { mcpClient.listAvailableTools() }
+  // Class-based AutoMobile MCP Tools (no reflection required)
+  // These tools use Koog's SimpleTool pattern for Robolectric compatibility
 
-    init {
-      // Validate that we have the expected core tools
-      val coreTools = listOf("observe", "tapOn", "typeText", "swipe", "waitFor", "goBack")
-      val availableToolNames = availableTools.map { it.name }
+  /** Observe the current device state and UI hierarchy */
+  class ObserveTool(private val mcpClient: MCPClient) :
+      SimpleTool<ObserveTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "observe",
+          description = "Observe the current device state and UI hierarchy") {
 
-      val missingTools = coreTools.filter { it !in availableToolNames }
-      if (missingTools.isNotEmpty()) {
-        println(
-            "Warning: Some expected core tools are not available: ${missingTools.joinToString(", ")}")
-        println("Available tools: ${availableToolNames.joinToString(", ")}")
-      }
-    }
+    @Serializable
+    data class Args(
+        val withViewHierarchy: Boolean = true,
+        val includeInvisible: Boolean = false
+    )
 
-    @ToolAnnotation
-    @LLMDescription("Observe the current device state and UI hierarchy")
-    fun observe(withViewHierarchy: Boolean = true, includeInvisible: Boolean = false): String {
+    override suspend fun execute(args: Args): String {
       val parameters =
-          mapOf("withViewHierarchy" to withViewHierarchy, "includeInvisible" to includeInvisible)
+          mapOf("withViewHierarchy" to args.withViewHierarchy, "includeInvisible" to args.includeInvisible)
       return mcpClient.callTool("observe", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Tap on UI elements by text, coordinates, or description")
-    fun tapOn(text: String? = null, id: String? = null, x: Int? = null, y: Int? = null): String {
+  /** Tap on UI elements by text, coordinates, or description */
+  class TapOnTool(private val mcpClient: MCPClient) :
+      SimpleTool<TapOnTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "tapOn",
+          description = "Tap on UI elements by text, coordinates, or description") {
+
+    @Serializable
+    data class Args(
+        val text: String? = null,
+        val id: String? = null,
+        val x: Int? = null,
+        val y: Int? = null
+    )
+
+    override suspend fun execute(args: Args): String {
       val parameters = mutableMapOf<String, Any>()
-      text?.let { parameters["text"] = it }
-      id?.let { parameters["id"] = it }
-      x?.let { parameters["x"] = it }
-      y?.let { parameters["y"] = it }
+      args.text?.let { parameters["text"] = it }
+      args.id?.let { parameters["id"] = it }
+      args.x?.let { parameters["x"] = it }
+      args.y?.let { parameters["y"] = it }
 
       if (parameters.isEmpty()) {
         throw IllegalArgumentException("Must specify either text, id, or coordinates (x, y)")
@@ -473,78 +481,132 @@ class AutoMobileAgent(
 
       return mcpClient.callTool("tapOn", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Enter text into input fields or send text to the device")
-    fun typeText(text: String): String {
-      val parameters = mapOf("text" to text)
+  /** Enter text into input fields or send text to the device */
+  class TypeTextTool(private val mcpClient: MCPClient) :
+      SimpleTool<TypeTextTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "typeText",
+          description = "Enter text into input fields or send text to the device") {
+
+    @Serializable data class Args(val text: String)
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mapOf("text" to args.text)
       return mcpClient.callTool("sendText", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Input text with optional IME action")
-    fun inputText(text: String, imeAction: String? = null): String {
-      val parameters = mutableMapOf<String, Any>("text" to text)
-      imeAction?.let { parameters["imeAction"] = it }
+  /** Input text with optional IME action */
+  class InputTextTool(private val mcpClient: MCPClient) :
+      SimpleTool<InputTextTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "inputText",
+          description = "Input text with optional IME action") {
+
+    @Serializable
+    data class Args(
+        val text: String,
+        val imeAction: String? = null
+    )
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mutableMapOf<String, Any>("text" to args.text)
+      args.imeAction?.let { parameters["imeAction"] = it }
       return mcpClient.callTool("inputText", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Perform swipe gestures for scrolling or navigation")
-    fun swipe(direction: String = "up", containerElementId: String? = null): String {
-      val parameters = mutableMapOf<String, Any>("direction" to direction)
+  /** Perform swipe gestures for scrolling or navigation */
+  class SwipeTool(private val mcpClient: MCPClient) :
+      SimpleTool<SwipeTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "swipe",
+          description = "Perform swipe gestures for scrolling or navigation") {
 
-      if (containerElementId != null) {
-        parameters["containerElementId"] = containerElementId
-        return mcpClient.callTool("scroll", parameters)
+    @Serializable
+    data class Args(
+        val direction: String = "up",
+        val containerElementId: String? = null
+    )
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mutableMapOf<String, Any>("direction" to args.direction)
+
+      return if (args.containerElementId != null) {
+        parameters["containerElementId"] = args.containerElementId
+        mcpClient.callTool("scroll", parameters)
       } else {
         parameters["includeSystemInsets"] = false
         parameters["duration"] = 300
-        return mcpClient.callTool("swipeOnScreen", parameters)
+        mcpClient.callTool("swipeOnScreen", parameters)
       }
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Scroll within a container element")
-    fun scroll(
-        containerElementId: String,
-        direction: String = "up",
-        lookForText: String? = null,
-        lookForElementId: String? = null
-    ): String {
+  /** Scroll within a container element */
+  class ScrollTool(private val mcpClient: MCPClient) :
+      SimpleTool<ScrollTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "scroll",
+          description = "Scroll within a container element") {
+
+    @Serializable
+    data class Args(
+        val containerElementId: String,
+        val direction: String = "up",
+        val lookForText: String? = null,
+        val lookForElementId: String? = null
+    )
+
+    override suspend fun execute(args: Args): String {
       val parameters =
           mutableMapOf<String, Any>(
-              "containerElementId" to containerElementId, "direction" to direction)
+              "containerElementId" to args.containerElementId, "direction" to args.direction)
 
-      if (lookForText != null || lookForElementId != null) {
+      if (args.lookForText != null || args.lookForElementId != null) {
         val lookFor = mutableMapOf<String, Any>()
-        lookForText?.let { lookFor["text"] = it }
-        lookForElementId?.let { lookFor["elementId"] = it }
+        args.lookForText?.let { lookFor["text"] = it }
+        args.lookForElementId?.let { lookFor["elementId"] = it }
         parameters["lookFor"] = lookFor
       }
 
       return mcpClient.callTool("scroll", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Wait for elements to appear or conditions to be met")
-    fun waitFor(text: String? = null, elementId: String? = null, timeout: Int = 5000): String {
+  /** Wait for elements to appear or conditions to be met */
+  class WaitForTool(private val mcpClient: MCPClient) :
+      SimpleTool<WaitForTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "waitFor",
+          description = "Wait for elements to appear or conditions to be met") {
+
+    @Serializable
+    data class Args(
+        val text: String? = null,
+        val elementId: String? = null,
+        val timeout: Int = 5000
+    )
+
+    override suspend fun execute(args: Args): String {
       // Note: The current MCP server doesn't have a dedicated waitFor tool
       // We'll simulate it by repeatedly calling observe until the element is found
       val startTime = System.currentTimeMillis()
-      val endTime = startTime + timeout
+      val endTime = startTime + args.timeout
 
       while (System.currentTimeMillis() < endTime) {
         try {
-          val observeResult = observe(withViewHierarchy = true)
+          val observeResult = mcpClient.callTool("observe", mapOf("withViewHierarchy" to true))
 
           // Check if the element we're waiting for is present
-          if (text != null && observeResult.contains(text, ignoreCase = true)) {
-            return "Element with text '$text' found"
+          if (args.text != null && observeResult.contains(args.text, ignoreCase = true)) {
+            return "Element with text '${args.text}' found"
           }
 
-          if (elementId != null && observeResult.contains(elementId)) {
-            return "Element with ID '$elementId' found"
+          if (args.elementId != null && observeResult.contains(args.elementId)) {
+            return "Element with ID '${args.elementId}' found"
           }
 
           Thread.sleep(500) // Wait 500ms before checking again
@@ -553,65 +615,122 @@ class AutoMobileAgent(
         }
       }
 
-      val target = text ?: elementId ?: "unknown"
+      val target = args.text ?: args.elementId ?: "unknown"
       throw RuntimeException("Timeout waiting for element: $target")
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Navigate back in the app using the back button")
-    fun goBack(): String {
+  /** Navigate back in the app using the back button */
+  class GoBackTool(private val mcpClient: MCPClient) :
+      SimpleTool<GoBackTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "goBack",
+          description = "Navigate back in the app using the back button") {
+
+    @Serializable class Args
+
+    override suspend fun execute(args: Args): String {
       val parameters = mapOf("button" to "back")
       return mcpClient.callTool("pressButton", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Press a hardware button")
-    fun pressButton(button: String): String {
-      val parameters = mapOf("button" to button)
+  /** Press a hardware button */
+  class PressButtonTool(private val mcpClient: MCPClient) :
+      SimpleTool<PressButtonTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "pressButton",
+          description = "Press a hardware button") {
+
+    @Serializable data class Args(val button: String)
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mapOf("button" to args.button)
       return mcpClient.callTool("pressButton", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Clear text from input fields")
-    fun clearText(): String {
+  /** Clear text from input fields */
+  class ClearTextTool(private val mcpClient: MCPClient) :
+      SimpleTool<ClearTextTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "clearText",
+          description = "Clear text from input fields") {
+
+    @Serializable class Args
+
+    override suspend fun execute(args: Args): String {
       return mcpClient.callTool("clearText", emptyMap())
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Launch an app by package ID")
-    fun launchApp(appId: String): String {
-      val parameters = mapOf("appId" to appId)
+  /** Launch an app by package ID */
+  class LaunchAppTool(private val mcpClient: MCPClient) :
+      SimpleTool<LaunchAppTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "launchApp",
+          description = "Launch an app by package ID") {
+
+    @Serializable data class Args(val appId: String)
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mapOf("appId" to args.appId)
       return mcpClient.callTool("launchApp", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Terminate an app by package ID")
-    fun terminateApp(appId: String): String {
-      val parameters = mapOf("appId" to appId)
+  /** Terminate an app by package ID */
+  class TerminateAppTool(private val mcpClient: MCPClient) :
+      SimpleTool<TerminateAppTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "terminateApp",
+          description = "Terminate an app by package ID") {
+
+    @Serializable data class Args(val appId: String)
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mapOf("appId" to args.appId)
       return mcpClient.callTool("terminateApp", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Double tap on coordinates")
-    fun doubleTapOn(x: Int, y: Int): String {
-      val parameters = mapOf("x" to x, "y" to y)
+  /** Double tap on coordinates */
+  class DoubleTapOnTool(private val mcpClient: MCPClient) :
+      SimpleTool<DoubleTapOnTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "doubleTapOn",
+          description = "Double tap on coordinates") {
+
+    @Serializable data class Args(val x: Int, val y: Int)
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mapOf("x" to args.x, "y" to args.y)
       return mcpClient.callTool("doubleTapOn", parameters)
     }
+  }
 
-    @ToolAnnotation
-    @LLMDescription("Long press on coordinates or elements")
-    fun longPressOn(
-        text: String? = null,
-        id: String? = null,
-        x: Int? = null,
-        y: Int? = null,
-        duration: Int = 1000
-    ): String {
-      val parameters = mutableMapOf<String, Any>("duration" to duration)
-      text?.let { parameters["text"] = it }
-      id?.let { parameters["id"] = it }
-      x?.let { parameters["x"] = it }
-      y?.let { parameters["y"] = it }
+  /** Long press on coordinates or elements */
+  class LongPressOnTool(private val mcpClient: MCPClient) :
+      SimpleTool<LongPressOnTool.Args>(
+          argsSerializer = Args.serializer(),
+          name = "longPressOn",
+          description = "Long press on coordinates or elements") {
+
+    @Serializable
+    data class Args(
+        val text: String? = null,
+        val id: String? = null,
+        val x: Int? = null,
+        val y: Int? = null,
+        val duration: Int = 1000
+    )
+
+    override suspend fun execute(args: Args): String {
+      val parameters = mutableMapOf<String, Any>("duration" to args.duration)
+      args.text?.let { parameters["text"] = it }
+      args.id?.let { parameters["id"] = it }
+      args.x?.let { parameters["x"] = it }
+      args.y?.let { parameters["y"] = it }
 
       if (parameters.size == 1) { // Only duration was set
         throw IllegalArgumentException("Must specify either text, id, or coordinates (x, y)")
@@ -619,16 +738,26 @@ class AutoMobileAgent(
 
       return mcpClient.callTool("longPressOn", parameters)
     }
+  }
 
-    // Generic tool calling method for any tool not explicitly implemented above
-    fun callGenericTool(toolName: String, parameters: Map<String, Any> = emptyMap()): String {
-      return mcpClient.callTool(toolName, parameters)
-    }
-
-    // Method to list all available tools for debugging/introspection
-    fun listAvailableTools(): List<String> {
-      return availableTools.map { it.name }
-    }
+  /** Helper to create all MCP tools for an agent */
+  class AutoMobileMCPToolFactory(private val mcpClient: MCPClient) {
+    fun createAllTools(): List<SimpleTool<*>> = listOf(
+        ObserveTool(mcpClient),
+        TapOnTool(mcpClient),
+        TypeTextTool(mcpClient),
+        InputTextTool(mcpClient),
+        SwipeTool(mcpClient),
+        ScrollTool(mcpClient),
+        WaitForTool(mcpClient),
+        GoBackTool(mcpClient),
+        PressButtonTool(mcpClient),
+        ClearTextTool(mcpClient),
+        LaunchAppTool(mcpClient),
+        TerminateAppTool(mcpClient),
+        DoubleTapOnTool(mcpClient),
+        LongPressOnTool(mcpClient)
+    )
   }
 
   // Dependency interfaces for better testability
@@ -790,9 +919,11 @@ class AutoMobileAgent(
             ModelProvider.GOOGLE -> GoogleModels.Gemini2_5Pro
           }
 
-      // Create AutoMobile MCP tools using ToolSet pattern
-      val mcpTools = AutoMobileMCPTools(mcpClient)
-      val toolRegistry = ToolRegistry { tools(mcpTools.asTools()) }
+      // Create AutoMobile MCP tools using class-based pattern (no reflection)
+      val toolFactory = AutoMobileMCPToolFactory(mcpClient)
+      val toolRegistry = ToolRegistry {
+        toolFactory.createAllTools().forEach { tool(it) }
+      }
 
       val systemPrompt =
           """
