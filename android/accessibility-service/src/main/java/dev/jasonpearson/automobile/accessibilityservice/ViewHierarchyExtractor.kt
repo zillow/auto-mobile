@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
+import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import dev.jasonpearson.automobile.accessibilityservice.models.WindowHierarchy
@@ -39,10 +40,18 @@ class ViewHierarchyExtractor {
 
   private val json = Json { ignoreUnknownKeys = true }
 
-  /** Extracts view hierarchy from the active window */
+  /**
+   * Extracts view hierarchy from the active window.
+   * @param rootNode Root accessibility node
+   * @param textFilter Optional text filter
+   * @param screenDimensions Optional screen dimensions for offscreen filtering
+   * @param dedupeTextContentDesc When true, omit content-desc when it equals text (default: true)
+   */
   fun extractFromActiveWindow(
       rootNode: AccessibilityNodeInfo?,
-      textFilter: String? = null
+      textFilter: String? = null,
+      screenDimensions: ScreenDimensions? = null,
+      dedupeTextContentDesc: Boolean = true
   ): ViewHierarchy? {
     if (rootNode == null) {
       Log.w(TAG, "Root node is null")
@@ -50,10 +59,10 @@ class ViewHierarchyExtractor {
     }
 
     return try {
-      val rootElement = extractNodeInfo(rootNode, 0, textFilter)
-      val processedElement = rootElement?.let { processForAccessibility(it) }
+      val rootElement = extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+      val optimizedElement = rootElement?.let { optimizeHierarchy(it) }
 
-      ViewHierarchy(packageName = rootNode.packageName?.toString(), hierarchy = processedElement)
+      ViewHierarchy(packageName = rootNode.packageName?.toString(), hierarchy = optimizedElement)
     } catch (e: Exception) {
       Log.e(TAG, "Error extracting view hierarchy", e)
       ViewHierarchy(error = "Failed to extract view hierarchy: ${e.message}")
@@ -68,11 +77,15 @@ class ViewHierarchyExtractor {
    * @param windows List of all accessibility windows (from AccessibilityService.windows)
    * @param activeWindowRoot Root node of the active window (for backward compatibility)
    * @param textFilter Optional text filter
+   * @param screenDimensions Optional screen dimensions for offscreen filtering
+   * @param dedupeTextContentDesc When true, omit content-desc when it equals text (default: true)
    */
   fun extractFromAllWindows(
       windows: List<AccessibilityWindowInfo>,
       activeWindowRoot: AccessibilityNodeInfo?,
-      textFilter: String? = null
+      textFilter: String? = null,
+      screenDimensions: ScreenDimensions? = null,
+      dedupeTextContentDesc: Boolean = true
   ): ViewHierarchy {
     if (windows.isEmpty() && activeWindowRoot == null) {
       Log.w(TAG, "No windows available for extraction")
@@ -98,20 +111,20 @@ class ViewHierarchyExtractor {
           else -> "unknown_${window.type}"
         }
 
-        val element = extractNodeInfo(rootNode, 0, textFilter)
-        val processedElement = element?.let { processForAccessibility(it) }
+        val element = extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+        val optimizedElement = element?.let { optimizeHierarchy(it) }
         val packageName = rootNode.packageName?.toString()
 
         // The active window becomes the main hierarchy (backward compatibility)
         if (window.isActive) {
-          mainHierarchy = processedElement
+          mainHierarchy = optimizedElement
           mainPackageName = packageName
           // Skip adding to windows list - it's already in main hierarchy
           continue
         }
 
         // Filter out irrelevant windows to reduce payload size
-        if (shouldSkipWindow(windowType, processedElement)) {
+        if (shouldSkipWindow(windowType, optimizedElement)) {
           Log.d(TAG, "Skipping window ${window.id} (type=$windowType): filtered out")
           continue
         }
@@ -131,7 +144,7 @@ class ViewHierarchyExtractor {
             packageName = packageName,
             isActive = window.isActive,
             isFocused = window.isFocused,
-            hierarchy = processedElement
+            hierarchy = optimizedElement
           )
         )
       } catch (e: Exception) {
@@ -141,8 +154,8 @@ class ViewHierarchyExtractor {
 
     // Fallback to activeWindowRoot if no active window found in window list
     if (mainHierarchy == null && activeWindowRoot != null) {
-      val element = extractNodeInfo(activeWindowRoot, 0, textFilter)
-      mainHierarchy = element?.let { processForAccessibility(it) }
+      val element = extractNodeInfo(activeWindowRoot, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+      mainHierarchy = element?.let { optimizeHierarchy(it) }
       mainPackageName = activeWindowRoot.packageName?.toString()
     }
 
@@ -247,11 +260,20 @@ class ViewHierarchyExtractor {
     }
   }
 
-  /** Recursively extracts node information with depth limiting */
+  /**
+   * Recursively extracts node information with depth limiting, offscreen filtering, and zero-area filtering.
+   * @param node The accessibility node to extract
+   * @param depth Current recursion depth
+   * @param textFilter Optional text filter
+   * @param screenDimensions Optional screen dimensions for offscreen filtering
+   * @param dedupeTextContentDesc When true, omit content-desc when it equals text
+   */
   private fun extractNodeInfo(
       node: AccessibilityNodeInfo,
       depth: Int,
-      textFilter: String? = null
+      textFilter: String? = null,
+      screenDimensions: ScreenDimensions? = null,
+      dedupeTextContentDesc: Boolean = true
   ): UIElementInfo? {
     if (depth > MAX_DEPTH) {
       return null
@@ -260,6 +282,19 @@ class ViewHierarchyExtractor {
     return try {
       val bounds = Rect()
       node.getBoundsInScreen(bounds)
+      val elementBounds = ElementBounds(bounds)
+
+      // Filter zero-area bounds early
+      if (elementBounds.hasZeroArea()) {
+        return null
+      }
+
+      // Filter completely offscreen nodes early to avoid processing subtrees
+      if (screenDimensions != null && screenDimensions.isValid()) {
+        if (elementBounds.isCompletelyOffscreen(screenDimensions.width, screenDimensions.height)) {
+          return null
+        }
+      }
 
       val children = mutableListOf<UIElementInfo>()
       val childCount = min(node.childCount, MAX_CHILDREN)
@@ -267,7 +302,7 @@ class ViewHierarchyExtractor {
       for (i in 0 until childCount) {
         val child = node.getChild(i)
         if (child != null) {
-          val childInfo = extractNodeInfo(child, depth + 1, textFilter)
+          val childInfo = extractNodeInfo(child, depth + 1, textFilter, screenDimensions, dedupeTextContentDesc)
           if (childInfo != null) {
             children.add(childInfo)
           }
@@ -409,12 +444,20 @@ class ViewHierarchyExtractor {
         textColor = null // Remove the getTextColorHex(node) call
       }
 
+      // Dedupe content-desc when it equals text (keep text, omit content-desc)
+      val rawContentDesc = node.contentDescription?.toString()
+      val contentDesc = if (dedupeTextContentDesc && rawContentDesc == text) {
+        null
+      } else {
+        rawContentDesc
+      }
+
       val elementInfo =
           UIElementInfo(
               text = text,
               textSize = textSize,
               textColor = textColor,
-              contentDesc = node.contentDescription?.toString(),
+              contentDesc = contentDesc,
               className = className,
               resourceId = node.viewIdResourceName,
               bounds = ElementBounds(bounds),
@@ -637,5 +680,94 @@ class ViewHierarchyExtractor {
         textFilter?.let { filter -> element.text?.contains(filter, true) ?: false } ?: true
 
     return (hasStringCriteria || hasBooleanCriteria || hasAccessibilityFeatures) && meetsTextFilter
+  }
+
+  /**
+   * Optimizes the hierarchy by:
+   * 1. Collapsing single-child wrapper nodes (structural nodes with only bounds)
+   * 2. Filtering out bounds-only intermediate nodes
+   *
+   * This significantly reduces hierarchy size for complex UIs like YouTube.
+   */
+  private fun optimizeHierarchy(element: UIElementInfo): UIElementInfo? {
+    // First, recursively optimize children
+    val optimizedNode = element.node?.let { optimizeNode(it) }
+
+    // Check if this element is a bounds-only wrapper (has no useful properties)
+    val isBoundsOnlyWrapper = !meetsFilterCriteria(element) && element.accessible == null
+
+    // If it's a bounds-only wrapper with exactly one optimized child, collapse to that child
+    if (isBoundsOnlyWrapper && optimizedNode != null) {
+      val singleChild = extractSingleChild(optimizedNode)
+      if (singleChild != null) {
+        return singleChild
+      }
+    }
+
+    // If it's a bounds-only wrapper with no children (leaf), filter it out
+    if (isBoundsOnlyWrapper && optimizedNode == null) {
+      return null
+    }
+
+    // Return element with optimized children
+    return element.copy(node = optimizedNode)
+  }
+
+  /**
+   * Recursively optimize node children (handles both single element and array).
+   */
+  private fun optimizeNode(nodeElement: JsonElement): JsonElement? {
+    return when {
+      nodeElement is JsonObject -> {
+        try {
+          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
+          val optimized = optimizeHierarchy(child)
+          optimized?.let { json.encodeToJsonElement(UIElementInfo.serializer(), it) }
+        } catch (e: Exception) {
+          nodeElement
+        }
+      }
+      nodeElement is JsonArray -> {
+        val optimizedChildren = nodeElement.jsonArray.mapNotNull { childJson ->
+          try {
+            val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+            val optimized = optimizeHierarchy(child)
+            optimized?.let { json.encodeToJsonElement(UIElementInfo.serializer(), it) }
+          } catch (e: Exception) {
+            childJson
+          }
+        }
+        when {
+          optimizedChildren.isEmpty() -> null
+          optimizedChildren.size == 1 -> optimizedChildren[0]
+          else -> JsonArray(optimizedChildren)
+        }
+      }
+      else -> nodeElement
+    }
+  }
+
+  /**
+   * Extract single child from a node JsonElement.
+   * Returns the child if there's exactly one, null otherwise.
+   */
+  private fun extractSingleChild(nodeElement: JsonElement): UIElementInfo? {
+    return when {
+      nodeElement is JsonObject -> {
+        try {
+          json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
+        } catch (e: Exception) {
+          null
+        }
+      }
+      nodeElement is JsonArray && nodeElement.jsonArray.size == 1 -> {
+        try {
+          json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement.jsonArray[0])
+        } catch (e: Exception) {
+          null
+        }
+      }
+      else -> null
+    }
   }
 }

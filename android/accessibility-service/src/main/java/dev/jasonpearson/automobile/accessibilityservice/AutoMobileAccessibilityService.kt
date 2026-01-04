@@ -12,8 +12,11 @@ import android.graphics.Path
 import android.os.Build
 import android.util.Base64
 import android.util.Log
+import android.util.DisplayMetrics
 import android.view.Display
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
@@ -295,6 +298,31 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
+   * Get current screen dimensions for offscreen filtering.
+   */
+  @Suppress("DEPRECATION")
+  private fun getScreenDimensions(): ScreenDimensions? {
+    return try {
+      val windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+      if (windowManager != null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+          val bounds = windowManager.currentWindowMetrics.bounds
+          ScreenDimensions(bounds.width(), bounds.height())
+        } else {
+          val displayMetrics = DisplayMetrics()
+          windowManager.defaultDisplay.getRealMetrics(displayMetrics)
+          ScreenDimensions(displayMetrics.widthPixels, displayMetrics.heightPixels)
+        }
+      } else {
+        null
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to get screen dimensions", e)
+      null
+    }
+  }
+
+  /**
    * Direct hierarchy extraction without debouncing.
    * Used by the HierarchyDebouncer.
    * Extracts from all visible windows to capture popups, toolbars, etc.
@@ -303,6 +331,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     // Get all windows to capture popups, toolbars, and other floating windows
     val allWindows = windows
     val rootNode = rootInActiveWindow
+    val screenDimensions = getScreenDimensions()
 
     if (allWindows.isNullOrEmpty() && rootNode == null) {
       Log.w(TAG, "No windows or root node available for extraction")
@@ -312,9 +341,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     // Use multi-window extraction if windows are available, otherwise fall back to single window
     return if (!allWindows.isNullOrEmpty()) {
       Log.d(TAG, "Extracting from ${allWindows.size} windows")
-      viewHierarchyExtractor.extractFromAllWindows(allWindows, rootNode)
+      viewHierarchyExtractor.extractFromAllWindows(allWindows, rootNode, null, screenDimensions)
     } else {
-      viewHierarchyExtractor.extractFromActiveWindow(rootNode)
+      viewHierarchyExtractor.extractFromActiveWindow(rootNode, null, screenDimensions)
     }
   }
 
@@ -383,15 +412,16 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private fun extractHierarchy(textFilter: String? = null): ViewHierarchy? {
     val allWindows = windows
     val rootNode = rootInActiveWindow
+    val screenDimensions = getScreenDimensions()
 
     if (allWindows.isNullOrEmpty() && rootNode == null) {
       return null
     }
 
     return if (!allWindows.isNullOrEmpty()) {
-      viewHierarchyExtractor.extractFromAllWindows(allWindows, rootNode, textFilter)
+      viewHierarchyExtractor.extractFromAllWindows(allWindows, rootNode, textFilter, screenDimensions)
     } else {
-      viewHierarchyExtractor.extractFromActiveWindow(rootNode, textFilter)
+      viewHierarchyExtractor.extractFromActiveWindow(rootNode, textFilter, screenDimensions)
     }
   }
 

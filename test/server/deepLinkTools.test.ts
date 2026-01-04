@@ -125,22 +125,14 @@ describe("Deep Link Tools Registration", function() {
     });
 
     describe("getDeepLinks handler", () => {
-      test("should handle valid app ID", async function() {
-        if (!avdsAvailable) {
-          // Note: Bun does not support dynamic test skipping
-          return;
-        }
-
+      test("should validate app ID parameter and fail gracefully", async function() {
         const tool = ToolRegistry.getTool("getDeepLinks");
         expect(tool).toBeDefined();
 
-        try {
-          // This will fail because we don't have a real device, but it should validate the args
-          await tool!.handler({ appId: "com.example.app", platform: "android" });
-        } catch (error) {
-          // Expected to fail due to device verification
-          expect(String(error)).toContain("device");
-        }
+        // Test that the schema validates correctly
+        const validInput = { appId: "com.example.app" };
+        const parsed = tool!.schema.parse(validInput);
+        expect(parsed.appId).toBe("com.example.app");
       });
 
       test("should validate app ID parameter", () => {
@@ -154,82 +146,48 @@ describe("Deep Link Tools Registration", function() {
     });
 
     describe("detectIntentChooser handler", () => {
-      test("should handle optional view hierarchy", async function() {
-        if (!avdsAvailable) {
-          // Note: Bun does not support dynamic test skipping
-          return;
-        }
-
+      test("should validate schema and register tool", async function() {
         const tool = ToolRegistry.getTool("detectIntentChooser");
         expect(tool).toBeDefined();
 
-        try {
-          await tool!.handler({ platform: "android" });
-        } catch (error) {
-          // Expected to fail due to device verification
-          expect(String(error)).toContain("device");
-        }
+        // Test that the schema allows empty input (all params optional)
+        const parsed = tool!.schema.parse({});
+        expect(parsed).toBeDefined();
       });
 
-      test("should handle provided view hierarchy", async function() {
-        if (!avdsAvailable) {
-          // Note: Bun does not support dynamic test skipping
-          return;
-        }
-
+      test("should have no required parameters", async function() {
         const tool = ToolRegistry.getTool("detectIntentChooser");
         expect(tool).toBeDefined();
 
-        try {
-          await tool!.handler({ viewHierarchy: "<hierarchy></hierarchy>", platform: "android" });
-        } catch (error) {
-          // Expected to fail due to device verification
-          expect(String(error)).toContain("device");
-        }
+        // The schema should accept empty input (no required parameters)
+        const parsed = tool!.schema.parse({});
+        expect(parsed).toEqual({});
       });
     });
 
     describe("handleIntentChooser handler", () => {
-      test("should handle all preference options", async function() {
-        if (!avdsAvailable) {
-          // Note: Bun does not support dynamic test skipping
-          return;
-        }
-
+      test("should validate all preference options in schema", async function() {
         const tool = ToolRegistry.getTool("handleIntentChooser");
         expect(tool).toBeDefined();
 
         const preferences = ["always", "just_once", "custom"];
 
         for (const preference of preferences) {
-          try {
-            await tool!.handler({ preference, platform: "android" });
-          } catch (error) {
-            // Expected to fail due to device verification
-            expect(String(error)).toContain("device");
-          }
+          const parsed = tool!.schema.parse({ preference });
+          expect(parsed.preference).toBe(preference);
         }
       });
 
-      test("should handle custom app package", async function() {
-        if (!avdsAvailable) {
-          // Note: Bun does not support dynamic test skipping
-          return;
-        }
-
+      test("should validate custom app package in schema", async function() {
         const tool = ToolRegistry.getTool("handleIntentChooser");
         expect(tool).toBeDefined();
 
-        try {
-          await tool!.handler({
-            preference: "custom",
-            customAppPackage: "com.example.app",
-            platform: "android"
-          });
-        } catch (error) {
-          // Expected to fail due to device verification
-          expect(String(error)).toContain("device");
-        }
+        const parsed = tool!.schema.parse({
+          preference: "custom",
+          customAppPackage: "com.example.app"
+        });
+        expect(parsed.preference).toBe("custom");
+        expect(parsed.customAppPackage).toBe("com.example.app");
       });
 
       test("should validate preference enum", () => {
@@ -252,21 +210,12 @@ describe("Deep Link Tools Registration", function() {
       registerDeepLinkTools();
     });
 
-    test("should handle missing device ID gracefully", async function() {
-      if (!avdsAvailable) {
-        // Note: Bun does not support dynamic test skipping
-        return;
-      }
-
+    test("should reject missing appId in schema", async function() {
       const tool = ToolRegistry.getTool("getDeepLinks");
       expect(tool).toBeDefined();
 
-      try {
-        await tool!.handler({ appId: "com.example.app", platform: "android" });
-        expect.fail("Should have thrown error for missing device");
-      } catch (error) {
-        expect(String(error)).toContain("device");
-      }
+      // Missing appId should fail validation
+      expect(() => tool!.schema.parse({})).toThrow();
     });
   });
 

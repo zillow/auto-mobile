@@ -1238,3 +1238,177 @@ describe("findFocusedElement", function() {
     expect(focusedElement).toBeNull();
   });
 });
+
+describe("Offscreen Node Filtering", function() {
+  let viewHierarchy: ViewHierarchy;
+  let fakeAdb: FakeAdbExecutor;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    fakeAdb = new FakeAdbExecutor();
+    viewHierarchy = new ViewHierarchy(mockDevice, fakeAdb);
+  });
+
+  test("should filter out nodes completely below the screen", function() {
+    const hierarchy = {
+      hierarchy: {
+        bounds: "[0,0][1080,2400]",
+        node: [
+          { text: "Visible", bounds: "[0,100][500,200]" },
+          { text: "Below Screen", bounds: "[0,2600][500,2800]" },
+          { text: "Way Below", bounds: "[0,3000][500,3200]" }
+        ]
+      }
+    };
+
+    const result = viewHierarchy.filterOffscreenNodes(hierarchy, 1080, 2400);
+
+    // Flatten nodes for checking
+    const flatNodes: string[] = [];
+    const collectNodes = (node: any) => {
+      if (node.text) {flatNodes.push(node.text);}
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        children.forEach(collectNodes);
+      }
+    };
+    collectNodes(result.hierarchy);
+
+    expect(flatNodes).toContain("Visible");
+    expect(flatNodes).not.toContain("Below Screen");
+    expect(flatNodes).not.toContain("Way Below");
+  });
+
+  test("should filter out nodes completely above the screen", function() {
+    const hierarchy = {
+      hierarchy: {
+        bounds: "[0,0][1080,2400]",
+        node: [
+          { text: "Visible", bounds: "[0,100][500,200]" },
+          { text: "Above Screen", bounds: "[0,-500][500,-300]" }
+        ]
+      }
+    };
+
+    const result = viewHierarchy.filterOffscreenNodes(hierarchy, 1080, 2400);
+
+    const flatNodes: string[] = [];
+    const collectNodes = (node: any) => {
+      if (node.text) {flatNodes.push(node.text);}
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        children.forEach(collectNodes);
+      }
+    };
+    collectNodes(result.hierarchy);
+
+    expect(flatNodes).toContain("Visible");
+    expect(flatNodes).not.toContain("Above Screen");
+  });
+
+  test("should keep nodes within margin of screen edge", function() {
+    const hierarchy = {
+      hierarchy: {
+        bounds: "[0,0][1080,2400]",
+        node: [
+          { text: "JustBelow", bounds: "[0,2450][500,2550]" },  // Within 100px margin
+          { text: "FarBelow", bounds: "[0,2600][500,2800]" }    // Beyond margin
+        ]
+      }
+    };
+
+    const result = viewHierarchy.filterOffscreenNodes(hierarchy, 1080, 2400, 100);
+
+    const flatNodes: string[] = [];
+    const collectNodes = (node: any) => {
+      if (node.text) {flatNodes.push(node.text);}
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        children.forEach(collectNodes);
+      }
+    };
+    collectNodes(result.hierarchy);
+
+    expect(flatNodes).toContain("JustBelow");
+    expect(flatNodes).not.toContain("FarBelow");
+  });
+
+  test("should handle negative coordinates in bounds", function() {
+    const hierarchy = {
+      hierarchy: {
+        bounds: "[0,0][1080,2400]",
+        node: [
+          { text: "Visible", bounds: "[0,100][500,200]" },
+          { text: "PartiallyLeft", bounds: "[-50,100][100,200]" },  // Partially visible
+          { text: "CompletelyLeft", bounds: "[-500,-300][-200,100]" }  // Completely offscreen
+        ]
+      }
+    };
+
+    const result = viewHierarchy.filterOffscreenNodes(hierarchy, 1080, 2400);
+
+    const flatNodes: string[] = [];
+    const collectNodes = (node: any) => {
+      if (node.text) {flatNodes.push(node.text);}
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        children.forEach(collectNodes);
+      }
+    };
+    collectNodes(result.hierarchy);
+
+    expect(flatNodes).toContain("Visible");
+    expect(flatNodes).toContain("PartiallyLeft");
+    expect(flatNodes).not.toContain("CompletelyLeft");
+  });
+
+  test("should return original hierarchy if screen dimensions are invalid", function() {
+    const hierarchy = {
+      hierarchy: {
+        bounds: "[0,0][1080,2400]",
+        node: { text: "Test", bounds: "[0,100][500,200]" }
+      }
+    };
+
+    const result = viewHierarchy.filterOffscreenNodes(hierarchy, 0, 0);
+
+    expect(result).toEqual(hierarchy);
+  });
+
+  test("should preserve visible children of offscreen parents", function() {
+    const hierarchy = {
+      hierarchy: {
+        bounds: "[0,0][1080,2400]",
+        node: {
+          text: "OffscreenParent",
+          bounds: "[0,3000][1080,4000]",
+          node: [
+            { text: "VisibleChild", bounds: "[0,100][500,200]" }
+          ]
+        }
+      }
+    };
+
+    const result = viewHierarchy.filterOffscreenNodes(hierarchy, 1080, 2400);
+
+    const flatNodes: string[] = [];
+    const collectNodes = (node: any) => {
+      if (node.text) {flatNodes.push(node.text);}
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        children.forEach(collectNodes);
+      }
+    };
+    collectNodes(result.hierarchy);
+
+    // Visible child should be preserved even though parent is offscreen
+    expect(flatNodes).toContain("VisibleChild");
+    // Offscreen parent should be removed
+    expect(flatNodes).not.toContain("OffscreenParent");
+  });
+});
