@@ -79,6 +79,9 @@ export class DaemonManager {
     if (options.debugPerf) {
       args.push("--debug-perf");
     }
+    if (options.strictAwait) {
+      args.push("--strict-await");
+    }
 
     // Create secure temp directory with random suffix to prevent symlink attacks
     const tempDir = mkdtempSync(join(tmpdir(), "auto-mobile-daemon-"));
@@ -311,6 +314,8 @@ export async function runDaemonCommand(
             options.debug = true;
           } else if (args[i] === "--debug-perf") {
             options.debugPerf = true;
+          } else if (args[i] === "--strict-await") {
+            options.strictAwait = true;
           }
         }
 
@@ -351,6 +356,8 @@ export async function runDaemonCommand(
             options.debug = true;
           } else if (args[i] === "--debug-perf") {
             options.debugPerf = true;
+          } else if (args[i] === "--strict-await") {
+            options.strictAwait = true;
           }
         }
 

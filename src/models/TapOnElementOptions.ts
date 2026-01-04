@@ -22,4 +22,16 @@ export interface TapOnElementOptions {
     text?: string;
     elementId?: string;
   };
+
+  // Optional await for an element to appear after tap
+  await?: {
+    element: {
+      id?: string;
+      text?: string;
+    };
+    timeout?: number;
+  };
+
+  // Fail the tap if the awaited element is not found within the timeout
+  strictAwait?: boolean;
 }

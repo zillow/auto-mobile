@@ -69,6 +69,7 @@ function parseArgs(): {
   uiPerfMode: boolean;
   uiPerfDebug: boolean;
   memPerfAuditMode: boolean;
+  strictAwait: boolean;
   a11yAuditMode: boolean;
   a11yLevel?: string;
   a11yFailureMode?: string;
@@ -113,6 +114,9 @@ function parseArgs(): {
 
   // Detect memory performance audit mode
   const memPerfAuditMode = args.includes("--mem-perf-audit");
+
+  // Detect strict await mode for tapOn await timeouts
+  const strictAwait = args.includes("--strict-await");
 
   // Detect accessibility audit mode
   const a11yAuditMode = args.includes("--accessibility-audit");
@@ -185,6 +189,7 @@ function parseArgs(): {
     uiPerfMode,
     uiPerfDebug,
     memPerfAuditMode,
+    strictAwait,
     a11yAuditMode,
     a11yLevel,
     a11yFailureMode,
@@ -575,6 +580,7 @@ async function main() {
       uiPerfMode,
       uiPerfDebug,
       memPerfAuditMode,
+      strictAwait,
       a11yAuditMode,
       a11yLevel,
       a11yFailureMode,
@@ -615,6 +621,11 @@ async function main() {
       logger.info("Memory performance audit mode enabled (--mem-perf-audit)");
     }
 
+    if (strictAwait) {
+      serverConfig.setStrictAwaitEnabled(true);
+      logger.info("Strict await mode enabled (--strict-await)");
+    }
+
     // Enable accessibility audit mode if --accessibility-audit flag is set
     if (a11yAuditMode) {
       const level = (a11yLevel as "A" | "AA" | "AAA" | undefined) || "AA";
@@ -639,6 +650,7 @@ async function main() {
         host: transport.host,
         debug,
         debugPerf,
+        strictAwait,
       });
       return;
     }

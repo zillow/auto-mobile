@@ -14,7 +14,7 @@ import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
-import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
@@ -29,6 +29,7 @@ export class TapOnElement extends BaseVisualChange {
   private accessibilityService: AccessibilityServiceClient;
   private visionConfig: VisionFallbackConfig;
   private static readonly MAX_ATTEMPTS = 5;
+  private static readonly AWAIT_POLL_INTERVAL_MS = 100;
 
   constructor(
     device: BootedDevice,
@@ -322,7 +323,42 @@ export class TapOnElement extends BaseVisualChange {
           ...metadata
         };
       }
-      return result;
+      if (!result.success || !options.await?.element) {
+        return result;
+      }
+
+      if (!options.await.element.id && !options.await.element.text) {
+        return {
+          ...result,
+          success: false,
+          error: "await.element requires either id or text",
+          awaitTimeout: true,
+          awaitDuration: 0
+        };
+      }
+
+      const awaitOutcome = await this.waitForAwaitElement(
+        options.await,
+        result.observation
+      );
+
+      const awaitResult: TapOnElementResult = {
+        ...result,
+        awaitedElement: awaitOutcome.awaitedElement,
+        awaitDuration: awaitOutcome.awaitDuration,
+        awaitTimeout: awaitOutcome.awaitTimeout,
+        observation: awaitOutcome.observation || result.observation
+      };
+
+      if (awaitOutcome.awaitTimeout && options.strictAwait) {
+        return {
+          ...awaitResult,
+          success: false,
+          error: "Tap succeeded but awaited element not found within timeout"
+        };
+      }
+
+      return awaitResult;
     } catch (error) {
       perf.end();
 
@@ -606,5 +642,91 @@ export class TapOnElement extends BaseVisualChange {
     }
 
     return selectionFound;
+  }
+
+  private async waitForAwaitElement(
+    awaitOptions: NonNullable<TapOnElementOptions["await"]>,
+    initialObservation?: ObserveResult
+  ): Promise<{
+    awaitedElement?: Element;
+    awaitDuration: number;
+    awaitTimeout: boolean;
+    observation?: ObserveResult;
+  }> {
+    const startTime = Date.now();
+    const timeoutMs = awaitOptions.timeout ?? 5000;
+    const queryOptions = {
+      text: awaitOptions.element.text,
+      elementId: awaitOptions.element.id
+    };
+
+    if (initialObservation?.viewHierarchy) {
+      const existing = this.findAwaitElement(awaitOptions, initialObservation.viewHierarchy);
+      if (existing) {
+        return {
+          awaitedElement: existing,
+          awaitDuration: Date.now() - startTime,
+          awaitTimeout: false,
+          observation: initialObservation
+        };
+      }
+    }
+
+    let lastObservation: ObserveResult | undefined;
+
+    while (Date.now() - startTime < timeoutMs) {
+      const observation = await this.observeScreen.execute(
+        queryOptions,
+        new NoOpPerformanceTracker(),
+        false,
+        startTime
+      );
+      lastObservation = observation;
+
+      if (observation.viewHierarchy) {
+        const found = this.findAwaitElement(awaitOptions, observation.viewHierarchy);
+        if (found) {
+          return {
+            awaitedElement: found,
+            awaitDuration: Date.now() - startTime,
+            awaitTimeout: false,
+            observation
+          };
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, TapOnElement.AWAIT_POLL_INTERVAL_MS));
+    }
+
+    return {
+      awaitDuration: Date.now() - startTime,
+      awaitTimeout: true,
+      observation: lastObservation
+    };
+  }
+
+  private findAwaitElement(
+    awaitOptions: NonNullable<TapOnElementOptions["await"]>,
+    viewHierarchy: ViewHierarchyResult
+  ): Element | null {
+    if (awaitOptions.element.id) {
+      return this.elementUtils.findElementByResourceId(
+        viewHierarchy,
+        awaitOptions.element.id,
+        undefined
+      );
+    }
+
+    if (awaitOptions.element.text) {
+      return this.elementUtils.findElementByText(
+        viewHierarchy,
+        awaitOptions.element.text,
+        undefined,
+        true,
+        false
+      );
+    }
+
+    return null;
   }
 }

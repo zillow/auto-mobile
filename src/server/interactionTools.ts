@@ -13,6 +13,7 @@ import { HomeScreen } from "../features/action/HomeScreen";
 import { Rotate } from "../features/action/Rotate";
 import { OpenURL } from "../features/action/OpenURL";
 import { ActionableError, BootedDevice, ViewHierarchyResult } from "../models";
+import { serverConfig } from "../utils/ServerConfig";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
@@ -63,6 +64,13 @@ export interface TapOnArgs {
     y?: number;
     text?: string;
     elementId?: string;
+  };
+  await?: {
+    element: {
+      id?: string;
+      text?: string;
+    };
+    timeout?: number;
   };
   platform: Platform;
 }
@@ -123,6 +131,13 @@ export const tapOnSchema = z.object({
     text: z.string().optional().describe("Text of the drag target element"),
     elementId: z.string().optional().describe("Element ID of the drag target element"),
   }).optional().describe("Drag target for long press drag action"),
+  await: z.object({
+    element: z.object({
+      id: z.string().optional().describe("Wait for element with this resource ID"),
+      text: z.string().optional().describe("Wait for element with this text"),
+    }).describe("Element to wait for after tap"),
+    timeout: z.number().optional().describe("Max wait time in ms (default: 5000)"),
+  }).optional().describe("Wait for an element to appear after tap"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   // Framework parameters for device management (optional)
   sessionUuid: z.string().optional(),
@@ -396,6 +411,8 @@ export function registerInteractionTools() {
       action: args.action,
       duration: args.duration,
       dragTo: args.dragTo,
+      await: args.await,
+      strictAwait: serverConfig.isStrictAwaitEnabled(),
     }, progress);
 
     return createJSONToolResponse({

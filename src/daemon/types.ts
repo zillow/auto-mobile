@@ -74,6 +74,8 @@ export interface DaemonOptions {
   debug?: boolean;
   /** Enable debug performance tracking */
   debugPerf?: boolean;
+  /** Enable strict await mode for tapOn await timeouts */
+  strictAwait?: boolean;
 }
 
 /**
