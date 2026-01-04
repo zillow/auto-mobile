@@ -1,7 +1,7 @@
 # Installation
 
 Right now this guide assumes you are a software engineer who is roughly familiar with AI coding assistants like Cursor,
-Claude Code, or Firebender.
+Claude Code, Codex, or Firebender.
 
 ### MCP Server Configuration for your Agent
 

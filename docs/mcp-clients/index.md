@@ -6,6 +6,7 @@ AutoMobile MCP is designed to be run in STDIO mode in production settings like w
 We have specific documentation for clients we have used AutoMobile with:
 
 * [Claude Code](claude-code.md)
+* [Codex](codex.md)
 * [Cursor](cursor.md)
 * [Firebender](firebender.md)
 * [Goose](goose.md) 
