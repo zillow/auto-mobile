@@ -6,6 +6,8 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { BootedDevice } from "../models";
 import { APK_URL, APK_SHA256_CHECKSUM } from "../constants/release";
+import crypto from "crypto";
+import os from "os";
 
 const execAsync = promisify(exec);
 
@@ -21,11 +23,35 @@ export interface AccessibilityServiceManager {
   isInstalled(): Promise<boolean>;
   isEnabled(): Promise<boolean>;
   isAvailable(): Promise<boolean>;
+  getInstalledApkSha256(): Promise<string | null>;
+  isVersionCompatible(): Promise<boolean>;
+  ensureCompatibleVersion(): Promise<AccessibilityVersionCheckResult>;
   downloadApk(): Promise<string>;
   install(apkPath: string): Promise<void>;
   enable(): Promise<void>;
   cleanupApk(apkPath: string): Promise<void>;
 }
+
+export interface AccessibilityVersionCheckResult {
+  status: "skipped" | "not_installed" | "compatible" | "upgraded" | "reinstalled" | "failed";
+  expectedSha256?: string;
+  installedSha256?: string | null;
+  installedShaSource?: "device" | "host" | "none";
+  installedApkPath?: string | null;
+  attemptedDownload?: boolean;
+  attemptedInstall?: boolean;
+  attemptedReinstall?: boolean;
+  error?: string;
+  upgradeError?: string;
+  reinstallError?: string;
+}
+
+type InstalledApkSha256Result = {
+  sha256: string | null;
+  source: "device" | "host" | "none";
+  apkPath?: string;
+  error?: string;
+};
 
 export class AndroidAccessibilityServiceManager implements AccessibilityServiceManager {
   private readonly device: BootedDevice;
@@ -45,6 +71,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
 
   private attemptedAutomatedSetup: boolean = false;
   private static instances: Map<string, AndroidAccessibilityServiceManager> = new Map();
+  private static expectedChecksumOverride: string | null = null;
 
   private constructor(device: BootedDevice, adb: AdbClient) {
     // home should either be process.env.HOME or bash resolution of home for current user
@@ -71,6 +98,10 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
    */
   public static resetInstances(): void {
     AndroidAccessibilityServiceManager.instances.clear();
+  }
+
+  public static setExpectedChecksumForTesting(checksum: string | null): void {
+    AndroidAccessibilityServiceManager.expectedChecksumOverride = checksum;
   }
 
   /**
@@ -197,6 +228,133 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       this.cachedAvailability = null;
 
       return false;
+    }
+  }
+
+  /**
+   * Get SHA256 of installed accessibility service APK.
+   */
+  async getInstalledApkSha256(): Promise<string | null> {
+    const result = await this.getInstalledApkSha256WithDetails();
+    return result.sha256;
+  }
+
+  /**
+   * Check if installed APK SHA256 matches expected release checksum.
+   */
+  async isVersionCompatible(): Promise<boolean> {
+    const expectedSha = this.getExpectedChecksum();
+    if (expectedSha.length === 0) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Version check skipped (no checksum provided)");
+      return true;
+    }
+
+    const installedSha = await this.getInstalledApkSha256();
+    if (!installedSha) {
+      return false;
+    }
+
+    return installedSha.toLowerCase() === expectedSha.toLowerCase();
+  }
+
+  /**
+   * Ensure installed accessibility service version matches expected checksum.
+   */
+  async ensureCompatibleVersion(): Promise<AccessibilityVersionCheckResult> {
+    this.clearAvailabilityCache();
+
+    const expectedSha = this.getExpectedChecksum();
+    if (expectedSha.length === 0) {
+      return {
+        status: "skipped",
+        expectedSha256: expectedSha
+      };
+    }
+
+    const isInstalled = await this.isInstalled();
+    if (!isInstalled) {
+      return {
+        status: "not_installed",
+        expectedSha256: expectedSha
+      };
+    }
+
+    const installedShaResult = await this.getInstalledApkSha256WithDetails();
+    const result: AccessibilityVersionCheckResult = {
+      status: "compatible",
+      expectedSha256: expectedSha,
+      installedSha256: installedShaResult.sha256,
+      installedShaSource: installedShaResult.source,
+      installedApkPath: installedShaResult.apkPath
+    };
+
+    if (!installedShaResult.sha256) {
+      return {
+        ...result,
+        status: "failed",
+        error: installedShaResult.error || "Unable to determine installed APK checksum"
+      };
+    }
+
+    if (installedShaResult.sha256.toLowerCase() === expectedSha.toLowerCase()) {
+      return result;
+    }
+
+    logger.info("[ACCESSIBILITY_SERVICE] Installed APK SHA mismatch, attempting upgrade", {
+      expected: expectedSha,
+      actual: installedShaResult.sha256
+    });
+
+    let apkPath: string | null = null;
+    try {
+      result.attemptedDownload = true;
+      apkPath = await this.downloadApk();
+
+      try {
+        result.attemptedInstall = true;
+        await this.adb.executeCommand(`install -r -d "${apkPath}"`);
+        logger.info("[ACCESSIBILITY_SERVICE] APK upgraded successfully");
+        this.clearAvailabilityCache();
+        return {
+          ...result,
+          status: "upgraded"
+        };
+      } catch (upgradeError) {
+        const upgradeMessage = upgradeError instanceof Error ? upgradeError.message : String(upgradeError);
+        logger.warn("[ACCESSIBILITY_SERVICE] Upgrade failed, attempting reinstall", { error: upgradeMessage });
+        result.upgradeError = upgradeMessage;
+
+        try {
+          result.attemptedReinstall = true;
+          await this.adb.executeCommand(`shell pm uninstall ${AndroidAccessibilityServiceManager.PACKAGE}`);
+          await this.install(apkPath);
+          await this.enable();
+          logger.info("[ACCESSIBILITY_SERVICE] APK reinstalled and service re-enabled");
+          this.clearAvailabilityCache();
+          return {
+            ...result,
+            status: "reinstalled"
+          };
+        } catch (reinstallError) {
+          const reinstallMessage = reinstallError instanceof Error ? reinstallError.message : String(reinstallError);
+          return {
+            ...result,
+            status: "failed",
+            reinstallError: reinstallMessage
+          };
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ...result,
+        status: "failed",
+        error: message
+      };
+    } finally {
+      if (apkPath) {
+        await this.cleanupApk(apkPath);
+      }
     }
   }
 
@@ -365,6 +523,21 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     }
 
     try {
+      const compatibilityResult = await this.ensureCompatibleVersion();
+      if (compatibilityResult.status === "failed") {
+        return {
+          success: false,
+          message: "Failed to ensure compatible Accessibility Service version",
+          error: compatibilityResult.error || compatibilityResult.upgradeError || compatibilityResult.reinstallError
+        };
+      }
+      if (compatibilityResult.status === "upgraded" || compatibilityResult.status === "reinstalled") {
+        return {
+          success: true,
+          message: "Accessibility Service upgraded to a compatible version",
+        };
+      }
+
       // Check if already installed and setup (unless force is true)
       if (!force && await this.isInstalled() && await this.isEnabled()) {
         return {
@@ -402,5 +575,89 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         await this.cleanupApk(apkPath);
       }
     }
+  }
+
+  private async getInstalledApkSha256WithDetails(): Promise<InstalledApkSha256Result> {
+    const apkPath = await this.getInstalledApkPath();
+    if (!apkPath) {
+      return {
+        sha256: null,
+        source: "none",
+        error: "Installed APK path not found"
+      };
+    }
+
+    try {
+      const shaResult = await this.adb.executeCommand(`shell sha256sum "${apkPath}"`);
+      const sha256 = shaResult.stdout.trim().split(/\s+/)[0];
+      if (sha256) {
+        return {
+          sha256,
+          source: "device",
+          apkPath
+        };
+      }
+    } catch (error) {
+      logger.warn("[ACCESSIBILITY_SERVICE] sha256sum unavailable or failed, falling back to host hash", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-apk-"));
+    const safeDeviceId = (this.device.deviceId || "device").replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const localApkPath = path.join(tempDir, `accessibility-service-installed-${safeDeviceId}.apk`);
+
+    try {
+      await this.adb.executeCommand(`pull "${apkPath}" "${localApkPath}"`);
+      const apkBuffer = await fs.readFile(localApkPath);
+      const sha256 = crypto.createHash("sha256").update(apkBuffer).digest("hex");
+      return {
+        sha256,
+        source: "host",
+        apkPath
+      };
+    } catch (error) {
+      return {
+        sha256: null,
+        source: "none",
+        apkPath,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    } finally {
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch {
+      }
+    }
+  }
+
+  private async getInstalledApkPath(): Promise<string | null> {
+    try {
+      const pathResult = await this.adb.executeCommand(
+        `shell pm path ${AndroidAccessibilityServiceManager.PACKAGE}`,
+        undefined,
+        undefined,
+        true
+      );
+      const line = pathResult.stdout
+        .split("\n")
+        .map(entry => entry.trim())
+        .find(entry => entry.startsWith("package:"));
+
+      if (!line) {
+        return null;
+      }
+
+      return line.replace("package:", "").trim() || null;
+    } catch (error) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Failed to resolve installed APK path", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+
+  private getExpectedChecksum(): string {
+    return AndroidAccessibilityServiceManager.expectedChecksumOverride ?? APK_SHA256_CHECKSUM;
   }
 }

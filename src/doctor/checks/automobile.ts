@@ -11,6 +11,8 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { logger } from "../../utils/logger";
 
+const RELEASES_URL = "https://github.com/kaeawc/auto-mobile/releases";
+
 /**
  * Check AutoMobile version
  */
@@ -114,14 +116,43 @@ export async function checkAccessibilityService(): Promise<CheckResult> {
     const device = devices[0];
     const serviceManager = new AndroidAccessibilityServiceManager(device);
 
+    const versionResult = await serviceManager.ensureCompatibleVersion();
     const isInstalled = await serviceManager.isInstalled();
     const isEnabled = await serviceManager.isEnabled();
 
-    if (isInstalled && isEnabled) {
+    const diagnostics: string[] = [
+      `device=${device.deviceId}`,
+      `installed=${isInstalled}`,
+      `enabled=${isEnabled}`
+    ];
+
+    if (versionResult.expectedSha256 !== undefined) {
+      diagnostics.push(`expectedSha256=${versionResult.expectedSha256 || "n/a"}`);
+    }
+
+    if (versionResult.installedSha256 !== undefined) {
+      const source = versionResult.installedShaSource || "unknown";
+      diagnostics.push(`installedSha256=${versionResult.installedSha256 || "unknown"} (${source})`);
+    }
+
+    diagnostics.push(`versionStatus=${versionResult.status}`);
+
+    if (versionResult.error || versionResult.upgradeError || versionResult.reinstallError) {
+      diagnostics.push(`versionError=${versionResult.error || versionResult.upgradeError || versionResult.reinstallError}`);
+    }
+
+    const attemptedDownloadOrInstall = Boolean(
+      versionResult.attemptedDownload || versionResult.attemptedInstall || versionResult.attemptedReinstall
+    );
+
+    if (isInstalled && isEnabled && (versionResult.status === "compatible" || versionResult.status === "upgraded" || versionResult.status === "reinstalled" || versionResult.status === "skipped")) {
       return {
         name: "Accessibility Service",
         status: "pass",
-        message: `Installed and enabled on ${device.deviceId}`,
+        message: diagnostics.join("; "),
+        recommendation: attemptedDownloadOrInstall
+          ? `If you need the latest APK, download from ${RELEASES_URL}`
+          : undefined,
       };
     }
 
@@ -129,16 +160,29 @@ export async function checkAccessibilityService(): Promise<CheckResult> {
       return {
         name: "Accessibility Service",
         status: "warn",
-        message: `Installed but not enabled on ${device.deviceId}`,
-        recommendation: "Enable the accessibility service in device settings",
+        message: diagnostics.join("; "),
+        recommendation: attemptedDownloadOrInstall
+          ? `Enable the accessibility service in device settings. If you need the latest APK, download from ${RELEASES_URL}`
+          : "Enable the accessibility service in device settings",
+      };
+    }
+
+    if (!isInstalled) {
+      return {
+        name: "Accessibility Service",
+        status: "warn",
+        message: diagnostics.join("; "),
+        recommendation: "The accessibility service will be installed automatically when needed",
       };
     }
 
     return {
       name: "Accessibility Service",
       status: "warn",
-      message: `Not installed on ${device.deviceId}`,
-      recommendation: "The accessibility service will be installed automatically when needed",
+      message: diagnostics.join("; "),
+      recommendation: attemptedDownloadOrInstall
+        ? `If you need the latest APK, download from ${RELEASES_URL}`
+        : "Review accessibility service installation status",
     };
   } catch (error) {
     logger.debug(`Accessibility service check failed: ${error}`);

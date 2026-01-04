@@ -15,6 +15,8 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
   private shouldSetupFail: boolean = false;
   private shouldDownloadFail: boolean = false;
   private shouldCleanupFail: boolean = false;
+  private installedSha256: string | null = null;
+  private versionCompatible: boolean = true;
 
   /**
    * Set whether the accessibility service is installed
@@ -89,6 +91,22 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
   }
 
   /**
+   * Set the installed APK SHA256 for version compatibility checks.
+   * @param sha256 - The SHA256 to return
+   */
+  setInstalledApkSha256(sha256: string | null): void {
+    this.installedSha256 = sha256;
+  }
+
+  /**
+   * Configure version compatibility result.
+   * @param compatible - Whether version is compatible
+   */
+  setVersionCompatible(compatible: boolean): void {
+    this.versionCompatible = compatible;
+  }
+
+  /**
    * Get history of executed operations (for test assertions)
    * @returns Array of operation strings that were executed
    */
@@ -137,6 +155,36 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
   async isAvailable(): Promise<boolean> {
     this.executedOperations.push("isAvailable");
     return this.availableState;
+  }
+
+  async getInstalledApkSha256(): Promise<string | null> {
+    this.executedOperations.push("getInstalledApkSha256");
+    return this.installedSha256;
+  }
+
+  async isVersionCompatible(): Promise<boolean> {
+    this.executedOperations.push("isVersionCompatible");
+    return this.versionCompatible;
+  }
+
+  async ensureCompatibleVersion(): Promise<{
+    status: "skipped" | "not_installed" | "compatible" | "upgraded" | "reinstalled" | "failed";
+    expectedSha256?: string;
+    installedSha256?: string | null;
+    installedShaSource?: "device" | "host" | "none";
+    installedApkPath?: string | null;
+    attemptedDownload?: boolean;
+    attemptedInstall?: boolean;
+    attemptedReinstall?: boolean;
+    error?: string;
+    upgradeError?: string;
+    reinstallError?: string;
+  }> {
+    this.executedOperations.push("ensureCompatibleVersion");
+    return {
+      status: this.versionCompatible ? "compatible" : "failed",
+      installedSha256: this.installedSha256
+    };
   }
 
   clearAvailabilityCache(): void {
