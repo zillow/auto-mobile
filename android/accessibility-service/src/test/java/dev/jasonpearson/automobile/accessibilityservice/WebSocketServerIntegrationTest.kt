@@ -126,10 +126,11 @@ class WebSocketServerIntegrationTest {
         path = "/ws"
       ) {
         // Then - connection established
+        waitFor { server.getConnectionCount() == 1 }
         assertEquals(1, server.getConnectionCount())
 
         // Receive connection message
-        val frame = incoming.receive()
+        val frame = withTimeout(1000) { incoming.receive() }
         if (frame is Frame.Text) {
           val message = frame.readText()
           assertTrue("Should receive connection message", message.contains("connected"))
