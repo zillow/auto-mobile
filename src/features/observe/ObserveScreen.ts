@@ -9,7 +9,6 @@ import { TakeScreenshot } from "./TakeScreenshot";
 import { GetDumpsysWindow } from "./GetDumpsysWindow";
 import { GetBackStack } from "./GetBackStack";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { DeepLinkManager } from "../../utils/DeepLinkManager";
 import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
@@ -47,7 +46,6 @@ export class ObserveScreen {
   private adb: AdbClient;
   private axe: AxeClient;
   private webdriver: WebDriverAgent;
-  private deepLinkManager: DeepLinkManager;
 
   // Static cache for observe results
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
@@ -97,7 +95,6 @@ export class ObserveScreen {
     this.screenshotUtil = new TakeScreenshot(device, this.adb);
     this.dumpsysWindow = new GetDumpsysWindow(device, this.adb);
     this.backStack = new GetBackStack(this.adb);
-    this.deepLinkManager = new DeepLinkManager(device);
 
     // Ensure observe result cache directory exists
     if (!fs.existsSync(ObserveScreen.observeResultCacheDir)) {
@@ -257,7 +254,7 @@ export class ObserveScreen {
     }
 
     try {
-      const intentChooserDetected = this.deepLinkManager.detectIntentChooser(result.viewHierarchy);
+      const intentChooserDetected = result.viewHierarchy.intentChooserDetected;
 
       // Add intent chooser detection to result
       result.intentChooserDetected = intentChooserDetected;

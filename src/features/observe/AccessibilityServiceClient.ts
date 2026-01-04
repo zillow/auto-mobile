@@ -65,6 +65,7 @@ export interface AccessibilityHierarchy {
   packageName: string;
   hierarchy: AccessibilityNode;
   windows?: AccessibilityWindowHierarchy[];
+  intentChooserDetected?: boolean;
 }
 
 /**
@@ -1036,7 +1037,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
       const result: ViewHierarchyResult = {
         hierarchy: convertedHierarchy,
-        packageName: accessibilityHierarchy.packageName
+        packageName: accessibilityHierarchy.packageName,
+        intentChooserDetected: accessibilityHierarchy.intentChooserDetected
       };
 
       // Convert windows if present (for multi-window support - popups, toolbars, etc.)

@@ -234,6 +234,7 @@ describe("AccessibilityServiceClient", function() {
       const accessibilityHierarchy = {
         updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
+        intentChooserDetected: true,
         hierarchy: {
           "text": "6:43 AM",
           "content-desc": "6:43 AM",
@@ -270,6 +271,7 @@ describe("AccessibilityServiceClient", function() {
       expect(result.hierarchy.bounds).toBe("[175,687][692,973]");
       expect(result.hierarchy.clickable).toBeUndefined();
       expect(result.hierarchy.enabled).toBe("true");
+      expect(result.intentChooserDetected).toBe(true);
 
       // Check child node conversion
       expect(typeof result.hierarchy.node).toBe("object");

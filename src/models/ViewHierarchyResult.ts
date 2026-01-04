@@ -9,6 +9,8 @@ export interface ViewHierarchyResult {
   updatedAt?: number;
   /** Package name of the foreground app (from accessibility service) */
   packageName?: string;
+  /** Whether an intent chooser dialog was detected (from accessibility service) */
+  intentChooserDetected?: boolean;
   /** All visible windows (including popups, toolbars, etc.) */
   windows?: WindowHierarchy[];
 }

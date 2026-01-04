@@ -280,7 +280,8 @@ export class FakeAccessibilityService implements AccessibilityService {
         }
       },
       packageName: accessibilityHierarchy.packageName,
-      updatedAt: accessibilityHierarchy.updatedAt
+      updatedAt: accessibilityHierarchy.updatedAt,
+      intentChooserDetected: accessibilityHierarchy.intentChooserDetected
     };
   }
 

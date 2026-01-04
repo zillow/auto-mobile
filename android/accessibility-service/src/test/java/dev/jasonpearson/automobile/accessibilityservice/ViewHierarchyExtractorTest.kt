@@ -140,6 +140,33 @@ class ViewHierarchyExtractorTest {
   }
 
   @Test
+  fun `detectIntentChooserIndicators returns true for text indicator`() {
+    val child = UIElementInfo(text = "Choose an app")
+    val childJson = json.encodeToJsonElement(UIElementInfo.serializer(), child)
+    val root = UIElementInfo(className = "android.widget.LinearLayout", node = childJson)
+
+    assertTrue(extractor.detectIntentChooserIndicatorsForTest(root))
+  }
+
+  @Test
+  fun `detectIntentChooserIndicators returns true for resource id indicator`() {
+    val child = UIElementInfo(resourceId = "android:id/button_once", className = "android.widget.Button")
+    val childJson = json.encodeToJsonElement(UIElementInfo.serializer(), child)
+    val root = UIElementInfo(className = "android.widget.LinearLayout", node = childJson)
+
+    assertTrue(extractor.detectIntentChooserIndicatorsForTest(root))
+  }
+
+  @Test
+  fun `detectIntentChooserIndicators returns false when no indicators present`() {
+    val child = UIElementInfo(text = "Normal content", className = "android.widget.TextView")
+    val childJson = json.encodeToJsonElement(UIElementInfo.serializer(), child)
+    val root = UIElementInfo(className = "android.widget.LinearLayout", node = childJson)
+
+    assertFalse(extractor.detectIntentChooserIndicatorsForTest(root))
+  }
+
+  @Test
   fun `accessibility score is calculated for clickable elements`() = runTest {
     // This test would need a more complex setup to test accessibility scoring
     // For now, just verify that the structure supports it

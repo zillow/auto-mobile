@@ -27,7 +27,9 @@ export class DetectIntentChooser extends BaseVisualChange {
           }
 
           logger.info("[DetectIntentChooser] Starting intent chooser detection");
-          const detected = this.deepLinkManager.detectIntentChooser(viewHierarchy);
+          const detected =
+            viewHierarchy.intentChooserDetected ??
+            this.deepLinkManager.detectIntentChooser(viewHierarchy);
 
           logger.info(`[DetectIntentChooser] Intent chooser detection completed. Detected: ${detected}`);
 

@@ -61,8 +61,13 @@ class ViewHierarchyExtractor {
     return try {
       val rootElement = extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
       val optimizedElement = rootElement?.let { optimizeHierarchy(it) }
+      val intentChooserDetected = optimizedElement?.let { detectIntentChooserIndicators(it) } ?: false
 
-      ViewHierarchy(packageName = rootNode.packageName?.toString(), hierarchy = optimizedElement)
+      ViewHierarchy(
+        packageName = rootNode.packageName?.toString(),
+        hierarchy = optimizedElement,
+        intentChooserDetected = intentChooserDetected
+      )
     } catch (e: Exception) {
       Log.e(TAG, "Error extracting view hierarchy", e)
       ViewHierarchy(error = "Failed to extract view hierarchy: ${e.message}")
@@ -95,6 +100,7 @@ class ViewHierarchyExtractor {
     val windowHierarchies = mutableListOf<WindowHierarchy>()
     var mainHierarchy: UIElementInfo? = null
     var mainPackageName: String? = null
+    var intentChooserDetected = false
 
     // Extract from each window
     for (window in windows) {
@@ -114,6 +120,9 @@ class ViewHierarchyExtractor {
         val element = extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
         val optimizedElement = element?.let { optimizeHierarchy(it) }
         val packageName = rootNode.packageName?.toString()
+        if (!intentChooserDetected && optimizedElement != null) {
+          intentChooserDetected = detectIntentChooserIndicators(optimizedElement)
+        }
 
         // The active window becomes the main hierarchy (backward compatibility)
         if (window.isActive) {
@@ -157,6 +166,9 @@ class ViewHierarchyExtractor {
       val element = extractNodeInfo(activeWindowRoot, 0, textFilter, screenDimensions, dedupeTextContentDesc)
       mainHierarchy = element?.let { optimizeHierarchy(it) }
       mainPackageName = activeWindowRoot.packageName?.toString()
+      if (!intentChooserDetected && mainHierarchy != null) {
+        intentChooserDetected = detectIntentChooserIndicators(mainHierarchy!!)
+      }
     }
 
     Log.d(TAG, "Extracted ${windowHierarchies.size} additional window hierarchies (after filtering)")
@@ -164,7 +176,8 @@ class ViewHierarchyExtractor {
     return ViewHierarchy(
       packageName = mainPackageName,
       hierarchy = mainHierarchy,
-      windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null
+      windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null,
+      intentChooserDetected = intentChooserDetected
     )
   }
 
@@ -211,6 +224,58 @@ class ViewHierarchyExtractor {
     }
 
     return false
+  }
+
+  /**
+   * Detect intent chooser indicators in an optimized hierarchy.
+   */
+  private fun detectIntentChooserIndicators(element: UIElementInfo): Boolean {
+    val textIndicators = setOf(
+      "Choose an app",
+      "Open with",
+      "Complete action using",
+      "Always",
+      "Just once"
+    )
+
+    val classIndicators = listOf(
+      "com.android.internal.app.ChooserActivity",
+      "com.android.internal.app.ResolverActivity"
+    )
+
+    val resourceIdIndicators = listOf(
+      "android:id/button_always",
+      "android:id/button_once",
+      "resolver_list",
+      "chooser_list"
+    )
+
+    val nodeText = element.text ?: element.contentDesc ?: ""
+    if (textIndicators.contains(nodeText)) {
+      return true
+    }
+
+    val nodeClass = element.className ?: ""
+    if (classIndicators.any { nodeClass.contains(it) }) {
+      return true
+    }
+
+    val resourceId = element.resourceId ?: ""
+    if (resourceIdIndicators.any { resourceId.contains(it) }) {
+      return true
+    }
+
+    for (child in extractChildrenFromNode(element.node)) {
+      if (detectIntentChooserIndicators(child)) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  internal fun detectIntentChooserIndicatorsForTest(element: UIElementInfo): Boolean {
+    return detectIntentChooserIndicators(element)
   }
 
   /**
