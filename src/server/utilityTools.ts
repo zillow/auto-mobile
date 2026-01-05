@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import { ActionableError } from "../models/ActionableError";
 import { DemoMode } from "../features/utility/DemoMode";
+import { SystemConfigurationManager } from "../features/utility/SystemConfigurationManager";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
@@ -29,6 +30,30 @@ export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
+export const setLocaleSchema = addSessionUuidToSchema(z.object({
+  languageTag: z.string().min(1).describe("Locale language tag (e.g., \"ar-SA\", \"ja-JP\")"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+}));
+
+export const setTimeZoneSchema = addSessionUuidToSchema(z.object({
+  zoneId: z.string().min(1).describe("Time zone ID (e.g., \"America/Los_Angeles\")"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+}));
+
+export const setTextDirectionSchema = addSessionUuidToSchema(z.object({
+  rtl: z.boolean().describe("Enable or disable RTL layout"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+}));
+
+export const set24HourFormatSchema = addSessionUuidToSchema(z.object({
+  enabled: z.boolean().describe("Enable or disable 24-hour time format"),
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+}));
+
+export const getCalendarSystemSchema = addSessionUuidToSchema(z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform")
+}));
+
 // Export interfaces for type safety
 export interface EnableDemoModeArgs {
   time?: string;
@@ -44,6 +69,30 @@ export interface EnableDemoModeArgs {
 export interface SetActiveDeviceArgs {
   deviceId: string;
     platform: Platform;
+}
+
+export interface SetLocaleArgs {
+  languageTag: string;
+  platform: Platform;
+}
+
+export interface SetTimeZoneArgs {
+  zoneId: string;
+  platform: Platform;
+}
+
+export interface SetTextDirectionArgs {
+  rtl: boolean;
+  platform: Platform;
+}
+
+export interface Set24HourFormatArgs {
+  enabled: boolean;
+  platform: Platform;
+}
+
+export interface GetCalendarSystemArgs {
+  platform: Platform;
 }
 
 // Register tools
@@ -99,6 +148,71 @@ export function registerUtilityTools() {
     }
   };
 
+  const setLocaleHandler = async (device: BootedDevice, args: SetLocaleArgs) => {
+    const manager = new SystemConfigurationManager(device);
+    const result = await manager.setLocale(args.languageTag);
+    const message = result.success
+      ? `Locale set to ${args.languageTag}`
+      : `Failed to set locale${result.error ? `: ${result.error}` : ""}`;
+
+    return createJSONToolResponse({
+      message,
+      ...result
+    });
+  };
+
+  const setTimeZoneHandler = async (device: BootedDevice, args: SetTimeZoneArgs) => {
+    const manager = new SystemConfigurationManager(device);
+    const result = await manager.setTimeZone(args.zoneId);
+    const message = result.success
+      ? `Time zone set to ${args.zoneId}`
+      : `Failed to set time zone${result.error ? `: ${result.error}` : ""}`;
+
+    return createJSONToolResponse({
+      message,
+      ...result
+    });
+  };
+
+  const setTextDirectionHandler = async (device: BootedDevice, args: SetTextDirectionArgs) => {
+    const manager = new SystemConfigurationManager(device);
+    const result = await manager.setTextDirection(args.rtl);
+    const message = result.success
+      ? `Text direction set to ${args.rtl ? "RTL" : "LTR"}`
+      : `Failed to set text direction${result.error ? `: ${result.error}` : ""}`;
+
+    return createJSONToolResponse({
+      message,
+      ...result
+    });
+  };
+
+  const set24HourFormatHandler = async (device: BootedDevice, args: Set24HourFormatArgs) => {
+    const manager = new SystemConfigurationManager(device);
+    const result = await manager.set24HourFormat(args.enabled);
+    const message = result.success
+      ? `24-hour format ${args.enabled ? "enabled" : "disabled"}`
+      : `Failed to set 24-hour format${result.error ? `: ${result.error}` : ""}`;
+
+    return createJSONToolResponse({
+      message,
+      ...result
+    });
+  };
+
+  const getCalendarSystemHandler = async (device: BootedDevice, _args: GetCalendarSystemArgs) => {
+    const manager = new SystemConfigurationManager(device);
+    const result = await manager.getCalendarSystem();
+    const message = result.success
+      ? `Calendar system: ${result.calendarSystem ?? "unknown"}`
+      : `Failed to read calendar system${result.error ? `: ${result.error}` : ""}`;
+
+    return createJSONToolResponse({
+      message,
+      ...result
+    });
+  };
+
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "enableDemoMode",
@@ -119,5 +233,40 @@ export function registerUtilityTools() {
     "Set the active device ID for subsequent operations",
     setActiveDeviceSchema,
     setActiveDeviceHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "setLocale",
+    "Switch app/system locale (e.g., \"ar-SA\", \"ja-JP\")",
+    setLocaleSchema,
+    setLocaleHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "setTimeZone",
+    "Change the device time zone",
+    setTimeZoneSchema,
+    setTimeZoneHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "setTextDirection",
+    "Enable or disable RTL layout direction",
+    setTextDirectionSchema,
+    setTextDirectionHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "set24HourFormat",
+    "Toggle the device 24-hour time format",
+    set24HourFormatSchema,
+    set24HourFormatHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "getCalendarSystem",
+    "Read the current device calendar system",
+    getCalendarSystemSchema,
+    getCalendarSystemHandler
   );
 }

@@ -356,12 +356,21 @@ Session-based Execution:
     "killDevice",
     "checkRunningDevices"
   ];
+  const systemConfigTools = [
+    "setLocale",
+    "setTimeZone",
+    "setTextDirection",
+    "set24HourFormat",
+    "getCalendarSystem"
+  ];
 
   // Group tools by category (based on their prefixes or common patterns)
   tools.forEach(tool => {
     let category = "General";
 
-    if (deviceTools.includes(tool.name)) {
+    if (systemConfigTools.includes(tool.name)) {
+      category = "System Configuration";
+    } else if (deviceTools.includes(tool.name)) {
       category = "Device Management";
     } else if (tool.name.includes("App") || tool.name.includes("app")) {
       category = "App Management";

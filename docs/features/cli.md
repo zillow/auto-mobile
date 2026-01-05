@@ -16,7 +16,18 @@ Example tool invocations:
 ```bash
 auto-mobile --cli observe --platform android
 auto-mobile --cli tapOn --platform android --action tap --text "Submit"
+auto-mobile --cli setLocale --platform android --languageTag ar-SA
 ```
+
+## System Configuration
+
+Use the system configuration tools to adjust locale, text direction, and time settings:
+
+- `setLocale` - Switch app/system locale (e.g., "ar-SA", "ja-JP")
+- `setTimeZone` - Change the device time zone
+- `setTextDirection` - Enable or disable RTL layout direction
+- `set24HourFormat` - Toggle the device 24-hour time format
+- `getCalendarSystem` - Read the current device calendar system
 
 ## Daemon Mode
 
