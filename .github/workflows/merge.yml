@@ -280,7 +280,8 @@ jobs:
         if: steps.check.outputs.needed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use a PAT with workflow scope so the PR triggers CI runs.
+          token: ${{ secrets.AUTO_MOBILE_PR_TOKEN }}
           commit-message: |
             chore: update accessibility service APK SHA256
 
