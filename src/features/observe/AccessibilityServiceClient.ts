@@ -117,6 +117,17 @@ export interface A11ySwipeResult {
 }
 
 /**
+ * Interface for drag result from accessibility service
+ */
+export interface A11yDragResult {
+  success: boolean;
+  totalTimeMs: number;
+  gestureTimeMs?: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
  * Interface for set text result from accessibility service
  */
 export interface A11ySetTextResult {
@@ -425,6 +436,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Swipe handling
   private pendingSwipeResolve: ((result: A11ySwipeResult) => void) | null = null;
   private pendingSwipeRequestId: string | null = null;
+  private pendingDragResolve: ((result: A11yDragResult) => void) | null = null;
+  private pendingDragRequestId: string | null = null;
 
   // Set text handling
   private pendingSetTextResolve: ((result: A11ySetTextResult) => void) | null = null;
@@ -758,6 +771,24 @@ export class AccessibilityServiceClient implements AccessibilityService {
           totalTimeMs: swipeMessage.totalTimeMs,
           gestureTimeMs: swipeMessage.gestureTimeMs,
           error: swipeMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle drag result
+      if (message.type === "drag_result" && this.pendingDragResolve) {
+        const dragMessage = message as any;
+        const perfTiming = dragMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Drag result (requestId: ${dragMessage.requestId}, success: ${dragMessage.success}, totalTimeMs: ${dragMessage.totalTimeMs}, gestureTimeMs: ${dragMessage.gestureTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingDragResolve;
+        this.pendingDragResolve = null;
+        this.pendingDragRequestId = null;
+        resolve({
+          success: dragMessage.success,
+          totalTimeMs: dragMessage.totalTimeMs,
+          gestureTimeMs: dragMessage.gestureTimeMs,
+          error: dragMessage.error,
           perfTiming
         });
       }
@@ -1717,6 +1748,93 @@ export class AccessibilityServiceClient implements AccessibilityService {
       return {
         success: false,
         totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request a drag gesture from the accessibility service using dispatchGesture API.
+   * @param x1 - Starting X coordinate
+   * @param y1 - Starting Y coordinate
+   * @param x2 - Ending X coordinate
+   * @param y2 - Ending Y coordinate
+   * @param duration - Drag duration in milliseconds
+   * @param holdTime - Hold time before dragging in milliseconds
+   * @param timeoutMs - Maximum time to wait for drag completion in milliseconds
+   * @returns Promise<A11yDragResult> - The drag result with timing information
+   */
+  async requestDrag(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    duration: number = 500,
+    holdTime: number = 200,
+    timeoutMs: number = 5000
+  ): Promise<A11yDragResult> {
+    const startTime = Date.now();
+
+    try {
+      const connected = await this.connectWebSocket();
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for drag");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      const requestId = `drag_${Date.now()}_${generateSecureId()}`;
+      this.pendingDragRequestId = requestId;
+
+      const dragPromise = new Promise<A11yDragResult>(resolve => {
+        this.pendingDragResolve = resolve;
+        this.timer.setTimeout(() => {
+          if (this.pendingDragResolve === resolve) {
+            this.pendingDragResolve = null;
+            this.pendingDragRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Drag timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        throw new Error("WebSocket not connected");
+      }
+      const message = JSON.stringify({
+        type: "request_drag",
+        requestId,
+        x1: Math.round(x1),
+        y1: Math.round(y1),
+        x2: Math.round(x2),
+        y2: Math.round(y2),
+        duration,
+        holdTime
+      });
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent drag request (requestId: ${requestId}, ${x1},${y1} -> ${x2},${y2}, duration: ${duration}ms, hold: ${holdTime}ms)`);
+
+      const result = await dragPromise;
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Drag completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Drag failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const durationMs = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Drag request failed after ${durationMs}ms: ${error}`);
+      return {
+        success: false,
+        totalTimeMs: durationMs,
         error: `${error}`
       };
     }

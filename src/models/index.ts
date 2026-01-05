@@ -9,6 +9,8 @@ export * from "./DeepLinkResult";
 export * from "./DemoModeResult";
 export * from "./Device";
 export * from "./DeviceSession";
+export * from "./DragAndDropOptions";
+export * from "./DragAndDropResult";
 export * from "./Element";
 export * from "./ElementBounds";
 export * from "./DeviceInfo";
