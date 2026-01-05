@@ -120,6 +120,64 @@ When enabled, `observe` tool calls will include a `performanceAudit` field:
 }
 ```
 
+### Query Performance History
+
+Use the `listPerformanceAuditResults` tool to fetch recent audit history from the local SQLite database.
+Results are paginated and can be filtered by timestamp range.
+
+Example request:
+
+```json
+{
+  "name": "listPerformanceAuditResults",
+  "arguments": {
+    "startTime": "2026-01-05T12:00:00Z",
+    "endTime": "2026-01-05T12:05:00Z",
+    "limit": 20,
+    "offset": 0
+  }
+}
+```
+
+Example response:
+
+```json
+{
+  "results": [
+    {
+      "id": 42,
+      "deviceId": "emulator-5554",
+      "sessionId": "2026-01-05",
+      "packageName": "com.example.app",
+      "timestamp": "2026-01-05T12:02:01.123Z",
+      "passed": false,
+      "metrics": {
+        "p50Ms": 18.5,
+        "p90Ms": 28.3,
+        "p95Ms": 35.7,
+        "p99Ms": 52.1,
+        "jankCount": 12,
+        "missedVsyncCount": 8,
+        "slowUiThreadCount": 4,
+        "frameDeadlineMissedCount": 0,
+        "cpuUsagePercent": 65.2,
+        "touchLatencyMs": 28.5
+      },
+      "diagnostics": "Performance issues detected..."
+    }
+  ],
+  "toolCalls": ["tapOn", "swipeOn", "observe"],
+  "hasMore": false,
+  "nextOffset": null,
+  "range": {
+    "startTime": "2026-01-05T12:02:01.123Z",
+    "endTime": "2026-01-05T12:02:01.123Z"
+  }
+}
+```
+
+`toolCalls` lists the unique tool names executed during the time span covered by the current page of results.
+
 ### Interpreting Results
 
 #### Passed Audits

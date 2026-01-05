@@ -24,6 +24,13 @@ interface AutoMobileClient {
   fun getNavigationGraph(platform: String = "android"): JsonElement
   fun listFeatureFlags(): List<FeatureFlagState>
   fun setFeatureFlag(key: String, enabled: Boolean, config: JsonObject? = null): FeatureFlagState
+
+  fun listPerformanceAuditResults(
+      startTime: String? = null,
+      endTime: String? = null,
+      limit: Int? = null,
+      offset: Int? = null,
+  ): PerformanceAuditHistoryResult
   fun close() {}
 }
 

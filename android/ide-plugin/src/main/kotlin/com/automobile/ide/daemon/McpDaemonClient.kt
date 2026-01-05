@@ -94,6 +94,33 @@ class McpDaemonClient(
     return decodeToolResponse(json, response, FeatureFlagState.serializer())
   }
 
+  override fun listPerformanceAuditResults(
+      startTime: String?,
+      endTime: String?,
+      limit: Int?,
+      offset: Int?,
+  ): PerformanceAuditHistoryResult {
+    val response =
+        callTool(
+            "listPerformanceAuditResults",
+            buildJsonObject {
+              if (startTime != null) {
+                put("startTime", JsonPrimitive(startTime))
+              }
+              if (endTime != null) {
+                put("endTime", JsonPrimitive(endTime))
+              }
+              if (limit != null) {
+                put("limit", JsonPrimitive(limit))
+              }
+              if (offset != null) {
+                put("offset", JsonPrimitive(offset))
+              }
+            },
+        )
+    return decodeToolResponse(json, response, PerformanceAuditHistoryResult.serializer())
+  }
+
   private fun callTool(name: String, arguments: JsonObject): JsonElement {
     val response =
         sendRequest(

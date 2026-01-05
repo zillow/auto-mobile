@@ -6,6 +6,7 @@ import { Idle } from "../observe/Idle";
 import { DeviceCapabilitiesDetector, DeviceCapabilities } from "../../utils/DeviceCapabilities";
 import { TouchLatencyTracker } from "./TouchLatencyTracker";
 import { serverConfig } from "../../utils/ServerConfig";
+import { PerformanceAuditRepository } from "../../db/performanceAuditRepository";
 
 /**
  * Performance metrics collected during audit
@@ -70,6 +71,7 @@ export class PerformanceAudit {
   private idle: Idle;
   private capabilitiesDetector: DeviceCapabilitiesDetector;
   private touchLatencyTracker: TouchLatencyTracker;
+  private repository = new PerformanceAuditRepository();
 
   constructor(device: BootedDevice, adb: AdbClient | null = null) {
     this.device = device;
@@ -509,8 +511,32 @@ export class PerformanceAudit {
       ? this.generateDiagnostics(metrics, violations)
       : null;
 
+    const passed = violations.length === 0;
+    const sessionId = new Date().toISOString().split("T")[0];
+
+    await this.repository.recordAudit({
+      deviceId: this.device.deviceId,
+      sessionId,
+      packageName,
+      timestamp: new Date().toISOString(),
+      passed,
+      metrics: {
+        p50Ms: metrics.p50Ms,
+        p90Ms: metrics.p90Ms,
+        p95Ms: metrics.p95Ms,
+        p99Ms: metrics.p99Ms,
+        jankCount: metrics.jankCount,
+        missedVsyncCount: metrics.missedVsyncCount,
+        slowUiThreadCount: metrics.slowUiThreadCount,
+        frameDeadlineMissedCount: metrics.frameDeadlineMissedCount,
+        cpuUsagePercent: metrics.cpuUsagePercent,
+        touchLatencyMs: metrics.touchLatencyMs,
+      },
+      diagnostics,
+    });
+
     return {
-      passed: violations.length === 0,
+      passed,
       metrics,
       violations,
       diagnostics,

@@ -13,6 +13,7 @@ import { logger } from "../utils/logger";
 import { DaemonState } from "../daemon/daemonState";
 import { createToolExecutionContext, updateSessionCache } from "./ToolExecutionContext";
 import { AppCleanupService, DefaultAppCleanupService } from "./AppCleanupService";
+import { ToolCallRepository } from "../db/toolCallRepository";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -45,10 +46,12 @@ class ToolRegistryClass {
   private tools: Map<string, RegisteredTool> = new Map();
   private deviceSessionManager: DeviceSessionManager;
   private cleanupService: AppCleanupService;
+  private toolCallRepository: ToolCallRepository;
 
   constructor() {
     this.deviceSessionManager = DeviceSessionManager.getInstance();
     this.cleanupService = new DefaultAppCleanupService();
+    this.toolCallRepository = new ToolCallRepository();
   }
 
   // Register a new tool
@@ -94,6 +97,11 @@ class ToolRegistryClass {
       const sessionUuid = args.sessionUuid;
 
       logger.info(`[ToolRegistry] Tool ${name} called, sessionUuid=${sessionUuid}, daemonInitialized=${DaemonState.getInstance().isInitialized()}`);
+      void this.toolCallRepository.recordToolCall({
+        toolName: name,
+        timestamp: new Date().toISOString(),
+        sessionUuid,
+      });
 
       // If session UUID provided, resolve device from session
       if (sessionUuid && DaemonState.getInstance().isInitialized()) {

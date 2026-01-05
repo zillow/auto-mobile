@@ -172,6 +172,15 @@ export interface PredictionTransitionStatsTable {
   created_at: Generated<string>;
 }
 
+// Tool call tracking table
+export interface ToolCallsTable {
+  id: Generated<number>;
+  tool_name: string;
+  timestamp: string;
+  session_uuid: string | null;
+  created_at: Generated<string>;
+}
+
 // Accessibility baseline tables
 export interface AccessibilityBaselinesTable {
   id: Generated<number>;
@@ -306,6 +315,7 @@ export interface Database {
   scroll_positions: ScrollPositionsTable;
   prediction_outcomes: PredictionOutcomesTable;
   prediction_transition_stats: PredictionTransitionStatsTable;
+  tool_calls: ToolCallsTable;
   accessibility_baselines: AccessibilityBaselinesTable;
   memory_thresholds: MemoryThresholdsTable;
   memory_baselines: MemoryBaselinesTable;
@@ -362,6 +372,9 @@ export type NewPredictionOutcome = Insertable<PredictionOutcomesTable>;
 export type PredictionTransitionStats = Selectable<PredictionTransitionStatsTable>;
 export type NewPredictionTransitionStats = Insertable<PredictionTransitionStatsTable>;
 export type PredictionTransitionStatsUpdate = Updateable<PredictionTransitionStatsTable>;
+
+export type ToolCall = Selectable<ToolCallsTable>;
+export type NewToolCall = Insertable<ToolCallsTable>;
 
 export type AccessibilityBaseline = Selectable<AccessibilityBaselinesTable>;
 export type NewAccessibilityBaseline = Insertable<AccessibilityBaselinesTable>;

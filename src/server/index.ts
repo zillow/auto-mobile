@@ -29,6 +29,7 @@ import { registerPlanTools } from "./planTools";
 import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
 import { registerTestTimingTools } from "./testTimingTools";
+import { registerPerformanceTools } from "./performanceTools";
 
 // Import resource registration functions
 import { registerObservationResources } from "./observationResources";
@@ -90,6 +91,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerTestTimingTools();
   registerDoctorTools();
   registerFeatureFlagTools();
+  registerPerformanceTools();
 
   // Register all resources
   registerObservationResources();
