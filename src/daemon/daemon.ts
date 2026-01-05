@@ -461,6 +461,9 @@ export class Daemon {
         if (!session.hasReceivedHeartbeat && now - session.createdAt < INITIAL_HEARTBEAT_GRACE_MS) {
           continue;
         }
+        if (executionTracker.hasActiveSessionUuidExecutions(session.sessionId)) {
+          continue;
+        }
         const timeoutMs = session.heartbeatTimeoutMs ?? SessionManager.DEFAULT_HEARTBEAT_TIMEOUT_MS;
         const lastHeartbeat = session.lastHeartbeat ?? session.lastUsedAt;
         if (now - lastHeartbeat > timeoutMs) {

@@ -80,6 +80,11 @@ class ExecutionTracker {
     return this.cancelExecutionsForKey(sessionUuid, this.sessionUuidExecutions, "sessionUuid");
   }
 
+  hasActiveSessionUuidExecutions(sessionUuid: string): boolean {
+    const executions = this.sessionUuidExecutions.get(sessionUuid);
+    return executions !== undefined && executions.size > 0;
+  }
+
   private async cancelExecutionsForKey(
     key: string,
     executionMap: Map<string, Set<string>>,

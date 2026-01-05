@@ -257,8 +257,8 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         println("Executing via daemon socket: executePlan")
       }
 
-      val execStart = System.currentTimeMillis()
       DaemonHeartbeat.registerSession(sessionUuid)
+      val execStart = System.currentTimeMillis()
       val response = try {
         DaemonSocketClientManager.callTool("executePlan", daemonRequestArgs, annotation.timeoutMs)
       } finally {

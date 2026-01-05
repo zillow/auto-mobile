@@ -139,11 +139,11 @@ internal object AutoMobilePlanExecutor {
       println("Executing plan via daemon socket: executePlan")
     }
 
-    val heartbeat = DaemonHeartbeat.start(sessionUuid)
+    DaemonHeartbeat.registerSession(sessionUuid)
     val response = try {
       DaemonSocketClientManager.callTool("executePlan", JsonObject(args), options.timeoutMs)
     } finally {
-      heartbeat.close()
+      DaemonHeartbeat.unregisterSession(sessionUuid)
     }
     val outputPayload = response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
     val parsed = parseDaemonToolResult(response, json)
