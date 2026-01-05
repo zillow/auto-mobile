@@ -200,7 +200,7 @@ describe("MCP Tools Schema", () => {
       }, z.any());
       expect.fail("Should have thrown an error for invalid container");
     } catch (error: any) {
-      expect(error.message).toContain("container must be an object");
+      expect(error.message).toContain("container expected object");
     }
   });
 
