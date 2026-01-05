@@ -67,7 +67,7 @@ object DeepLinkManager {
     return url
   }
 
-  /** Generate deep link URL for long press screen (discover tab) */
+  /** Generate deep link URL for long press screen (discover tab alias) */
   fun generateLongPressUrl(): String {
     val url = buildUri(PATH_LONG_PRESS)
     Log.d(TAG, "Generated long press URL: $url")
@@ -158,7 +158,7 @@ object DeepLinkManager {
 
           path == PATH_MEDIA -> {
             Log.d(TAG, "Parsed as HomeDestination with media/discover tab selected")
-            HomeDestination(selectedTab = 0, selectedSubTab = 3) // Media sub-tab is index 3
+            HomeDestination(selectedTab = 0, selectedSubTab = 2) // Media sub-tab is index 2
           }
 
           path == PATH_TAP -> {
@@ -167,28 +167,28 @@ object DeepLinkManager {
           }
 
           path == PATH_LONG_PRESS -> {
-            Log.d(TAG, "Parsed as HomeDestination with long press sub-tab selected")
-            HomeDestination(selectedTab = 0, selectedSubTab = 1) // Long Press sub-tab is index 1
+            Log.d(TAG, "Parsed as HomeDestination with tap sub-tab selected (long press alias)")
+            HomeDestination(selectedTab = 0, selectedSubTab = 0) // Tap sub-tab is index 0
           }
 
           path == PATH_SWIPE -> {
             Log.d(TAG, "Parsed as HomeDestination with swipe sub-tab selected")
-            HomeDestination(selectedTab = 0, selectedSubTab = 2) // Swipe sub-tab is index 2
+            HomeDestination(selectedTab = 0, selectedSubTab = 1) // Swipe sub-tab is index 1
           }
 
           path == PATH_TEXT -> {
             Log.d(TAG, "Parsed as HomeDestination with text sub-tab selected")
-            HomeDestination(selectedTab = 0, selectedSubTab = 4) // Text sub-tab is index 4
+            HomeDestination(selectedTab = 0, selectedSubTab = 3) // Text sub-tab is index 3
           }
 
           path == PATH_CHAT -> {
             Log.d(TAG, "Parsed as HomeDestination with chat sub-tab selected")
-            HomeDestination(selectedTab = 0, selectedSubTab = 5) // Chat sub-tab is index 5
+            HomeDestination(selectedTab = 0, selectedSubTab = 4) // Chat sub-tab is index 4
           }
 
           path == PATH_VIDEO -> {
             Log.d(TAG, "Parsed as HomeDestination with video sub-tab selected (alias for media)")
-            HomeDestination(selectedTab = 0, selectedSubTab = 3) // Video is same as Media sub-tab
+            HomeDestination(selectedTab = 0, selectedSubTab = 2) // Video is same as Media sub-tab
           }
 
           path.startsWith(PATH_SLIDES) -> {
@@ -250,7 +250,7 @@ object DeepLinkManager {
           path == PATH_HOME || path.isEmpty() -> "Home"
           path == PATH_MEDIA -> "Media"
           path == PATH_TAP -> "Tap"
-          path == PATH_LONG_PRESS -> "Long Press"
+          path == PATH_LONG_PRESS -> "Tap"
           path == PATH_SWIPE -> "Swipe"
           path == PATH_TEXT -> "Text"
           path == PATH_CHAT -> "Chat"
@@ -297,7 +297,7 @@ object DeepLinkManager {
     launchDeepLink(context, generateTapUrl())
   }
 
-  /** Navigate to long press screen (discover tab) via deep link for AutoMobile tests */
+  /** Navigate to long press screen (discover tab alias) via deep link for AutoMobile tests */
   fun navigateToLongPressForTest(context: Context) {
     Log.d(TAG, "Navigating to long press for test")
     launchDeepLink(context, generateLongPressUrl())
@@ -377,7 +377,7 @@ object DeepLinkManager {
             "Home" to generateHomeUrl(),
             "Media" to generateMediaUrl(),
             "Tap" to generateTapUrl(),
-            "Long Press" to generateLongPressUrl(),
+            "Long Press (alias)" to generateLongPressUrl(),
             "Swipe" to generateSwipeUrl(),
             "Text" to generateTextUrl(),
             "Chat" to generateChatUrl(),
