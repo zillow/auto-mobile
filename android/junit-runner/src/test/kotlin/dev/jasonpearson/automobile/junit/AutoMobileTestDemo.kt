@@ -108,7 +108,8 @@ class AutoMobileExampleClass {
       maxRetries = 2,
       aiAssistance = true,
       timeoutMs = 60000L,
-      device = "auto")
+      device = "auto",
+  )
   fun testLaunchClockWithAdvancedConfig() {
     // Advanced configuration example
   }
@@ -124,6 +125,9 @@ class AutoMobileExampleClass {
   }
 
   @AutoMobileTest(
-      plan = "test-plans/launch-clock.yaml", device = "emulator-5554", timeoutMs = 45000L)
+      plan = "test-plans/launch-clock.yaml",
+      device = "emulator-5554",
+      timeoutMs = 45000L,
+  )
   fun testLaunchClockSpecificDevice() {}
 }

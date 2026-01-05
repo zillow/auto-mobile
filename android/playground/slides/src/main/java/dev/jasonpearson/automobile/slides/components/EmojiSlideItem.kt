@@ -26,31 +26,35 @@ fun EmojiSlideItem(
     emoji: PresentationEmoji,
     caption: String? = null,
     modifier: Modifier = Modifier,
-    captionColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    captionColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
   Column(
       modifier = modifier.fillMaxSize().padding(24.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center) {
-        // Large emoji display - reduced size to account for window insets
-        Text(
-            text = emoji.unicode,
-            fontSize = if (caption != null) 100.sp else 140.sp,
-            modifier = Modifier.padding(bottom = if (caption != null) 24.dp else 0.dp))
+      verticalArrangement = Arrangement.Center,
+  ) {
+    // Large emoji display - reduced size to account for window insets
+    Text(
+        text = emoji.unicode,
+        fontSize = if (caption != null) 100.sp else 140.sp,
+        modifier = Modifier.padding(bottom = if (caption != null) 24.dp else 0.dp),
+    )
 
-        // Optional caption with better spacing
-        caption?.let {
-          Text(
-              text = it,
-              style =
-                  MaterialTheme.typography.headlineMedium.copy(
-                      textAlign = TextAlign.Center,
-                      color = captionColor,
-                      fontWeight = FontWeight.Medium,
-                      lineHeight = 30.sp),
-              modifier = Modifier.padding(horizontal = 16.dp))
-        }
-      }
+    // Optional caption with better spacing
+    caption?.let {
+      Text(
+          text = it,
+          style =
+              MaterialTheme.typography.headlineMedium.copy(
+                  textAlign = TextAlign.Center,
+                  color = captionColor,
+                  fontWeight = FontWeight.Medium,
+                  lineHeight = 30.sp,
+              ),
+          modifier = Modifier.padding(horizontal = 16.dp),
+      )
+    }
+  }
 }
 
 @Preview(showBackground = true)

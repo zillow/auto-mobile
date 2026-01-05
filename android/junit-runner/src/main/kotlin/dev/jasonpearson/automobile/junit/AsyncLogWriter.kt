@@ -6,19 +6,18 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * Writes test logs asynchronously to avoid blocking the critical path.
- * Uses a single-threaded executor to maintain ordering.
+ * Writes test logs asynchronously to avoid blocking the critical path. Uses a single-threaded
+ * executor to maintain ordering.
  */
 object AsyncLogWriter {
-  private val executor: Executor = Executors.newSingleThreadExecutor { runnable ->
-    val thread = Thread(runnable, "AsyncLogWriter")
-    thread.isDaemon = false // Keep JVM alive until all logs are written
-    thread
-  }
+  private val executor: Executor =
+      Executors.newSingleThreadExecutor { runnable ->
+        val thread = Thread(runnable, "AsyncLogWriter")
+        thread.isDaemon = false // Keep JVM alive until all logs are written
+        thread
+      }
 
-  private val shutdownHook = Runtime.getRuntime().addShutdownHook(Thread {
-    shutdown()
-  })
+  private val shutdownHook = Runtime.getRuntime().addShutdownHook(Thread { shutdown() })
 
   fun writeAsync(logFile: File, content: String, onComplete: ((File) -> Unit)? = null) {
     executor.execute {

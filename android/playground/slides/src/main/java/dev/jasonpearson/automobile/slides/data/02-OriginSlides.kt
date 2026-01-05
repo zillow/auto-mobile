@@ -28,11 +28,16 @@ fun getOriginSlides(): List<SlideContent> =
         // 2024"),
         SlideContent.Emoji(
             emoji = PresentationEmoji.PROGRAMMER,
-            caption = "I got tasked with looking at OSS AI tools for UI testing"),
+            caption = "I got tasked with looking at OSS AI tools for UI testing",
+        ),
         SlideContent.Emoji(
-            emoji = PresentationEmoji.SHRUG, caption = "Didn't find what I was looking for"),
+            emoji = PresentationEmoji.SHRUG,
+            caption = "Didn't find what I was looking for",
+        ),
         SlideContent.Emoji(
-            emoji = PresentationEmoji.GIFT, caption = "Most MCP servers are just thin wrappers"),
+            emoji = PresentationEmoji.GIFT,
+            caption = "Most MCP servers are just thin wrappers",
+        ),
 
         // - Mermaid Diagram of screenshot, tap, screenshot, swipe with AI agent. That's like
         // throwing instructions at someone who has never used a mobile phone before
@@ -43,14 +48,17 @@ fun getOriginSlides(): List<SlideContent> =
         SlideContent.LargeText(title = "Swipe"),
         SlideContent.Emoji(
             emoji = PresentationEmoji.THINKING,
-            caption = "What if instead I made tool calls the way we navigate mobile devices?"),
+            caption = "What if instead I made tool calls the way we navigate mobile devices?",
+        ),
         SlideContent.LargeText(
             title = "Open recent apps",
             subtitle =
-                "Depending on device settings either swipe up from bottom edge or tap the recent apps button"),
+                "Depending on device settings either swipe up from bottom edge or tap the recent apps button",
+        ),
         SlideContent.LargeText(
             title = "Looking at notifications",
-            subtitle = "Swipe down on system bar, scroll to find relevant icon/text"),
+            subtitle = "Swipe down on system bar, scroll to find relevant icon/text",
+        ),
         //        SlideContent.LargeText(
         //            title = "Selecting text",
         //            subtitle =
@@ -58,28 +66,32 @@ fun getOriginSlides(): List<SlideContent> =
         // to clear text field"),
         SlideContent.Emoji(
             emoji = PresentationEmoji.THINKING,
-            caption = "What if I provided the AI agent with the exact relevant context it needs?"),
+            caption = "What if I provided the AI agent with the exact relevant context it needs?",
+        ),
         SlideContent.MermaidDiagram(
             title = "Automatic observation on interaction",
             code =
                 """
-      sequenceDiagram
-          participant Agent as AI Agent
-          participant MCP as MCP Server
-          participant Device as Device
+                sequenceDiagram
+                    participant Agent as AI Agent
+                    participant MCP as MCP Server
+                    participant Device as Device
 
-          Agent->>MCP: 🤖 Interaction Request
-          MCP->>Device: 👀 Observe
-          Device-->>MCP: 📱 UI State/Data (Cached)
+                    Agent->>MCP: 🤖 Interaction Request
+                    MCP->>Device: 👀 Observe
+                    Device-->>MCP: 📱 UI State/Data (Cached)
 
-          MCP->>Device: ⚡ Execute Actions
-          Device-->>MCP: ✅ Result
+                    MCP->>Device: ⚡ Execute Actions
+                    Device-->>MCP: ✅ Result
 
-          MCP->>Device: 👀 Observe
-          Device-->>MCP: 📱 UI State/Data
-          MCP-->>Agent: 🔄 Interaction Response with UI State
-      """
-                    .trimIndent()),
+                    MCP->>Device: 👀 Observe
+                    Device-->>MCP: 📱 UI State/Data
+                    MCP-->>Agent: 🔄 Interaction Response with UI State
+                """
+                    .trimIndent(),
+        ),
         SlideContent.Emoji(
             emoji = PresentationEmoji.FIRE,
-            caption = "Leveraged Firebender & Claude to quickly iterate"))
+            caption = "Leveraged Firebender & Claude to quickly iterate",
+        ),
+    )

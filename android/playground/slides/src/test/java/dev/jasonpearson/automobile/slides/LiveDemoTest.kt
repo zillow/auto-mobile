@@ -14,9 +14,7 @@ class LiveDemoTest {
   fun `Given we have a Clock app we should be able to set an alarm`() {
 
     // ab test or
-    val result =
-        AutoMobilePlan("test-plans/clock-set-alarm.yaml")
-            .execute()
+    val result = AutoMobilePlan("test-plans/clock-set-alarm.yaml").execute()
 
     assertTrue(result.success)
   }
@@ -55,7 +53,9 @@ class LiveDemoTest {
 
     val result =
         AutoMobilePlan(
-                "test-plans/system-notification-youtube-music-play.yaml", { "slide" to "83" })
+                "test-plans/system-notification-youtube-music-play.yaml",
+                { "slide" to "83" },
+            )
             .execute()
 
     assertTrue(result.success)

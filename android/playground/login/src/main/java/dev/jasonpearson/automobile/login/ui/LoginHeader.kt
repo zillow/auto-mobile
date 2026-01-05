@@ -26,7 +26,10 @@ internal fun LoginHeader() {
 
 @Preview(name = "Login Header", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-    name = "Login Header - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+    name = "Login Header - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun LoginHeaderPreview() {
   // Explicitly check if we're in dark mode based on the configuration

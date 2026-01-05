@@ -39,7 +39,7 @@ fun AutoMobileTextField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
-    minLines: Int = 1
+    minLines: Int = 1,
 ) {
   TextField(
       value = value,
@@ -68,7 +68,9 @@ fun AutoMobileTextField(
               unfocusedContainerColor = MaterialTheme.colorScheme.surface,
               focusedIndicatorColor = MaterialTheme.colorScheme.primary,
               unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
-              errorIndicatorColor = MaterialTheme.colorScheme.error))
+              errorIndicatorColor = MaterialTheme.colorScheme.error,
+          ),
+  )
 }
 
 @Composable
@@ -92,7 +94,7 @@ fun AutoMobileOutlinedTextField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     singleLine: Boolean = false,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
-    minLines: Int = 1
+    minLines: Int = 1,
 ) {
   OutlinedTextField(
       value = value,
@@ -121,7 +123,9 @@ fun AutoMobileOutlinedTextField(
               unfocusedBorderColor = MaterialTheme.colorScheme.outline,
               errorBorderColor = MaterialTheme.colorScheme.error,
               focusedLabelColor = MaterialTheme.colorScheme.primary,
-              unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant))
+              unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+          ),
+  )
 }
 
 @Preview(showBackground = true)
@@ -133,16 +137,19 @@ private fun AutoMobileTextFieldPreview() {
           value = "Sample Text",
           onValueChange = {},
           label = { Text("Label") },
-          modifier = Modifier.fillMaxWidth())
+          modifier = Modifier.fillMaxWidth(),
+      )
 
       androidx.compose.foundation.layout.Spacer(
-          modifier = Modifier.height(AutoMobileDimensions.spacing4))
+          modifier = Modifier.height(AutoMobileDimensions.spacing4)
+      )
 
       AutoMobileOutlinedTextField(
           value = "Sample Outlined Text",
           onValueChange = {},
           label = { Text("Outlined Label") },
-          modifier = Modifier.fillMaxWidth())
+          modifier = Modifier.fillMaxWidth(),
+      )
     }
   }
 }

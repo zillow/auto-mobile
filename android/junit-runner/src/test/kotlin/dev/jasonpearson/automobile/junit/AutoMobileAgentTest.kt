@@ -38,7 +38,8 @@ class AutoMobileAgentTest {
             fileSystemOperations = mockFileSystemOperations,
             aiAgentFactory = mockAiAgentFactory,
             timeProvider = mockTimeProvider,
-            mcpClient = mockMcpClient)
+            mcpClient = mockMcpClient,
+        )
   }
 
   @Test
@@ -53,13 +54,13 @@ class AutoMobileAgentTest {
     val modelConfig = AutoMobileAgent.ModelConfig(AutoMobileAgent.ModelProvider.OPENAI, "test-key")
     val expectedYamlContent =
         """
-            ---
-            name: login-test
-            description: Test login functionality
-            steps:
-              - tool: observe
-                withViewHierarchy: true
-                label: Initial observation
+        ---
+        name: login-test
+        description: Test login functionality
+        steps:
+          - tool: observe
+            withViewHierarchy: true
+            label: Initial observation
         """
             .trimIndent()
 
@@ -292,15 +293,15 @@ class AutoMobileAgentTest {
     val agent = AutoMobileAgent()
     val response =
         """
-            Here's your YAML plan:
-            ```yaml
-            ---
-            name: test-plan
-            description: A test plan
-            steps:
-              - tool: observe
-            ```
-            That should work!
+        Here's your YAML plan:
+        ```yaml
+        ---
+        name: test-plan
+        description: A test plan
+        steps:
+          - tool: observe
+        ```
+        That should work!
         """
             .trimIndent()
 
@@ -313,11 +314,11 @@ class AutoMobileAgentTest {
     // Assert
     val expectedYaml =
         """
-            ---
-            name: test-plan
-            description: A test plan
-            steps:
-              - tool: observe
+        ---
+        name: test-plan
+        description: A test plan
+        steps:
+          - tool: observe
         """
             .trimIndent()
     assertEquals(expectedYaml, result)
@@ -329,13 +330,13 @@ class AutoMobileAgentTest {
     val agent = AutoMobileAgent()
     val response =
         """
-            Here's your plan:
+        Here's your plan:
 
-            ---
-            name: test-plan
-            description: A test plan
-            steps:
-              - tool: observe
+        ---
+        name: test-plan
+        description: A test plan
+        steps:
+          - tool: observe
         """
             .trimIndent()
 
@@ -348,11 +349,11 @@ class AutoMobileAgentTest {
     // Assert
     val expectedYaml =
         """
-            ---
-            name: test-plan
-            description: A test plan
-            steps:
-              - tool: observe
+        ---
+        name: test-plan
+        description: A test plan
+        steps:
+          - tool: observe
         """
             .trimIndent()
     assertEquals(expectedYaml, result)
@@ -364,10 +365,10 @@ class AutoMobileAgentTest {
     val agent = AutoMobileAgent()
     val response =
         """
-            name: test-plan
-            description: A test plan
-            steps:
-              - tool: observe
+        name: test-plan
+        description: A test plan
+        steps:
+          - tool: observe
         """
             .trimIndent()
 

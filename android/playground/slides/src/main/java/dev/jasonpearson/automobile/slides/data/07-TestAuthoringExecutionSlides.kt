@@ -24,33 +24,34 @@ fun getTestAuthoringExecutionSlides(): List<SlideContent> =
             title = "YAML Plan Sample",
             code =
                 """
----
-name: set-alarm-6-30am-demo-mode
-description: Create 6:30 AM alarm in Clock app
-steps:
-  - tool: launchApp
-    appId: com.google.android.deskclock
-    forceCold: true
-    clearPackageData: true
+                ---
+                name: set-alarm-6-30am-demo-mode
+                description: Create 6:30 AM alarm in Clock app
+                steps:
+                  - tool: launchApp
+                    appId: com.google.android.deskclock
+                    forceCold: true
+                    clearPackageData: true
 
-  - tool: tapOn
-    text: "Alarm"
+                  - tool: tapOn
+                    text: "Alarm"
 
-  - tool: tapOn
-    id: "com.google.android.deskclock:id/fab"
+                  - tool: tapOn
+                    id: "com.google.android.deskclock:id/fab"
 
-  - tool: tapOn
-    text: "6"
+                  - tool: tapOn
+                    text: "6"
 
-  - tool: tapOn
-    text: "30"
+                  - tool: tapOn
+                    text: "30"
 
-  - tool: tapOn
-    text: "OK"
+                  - tool: tapOn
+                    text: "OK"
 
-    """
+                """
                     .trimIndent(),
-            language = "yaml"),
+            language = "yaml",
+        ),
         SlideContent.BulletPoints(
             title = "AutoMobile JUnitRunner",
             points =
@@ -60,7 +61,8 @@ steps:
                     BulletPoint(text = "Runs AutoMobile in CLI mode until failure"),
                     // TODO: Update when koog lands
                     BulletPoint(text = "koog integration for self healing (untested)"),
-                )),
+                ),
+        ),
         SlideContent.Emoji(
             emoji = PresentationEmoji.PLAYGROUND,
             caption = "Demo: AutoMobile Playground",

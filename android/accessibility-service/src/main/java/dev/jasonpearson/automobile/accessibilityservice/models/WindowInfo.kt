@@ -9,5 +9,5 @@ data class WindowInfo(
     val type: Int? = null,
     val isActive: Boolean = false,
     val isFocused: Boolean = false,
-    val bounds: ElementBounds? = null
+    val bounds: ElementBounds? = null,
 )

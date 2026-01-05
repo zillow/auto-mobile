@@ -5,9 +5,7 @@ import java.util.concurrent.TimeUnit
 /** Shared utilities for AutoMobile tests. */
 object AutoMobileSharedUtils {
   // Phase 5: Lazy device checker initialization
-  val deviceChecker: DeviceAvailabilityChecker by lazy {
-    DeviceAvailabilityChecker()
-  }
+  val deviceChecker: DeviceAvailabilityChecker by lazy { DeviceAvailabilityChecker() }
 
   fun executeCommand(command: List<String>, timeoutMs: Long): CommandResult {
     val process = ProcessBuilder(command).start()
@@ -120,8 +118,8 @@ class DeviceAvailabilityChecker {
   }
 
   /**
-   * Get the number of connected Android devices.
-   * This can be used to limit parallelism to match available devices.
+   * Get the number of connected Android devices. This can be used to limit parallelism to match
+   * available devices.
    */
   fun getDeviceCount(): Int {
     if (!checkComplete) {

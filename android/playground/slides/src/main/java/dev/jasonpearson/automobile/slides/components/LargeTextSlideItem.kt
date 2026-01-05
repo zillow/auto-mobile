@@ -34,7 +34,7 @@ fun LargeTextSlideItem(
     subtitle: String? = null,
     modifier: Modifier = Modifier,
     titleColor: Color = MaterialTheme.colorScheme.onBackground,
-    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
   val configuration = LocalConfiguration.current
   val isLandscape =
@@ -43,33 +43,40 @@ fun LargeTextSlideItem(
   Column(
       modifier = modifier.fillMaxSize().padding(32.dp),
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center) {
-        // Auto-resizing title
-        AutoResizingText(
-            text = title,
-            style =
-                MaterialTheme.typography.displayLarge.copy(
-                    fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, color = titleColor),
-            modifier = Modifier.weight(if (subtitle != null) 0.5f else 0.5f),
-            isLandscape = isLandscape,
-            hasSubtitle = subtitle != null)
+      verticalArrangement = Arrangement.Center,
+  ) {
+    // Auto-resizing title
+    AutoResizingText(
+        text = title,
+        style =
+            MaterialTheme.typography.displayLarge.copy(
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                color = titleColor,
+            ),
+        modifier = Modifier.weight(if (subtitle != null) 0.5f else 0.5f),
+        isLandscape = isLandscape,
+        hasSubtitle = subtitle != null,
+    )
 
-        // Optional subtitle
-        subtitle?.let {
-          AutoResizingText(
-              text = it,
-              style =
-                  MaterialTheme.typography.headlineMedium.copy(
-                      textAlign = TextAlign.Center,
-                      color = subtitleColor,
-                      fontWeight = FontWeight.Normal),
-              maxFontSize = 48f,
-              minFontSize = 12f,
-              modifier = Modifier.weight(0.3f).padding(top = 16.dp),
-              isLandscape = isLandscape,
-              hasSubtitle = false)
-        }
-      }
+    // Optional subtitle
+    subtitle?.let {
+      AutoResizingText(
+          text = it,
+          style =
+              MaterialTheme.typography.headlineMedium.copy(
+                  textAlign = TextAlign.Center,
+                  color = subtitleColor,
+                  fontWeight = FontWeight.Normal,
+              ),
+          maxFontSize = 48f,
+          minFontSize = 12f,
+          modifier = Modifier.weight(0.3f).padding(top = 16.dp),
+          isLandscape = isLandscape,
+          hasSubtitle = false,
+      )
+    }
+  }
 }
 
 /**
@@ -84,7 +91,7 @@ private fun AutoResizingText(
     maxFontSize: Float = 96f,
     minFontSize: Float = 12f,
     isLandscape: Boolean,
-    hasSubtitle: Boolean
+    hasSubtitle: Boolean,
 ) {
   val maxLines =
       when {
@@ -130,7 +137,8 @@ private fun AutoResizingText(
         } else {
           readyToDraw = true
         }
-      })
+      },
+  )
 }
 
 @Preview(showBackground = true)
@@ -138,7 +146,9 @@ private fun AutoResizingText(
 fun LargeTextSlideItemPreview() {
   MaterialTheme {
     LargeTextSlideItem(
-        title = "Welcome to AutoMobile", subtitle = "The Future of Android UI Testing")
+        title = "Welcome to AutoMobile",
+        subtitle = "The Future of Android UI Testing",
+    )
   }
 }
 

@@ -15,12 +15,12 @@ data class RecompositionEntry(
     val likelyCause: String? = null,
     val parentChain: List<String>? = null,
     val stableAnnotated: Boolean? = null,
-    val rememberedCount: Int? = null
+    val rememberedCount: Int? = null,
 )
 
 @Serializable
 data class RecompositionSnapshot(
     val timestamp: Long,
     val applicationId: String,
-    val entries: List<RecompositionEntry>
+    val entries: List<RecompositionEntry>,
 )

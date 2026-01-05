@@ -26,7 +26,7 @@ fun AutoMobileText(
     overflow: TextOverflow = TextOverflow.Clip,
     softWrap: Boolean = true,
     maxLines: Int = Int.MAX_VALUE,
-    minLines: Int = 1
+    minLines: Int = 1,
 ) {
   Text(
       text = text,
@@ -37,7 +37,8 @@ fun AutoMobileText(
       overflow = overflow,
       softWrap = softWrap,
       maxLines = maxLines,
-      minLines = minLines)
+      minLines = minLines,
+  )
 }
 
 @Composable
@@ -46,7 +47,7 @@ fun AutoMobileHeadline(
     modifier: Modifier = Modifier,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
-    maxLines: Int = 2
+    maxLines: Int = 2,
 ) {
   AutoMobileText(
       text = text,
@@ -55,7 +56,8 @@ fun AutoMobileHeadline(
       style = MaterialTheme.typography.headlineMedium,
       textAlign = textAlign,
       overflow = overflow,
-      maxLines = maxLines)
+      maxLines = maxLines,
+  )
 }
 
 @Composable
@@ -64,7 +66,7 @@ fun AutoMobileTitle(
     modifier: Modifier = Modifier,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
-    maxLines: Int = 1
+    maxLines: Int = 1,
 ) {
   AutoMobileText(
       text = text,
@@ -73,7 +75,8 @@ fun AutoMobileTitle(
       color = MaterialTheme.colorScheme.onSurface,
       textAlign = textAlign,
       overflow = overflow,
-      maxLines = maxLines)
+      maxLines = maxLines,
+  )
 }
 
 @Composable
@@ -82,7 +85,7 @@ fun AutoMobileBodyText(
     modifier: Modifier = Modifier,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Clip,
-    maxLines: Int = Int.MAX_VALUE
+    maxLines: Int = Int.MAX_VALUE,
 ) {
   AutoMobileText(
       text = text,
@@ -91,7 +94,8 @@ fun AutoMobileBodyText(
       color = MaterialTheme.colorScheme.onSurface,
       textAlign = textAlign,
       overflow = overflow,
-      maxLines = maxLines)
+      maxLines = maxLines,
+  )
 }
 
 @Composable
@@ -100,7 +104,7 @@ fun AutoMobileLabel(
     modifier: Modifier = Modifier,
     textAlign: TextAlign? = null,
     overflow: TextOverflow = TextOverflow.Ellipsis,
-    maxLines: Int = 1
+    maxLines: Int = 1,
 ) {
   AutoMobileText(
       text = text,
@@ -109,7 +113,8 @@ fun AutoMobileLabel(
       color = MaterialTheme.colorScheme.onSurface,
       textAlign = textAlign,
       overflow = overflow,
-      maxLines = maxLines)
+      maxLines = maxLines,
+  )
 }
 
 @Preview(name = "Text", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)

@@ -36,63 +36,69 @@ fun VisualizationSlideItem(
     caption: String? = null,
     contentDescription: String? = null,
     modifier: Modifier = Modifier,
-    captionColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    captionColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
   Column(
       modifier = modifier.fillMaxSize().padding(24.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        // Image display
-        Card(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors =
-                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)) {
-              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = contentDescription ?: caption,
-                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                    contentScale = ContentScale.Fit,
-                    onState = { state ->
-                      when (state) {
-                        is AsyncImagePainter.State.Loading -> {
-                          // Loading indicator will be shown by the Box below
-                        }
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    // Image display
+    Card(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+    ) {
+      Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        AsyncImage(
+            model = imageUrl,
+            contentDescription = contentDescription ?: caption,
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+            contentScale = ContentScale.Fit,
+            onState = { state ->
+              when (state) {
+                is AsyncImagePainter.State.Loading -> {
+                  // Loading indicator will be shown by the Box below
+                }
 
-                        is AsyncImagePainter.State.Error -> {
-                          // Error state handled by placeholder in Box below
-                        }
+                is AsyncImagePainter.State.Error -> {
+                  // Error state handled by placeholder in Box below
+                }
 
-                        is AsyncImagePainter.State.Success -> {
-                          // Image loaded successfully
-                        }
+                is AsyncImagePainter.State.Success -> {
+                  // Image loaded successfully
+                }
 
-                        else -> {
-                          // Other states
-                        }
-                      }
-                    })
-
-                // Loading indicator overlay
-                CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp), color = MaterialTheme.colorScheme.primary)
+                else -> {
+                  // Other states
+                }
               }
-            }
+            },
+        )
 
-        // Caption
-        caption?.let {
-          Text(
-              text = it,
-              style =
-                  MaterialTheme.typography.headlineSmall.copy(
-                      textAlign = TextAlign.Center,
-                      color = captionColor,
-                      fontWeight = FontWeight.Medium),
-              modifier = Modifier.padding(horizontal = 16.dp))
-        }
+        // Loading indicator overlay
+        CircularProgressIndicator(
+            modifier = Modifier.size(48.dp),
+            color = MaterialTheme.colorScheme.primary,
+        )
       }
+    }
+
+    // Caption
+    caption?.let {
+      Text(
+          text = it,
+          style =
+              MaterialTheme.typography.headlineSmall.copy(
+                  textAlign = TextAlign.Center,
+                  color = captionColor,
+                  fontWeight = FontWeight.Medium,
+              ),
+          modifier = Modifier.padding(horizontal = 16.dp),
+      )
+    }
+  }
 }
 
 /** Error state component for failed image loads. */
@@ -101,17 +107,20 @@ private fun ImageErrorState(modifier: Modifier = Modifier) {
   Column(
       modifier = modifier,
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center) {
-        Text(
-            text = "📷",
-            style = MaterialTheme.typography.displayMedium,
-            modifier = Modifier.padding(bottom = 8.dp))
-        Text(
-            text = "Unable to load image",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center)
-      }
+      verticalArrangement = Arrangement.Center,
+  ) {
+    Text(
+        text = "📷",
+        style = MaterialTheme.typography.displayMedium,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+    Text(
+        text = "Unable to load image",
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+  }
 }
 
 @Preview(showBackground = true)
@@ -122,7 +131,8 @@ fun VisualizationSlideItemPreview() {
         imageUrl = "https://example.com/architecture-diagram.png",
         caption = "AutoMobile Architecture Overview",
         contentDescription =
-            "Diagram showing AutoMobile's architecture with Android and iOS components")
+            "Diagram showing AutoMobile's architecture with Android and iOS components",
+    )
   }
 }
 

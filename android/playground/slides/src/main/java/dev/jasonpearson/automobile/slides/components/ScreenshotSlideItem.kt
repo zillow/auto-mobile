@@ -39,7 +39,7 @@ fun ScreenshotSlideItem(
     contentDescription: String? = null,
     modifier: Modifier = Modifier,
     captionColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    forceTheme: Boolean? = null // For testing - null uses system theme
+    forceTheme: Boolean? = null, // For testing - null uses system theme
 ) {
   val isDarkTheme = forceTheme ?: isSystemInDarkTheme()
 
@@ -56,56 +56,59 @@ fun ScreenshotSlideItem(
   Column(
       modifier = modifier.fillMaxSize().padding(24.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        // Screenshot display
-        Card(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors =
-                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (screenshotRes != null) {
-              AsyncImage(
-                  model = screenshotRes,
-                  contentDescription = contentDescription ?: caption,
-                  modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                  contentScale = ContentScale.Fit,
-                  onState = { state ->
-                    when (state) {
-                      is AsyncImagePainter.State.Loading -> {
-                        // Loading indicator will be shown by the Box below
-                      }
-                      is AsyncImagePainter.State.Error -> {
-                        // Error state handled by placeholder in Box below
-                      }
-                      is AsyncImagePainter.State.Success -> {
-                        // Screenshot loaded successfully
-                      }
-                      else -> {
-                        // Other states
-                      }
-                    }
-                  })
-            } else {
-              // No screenshot available
-              ScreenshotErrorState()
-            }
-          }
-        }
-
-        // Caption
-        caption?.let {
-          Text(
-              text = it,
-              style =
-                  MaterialTheme.typography.headlineSmall.copy(
-                      textAlign = TextAlign.Center,
-                      color = captionColor,
-                      fontWeight = FontWeight.Medium),
-              modifier = Modifier.padding(horizontal = 16.dp))
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    // Screenshot display
+    Card(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+      Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (screenshotRes != null) {
+          AsyncImage(
+              model = screenshotRes,
+              contentDescription = contentDescription ?: caption,
+              modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+              contentScale = ContentScale.Fit,
+              onState = { state ->
+                when (state) {
+                  is AsyncImagePainter.State.Loading -> {
+                    // Loading indicator will be shown by the Box below
+                  }
+                  is AsyncImagePainter.State.Error -> {
+                    // Error state handled by placeholder in Box below
+                  }
+                  is AsyncImagePainter.State.Success -> {
+                    // Screenshot loaded successfully
+                  }
+                  else -> {
+                    // Other states
+                  }
+                }
+              },
+          )
+        } else {
+          // No screenshot available
+          ScreenshotErrorState()
         }
       }
+    }
+
+    // Caption
+    caption?.let {
+      Text(
+          text = it,
+          style =
+              MaterialTheme.typography.headlineSmall.copy(
+                  textAlign = TextAlign.Center,
+                  color = captionColor,
+                  fontWeight = FontWeight.Medium,
+              ),
+          modifier = Modifier.padding(horizontal = 16.dp),
+      )
+    }
+  }
 }
 
 /** Error state component for when no screenshot is available. */
@@ -114,17 +117,20 @@ private fun ScreenshotErrorState(modifier: Modifier = Modifier) {
   Column(
       modifier = modifier,
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center) {
-        Text(
-            text = "📱",
-            style = MaterialTheme.typography.displayMedium,
-            modifier = Modifier.padding(bottom = 8.dp))
-        Text(
-            text = "No screenshot available",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center)
-      }
+      verticalArrangement = Arrangement.Center,
+  ) {
+    Text(
+        text = "📱",
+        style = MaterialTheme.typography.displayMedium,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
+    Text(
+        text = "No screenshot available",
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
+  }
 }
 
 @Preview(showBackground = true, name = "Light Theme")
@@ -136,7 +142,8 @@ fun ScreenshotSlideItemLightPreview() {
         darkScreenshot = android.R.drawable.ic_menu_camera,
         caption = "App Screenshot - Light Mode",
         contentDescription = "Screenshot showing the app in light mode",
-        forceTheme = false)
+        forceTheme = false,
+    )
   }
 }
 
@@ -149,7 +156,8 @@ fun ScreenshotSlideItemDarkPreview() {
         darkScreenshot = android.R.drawable.ic_menu_camera,
         caption = "App Screenshot - Dark Mode",
         contentDescription = "Screenshot showing the app in dark mode",
-        forceTheme = true)
+        forceTheme = true,
+    )
   }
 }
 
@@ -160,7 +168,8 @@ fun ScreenshotSlideItemLightOnlyPreview() {
     ScreenshotSlideItem(
         lightScreenshot = android.R.drawable.ic_menu_gallery,
         caption = "App Screenshot - Light Only Available",
-        contentDescription = "Screenshot available only in light mode")
+        contentDescription = "Screenshot available only in light mode",
+    )
   }
 }
 
@@ -169,6 +178,8 @@ fun ScreenshotSlideItemLightOnlyPreview() {
 fun ScreenshotSlideItemNoScreenshotsPreview() {
   MaterialTheme {
     ScreenshotSlideItem(
-        caption = "Missing Screenshot", contentDescription = "No screenshots available")
+        caption = "Missing Screenshot",
+        contentDescription = "No screenshots available",
+    )
   }
 }

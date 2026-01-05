@@ -43,7 +43,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.launch
 
 /**
@@ -54,7 +53,7 @@ import kotlinx.coroutines.launch
 fun AudioPlayerComponent(
     audioResource: VideoResource,
     modifier: Modifier = Modifier,
-    viewModel: MediaPlayerViewModel = viewModel()
+    viewModel: MediaPlayerViewModel = viewModel(),
 ) {
   val context = LocalContext.current
   val player by viewModel.playerState.collectAsState()
@@ -86,45 +85,50 @@ fun AudioPlayerComponent(
   Card(
       modifier = modifier,
       elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-          Text(
-              text = "🎵 Audio Player",
-              fontSize = 20.sp,
-              fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.onSurface,
-              modifier = Modifier.padding(bottom = 16.dp))
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+  ) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+      Text(
+          text = "🎵 Audio Player",
+          fontSize = 20.sp,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onSurface,
+          modifier = Modifier.padding(bottom = 16.dp),
+      )
 
-          Text(
-              text = "Audio playback with ExoPlayer - supports various audio formats",
-              fontSize = 14.sp,
-              color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-              modifier = Modifier.padding(bottom = 16.dp))
+      Text(
+          text = "Audio playback with ExoPlayer - supports various audio formats",
+          fontSize = 14.sp,
+          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+          modifier = Modifier.padding(bottom = 16.dp),
+      )
 
-          // Show error if playback failed
-          playbackError?.let { error ->
-            ErrorMessage(
-                error = error,
-                onRetry = {
-                  viewModel.clearError()
-                  viewModel.initializePlayer(context, audioResource)
-                },
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
-          }
-
-          // Audio player interface
-          if (playbackError == null) {
-            AudioPlayerInterface(
-                isPlaying = isPlaying,
-                isPlayerReady = isPlayerReady,
-                currentPosition = currentPosition,
-                duration = duration,
-                onPlayPause = { viewModel.togglePlayPause() },
-                onSeek = { position -> viewModel.seekTo(position) },
-                onVolumeChange = { volume -> viewModel.setVolume(volume) })
-          }
-        }
+      // Show error if playback failed
+      playbackError?.let { error ->
+        ErrorMessage(
+            error = error,
+            onRetry = {
+              viewModel.clearError()
+              viewModel.initializePlayer(context, audioResource)
+            },
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        )
       }
+
+      // Audio player interface
+      if (playbackError == null) {
+        AudioPlayerInterface(
+            isPlaying = isPlaying,
+            isPlayerReady = isPlayerReady,
+            currentPosition = currentPosition,
+            duration = duration,
+            onPlayPause = { viewModel.togglePlayPause() },
+            onSeek = { position -> viewModel.seekTo(position) },
+            onVolumeChange = { volume -> viewModel.setVolume(volume) },
+        )
+      }
+    }
+  }
 }
 
 /** Audio player interface with visualizations and controls. */
@@ -136,26 +140,28 @@ fun AudioPlayerInterface(
     duration: Long,
     onPlayPause: () -> Unit,
     onSeek: (Long) -> Unit,
-    onVolumeChange: (Float) -> Unit
+    onVolumeChange: (Float) -> Unit,
 ) {
   Column(
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        // Audio visualization area
-        AudioVisualization(isPlaying = isPlaying, isPlayerReady = isPlayerReady)
+      verticalArrangement = Arrangement.spacedBy(24.dp),
+  ) {
+    // Audio visualization area
+    AudioVisualization(isPlaying = isPlaying, isPlayerReady = isPlayerReady)
 
-        // Track progress
-        if (isPlayerReady) {
-          TrackProgress(currentPosition = currentPosition, duration = duration, onSeek = onSeek)
-        }
+    // Track progress
+    if (isPlayerReady) {
+      TrackProgress(currentPosition = currentPosition, duration = duration, onSeek = onSeek)
+    }
 
-        // Audio controls
-        AudioControls(
-            isPlaying = isPlaying,
-            isPlayerReady = isPlayerReady,
-            onPlayPause = onPlayPause,
-            onVolumeChange = onVolumeChange)
-      }
+    // Audio controls
+    AudioControls(
+        isPlaying = isPlaying,
+        isPlayerReady = isPlayerReady,
+        onPlayPause = onPlayPause,
+        onVolumeChange = onVolumeChange,
+    )
+  }
 }
 
 /** Audio visualization component with animated elements. */
@@ -163,25 +169,28 @@ fun AudioPlayerInterface(
 fun AudioVisualization(isPlaying: Boolean, isPlayerReady: Boolean) {
   Box(
       modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-      contentAlignment = Alignment.Center) {
-        if (!isPlayerReady) {
-          // Loading state
-          Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(64.dp),
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 4.dp)
-            Text(
-                text = "Loading audio...",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 16.dp))
-          }
-        } else {
-          // Audio waveform visualization (simplified)
-          AudioWaveform(isPlaying = isPlaying)
-        }
+      contentAlignment = Alignment.Center,
+  ) {
+    if (!isPlayerReady) {
+      // Loading state
+      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(64.dp),
+            color = MaterialTheme.colorScheme.primary,
+            strokeWidth = 4.dp,
+        )
+        Text(
+            text = "Loading audio...",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            modifier = Modifier.padding(top = 16.dp),
+        )
       }
+    } else {
+      // Audio waveform visualization (simplified)
+      AudioWaveform(isPlaying = isPlaying)
+    }
+  }
 }
 
 /** Simplified audio waveform visualization. */
@@ -202,31 +211,37 @@ fun AudioWaveform(isPlaying: Boolean) {
                 .clip(CircleShape)
                 .background(
                     MaterialTheme.colorScheme.primaryContainer.copy(
-                        alpha = if (isPlaying) 1f else 0.5f)),
-        contentAlignment = Alignment.Center) {
-          Text(text = if (isPlaying) "🎵" else "🎼", fontSize = 48.sp)
-        }
+                        alpha = if (isPlaying) 1f else 0.5f
+                    )
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+      Text(text = if (isPlaying) "🎵" else "🎼", fontSize = 48.sp)
+    }
 
     // Waveform bars (simplified visualization)
     Row(
         modifier = Modifier.padding(top = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-          repeat(12) { index ->
-            val height = remember { (20..60).random() }
-            Box(
-                modifier =
-                    Modifier.size(width = 4.dp, height = height.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(waveformColor))
-          }
-        }
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+      repeat(12) { index ->
+        val height = remember { (20..60).random() }
+        Box(
+            modifier =
+                Modifier.size(width = 4.dp, height = height.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(waveformColor)
+        )
+      }
+    }
 
     Text(
         text = if (isPlaying) "♪ Now Playing ♪" else "♪ Audio Ready ♪",
         fontSize = 16.sp,
         fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(top = 16.dp))
+        modifier = Modifier.padding(top = 16.dp),
+    )
   }
 }
 
@@ -239,11 +254,13 @@ fun TrackProgress(currentPosition: Long, duration: Long, onSeek: (Long) -> Unit)
       Text(
           text = formatTime(currentPosition),
           fontSize = 12.sp,
-          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+      )
       Text(
           text = formatTime(duration),
           fontSize = 12.sp,
-          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+      )
     }
 
     // Progress slider
@@ -258,13 +275,16 @@ fun TrackProgress(currentPosition: Long, duration: Long, onSeek: (Long) -> Unit)
               SliderDefaults.colors(
                   thumbColor = MaterialTheme.colorScheme.primary,
                   activeTrackColor = MaterialTheme.colorScheme.primary,
-                  inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)))
+                  inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+              ),
+      )
     } else {
       // Progress indicator when duration is unknown
       LinearProgressIndicator(
           modifier = Modifier.fillMaxWidth(),
           color = MaterialTheme.colorScheme.primary,
-          trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+          trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+      )
     }
   }
 }
@@ -275,49 +295,55 @@ fun AudioControls(
     isPlaying: Boolean,
     isPlayerReady: Boolean,
     onPlayPause: () -> Unit,
-    onVolumeChange: (Float) -> Unit
+    onVolumeChange: (Float) -> Unit,
 ) {
   var volume by remember { mutableFloatStateOf(0.7f) }
 
   Column(
       horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        // Play/Pause button
-        Button(
-            onClick = onPlayPause,
-            enabled = isPlayerReady,
-            modifier = Modifier.size(72.dp),
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
-            shape = CircleShape) {
-              Icon(
-                  imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                  contentDescription = if (isPlaying) "Pause" else "Play")
-            }
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+  ) {
+    // Play/Pause button
+    Button(
+        onClick = onPlayPause,
+        enabled = isPlayerReady,
+        modifier = Modifier.size(72.dp),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                disabledContainerColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            ),
+        shape = CircleShape,
+    ) {
+      Icon(
+          imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+          contentDescription = if (isPlaying) "Pause" else "Play",
+      )
+    }
 
-        // Volume control
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-          Text(text = "🔉", fontSize = 18.sp, modifier = Modifier.padding(end = 12.dp))
+    // Volume control
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+      Text(text = "🔉", fontSize = 18.sp, modifier = Modifier.padding(end = 12.dp))
 
-          Slider(
-              value = volume,
-              onValueChange = { newVolume ->
-                volume = newVolume
-                onVolumeChange(newVolume)
-              },
-              valueRange = 0f..1f,
-              modifier = Modifier.weight(1f),
-              colors =
-                  SliderDefaults.colors(
-                      thumbColor = MaterialTheme.colorScheme.primary,
-                      activeTrackColor = MaterialTheme.colorScheme.primary,
-                      inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)))
+      Slider(
+          value = volume,
+          onValueChange = { newVolume ->
+            volume = newVolume
+            onVolumeChange(newVolume)
+          },
+          valueRange = 0f..1f,
+          modifier = Modifier.weight(1f),
+          colors =
+              SliderDefaults.colors(
+                  thumbColor = MaterialTheme.colorScheme.primary,
+                  activeTrackColor = MaterialTheme.colorScheme.primary,
+                  inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+              ),
+      )
 
-          Text(text = "🔊", fontSize = 18.sp, modifier = Modifier.padding(start = 12.dp))
-        }
-      }
+      Text(text = "🔊", fontSize = 18.sp, modifier = Modifier.padding(start = 12.dp))
+    }
+  }
 }
 
 /** Format time in milliseconds to MM:SS format. */
@@ -336,6 +362,8 @@ fun AudioPlayerComponentPreview() {
     AudioPlayerComponent(
         audioResource =
             VideoResource.UriVideo(
-                android.net.Uri.parse("https://www.soundjay.com/misc/sounds/bell-ringing-05.wav")))
+                android.net.Uri.parse("https://www.soundjay.com/misc/sounds/bell-ringing-05.wav")
+            )
+    )
   }
 }

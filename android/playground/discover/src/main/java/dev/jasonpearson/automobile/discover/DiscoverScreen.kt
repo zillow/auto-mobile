@@ -28,56 +28,61 @@ import kotlinx.coroutines.launch
 @Composable
 fun DiscoverVideoScreen(
     onNavigateToVideoPlayer: (String) -> Unit,
-    initialSelectedSubTab: Int? = null
+    initialSelectedSubTab: Int? = null,
 ) {
   TrackRecomposition(id = "screen.discover", composableName = "DiscoverVideoScreen") {
-  val tabs: Map<String, @Composable () -> Unit> =
-      mapOf(
-          "Tap" to { TapScreen() },
-          "Long Press" to { LongPressScreen() },
-          "Swipe" to { SwipeScreen() },
-          "Media" to { VideoListScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer) },
-          "Text" to { InputTextScreen() },
-          "Chat" to { ChatScreen() },
-      )
-  val tabPageMap: Map<Int, @Composable () -> Unit> =
-      tabs.map { it.value }.mapIndexed { index, entry -> index to entry }.toMap()
-  val tabTitles = tabs.keys
-  val initialPage = initialSelectedSubTab?.coerceIn(0, tabTitles.size - 1) ?: 0
-  val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { tabTitles.size })
-  val coroutineScope = rememberCoroutineScope()
+    val tabs: Map<String, @Composable () -> Unit> =
+        mapOf(
+            "Tap" to { TapScreen() },
+            "Long Press" to { LongPressScreen() },
+            "Swipe" to { SwipeScreen() },
+            "Media" to { VideoListScreen(onNavigateToVideoPlayer = onNavigateToVideoPlayer) },
+            "Text" to { InputTextScreen() },
+            "Chat" to { ChatScreen() },
+        )
+    val tabPageMap: Map<Int, @Composable () -> Unit> =
+        tabs.map { it.value }.mapIndexed { index, entry -> index to entry }.toMap()
+    val tabTitles = tabs.keys
+    val initialPage = initialSelectedSubTab?.coerceIn(0, tabTitles.size - 1) ?: 0
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { tabTitles.size })
+    val coroutineScope = rememberCoroutineScope()
 
-  Scaffold(
-      topBar = {
-        TopAppBar(
-            title = { Text(text = "Discover", fontSize = 24.sp, fontWeight = FontWeight.Bold) })
-      }) { paddingValues ->
-        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-          TabRow(selectedTabIndex = pagerState.currentPage, modifier = Modifier.fillMaxWidth()) {
-            tabTitles.forEachIndexed { index, title ->
-              Tab(
-                  selected = pagerState.currentPage == index,
-                  onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
-                  text = { Text(title) })
-            }
-          }
-
-          HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            tabPageMap.getOrDefault(page, defaultValue = {})()
+    Scaffold(
+        topBar = {
+          TopAppBar(
+              title = { Text(text = "Discover", fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+          )
+        }
+    ) { paddingValues ->
+      Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        TabRow(selectedTabIndex = pagerState.currentPage, modifier = Modifier.fillMaxWidth()) {
+          tabTitles.forEachIndexed { index, title ->
+            Tab(
+                selected = pagerState.currentPage == index,
+                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
+                text = { Text(title) },
+            )
           }
         }
+
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+          tabPageMap.getOrDefault(page, defaultValue = {})()
+        }
       }
+    }
   }
 }
 
 @Preview(
     name = "Discover Screen - Keyboard Open",
     showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_NO)
+    uiMode = Configuration.UI_MODE_NIGHT_NO,
+)
 @Preview(
     name = "Discover Screen - Keyboard Open - Dark",
     showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_YES)
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun PreviewDiscoverVideoScreen() {
 

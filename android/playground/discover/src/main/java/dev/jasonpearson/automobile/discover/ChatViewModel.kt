@@ -15,7 +15,7 @@ data class ChatMessage(
     val text: String,
     val isFromUser: Boolean,
     val timestamp: Long = System.currentTimeMillis(),
-    val profileImageUrl: String? = null
+    val profileImageUrl: String? = null,
 )
 
 class ChatViewModel : ViewModel() {
@@ -29,12 +29,16 @@ class ChatViewModel : ViewModel() {
                   text =
                       "Hello! Welcome to the chat screen. This is an example of a realistic chat interface.",
                   isFromUser = false,
-                  profileImageUrl = null),
+                  profileImageUrl = null,
+              ),
               ChatMessage(
                   id = "2",
                   text = "You can type messages and they will appear here. Try sending a message!",
                   isFromUser = false,
-                  profileImageUrl = null)))
+                  profileImageUrl = null,
+              ),
+          )
+      )
   val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
 
   private val botResponses =
@@ -48,7 +52,8 @@ class ChatViewModel : ViewModel() {
           "I understand your perspective.",
           "Could you elaborate on that?",
           "That's a good point.",
-          "I appreciate you telling me this.")
+          "I appreciate you telling me this.",
+      )
 
   private fun generateUniqueId(): String {
     return "${System.currentTimeMillis()}-${messageIdCounter.getAndIncrement()}"
@@ -81,7 +86,8 @@ class ChatViewModel : ViewModel() {
             id = generateUniqueId(),
             text = botResponses[Random.nextInt(botResponses.size)],
             isFromUser = false,
-            profileImageUrl = null)
+            profileImageUrl = null,
+        )
 
     _messages.value = _messages.value + botMessage
   }

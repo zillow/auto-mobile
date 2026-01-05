@@ -38,7 +38,7 @@ class AnalyticsTracker private constructor() {
       elementId: String? = null,
       elementType: String? = null,
       coordinates: Pair<Float, Float>? = null,
-      properties: Map<String, Any> = emptyMap()
+      properties: Map<String, Any> = emptyMap(),
   ) {
     getRepository()
         ?.incrementTaps(elementId = elementId, elementType = elementType, coordinates = coordinates)
@@ -50,14 +50,15 @@ class AnalyticsTracker private constructor() {
       elementType: String? = null,
       direction: String? = null,
       coordinates: Pair<Float, Float>? = null,
-      properties: Map<String, Any> = emptyMap()
+      properties: Map<String, Any> = emptyMap(),
   ) {
     getRepository()
         ?.incrementSwipes(
             elementId = elementId,
             elementType = elementType,
             direction = direction,
-            coordinates = coordinates)
+            coordinates = coordinates,
+        )
   }
 
   /** Track screen navigation events */
@@ -91,7 +92,8 @@ fun Activity.enableAnalyticsTracking() {
           tracker.trackTap(
               elementId = view.id.toString(),
               elementType = view.javaClass.simpleName,
-              coordinates = event.x to event.y)
+              coordinates = event.x to event.y,
+          )
         }
 
         MotionEvent.ACTION_MOVE -> {
@@ -114,7 +116,8 @@ fun Activity.enableAnalyticsTracking() {
                   elementId = view.id.toString(),
                   elementType = view.javaClass.simpleName,
                   direction = direction,
-                  coordinates = event.x to event.y)
+                  coordinates = event.x to event.y,
+              )
             }
           }
         }
@@ -128,7 +131,7 @@ fun Activity.enableAnalyticsTracking() {
 fun View.trackInteraction(
     elementId: String? = null,
     elementType: String? = null,
-    action: String = "tap"
+    action: String = "tap",
 ) {
   val tracker = AnalyticsTracker.getInstance()
 
@@ -136,7 +139,8 @@ fun View.trackInteraction(
     tracker.trackTap(
         elementId = elementId ?: this.id.toString(),
         elementType = elementType ?: this.javaClass.simpleName,
-        coordinates = null)
+        coordinates = null,
+    )
   }
 
   this.setOnTouchListener { _, event ->
@@ -145,7 +149,8 @@ fun View.trackInteraction(
         tracker.trackTap(
             elementId = elementId ?: this.id.toString(),
             elementType = elementType ?: this.javaClass.simpleName,
-            coordinates = event.x to event.y)
+            coordinates = event.x to event.y,
+        )
       }
     }
     false
@@ -167,7 +172,7 @@ object MediaPlayerTracker {
       action: String,
       videoId: String? = null,
       position: Long? = null,
-      duration: Long? = null
+      duration: Long? = null,
   ) {
     val tracker = AnalyticsTracker.getInstance()
     val properties = mutableMapOf<String, Any>("action" to action)
@@ -182,13 +187,19 @@ object MediaPlayerTracker {
       "stop",
       "seek" -> {
         tracker.trackTap(
-            elementType = "media_control", elementId = "player_$action", coordinates = null)
+            elementType = "media_control",
+            elementId = "player_$action",
+            coordinates = null,
+        )
       }
 
       "fullscreen",
       "exit_fullscreen" -> {
         tracker.trackTap(
-            elementType = "media_control", elementId = "player_fullscreen", coordinates = null)
+            elementType = "media_control",
+            elementId = "player_fullscreen",
+            coordinates = null,
+        )
       }
     }
 

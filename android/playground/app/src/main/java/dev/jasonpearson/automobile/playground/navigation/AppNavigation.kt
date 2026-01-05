@@ -12,20 +12,20 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.*
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
-import androidx.navigation3.runtime.*
-import androidx.navigation3.ui.NavDisplay
 import androidx.navigation3.ui.*
+import androidx.navigation3.ui.NavDisplay
 import dev.jasonpearson.automobile.home.HomeScreen
 import dev.jasonpearson.automobile.login.ui.LoginScreen
 import dev.jasonpearson.automobile.mediaplayer.VideoPlayerScreen
 import dev.jasonpearson.automobile.onboarding.OnboardingScreen
-import dev.jasonpearson.automobile.settings.SettingsScreen
-import dev.jasonpearson.automobile.slides.SlidesScreen
 import dev.jasonpearson.automobile.sdk.AutoMobileSDK
 import dev.jasonpearson.automobile.sdk.adapters.Navigation3Adapter
+import dev.jasonpearson.automobile.settings.SettingsScreen
+import dev.jasonpearson.automobile.slides.SlidesScreen
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 import dev.jasonpearson.automobile.storage.NavigationTracker
 import dev.jasonpearson.automobile.storage.UserPreferences
@@ -84,7 +84,7 @@ private const val TAG = "AppNavigation"
 /** Determines the start destination based on user state */
 fun determineStartDestination(
     hasCompletedOnboarding: Boolean,
-    isAuthenticated: Boolean
+    isAuthenticated: Boolean,
 ): AppDestination {
   return when {
     !hasCompletedOnboarding -> OnboardingDestination
@@ -97,11 +97,12 @@ fun determineStartDestination(
 fun determineStartDestinationWithDeepLink(
     deepLinkUri: Uri?,
     hasCompletedOnboarding: Boolean,
-    isAuthenticated: Boolean
+    isAuthenticated: Boolean,
 ): AppDestination {
   Log.d(
       TAG,
-      "determineStartDestinationWithDeepLink - deepLinkUri: $deepLinkUri, hasCompletedOnboarding: $hasCompletedOnboarding, isAuthenticated: $isAuthenticated")
+      "determineStartDestinationWithDeepLink - deepLinkUri: $deepLinkUri, hasCompletedOnboarding: $hasCompletedOnboarding, isAuthenticated: $isAuthenticated",
+  )
 
   return if (deepLinkUri != null) {
     Log.d(TAG, "Processing deep link: $deepLinkUri")
@@ -131,21 +132,24 @@ fun determineStartDestinationWithDeepLink(
                 !hasCompletedOnboarding -> {
                   Log.d(
                       TAG,
-                      "Deep link targets protected destination but user hasn't completed onboarding, redirecting to onboarding")
+                      "Deep link targets protected destination but user hasn't completed onboarding, redirecting to onboarding",
+                  )
                   OnboardingDestination
                 }
 
                 !isAuthenticated -> {
                   Log.d(
                       TAG,
-                      "Deep link targets protected destination but user not authenticated, redirecting to login")
+                      "Deep link targets protected destination but user not authenticated, redirecting to login",
+                  )
                   LoginDestination
                 }
 
                 else -> {
                   Log.d(
                       TAG,
-                      "Deep link targets protected destination and user is authenticated, allowing: $parsedDestination")
+                      "Deep link targets protected destination and user is authenticated, allowing: $parsedDestination",
+                  )
                   parsedDestination
                 }
               }
@@ -195,7 +199,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
       determineStartDestinationWithDeepLink(
           deepLinkUri = deepLinkUri,
           hasCompletedOnboarding = userPreferences.hasCompletedOnboarding,
-          isAuthenticated = userPreferences.isAuthenticated)
+          isAuthenticated = userPreferences.isAuthenticated,
+      )
 
   Log.d(TAG, "Determined start destination: $startDestination")
 
@@ -207,7 +212,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
     AutoMobileSDK.addNavigationListener { event ->
       Log.d(
           TAG,
-          "AutoMobileSDK Navigation Event: destination=${event.destination}, source=${event.source}, arguments=${event.arguments}, metadata=${event.metadata}")
+          "AutoMobileSDK Navigation Event: destination=${event.destination}, source=${event.source}, arguments=${event.arguments}, metadata=${event.metadata}",
+      )
     }
   }
 
@@ -260,7 +266,9 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
             mapOf(
                 "uri" to uri.toString(),
                 "destination" to targetDestination.toString(),
-                "isRuntime" to "true"))
+                "isRuntime" to "true",
+            ),
+        )
       } else {
         Log.w(TAG, "Failed to parse deep link destination: $uri")
       }
@@ -274,7 +282,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
       entryDecorators =
           listOf(
               rememberSaveableStateHolderNavEntryDecorator(),
-              rememberViewModelStoreNavEntryDecorator()),
+              rememberViewModelStoreNavEntryDecorator(),
+          ),
       entryProvider =
           entryProvider {
             entry<OnboardingDestination> { destination ->
@@ -289,10 +298,14 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                       Log.d(TAG, "Onboarding finished, navigating to LoginScreen")
                       userPreferences.hasCompletedOnboarding = true
                       NavigationTracker.trackNavigation(
-                          "OnboardingScreen", "LoginScreen", "onboarding_finish")
+                          "OnboardingScreen",
+                          "LoginScreen",
+                          "onboarding_finish",
+                      )
                       backStack.clear()
                       backStack.add(LoginDestination)
-                    })
+                    }
+                )
               }
             }
 
@@ -308,7 +321,10 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                     onNavigateToHome = {
                       Log.d(TAG, "Login successful, navigating to HomeScreen")
                       NavigationTracker.trackNavigation(
-                          "LoginScreen", "HomeScreen", "login_success")
+                          "LoginScreen",
+                          "HomeScreen",
+                          "login_success",
+                      )
                       backStack.clear()
                       backStack.add(HomeDestination())
                     },
@@ -318,7 +334,8 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                       NavigationTracker.trackNavigation("LoginScreen", "HomeScreen", "guest_mode")
                       backStack.clear()
                       backStack.add(HomeDestination())
-                    })
+                    },
+                )
               }
             }
 
@@ -327,11 +344,13 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                   destination = homeDestination,
                   extractArguments = {
                     mapOf("selectedTab" to it.selectedTab, "selectedSubTab" to it.selectedSubTab)
-                  })
+                  },
+              )
               LaunchedEffect(Unit) {
                 Log.d(
                     TAG,
-                    "Navigated to HomeScreen with selectedTab: ${homeDestination.selectedTab}, selectedSubTab: ${homeDestination.selectedSubTab}")
+                    "Navigated to HomeScreen with selectedTab: ${homeDestination.selectedTab}, selectedSubTab: ${homeDestination.selectedSubTab}",
+                )
                 analyticsTracker.trackScreenView("HomeScreen")
               }
               Box(modifier = Modifier.destinationSemanticModifier<HomeDestination>()) {
@@ -341,13 +360,19 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                     onNavigateToVideoPlayer = { videoId ->
                       Log.d(TAG, "Navigating to VideoPlayerScreen with videoId: $videoId")
                       NavigationTracker.trackNavigation(
-                          "HomeScreen", "VideoPlayerScreen", "video_selection")
+                          "HomeScreen",
+                          "VideoPlayerScreen",
+                          "video_selection",
+                      )
                       backStack.add(VideoPlayerDestination(videoId))
                     },
                     onNavigateToSlides = { slideIndex ->
                       Log.d(TAG, "Navigating to SlidesScreen with slideIndex: $slideIndex")
                       NavigationTracker.trackNavigation(
-                          "HomeScreen", "SlidesScreen", "slides_selection")
+                          "HomeScreen",
+                          "SlidesScreen",
+                          "slides_selection",
+                      )
                       backStack.add(SlidesDestination(slideIndex))
                     },
                     onLogout = {
@@ -365,7 +390,10 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                       Log.d(TAG, "Guest mode to login, navigating to LoginScreen")
                       userPreferences.isGuestMode = false
                       NavigationTracker.trackNavigation(
-                          "HomeScreen", "LoginScreen", "guest_to_login")
+                          "HomeScreen",
+                          "LoginScreen",
+                          "guest_to_login",
+                      )
                       backStack.clear()
                       backStack.add(LoginDestination)
                     },
@@ -377,51 +405,67 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
             entry<SlidesDestination> { slidesDestination ->
               Navigation3Adapter.TrackNavigation(
                   destination = slidesDestination,
-                  extractArguments = { mapOf("slideIndex" to it.slideIndex) })
+                  extractArguments = { mapOf("slideIndex" to it.slideIndex) },
+              )
               LaunchedEffect(Unit) {
                 Log.d(
                     TAG,
-                    "Navigated to SlidesScreen with slideIndex: ${slidesDestination.slideIndex}")
+                    "Navigated to SlidesScreen with slideIndex: ${slidesDestination.slideIndex}",
+                )
                 analyticsTracker.trackScreenView("SlidesScreen")
               }
               Box(
                   modifier =
                       Modifier.destinationSemanticModifier<SlidesDestination>(
-                          "slide_${slidesDestination.slideIndex}")) {
-                    SlidesScreen(
-                        initialSlideIndex = slidesDestination.slideIndex,
-                        onNavigateBack = {
-                          Log.d(TAG, "Navigating back from SlidesScreen to HomeScreen")
-                          NavigationTracker.trackNavigation(
-                              "SlidesScreen", "HomeScreen", "back_navigation")
-                          backStack.removeLastOrNull()
-                        })
-                  }
+                          "slide_${slidesDestination.slideIndex}"
+                      )
+              ) {
+                SlidesScreen(
+                    initialSlideIndex = slidesDestination.slideIndex,
+                    onNavigateBack = {
+                      Log.d(TAG, "Navigating back from SlidesScreen to HomeScreen")
+                      NavigationTracker.trackNavigation(
+                          "SlidesScreen",
+                          "HomeScreen",
+                          "back_navigation",
+                      )
+                      backStack.removeLastOrNull()
+                    },
+                )
+              }
             }
 
             entry<VideoPlayerDestination> { videoPlayerDestination ->
               Navigation3Adapter.TrackNavigation(
                   destination = videoPlayerDestination,
-                  extractArguments = { mapOf("videoId" to it.videoId) })
+                  extractArguments = { mapOf("videoId" to it.videoId) },
+              )
               LaunchedEffect(Unit) {
                 Log.d(
                     TAG,
-                    "Navigated to VideoPlayerScreen with videoId: ${videoPlayerDestination.videoId}")
+                    "Navigated to VideoPlayerScreen with videoId: ${videoPlayerDestination.videoId}",
+                )
                 analyticsTracker.trackScreenView("VideoPlayerScreen")
               }
               Box(
                   modifier =
                       Modifier.destinationSemanticModifier<VideoPlayerDestination>(
-                          "video_${videoPlayerDestination.videoId}")) {
-                    VideoPlayerScreen(
-                        videoId = videoPlayerDestination.videoId,
-                        onNavigateBack = {
-                          Log.d(TAG, "Navigating back from VideoPlayerScreen to HomeScreen")
-                          NavigationTracker.trackNavigation(
-                              "VideoPlayerScreen", "HomeScreen", "back_navigation")
-                          backStack.removeLastOrNull()
-                        })
-                  }
+                          "video_${videoPlayerDestination.videoId}"
+                      )
+              ) {
+                VideoPlayerScreen(
+                    videoId = videoPlayerDestination.videoId,
+                    onNavigateBack = {
+                      Log.d(TAG, "Navigating back from VideoPlayerScreen to HomeScreen")
+                      NavigationTracker.trackNavigation(
+                          "VideoPlayerScreen",
+                          "HomeScreen",
+                          "back_navigation",
+                      )
+                      backStack.removeLastOrNull()
+                    },
+                )
+              }
             }
 
             entry<SettingsDestination> { destination ->
@@ -447,11 +491,16 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                       Log.d(TAG, "Guest mode to login from settings, navigating to LoginScreen")
                       userPreferences.isGuestMode = false
                       NavigationTracker.trackNavigation(
-                          "SettingsScreen", "LoginScreen", "guest_to_login")
+                          "SettingsScreen",
+                          "LoginScreen",
+                          "guest_to_login",
+                      )
                       backStack.clear()
                       backStack.add(LoginDestination)
-                    })
+                    },
+                )
               }
             }
-          })
+          },
+  )
 }

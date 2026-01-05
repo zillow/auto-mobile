@@ -34,12 +34,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /**
- * Integration tests for WebSocketServer with actual network I/O.
- * These tests verify real WebSocket connections and message broadcasting.
+ * Integration tests for WebSocketServer with actual network I/O. These tests verify real WebSocket
+ * connections and message broadcasting.
  *
- * Note: These tests use runBlocking instead of runTest to allow actual
- * network operations. They may be slower than pure unit tests but provide
- * confidence that the WebSocket server works correctly.
+ * Note: These tests use runBlocking instead of runTest to allow actual network operations. They may
+ * be slower than pure unit tests but provide confidence that the WebSocket server works correctly.
  */
 @RunWith(RobolectricTestRunner::class)
 class WebSocketServerIntegrationTest {
@@ -55,10 +54,7 @@ class WebSocketServerIntegrationTest {
     server = WebSocketServer(port = 0, scope = testScope)
   }
 
-  /**
-   * Get the actual port the server is listening on.
-   * Must be called after server.start().
-   */
+  /** Get the actual port the server is listening on. Must be called after server.start(). */
   private fun getServerPort(): Int {
     return server.getActualPort() ?: error("Server not running or port not available")
   }
@@ -74,13 +70,13 @@ class WebSocketServerIntegrationTest {
   }
 
   /**
-   * Wait for a condition to be true with exponential backoff.
-   * Much faster than fixed delays when condition becomes true quickly.
+   * Wait for a condition to be true with exponential backoff. Much faster than fixed delays when
+   * condition becomes true quickly.
    */
   private suspend fun waitFor(
-    timeoutMs: Long = 1000,
-    checkIntervalMs: Long = 10,
-    condition: () -> Boolean
+      timeoutMs: Long = 1000,
+      checkIntervalMs: Long = 10,
+      condition: () -> Boolean,
   ) {
     withTimeout(timeoutMs) {
       while (!condition()) {
@@ -122,16 +118,14 @@ class WebSocketServerIntegrationTest {
     server.start()
 
     // When
-    val client = HttpClient(CIO) {
-      install(WebSockets)
-    }
+    val client = HttpClient(CIO) { install(WebSockets) }
 
     client.use { client ->
       client.webSocket(
-        method = HttpMethod.Get,
-        host = "localhost",
-        port = getServerPort(),
-        path = "/ws"
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
       ) {
         // Then - connection established
         waitFor { server.getConnectionCount() == 1 }
@@ -162,10 +156,10 @@ class WebSocketServerIntegrationTest {
     client.use { client ->
       val job = launch {
         client.webSocket(
-          method = HttpMethod.Get,
-          host = "localhost",
-          port = getServerPort(),
-          path = "/ws"
+            method = HttpMethod.Get,
+            host = "localhost",
+            port = getServerPort(),
+            path = "/ws",
         ) {
           // Receive and discard connection message
           incoming.receive()
@@ -211,10 +205,10 @@ class WebSocketServerIntegrationTest {
     client.use { client ->
       val job = launch {
         client.webSocket(
-          method = HttpMethod.Get,
-          host = "localhost",
-          port = getServerPort(),
-          path = "/ws"
+            method = HttpMethod.Get,
+            host = "localhost",
+            port = getServerPort(),
+            path = "/ws",
         ) {
           incoming.receive() // Discard connection message
           var messageCount = 0
@@ -232,17 +226,20 @@ class WebSocketServerIntegrationTest {
       waitFor { server.getConnectionCount() == 1 }
 
       // When - create and broadcast a hierarchy update
-      val hierarchy = ViewHierarchy(
-        packageName = "com.example.app",
-        hierarchy = UIElementInfo(
-          text = "Hello",
-          clickable = "true",
-          bounds = ElementBounds(0, 0, 100, 50)
-        )
-      )
+      val hierarchy =
+          ViewHierarchy(
+              packageName = "com.example.app",
+              hierarchy =
+                  UIElementInfo(
+                      text = "Hello",
+                      clickable = "true",
+                      bounds = ElementBounds(0, 0, 100, 50),
+                  ),
+          )
 
       val hierarchyJson = json.encodeToString(ViewHierarchy.serializer(), hierarchy)
-      val message = """{"type":"hierarchy_update","timestamp":${System.currentTimeMillis()},"data":$hierarchyJson}"""
+      val message =
+          """{"type":"hierarchy_update","timestamp":${System.currentTimeMillis()},"data":$hierarchyJson}"""
       server.broadcast(message)
 
       // Wait for message to be received
@@ -291,10 +288,10 @@ class WebSocketServerIntegrationTest {
     client.use { client ->
       val job = launch {
         client.webSocket(
-          method = HttpMethod.Get,
-          host = "localhost",
-          port = getServerPort(),
-          path = "/ws"
+            method = HttpMethod.Get,
+            host = "localhost",
+            port = getServerPort(),
+            path = "/ws",
         ) {
           incoming.receive() // Connection message
           delay(10)

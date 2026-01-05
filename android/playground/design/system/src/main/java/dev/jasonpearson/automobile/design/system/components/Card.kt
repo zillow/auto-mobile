@@ -25,16 +25,17 @@ fun AutoMobileCard(
     containerColor: Color = MaterialTheme.colorScheme.surface,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     elevation: Dp = AutoMobileDimensions.elevationSmall,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
   Card(
       modifier = modifier,
       shape = shape,
       colors =
           CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
-      elevation = CardDefaults.cardElevation(defaultElevation = elevation)) {
-        Column(modifier = Modifier.padding(AutoMobileDimensions.spacing4)) { content() }
-      }
+      elevation = CardDefaults.cardElevation(defaultElevation = elevation),
+  ) {
+    Column(modifier = Modifier.padding(AutoMobileDimensions.spacing4)) { content() }
+  }
 }
 
 @Composable
@@ -45,17 +46,20 @@ fun AutoMobileOutlinedCard(
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     borderColor: Color = MaterialTheme.colorScheme.outline,
     borderWidth: Dp = AutoMobileDimensions.borderThin,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable ColumnScope.() -> Unit,
 ) {
   OutlinedCard(
       modifier = modifier,
       shape = shape,
       colors =
           CardDefaults.outlinedCardColors(
-              containerColor = containerColor, contentColor = contentColor),
-      border = BorderStroke(width = borderWidth, color = borderColor)) {
-        Column(modifier = Modifier.padding(AutoMobileDimensions.spacing4)) { content() }
-      }
+              containerColor = containerColor,
+              contentColor = contentColor,
+          ),
+      border = BorderStroke(width = borderWidth, color = borderColor),
+  ) {
+    Column(modifier = Modifier.padding(AutoMobileDimensions.spacing4)) { content() }
+  }
 }
 
 @Preview(name = "Card", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
@@ -71,7 +75,10 @@ private fun AutoMobileCardPreview() {
 
 @Preview(name = "Outlined Card", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-    name = "Outlined Card - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+    name = "Outlined Card - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 private fun AutoMobileOutlinedCardPreview() {
   AutoMobileTheme {

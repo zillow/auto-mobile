@@ -45,11 +45,14 @@ class SlidesScreenTest {
     val testFlowSlide = mermaidSlides.find { it.title == "View Hierarchy Cache System" }
     assertTrue("Should contain the View Hierarchy Cache System diagram", testFlowSlide != null)
     testFlowSlide?.let { slide ->
-      assertTrue("Should contain flowchart or sequenceDiagram syntax",
-          slide.code.contains("flowchart") || slide.code.contains("sequenceDiagram"))
+      assertTrue(
+          "Should contain flowchart or sequenceDiagram syntax",
+          slide.code.contains("flowchart") || slide.code.contains("sequenceDiagram"),
+      )
       assertTrue(
           "Should contain View Hierarchy Cache content",
-          slide.code.contains("View Hierarchy") || slide.code.contains("Cache"))
+          slide.code.contains("View Hierarchy") || slide.code.contains("Cache"),
+      )
     }
   }
 
@@ -93,7 +96,8 @@ class SlidesScreenTest {
               slide.code.contains("fun ") ||
               slide.code.contains("flowchart") ||
               slide.code.contains("sequenceDiagram") ||
-              slide.code.length > 20)
+              slide.code.length > 20,
+      )
     }
   }
 }
@@ -136,9 +140,11 @@ class SlideContentTestHelper {
           SlideContent.Emoji(PresentationEmoji.ROCKET, "Test Caption"),
           SlideContent.BulletPoints(
               "Test Features",
-              listOf(BulletPoint("Feature 1", listOf("Sub 1", "Sub 2")), BulletPoint("Feature 2"))),
+              listOf(BulletPoint("Feature 1", listOf("Sub 1", "Sub 2")), BulletPoint("Feature 2")),
+          ),
           SlideContent.CodeSample("fun test() {}", "kotlin", "Test Code"),
-          SlideContent.Visualization("test-image.png", "Test Image"))
+          SlideContent.Visualization("test-image.png", "Test Image"),
+      )
 
   private fun createEmptySlideList(): List<SlideContent> = emptyList()
 
@@ -153,7 +159,8 @@ class SlideNavigationTest {
         listOf(
             SlideContent.LargeText("Slide 1"),
             SlideContent.LargeText("Slide 2"),
-            SlideContent.LargeText("Slide 3"))
+            SlideContent.LargeText("Slide 3"),
+        )
 
     // Test negative index
     val negativeIndex = -5
@@ -193,7 +200,8 @@ class SlideNavigationTest {
         listOf(
             SlideContent.LargeText("First"),
             SlideContent.Emoji(PresentationEmoji.ROCKET),
-            SlideContent.BulletPoints("Third", emptyList()))
+            SlideContent.BulletPoints("Third", emptyList()),
+        )
     assertEquals("Multiple slides should have correct count", 3, multipleSlides.size)
   }
 }

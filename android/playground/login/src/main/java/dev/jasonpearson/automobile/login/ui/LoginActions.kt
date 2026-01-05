@@ -27,14 +27,15 @@ internal fun LoginActions(
     isLoading: Boolean,
     onSignInClick: () -> Unit,
     onGuestModeClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
     AnimatedVisibility(visible = isFormValid && !isLoading, enter = fadeIn(), exit = fadeOut()) {
       AutoMobileButton(
           text = stringResource(R.string.action_sign_in),
           onClick = onSignInClick,
-          modifier = Modifier.wrapContentWidth())
+          modifier = Modifier.wrapContentWidth(),
+      )
     }
 
     if (isLoading) {
@@ -47,13 +48,17 @@ internal fun LoginActions(
     AutoMobileOutlinedButton(
         text = "Continue as Guest",
         onClick = onGuestModeClick,
-        modifier = Modifier.wrapContentWidth())
+        modifier = Modifier.wrapContentWidth(),
+    )
   }
 }
 
 @Preview(name = "Login Actions", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-    name = "Login Actions - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+    name = "Login Actions - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun LoginActionsPreview() {
   AutoMobileTheme {

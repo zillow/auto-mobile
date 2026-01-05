@@ -14,12 +14,12 @@ data class ViewHierarchy(
     val windowInfo: WindowInfo? = null,
     val windows: List<WindowHierarchy>? = null, // All visible windows (including popups, toolbars)
     val intentChooserDetected: Boolean? = null,
-    val error: String? = null // For error cases like locked screen
+    val error: String? = null, // For error cases like locked screen
 )
 
 /**
- * Represents a single window's hierarchy with its metadata.
- * Used to capture all visible windows including floating toolbars and popups.
+ * Represents a single window's hierarchy with its metadata. Used to capture all visible windows
+ * including floating toolbars and popups.
  */
 @Serializable
 data class WindowHierarchy(
@@ -29,5 +29,5 @@ data class WindowHierarchy(
     val packageName: String? = null,
     val isActive: Boolean = false,
     val isFocused: Boolean = false,
-    val hierarchy: UIElementInfo? = null
+    val hierarchy: UIElementInfo? = null,
 )

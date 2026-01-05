@@ -28,14 +28,16 @@ fun AutoMobileTopAppBar(
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-            actionIconContentColor = MaterialTheme.colorScheme.onSurface)
+            actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
 ) {
   TopAppBar(
       title = title,
       modifier = modifier,
       navigationIcon = navigationIcon,
       actions = actions,
-      colors = colors)
+      colors = colors,
+  )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,14 +52,16 @@ fun AutoMobileCenterAlignedTopAppBar(
             containerColor = MaterialTheme.colorScheme.surface,
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-            actionIconContentColor = MaterialTheme.colorScheme.onSurface)
+            actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
 ) {
   CenterAlignedTopAppBar(
       title = title,
       modifier = modifier,
       navigationIcon = navigationIcon,
       actions = actions,
-      colors = colors)
+      colors = colors,
+  )
 }
 
 @Composable
@@ -65,13 +69,14 @@ fun AutoMobileBackButton(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector = Icons.AutoMirrored.Filled.ArrowBack,
-    contentDescription: String? = "Navigate back"
+    contentDescription: String? = "Navigate back",
 ) {
   IconButton(onClick = onBackClick, modifier = modifier) {
     Icon(
         imageVector = icon,
         contentDescription = contentDescription,
-        tint = MaterialTheme.colorScheme.onSurface)
+        tint = MaterialTheme.colorScheme.onSurface,
+    )
   }
 }
 
@@ -82,6 +87,7 @@ private fun AutoMobileTopAppBarPreview() {
   dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme {
     AutoMobileTopAppBar(
         title = { AutoMobileTitle("App Title") },
-        navigationIcon = { AutoMobileBackButton(onBackClick = {}) })
+        navigationIcon = { AutoMobileBackButton(onBackClick = {}) },
+    )
   }
 }

@@ -28,8 +28,14 @@ android {
 
 kotlin {
   compilerOptions {
-    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get()))
-    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(libs.versions.build.kotlin.language.get()))
+    jvmTarget.set(
+        org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get())
+    )
+    languageVersion.set(
+        org.jetbrains.kotlin.gradle.dsl.KotlinVersion.fromVersion(
+            libs.versions.build.kotlin.language.get()
+        )
+    )
   }
 }
 

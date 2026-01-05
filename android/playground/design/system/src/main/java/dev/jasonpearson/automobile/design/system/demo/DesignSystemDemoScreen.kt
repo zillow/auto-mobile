@@ -59,159 +59,167 @@ fun DesignSystemDemoScreen(onBackClick: () -> Unit = {}) {
         topBar = {
           AutoMobileTopAppBar(
               title = { AutoMobileTitle("Design System Demo") },
-              navigationIcon = { AutoMobileBackButton(onBackClick = onBackClick) })
-        }) { paddingValues ->
-          Column(
-              modifier =
-                  Modifier.fillMaxSize()
-                      .padding(paddingValues)
-                      .padding(AutoMobileDimensions.spacing4)
-                      .verticalScroll(rememberScrollState()),
-              verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4)) {
-                // Typography Section
-                AutoMobileCard {
-                  AutoMobileHeadline("Typography")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-                  AutoMobileTitle("Title Text")
-                  AutoMobileBodyText("This is body text that demonstrates the typography system.")
-                  AutoMobileLabel("Label Text")
-                }
-
-                // Buttons Section
-                AutoMobileCard {
-                  AutoMobileHeadline("Buttons")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-
-                  Column(
-                      verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                        AutoMobileButton(
-                            text = "Primary Button",
-                            onClick = {},
-                            modifier = Modifier.fillMaxWidth())
-
-                        AutoMobileSecondaryButton(
-                            text = "Secondary Button",
-                            onClick = {},
-                            modifier = Modifier.fillMaxWidth())
-
-                        AutoMobileOutlinedButton(
-                            text = "Outlined Button",
-                            onClick = {},
-                            modifier = Modifier.fillMaxWidth())
-
-                        Row(
-                            horizontalArrangement =
-                                Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                              AutoMobileTextButton(text = "Text Button", onClick = {})
-
-                              AutoMobileButton(text = "Disabled", onClick = {}, enabled = false)
-                            }
-                      }
-                }
-
-                // Cards Section
-                AutoMobileOutlinedCard {
-                  AutoMobileHeadline("Cards")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-                  AutoMobileBodyText(
-                      "This is an outlined card variant. Cards follow flat design principles and avoid nesting.")
-                }
-
-                // Text Fields Section
-                AutoMobileCard {
-                  AutoMobileHeadline("Text Fields")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-
-                  Column(
-                      verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                        AutoMobileTextField(
-                            value = textFieldValue,
-                            onValueChange = { textFieldValue = it },
-                            label = { Text("Filled Text Field") },
-                            modifier = Modifier.fillMaxWidth())
-
-                        AutoMobileOutlinedTextField(
-                            value = outlinedTextFieldValue,
-                            onValueChange = { outlinedTextFieldValue = it },
-                            label = { Text("Outlined Text Field") },
-                            modifier = Modifier.fillMaxWidth())
-                      }
-                }
-
-                // Color Showcase
-                AutoMobileCard {
-                  AutoMobileHeadline("Color System")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-                  AutoMobileBodyText("Primary: Black (#000000)")
-                  AutoMobileBodyText("Secondary: Red (#FF0000)")
-                  AutoMobileBodyText("Background: Eggshell (#F8F8FF)")
-                  AutoMobileBodyText(text = "This text uses the primary color")
-                  AutoMobileBodyText(text = "This text uses the secondary color")
-                }
-
-                // AutoMobile Logo Section
-                AutoMobileCard {
-                  AutoMobileHeadline("AutoMobile Logo")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-
-                  Column(
-                      verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                        AutoMobileBodyText("Logo sizes - Normal mode:")
-                        Row(
-                            horizontalArrangement =
-                                Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                              AutoMobileLogo()
-                              AutoMobileLogo()
-                              AutoMobileLogo()
-                              AutoMobileLogo()
-                            }
-
-                        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-                        AutoMobileBodyText("Party mode (holographic):")
-                        Row(
-                            horizontalArrangement =
-                                Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                              AutoMobileLogo()
-                            }
-                      }
-                }
-
-                // Floating Action Buttons Section
-                AutoMobileCard {
-                  AutoMobileHeadline("Floating Action Buttons")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-
-                  Row(horizontalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
-                    AutoMobileFloatingActionButton(
-                        onClick = {}, icon = Icons.Default.Add, contentDescription = "Add")
-
-                    AutoMobileExtendedFloatingActionButton(
-                        text = "Add Item",
-                        onClick = {},
-                        icon = Icons.Default.Add,
-                        contentDescription = "Add Item")
-                  }
-                }
-
-                // Bottom Navigation Section
-                AutoMobileCard {
-                  AutoMobileHeadline("Bottom Navigation")
-                  Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
-
-                  val bottomNavItems =
-                      listOf(
-                          BottomNavItem("Home", Icons.Default.Home),
-                          BottomNavItem("Search", Icons.Default.Search),
-                          BottomNavItem("Profile", Icons.Default.Person),
-                          BottomNavItem("Settings", Icons.Default.Settings))
-
-                  AutoMobileBottomNavigation(
-                      items = bottomNavItems, selectedItemIndex = 0, onItemSelected = {})
-                }
-
-                Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing8))
-              }
+              navigationIcon = { AutoMobileBackButton(onBackClick = onBackClick) },
+          )
         }
+    ) { paddingValues ->
+      Column(
+          modifier =
+              Modifier.fillMaxSize()
+                  .padding(paddingValues)
+                  .padding(AutoMobileDimensions.spacing4)
+                  .verticalScroll(rememberScrollState()),
+          verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4),
+      ) {
+        // Typography Section
+        AutoMobileCard {
+          AutoMobileHeadline("Typography")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+          AutoMobileTitle("Title Text")
+          AutoMobileBodyText("This is body text that demonstrates the typography system.")
+          AutoMobileLabel("Label Text")
+        }
+
+        // Buttons Section
+        AutoMobileCard {
+          AutoMobileHeadline("Buttons")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+
+          Column(verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
+            AutoMobileButton(
+                text = "Primary Button",
+                onClick = {},
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            AutoMobileSecondaryButton(
+                text = "Secondary Button",
+                onClick = {},
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            AutoMobileOutlinedButton(
+                text = "Outlined Button",
+                onClick = {},
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
+              AutoMobileTextButton(text = "Text Button", onClick = {})
+
+              AutoMobileButton(text = "Disabled", onClick = {}, enabled = false)
+            }
+          }
+        }
+
+        // Cards Section
+        AutoMobileOutlinedCard {
+          AutoMobileHeadline("Cards")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+          AutoMobileBodyText(
+              "This is an outlined card variant. Cards follow flat design principles and avoid nesting."
+          )
+        }
+
+        // Text Fields Section
+        AutoMobileCard {
+          AutoMobileHeadline("Text Fields")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+
+          Column(verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
+            AutoMobileTextField(
+                value = textFieldValue,
+                onValueChange = { textFieldValue = it },
+                label = { Text("Filled Text Field") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            AutoMobileOutlinedTextField(
+                value = outlinedTextFieldValue,
+                onValueChange = { outlinedTextFieldValue = it },
+                label = { Text("Outlined Text Field") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+          }
+        }
+
+        // Color Showcase
+        AutoMobileCard {
+          AutoMobileHeadline("Color System")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+          AutoMobileBodyText("Primary: Black (#000000)")
+          AutoMobileBodyText("Secondary: Red (#FF0000)")
+          AutoMobileBodyText("Background: Eggshell (#F8F8FF)")
+          AutoMobileBodyText(text = "This text uses the primary color")
+          AutoMobileBodyText(text = "This text uses the secondary color")
+        }
+
+        // AutoMobile Logo Section
+        AutoMobileCard {
+          AutoMobileHeadline("AutoMobile Logo")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+
+          Column(verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
+            AutoMobileBodyText("Logo sizes - Normal mode:")
+            Row(horizontalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
+              AutoMobileLogo()
+              AutoMobileLogo()
+              AutoMobileLogo()
+              AutoMobileLogo()
+            }
+
+            Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+            AutoMobileBodyText("Party mode (holographic):")
+            Row(horizontalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
+              AutoMobileLogo()
+            }
+          }
+        }
+
+        // Floating Action Buttons Section
+        AutoMobileCard {
+          AutoMobileHeadline("Floating Action Buttons")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+
+          Row(horizontalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing2)) {
+            AutoMobileFloatingActionButton(
+                onClick = {},
+                icon = Icons.Default.Add,
+                contentDescription = "Add",
+            )
+
+            AutoMobileExtendedFloatingActionButton(
+                text = "Add Item",
+                onClick = {},
+                icon = Icons.Default.Add,
+                contentDescription = "Add Item",
+            )
+          }
+        }
+
+        // Bottom Navigation Section
+        AutoMobileCard {
+          AutoMobileHeadline("Bottom Navigation")
+          Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing2))
+
+          val bottomNavItems =
+              listOf(
+                  BottomNavItem("Home", Icons.Default.Home),
+                  BottomNavItem("Search", Icons.Default.Search),
+                  BottomNavItem("Profile", Icons.Default.Person),
+                  BottomNavItem("Settings", Icons.Default.Settings),
+              )
+
+          AutoMobileBottomNavigation(
+              items = bottomNavItems,
+              selectedItemIndex = 0,
+              onItemSelected = {},
+          )
+        }
+
+        Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing8))
+      }
+    }
   }
 }
 

@@ -22,84 +22,84 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class WebSocketServerTest {
 
-    private lateinit var server: WebSocketServer
-    private lateinit var testScope: TestScope
+  private lateinit var server: WebSocketServer
+  private lateinit var testScope: TestScope
 
-    @Before
-    fun setUp() {
-        testScope = TestScope()
-        // Use port 0 to let OS assign an available port, avoiding conflicts when tests run in parallel
-        server = WebSocketServer(port = 0, scope = testScope)
+  @Before
+  fun setUp() {
+    testScope = TestScope()
+    // Use port 0 to let OS assign an available port, avoiding conflicts when tests run in parallel
+    server = WebSocketServer(port = 0, scope = testScope)
+  }
+
+  @After
+  fun tearDown() {
+    if (server.isRunning()) {
+      server.stop()
     }
+    testScope.cancel()
+  }
 
-    @After
-    fun tearDown() {
-        if (server.isRunning()) {
-            server.stop()
-        }
-        testScope.cancel()
-    }
+  @Test
+  fun `server starts successfully`() = runTest {
+    // Given
+    assertFalse("Server should not be running initially", server.isRunning())
 
-    @Test
-    fun `server starts successfully`() = runTest {
-        // Given
-        assertFalse("Server should not be running initially", server.isRunning())
+    // When
+    server.start()
 
-        // When
-        server.start()
+    // Then
+    assertTrue("Server should be running", server.isRunning())
+    assertEquals("Should have no connections initially", 0, server.getConnectionCount())
+  }
 
-        // Then
-        assertTrue("Server should be running", server.isRunning())
-        assertEquals("Should have no connections initially", 0, server.getConnectionCount())
-    }
+  @Test
+  fun `server stops successfully`() = runTest {
+    // Given
+    server.start()
+    assertTrue(server.isRunning())
 
-    @Test
-    fun `server stops successfully`() = runTest {
-        // Given
-        server.start()
-        assertTrue(server.isRunning())
+    // When
+    server.stop()
 
-        // When
-        server.stop()
+    // Then
+    assertFalse("Server should be stopped", server.isRunning())
+  }
 
-        // Then
-        assertFalse("Server should be stopped", server.isRunning())
-    }
+  @Test
+  fun `server does not start twice`() = runTest {
+    // Given
+    server.start()
 
-    @Test
-    fun `server does not start twice`() = runTest {
-        // Given
-        server.start()
+    // When - try to start again
+    server.start()
 
-        // When - try to start again
-        server.start()
+    // Then - should still be running normally
+    assertTrue("Server should still be running", server.isRunning())
+  }
 
-        // Then - should still be running normally
-        assertTrue("Server should still be running", server.isRunning())
-    }
+  @Test
+  fun `server connection count starts at zero`() = runTest {
+    // Given
+    server.start()
 
-    @Test
-    fun `server connection count starts at zero`() = runTest {
-        // Given
-        server.start()
+    // Then
+    assertEquals("Connection count should start at 0", 0, server.getConnectionCount())
+  }
 
-        // Then
-        assertEquals("Connection count should start at 0", 0, server.getConnectionCount())
-    }
+  @Test
+  fun `server can be created with custom port`() = runTest {
+    // Given
+    val customPort = 9999
+    val customServer = WebSocketServer(port = customPort, scope = testScope)
 
-    @Test
-    fun `server can be created with custom port`() = runTest {
-        // Given
-        val customPort = 9999
-        val customServer = WebSocketServer(port = customPort, scope = testScope)
+    // When
+    customServer.start()
 
-        // When
-        customServer.start()
+    // Then
+    assertTrue("Custom server should be running", customServer.isRunning())
 
-        // Then
-        assertTrue("Custom server should be running", customServer.isRunning())
-
-        // Cleanup
-        customServer.stop()
-    }
+    // Cleanup
+    customServer.stop()
+  }
 }

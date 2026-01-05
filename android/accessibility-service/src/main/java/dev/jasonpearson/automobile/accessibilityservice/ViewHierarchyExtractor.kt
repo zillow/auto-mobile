@@ -35,13 +35,15 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             "android.view.View",
             "android.widget.FrameLayout",
             "android.widget.ScrollView",
-            "android.widget.TextView")
+            "android.widget.TextView",
+        )
   }
 
   private val json = Json { ignoreUnknownKeys = true }
 
   /**
    * Extracts view hierarchy from the active window.
+   *
    * @param rootNode Root accessibility node
    * @param textFilter Optional text filter
    * @param screenDimensions Optional screen dimensions for offscreen filtering
@@ -51,7 +53,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       rootNode: AccessibilityNodeInfo?,
       textFilter: String? = null,
       screenDimensions: ScreenDimensions? = null,
-      dedupeTextContentDesc: Boolean = true
+      dedupeTextContentDesc: Boolean = true,
   ): ViewHierarchy? {
     if (rootNode == null) {
       Log.w(TAG, "Root node is null")
@@ -59,14 +61,16 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     }
 
     return try {
-      val rootElement = extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+      val rootElement =
+          extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
       val optimizedElement = rootElement?.let { optimizeHierarchy(it) }
-      val intentChooserDetected = optimizedElement?.let { detectIntentChooserIndicators(it) } ?: false
+      val intentChooserDetected =
+          optimizedElement?.let { detectIntentChooserIndicators(it) } ?: false
 
       ViewHierarchy(
-        packageName = rootNode.packageName?.toString(),
-        hierarchy = optimizedElement,
-        intentChooserDetected = intentChooserDetected
+          packageName = rootNode.packageName?.toString(),
+          hierarchy = optimizedElement,
+          intentChooserDetected = intentChooserDetected,
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error extracting view hierarchy", e)
@@ -75,9 +79,9 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   }
 
   /**
-   * Extracts view hierarchy from all visible windows.
-   * This captures popups, toolbars, and other floating windows that aren't in the main window.
-   * Filters out irrelevant windows (system UI, input methods, selection handles) to reduce payload size.
+   * Extracts view hierarchy from all visible windows. This captures popups, toolbars, and other
+   * floating windows that aren't in the main window. Filters out irrelevant windows (system UI,
+   * input methods, selection handles) to reduce payload size.
    *
    * @param windows List of all accessibility windows (from AccessibilityService.windows)
    * @param activeWindowRoot Root node of the active window (for backward compatibility)
@@ -90,7 +94,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       activeWindowRoot: AccessibilityNodeInfo?,
       textFilter: String? = null,
       screenDimensions: ScreenDimensions? = null,
-      dedupeTextContentDesc: Boolean = true
+      dedupeTextContentDesc: Boolean = true,
   ): ViewHierarchy {
     if (windows.isEmpty() && activeWindowRoot == null) {
       Log.w(TAG, "No windows available for extraction")
@@ -107,17 +111,19 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       try {
         val rootNode = window.root ?: continue
 
-        val windowType = when (window.type) {
-          AccessibilityWindowInfo.TYPE_APPLICATION -> "application"
-          AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "input_method"
-          AccessibilityWindowInfo.TYPE_SYSTEM -> "system"
-          AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY -> "accessibility_overlay"
-          AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER -> "split_screen_divider"
-          AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY -> "magnification_overlay"
-          else -> "unknown_${window.type}"
-        }
+        val windowType =
+            when (window.type) {
+              AccessibilityWindowInfo.TYPE_APPLICATION -> "application"
+              AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "input_method"
+              AccessibilityWindowInfo.TYPE_SYSTEM -> "system"
+              AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY -> "accessibility_overlay"
+              AccessibilityWindowInfo.TYPE_SPLIT_SCREEN_DIVIDER -> "split_screen_divider"
+              AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY -> "magnification_overlay"
+              else -> "unknown_${window.type}"
+            }
 
-        val element = extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+        val element =
+            extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
         val optimizedElement = element?.let { optimizeHierarchy(it) }
         val packageName = rootNode.packageName?.toString()
         if (!intentChooserDetected && optimizedElement != null) {
@@ -139,22 +145,23 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         }
 
         // Get window layer for z-ordering
-        val layer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-          window.displayId
-        } else {
-          window.id
-        }
+        val layer =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+              window.displayId
+            } else {
+              window.id
+            }
 
         windowHierarchies.add(
-          WindowHierarchy(
-            windowId = window.id,
-            windowType = windowType,
-            windowLayer = layer,
-            packageName = packageName,
-            isActive = window.isActive,
-            isFocused = window.isFocused,
-            hierarchy = optimizedElement
-          )
+            WindowHierarchy(
+                windowId = window.id,
+                windowType = windowType,
+                windowLayer = layer,
+                packageName = packageName,
+                isActive = window.isActive,
+                isFocused = window.isFocused,
+                hierarchy = optimizedElement,
+            )
         )
       } catch (e: Exception) {
         Log.e(TAG, "Error extracting hierarchy from window ${window.id}", e)
@@ -163,7 +170,8 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
 
     // Fallback to activeWindowRoot if no active window found in window list
     if (mainHierarchy == null && activeWindowRoot != null) {
-      val element = extractNodeInfo(activeWindowRoot, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+      val element =
+          extractNodeInfo(activeWindowRoot, 0, textFilter, screenDimensions, dedupeTextContentDesc)
       mainHierarchy = element?.let { optimizeHierarchy(it) }
       mainPackageName = activeWindowRoot.packageName?.toString()
       if (!intentChooserDetected && mainHierarchy != null) {
@@ -171,19 +179,22 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       }
     }
 
-    Log.d(TAG, "Extracted ${windowHierarchies.size} additional window hierarchies (after filtering)")
+    Log.d(
+        TAG,
+        "Extracted ${windowHierarchies.size} additional window hierarchies (after filtering)",
+    )
 
     return ViewHierarchy(
-      packageName = mainPackageName,
-      hierarchy = mainHierarchy,
-      windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null,
-      intentChooserDetected = intentChooserDetected
+        packageName = mainPackageName,
+        hierarchy = mainHierarchy,
+        windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null,
+        intentChooserDetected = intentChooserDetected,
     )
   }
 
   /**
-   * Determines if a window should be skipped based on filtering heuristics.
-   * We skip windows that don't add useful information for UI automation:
+   * Determines if a window should be skipped based on filtering heuristics. We skip windows that
+   * don't add useful information for UI automation:
    * - System windows (status bar, navigation bar)
    * - Input method windows (keyboard)
    * - Tiny windows without actionable content (selection handles)
@@ -226,29 +237,24 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     return false
   }
 
-  /**
-   * Detect intent chooser indicators in an optimized hierarchy.
-   */
+  /** Detect intent chooser indicators in an optimized hierarchy. */
   private fun detectIntentChooserIndicators(element: UIElementInfo): Boolean {
-    val textIndicators = setOf(
-      "Choose an app",
-      "Open with",
-      "Complete action using",
-      "Always",
-      "Just once"
-    )
+    val textIndicators =
+        setOf("Choose an app", "Open with", "Complete action using", "Always", "Just once")
 
-    val classIndicators = listOf(
-      "com.android.internal.app.ChooserActivity",
-      "com.android.internal.app.ResolverActivity"
-    )
+    val classIndicators =
+        listOf(
+            "com.android.internal.app.ChooserActivity",
+            "com.android.internal.app.ResolverActivity",
+        )
 
-    val resourceIdIndicators = listOf(
-      "android:id/button_always",
-      "android:id/button_once",
-      "resolver_list",
-      "chooser_list"
-    )
+    val resourceIdIndicators =
+        listOf(
+            "android:id/button_always",
+            "android:id/button_once",
+            "resolver_list",
+            "chooser_list",
+        )
 
     val nodeText = element.text ?: element.contentDesc ?: ""
     if (textIndicators.contains(nodeText)) {
@@ -279,16 +285,18 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   }
 
   /**
-   * Checks if a hierarchy contains actionable content worth including.
-   * Actionable content = clickable elements with text or content-desc.
+   * Checks if a hierarchy contains actionable content worth including. Actionable content =
+   * clickable elements with text or content-desc.
    */
   private fun hasActionableContent(element: UIElementInfo): Boolean {
     // Check if this element is actionable
     if (element.isClickable || element.isLongClickable) {
       // Has meaningful identifier?
-      if (!element.text.isNullOrBlank() ||
-          !element.contentDesc.isNullOrBlank() ||
-          !element.resourceId.isNullOrBlank()) {
+      if (
+          !element.text.isNullOrBlank() ||
+              !element.contentDesc.isNullOrBlank() ||
+              !element.resourceId.isNullOrBlank()
+      ) {
         return true
       }
     }
@@ -298,9 +306,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     return hasActionableContentInNode(nodeElement)
   }
 
-  /**
-   * Recursively checks if a node JsonElement contains actionable content.
-   */
+  /** Recursively checks if a node JsonElement contains actionable content. */
   private fun hasActionableContentInNode(nodeElement: JsonElement): Boolean {
     return when {
       nodeElement is JsonObject -> {
@@ -326,7 +332,9 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   }
 
   /**
-   * Recursively extracts node information with depth limiting, offscreen filtering, and zero-area filtering.
+   * Recursively extracts node information with depth limiting, offscreen filtering, and zero-area
+   * filtering.
+   *
    * @param node The accessibility node to extract
    * @param depth Current recursion depth
    * @param textFilter Optional text filter
@@ -338,7 +346,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       depth: Int,
       textFilter: String? = null,
       screenDimensions: ScreenDimensions? = null,
-      dedupeTextContentDesc: Boolean = true
+      dedupeTextContentDesc: Boolean = true,
   ): UIElementInfo? {
     if (depth > MAX_DEPTH) {
       return null
@@ -367,7 +375,8 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       for (i in 0 until childCount) {
         val child = node.getChild(i)
         if (child != null) {
-          val childInfo = extractNodeInfo(child, depth + 1, textFilter, screenDimensions, dedupeTextContentDesc)
+          val childInfo =
+              extractNodeInfo(child, depth + 1, textFilter, screenDimensions, dedupeTextContentDesc)
           if (childInfo != null) {
             children.add(childInfo)
           }
@@ -514,15 +523,18 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
 
       // Dedupe content-desc when it equals text (keep text, omit content-desc)
       val rawContentDesc = node.contentDescription?.toString()
-      val contentDesc = if (dedupeTextContentDesc && rawContentDesc == text) {
-        null
-      } else {
-        rawContentDesc
-      }
+      val contentDesc =
+          if (dedupeTextContentDesc && rawContentDesc == text) {
+            null
+          } else {
+            rawContentDesc
+          }
 
       val recompositionEntry =
-          if (recompositionStore?.isEnabled() == true &&
-              recompositionStore.isForPackage(node.packageName?.toString())) {
+          if (
+              recompositionStore?.isEnabled() == true &&
+                  recompositionStore.isForPackage(node.packageName?.toString())
+          ) {
             recompositionStore.findMatch(extrasMap)
           } else {
             null
@@ -577,12 +589,14 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
 
   /** Processes the hierarchy to add accessibility information (z-index analysis) */
   private fun processForAccessibility(element: UIElementInfo): UIElementInfo {
-    return if (element.isClickable ||
-        element.isLongClickable ||
-        element.isCheckable ||
-        element.isSelected ||
-        element.isScrollable ||
-        element.isFocusable) {
+    return if (
+        element.isClickable ||
+            element.isLongClickable ||
+            element.isCheckable ||
+            element.isSelected ||
+            element.isScrollable ||
+            element.isFocusable
+    ) {
       val accessibilityScore = calculateAccessibilityScore(element)
       element.copy(accessible = accessibilityScore)
     } else {
@@ -638,7 +652,9 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
 
     val score = accessibleArea.toDouble() / totalArea.toDouble()
     return max(
-        0.0, min(1.0, kotlin.math.round(score * 1000.0) / 1000.0)) // Round to 3 decimal places
+        0.0,
+        min(1.0, kotlin.math.round(score * 1000.0) / 1000.0),
+    ) // Round to 3 decimal places
   }
 
   /** Calculate area covered by overlapping elements */
@@ -742,7 +758,8 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             "androidx.compose.ui.semantics.TestTag",
             "androidx.compose.ui.testTag",
             "testTag",
-            "test-tag")
+            "test-tag",
+        )
 
     for (key in candidates) {
       val value = extras[key]
@@ -786,7 +803,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             !element.collectionInfo.isNullOrBlank() ||
             !element.collectionItemInfo.isNullOrBlank() ||
             !element.rangeInfo.isNullOrBlank() ||
-        !element.inputType.isNullOrBlank() ||
+            !element.inputType.isNullOrBlank() ||
             !element.actions.isNullOrEmpty() ||
             !element.extras.isNullOrEmpty()
 
@@ -828,9 +845,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     return element.copy(node = optimizedNode)
   }
 
-  /**
-   * Recursively optimize node children (handles both single element and array).
-   */
+  /** Recursively optimize node children (handles both single element and array). */
   private fun optimizeNode(nodeElement: JsonElement): JsonElement? {
     return when {
       nodeElement is JsonObject -> {
@@ -843,15 +858,16 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         }
       }
       nodeElement is JsonArray -> {
-        val optimizedChildren = nodeElement.jsonArray.mapNotNull { childJson ->
-          try {
-            val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
-            val optimized = optimizeHierarchy(child)
-            optimized?.let { json.encodeToJsonElement(UIElementInfo.serializer(), it) }
-          } catch (e: Exception) {
-            childJson
-          }
-        }
+        val optimizedChildren =
+            nodeElement.jsonArray.mapNotNull { childJson ->
+              try {
+                val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+                val optimized = optimizeHierarchy(child)
+                optimized?.let { json.encodeToJsonElement(UIElementInfo.serializer(), it) }
+              } catch (e: Exception) {
+                childJson
+              }
+            }
         when {
           optimizedChildren.isEmpty() -> null
           optimizedChildren.size == 1 -> optimizedChildren[0]
@@ -863,8 +879,8 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   }
 
   /**
-   * Extract single child from a node JsonElement.
-   * Returns the child if there's exactly one, null otherwise.
+   * Extract single child from a node JsonElement. Returns the child if there's exactly one, null
+   * otherwise.
    */
   private fun extractSingleChild(nodeElement: JsonElement): UIElementInfo? {
     return when {

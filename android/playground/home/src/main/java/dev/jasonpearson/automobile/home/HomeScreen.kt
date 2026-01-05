@@ -29,8 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
 import dev.jasonpearson.automobile.discover.DiscoverVideoScreen
-import dev.jasonpearson.automobile.settings.SettingsScreen
 import dev.jasonpearson.automobile.sdk.TrackRecomposition
+import dev.jasonpearson.automobile.settings.SettingsScreen
 import dev.jasonpearson.automobile.storage.AnalyticsTracker
 
 data class BottomNavItem(val label: String, val icon: ImageVector, val route: String)
@@ -43,19 +43,20 @@ fun HomeScreen(
     onNavigateToVideoPlayer: (String) -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
     onLogout: () -> Unit = {},
-    onGuestModeNavigateToLogin: () -> Unit = {}
+    onGuestModeNavigateToLogin: () -> Unit = {},
 ) {
   TrackRecomposition(id = "screen.home", composableName = "HomeScreen") {
-  var bottomNavSelection by remember { mutableIntStateOf(initialSelectedTab) }
-  HomeScreenCore(
-      modifier = modifier,
-      bottomNavSelected = bottomNavSelection,
-      setBottomNavSelection = { bottomNavSelection = it },
-      initialSelectedSubTab = initialSelectedSubTab,
-      onNavigateToVideoPlayer = onNavigateToVideoPlayer,
-      onNavigateToSlides = onNavigateToSlides,
-      onLogout = onLogout,
-      onGuestModeNavigateToLogin = onGuestModeNavigateToLogin)
+    var bottomNavSelection by remember { mutableIntStateOf(initialSelectedTab) }
+    HomeScreenCore(
+        modifier = modifier,
+        bottomNavSelected = bottomNavSelection,
+        setBottomNavSelection = { bottomNavSelection = it },
+        initialSelectedSubTab = initialSelectedSubTab,
+        onNavigateToVideoPlayer = onNavigateToVideoPlayer,
+        onNavigateToSlides = onNavigateToSlides,
+        onLogout = onLogout,
+        onGuestModeNavigateToLogin = onGuestModeNavigateToLogin,
+    )
   }
 }
 
@@ -68,7 +69,7 @@ fun HomeScreenCore(
     onNavigateToVideoPlayer: (String) -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
     onLogout: () -> Unit = {},
-    onGuestModeNavigateToLogin: () -> Unit = {}
+    onGuestModeNavigateToLogin: () -> Unit = {},
 ) {
   val context = LocalContext.current
   val analyticsTracker = remember { AnalyticsTracker.getInstance().apply { initialize(context) } }
@@ -77,7 +78,8 @@ fun HomeScreenCore(
       listOf(
           BottomNavItem("Discover", Icons.Filled.Search, "discover"),
           BottomNavItem("Slides", Icons.Filled.Slideshow, "slides"),
-          BottomNavItem("Settings", Icons.Filled.Settings, "settings"))
+          BottomNavItem("Settings", Icons.Filled.Settings, "settings"),
+      )
 
   // Track screen view when tab changes
   LaunchedEffect(bottomNavSelected) {
@@ -102,37 +104,44 @@ fun HomeScreenCore(
                   }
                 },
                 icon = { Icon(item.icon, contentDescription = item.label) },
-                label = { Text(item.label) })
+                label = { Text(item.label) },
+            )
           }
         }
       },
-      modifier = modifier) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-          when (bottomNavSelected) {
-            0 ->
-                DiscoverVideoScreen(
-                    onNavigateToVideoPlayer = onNavigateToVideoPlayer,
-                    initialSelectedSubTab = initialSelectedSubTab)
-            1 -> {
-              // Slides handled by navigation - this case shouldn't be reached
-              // since we navigate away when slides is selected
-            }
-            2 ->
-                SettingsScreen(
-                    onLogout = onLogout, onGuestModeNavigateToLogin = onGuestModeNavigateToLogin)
-          }
+      modifier = modifier,
+  ) { paddingValues ->
+    Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+      when (bottomNavSelected) {
+        0 ->
+            DiscoverVideoScreen(
+                onNavigateToVideoPlayer = onNavigateToVideoPlayer,
+                initialSelectedSubTab = initialSelectedSubTab,
+            )
+        1 -> {
+          // Slides handled by navigation - this case shouldn't be reached
+          // since we navigate away when slides is selected
         }
+        2 ->
+            SettingsScreen(
+                onLogout = onLogout,
+                onGuestModeNavigateToLogin = onGuestModeNavigateToLogin,
+            )
       }
+    }
+  }
 }
 
 @Preview(
     name = "Home - Tap - Keyboard Open",
     showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_NO)
+    uiMode = Configuration.UI_MODE_NIGHT_NO,
+)
 @Preview(
     name = "Home - Tap - Keyboard Open - Dark",
     showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_YES)
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun HomeScreenTapPreview() {
 
@@ -148,11 +157,13 @@ fun HomeScreenTapPreview() {
 @Preview(
     name = "Home - Settings - Keyboard Open",
     showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_NO)
+    uiMode = Configuration.UI_MODE_NIGHT_NO,
+)
 @Preview(
     name = "Home - Settings - Keyboard Open - Dark",
     showBackground = true,
-    uiMode = Configuration.UI_MODE_NIGHT_YES)
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun HomeScreenSettingsPreview() {
 

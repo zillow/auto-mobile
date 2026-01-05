@@ -19,7 +19,7 @@ package dev.jasonpearson.automobile.junit
  */
 class AutoMobilePlan(
     private val planPath: String,
-    private val parameters: ParameterBuilder.() -> Unit = {}
+    private val parameters: ParameterBuilder.() -> Unit = {},
 ) {
 
   private val parameterMap = mutableMapOf<String, Any>()

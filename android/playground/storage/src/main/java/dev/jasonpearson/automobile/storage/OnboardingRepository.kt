@@ -7,7 +7,7 @@ import androidx.core.content.edit
 data class OnboardingRecord(
     val hasCompletedOnboarding: Boolean,
     val completedSteps: List<String>,
-    val lastStepCompleted: String?
+    val lastStepCompleted: String?,
 )
 
 class OnboardingRepository(context: Context) {
@@ -26,7 +26,8 @@ class OnboardingRepository(context: Context) {
     return OnboardingRecord(
         hasCompletedOnboarding = hasCompletedOnboarding,
         completedSteps = completedSteps,
-        lastStepCompleted = lastStep)
+        lastStepCompleted = lastStep,
+    )
   }
 
   fun markStepCompleted(stepName: String) {

@@ -18,9 +18,11 @@ fun getIntroductionSlides(): List<SlideContent> =
                 listOf(
                     BulletPoint(text = "Manual"),
                     BulletPoint(text = "Automated"),
-                )),
+                ),
+        ),
         SlideContent.LargeText(
-            title = "AutoMobile is a set of tools for automating mobile engineering"),
+            title = "AutoMobile is a set of tools for automating mobile engineering"
+        ),
         SlideContent.BulletPoints(
             title = "AutoMobile includes:",
             points =
@@ -31,7 +33,8 @@ fun getIntroductionSlides(): List<SlideContent> =
                     BulletPoint("Accessibility service to expose data quickly"),
                     // TODO: Uncomment if koog lands BulletPoint("An agentic loop for intelligently
                     // self-healing tests")
-                )),
+                ),
+        ),
         SlideContent.BulletPoints(
             title = "How does it work?",
             points =
@@ -40,5 +43,6 @@ fun getIntroductionSlides(): List<SlideContent> =
                     BulletPoint(text = "Directly uses Android platform tools"),
                     BulletPoint(text = "Indexes your project source code"),
                     BulletPoint(text = "Can write tests for you"),
-                )),
+                ),
+        ),
     )

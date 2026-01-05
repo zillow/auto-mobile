@@ -35,7 +35,7 @@ internal fun LoginForm(
     usernameBlurred: Boolean,
     passwordBlurred: Boolean,
     onPasswordDone: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   Column(modifier = modifier) {
     OutlinedTextField(
@@ -48,14 +48,17 @@ internal fun LoginForm(
             (usernameHadContent && username.length < 5) ||
                 (usernameBlurred && loginFormState.usernameError != null),
         supportingText = {
-          if ((usernameHadContent && username.length < 5) ||
-              (usernameBlurred && loginFormState.usernameError != null)) {
+          if (
+              (usernameHadContent && username.length < 5) ||
+                  (usernameBlurred && loginFormState.usernameError != null)
+          ) {
             loginFormState.usernameError?.let {
               Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
             }
           }
         },
-        modifier = Modifier.fillMaxWidth())
+        modifier = Modifier.fillMaxWidth(),
+    )
 
     Spacer(modifier = Modifier.height(AutoMobileDimensions.spacing4))
 
@@ -71,20 +74,26 @@ internal fun LoginForm(
             (passwordHadContent && password.length < 5) ||
                 (passwordBlurred && loginFormState.passwordError != null),
         supportingText = {
-          if ((passwordHadContent && password.length < 5) ||
-              (passwordBlurred && loginFormState.passwordError != null)) {
+          if (
+              (passwordHadContent && password.length < 5) ||
+                  (passwordBlurred && loginFormState.passwordError != null)
+          ) {
             loginFormState.passwordError?.let {
               Text(text = stringResource(it), color = MaterialTheme.colorScheme.error)
             }
           }
         },
-        modifier = Modifier.fillMaxWidth())
+        modifier = Modifier.fillMaxWidth(),
+    )
   }
 }
 
 @Preview(name = "Login Form", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(
-    name = "Login Form - Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+    name = "Login Form - Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
 fun LoginFormPreview() {
   AutoMobileTheme {
@@ -99,7 +108,8 @@ fun LoginFormPreview() {
           passwordHadContent = true,
           usernameBlurred = false,
           passwordBlurred = false,
-          onPasswordDone = {})
+          onPasswordDone = {},
+      )
     }
   }
 }

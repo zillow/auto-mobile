@@ -78,7 +78,8 @@ class MainActivity : ComponentActivity() {
             onDeepLinkCallbackSet = { callback ->
               Log.d(TAG, "Deep link callback set")
               deepLinkCallback = callback
-            })
+            },
+        )
       }
     }
   }
@@ -109,7 +110,9 @@ class MainActivity : ComponentActivity() {
               mapOf(
                   "uri" to data.toString(),
                   "destination" to (destinationName ?: "unknown"),
-                  "isNewIntent" to isNewIntent.toString()))
+                  "isNewIntent" to isNewIntent.toString(),
+              ),
+          )
     } else {
       Log.d(TAG, "No valid deep link found, clearing pending deep link")
       // Clear any previous deep link if this isn't a deep link intent

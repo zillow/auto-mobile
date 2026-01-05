@@ -20,7 +20,7 @@ internal object AutoMobilePlanExecutor {
   fun execute(
       planPath: String,
       parameters: Map<String, Any>,
-      options: AutoMobilePlanExecutionOptions
+      options: AutoMobilePlanExecutionOptions,
   ): AutoMobilePlanExecutionResult {
 
     val startTime = System.currentTimeMillis()
@@ -37,7 +37,8 @@ internal object AutoMobilePlanExecutor {
             exitCode = -1,
             errorMessage = "No Android devices available for plan execution",
             executionTimeMs = executionTime,
-            parametersUsed = parameters)
+            parametersUsed = parameters,
+        )
       }
 
       // Load and process the plan with parameter substitution
@@ -62,7 +63,8 @@ internal object AutoMobilePlanExecutor {
           executionTimeMs = executionTime,
           aiRecoveryAttempted = result.aiRecoveryAttempted,
           aiRecoverySuccessful = result.aiRecoverySuccessful,
-          parametersUsed = parameters)
+          parametersUsed = parameters,
+      )
     } catch (e: Exception) {
       val executionTime = System.currentTimeMillis() - startTime
       return AutoMobilePlanExecutionResult(
@@ -70,7 +72,8 @@ internal object AutoMobilePlanExecutor {
           exitCode = -1,
           errorMessage = "Plan execution failed: ${e.message}",
           executionTimeMs = executionTime,
-          parametersUsed = parameters)
+          parametersUsed = parameters,
+      )
     }
   }
 
@@ -118,18 +121,23 @@ internal object AutoMobilePlanExecutor {
 
   private fun executeProcessedPlan(
       planContent: String,
-      options: AutoMobilePlanExecutionOptions
+      options: AutoMobilePlanExecutionOptions,
   ): InternalExecutionResult {
 
     val json = Json { ignoreUnknownKeys = true }
     val sessionUuid = UUID.randomUUID().toString()
 
-    val args = mutableMapOf<String, JsonElement>(
-        "planContent" to JsonPrimitive("base64:" + java.util.Base64.getEncoder().encodeToString(planContent.toByteArray())),
-        "platform" to JsonPrimitive("android"),
-        "startStep" to JsonPrimitive(0),
-        "sessionUuid" to JsonPrimitive(sessionUuid)
-    )
+    val args =
+        mutableMapOf<String, JsonElement>(
+            "planContent" to
+                JsonPrimitive(
+                    "base64:" +
+                        java.util.Base64.getEncoder().encodeToString(planContent.toByteArray())
+                ),
+            "platform" to JsonPrimitive("android"),
+            "startStep" to JsonPrimitive(0),
+            "sessionUuid" to JsonPrimitive(sessionUuid),
+        )
 
     if (options.device != "auto") {
       args["deviceId"] = JsonPrimitive(options.device)
@@ -140,12 +148,14 @@ internal object AutoMobilePlanExecutor {
     }
 
     DaemonHeartbeat.registerSession(sessionUuid)
-    val response = try {
-      DaemonSocketClientManager.callTool("executePlan", JsonObject(args), options.timeoutMs)
-    } finally {
-      DaemonHeartbeat.unregisterSession(sessionUuid)
-    }
-    val outputPayload = response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
+    val response =
+        try {
+          DaemonSocketClientManager.callTool("executePlan", JsonObject(args), options.timeoutMs)
+        } finally {
+          DaemonHeartbeat.unregisterSession(sessionUuid)
+        }
+    val outputPayload =
+        response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
     val parsed = parseDaemonToolResult(response, json)
 
     if (options.debugMode) {
@@ -158,9 +168,7 @@ internal object AutoMobilePlanExecutor {
     return if (response.success && parsed.success) {
       InternalExecutionResult(success = true, exitCode = 0, output = outputPayload)
     } else {
-      handleFailure(
-          CommandResult(1, outputPayload, response.error ?: parsed.errorMessage),
-          options)
+      handleFailure(CommandResult(1, outputPayload, response.error ?: parsed.errorMessage), options)
     }
   }
 
@@ -169,7 +177,8 @@ internal object AutoMobilePlanExecutor {
       return ParsedToolResult(false, response.error ?: "Daemon returned failure")
     }
 
-    val resultElement = response.result ?: return ParsedToolResult(false, "Daemon returned empty result")
+    val resultElement =
+        response.result ?: return ParsedToolResult(false, "Daemon returned empty result")
     val resultObject = resultElement.jsonObject
     val contentArray = resultObject["content"]
     if (contentArray is JsonArray && contentArray.isNotEmpty()) {
@@ -194,7 +203,7 @@ internal object AutoMobilePlanExecutor {
 
   private fun handleFailure(
       result: CommandResult,
-      options: AutoMobilePlanExecutionOptions
+      options: AutoMobilePlanExecutionOptions,
   ): InternalExecutionResult {
 
     val ciMode = System.getProperty("automobile.ci.mode", "false").toBoolean()
@@ -205,7 +214,8 @@ internal object AutoMobilePlanExecutor {
           output = result.output,
           errorMessage =
               "AutoMobile plan execution failed with exit code ${result.exitCode}" +
-                  if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else "")
+                  if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else "",
+      )
     }
 
     // TODO: Implement AI recovery similar to AutoMobileRunner
@@ -219,7 +229,8 @@ internal object AutoMobilePlanExecutor {
             "AutoMobile plan execution failed with exit code ${result.exitCode}" +
                 if (result.errorOutput.isNotEmpty()) "\nErrors: ${result.errorOutput}" else "",
         aiRecoveryAttempted = false,
-        aiRecoverySuccessful = false)
+        aiRecoverySuccessful = false,
+    )
   }
 
   private data class InternalExecutionResult(
@@ -228,11 +239,8 @@ internal object AutoMobilePlanExecutor {
       val output: String = "",
       val errorMessage: String = "",
       val aiRecoveryAttempted: Boolean = false,
-      val aiRecoverySuccessful: Boolean = false
+      val aiRecoverySuccessful: Boolean = false,
   )
 
-  private data class ParsedToolResult(
-      val success: Boolean,
-      val errorMessage: String
-  )
+  private data class ParsedToolResult(val success: Boolean, val errorMessage: String)
 }

@@ -7,53 +7,53 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 class RecompositionStore {
-    private val entriesById = ConcurrentHashMap<String, RecompositionEntry>()
-    private val enabled = AtomicBoolean(false)
-    private val lastUpdatedAt = AtomicLong(0)
-    private var lastApplicationId: String? = null
+  private val entriesById = ConcurrentHashMap<String, RecompositionEntry>()
+  private val enabled = AtomicBoolean(false)
+  private val lastUpdatedAt = AtomicLong(0)
+  private var lastApplicationId: String? = null
 
-    fun setEnabled(isEnabled: Boolean) {
-        enabled.set(isEnabled)
-        if (!isEnabled) {
-            clear()
-        }
+  fun setEnabled(isEnabled: Boolean) {
+    enabled.set(isEnabled)
+    if (!isEnabled) {
+      clear()
+    }
+  }
+
+  fun isEnabled(): Boolean = enabled.get()
+
+  fun updateSnapshot(snapshot: RecompositionSnapshot) {
+    if (!enabled.get()) {
+      return
     }
 
-    fun isEnabled(): Boolean = enabled.get()
+    lastApplicationId = snapshot.applicationId
+    lastUpdatedAt.set(snapshot.timestamp)
+    entriesById.clear()
 
-    fun updateSnapshot(snapshot: RecompositionSnapshot) {
-        if (!enabled.get()) {
-            return
-        }
+    snapshot.entries.forEach { entry -> entriesById[entry.id] = entry }
+  }
 
-        lastApplicationId = snapshot.applicationId
-        lastUpdatedAt.set(snapshot.timestamp)
-        entriesById.clear()
+  fun isForPackage(packageName: String?): Boolean {
+    return packageName != null && packageName == lastApplicationId
+  }
 
-        snapshot.entries.forEach { entry ->
-            entriesById[entry.id] = entry
-        }
+  fun findMatch(extras: Map<String, String>?): RecompositionEntry? {
+    extras?.get(RECOMPOSITION_ID_KEY)?.let { id ->
+      entriesById[id]?.let {
+        return it
+      }
     }
 
-    fun isForPackage(packageName: String?): Boolean {
-        return packageName != null && packageName == lastApplicationId
-    }
+    return null
+  }
 
-    fun findMatch(extras: Map<String, String>?): RecompositionEntry? {
-        extras?.get(RECOMPOSITION_ID_KEY)?.let { id ->
-            entriesById[id]?.let { return it }
-        }
+  private fun clear() {
+    entriesById.clear()
+    lastUpdatedAt.set(0)
+    lastApplicationId = null
+  }
 
-        return null
-    }
-
-    private fun clear() {
-        entriesById.clear()
-        lastUpdatedAt.set(0)
-        lastApplicationId = null
-    }
-
-    companion object {
-        const val RECOMPOSITION_ID_KEY = "auto-mobile-recomposition-id"
-    }
+  companion object {
+    const val RECOMPOSITION_ID_KEY = "auto-mobile-recomposition-id"
+  }
 }
