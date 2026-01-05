@@ -32,6 +32,7 @@ data class WebSocketRequest(
     val x2: Int? = null,
     val y2: Int? = null,
     val duration: Long? = null,
+    val holdTime: Long? = null,
     // Text input parameters
     val text: String? = null,
     val resourceId: String? = null, // Optional: target specific element by resource-id
@@ -57,6 +58,9 @@ class WebSocketServer(
     private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
     private val onRequestSwipe:
         ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? =
+        null,
+    private val onRequestDrag:
+        ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, holdTime: Long) -> Unit)? =
         null,
     private val onRequestSetText:
         ((requestId: String?, text: String, resourceId: String?) -> Unit)? =
@@ -299,6 +303,20 @@ class WebSocketServer(
             onRequestSwipe?.invoke(request.requestId, x1, y1, x2, y2, duration)
           } else {
             Log.w(TAG, "Swipe request missing required coordinates")
+          }
+        }
+        "request_drag" -> {
+          Log.d(TAG, "Received drag request (requestId: ${request.requestId})")
+          val x1 = request.x1
+          val y1 = request.y1
+          val x2 = request.x2
+          val y2 = request.y2
+          val duration = request.duration ?: 500L
+          val holdTime = request.holdTime ?: 200L
+          if (x1 != null && y1 != null && x2 != null && y2 != null) {
+            onRequestDrag?.invoke(request.requestId, x1, y1, x2, y2, duration, holdTime)
+          } else {
+            Log.w(TAG, "Drag request missing required coordinates")
           }
         }
         "request_set_text" -> {

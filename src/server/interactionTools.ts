@@ -5,6 +5,7 @@ import { InputText } from "../features/action/InputText";
 import { ClearText } from "../features/action/ClearText";
 import { SelectAllText } from "../features/action/SelectAllText";
 import { PressButton } from "../features/action/PressButton";
+import { DragAndDrop } from "../features/action/DragAndDrop";
 import { SwipeOn } from "../features/action/SwipeOn";
 import { Shake } from "../features/action/Shake";
 import { ImeAction } from "../features/action/ImeAction";
@@ -76,6 +77,21 @@ export interface TapOnArgs {
     };
     timeout?: number;
   };
+  platform: Platform;
+}
+
+export interface DragAndDropArgs {
+  source: {
+    text?: string;
+    elementId?: string;
+  };
+  target: {
+    text?: string;
+    elementId?: string;
+  };
+  duration?: number;
+  holdTime?: number;
+  dropDelay?: number;
   platform: Platform;
 }
 
@@ -154,16 +170,20 @@ export const tapOnSchema = z.object({
 });
 
 export const dragAndDropSchema = z.object({
-  from: z.object({
-    index: z.number().describe("Index of the source element to drag"),
-    text: z.string().optional().describe("Optional text for validation and debugging")
+  source: z.object({
+    text: z.string().optional().describe("Text of the source element to drag"),
+    elementId: z.string().optional().describe("Element ID of the source element to drag")
   }).describe("Source element to drag from"),
-  to: z.object({
-    index: z.number().describe("Index of the destination element to drop to"),
-    text: z.string().optional().describe("Optional text for validation and debugging")
-  }).describe("Destination element to drop to"),
+  target: z.object({
+    text: z.string().optional().describe("Text of the target element to drop onto"),
+    elementId: z.string().optional().describe("Element ID of the target element to drop onto")
+  }).describe("Target element to drop onto"),
   duration: z.number().optional().describe("Duration of the drag in milliseconds (default: 500)"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  holdTime: z.number().optional().describe("Hold time before dragging in milliseconds (default: 200)"),
+  dropDelay: z.number().optional().describe("Delay after dropping in milliseconds (default: 100)"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
 });
 
 export const swipeOnSchema = z.object({
@@ -443,6 +463,25 @@ export function registerInteractionTools() {
 
     return createJSONToolResponse({
       message: `Tapped on element`,
+      observation: result.observation,
+      ...result
+    });
+  };
+
+  // Drag and drop handler
+  const dragAndDropHandler = async (device: BootedDevice, args: DragAndDropArgs, progress?: ProgressCallback) => {
+    RecompositionTracker.getInstance().recordInteraction();
+    const dragAndDrop = new DragAndDrop(device);
+    const result = await dragAndDrop.execute({
+      source: args.source,
+      target: args.target,
+      duration: args.duration,
+      holdTime: args.holdTime,
+      dropDelay: args.dropDelay
+    }, progress);
+
+    return createJSONToolResponse({
+      message: "Dragged element to target",
       observation: result.observation,
       ...result
     });
@@ -791,6 +830,14 @@ export function registerInteractionTools() {
     "Tap supporting text or resourceId",
     tapOnSchema,
     tapOnHandler,
+    true // Supports progress notifications
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "dragAndDrop",
+    "Drag an element and drop it onto another element",
+    dragAndDropSchema,
+    dragAndDropHandler,
     true // Supports progress notifications
   );
 
