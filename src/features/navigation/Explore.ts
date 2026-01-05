@@ -4,7 +4,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { logger } from "../../utils/logger";
-import { NavigationGraphManager } from "./NavigationGraphManager";
+import { NavigationGraphManager, type NavigationEdge } from "./NavigationGraphManager";
 import { ExportedGraph } from "../../utils/interfaces/NavigationGraph";
 import { TapOnElement } from "../action/TapOnElement";
 import { SwipeOnElement } from "../action/SwipeOnElement";
@@ -46,6 +46,9 @@ export interface ExploreOptions {
 
   /** Package name to limit exploration to */
   packageName?: string;
+
+  /** Dry run mode (no interactions performed) */
+  dryRun?: boolean;
 }
 
 /**
@@ -83,6 +86,41 @@ export interface ExploreResult {
   durationMs: number;
   stopReason?: string;
 }
+
+export interface PlannedInteraction {
+  order: number;
+  action: "tapOn" | "swipeOn";
+  target: {
+    type: "text" | "id" | "coordinates";
+    value: string;
+  };
+  reason: string;
+  predictedOutcome: {
+    screen: string;
+    confidence: number;
+  };
+  whitelistStatus: "allowed" | "blocked" | "unknown";
+}
+
+export interface ExploreDryRunResult {
+  success: true;
+  dryRun: true;
+  currentScreen: {
+    name: string;
+    interactableElements: number;
+  };
+  plannedInteractions: PlannedInteraction[];
+  estimatedCoverage: {
+    screensToVisit: string[];
+    newScreensExpected: number;
+    existingScreensToRevisit: number;
+  };
+  warnings: string[];
+  observation?: ObserveResult;
+  durationMs: number;
+}
+
+export type ExploreExecutionResult = ExploreResult | ExploreDryRunResult;
 
 /**
  * Tracked element interaction state
@@ -144,12 +182,16 @@ export class Explore extends BaseVisualChange {
     options: ExploreOptions = {},
     progress?: ProgressCallback,
     signal?: AbortSignal
-  ): Promise<ExploreResult> {
+  ): Promise<ExploreExecutionResult> {
     const perf = createGlobalPerformanceTracker();
     perf.serial("explore");
     const startTime = Date.now();
 
     try {
+      if (options.dryRun) {
+        return await this.executeDryRun(options, progress, signal, perf, startTime);
+      }
+
       // Set defaults
       const maxInteractions = options.maxInteractions ?? Explore.DEFAULT_MAX_INTERACTIONS;
       const timeoutMs = options.timeoutMs ?? Explore.DEFAULT_TIMEOUT_MS;
@@ -318,6 +360,127 @@ export class Explore extends BaseVisualChange {
       perf.end();
       throw new ActionableError(`Failed to execute exploration: ${error}`);
     }
+  }
+
+  private async executeDryRun(
+    options: ExploreOptions,
+    progress: ProgressCallback | undefined,
+    signal: AbortSignal | undefined,
+    perf: PerformanceTracker,
+    startTime: number
+  ): Promise<ExploreDryRunResult> {
+    const strategy = options.strategy ?? "weighted";
+    const mode = options.mode ?? "hybrid";
+    const maxInteractions = options.maxInteractions ?? Explore.DEFAULT_MAX_INTERACTIONS;
+
+    if (progress) {
+      await progress(0, maxInteractions, "Starting exploration dry run...");
+    }
+
+    this.exploredElements.clear();
+    this.elementSelections = [];
+    this.explorationPath = [];
+    this.interactionCount = 0;
+    this.stopReason = "";
+    this.previousScreen = null;
+    this.consecutiveOutOfAppCount = 0;
+    this.targetPackageName = options.packageName?.trim() || null;
+
+    const warnings: string[] = [];
+
+    const observation = await this.observeScreen.execute(undefined, perf, true, 0, signal);
+    const viewHierarchy = observation.viewHierarchy;
+    if (!viewHierarchy || viewHierarchy.hierarchy.error) {
+      warnings.push("Unable to inspect view hierarchy for dry run planning.");
+      return {
+        success: true,
+        dryRun: true,
+        currentScreen: {
+          name: "unknown",
+          interactableElements: 0
+        },
+        plannedInteractions: [],
+        estimatedCoverage: {
+          screensToVisit: [],
+          newScreensExpected: 0,
+          existingScreensToRevisit: 0
+        },
+        warnings,
+        observation,
+        durationMs: Date.now() - startTime
+      };
+    }
+
+    const currentPackage = this.getObservationPackageName(observation);
+    if (this.targetPackageName && currentPackage && this.targetPackageName !== currentPackage) {
+      warnings.push(
+        `Foreground package '${currentPackage}' does not match target '${this.targetPackageName}'.`
+      );
+    }
+
+    const currentScreen = this.navigationManager.getCurrentScreen() ?? "unknown";
+    const edges =
+      currentScreen !== "unknown"
+        ? await this.navigationManager.getEdgesFrom(currentScreen)
+        : [];
+
+    const navigationElements = this.extractNavigationElements(viewHierarchy);
+    const scrollableContainers = this.extractScrollableContainers(viewHierarchy);
+    const allCandidates = [...navigationElements, ...scrollableContainers];
+
+    if (allCandidates.length === 0) {
+      warnings.push("No interactable elements were detected on the current screen.");
+    }
+
+    const scored = this.rankElementsForDryRun(allCandidates, strategy, mode);
+    const plannedInteractions = scored.slice(0, maxInteractions).map((entry, index) => {
+      const target = this.getElementTarget(entry.element);
+      const predictedOutcome = this.predictOutcomeForElement(entry.element, edges);
+
+      return {
+        order: index + 1,
+        action: entry.action,
+        target,
+        reason: entry.reason,
+        predictedOutcome,
+        whitelistStatus: entry.whitelistStatus
+      };
+    });
+
+    const predictedScreens = plannedInteractions
+      .map(interaction => interaction.predictedOutcome.screen)
+      .filter(screen => screen && screen !== "unknown");
+    const uniqueScreens = Array.from(new Set(predictedScreens));
+    const knownScreens = await this.navigationManager.getKnownScreens();
+    const knownScreenSet = new Set(knownScreens);
+
+    const newScreensExpected = uniqueScreens.filter(screen => !knownScreenSet.has(screen)).length;
+    const existingScreensToRevisit = uniqueScreens.filter(screen => knownScreenSet.has(screen)).length;
+
+    if (currentScreen === "unknown") {
+      warnings.push("Current screen is unknown; outcome predictions may be limited.");
+    } else if (edges.length === 0) {
+      warnings.push("No navigation edges recorded for the current screen.");
+    }
+
+    perf.end();
+    return {
+      success: true,
+      dryRun: true,
+      currentScreen: {
+        name: currentScreen,
+        interactableElements: allCandidates.length
+      },
+      plannedInteractions,
+      estimatedCoverage: {
+        screensToVisit: uniqueScreens,
+        newScreensExpected,
+        existingScreensToRevisit
+      },
+      warnings,
+      observation,
+      durationMs: Date.now() - startTime
+    };
   }
 
   /**
@@ -782,6 +945,191 @@ export class Explore extends BaseVisualChange {
     });
 
     return selected.element;
+  }
+
+  private rankElementsForDryRun(
+    elements: Element[],
+    strategy: ExplorationStrategy,
+    mode: ExplorationMode
+  ): Array<{
+    element: Element;
+    score: number;
+    reason: string;
+    action: "tapOn" | "swipeOn";
+    whitelistStatus: "allowed" | "blocked" | "unknown";
+  }> {
+    const scored = elements.map(element => {
+      const navScore = this.calculateNavigationScore(element);
+      const novelty = this.calculateNoveltyScore(element);
+      const coverage = this.estimateCoverageGain(element);
+      const isScrollable = element.scrollable === true || (element.scrollable as any) === "true";
+
+      let score = navScore;
+      let reason = `Navigation score ${navScore.toFixed(1)}`;
+
+      if (strategy === "weighted") {
+        if (mode === "discover") {
+          score = navScore * 0.3 + novelty * 0.4 + coverage * 0.3;
+        } else if (mode === "validate") {
+          score = navScore * 0.5 + (10 - novelty) * 0.3 + coverage * 0.2;
+        } else {
+          score = navScore * 0.4 + novelty * 0.4 + coverage * 0.2;
+        }
+        reason =
+          `Weighted score ${score.toFixed(2)} ` +
+          `(nav=${navScore.toFixed(1)}, novelty=${novelty.toFixed(1)}, coverage=${coverage.toFixed(1)})`;
+      } else if (strategy === "depth-first") {
+        reason = `Depth-first preference with score ${score.toFixed(1)}`;
+      } else {
+        reason = `Breadth-first priority with score ${score.toFixed(1)}`;
+      }
+
+      return {
+        element,
+        score,
+        reason,
+        action: isScrollable ? "swipeOn" : "tapOn",
+        whitelistStatus: "unknown"
+      };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored;
+  }
+
+  private getElementTarget(element: Element): PlannedInteraction["target"] {
+    if (element.text) {
+      return { type: "text", value: element.text };
+    }
+    if (element["content-desc"]) {
+      return { type: "text", value: element["content-desc"] };
+    }
+    if (element["resource-id"]) {
+      return { type: "id", value: element["resource-id"] };
+    }
+    if (element.bounds) {
+      const x = Math.round((element.bounds.left + element.bounds.right) / 2);
+      const y = Math.round((element.bounds.top + element.bounds.bottom) / 2);
+      return { type: "coordinates", value: `${x},${y}` };
+    }
+    return { type: "coordinates", value: "0,0" };
+  }
+
+  private predictOutcomeForElement(
+    element: Element,
+    edges: NavigationEdge[]
+  ): PlannedInteraction["predictedOutcome"] {
+    if (edges.length === 0) {
+      return { screen: "unknown", confidence: 0 };
+    }
+
+    let bestScore = 0;
+    let bestScreen = "unknown";
+
+    for (const edge of edges) {
+      const score = this.scoreEdgeMatch(element, edge);
+      if (score > bestScore) {
+        bestScore = score;
+        bestScreen = edge.to;
+      }
+    }
+
+    if (bestScore <= 0) {
+      return { screen: "unknown", confidence: 0 };
+    }
+
+    return { screen: bestScreen, confidence: Math.round(bestScore * 100) / 100 };
+  }
+
+  private scoreEdgeMatch(element: Element, edge: NavigationEdge): number {
+    const uiState = edge.uiState || edge.interaction?.uiState;
+    if (!uiState) {
+      return 0;
+    }
+
+    let score = 0;
+    for (const selected of uiState.selectedElements ?? []) {
+      score = Math.max(score, this.scoreSelectedElementMatch(element, selected));
+    }
+
+    if (uiState.scrollPosition) {
+      score = Math.max(score, this.scoreScrollPositionMatch(element, uiState.scrollPosition));
+    }
+
+    return score;
+  }
+
+  private scoreSelectedElementMatch(
+    element: Element,
+    selected: { text?: string; resourceId?: string; contentDesc?: string }
+  ): number {
+    let score = 0;
+    score = Math.max(
+      score,
+      this.scoreIdentifierMatch(element["resource-id"], selected.resourceId, 0.95, 0.85)
+    );
+    score = Math.max(score, this.scoreIdentifierMatch(element.text, selected.text, 0.9, 0.7));
+    score = Math.max(
+      score,
+      this.scoreIdentifierMatch(element["content-desc"], selected.contentDesc, 0.85, 0.65)
+    );
+    return score;
+  }
+
+  private scoreScrollPositionMatch(
+    element: Element,
+    scrollPosition: {
+      container?: { text?: string; resourceId?: string; contentDesc?: string };
+      targetElement: { text?: string; resourceId?: string; contentDesc?: string };
+    }
+  ): number {
+    let score = 0;
+    if (scrollPosition.container) {
+      score = Math.max(
+        score,
+        this.scoreIdentifierMatch(element["resource-id"], scrollPosition.container.resourceId, 0.8, 0.7)
+      );
+      score = Math.max(score, this.scoreIdentifierMatch(element.text, scrollPosition.container.text, 0.75, 0.65));
+      score = Math.max(
+        score,
+        this.scoreIdentifierMatch(element["content-desc"], scrollPosition.container.contentDesc, 0.75, 0.65)
+      );
+    }
+
+    score = Math.max(
+      score,
+      this.scoreIdentifierMatch(element["resource-id"], scrollPosition.targetElement.resourceId, 0.8, 0.7)
+    );
+    score = Math.max(score, this.scoreIdentifierMatch(element.text, scrollPosition.targetElement.text, 0.75, 0.65));
+    score = Math.max(
+      score,
+      this.scoreIdentifierMatch(element["content-desc"], scrollPosition.targetElement.contentDesc, 0.75, 0.65)
+    );
+
+    return score;
+  }
+
+  private scoreIdentifierMatch(
+    value: string | undefined,
+    candidate: string | undefined,
+    fullMatchScore: number,
+    partialMatchScore: number
+  ): number {
+    if (!value || !candidate) {
+      return 0;
+    }
+    const normalizedValue = value.trim().toLowerCase();
+    const normalizedCandidate = candidate.trim().toLowerCase();
+    if (normalizedValue === normalizedCandidate) {
+      return fullMatchScore;
+    }
+    if (
+      normalizedValue.includes(normalizedCandidate) ||
+      normalizedCandidate.includes(normalizedValue)
+    ) {
+      return partialMatchScore;
+    }
+    return 0;
   }
 
   /**
