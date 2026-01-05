@@ -124,7 +124,7 @@ class ToolRegistryClass {
         // Excludes app lifecycle tools (launchApp, terminateApp, homeScreen, etc.)
         // as they don't represent replayable in-app navigation paths
         const navigationRelevantTools = [
-          "tapOn", "swipeOn", "dragAndDrop",
+          "tapOn", "swipeOn", "pinchOn", "dragAndDrop",
           "pressButton", "pressKey", "inputText", "clearText", "imeAction"
         ];
         if (navigationRelevantTools.includes(name)) {
@@ -209,7 +209,7 @@ class ToolRegistryClass {
           }
 
           // Update last action timestamp for interaction tools
-          if (["tapOn", "swipeOn", "dragAndDrop", "scroll", "inputText", "clearText", "pressButton"].includes(name)) {
+          if (["tapOn", "swipeOn", "pinchOn", "dragAndDrop", "scroll", "inputText", "clearText", "pressButton"].includes(name)) {
             await updateSessionCache(context, "lastActionTime", Date.now());
           }
         }

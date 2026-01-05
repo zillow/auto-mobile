@@ -265,8 +265,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onRequestSwipe = { requestId, x1, y1, x2, y2, duration ->
                 performSwipe(requestId, x1, y1, x2, y2, duration)
               },
-              onRequestDrag = { requestId, x1, y1, x2, y2, duration, holdTime ->
-                performDrag(requestId, x1, y1, x2, y2, duration, holdTime)
+              onRequestPinch = { requestId, centerX, centerY, distanceStart, distanceEnd, rotationDegrees, duration ->
+                performPinch(requestId, centerX, centerY, distanceStart, distanceEnd, rotationDegrees, duration)
               },
               onRequestSetText = { requestId, text, resourceId ->
                 performSetText(requestId, text, resourceId)
@@ -757,46 +757,62 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
-   * Perform a drag gesture using AccessibilityService's dispatchGesture API.
+   * Perform a pinch gesture using AccessibilityService's dispatchGesture API.
    */
-  private fun performDrag(
+  private fun performPinch(
       requestId: String?,
-      x1: Int,
-      y1: Int,
-      x2: Int,
-      y2: Int,
+      centerX: Int,
+      centerY: Int,
+      distanceStart: Int,
+      distanceEnd: Int,
+      rotationDegrees: Float,
       duration: Long,
-      holdTime: Long,
   ) {
     val startTime = System.currentTimeMillis()
-    Log.d(TAG, "performDrag: ($x1, $y1) -> ($x2, $y2) hold=${holdTime}ms duration=${duration}ms")
-    perfProvider.serial("performDrag")
+    Log.d(
+        TAG,
+        "performPinch: center=($centerX,$centerY) start=$distanceStart end=$distanceEnd rotation=$rotationDegrees duration=${duration}ms",
+    )
+    perfProvider.serial("performPinch")
 
     try {
       perfProvider.startOperation("buildPath")
-      val holdPath =
-          Path().apply {
-            moveTo(x1.toFloat(), y1.toFloat())
-            lineTo(x1.toFloat(), y1.toFloat())
-          }
-      val dragPath =
-          Path().apply {
-            moveTo(x1.toFloat(), y1.toFloat())
-            lineTo(x2.toFloat(), y2.toFloat())
-          }
+      val startRadius = distanceStart / 2f
+      val endRadius = distanceEnd / 2f
+      val startAngle = 0.0
+      val endAngle = Math.toRadians(rotationDegrees.toDouble())
 
-      val holdStroke = GestureDescription.StrokeDescription(holdPath, 0, holdTime, true)
-      val dragStroke = holdStroke.continueStroke(dragPath, 0, duration, false)
+      fun pointAt(radius: Float, angleRad: Double): Pair<Float, Float> {
+        val x = centerX + (radius * kotlin.math.cos(angleRad)).toFloat()
+        val y = centerY + (radius * kotlin.math.sin(angleRad)).toFloat()
+        return x to y
+      }
+
+      val (startX1, startY1) = pointAt(startRadius, startAngle)
+      val (startX2, startY2) = pointAt(startRadius, Math.PI + startAngle)
+      val (endX1, endY1) = pointAt(endRadius, endAngle)
+      val (endX2, endY2) = pointAt(endRadius, Math.PI + endAngle)
+
+      val path1 =
+          Path().apply {
+            moveTo(startX1, startY1)
+            lineTo(endX1, endY1)
+          }
+      val path2 =
+          Path().apply {
+            moveTo(startX2, startY2)
+            lineTo(endX2, endY2)
+          }
 
       val gesture =
           GestureDescription.Builder()
-              .addStroke(holdStroke)
-              .addStroke(dragStroke)
+              .addStroke(GestureDescription.StrokeDescription(path1, 0, duration))
+              .addStroke(GestureDescription.StrokeDescription(path2, 0, duration))
               .build()
       perfProvider.endOperation("buildPath")
 
       val gestureBuiltTime = System.currentTimeMillis()
-      Log.d(TAG, "Drag gesture built in ${gestureBuiltTime - startTime}ms")
+      Log.d(TAG, "Pinch gesture built in ${gestureBuiltTime - startTime}ms")
 
       perfProvider.startOperation("dispatchGesture")
       val dispatched =
@@ -809,9 +825,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                   val completedTime = System.currentTimeMillis()
                   val totalTime = completedTime - startTime
                   val gestureTime = completedTime - gestureBuiltTime
-                  Log.d(TAG, "Drag completed: gesture=${gestureTime}ms, total=${totalTime}ms")
+                  Log.d(TAG, "Pinch completed: gesture=${gestureTime}ms, total=${totalTime}ms")
+
                   serviceScope.launch {
-                    broadcastDragResult(requestId, true, null, totalTime, gestureTime)
+                    broadcastPinchResult(requestId, true, null, totalTime, gestureTime)
                   }
                 }
 
@@ -820,9 +837,16 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                   perfProvider.end()
                   val cancelledTime = System.currentTimeMillis()
                   val totalTime = cancelledTime - startTime
-                  Log.w(TAG, "Drag cancelled after ${totalTime}ms")
+                  Log.w(TAG, "Pinch cancelled after ${totalTime}ms")
+
                   serviceScope.launch {
-                    broadcastDragResult(requestId, false, "Gesture was cancelled", totalTime, null)
+                    broadcastPinchResult(
+                        requestId,
+                        false,
+                        "Gesture was cancelled",
+                        totalTime,
+                        null,
+                    )
                   }
                 }
               },
@@ -833,9 +857,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         perfProvider.endOperation("dispatchGesture")
         perfProvider.end()
         val failTime = System.currentTimeMillis()
-        Log.e(TAG, "Failed to dispatch drag gesture")
+        Log.e(TAG, "Failed to dispatch pinch gesture")
         serviceScope.launch {
-          broadcastDragResult(
+          broadcastPinchResult(
               requestId,
               false,
               "Failed to dispatch gesture",
@@ -847,9 +871,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     } catch (e: Exception) {
       perfProvider.end()
       val errorTime = System.currentTimeMillis()
-      Log.e(TAG, "Error performing drag", e)
+      Log.e(TAG, "Error performing pinch", e)
       serviceScope.launch {
-        broadcastDragResult(requestId, false, e.message, errorTime - startTime, null)
+        broadcastPinchResult(requestId, false, e.message, errorTime - startTime, null)
       }
     }
   }
@@ -1496,8 +1520,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
-  /** Broadcast drag result to WebSocket clients */
-  private suspend fun broadcastDragResult(
+  /** Broadcast pinch result to WebSocket clients */
+  private suspend fun broadcastPinchResult(
       requestId: String?,
       success: Boolean,
       error: String?,
@@ -1505,14 +1529,14 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       gestureTimeMs: Long?,
   ) {
     if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
-      Log.d(TAG, "WebSocket server not running, skipping drag result broadcast")
+      Log.d(TAG, "WebSocket server not running, skipping pinch result broadcast")
       return
     }
 
     try {
       webSocketServer.broadcastWithPerf { perfTiming ->
         buildString {
-          append("""{"type":"drag_result","timestamp":${System.currentTimeMillis()}""")
+          append("""{"type":"pinch_result","timestamp":${System.currentTimeMillis()}""")
           if (requestId != null) {
             append(""","requestId":"$requestId"""")
           }
@@ -1530,9 +1554,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append("}")
         }
       }
-      Log.d(TAG, "Broadcasted drag result to ${webSocketServer.getConnectionCount()} clients")
+      Log.d(TAG, "Broadcasted pinch result to ${webSocketServer.getConnectionCount()} clients")
     } catch (e: Exception) {
-      Log.e(TAG, "Error broadcasting drag result", e)
+      Log.e(TAG, "Error broadcasting pinch result", e)
     }
   }
 

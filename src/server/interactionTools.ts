@@ -7,6 +7,7 @@ import { SelectAllText } from "../features/action/SelectAllText";
 import { PressButton } from "../features/action/PressButton";
 import { DragAndDrop } from "../features/action/DragAndDrop";
 import { SwipeOn } from "../features/action/SwipeOn";
+import { PinchOn } from "../features/action/PinchOn";
 import { Shake } from "../features/action/Shake";
 import { ImeAction } from "../features/action/ImeAction";
 import { RecentApps } from "../features/action/RecentApps";
@@ -109,6 +110,22 @@ export interface SwipeOnArgs {
     text?: string;
   };
   speed?: "slow" | "normal" | "fast";
+  platform: Platform;
+}
+
+export interface PinchOnArgs {
+  direction: "in" | "out";
+  distanceStart?: number;
+  distanceEnd?: number;
+  scale?: number;
+  duration?: number;
+  rotationDegrees?: number;
+  includeSystemInsets?: boolean;
+  container?: {
+    elementId?: string;
+    text?: string;
+  };
+  autoTarget?: boolean;
   platform: Platform;
 }
 
@@ -228,6 +245,24 @@ To see more content ABOVE: use direction "down".`
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   // Framework parameters for device management (optional)
+  sessionUuid: z.string().optional(),
+  deviceId: z.string().optional()
+});
+
+export const pinchOnSchema = z.object({
+  direction: z.enum(["in", "out"]).describe("Pinch direction (in = zoom out, out = zoom in)"),
+  distanceStart: z.number().optional().describe("Starting distance between fingers in pixels"),
+  distanceEnd: z.number().optional().describe("Ending distance between fingers in pixels"),
+  scale: z.number().optional().describe("Scale multiplier applied to distanceStart to compute distanceEnd"),
+  duration: z.number().optional().describe("Gesture duration in milliseconds (default: 300)"),
+  rotationDegrees: z.number().optional().describe("Rotate fingers by degrees during pinch (positive = clockwise)"),
+  includeSystemInsets: z.boolean().optional().describe("Include status/navigation bars in bounds calculation (default false)"),
+  container: z.object({
+    elementId: z.string().optional().describe("Resource ID of the container element to center within"),
+    text: z.string().optional().describe("Text within the container element to center within")
+  }).optional().describe("Container element to pinch within; omit for auto-target or full-screen pinch"),
+  autoTarget: z.boolean().optional().describe("Auto-target a large, tappable surface when container is omitted (default true)"),
+  platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
   deviceId: z.string().optional()
 });
@@ -658,6 +693,47 @@ export function registerInteractionTools() {
     });
   };
 
+  const pinchOnHandler = async (device: BootedDevice, args: PinchOnArgs, progress?: ProgressCallback) => {
+    RecompositionTracker.getInstance().recordInteraction();
+    const pinchOn = new PinchOn(device);
+
+    const options: import("../models").PinchOnOptions = {
+      direction: args.direction,
+      distanceStart: args.distanceStart,
+      distanceEnd: args.distanceEnd,
+      scale: args.scale,
+      duration: args.duration,
+      rotationDegrees: args.rotationDegrees,
+      includeSystemInsets: args.includeSystemInsets,
+      container: args.container,
+      autoTarget: args.autoTarget
+    };
+
+    const result = await pinchOn.execute(options, progress);
+
+    let message = `Pinched ${args.direction}`;
+    if (result.targetType === "container" && result.container?.text) {
+      message = `Pinched ${args.direction} in container with text "${result.container.text}"`;
+    } else if (result.targetType === "container" && result.container?.elementId) {
+      message = `Pinched ${args.direction} in container with id "${result.container.elementId}"`;
+    } else if (result.targetType === "screen") {
+      message = `Pinched ${args.direction} on screen`;
+    }
+
+    if (!result.success && result.error) {
+      message = `Pinch failed: ${result.error}`;
+    }
+
+    if (result.warning) {
+      message = `${message} Warning: ${result.warning}`;
+    }
+
+    return createJSONToolResponse({
+      message,
+      ...result
+    });
+  };
+
   // Press key handler
   const pressKeyHandler = async (device: BootedDevice, args: PressKeyArgs, progress?: ProgressCallback) => {
     RecompositionTracker.getInstance().recordInteraction();
@@ -857,6 +933,14 @@ export function registerInteractionTools() {
     "Unified swipe/scroll tool - swipe on screen or elements, with optional scroll-until-visible. IMPORTANT: use container when scrolling lists; omit only for full-screen swipes.",
     swipeOnSchema,
     swipeOnHandler,
+    true // Supports progress notifications
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "pinchOn",
+    "Pinch to zoom in/out on screen or elements using a multi-touch gesture (requires accessibility service)",
+    pinchOnSchema,
+    pinchOnHandler,
     true // Supports progress notifications
   );
 
