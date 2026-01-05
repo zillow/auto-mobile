@@ -13,10 +13,26 @@ export interface PredictionActionContext {
   toolArgs: Record<string, any>;
 }
 
+export interface PredictionHistoryStore {
+  recordOutcome: PredictionHistoryRepository["recordOutcome"];
+}
+
+export interface NavigationGraphLike {
+  getCurrentScreen(): string | null;
+}
+
 export class PredictionAnalyzer {
   private elementParser = new ElementParser();
-  private historyRepository = new PredictionHistoryRepository();
-  private navigationGraph = NavigationGraphManager.getInstance();
+  private historyRepository: PredictionHistoryStore;
+  private navigationGraph: NavigationGraphLike;
+
+  constructor(
+    historyRepository: PredictionHistoryStore = new PredictionHistoryRepository(),
+    navigationGraph: NavigationGraphLike = NavigationGraphManager.getInstance()
+  ) {
+    this.historyRepository = historyRepository;
+    this.navigationGraph = navigationGraph;
+  }
 
   async recordOutcomeForAction(
     previousObservation: ObserveResult | null,
