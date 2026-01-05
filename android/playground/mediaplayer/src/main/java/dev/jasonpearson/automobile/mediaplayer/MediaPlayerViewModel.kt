@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.delay
@@ -121,11 +120,13 @@ class MediaPlayerViewModel : ViewModel() {
                         override fun onPositionDiscontinuity(
                             oldPosition: Player.PositionInfo,
                             newPosition: Player.PositionInfo,
-                            reason: Int
+                            reason: Int,
                         ) {
                           // Hide controls when user seeks to the beginning
-                          if (reason == Player.DISCONTINUITY_REASON_SEEK &&
-                              newPosition.positionMs <= 100) { // Within 100ms of start
+                          if (
+                              reason == Player.DISCONTINUITY_REASON_SEEK &&
+                                  newPosition.positionMs <= 100
+                          ) { // Within 100ms of start
                             Log.d("MediaPlayerVM", "Rewound to start, hiding controls")
                             _shouldShowControls.value = false
                             // Auto-show controls after delay if playing
@@ -139,7 +140,8 @@ class MediaPlayerViewModel : ViewModel() {
                             //                      }
                           }
                         }
-                      })
+                      }
+                  )
                 } else {
                   Log.e("MediaPlayerVM", "MediaItem is null")
                   _playbackError.value = "No valid media source provided"
@@ -257,8 +259,10 @@ class MediaPlayerViewModel : ViewModel() {
           }
 
           PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> {
-            if (error.cause?.message?.contains("vp9", ignoreCase = true) == true ||
-                error.cause?.message?.contains("webm", ignoreCase = true) == true) {
+            if (
+                error.cause?.message?.contains("vp9", ignoreCase = true) == true ||
+                    error.cause?.message?.contains("webm", ignoreCase = true) == true
+            ) {
               "This video codec (WebM/VP9) is not supported on this device. Please try a different video format."
             } else {
               "Unable to play this media format. Decoder initialization failed."
@@ -276,9 +280,11 @@ class MediaPlayerViewModel : ViewModel() {
           else -> {
             // Check if it's a codec-related error in the cause chain
             val causeMessage = error.cause?.message ?: ""
-            if (causeMessage.contains("codec", ignoreCase = true) ||
-                causeMessage.contains("decoder", ignoreCase = true) ||
-                causeMessage.contains("vp9", ignoreCase = true)) {
+            if (
+                causeMessage.contains("codec", ignoreCase = true) ||
+                    causeMessage.contains("decoder", ignoreCase = true) ||
+                    causeMessage.contains("vp9", ignoreCase = true)
+            ) {
               "Video codec not supported on this device. The video format may not be compatible."
             } else {
               "Playback error occurred: ${error.message ?: "Unknown error"}"

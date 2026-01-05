@@ -14,8 +14,10 @@ fun getDevWorkflowAssistSlides(): List<SlideContent> =
                     BulletPoint(text = "Constantly seeking ways to be more productive"),
                     BulletPoint(
                         text =
-                            "Hope we're always applying all the deep technical knowledge for all the things"),
-                )),
+                            "Hope we're always applying all the deep technical knowledge for all the things"
+                    ),
+                ),
+        ),
         SlideContent.Emoji(
             emoji = PresentationEmoji.NEW_EMPLOYEE,
             caption = "Demo: Onboarding a new dev",

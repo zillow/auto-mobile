@@ -1,8 +1,8 @@
 package dev.jasonpearson.automobile.junit
 
 /**
- * Tracks and logs performance metrics for JUnitRunner operations.
- * Timing output is only printed when automobile.junitrunner.perf.debug=true is set.
+ * Tracks and logs performance metrics for JUnitRunner operations. Timing output is only printed
+ * when automobile.junitrunner.perf.debug=true is set.
  */
 object PerformanceTracker {
   // Phase 5: Lazy evaluation of perf debug mode

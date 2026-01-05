@@ -72,38 +72,40 @@ fun AccessibilityServiceScreen() {
   Column(
       modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(32.dp),
       verticalArrangement = Arrangement.spacedBy(24.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        // Title
-        Text(
-            text = "AutoMobile Accessibility Service",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center)
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    // Title
+    Text(
+        text = "AutoMobile Accessibility Service",
+        fontSize = 20.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+    )
 
-        // Description
-        Text(
-            text =
-                """
-        This service provides view hierarchy extraction capabilities for automated testing.
+    // Description
+    Text(
+        text =
+            """
+            This service provides view hierarchy extraction capabilities for automated testing.
 
-        To use this service:
-        1. Enable the accessibility service in Settings
-        2. Grant necessary permissions
-        3. The service will be available for AutoMobile testing
-      """
-                    .trimIndent(),
-            textAlign = TextAlign.Start,
-            modifier = Modifier.fillMaxWidth())
+            To use this service:
+            1. Enable the accessibility service in Settings
+            2. Grant necessary permissions
+            3. The service will be available for AutoMobile testing
+            """
+                .trimIndent(),
+        textAlign = TextAlign.Start,
+        modifier = Modifier.fillMaxWidth(),
+    )
 
-        // Status
-        ServiceStatusDisplay(isServiceEnabled = isServiceEnabled)
+    // Status
+    ServiceStatusDisplay(isServiceEnabled = isServiceEnabled)
 
-        // Open Settings button
-        Button(
-            onClick = { openAccessibilitySettings(context) }, modifier = Modifier.fillMaxWidth()) {
-              Text("Open Accessibility Settings")
-            }
-      }
+    // Open Settings button
+    Button(onClick = { openAccessibilitySettings(context) }, modifier = Modifier.fillMaxWidth()) {
+      Text("Open Accessibility Settings")
+    }
+  }
 }
 
 @Composable
@@ -127,7 +129,8 @@ fun ServiceStatusDisplay(isServiceEnabled: Boolean) {
       color = statusColor,
       fontSize = 16.sp,
       fontWeight = FontWeight.Medium,
-      textAlign = TextAlign.Center)
+      textAlign = TextAlign.Center,
+  )
 }
 
 @Composable
@@ -142,7 +145,9 @@ private fun checkAccessibilityServiceStatus(context: android.content.Context): B
         context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
     val enabledServices =
         Settings.Secure.getString(
-            context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+        )
 
     val serviceName =
         "${context.packageName}/${AutoMobileAccessibilityService::class.java.canonicalName}"

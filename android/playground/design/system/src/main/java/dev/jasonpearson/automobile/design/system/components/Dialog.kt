@@ -31,7 +31,7 @@ fun AutoMobileAlertDialog(
     modifier: Modifier = Modifier,
     dismissButtonText: String? = null,
     onDismissClick: (() -> Unit)? = null,
-    properties: DialogProperties = DialogProperties()
+    properties: DialogProperties = DialogProperties(),
 ) {
   AlertDialog(
       onDismissRequest = onDismissRequest,
@@ -46,7 +46,8 @@ fun AutoMobileAlertDialog(
       containerColor = MaterialTheme.colorScheme.surface,
       titleContentColor = MaterialTheme.colorScheme.onSurface,
       textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-      properties = properties)
+      properties = properties,
+  )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,21 +56,25 @@ fun AutoMobileCustomDialog(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     properties: DialogProperties = DialogProperties(),
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
   BasicAlertDialog(
-      onDismissRequest = onDismissRequest, modifier = modifier, properties = properties) {
-        Card(
-            colors =
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface),
-            elevation =
-                CardDefaults.cardElevation(
-                    defaultElevation = AutoMobileDimensions.elevationLarge)) {
-              Column(modifier = Modifier.padding(AutoMobileDimensions.spacing6)) { content() }
-            }
-      }
+      onDismissRequest = onDismissRequest,
+      modifier = modifier,
+      properties = properties,
+  ) {
+    Card(
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+        elevation =
+            CardDefaults.cardElevation(defaultElevation = AutoMobileDimensions.elevationLarge),
+    ) {
+      Column(modifier = Modifier.padding(AutoMobileDimensions.spacing6)) { content() }
+    }
+  }
 }
 
 @Composable
@@ -81,7 +86,7 @@ fun AutoMobileConfirmationDialog(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     confirmText: String = "Confirm",
-    cancelText: String = "Cancel"
+    cancelText: String = "Cancel",
 ) {
   AutoMobileAlertDialog(
       onDismissRequest = onDismissRequest,
@@ -91,7 +96,8 @@ fun AutoMobileConfirmationDialog(
       onConfirmClick = onConfirm,
       dismissButtonText = cancelText,
       onDismissClick = onCancel,
-      modifier = modifier)
+      modifier = modifier,
+  )
 }
 
 @Preview(showBackground = true)

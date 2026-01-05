@@ -17,7 +17,8 @@ class PageViewModel : ViewModel() {
           .stateIn(
               scope = viewModelScope,
               started = SharingStarted.WhileSubscribed(5000),
-              initialValue = "Hello world from section: 0")
+              initialValue = "Hello world from section: 0",
+          )
 
   fun setIndex(index: Int) {
     _index.value = index

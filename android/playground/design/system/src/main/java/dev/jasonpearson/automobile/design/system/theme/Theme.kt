@@ -62,7 +62,8 @@ private val AutoMobileLightColorScheme =
         surfaceContainerLow = AutoMobileEggshell,
         surfaceContainer = AutoMobileEggshell,
         surfaceContainerHigh = AutoMobileEggshell,
-        surfaceContainerHighest = AutoMobileEggshell)
+        surfaceContainerHighest = AutoMobileEggshell,
+    )
 
 // AutoMobile Dark Color Scheme
 private val AutoMobileDarkColorScheme =
@@ -101,14 +102,15 @@ private val AutoMobileDarkColorScheme =
         surfaceContainerLow = AutoMobileLalala,
         surfaceContainer = AutoMobileLalala,
         surfaceContainerHigh = AutoMobileLalala,
-        surfaceContainerHighest = AutoMobileBlack)
+        surfaceContainerHighest = AutoMobileBlack,
+    )
 
 @Composable
 fun AutoMobileTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false, // Disabled by default to use design system colors
     experimentRepository: ExperimentRepository? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
   val context = LocalContext.current
   val experiments = experimentRepository?.getExperiments() ?: emptyList()

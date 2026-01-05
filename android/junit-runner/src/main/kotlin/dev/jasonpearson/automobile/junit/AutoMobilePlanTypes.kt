@@ -6,7 +6,7 @@ data class AutoMobilePlanExecutionOptions(
     val device: String = "auto",
     val aiAssistance: Boolean = true,
     val maxRetries: Int = 0,
-    val debugMode: Boolean = System.getProperty("automobile.debug", "false").toBoolean()
+    val debugMode: Boolean = System.getProperty("automobile.debug", "false").toBoolean(),
 )
 
 /** Result of AutoMobile plan execution. */
@@ -18,5 +18,5 @@ data class AutoMobilePlanExecutionResult(
     val executionTimeMs: Long = 0L,
     val aiRecoveryAttempted: Boolean = false,
     val aiRecoverySuccessful: Boolean = false,
-    val parametersUsed: Map<String, Any> = emptyMap()
+    val parametersUsed: Map<String, Any> = emptyMap(),
 )

@@ -13,8 +13,7 @@ sealed class SlideContent {
   /**
    * Bulleted list slide with hierarchical support. Each bullet point can contain nested sub-points.
    */
-  data class BulletPoints(val title: String? = null, val points: List<BulletPoint>) :
-      SlideContent()
+  data class BulletPoints(val title: String? = null, val points: List<BulletPoint>) : SlideContent()
 
   /**
    * Emoji slide with large emoji display and optional caption. Uses predefined emoji set for
@@ -30,7 +29,7 @@ sealed class SlideContent {
       val code: String,
       val language: String,
       val title: String? = null,
-      val highlight: String? = null
+      val highlight: String? = null,
   ) : SlideContent()
 
   /**
@@ -40,7 +39,7 @@ sealed class SlideContent {
   data class Visualization(
       val imageUrl: String,
       val caption: String? = null,
-      val contentDescription: String? = null
+      val contentDescription: String? = null,
   ) : SlideContent()
 
   /**
@@ -49,7 +48,7 @@ sealed class SlideContent {
   data class Video(
       val videoUrl: String,
       val caption: String? = null,
-      val contentDescription: String? = null
+      val contentDescription: String? = null,
   ) : SlideContent()
 
   /**
@@ -70,7 +69,7 @@ sealed class SlideContent {
       val darkScreenshot: Int? = null,
       val title: String? = null,
       val caption: String? = null,
-      val contentDescription: String? = null
+      val contentDescription: String? = null,
   ) : SlideContent()
 }
 
@@ -151,5 +150,5 @@ enum class PresentationEmoji(val unicode: String, val description: String) {
   PLAYGROUND("🛝", "Playground/Testing"),
   ONE("1️⃣", "One/Single"),
   TWO("2️⃣", "Two/Double"),
-  THREE("3️⃣", "Three/Triple")
+  THREE("3️⃣", "Three/Triple"),
 }

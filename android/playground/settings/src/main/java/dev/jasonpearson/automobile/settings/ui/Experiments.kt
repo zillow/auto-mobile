@@ -39,14 +39,15 @@ import dev.jasonpearson.automobile.experimentation.experiments.MoodTreatment
 @Composable
 fun <T : Treatment> ExperimentBottomSheetContent(
     experiment: Experiment<T>,
-    onTreatmentSelected: (T) -> Unit
+    onTreatmentSelected: (T) -> Unit,
 ) {
   Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
     Text(
         text = "Select Treatment for ${experiment.name}",
         fontSize = 20.sp,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(bottom = 16.dp))
+        modifier = Modifier.padding(bottom = 16.dp),
+    )
 
     experiment.treatments.forEach { treatment ->
       Row(
@@ -54,12 +55,14 @@ fun <T : Treatment> ExperimentBottomSheetContent(
               Modifier.fillMaxWidth()
                   .clickable { onTreatmentSelected(treatment) }
                   .padding(vertical = 8.dp),
-          verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(
-                selected = treatment == experiment.currentTreatment,
-                onClick = { onTreatmentSelected(treatment) })
-            Text(text = treatment.label, modifier = Modifier.padding(start = 8.dp))
-          }
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
+        RadioButton(
+            selected = treatment == experiment.currentTreatment,
+            onClick = { onTreatmentSelected(treatment) },
+        )
+        Text(text = treatment.label, modifier = Modifier.padding(start = 8.dp))
+      }
     }
 
     Spacer(modifier = Modifier.height(16.dp))
@@ -69,53 +72,55 @@ fun <T : Treatment> ExperimentBottomSheetContent(
 @Composable
 fun ExperimentsCard(
     experiments: List<Experiment<*>>,
-    onExperimentClicked: (Experiment<*>) -> Unit
+    onExperimentClicked: (Experiment<*>) -> Unit,
 ) {
   Card(
       modifier = Modifier.fillMaxWidth(),
       elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-      shape = RoundedCornerShape(12.dp)) {
-        Column(
-            modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-              Row(
-                  modifier = Modifier.fillMaxWidth(),
-                  verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Science,
-                        contentDescription = "Experiments",
-                        modifier = Modifier.padding(end = 8.dp),
-                        tint = MaterialTheme.colorScheme.primary)
-                    Text(
-                        text = "Experiments",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface)
-                  }
-
-              experiments.forEach { experiment ->
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .clickable { onExperimentClicked(experiment) }
-                            .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                      Text(text = experiment.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                      Text(
-                          text = experiment.currentTreatment.label,
-                          fontSize = 14.sp,
-                          color = MaterialTheme.colorScheme.onSurfaceVariant,
-                          modifier = Modifier.padding(start = 12.dp))
-                    }
-              }
-            }
+      shape = RoundedCornerShape(12.dp),
+  ) {
+    Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+      Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.Science,
+            contentDescription = "Experiments",
+            modifier = Modifier.padding(end = 8.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = "Experiments",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
       }
+
+      experiments.forEach { experiment ->
+        Row(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .clickable { onExperimentClicked(experiment) }
+                    .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(text = experiment.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+          Text(
+              text = experiment.currentTreatment.label,
+              fontSize = 14.sp,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(start = 12.dp),
+          )
+        }
+      }
+    }
+  }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExperimentsSection(
     experiments: List<Experiment<*>>,
-    onExperimentsUpdated: (List<Experiment<*>>) -> Unit
+    onExperimentsUpdated: (List<Experiment<*>>) -> Unit,
 ) {
   var showBottomSheet by remember { mutableStateOf(false) }
   var selectedExperiment by remember { mutableStateOf<Experiment<*>?>(null) }
@@ -126,7 +131,8 @@ fun ExperimentsSection(
       onExperimentClicked = { experiment ->
         selectedExperiment = experiment
         showBottomSheet = true
-      })
+      },
+  )
 
   // Bottom Sheet for Experiments
   if (showBottomSheet && selectedExperiment != null) {
@@ -142,7 +148,8 @@ fun ExperimentsSection(
                 }
             onExperimentsUpdated(updatedExperiments)
             showBottomSheet = false
-          })
+          },
+      )
     }
   }
 }
@@ -153,7 +160,8 @@ fun ExperimentBottomSheetPreview() {
   MaterialTheme {
     ExperimentBottomSheetContent(
         experiment = MoodExperiment(currentTreatment = MoodTreatment.PARTY),
-        onTreatmentSelected = { /* Preview treatment selection */ })
+        onTreatmentSelected = { /* Preview treatment selection */ },
+    )
   }
 }
 
@@ -163,6 +171,7 @@ fun ExperimentsCardPreview() {
   MaterialTheme {
     ExperimentsCard(
         experiments = listOf(MoodExperiment(currentTreatment = MoodTreatment.PARTY)),
-        onExperimentClicked = { /* Preview click */ })
+        onExperimentClicked = { /* Preview click */ },
+    )
   }
 }

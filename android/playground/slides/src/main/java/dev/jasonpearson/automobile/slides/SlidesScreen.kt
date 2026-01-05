@@ -45,6 +45,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import dev.jasonpearson.automobile.design.system.theme.AutoMobileTheme
+import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import dev.jasonpearson.automobile.slides.components.BulletPointSlideItem
 import dev.jasonpearson.automobile.slides.components.CodeSampleSlideItem
 import dev.jasonpearson.automobile.slides.components.EmojiSlideItem
@@ -55,7 +56,6 @@ import dev.jasonpearson.automobile.slides.components.VideoPlayerSlideItem
 import dev.jasonpearson.automobile.slides.components.VisualizationSlideItem
 import dev.jasonpearson.automobile.slides.data.getAllSlides
 import dev.jasonpearson.automobile.slides.model.SlideContent
-import dev.jasonpearson.automobile.sdk.TrackRecomposition
 import kotlinx.coroutines.launch
 
 /**
@@ -68,134 +68,146 @@ fun SlidesScreen(
     slides: List<SlideContent> = getAllSlides(),
     initialSlideIndex: Int = 0,
     modifier: Modifier = Modifier,
-    onNavigateBack: (() -> Unit)? = null
+    onNavigateBack: (() -> Unit)? = null,
 ) {
   TrackRecomposition(id = "screen.slides", composableName = "SlidesScreen") {
-  val context = LocalContext.current
-  val configuration = LocalConfiguration.current
-  val themeManager = remember(context) { SlidesThemeManager(context) }
-  val isDarkMode = themeManager.isDarkMode
-  val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val themeManager = remember(context) { SlidesThemeManager(context) }
+    val isDarkMode = themeManager.isDarkMode
+    val coroutineScope = rememberCoroutineScope()
 
-  // Enable immersive mode
-  DisposableEffect(Unit) {
-    val activity = context as? androidx.activity.ComponentActivity
-    activity?.let {
-      val window = it.window
-      val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-
-      // Hide system bars
-      insetsController.hide(WindowInsetsCompat.Type.systemBars())
-      insetsController.systemBarsBehavior =
-          WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-      // Make content appear behind system bars
-      WindowCompat.setDecorFitsSystemWindows(window, false)
-    }
-
-    onDispose {
-      // Restore normal mode when leaving
+    // Enable immersive mode
+    DisposableEffect(Unit) {
+      val activity = context as? androidx.activity.ComponentActivity
       activity?.let {
         val window = it.window
         val insetsController = WindowCompat.getInsetsController(window, window.decorView)
-        insetsController.show(WindowInsetsCompat.Type.systemBars())
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-      }
-    }
-  }
 
-  // Remember PagerState with saveable current page
-  val savedPage: MutableState<Int> = rememberSaveable { mutableIntStateOf(initialSlideIndex) }
+        // Hide system bars
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
-  val pagerState =
-      rememberPagerState(
-          initialPage = savedPage.value.coerceIn(0, slides.size - 1), pageCount = { slides.size })
-
-  // Update saved page when current page changes
-  LaunchedEffect(pagerState.currentPage) { savedPage.value = pagerState.currentPage }
-
-  // Restore to saved position if needed (e.g., after configuration change)
-  LaunchedEffect(Unit) {
-    if (pagerState.currentPage != savedPage.value && savedPage.value in 0 until slides.size) {
-      pagerState.scrollToPage(savedPage.value)
-    }
-  }
-
-  AutoMobileTheme(darkTheme = isDarkMode) {
-    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-      // Slide content with floating day/night button and tap navigation
-      Box(modifier = Modifier.weight(1f)) {
-        HorizontalPager(
-            state = pagerState, userScrollEnabled = false, modifier = Modifier.fillMaxSize()) { page
-              ->
-              SlideItem(
-                  slideContent = slides[page],
-                  isDarkMode = isDarkMode,
-                  modifier =
-                      Modifier.fillMaxSize()
-                          .background(MaterialTheme.colorScheme.background)
-                          .windowInsetsPadding(WindowInsets.displayCutout))
-            }
-
-        // Left tap area for previous slide
-        Box(
-            modifier =
-                Modifier.width((configuration.screenWidthDp * 0.3f).dp)
-                    .fillMaxHeight()
-                    .align(Alignment.CenterStart)
-                    .semantics { contentDescription = "Previous" }
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null) {
-                          if (pagerState.currentPage > 0) {
-                            coroutineScope.launch {
-                              pagerState.scrollToPage(pagerState.currentPage - 1)
-                            }
-                          }
-                        })
-
-        // Right tap area for next slide
-        Box(
-            modifier =
-                Modifier.width((configuration.screenWidthDp * 0.3f).dp)
-                    .fillMaxHeight()
-                    .align(Alignment.CenterEnd)
-                    .semantics { contentDescription = "Next" }
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null) {
-                          if (pagerState.currentPage < slides.size - 1) {
-                            coroutineScope.launch {
-                              pagerState.scrollToPage(pagerState.currentPage + 1)
-                            }
-                          }
-                        })
-
-        // Day/Night mode toggle - floating in bottom right corner
-        IconButton(
-            onClick = { themeManager.toggleTheme() },
-            modifier =
-                Modifier.size(64.dp)
-                    .align(Alignment.BottomEnd)
-                    .windowInsetsPadding(WindowInsets.systemBars)
-                    .padding(16.dp)) {
-              Icon(
-                  imageVector = if (!isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode,
-                  contentDescription = if (!isDarkMode) "Light Mode" else "Dark Mode",
-                  modifier = Modifier.size(32.dp),
-                  tint = MaterialTheme.colorScheme.onSurface)
-            }
+        // Make content appear behind system bars
+        WindowCompat.setDecorFitsSystemWindows(window, false)
       }
 
-      // Progress bar - pinned to bottom with minimal height and no padding
-      LinearProgressIndicator(
-          progress = (pagerState.currentPage + 1f) / slides.size,
-          modifier =
-              Modifier.fillMaxWidth()
-                  .size(height = 2.dp, width = 0.dp)
-                  .windowInsetsPadding(WindowInsets.navigationBars))
+      onDispose {
+        // Restore normal mode when leaving
+        activity?.let {
+          val window = it.window
+          val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+          insetsController.show(WindowInsetsCompat.Type.systemBars())
+          WindowCompat.setDecorFitsSystemWindows(window, true)
+        }
+      }
     }
-  }
+
+    // Remember PagerState with saveable current page
+    val savedPage: MutableState<Int> = rememberSaveable { mutableIntStateOf(initialSlideIndex) }
+
+    val pagerState =
+        rememberPagerState(
+            initialPage = savedPage.value.coerceIn(0, slides.size - 1),
+            pageCount = { slides.size },
+        )
+
+    // Update saved page when current page changes
+    LaunchedEffect(pagerState.currentPage) { savedPage.value = pagerState.currentPage }
+
+    // Restore to saved position if needed (e.g., after configuration change)
+    LaunchedEffect(Unit) {
+      if (pagerState.currentPage != savedPage.value && savedPage.value in 0 until slides.size) {
+        pagerState.scrollToPage(savedPage.value)
+      }
+    }
+
+    AutoMobileTheme(darkTheme = isDarkMode) {
+      Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // Slide content with floating day/night button and tap navigation
+        Box(modifier = Modifier.weight(1f)) {
+          HorizontalPager(
+              state = pagerState,
+              userScrollEnabled = false,
+              modifier = Modifier.fillMaxSize(),
+          ) { page ->
+            SlideItem(
+                slideContent = slides[page],
+                isDarkMode = isDarkMode,
+                modifier =
+                    Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .windowInsetsPadding(WindowInsets.displayCutout),
+            )
+          }
+
+          // Left tap area for previous slide
+          Box(
+              modifier =
+                  Modifier.width((configuration.screenWidthDp * 0.3f).dp)
+                      .fillMaxHeight()
+                      .align(Alignment.CenterStart)
+                      .semantics { contentDescription = "Previous" }
+                      .clickable(
+                          interactionSource = remember { MutableInteractionSource() },
+                          indication = null,
+                      ) {
+                        if (pagerState.currentPage > 0) {
+                          coroutineScope.launch {
+                            pagerState.scrollToPage(pagerState.currentPage - 1)
+                          }
+                        }
+                      }
+          )
+
+          // Right tap area for next slide
+          Box(
+              modifier =
+                  Modifier.width((configuration.screenWidthDp * 0.3f).dp)
+                      .fillMaxHeight()
+                      .align(Alignment.CenterEnd)
+                      .semantics { contentDescription = "Next" }
+                      .clickable(
+                          interactionSource = remember { MutableInteractionSource() },
+                          indication = null,
+                      ) {
+                        if (pagerState.currentPage < slides.size - 1) {
+                          coroutineScope.launch {
+                            pagerState.scrollToPage(pagerState.currentPage + 1)
+                          }
+                        }
+                      }
+          )
+
+          // Day/Night mode toggle - floating in bottom right corner
+          IconButton(
+              onClick = { themeManager.toggleTheme() },
+              modifier =
+                  Modifier.size(64.dp)
+                      .align(Alignment.BottomEnd)
+                      .windowInsetsPadding(WindowInsets.systemBars)
+                      .padding(16.dp),
+          ) {
+            Icon(
+                imageVector = if (!isDarkMode) Icons.Filled.LightMode else Icons.Filled.DarkMode,
+                contentDescription = if (!isDarkMode) "Light Mode" else "Dark Mode",
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+          }
+        }
+
+        // Progress bar - pinned to bottom with minimal height and no padding
+        LinearProgressIndicator(
+            progress = (pagerState.currentPage + 1f) / slides.size,
+            modifier =
+                Modifier.fillMaxWidth()
+                    .size(height = 2.dp, width = 0.dp)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+        )
+      }
+    }
   }
 }
 
@@ -205,22 +217,31 @@ fun SlidesScreen(
 private fun SlideItem(
     slideContent: SlideContent,
     isDarkMode: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   when (slideContent) {
     is SlideContent.LargeText -> {
       LargeTextSlideItem(
-          title = slideContent.title, subtitle = slideContent.subtitle, modifier = modifier)
+          title = slideContent.title,
+          subtitle = slideContent.subtitle,
+          modifier = modifier,
+      )
     }
 
     is SlideContent.BulletPoints -> {
       BulletPointSlideItem(
-          title = slideContent.title, points = slideContent.points, modifier = modifier)
+          title = slideContent.title,
+          points = slideContent.points,
+          modifier = modifier,
+      )
     }
 
     is SlideContent.Emoji -> {
       EmojiSlideItem(
-          emoji = slideContent.emoji, caption = slideContent.caption, modifier = modifier)
+          emoji = slideContent.emoji,
+          caption = slideContent.caption,
+          modifier = modifier,
+      )
     }
 
     is SlideContent.CodeSample -> {
@@ -230,7 +251,8 @@ private fun SlideItem(
           title = slideContent.title,
           highlight = slideContent.highlight,
           isDarkMode = isDarkMode,
-          modifier = modifier)
+          modifier = modifier,
+      )
     }
 
     is SlideContent.Visualization -> {
@@ -238,7 +260,8 @@ private fun SlideItem(
           imageUrl = slideContent.imageUrl,
           caption = slideContent.caption,
           contentDescription = slideContent.contentDescription,
-          modifier = modifier)
+          modifier = modifier,
+      )
     }
 
     is SlideContent.Video -> {
@@ -246,7 +269,8 @@ private fun SlideItem(
           videoUrl = slideContent.videoUrl,
           caption = slideContent.caption,
           contentDescription = slideContent.contentDescription,
-          modifier = modifier)
+          modifier = modifier,
+      )
     }
 
     is SlideContent.MermaidDiagram -> {
@@ -254,7 +278,8 @@ private fun SlideItem(
           mermaidCode = slideContent.code,
           title = slideContent.title,
           isDarkMode = isDarkMode,
-          modifier = modifier)
+          modifier = modifier,
+      )
     }
 
     is SlideContent.Screenshot -> {
@@ -263,7 +288,8 @@ private fun SlideItem(
           darkScreenshot = slideContent.darkScreenshot,
           caption = slideContent.caption,
           contentDescription = slideContent.contentDescription,
-          modifier = modifier)
+          modifier = modifier,
+      )
     }
   }
 }

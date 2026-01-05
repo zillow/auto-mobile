@@ -28,11 +28,7 @@ internal object DaemonSocketClientManager {
   private val clientLock = Any()
   private var client: DaemonSocketClient? = null
 
-  fun callTool(
-      toolName: String,
-      arguments: JsonObject,
-      timeoutMs: Long
-  ): DaemonResponse {
+  fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse {
     val socketClient = getOrCreateClient()
     return socketClient.callTool(toolName, arguments, timeoutMs)
   }
@@ -64,13 +60,15 @@ internal object DaemonSocketClientManager {
 
     AutoMobileSharedUtils.executeCommand(startCommand, DaemonSocketPaths.daemonStartTimeoutMs())
 
-    val started = DaemonSocketClient.waitForAvailability(
-        DaemonSocketPaths.socketPath(),
-        DaemonSocketPaths.daemonStartTimeoutMs()
-    )
+    val started =
+        DaemonSocketClient.waitForAvailability(
+            DaemonSocketPaths.socketPath(),
+            DaemonSocketPaths.daemonStartTimeoutMs(),
+        )
     if (!started) {
       throw DaemonUnavailableException(
-          "Daemon failed to start within ${DaemonSocketPaths.daemonStartTimeoutMs()}ms")
+          "Daemon failed to start within ${DaemonSocketPaths.daemonStartTimeoutMs()}ms"
+      )
     }
   }
 }
@@ -87,7 +85,11 @@ internal object DaemonSocketPaths {
   }
 
   fun daemonStartTimeoutMs(): Long {
-    val configured = SystemPropertyCache.get("automobile.daemon.startup.timeout.ms", DEFAULT_DAEMON_STARTUP_TIMEOUT_MS.toString())
+    val configured =
+        SystemPropertyCache.get(
+            "automobile.daemon.startup.timeout.ms",
+            DEFAULT_DAEMON_STARTUP_TIMEOUT_MS.toString(),
+        )
     return configured.toLongOrNull() ?: DEFAULT_DAEMON_STARTUP_TIMEOUT_MS
   }
 
@@ -132,9 +134,7 @@ internal object DaemonSocketPaths {
   }
 }
 
-internal class DaemonSocketClient(
-    private val socketPath: String
-) : Closeable {
+internal class DaemonSocketClient(private val socketPath: String) : Closeable {
   private val json = Json { ignoreUnknownKeys = true }
   private val pending = ConcurrentHashMap<String, CompletableFuture<DaemonResponse>>()
   private val writeLock = Any()
@@ -151,31 +151,27 @@ internal class DaemonSocketClient(
     reader = BufferedReader(InputStreamReader(inputStream, StandardCharsets.UTF_8))
     writer = BufferedWriter(OutputStreamWriter(outputStream, StandardCharsets.UTF_8))
 
-    readThread = thread(start = true, isDaemon = true, name = "auto-mobile-daemon-reader") {
-      readLoop()
-    }
+    readThread =
+        thread(start = true, isDaemon = true, name = "auto-mobile-daemon-reader") { readLoop() }
   }
 
   fun isConnected(): Boolean {
     return !closed && channel.isOpen
   }
 
-  fun callTool(
-      toolName: String,
-      arguments: JsonObject,
-      timeoutMs: Long
-  ): DaemonResponse {
+  fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse {
     if (!isConnected()) {
       throw DaemonUnavailableException("Daemon socket connection is not available")
     }
 
     val requestId = UUID.randomUUID().toString()
-    val request = DaemonRequest(
-        id = requestId,
-        type = "mcp_request",
-        method = "tools/call",
-        params = buildJsonParams(toolName, arguments)
-    )
+    val request =
+        DaemonRequest(
+            id = requestId,
+            type = "mcp_request",
+            method = "tools/call",
+            params = buildJsonParams(toolName, arguments),
+        )
 
     val responseFuture = CompletableFuture<DaemonResponse>()
     pending[requestId] = responseFuture
@@ -251,12 +247,7 @@ internal class DaemonSocketClient(
   }
 
   private fun buildJsonParams(toolName: String, arguments: JsonObject): JsonObject {
-    return JsonObject(
-        mapOf(
-            "name" to JsonPrimitive(toolName),
-            "arguments" to arguments
-        )
-    )
+    return JsonObject(mapOf("name" to JsonPrimitive(toolName), "arguments" to arguments))
   }
 
   private fun failPendingRequests(message: String) {
@@ -294,7 +285,7 @@ internal data class DaemonRequest(
     val id: String,
     val type: String,
     val method: String,
-    val params: JsonObject
+    val params: JsonObject,
 )
 
 @Serializable
@@ -303,23 +294,19 @@ internal data class DaemonResponse(
     val type: String,
     val success: Boolean,
     val result: JsonElement? = null,
-    val error: String? = null
+    val error: String? = null,
 )
 
 internal class DaemonUnavailableException(message: String) : Exception(message)
 
-/**
- * Interface for checking daemon connectivity.
- * Allows for easy testing with fakes.
- */
+/** Interface for checking daemon connectivity. Allows for easy testing with fakes. */
 internal interface DaemonConnectivityChecker {
   fun isDaemonAlive(): Boolean
+
   fun waitForDaemon(timeoutMs: Long): Boolean
 }
 
-/**
- * Default implementation that checks actual daemon socket connectivity.
- */
+/** Default implementation that checks actual daemon socket connectivity. */
 internal class DefaultDaemonConnectivityChecker : DaemonConnectivityChecker {
   override fun isDaemonAlive(): Boolean {
     return DaemonSocketClient.isAvailable(DaemonSocketPaths.socketPath())

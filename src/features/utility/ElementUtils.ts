@@ -99,20 +99,27 @@ export class ElementUtils {
   findElementByText(
     viewHierarchy: ViewHierarchyResult,
     text: string,
-    containerElementId: string | null = null,
+    container: { elementId?: string; text?: string } | null = null,
     fuzzyMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element | null {
-    return this.finder.findElementByText(viewHierarchy, text, containerElementId, fuzzyMatch, caseSensitive);
+    return this.finder.findElementByText(viewHierarchy, text, container, fuzzyMatch, caseSensitive);
   }
 
   findElementByResourceId(
     viewHierarchy: ViewHierarchyResult,
     resourceId: string,
-    containerElementId: string | null = null,
+    container: { elementId?: string; text?: string } | null = null,
     partialMatch: boolean = false
   ): Element | null {
-    return this.finder.findElementByResourceId(viewHierarchy, resourceId, containerElementId, partialMatch);
+    return this.finder.findElementByResourceId(viewHierarchy, resourceId, container, partialMatch);
+  }
+
+  hasContainerElement(
+    viewHierarchy: ViewHierarchyResult,
+    container: { elementId?: string; text?: string }
+  ): boolean {
+    return this.finder.hasContainerElement(viewHierarchy, container);
   }
 
   findElementByIndex(viewHierarchy: ViewHierarchyResult, index: number): { element: Element; text?: string } | null {

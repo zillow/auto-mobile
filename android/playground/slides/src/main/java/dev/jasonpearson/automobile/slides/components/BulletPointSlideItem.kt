@@ -32,34 +32,38 @@ fun BulletPointSlideItem(
     modifier: Modifier = Modifier,
     titleColor: Color = MaterialTheme.colorScheme.onBackground,
     bulletColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    subBulletColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+    subBulletColor: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
 ) {
   Column(
       modifier = modifier.fillMaxSize().padding(32.dp).verticalScroll(rememberScrollState()),
       horizontalAlignment = Alignment.Start,
-      verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        // Title
-        if (title != null) {
-          Text(
-              text = title,
-              style =
-                  MaterialTheme.typography.displaySmall.copy(
-                      fontWeight = FontWeight.Bold,
-                      textAlign = TextAlign.Center,
-                      color = titleColor),
-              modifier = Modifier.padding(bottom = 16.dp))
-        }
+      verticalArrangement = Arrangement.spacedBy(24.dp),
+  ) {
+    // Title
+    if (title != null) {
+      Text(
+          text = title,
+          style =
+              MaterialTheme.typography.displaySmall.copy(
+                  fontWeight = FontWeight.Bold,
+                  textAlign = TextAlign.Center,
+                  color = titleColor,
+              ),
+          modifier = Modifier.padding(bottom = 16.dp),
+      )
+    }
 
-        // Bullet points
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(24.dp)) {
-              points.forEach { bulletPoint ->
-                BulletPointItem(bulletPoint = bulletPoint, bulletColor = bulletColor)
-              }
-            }
+    // Bullet points
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+      points.forEach { bulletPoint ->
+        BulletPointItem(bulletPoint = bulletPoint, bulletColor = bulletColor)
       }
+    }
+  }
 }
 
 /** Individual bullet point item. */
@@ -67,17 +71,19 @@ fun BulletPointSlideItem(
 private fun BulletPointItem(
     bulletPoint: BulletPoint,
     bulletColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
     Text(
         text = "•",
         style = MaterialTheme.typography.displaySmall,
         color = bulletColor,
-        modifier = Modifier.padding(top = 4.dp))
+        modifier = Modifier.padding(top = 4.dp),
+    )
     Text(
         text = bulletPoint.text,
-        style = MaterialTheme.typography.displaySmall.copy(color = bulletColor, lineHeight = 48.sp))
+        style = MaterialTheme.typography.displaySmall.copy(color = bulletColor, lineHeight = 48.sp),
+    )
   }
 }
 
@@ -94,17 +100,24 @@ fun BulletPointSlideItemPreview() {
                     subPoints =
                         listOf(
                             "Analyzes Android app source code",
-                            "Generates intelligent test selectors")),
+                            "Generates intelligent test selectors",
+                        ),
+                ),
                 BulletPoint(
                     text = "Cross-Platform Testing",
                     subPoints =
-                        listOf("Supports Android and iOS", "Unified API for both platforms")),
+                        listOf("Supports Android and iOS", "Unified API for both platforms"),
+                ),
                 BulletPoint(
                     text = "JUnit Integration",
                     subPoints =
                         listOf(
                             "Drop-in replacement for Espresso",
-                            "Compatible with existing test infrastructure"))))
+                            "Compatible with existing test infrastructure",
+                        ),
+                ),
+            ),
+    )
   }
 }
 
@@ -121,16 +134,23 @@ fun BulletPointSlideItemLandscapePreview() {
                     subPoints =
                         listOf(
                             "Analyzes Android app source code",
-                            "Generates intelligent test selectors")),
+                            "Generates intelligent test selectors",
+                        ),
+                ),
                 BulletPoint(
                     text = "Cross-Platform Testing",
                     subPoints =
-                        listOf("Supports Android and iOS", "Unified API for both platforms")),
+                        listOf("Supports Android and iOS", "Unified API for both platforms"),
+                ),
                 BulletPoint(
                     text = "JUnit Integration",
                     subPoints =
                         listOf(
                             "Drop-in replacement for Espresso",
-                            "Compatible with existing test infrastructure"))))
+                            "Compatible with existing test infrastructure",
+                        ),
+                ),
+            ),
+    )
   }
 }

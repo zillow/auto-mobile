@@ -8,7 +8,7 @@ data class UserProfile(
     val name: String,
     val email: String,
     val profileImageUrl: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 class UserRepository(context: Context) {
@@ -24,7 +24,8 @@ class UserRepository(context: Context) {
           name = "Anon Ymous",
           email = "you@somewhere.net",
           profileImageUrl = null,
-          createdAt = System.currentTimeMillis())
+          createdAt = System.currentTimeMillis(),
+      )
     } else {
       val name = sharedPreferences.getString(KEY_NAME, null)
       val email = sharedPreferences.getString(KEY_EMAIL, null)

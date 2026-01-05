@@ -32,10 +32,8 @@ internal object DaemonHeartbeat {
 
   fun start(sessionId: String, intervalMs: Long = DEFAULT_INTERVAL_MS): Closeable {
     val running = AtomicBoolean(true)
-    val heartbeatThread = thread(
-        start = true,
-        isDaemon = true,
-        name = "auto-mobile-daemon-heartbeat") {
+    val heartbeatThread =
+        thread(start = true, isDaemon = true, name = "auto-mobile-daemon-heartbeat") {
           while (running.get()) {
             try {
               sendHeartbeat(sessionId)

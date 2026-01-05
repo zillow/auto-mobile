@@ -42,33 +42,38 @@ fun ImageGalleryComponent(imageUrls: List<String>, modifier: Modifier = Modifier
   Card(
       modifier = modifier,
       elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-          Text(
-              text = "🖼️ Image Gallery",
-              fontSize = 20.sp,
-              fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.onSurface,
-              modifier = Modifier.padding(bottom = 16.dp))
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+  ) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+      Text(
+          text = "🖼️ Image Gallery",
+          fontSize = 20.sp,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onSurface,
+          modifier = Modifier.padding(bottom = 16.dp),
+      )
 
-          Text(
-              text = "Images loaded with Coil - efficient caching and lazy loading",
-              fontSize = 14.sp,
-              color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-              modifier = Modifier.padding(bottom = 16.dp))
+      Text(
+          text = "Images loaded with Coil - efficient caching and lazy loading",
+          fontSize = 14.sp,
+          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+          modifier = Modifier.padding(bottom = 16.dp),
+      )
 
-          LazyColumn(
-              verticalArrangement = Arrangement.spacedBy(12.dp),
-              contentPadding = PaddingValues(vertical = 8.dp)) {
-                items(imageUrls.withIndex().toList()) { (index, imageUrl) ->
-                  ImageCard(
-                      imageUrl = imageUrl,
-                      title = "Image ${index + 1}",
-                      modifier = Modifier.fillMaxWidth())
-                }
-              }
+      LazyColumn(
+          verticalArrangement = Arrangement.spacedBy(12.dp),
+          contentPadding = PaddingValues(vertical = 8.dp),
+      ) {
+        items(imageUrls.withIndex().toList()) { (index, imageUrl) ->
+          ImageCard(
+              imageUrl = imageUrl,
+              title = "Image ${index + 1}",
+              modifier = Modifier.fillMaxWidth(),
+          )
         }
       }
+    }
+  }
 }
 
 /** Individual image card with loading, error, and success states. */
@@ -77,27 +82,31 @@ fun ImageCard(imageUrl: String, title: String, modifier: Modifier = Modifier) {
   Card(
       modifier = modifier,
       elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-        Column {
-          Box(
-              modifier =
-                  Modifier.fillMaxWidth()
-                      .aspectRatio(16f / 9f)
-                      .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))) {
-                AsyncImageWithStates(
-                    imageUrl = imageUrl,
-                    contentDescription = title,
-                    modifier = Modifier.fillMaxSize())
-              }
-
-          Text(
-              text = title,
-              fontSize = 16.sp,
-              fontWeight = FontWeight.Medium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.padding(12.dp))
-        }
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+  ) {
+    Column {
+      Box(
+          modifier =
+              Modifier.fillMaxWidth()
+                  .aspectRatio(16f / 9f)
+                  .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+      ) {
+        AsyncImageWithStates(
+            imageUrl = imageUrl,
+            contentDescription = title,
+            modifier = Modifier.fillMaxSize(),
+        )
       }
+
+      Text(
+          text = title,
+          fontSize = 16.sp,
+          fontWeight = FontWeight.Medium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.padding(12.dp),
+      )
+    }
+  }
 }
 
 /**
@@ -108,7 +117,7 @@ fun ImageCard(imageUrl: String, title: String, modifier: Modifier = Modifier) {
 fun AsyncImageWithStates(
     imageUrl: String,
     contentDescription: String?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   val painter = rememberAsyncImagePainter(model = imageUrl)
   val state by painter.state.collectAsState()
@@ -127,7 +136,8 @@ fun AsyncImageWithStates(
         },
         onSuccess = {
           // Success state - image is displayed
-        })
+        },
+    )
 
     // Overlay for loading and error states
     when (state) {
@@ -151,19 +161,24 @@ fun AsyncImageWithStates(
 fun LoadingOverlay() {
   Box(
       modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-      contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center) {
-              CircularProgressIndicator(
-                  modifier = Modifier.size(40.dp), color = MaterialTheme.colorScheme.primary)
-              Text(
-                  text = "Loading...",
-                  fontSize = 14.sp,
-                  color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                  modifier = Modifier.padding(top = 8.dp))
-            }
-      }
+      contentAlignment = Alignment.Center,
+  ) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+      CircularProgressIndicator(
+          modifier = Modifier.size(40.dp),
+          color = MaterialTheme.colorScheme.primary,
+      )
+      Text(
+          text = "Loading...",
+          fontSize = 14.sp,
+          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+          modifier = Modifier.padding(top = 8.dp),
+      )
+    }
+  }
 }
 
 /** Error overlay for failed image loads. */
@@ -171,19 +186,22 @@ fun LoadingOverlay() {
 fun ErrorOverlay() {
   Box(
       modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-      contentAlignment = Alignment.Center) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center) {
-              Text(text = "❌", fontSize = 32.sp, textAlign = TextAlign.Center)
-              Text(
-                  text = "Failed to load image",
-                  fontSize = 14.sp,
-                  color = MaterialTheme.colorScheme.error,
-                  textAlign = TextAlign.Center,
-                  modifier = Modifier.padding(top = 8.dp))
-            }
-      }
+      contentAlignment = Alignment.Center,
+  ) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+      Text(text = "❌", fontSize = 32.sp, textAlign = TextAlign.Center)
+      Text(
+          text = "Failed to load image",
+          fontSize = 14.sp,
+          color = MaterialTheme.colorScheme.error,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.padding(top = 8.dp),
+      )
+    }
+  }
 }
 
 /**
@@ -200,6 +218,8 @@ fun ImageGalleryComponentPreview() {
                 "https://randomuser.me/api/portraits/lego/1.jpg",
                 "https://randomuser.me/api/portraits/lego/2.jpg",
                 "https://randomuser.me/api/portraits/lego/3.jpg",
-                "https://randomuser.me/api/portraits/lego/4.jpg"))
+                "https://randomuser.me/api/portraits/lego/4.jpg",
+            )
+    )
   }
 }

@@ -127,7 +127,8 @@ class ChatViewModelTest {
             "I understand your perspective.",
             "Could you elaborate on that?",
             "That's a good point.",
-            "I appreciate you telling me this.")
+            "I appreciate you telling me this.",
+        )
 
     viewModel.addUserMessage("Test message")
     advanceTimeBy(4000L)
@@ -136,7 +137,9 @@ class ChatViewModelTest {
     val botMessage = messages.last()
 
     assertTrue(
-        "Bot response should be from predefined list", botResponses.contains(botMessage.text))
+        "Bot response should be from predefined list",
+        botResponses.contains(botMessage.text),
+    )
   }
 
   @Test
@@ -174,6 +177,7 @@ class ChatViewModelTest {
 
     assertTrue(
         "Message timestamp should be within expected range",
-        userMessage.timestamp in beforeTime..afterTime)
+        userMessage.timestamp in beforeTime..afterTime,
+    )
   }
 }

@@ -65,30 +65,41 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
   override fun childrenInvoker(notifier: RunNotifier): org.junit.runners.model.Statement {
     // Get max parallel forks from system property, default to number of available processors
-    val configuredForks = SystemPropertyCache.get("junit.parallel.forks",
-      Runtime.getRuntime().availableProcessors().toString()).toIntOrNull() ?: 2
+    val configuredForks =
+        SystemPropertyCache.get(
+                "junit.parallel.forks",
+                Runtime.getRuntime().availableProcessors().toString(),
+            )
+            .toIntOrNull() ?: 2
 
     // Limit parallelism to the number of available devices to prevent contention
     // This ensures tests don't compete for limited device resources
     val deviceCount = AutoMobileSharedUtils.deviceChecker.getDeviceCount()
-    val maxParallelForks = if (deviceCount > 0) {
-      val effectiveForks = configuredForks.coerceAtMost(deviceCount)
-      if (effectiveForks < configuredForks) {
-        println("AutoMobileRunner: Limiting parallelism from $configuredForks to $effectiveForks (only $deviceCount device(s) available)")
-      }
-      effectiveForks
-    } else {
-      // No devices detected - fall back to configured value (tests may fail or be skipped)
-      configuredForks
-    }
+    val maxParallelForks =
+        if (deviceCount > 0) {
+          val effectiveForks = configuredForks.coerceAtMost(deviceCount)
+          if (effectiveForks < configuredForks) {
+            println(
+                "AutoMobileRunner: Limiting parallelism from $configuredForks to $effectiveForks (only $deviceCount device(s) available)"
+            )
+          }
+          effectiveForks
+        } else {
+          // No devices detected - fall back to configured value (tests may fail or be skipped)
+          configuredForks
+        }
 
     val children = getChildren()
 
-    println("AutoMobileRunner: childrenInvoker called with ${children.size} children, maxParallelForks=$maxParallelForks, deviceCount=$deviceCount")
+    println(
+        "AutoMobileRunner: childrenInvoker called with ${children.size} children, maxParallelForks=$maxParallelForks, deviceCount=$deviceCount"
+    )
 
     // Only parallelize if we have multiple children and parallelism is enabled
     if (children.size <= 1 || maxParallelForks <= 1) {
-      println("AutoMobileRunner: Using SEQUENTIAL execution (children=${children.size}, forks=$maxParallelForks)")
+      println(
+          "AutoMobileRunner: Using SEQUENTIAL execution (children=${children.size}, forks=$maxParallelForks)"
+      )
       // Fall back to sequential execution
       return super.childrenInvoker(notifier)
     }
@@ -103,14 +114,19 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
         try {
           // Submit each test method for parallel execution
-          val futures = children.map { child ->
-            executor.submit {
-              println("[${Thread.currentThread().name}] Starting test: ${describeChild(child).methodName}")
-              // Synchronize notifier access to ensure thread safety
-              runChild(child, SynchronizedRunNotifier(notifier))
-              println("[${Thread.currentThread().name}] Finished test: ${describeChild(child).methodName}")
-            }
-          }
+          val futures =
+              children.map { child ->
+                executor.submit {
+                  println(
+                      "[${Thread.currentThread().name}] Starting test: ${describeChild(child).methodName}"
+                  )
+                  // Synchronize notifier access to ensure thread safety
+                  runChild(child, SynchronizedRunNotifier(notifier))
+                  println(
+                      "[${Thread.currentThread().name}] Finished test: ${describeChild(child).methodName}"
+                  )
+                }
+              }
 
           // Wait for all test methods to complete and collect any exceptions
           val exceptions = mutableListOf<Throwable>()
@@ -148,7 +164,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   private fun runAutoMobileTest(
       method: FrameworkMethod,
       annotation: AutoMobileTest,
-      notifier: RunNotifier
+      notifier: RunNotifier,
   ) {
     val description = describeChild(method)
     notifier.fireTestStarted(description)
@@ -171,10 +187,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
             append("\n\nFull test output written to: ${result.logFile.absolutePath}")
           }
         }
-        val failure =
-            Failure(
-                description,
-                AutoMobileTestException(errorMessage))
+        val failure = Failure(description, AutoMobileTestException(errorMessage))
         notifier.fireTestFailure(failure)
       }
     } catch (e: Exception) {
@@ -194,7 +207,8 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       }
       else ->
           throw IllegalArgumentException(
-              "Either 'plan' or 'prompt' (with aiAssistance=true) must be specified in @AutoMobileTest")
+              "Either 'plan' or 'prompt' (with aiAssistance=true) must be specified in @AutoMobileTest"
+          )
     }
   }
 
@@ -206,14 +220,17 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     val testResourcesDir =
         File(
             klass.classLoader.getResource(".")?.toURI()
-                ?: throw RuntimeException("Cannot find test resources directory"))
+                ?: throw RuntimeException("Cannot find test resources directory")
+        )
 
     return agent.generatePlanFromPrompt(annotation.prompt, className, methodName, testResourcesDir)
   }
 
   private fun resolvePlanPath(planPath: String): String {
     // Check cache first to avoid repeated classpath resolution
-    PlanCache.getCachedPath(planPath)?.let { return it }
+    PlanCache.getCachedPath(planPath)?.let {
+      return it
+    }
 
     val classLoader = klass.classLoader
     val resource =
@@ -225,18 +242,24 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     return resolvedPath
   }
 
-  private fun executeAutoMobilePlan(planPath: String, annotation: AutoMobileTest, testName: String): ExecutionResult {
+  private fun executeAutoMobilePlan(
+      planPath: String,
+      annotation: AutoMobileTest,
+      testName: String,
+  ): ExecutionResult {
     val startTime = System.currentTimeMillis()
     val json = Json { ignoreUnknownKeys = true }
 
     try {
       // Read the YAML plan content (with caching for repeated plans)
       val planReadStart = System.currentTimeMillis()
-      val planContent = PlanCache.getCachedContent(planPath) ?: run {
-        val content = File(planPath).readText()
-        PlanCache.cacheContent(planPath, content)
-        content
-      }
+      val planContent =
+          PlanCache.getCachedContent(planPath)
+              ?: run {
+                val content = File(planPath).readText()
+                PlanCache.cacheContent(planPath, content)
+                content
+              }
       PerformanceTracker.measure("Plan file read", planReadStart)
 
       // Base64 encode the plan content to safely pass through command line
@@ -246,7 +269,9 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
       // Generate unique session UUID for this test execution to enable proper device assignment
       val sessionUuid = UUID.randomUUID().toString()
-      println("[${Thread.currentThread().name}] Generated session UUID: $sessionUuid for test: $testName")
+      println(
+          "[${Thread.currentThread().name}] Generated session UUID: $sessionUuid for test: $testName"
+      )
 
       val requestBuildStart = System.currentTimeMillis()
       val daemonRequestArgs = buildDaemonExecutePlanArgs(base64Content, annotation, sessionUuid)
@@ -259,11 +284,16 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
       DaemonHeartbeat.registerSession(sessionUuid)
       val execStart = System.currentTimeMillis()
-      val response = try {
-        DaemonSocketClientManager.callTool("executePlan", daemonRequestArgs, annotation.timeoutMs)
-      } finally {
-        DaemonHeartbeat.unregisterSession(sessionUuid)
-      }
+      val response =
+          try {
+            DaemonSocketClientManager.callTool(
+                "executePlan",
+                daemonRequestArgs,
+                annotation.timeoutMs,
+            )
+          } finally {
+            DaemonHeartbeat.unregisterSession(sessionUuid)
+          }
       PerformanceTracker.measure("Daemon request execution", execStart)
 
       // Verify daemon is still alive after test execution
@@ -272,21 +302,23 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
       val executionTime = System.currentTimeMillis() - startTime
 
-      val outputPayload = response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
+      val outputPayload =
+          response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
       val parseResult = parseDaemonToolResult(response, json)
 
       // Write log file for this test execution
       val logWriteStart = System.currentTimeMillis()
-      val logFile = writeTestLog(
-          testName = testName,
-          className = klass.simpleName,
-          stdout = outputPayload,
-          stderr = response.error ?: "",
-          exitCode = if (response.success && parseResult.success) 0 else 1,
-          executionTimeMs = executionTime,
-          success = response.success && parseResult.success,
-          performanceMeasurements = PerformanceTracker.getMeasurements()
-      )
+      val logFile =
+          writeTestLog(
+              testName = testName,
+              className = klass.simpleName,
+              stdout = outputPayload,
+              stderr = response.error ?: "",
+              exitCode = if (response.success && parseResult.success) 0 else 1,
+              executionTimeMs = executionTime,
+              success = response.success && parseResult.success,
+              performanceMeasurements = PerformanceTracker.getMeasurements(),
+          )
       PerformanceTracker.measure("Log file write", logWriteStart)
       PerformanceTracker.clear()
 
@@ -294,22 +326,25 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         println("Test output written to: ${logFile.absolutePath}")
       }
 
-      val finalResult = if (response.success && parseResult.success) {
-        ExecutionResult(
-            success = true,
-            exitCode = 0,
-            output = outputPayload,
-            executionTimeMs = executionTime,
-            logFile = logFile)
-      } else {
-        handleFailure(
-            annotation,
-            1,
-            outputPayload,
-            response.error ?: parseResult.errorMessage,
-            executionTime,
-            logFile)
-      }
+      val finalResult =
+          if (response.success && parseResult.success) {
+            ExecutionResult(
+                success = true,
+                exitCode = 0,
+                output = outputPayload,
+                executionTimeMs = executionTime,
+                logFile = logFile,
+            )
+          } else {
+            handleFailure(
+                annotation,
+                1,
+                outputPayload,
+                response.error ?: parseResult.errorMessage,
+                executionTime,
+                logFile,
+            )
+          }
 
       return finalResult
     } catch (e: Exception) {
@@ -320,21 +355,23 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
           success = false,
           exitCode = -1,
           errorMessage = e.message ?: "Unknown error",
-          executionTimeMs = executionTime)
+          executionTimeMs = executionTime,
+      )
     }
   }
 
   private fun buildDaemonExecutePlanArgs(
       base64PlanContent: String,
       annotation: AutoMobileTest,
-      sessionUuid: String
+      sessionUuid: String,
   ): JsonObject {
-    val values = mutableMapOf<String, kotlinx.serialization.json.JsonElement>(
-        "planContent" to JsonPrimitive("base64:$base64PlanContent"),
-        "platform" to JsonPrimitive("android"),
-        "startStep" to JsonPrimitive(0),
-        "sessionUuid" to JsonPrimitive(sessionUuid)
-    )
+    val values =
+        mutableMapOf<String, kotlinx.serialization.json.JsonElement>(
+            "planContent" to JsonPrimitive("base64:$base64PlanContent"),
+            "platform" to JsonPrimitive("android"),
+            "startStep" to JsonPrimitive(0),
+            "sessionUuid" to JsonPrimitive(sessionUuid),
+        )
 
     if (annotation.device != "auto") {
       values["deviceId"] = JsonPrimitive(annotation.device)
@@ -348,7 +385,8 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       return ParsedToolResult(false, response.error ?: "Daemon returned failure")
     }
 
-    val resultElement = response.result ?: return ParsedToolResult(false, "Daemon returned empty result")
+    val resultElement =
+        response.result ?: return ParsedToolResult(false, "Daemon returned empty result")
 
     val resultObject = resultElement.jsonObject
     val contentArray = resultObject["content"]
@@ -378,7 +416,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       output: String,
       errorOutput: String,
       baseExecutionTime: Long,
-      logFile: File
+      logFile: File,
   ): ExecutionResult {
 
     val ciMode = SystemPropertyCache.getBoolean("automobile.ci.mode", false)
@@ -388,16 +426,18 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
           success = false,
           exitCode = exitCode,
           output = output,
-          errorMessage = buildString {
-            append("AutoMobile plan execution failed with exit code ")
-            append(exitCode)
-            if (errorOutput.isNotEmpty()) {
-              append("\nErrors: ")
-              append(errorOutput)
-            }
-          },
+          errorMessage =
+              buildString {
+                append("AutoMobile plan execution failed with exit code ")
+                append(exitCode)
+                if (errorOutput.isNotEmpty()) {
+                  append("\nErrors: ")
+                  append(errorOutput)
+                }
+              },
           executionTimeMs = baseExecutionTime,
-          logFile = logFile)
+          logFile = logFile,
+      )
     }
 
     println("Attempting AI-assisted recovery for failed test")
@@ -413,24 +453,27 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
           aiRecoveryAttempted = true,
           aiRecoverySuccessful = true,
           executionTimeMs = baseExecutionTime + recoveryResult.recoveryTimeMs,
-          logFile = logFile)
+          logFile = logFile,
+      )
     } else {
       println("AI recovery failed")
       ExecutionResult(
           success = false,
           exitCode = exitCode,
           output = output,
-          errorMessage = buildString {
-            append("AutoMobile plan execution failed and AI recovery unsuccessful")
-            if (errorOutput.isNotEmpty()) {
-              append("\nErrors: ")
-              append(errorOutput)
-            }
-          },
+          errorMessage =
+              buildString {
+                append("AutoMobile plan execution failed and AI recovery unsuccessful")
+                if (errorOutput.isNotEmpty()) {
+                  append("\nErrors: ")
+                  append(errorOutput)
+                }
+              },
           aiRecoveryAttempted = true,
           aiRecoverySuccessful = false,
           executionTimeMs = baseExecutionTime + recoveryResult.recoveryTimeMs,
-          logFile = logFile)
+          logFile = logFile,
+      )
     }
   }
 
@@ -444,20 +487,20 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   }
 
   /**
-   * Verify the daemon is still alive after test execution.
-   * This helps detect if the daemon crashed or was killed by heartbeat timeout.
-   * Logs a warning if the daemon is not responding, which aids debugging.
+   * Verify the daemon is still alive after test execution. This helps detect if the daemon crashed
+   * or was killed by heartbeat timeout. Logs a warning if the daemon is not responding, which aids
+   * debugging.
    */
   private fun verifyDaemonHealth(testName: String) {
     val checker = connectivityChecker
     if (!checker.isDaemonAlive()) {
       println("[WARNING] Daemon is no longer responding after test: $testName")
       println("[WARNING] This may indicate the daemon crashed or was killed by heartbeat timeout.")
-      println("[WARNING] Subsequent tests may fail. Consider increasing heartbeat timeout or checking daemon logs.")
+      println(
+          "[WARNING] Subsequent tests may fail. Consider increasing heartbeat timeout or checking daemon logs."
+      )
     }
   }
-
-
 
   private data class ExecutionResult(
       val success: Boolean,
@@ -467,29 +510,26 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       val executionTimeMs: Long = 0L,
       val aiRecoveryAttempted: Boolean = false,
       val aiRecoverySuccessful: Boolean = false,
-      val logFile: File? = null
+      val logFile: File? = null,
   )
 
-  private data class ParsedToolResult(
-      val success: Boolean,
-      val errorMessage: String
-  )
+  private data class ParsedToolResult(val success: Boolean, val errorMessage: String)
 
   class AutoMobileTestException(message: String) : Exception(message)
 
   companion object {
     /**
-     * Injectable connectivity checker for testing.
-     * Set this to a fake implementation before running tests to verify daemon health check behavior.
+     * Injectable connectivity checker for testing. Set this to a fake implementation before running
+     * tests to verify daemon health check behavior.
      */
-    @JvmStatic
-    internal var testConnectivityChecker: DaemonConnectivityChecker? = null
+    @JvmStatic internal var testConnectivityChecker: DaemonConnectivityChecker? = null
 
-    private val LOG_DIR = File("scratch/test-logs").apply {
-      if (!exists()) {
-        mkdirs()
-      }
-    }
+    private val LOG_DIR =
+        File("scratch/test-logs").apply {
+          if (!exists()) {
+            mkdirs()
+          }
+        }
 
     private const val MAX_LOGS_TO_KEEP = 10
 
@@ -497,14 +537,14 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     private val SEPARATOR_LONG = "=".repeat(80)
     private val SEPARATOR_SHORT = "-".repeat(80)
 
-    // Phase 7: Thread-local SimpleDateFormat for log content (not filename - that uses compact format)
-    private val logTimestampFormat: ThreadLocal<SimpleDateFormat> = ThreadLocal.withInitial {
-      SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
-    }
+    // Phase 7: Thread-local SimpleDateFormat for log content (not filename - that uses compact
+    // format)
+    private val logTimestampFormat: ThreadLocal<SimpleDateFormat> =
+        ThreadLocal.withInitial { SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS") }
 
     /**
-     * Write test execution output to a log file in the scratch directory.
-     * Returns the path to the log file.
+     * Write test execution output to a log file in the scratch directory. Returns the path to the
+     * log file.
      */
     fun writeTestLog(
         testName: String,
@@ -514,7 +554,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         exitCode: Int,
         executionTimeMs: Long,
         success: Boolean,
-        performanceMeasurements: List<Pair<String, Long>> = emptyList()
+        performanceMeasurements: List<Pair<String, Long>> = emptyList(),
     ): File {
       val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss-SSS").format(Date())
       // Phase 6: Use cached regex patterns to avoid repeated compilation
@@ -583,12 +623,11 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
 
     /**
-     * Deferred log cleanup - only runs cleanup when log count exceeds 2x the max threshold.
-     * This avoids running cleanup on every test execution.
+     * Deferred log cleanup - only runs cleanup when log count exceeds 2x the max threshold. This
+     * avoids running cleanup on every test execution.
      */
     private fun deferredCleanupOldLogs() {
-      val logFiles = LOG_DIR.listFiles { file -> file.isFile && file.extension == "log" }
-          ?: return
+      val logFiles = LOG_DIR.listFiles { file -> file.isFile && file.extension == "log" } ?: return
 
       // Only cleanup when we have significantly more logs than needed (2x threshold)
       val cleanupThreshold = MAX_LOGS_TO_KEEP * 2
@@ -602,9 +641,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   }
 }
 
-/**
- * Thread-safe wrapper for RunNotifier to ensure synchronized access from parallel test threads.
- */
+/** Thread-safe wrapper for RunNotifier to ensure synchronized access from parallel test threads. */
 private class SynchronizedRunNotifier(private val delegate: RunNotifier) : RunNotifier() {
 
   @Synchronized

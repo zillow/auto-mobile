@@ -45,7 +45,9 @@ subprojects {
     compilerOptions {
       languageVersion.set(
           KotlinVersion.valueOf(
-              "KOTLIN_${libs.versions.build.kotlin.language.get().replace(".", "_")}"))
+              "KOTLIN_${libs.versions.build.kotlin.language.get().replace(".", "_")}"
+          )
+      )
       jvmTarget.set(JvmTarget.valueOf("JVM_${libs.versions.build.java.target.get()}"))
       freeCompilerArgs.addAll(
           listOf(
@@ -58,7 +60,8 @@ subprojects {
               "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
               "-opt-in=kotlinx.coroutines.FlowPreview",
               "-Xcontext-receivers",
-          ))
+          )
+      )
     }
   }
 }

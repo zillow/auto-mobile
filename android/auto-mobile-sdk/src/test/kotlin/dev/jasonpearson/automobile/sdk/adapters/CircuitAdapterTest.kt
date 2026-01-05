@@ -10,134 +10,116 @@ import org.junit.Test
 
 class CircuitAdapterTest {
 
-    @Before
-    fun setup() {
-        AutoMobileSDK.clearNavigationListeners()
-        AutoMobileSDK.setEnabled(true)
-        CircuitAdapter.stop()
-    }
+  @Before
+  fun setup() {
+    AutoMobileSDK.clearNavigationListeners()
+    AutoMobileSDK.setEnabled(true)
+    CircuitAdapter.stop()
+  }
 
-    @After
-    fun tearDown() {
-        AutoMobileSDK.clearNavigationListeners()
-        CircuitAdapter.stop()
-    }
+  @After
+  fun tearDown() {
+    AutoMobileSDK.clearNavigationListeners()
+    CircuitAdapter.stop()
+  }
 
-    @Test
-    fun `start should activate adapter`() {
-        assertFalse(CircuitAdapter.isActive())
+  @Test
+  fun `start should activate adapter`() {
+    assertFalse(CircuitAdapter.isActive())
 
-        CircuitAdapter.start()
+    CircuitAdapter.start()
 
-        assertTrue(CircuitAdapter.isActive())
-    }
+    assertTrue(CircuitAdapter.isActive())
+  }
 
-    @Test
-    fun `stop should deactivate adapter`() {
-        CircuitAdapter.start()
-        assertTrue(CircuitAdapter.isActive())
+  @Test
+  fun `stop should deactivate adapter`() {
+    CircuitAdapter.start()
+    assertTrue(CircuitAdapter.isActive())
 
-        CircuitAdapter.stop()
+    CircuitAdapter.stop()
 
-        assertFalse(CircuitAdapter.isActive())
-    }
+    assertFalse(CircuitAdapter.isActive())
+  }
 
-    @Test
-    fun `trackNavigation should notify SDK when active`() {
-        var receivedEvent: NavigationEvent? = null
-        AutoMobileSDK.addNavigationListener { event ->
-            receivedEvent = event
-        }
+  @Test
+  fun `trackNavigation should notify SDK when active`() {
+    var receivedEvent: NavigationEvent? = null
+    AutoMobileSDK.addNavigationListener { event -> receivedEvent = event }
 
-        CircuitAdapter.start()
-        CircuitAdapter.trackNavigation("ProfileScreen")
+    CircuitAdapter.start()
+    CircuitAdapter.trackNavigation("ProfileScreen")
 
-        assertNotNull(receivedEvent)
-        assertEquals("ProfileScreen", receivedEvent?.destination)
-        assertEquals(NavigationSource.CIRCUIT, receivedEvent?.source)
-    }
+    assertNotNull(receivedEvent)
+    assertEquals("ProfileScreen", receivedEvent?.destination)
+    assertEquals(NavigationSource.CIRCUIT, receivedEvent?.source)
+  }
 
-    @Test
-    fun `trackNavigation should not notify SDK when inactive`() {
-        var receivedEvent: NavigationEvent? = null
-        AutoMobileSDK.addNavigationListener { event ->
-            receivedEvent = event
-        }
+  @Test
+  fun `trackNavigation should not notify SDK when inactive`() {
+    var receivedEvent: NavigationEvent? = null
+    AutoMobileSDK.addNavigationListener { event -> receivedEvent = event }
 
-        // Don't start the adapter
-        CircuitAdapter.trackNavigation("ProfileScreen")
+    // Don't start the adapter
+    CircuitAdapter.trackNavigation("ProfileScreen")
 
-        assertNull(receivedEvent)
-    }
+    assertNull(receivedEvent)
+  }
 
-    @Test
-    fun `trackNavigation should include arguments`() {
-        var receivedEvent: NavigationEvent? = null
-        AutoMobileSDK.addNavigationListener { event ->
-            receivedEvent = event
-        }
+  @Test
+  fun `trackNavigation should include arguments`() {
+    var receivedEvent: NavigationEvent? = null
+    AutoMobileSDK.addNavigationListener { event -> receivedEvent = event }
 
-        val arguments = mapOf("userId" to "123", "fromScreen" to "Home")
+    val arguments = mapOf("userId" to "123", "fromScreen" to "Home")
 
-        CircuitAdapter.start()
-        CircuitAdapter.trackNavigation(
-            destination = "ProfileScreen",
-            arguments = arguments
-        )
+    CircuitAdapter.start()
+    CircuitAdapter.trackNavigation(destination = "ProfileScreen", arguments = arguments)
 
-        assertNotNull(receivedEvent)
-        assertEquals(arguments, receivedEvent?.arguments)
-    }
+    assertNotNull(receivedEvent)
+    assertEquals(arguments, receivedEvent?.arguments)
+  }
 
-    @Test
-    fun `trackNavigation should include metadata`() {
-        var receivedEvent: NavigationEvent? = null
-        AutoMobileSDK.addNavigationListener { event ->
-            receivedEvent = event
-        }
+  @Test
+  fun `trackNavigation should include metadata`() {
+    var receivedEvent: NavigationEvent? = null
+    AutoMobileSDK.addNavigationListener { event -> receivedEvent = event }
 
-        val metadata = mapOf("transition" to "slide", "duration" to "300")
+    val metadata = mapOf("transition" to "slide", "duration" to "300")
 
-        CircuitAdapter.start()
-        CircuitAdapter.trackNavigation(
-            destination = "ProfileScreen",
-            metadata = metadata
-        )
+    CircuitAdapter.start()
+    CircuitAdapter.trackNavigation(destination = "ProfileScreen", metadata = metadata)
 
-        assertNotNull(receivedEvent)
-        assertEquals(metadata, receivedEvent?.metadata)
-    }
+    assertNotNull(receivedEvent)
+    assertEquals(metadata, receivedEvent?.metadata)
+  }
 
-    @Test
-    fun `trackNavigation should handle empty arguments and metadata`() {
-        var receivedEvent: NavigationEvent? = null
-        AutoMobileSDK.addNavigationListener { event ->
-            receivedEvent = event
-        }
+  @Test
+  fun `trackNavigation should handle empty arguments and metadata`() {
+    var receivedEvent: NavigationEvent? = null
+    AutoMobileSDK.addNavigationListener { event -> receivedEvent = event }
 
-        CircuitAdapter.start()
-        CircuitAdapter.trackNavigation("ProfileScreen")
+    CircuitAdapter.start()
+    CircuitAdapter.trackNavigation("ProfileScreen")
 
-        assertNotNull(receivedEvent)
-        assertTrue(receivedEvent?.arguments?.isEmpty() ?: false)
-        assertTrue(receivedEvent?.metadata?.isEmpty() ?: false)
-    }
+    assertNotNull(receivedEvent)
+    assertTrue(receivedEvent?.arguments?.isEmpty() ?: false)
+    assertTrue(receivedEvent?.metadata?.isEmpty() ?: false)
+  }
 
-    @Test
-    fun `multiple trackNavigation calls should trigger multiple events`() {
-        val receivedEvents = mutableListOf<NavigationEvent>()
-        AutoMobileSDK.addNavigationListener { event ->
-            receivedEvents.add(event)
-        }
+  @Test
+  fun `multiple trackNavigation calls should trigger multiple events`() {
+    val receivedEvents = mutableListOf<NavigationEvent>()
+    AutoMobileSDK.addNavigationListener { event -> receivedEvents.add(event) }
 
-        CircuitAdapter.start()
-        CircuitAdapter.trackNavigation("Screen1")
-        CircuitAdapter.trackNavigation("Screen2")
-        CircuitAdapter.trackNavigation("Screen3")
+    CircuitAdapter.start()
+    CircuitAdapter.trackNavigation("Screen1")
+    CircuitAdapter.trackNavigation("Screen2")
+    CircuitAdapter.trackNavigation("Screen3")
 
-        assertEquals(3, receivedEvents.size)
-        assertEquals("Screen1", receivedEvents[0].destination)
-        assertEquals("Screen2", receivedEvents[1].destination)
-        assertEquals("Screen3", receivedEvents[2].destination)
-    }
+    assertEquals(3, receivedEvents.size)
+    assertEquals("Screen1", receivedEvents[0].destination)
+    assertEquals("Screen2", receivedEvents[1].destination)
+    assertEquals("Screen3", receivedEvents[2].destination)
+  }
 }

@@ -65,7 +65,10 @@ export interface DebugSearchResult {
   query: {
     text?: string;
     resourceId?: string;
-    containerElementId?: string;
+    container?: {
+      elementId?: string;
+      text?: string;
+    };
     fuzzyMatch: boolean;
     caseSensitive: boolean;
   };

@@ -67,7 +67,8 @@ export class TapOnElement extends BaseVisualChange {
     options: TapOnElementOptions,
     attempt: number,
     observeResult?: ObserveResult,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    containerFound: boolean = true
   ): Promise<Element> {
     if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
       const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
@@ -80,7 +81,7 @@ export class TapOnElement extends BaseVisualChange {
         case "android":
           const queryOptions = {
             query: options.text || options.elementId || "",
-            containerElementId: options.containerElementId
+            containerElementId: options.container?.elementId
           };
           latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(queryOptions, undefined, false, 0, signal);
           break;
@@ -101,6 +102,15 @@ export class TapOnElement extends BaseVisualChange {
           signal
         );
       }
+    }
+
+    if (!element && options.container && !containerFound) {
+      const containerLabel = options.container.elementId
+        ? `elementId '${options.container.elementId}'`
+        : `text '${options.container.text}'`;
+      throw new ActionableError(
+        `Container element not found with provided ${containerLabel}`
+      );
     }
 
     // Vision fallback: Try Claude vision API if all retries exhausted
@@ -169,13 +179,30 @@ export class TapOnElement extends BaseVisualChange {
 
     if (!element) {
       if (options.text) {
-        throw new ActionableError(`Element not found with provided text '${options.text}'`);
+        const containerHint = options.container
+          ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
+          : "";
+        throw new ActionableError(`Element not found with provided text '${options.text}'${containerHint}`);
       } else {
-        throw new ActionableError(`Element not found with provided elementId '${options.elementId}'`);
+        const containerHint = options.container
+          ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
+          : "";
+        throw new ActionableError(`Element not found with provided elementId '${options.elementId}'${containerHint}`);
       }
     }
 
     return element;
+  }
+
+  private isContainerAvailable(
+    viewHierarchy: ViewHierarchyResult,
+    container?: { elementId?: string; text?: string }
+  ): boolean {
+    if (!container) {
+      return true;
+    }
+
+    return this.elementUtils.hasContainerElement(viewHierarchy, container);
   }
 
   async findElementToTap(
@@ -185,26 +212,27 @@ export class TapOnElement extends BaseVisualChange {
     observeResult?: ObserveResult,
     signal?: AbortSignal
   ): Promise<Element> {
+    const containerFound = this.isContainerAvailable(viewHierarchy, options.container);
     if (options.text) {
       // Find the UI element that contains the text
       const element = this.elementUtils.findElementByText(
         viewHierarchy,
         options.text,
-        options.containerElementId,
+        options.container,
         true,
         false,
       );
 
-      return await this.handleElementResult(element, options, attempt, observeResult, signal);
+      return await this.handleElementResult(element, options, attempt, observeResult, signal, containerFound);
     } else if (options.elementId) {
       // Find the UI element that matches the id
       const element = this.elementUtils.findElementByResourceId(
         viewHierarchy,
         options.elementId,
-        options.containerElementId,
+        options.container,
       );
 
-      return await this.handleElementResult(element, options, attempt, observeResult, signal);
+      return await this.handleElementResult(element, options, attempt, observeResult, signal, containerFound);
     } else {
       throw new ActionableError(`tapOn requires non-blank text or elementId to interact with`);
     }
@@ -307,7 +335,7 @@ export class TapOnElement extends BaseVisualChange {
           queryOptions: {
             text: options.text,
             elementId: options.elementId,
-            containerElementId: options.containerElementId
+            containerElementId: options.container?.elementId
           },
           changeExpected: false,
           timeoutMs: 800, // Reduce timeout for faster execution
@@ -368,7 +396,7 @@ export class TapOnElement extends BaseVisualChange {
         {
           text: options.text,
           resourceId: options.elementId,
-          containerElementId: options.containerElementId
+          container: options.container
         }
       );
 
@@ -478,7 +506,7 @@ export class TapOnElement extends BaseVisualChange {
       const targetElement = this.elementUtils.findElementByText(
         viewHierarchy,
         dragTo.text,
-        options.containerElementId,
+        options.container,
         true,
         false
       );
@@ -492,7 +520,7 @@ export class TapOnElement extends BaseVisualChange {
       const targetElement = this.elementUtils.findElementByResourceId(
         viewHierarchy,
         dragTo.elementId,
-        options.containerElementId
+        options.container
       );
       if (!targetElement) {
         throw new ActionableError(`Drag target not found with provided elementId '${dragTo.elementId}'`);

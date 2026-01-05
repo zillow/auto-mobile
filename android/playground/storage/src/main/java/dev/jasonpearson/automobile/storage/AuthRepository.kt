@@ -37,7 +37,9 @@ class AuthRepository(context: Context) {
       if (username.isNotEmpty() && password.isNotEmpty()) {
         val loggedInUser =
             LoggedInUserRecord(
-                userId = username, displayName = username.replaceFirstChar { it.uppercase() })
+                userId = username,
+                displayName = username.replaceFirstChar { it.uppercase() },
+            )
         setLoggedInUser(loggedInUser)
         LoginResult(success = loggedInUser)
       } else {

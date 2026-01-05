@@ -43,7 +43,8 @@ class ViewHierarchyExtractorTest {
             resourceId = null,
             clickable = "false",
             focusable = "false",
-            scrollable = "false")
+            scrollable = "false",
+        )
 
     val interactiveElement = UIElementInfo(text = "Button", clickable = "true")
 
@@ -119,7 +120,8 @@ class ViewHierarchyExtractorTest {
             enabled = "false",
             focusable = "true",
             focused = "false",
-            scrollable = "true")
+            scrollable = "true",
+        )
 
     assertTrue(element.isClickable)
     assertFalse(element.isEnabled)
@@ -132,8 +134,9 @@ class ViewHierarchyExtractorTest {
   fun `UIElementInfo enabled defaults to true when not specified`() {
     val element =
         UIElementInfo(
-            clickable = "false", enabled = null // Not specified
-            )
+            clickable = "false",
+            enabled = null, // Not specified
+        )
 
     assertFalse(element.isClickable)
     assertTrue(element.isEnabled) // Should default to true
@@ -150,7 +153,8 @@ class ViewHierarchyExtractorTest {
 
   @Test
   fun `detectIntentChooserIndicators returns true for resource id indicator`() {
-    val child = UIElementInfo(resourceId = "android:id/button_once", className = "android.widget.Button")
+    val child =
+        UIElementInfo(resourceId = "android:id/button_once", className = "android.widget.Button")
     val childJson = json.encodeToJsonElement(UIElementInfo.serializer(), child)
     val root = UIElementInfo(className = "android.widget.LinearLayout", node = childJson)
 
@@ -175,8 +179,8 @@ class ViewHierarchyExtractorTest {
             text = "Button",
             clickable = "true",
             bounds = ElementBounds(0, 0, 100, 50),
-            accessible = 0.75 // 75% accessible
-            )
+            accessible = 0.75, // 75% accessible
+        )
 
     assertEquals(0.75, clickableElement.accessible!!, 0.001)
   }
@@ -218,7 +222,8 @@ class ViewHierarchyExtractorTest {
             elementWithHint,
             elementWithError,
             elementWithActions,
-            elementWithRange)
+            elementWithRange,
+        )
     val childrenJson =
         json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
 
@@ -246,7 +251,8 @@ class ViewHierarchyExtractorTest {
               it.errorMessage == null &&
               it.actions == null &&
               it.rangeInfo == null
-        })
+        }
+    )
   }
 
   @Test
@@ -267,7 +273,8 @@ class ViewHierarchyExtractorTest {
             rangeInfo = "current:50,min:0,max:100",
             inputType = "text",
             actions = listOf("click", "focus"),
-            extras = mapOf("custom-property" to "custom-value"))
+            extras = mapOf("custom-property" to "custom-value"),
+        )
 
     assertEquals("submit-button", element.testTag)
     assertEquals("button", element.role)
@@ -297,7 +304,8 @@ class ViewHierarchyExtractorTest {
             hintText = "Click me",
             actions = listOf("click", "focus"),
             clickable = "false", // Not clickable so it goes through the non-clickable path
-            bounds = ElementBounds(0, 0, 100, 50))
+            bounds = ElementBounds(0, 0, 100, 50),
+        )
 
     // Use reflection to access the private processForAccessibility method
     val extractor = ViewHierarchyExtractor()
@@ -328,7 +336,8 @@ class ViewHierarchyExtractorTest {
             role = "button",
             stateDescription = "Enabled",
             actions = listOf("click"),
-            extras = mapOf("custom" to "value"))
+            extras = mapOf("custom" to "value"),
+        )
 
     val json = Json { prettyPrint = true }
     val jsonString = json.encodeToString(UIElementInfo.serializer(), element)
@@ -337,7 +346,9 @@ class ViewHierarchyExtractorTest {
     assertTrue("JSON should contain test-tag field", jsonString.contains("test-tag"))
     assertTrue("JSON should contain role field", jsonString.contains("\"role\""))
     assertTrue(
-        "JSON should contain state-description field", jsonString.contains("state-description"))
+        "JSON should contain state-description field",
+        jsonString.contains("state-description"),
+    )
     assertTrue("JSON should contain actions field", jsonString.contains("\"actions\""))
     assertTrue("JSON should contain extras field", jsonString.contains("\"extras\""))
   }
@@ -349,7 +360,9 @@ class ViewHierarchyExtractorTest {
   ): List<UIElementInfo> {
     return this.javaClass
         .getDeclaredMethod(
-            "extractChildrenFromNode", kotlinx.serialization.json.JsonElement::class.java)
+            "extractChildrenFromNode",
+            kotlinx.serialization.json.JsonElement::class.java,
+        )
         .let { method ->
           method.isAccessible = true
           @Suppress("UNCHECKED_CAST")

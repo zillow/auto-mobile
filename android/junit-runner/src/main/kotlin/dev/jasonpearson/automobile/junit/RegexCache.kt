@@ -1,8 +1,9 @@
 package dev.jasonpearson.automobile.junit
 
 /**
- * Phase 6 optimization: Caches compiled regex patterns to avoid repeated compilation.
- * Regex compilation has measurable overhead; caching patterns used multiple times per test reduces allocations.
+ * Phase 6 optimization: Caches compiled regex patterns to avoid repeated compilation. Regex
+ * compilation has measurable overhead; caching patterns used multiple times per test reduces
+ * allocations.
  */
 object RegexCache {
   private val cache = mutableMapOf<String, Regex>()

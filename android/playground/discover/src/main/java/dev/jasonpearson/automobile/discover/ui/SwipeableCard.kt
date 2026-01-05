@@ -44,7 +44,7 @@ data class SwipeCard(
     val title: String,
     val description: String,
     val imageUrl: String,
-    val color: Color
+    val color: Color,
 )
 
 @Composable
@@ -67,7 +67,8 @@ fun SwipeableCard(card: SwipeCard, onSwipeAway: () -> Unit) {
                         coroutineScope.launch {
                           offsetX.animateTo(
                               targetValue = if (offsetX.value > 0) 1000f else -1000f,
-                              animationSpec = tween(300))
+                              animationSpec = tween(300),
+                          )
                           onSwipeAway()
                         }
                       } else {
@@ -77,44 +78,51 @@ fun SwipeableCard(card: SwipeCard, onSwipeAway: () -> Unit) {
                           scale.snapTo(1f)
                         }
                       }
-                    }) { change, dragAmount ->
-                      change.consume()
-                      coroutineScope.launch {
-                        offsetX.snapTo(offsetX.value + dragAmount)
-                        val progress = abs(offsetX.value) / 300f
-                        scale.snapTo(1f - (progress * 0.1f).coerceAtMost(0.1f))
-                      }
                     }
+                ) { change, dragAmount ->
+                  change.consume()
+                  coroutineScope.launch {
+                    offsetX.snapTo(offsetX.value + dragAmount)
+                    val progress = abs(offsetX.value) / 300f
+                    scale.snapTo(1f - (progress * 0.1f).coerceAtMost(0.1f))
+                  }
+                }
               },
-      colors = CardDefaults.cardColors(containerColor = card.color.copy(alpha = 0.1f))) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-              AsyncImage(
-                  model = card.imageUrl,
-                  contentDescription = card.title,
-                  modifier = Modifier.size(120.dp).clip(RoundedCornerShape(8.dp)),
-                  contentScale = ContentScale.Crop)
+      colors = CardDefaults.cardColors(containerColor = card.color.copy(alpha = 0.1f)),
+  ) {
+    Row(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      AsyncImage(
+          model = card.imageUrl,
+          contentDescription = card.title,
+          modifier = Modifier.size(120.dp).clip(RoundedCornerShape(8.dp)),
+          contentScale = ContentScale.Crop,
+      )
 
-              Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
-                Text(
-                    text = card.title,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface)
-                Text(
-                    text = card.description,
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp))
-              }
-
-              Icon(
-                  imageVector = Icons.Filled.DragHandle,
-                  contentDescription = "Swipe indicator",
-                  tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+      Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
+        Text(
+            text = card.title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = card.description,
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
       }
+
+      Icon(
+          imageVector = Icons.Filled.DragHandle,
+          contentDescription = "Swipe indicator",
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
 }
 
 @Preview(showBackground = true)
@@ -126,7 +134,8 @@ fun PreviewSwipeableCard() {
           title = "Preview Card",
           description = "This is a preview of the swipeable card component",
           imageUrl = "https://picsum.photos/300/200?random=1",
-          color = Color(0xFF6200EE))
+          color = Color(0xFF6200EE),
+      )
 
   MaterialTheme { SwipeableCard(card = sampleCard, onSwipeAway = {}) }
 }

@@ -17,7 +17,10 @@ export interface DebugSearchArgs {
   platform: Platform;
   text?: string;
   resourceId?: string;
-  containerElementId?: string;
+  container?: {
+    elementId?: string;
+    text?: string;
+  };
   fuzzyMatch?: boolean;
   caseSensitive?: boolean;
   includeNearMisses?: boolean;
@@ -47,7 +50,10 @@ export const debugSearchSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   text: z.string().optional().describe("Text to search for in elements"),
   resourceId: z.string().optional().describe("Resource ID to search for"),
-  containerElementId: z.string().optional().describe("Container element ID to restrict search within"),
+  container: z.object({
+    elementId: z.string().optional().describe("Container element resource ID to restrict search within"),
+    text: z.string().optional().describe("Container element text to restrict search within")
+  }).optional().describe("Container element to scope the search - specify elementId or text to locate it"),
   fuzzyMatch: z.boolean().optional().describe("Whether to use fuzzy matching (default: true)"),
   caseSensitive: z.boolean().optional().describe("Whether to use case-sensitive matching (default: false)"),
   includeNearMisses: z.boolean().optional().describe("Include elements that almost matched (default: true)"),
@@ -91,7 +97,7 @@ export function registerDebugTools() {
       const result = await debugSearch.execute({
         text: args.text,
         resourceId: args.resourceId,
-        containerElementId: args.containerElementId,
+        container: args.container,
         fuzzyMatch: args.fuzzyMatch,
         caseSensitive: args.caseSensitive,
         includeNearMisses: args.includeNearMisses,

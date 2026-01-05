@@ -28,5 +28,5 @@ annotation class AutoMobileTest(
     val timeoutMs: Long = 60000L,
 
     /** Target device ID or "auto" for any available device. Default: "auto" */
-    val device: String = "auto"
+    val device: String = "auto",
 )

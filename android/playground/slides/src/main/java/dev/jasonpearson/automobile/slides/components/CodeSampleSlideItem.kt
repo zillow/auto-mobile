@@ -32,7 +32,7 @@ fun CodeSampleSlideItem(
     title: String? = null, // Kept for API compatibility but not used
     highlight: String? = null,
     isDarkMode: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
   var showLoading by remember { mutableStateOf(true) }
@@ -61,12 +61,14 @@ fun CodeSampleSlideItem(
                     code = code,
                     language = language,
                     highlight = highlight,
-                    isDarkMode = isDarkMode)
+                    isDarkMode = isDarkMode,
+                )
 
             loadDataWithBaseURL("file:///android_asset/", htmlContent, "text/html", "UTF-8", null)
           }
         },
-        modifier = Modifier.fillMaxSize())
+        modifier = Modifier.fillMaxSize(),
+    )
 
     // Loading overlay
     if (showLoading) {
@@ -82,7 +84,7 @@ private fun createHighlightedCodeHtml(
     code: String,
     language: String,
     isDarkMode: Boolean,
-    highlight: String? = null
+    highlight: String? = null,
 ): String {
   val themeFile = if (isDarkMode) "prism-dark.css" else "prism-light.css"
 
@@ -147,7 +149,7 @@ private fun createHighlightedCodeHtml(
 internal fun processCodeWithHighlighting(
     code: String,
     highlight: String,
-    isDarkMode: Boolean
+    isDarkMode: Boolean,
 ): String {
   val codeLines = code.lines()
   val highlightLines = highlight.lines().map { it.trim() }.filter { it.isNotEmpty() }
@@ -174,26 +176,27 @@ fun CodeSampleSlideItemPreview() {
     CodeSampleSlideItem(
         code =
             """
-                @Test
-                fun testLoginFlow() {
-                    // Launch the app
-                    tapOn(text = "Login")
+            @Test
+            fun testLoginFlow() {
+                // Launch the app
+                tapOn(text = "Login")
 
-                    // Enter credentials
-                    inputText("user@example.com")
-                    tapOn(text = "Next")
-                    inputText("password123")
+                // Enter credentials
+                inputText("user@example.com")
+                tapOn(text = "Next")
+                inputText("password123")
 
-                    // Submit login
-                    tapOn(text = "Sign In")
+                // Submit login
+                tapOn(text = "Sign In")
 
-                    // Verify success
-                    assertVisible(text = "Welcome")
-                }
+                // Verify success
+                assertVisible(text = "Welcome")
+            }
             """
                 .trimIndent(),
         language = "kotlin",
-        isDarkMode = false)
+        isDarkMode = false,
+    )
   }
 }
 
@@ -204,26 +207,27 @@ fun CodeSampleSlideItemDarkPreview() {
     CodeSampleSlideItem(
         code =
             """
-                @Test
-                fun testLoginFlow() {
-                    // Launch the app
-                    tapOn(text = "Login")
+            @Test
+            fun testLoginFlow() {
+                // Launch the app
+                tapOn(text = "Login")
 
-                    // Enter credentials
-                    inputText("user@example.com")
-                    tapOn(text = "Next")
-                    inputText("password123")
+                // Enter credentials
+                inputText("user@example.com")
+                tapOn(text = "Next")
+                inputText("password123")
 
-                    // Submit login
-                    tapOn(text = "Sign In")
+                // Submit login
+                tapOn(text = "Sign In")
 
-                    // Verify success
-                    assertVisible(text = "Welcome")
-                }
+                // Verify success
+                assertVisible(text = "Welcome")
+            }
             """
                 .trimIndent(),
         language = "kotlin",
-        isDarkMode = true)
+        isDarkMode = true,
+    )
   }
 }
 
@@ -234,31 +238,32 @@ fun CodeSampleSlideItemHighlightPreview() {
     CodeSampleSlideItem(
         code =
             """
-                keepClearAreas: restricted=[], unrestricted=[]
-                mPrepareSyncSeqId=0
+            keepClearAreas: restricted=[], unrestricted=[]
+            mPrepareSyncSeqId=0
 
-                mGlobalConfiguration={1.0 310mcc260mnc [en_US] ldltr sw448dp w997dp h448dp 360dpi nrml long hdr widecg land finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 2244, 1008) mAppBounds=Rect(0, 0 - 2244, 1008) mMaxBounds=Rect(0, 0 - 2244, 1008) mDisplayRotation=ROTATION_90 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_90} s.6257 fontWeightAdjustment=0}
-                mHasPermanentDpad=false
-                mTopFocusedDisplayId=0
-                imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-                imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-                imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-                Minimum task size of display#0 220  mBlurEnabled=true
-                mLastDisplayFreezeDuration=0 due to new-config
-                mDisableSecureWindows=false
-                mHighResSnapshotScale=0.8
-                mSnapshotEnabled=true
-                SnapshotCache Task
+            mGlobalConfiguration={1.0 310mcc260mnc [en_US] ldltr sw448dp w997dp h448dp 360dpi nrml long hdr widecg land finger -keyb/v/h -nav/h winConfig={ mBounds=Rect(0, 0 - 2244, 1008) mAppBounds=Rect(0, 0 - 2244, 1008) mMaxBounds=Rect(0, 0 - 2244, 1008) mDisplayRotation=ROTATION_90 mWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_90} s.6257 fontWeightAdjustment=0}
+            mHasPermanentDpad=false
+            mTopFocusedDisplayId=0
+            imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+            imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+            imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+            Minimum task size of display#0 220  mBlurEnabled=true
+            mLastDisplayFreezeDuration=0 due to new-config
+            mDisableSecureWindows=false
+            mHighResSnapshotScale=0.8
+            mSnapshotEnabled=true
+            SnapshotCache Task
             """
                 .trimIndent(),
         language = "shell",
         highlight =
             """
-                imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-                imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-                imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+            imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+            imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+            imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
             """
                 .trimIndent(),
-        isDarkMode = true)
+        isDarkMode = true,
+    )
   }
 }

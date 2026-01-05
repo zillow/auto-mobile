@@ -10,14 +10,22 @@ fun getVisionSlides(): List<SlideContent> =
         SlideContent.LargeText(title = "Vision"),
         SlideContent.LargeText(title = "Built-in opt-in testing"),
         SlideContent.Emoji(
-            emoji = PresentationEmoji.ACCESSIBILITY, caption = "Accessibility Testing"),
+            emoji = PresentationEmoji.ACCESSIBILITY,
+            caption = "Accessibility Testing",
+        ),
         SlideContent.Emoji(
-            emoji = PresentationEmoji.SECURE, caption = "Security and Privacy Testing"),
+            emoji = PresentationEmoji.SECURE,
+            caption = "Security and Privacy Testing",
+        ),
         SlideContent.Emoji(emoji = PresentationEmoji.FAST, caption = "Performance Testing"),
         SlideContent.Emoji(
-            emoji = PresentationEmoji.DATA_TRANSFER, caption = "State Capture and Restoration"),
+            emoji = PresentationEmoji.DATA_TRANSFER,
+            caption = "State Capture and Restoration",
+        ),
         SlideContent.Emoji(
-            emoji = PresentationEmoji.TOOLBOX, caption = "We can build a better toolbox"),
+            emoji = PresentationEmoji.TOOLBOX,
+            caption = "We can build a better toolbox",
+        ),
         SlideContent.LargeText(title = "Project Status"),
         SlideContent.LargeText(title = "Works on all Android apps today"),
         SlideContent.LargeText(title = "iOS support prototyped"),
@@ -29,7 +37,8 @@ fun getVisionSlides(): List<SlideContent> =
                     BulletPoint(text = "Portrait/Landscape"),
                     BulletPoint(text = "API Levels"),
                     BulletPoint(text = "Input devices"),
-                )),
+                ),
+        ),
         SlideContent.LargeText(title = "Self healing soon"),
         SlideContent.BulletPoints(
             title = "Android MCP SDK which is also OSS",
@@ -38,9 +47,11 @@ fun getVisionSlides(): List<SlideContent> =
                     BulletPoint(text = "Tools: View Hierarchy, Storage, Network"),
                     BulletPoint(text = "Resources: App Resources, Filesystem"),
                     BulletPoint(text = "https://github.com/kaeawc/android-mcp-sdk"),
-                )),
+                ),
+        ),
         SlideContent.Screenshot(
             title = "Questions?",
             lightScreenshot = R.drawable.auto_mobile_qr_code,
-            caption = "https://www.jasonpearson.dev"),
+            caption = "https://www.jasonpearson.dev",
+        ),
     )

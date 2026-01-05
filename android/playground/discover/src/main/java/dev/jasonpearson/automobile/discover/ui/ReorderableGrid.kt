@@ -58,53 +58,53 @@ fun ReorderableGrid(images: List<GridImage>, onReorder: (Int, Int) -> Unit) {
       contentPadding = PaddingValues(8.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
-      modifier = Modifier.height(280.dp)) {
-        itemsIndexed(images, key = { _, image -> image.id }) { index, image ->
-          val isBeingDragged = draggedItemId == image.id
-          val isDropTarget = draggedOverIndex == index && !isBeingDragged
+      modifier = Modifier.height(280.dp),
+  ) {
+    itemsIndexed(images, key = { _, image -> image.id }) { index, image ->
+      val isBeingDragged = draggedItemId == image.id
+      val isDropTarget = draggedOverIndex == index && !isBeingDragged
 
-          GridImageItem(
-              image = image,
-              isDragged = isBeingDragged,
-              isDropTarget = isDropTarget,
-              onDragStart = { draggedItemId = image.id },
-              onDragEnd = {
-                if (draggedItemId != null && draggedOverIndex != -1) {
-                  val draggedIndex = images.indexOfFirst { it.id == draggedItemId }
-                  if (draggedIndex != -1 && draggedIndex != draggedOverIndex) {
-                    onReorder(draggedIndex, draggedOverIndex)
-                  }
-                }
-                draggedItemId = null
-                draggedOverIndex = -1
-              },
-              onDragMove = { offset ->
-                if (draggedItemId != null) {
-                  // Calculate which grid cell we're hovering over
-                  val itemSize = with(density) { 96.dp.toPx() } // Item size + spacing
-                  val cols = 3
-                  val currentRow = index / cols
-                  val currentCol = index % cols
+      GridImageItem(
+          image = image,
+          isDragged = isBeingDragged,
+          isDropTarget = isDropTarget,
+          onDragStart = { draggedItemId = image.id },
+          onDragEnd = {
+            if (draggedItemId != null && draggedOverIndex != -1) {
+              val draggedIndex = images.indexOfFirst { it.id == draggedItemId }
+              if (draggedIndex != -1 && draggedIndex != draggedOverIndex) {
+                onReorder(draggedIndex, draggedOverIndex)
+              }
+            }
+            draggedItemId = null
+            draggedOverIndex = -1
+          },
+          onDragMove = { offset ->
+            if (draggedItemId != null) {
+              // Calculate which grid cell we're hovering over
+              val itemSize = with(density) { 96.dp.toPx() } // Item size + spacing
+              val cols = 3
+              val currentRow = index / cols
+              val currentCol = index % cols
 
-                  val newCol =
-                      ((currentCol * itemSize + offset.x) / itemSize)
-                          .roundToInt()
-                          .coerceIn(0, cols - 1)
-                  val newRow =
-                      ((currentRow * itemSize + offset.y) / itemSize)
-                          .roundToInt()
-                          .coerceIn(0, 1) // 2 rows max in our 280dp height
-                  val newIndex = (newRow * cols + newCol).coerceIn(0, images.size - 1)
+              val newCol =
+                  ((currentCol * itemSize + offset.x) / itemSize).roundToInt().coerceIn(0, cols - 1)
+              val newRow =
+                  ((currentRow * itemSize + offset.y) / itemSize)
+                      .roundToInt()
+                      .coerceIn(0, 1) // 2 rows max in our 280dp height
+              val newIndex = (newRow * cols + newCol).coerceIn(0, images.size - 1)
 
-                  val draggedIndex = images.indexOfFirst { it.id == draggedItemId }
-                  if (newIndex != draggedOverIndex && newIndex != draggedIndex) {
-                    draggedOverIndex = newIndex
-                  }
-                }
-              },
-              modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
-        }
-      }
+              val draggedIndex = images.indexOfFirst { it.id == draggedItemId }
+              if (newIndex != draggedOverIndex && newIndex != draggedIndex) {
+                draggedOverIndex = newIndex
+              }
+            }
+          },
+          modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null),
+      )
+    }
+  }
 }
 
 @Composable
@@ -115,7 +115,7 @@ fun GridImageItem(
     onDragStart: () -> Unit,
     onDragEnd: () -> Unit,
     onDragMove: (Offset) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   var dragOffset by remember { mutableStateOf(Offset.Zero) }
   val scale = remember { Animatable(1f) }
@@ -149,10 +149,11 @@ fun GridImageItem(
                     onDragEnd = {
                       onDragEnd()
                       dragOffset = Offset.Zero
-                    }) { change, dragAmount ->
-                      dragOffset += dragAmount
-                      onDragMove(dragOffset)
-                    }
+                    },
+                ) { change, dragAmount ->
+                  dragOffset += dragAmount
+                  onDragMove(dragOffset)
+                }
               },
       elevation = CardDefaults.cardElevation(defaultElevation = if (isDragged) 16.dp else 4.dp),
       colors =
@@ -162,35 +163,41 @@ fun GridImageItem(
                     isDragged -> MaterialTheme.colorScheme.primaryContainer
                     isDropTarget -> MaterialTheme.colorScheme.secondaryContainer
                     else -> MaterialTheme.colorScheme.surface
-                  })) {
-        Box(modifier = Modifier.fillMaxSize()) {
-          AsyncImage(
-              model = image.imageUrl,
-              contentDescription = image.description,
-              modifier = Modifier.fillMaxSize(),
-              contentScale = ContentScale.Crop)
+                  }
+          ),
+  ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      AsyncImage(
+          model = image.imageUrl,
+          contentDescription = image.description,
+          modifier = Modifier.fillMaxSize(),
+          contentScale = ContentScale.Crop,
+      )
 
-          if (isDragged) {
-            Box(
-                modifier =
-                    Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)))
-          }
-
-          if (isDropTarget && !isDragged) {
-            Box(
-                modifier =
-                    Modifier.fillMaxSize()
-                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)))
-          }
-
-          Icon(
-              imageVector = Icons.Filled.Star,
-              contentDescription = "Drag handle",
-              modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp),
-              tint = Color.White)
-        }
+      if (isDragged) {
+        Box(
+            modifier =
+                Modifier.fillMaxSize()
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+        )
       }
+
+      if (isDropTarget && !isDragged) {
+        Box(
+            modifier =
+                Modifier.fillMaxSize()
+                    .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f))
+        )
+      }
+
+      Icon(
+          imageVector = Icons.Filled.Star,
+          contentDescription = "Drag handle",
+          modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).size(16.dp),
+          tint = Color.White,
+      )
+    }
+  }
 }
 
 @Preview(showBackground = true)
@@ -203,13 +210,15 @@ fun ReorderableGridPreview() {
           GridImage("3", "https://picsum.photos/200/200?random=3", "Sample image 3"),
           GridImage("4", "https://picsum.photos/200/200?random=4", "Sample image 4"),
           GridImage("5", "https://picsum.photos/200/200?random=5", "Sample image 5"),
-          GridImage("6", "https://picsum.photos/200/200?random=6", "Sample image 6"))
+          GridImage("6", "https://picsum.photos/200/200?random=6", "Sample image 6"),
+      )
 
   MaterialTheme {
     ReorderableGrid(
         images = sampleImages,
         onReorder = { fromIndex, toIndex ->
           // Preview doesn't handle reordering
-        })
+        },
+    )
   }
 }

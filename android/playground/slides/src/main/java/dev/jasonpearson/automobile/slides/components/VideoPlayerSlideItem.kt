@@ -23,7 +23,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 
@@ -38,7 +37,7 @@ fun VideoPlayerSlideItem(
     contentDescription: String? = null,
     modifier: Modifier = Modifier,
     captionColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    autoPlay: Boolean = false
+    autoPlay: Boolean = false,
 ) {
   val context = LocalContext.current
 
@@ -54,40 +53,44 @@ fun VideoPlayerSlideItem(
   Column(
       modifier = modifier.fillMaxSize().padding(24.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        // Video player
-        Card(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors =
-                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)) {
-              AndroidView(
-                  factory = { context ->
-                    PlayerView(context).apply {
-                      player = exoPlayer
-                      useController = true
-                      setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                      controllerAutoShow = true
-                      controllerHideOnTouch = false
-                      setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    }
-                  },
-                  modifier = Modifier.fillMaxSize())
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    // Video player
+    Card(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+    ) {
+      AndroidView(
+          factory = { context ->
+            PlayerView(context).apply {
+              player = exoPlayer
+              useController = true
+              setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+              controllerAutoShow = true
+              controllerHideOnTouch = false
+              setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
             }
+          },
+          modifier = Modifier.fillMaxSize(),
+      )
+    }
 
-        // Caption
-        caption?.let {
-          Text(
-              text = it,
-              style =
-                  MaterialTheme.typography.headlineSmall.copy(
-                      textAlign = TextAlign.Center,
-                      color = captionColor,
-                      fontWeight = FontWeight.Medium),
-              modifier = Modifier.padding(horizontal = 16.dp))
-        }
-      }
+    // Caption
+    caption?.let {
+      Text(
+          text = it,
+          style =
+              MaterialTheme.typography.headlineSmall.copy(
+                  textAlign = TextAlign.Center,
+                  color = captionColor,
+                  fontWeight = FontWeight.Medium,
+              ),
+          modifier = Modifier.padding(horizontal = 16.dp),
+      )
+    }
+  }
 
   // Lifecycle management
   DisposableEffect(exoPlayer) { onDispose { exoPlayer.release() } }
@@ -99,41 +102,47 @@ private fun VideoPlayerPreview(caption: String? = null, modifier: Modifier = Mod
   Column(
       modifier = modifier.fillMaxSize().padding(24.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally) {
-        // Video placeholder
-        Card(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors =
-                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)) {
-              Column(
-                  modifier = Modifier.fillMaxSize(),
-                  horizontalAlignment = Alignment.CenterHorizontally,
-                  verticalArrangement = Arrangement.Center) {
-                    Text(
-                        text = "🎬",
-                        style = MaterialTheme.typography.displayLarge,
-                        modifier = Modifier.padding(bottom = 16.dp))
-                    Text(
-                        text = "Video Player",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                  }
-            }
-
-        // Caption
-        caption?.let {
-          Text(
-              text = it,
-              style =
-                  MaterialTheme.typography.headlineSmall.copy(
-                      textAlign = TextAlign.Center,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
-                      fontWeight = FontWeight.Medium),
-              modifier = Modifier.padding(horizontal = 16.dp))
-        }
+      horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    // Video placeholder
+    Card(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+    ) {
+      Column(
+          modifier = Modifier.fillMaxSize(),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center,
+      ) {
+        Text(
+            text = "🎬",
+            style = MaterialTheme.typography.displayLarge,
+            modifier = Modifier.padding(bottom = 16.dp),
+        )
+        Text(
+            text = "Video Player",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
+    }
+
+    // Caption
+    caption?.let {
+      Text(
+          text = it,
+          style =
+              MaterialTheme.typography.headlineSmall.copy(
+                  textAlign = TextAlign.Center,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  fontWeight = FontWeight.Medium,
+              ),
+          modifier = Modifier.padding(horizontal = 16.dp),
+      )
+    }
+  }
 }
 
 @Preview(showBackground = true)

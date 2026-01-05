@@ -52,7 +52,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
@@ -63,7 +62,7 @@ sealed class VideoResource {
 
   data class RawVideo(
       @RawRes val portraitResourceId: Int,
-      @RawRes val landscapeResourceId: Int? = null
+      @RawRes val landscapeResourceId: Int? = null,
   ) : VideoResource()
 
   data object PlaceholderVideo : VideoResource()
@@ -95,7 +94,8 @@ fun VideoResource.toMediaItem(context: Context? = null): MediaItem? {
       val uri = "android.resource://$packageName/$resourceId".toUri()
       Log.d(
           "VideoResource",
-          "Creating MediaItem from raw resource: $resourceId (landscape: $landscapeResourceId, portrait: $portraitResourceId), URI: $uri, package: $packageName")
+          "Creating MediaItem from raw resource: $resourceId (landscape: $landscapeResourceId, portrait: $portraitResourceId), URI: $uri, package: $packageName",
+      )
       MediaItem.fromUri(uri)
     }
 
@@ -110,112 +110,119 @@ fun VideoResource.toMediaItem(context: Context? = null): MediaItem? {
 fun VideoPlayerScreen(
     videoId: String,
     onNavigateBack: () -> Unit,
-    viewModel: MediaPlayerViewModel = viewModel()
+    viewModel: MediaPlayerViewModel = viewModel(),
 ) {
   TrackRecomposition(id = "screen.videoPlayer", composableName = "VideoPlayerScreen") {
-  val context = LocalContext.current
-  val activity = LocalActivity.current
-  val player by viewModel.playerState.collectAsState()
-  val playbackError by viewModel.playbackError.collectAsState()
-  val shouldShowControls by viewModel.shouldShowControls.collectAsState()
+    val context = LocalContext.current
+    val activity = LocalActivity.current
+    val player by viewModel.playerState.collectAsState()
+    val playbackError by viewModel.playbackError.collectAsState()
+    val shouldShowControls by viewModel.shouldShowControls.collectAsState()
 
-  // Sample video data based on videoId
-  // TODO: probably shouldn't assume video data id matches data
-  val videoData = VideoData.entries.first { it.id == videoId }
+    // Sample video data based on videoId
+    // TODO: probably shouldn't assume video data id matches data
+    val videoData = VideoData.entries.first { it.id == videoId }
 
-  // Enable immersive mode
-  LaunchedEffect(Unit) {
-    activity?.let { act ->
-      WindowCompat.setDecorFitsSystemWindows(act.window, false)
-      val windowInsetsController =
-          WindowCompat.getInsetsController(act.window, act.window.decorView)
-      windowInsetsController.apply {
-        hide(WindowInsetsCompat.Type.systemBars())
-        systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-      }
-    }
-  }
-
-  // Initialize player when video URL is provided
-  LaunchedEffect(videoData.videoResource) {
-    if (videoData.videoResource !is VideoResource.PlaceholderVideo) {
-      viewModel.initializePlayer(context, videoData.videoResource)
-    }
-  }
-
-  // Cleanup player and restore system UI on disposal
-  DisposableEffect(Unit) {
-    onDispose {
-      viewModel.savePlayerState()
-      viewModel.releasePlayer()
-      // Restore system bars when leaving video player
+    // Enable immersive mode
+    LaunchedEffect(Unit) {
       activity?.let { act ->
-        WindowCompat.setDecorFitsSystemWindows(act.window, true)
+        WindowCompat.setDecorFitsSystemWindows(act.window, false)
         val windowInsetsController =
             WindowCompat.getInsetsController(act.window, act.window.decorView)
-        windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
-      }
-    }
-  }
-
-  Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-    // Video content or thumbnail
-    if (playbackError == null && videoData.videoResource !is VideoResource.PlaceholderVideo) {
-      ExoPlayerView(
-          player = player,
-          showControls = shouldShowControls,
-          onControlsVisibilityChanged = { show ->
-            if (show) viewModel.showControls() else viewModel.hideControls()
-          },
-          modifier = Modifier.fillMaxSize())
-    } else if (playbackError == null) {
-      // Show thumbnail for videos without URLs
-      AsyncImage(
-          model = videoData.thumbnailUrl,
-          contentDescription = videoData.title,
-          modifier = Modifier.fillMaxSize(),
-          contentScale = ContentScale.Crop)
-    } else {
-      // Show error if playback failed
-      playbackError?.let { error ->
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-          ErrorMessage(
-              error = error,
-              onRetry = {
-                viewModel.clearError()
-                viewModel.initializePlayer(context, videoData.videoResource)
-              })
+        windowInsetsController.apply {
+          hide(WindowInsetsCompat.Type.systemBars())
+          systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
       }
     }
 
-    // Top bar with back button and title - Show only when controls are visible
-    if (shouldShowControls) {
-      Row(
-          modifier =
-              Modifier.fillMaxWidth()
-                  .padding(16.dp)
-                  .padding(top = 24.dp), // Additional top padding for status bar area
-          verticalAlignment = Alignment.CenterVertically) {
-            IconButton(
-                onClick = onNavigateBack,
-                modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))) {
-                  Icon(
-                      imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                      contentDescription = "Back",
-                      tint = Color.White)
-                }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Text(
-                text = videoData.title,
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold)
-          }
+    // Initialize player when video URL is provided
+    LaunchedEffect(videoData.videoResource) {
+      if (videoData.videoResource !is VideoResource.PlaceholderVideo) {
+        viewModel.initializePlayer(context, videoData.videoResource)
+      }
     }
-  }
+
+    // Cleanup player and restore system UI on disposal
+    DisposableEffect(Unit) {
+      onDispose {
+        viewModel.savePlayerState()
+        viewModel.releasePlayer()
+        // Restore system bars when leaving video player
+        activity?.let { act ->
+          WindowCompat.setDecorFitsSystemWindows(act.window, true)
+          val windowInsetsController =
+              WindowCompat.getInsetsController(act.window, act.window.decorView)
+          windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
+        }
+      }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+      // Video content or thumbnail
+      if (playbackError == null && videoData.videoResource !is VideoResource.PlaceholderVideo) {
+        ExoPlayerView(
+            player = player,
+            showControls = shouldShowControls,
+            onControlsVisibilityChanged = { show ->
+              if (show) viewModel.showControls() else viewModel.hideControls()
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+      } else if (playbackError == null) {
+        // Show thumbnail for videos without URLs
+        AsyncImage(
+            model = videoData.thumbnailUrl,
+            contentDescription = videoData.title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+      } else {
+        // Show error if playback failed
+        playbackError?.let { error ->
+          Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            ErrorMessage(
+                error = error,
+                onRetry = {
+                  viewModel.clearError()
+                  viewModel.initializePlayer(context, videoData.videoResource)
+                },
+            )
+          }
+        }
+      }
+
+      // Top bar with back button and title - Show only when controls are visible
+      if (shouldShowControls) {
+        Row(
+            modifier =
+                Modifier.fillMaxWidth()
+                    .padding(16.dp)
+                    .padding(top = 24.dp), // Additional top padding for status bar area
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          IconButton(
+              onClick = onNavigateBack,
+              modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
+          ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White,
+            )
+          }
+
+          Spacer(modifier = Modifier.width(16.dp))
+
+          Text(
+              text = videoData.title,
+              color = Color.White,
+              fontSize = 18.sp,
+              fontWeight = FontWeight.Bold,
+          )
+        }
+      }
+    }
   }
 }
 
@@ -225,7 +232,7 @@ fun ExoPlayerView(
     player: ExoPlayer?,
     showControls: Boolean,
     onControlsVisibilityChanged: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
   AndroidView(
       modifier = modifier,
@@ -238,7 +245,8 @@ fun ExoPlayerView(
           setControllerVisibilityListener(
               PlayerView.ControllerVisibilityListener { visibility ->
                 onControlsVisibilityChanged(visibility == View.VISIBLE)
-              })
+              }
+          )
         }
       },
       update = { playerView ->
@@ -248,7 +256,8 @@ fun ExoPlayerView(
         } else {
           playerView.hideController()
         }
-      })
+      },
+  )
 }
 
 /** Error message component with retry functionality. */
@@ -256,31 +265,31 @@ fun ExoPlayerView(
 fun ErrorMessage(error: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
   Card(
       modifier = modifier,
-      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
-              Icon(
-                  imageVector = Icons.Filled.Warning,
-                  contentDescription = "Error",
-                  modifier = Modifier.size(24.dp))
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+  ) {
+    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+      Icon(
+          imageVector = Icons.Filled.Warning,
+          contentDescription = "Error",
+          modifier = Modifier.size(24.dp),
+      )
 
-              Text(
-                  text = error,
-                  fontSize = 14.sp,
-                  color = MaterialTheme.colorScheme.onErrorContainer,
-                  textAlign = TextAlign.Center,
-                  modifier = Modifier.padding(vertical = 8.dp))
+      Text(
+          text = error,
+          fontSize = 14.sp,
+          color = MaterialTheme.colorScheme.onErrorContainer,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.padding(vertical = 8.dp),
+      )
 
-              Button(
-                  onClick = onRetry,
-                  colors =
-                      ButtonDefaults.buttonColors(
-                          containerColor = MaterialTheme.colorScheme.error)) {
-                    Text(text = "Retry", color = MaterialTheme.colorScheme.onError)
-                  }
-            }
+      Button(
+          onClick = onRetry,
+          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+      ) {
+        Text(text = "Retry", color = MaterialTheme.colorScheme.onError)
       }
+    }
+  }
 }
 
 enum class VideoData(
@@ -289,7 +298,7 @@ enum class VideoData(
     val description: String,
     val thumbnailUrl: String,
     val videoResource: VideoResource,
-    val duration: String
+    val duration: String,
 ) {
   AUTO_MOBILE(
       "auto-mobile",
@@ -298,7 +307,8 @@ enum class VideoData(
       "https://picsum.photos/800/450?random=1",
       // Use a publicly available MP4 for better codec compatibility
       VideoResource.RawVideo(R.raw.automobile_portrait, R.raw.automobile_landscape),
-      "00:32")
+      "00:32",
+  )
 }
 
 private fun formatTime(timeMs: Long): String {

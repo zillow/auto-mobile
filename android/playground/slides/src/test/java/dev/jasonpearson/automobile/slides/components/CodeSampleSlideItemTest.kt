@@ -10,22 +10,22 @@ class CodeSampleSlideItemTest {
   fun `processCodeWithHighlighting should highlight matching lines`() {
     val code =
         """
-      keepClearAreas: restricted=[], unrestricted=[]
-      mPrepareSyncSeqId=0
+        keepClearAreas: restricted=[], unrestricted=[]
+        mPrepareSyncSeqId=0
 
-      imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-      imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-      imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-      Minimum task size of display#0 220  mBlurEnabled=true
-    """
+        imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+        imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+        imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+        Minimum task size of display#0 220  mBlurEnabled=true
+        """
             .trimIndent()
 
     val highlight =
         """
-      imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-      imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-      imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
-    """
+        imeLayeringTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+        imeInputTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+        imeControlTarget in display# 0 Window{ea58714 u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.automobile.playground.MainActivity}
+        """
             .trimIndent()
 
     val result = processCodeWithHighlighting(code, highlight, true)

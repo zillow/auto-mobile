@@ -23,16 +23,17 @@ fun AutoMobileFloatingActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector,
-    contentDescription: String? = null
+    contentDescription: String? = null,
 ) {
   FloatingActionButton(
       onClick = onClick,
       modifier = modifier,
       containerColor = MaterialTheme.colorScheme.secondary,
       contentColor = MaterialTheme.colorScheme.onSecondary,
-      elevation = FloatingActionButtonDefaults.elevation()) {
-        Icon(imageVector = icon, contentDescription = contentDescription)
-      }
+      elevation = FloatingActionButtonDefaults.elevation(),
+  ) {
+    Icon(imageVector = icon, contentDescription = contentDescription)
+  }
 }
 
 @Composable
@@ -40,16 +41,17 @@ fun AutoMobileSmallFloatingActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector,
-    contentDescription: String? = null
+    contentDescription: String? = null,
 ) {
   SmallFloatingActionButton(
       onClick = onClick,
       modifier = modifier,
       containerColor = MaterialTheme.colorScheme.secondary,
       contentColor = MaterialTheme.colorScheme.onSecondary,
-      elevation = FloatingActionButtonDefaults.elevation()) {
-        Icon(imageVector = icon, contentDescription = contentDescription)
-      }
+      elevation = FloatingActionButtonDefaults.elevation(),
+  ) {
+    Icon(imageVector = icon, contentDescription = contentDescription)
+  }
 }
 
 @Composable
@@ -58,19 +60,20 @@ fun AutoMobileExtendedFloatingActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
-    contentDescription: String? = null
+    contentDescription: String? = null,
 ) {
   ExtendedFloatingActionButton(
       onClick = onClick,
       modifier = modifier,
       containerColor = MaterialTheme.colorScheme.secondary,
       contentColor = MaterialTheme.colorScheme.onSecondary,
-      elevation = FloatingActionButtonDefaults.elevation()) {
-        if (icon != null) {
-          Icon(imageVector = icon, contentDescription = contentDescription)
-        }
-        Text(text = text)
-      }
+      elevation = FloatingActionButtonDefaults.elevation(),
+  ) {
+    if (icon != null) {
+      Icon(imageVector = icon, contentDescription = contentDescription)
+    }
+    Text(text = text)
+  }
 }
 
 @Preview(showBackground = true)
@@ -79,13 +82,23 @@ private fun AutoMobileFloatingActionButtonPreview() {
   AutoMobileTheme {
     Column(verticalArrangement = Arrangement.spacedBy(AutoMobileDimensions.spacing4)) {
       AutoMobileFloatingActionButton(
-          onClick = {}, icon = Icons.Default.Add, contentDescription = "Add")
+          onClick = {},
+          icon = Icons.Default.Add,
+          contentDescription = "Add",
+      )
 
       AutoMobileSmallFloatingActionButton(
-          onClick = {}, icon = Icons.Default.Add, contentDescription = "Add")
+          onClick = {},
+          icon = Icons.Default.Add,
+          contentDescription = "Add",
+      )
 
       AutoMobileExtendedFloatingActionButton(
-          text = "Add Item", onClick = {}, icon = Icons.Default.Add, contentDescription = "Add")
+          text = "Add Item",
+          onClick = {},
+          icon = Icons.Default.Add,
+          contentDescription = "Add",
+      )
     }
   }
 }

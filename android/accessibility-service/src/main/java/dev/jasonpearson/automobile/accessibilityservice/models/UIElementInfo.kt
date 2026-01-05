@@ -54,7 +54,7 @@ data class UIElementInfo(
     val recomposition: RecompositionEntry? = null,
 
     // Use JsonElement to allow flexible structure matching test expectations
-    val node: JsonElement? = null
+    val node: JsonElement? = null,
 ) {
   /** Helper properties for boolean checks (for backwards compatibility) */
   val isClickable: Boolean

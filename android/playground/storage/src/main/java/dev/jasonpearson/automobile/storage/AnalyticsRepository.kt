@@ -23,7 +23,7 @@ data class UserStats(
     val swipeBreakdown: Map<String, Int> = emptyMap(),
     val screenBreakdown: Map<String, Int> = emptyMap(),
     val todayStats: DailyStats = DailyStats(),
-    val weeklyStats: List<DailyStats> = emptyList()
+    val weeklyStats: List<DailyStats> = emptyList(),
 )
 
 data class DailyStats(
@@ -32,7 +32,7 @@ data class DailyStats(
     val swipes: Int = 0,
     val screens: Int = 0,
     val sessionCount: Int = 0,
-    val totalDuration: Long = 0
+    val totalDuration: Long = 0,
 )
 
 data class AnalyticsEvent(
@@ -42,7 +42,7 @@ data class AnalyticsEvent(
     val elementId: String? = null,
     val elementType: String? = null,
     val screenName: String? = null,
-    val coordinates: Pair<Float, Float>? = null
+    val coordinates: Pair<Float, Float>? = null,
 )
 
 data class DetailedEventStats(
@@ -50,7 +50,7 @@ data class DetailedEventStats(
     val recentEvents: List<AnalyticsEvent>,
     val topElements: Map<String, Int>,
     val topScreens: Map<String, Int>,
-    val hourlyDistribution: Map<Int, Int>
+    val hourlyDistribution: Map<Int, Int>,
 )
 
 class AnalyticsRepository(context: Context) {
@@ -114,7 +114,8 @@ class AnalyticsRepository(context: Context) {
         swipeBreakdown = getSwipeBreakdown(),
         screenBreakdown = getScreenBreakdown(),
         todayStats = getTodayStats(),
-        weeklyStats = getWeeklyStats())
+        weeklyStats = getWeeklyStats(),
+    )
   }
 
   private fun getTapBreakdown(): Map<String, Int> {
@@ -164,7 +165,8 @@ class AnalyticsRepository(context: Context) {
           incrementTaps(
               elementType = properties["elementType"] as? String,
               elementId = properties["elementId"] as? String,
-              coordinates = coordinates)
+              coordinates = coordinates,
+          )
 
       "swipe",
       "scroll",
@@ -173,7 +175,8 @@ class AnalyticsRepository(context: Context) {
               elementType = properties["elementType"] as? String,
               elementId = properties["elementId"] as? String,
               direction = properties["direction"] as? String,
-              coordinates = coordinates)
+              coordinates = coordinates,
+          )
 
       "navigation",
       "screen_view" -> incrementScreensNavigated(screenName = properties["screenName"] as? String)
@@ -194,7 +197,8 @@ class AnalyticsRepository(context: Context) {
         swipes = todaySwipes,
         screens = todayScreens,
         sessionCount = todaySessions,
-        totalDuration = todayDuration)
+        totalDuration = todayDuration,
+    )
   }
 
   private fun getWeeklyStats(): List<DailyStats> {
@@ -220,7 +224,7 @@ class AnalyticsRepository(context: Context) {
       count: Int = 1,
       elementId: String? = null,
       elementType: String? = null,
-      coordinates: Pair<Float, Float>? = null
+      coordinates: Pair<Float, Float>? = null,
   ) {
     if (!isTrackingEnabled) return
 
@@ -257,7 +261,7 @@ class AnalyticsRepository(context: Context) {
       elementId: String? = null,
       elementType: String? = null,
       direction: String? = null,
-      coordinates: Pair<Float, Float>? = null
+      coordinates: Pair<Float, Float>? = null,
   ) {
     if (!isTrackingEnabled) return
 
@@ -291,7 +295,8 @@ class AnalyticsRepository(context: Context) {
         elementId,
         elementType,
         coordinates,
-        mapOf("direction" to (direction ?: "unknown")))
+        mapOf("direction" to (direction ?: "unknown")),
+    )
 
     // Performance monitoring
     monitorPerformance("swipe")
@@ -358,7 +363,7 @@ class AnalyticsRepository(context: Context) {
       elementId: String? = null,
       elementType: String? = null,
       coordinates: Pair<Float, Float>? = null,
-      additionalProperties: Map<String, Any> = emptyMap()
+      additionalProperties: Map<String, Any> = emptyMap(),
   ) {
     val event =
         AnalyticsEvent(
@@ -368,7 +373,8 @@ class AnalyticsRepository(context: Context) {
             elementId = elementId,
             elementType = elementType,
             screenName = _currentScreen.value,
-            coordinates = coordinates)
+            coordinates = coordinates,
+        )
 
     // Keep only last 1000 events to prevent memory issues
     if (eventHistory.size >= 1000) {
@@ -427,7 +433,8 @@ class AnalyticsRepository(context: Context) {
         recentEvents = filteredEvents.takeLast(50),
         topElements = topElements,
         topScreens = topScreens,
-        hourlyDistribution = hourlyDistribution)
+        hourlyDistribution = hourlyDistribution,
+    )
   }
 
   fun getPerformanceMetrics(): Map<String, Map<String, Double>> {
@@ -438,7 +445,8 @@ class AnalyticsRepository(context: Context) {
         mapOf(
             "avg" to times.average(),
             "min" to (times.minOrNull()?.toDouble() ?: 0.0),
-            "max" to (times.maxOrNull()?.toDouble() ?: 0.0))
+            "max" to (times.maxOrNull()?.toDouble() ?: 0.0),
+        )
       }
     }
   }
@@ -448,7 +456,8 @@ class AnalyticsRepository(context: Context) {
         "userStats" to getUserStats(),
         "eventHistory" to eventHistory.takeLast(500), // Export last 500 events
         "performanceMetrics" to getPerformanceMetrics(),
-        "exportTimestamp" to System.currentTimeMillis())
+        "exportTimestamp" to System.currentTimeMillis(),
+    )
   }
 
   fun updateUserStats(stats: UserStats) {

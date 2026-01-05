@@ -14,28 +14,26 @@ data class NavigationEvent(
     val timestamp: Long = System.currentTimeMillis(),
     val source: NavigationSource,
     val arguments: Map<String, Any?> = emptyMap(),
-    val metadata: Map<String, String> = emptyMap()
+    val metadata: Map<String, String> = emptyMap(),
 )
 
-/**
- * Identifies the source/framework of a navigation event.
- */
+/** Identifies the source/framework of a navigation event. */
 enum class NavigationSource {
-    /** Jetpack Navigation Component (XML-based) */
-    NAVIGATION_COMPONENT,
+  /** Jetpack Navigation Component (XML-based) */
+  NAVIGATION_COMPONENT,
 
-    /** Jetpack Compose Navigation */
-    COMPOSE_NAVIGATION,
+  /** Jetpack Compose Navigation */
+  COMPOSE_NAVIGATION,
 
-    /** Circuit navigation library */
-    CIRCUIT,
+  /** Circuit navigation library */
+  CIRCUIT,
 
-    /** Custom or unknown navigation framework */
-    CUSTOM,
+  /** Custom or unknown navigation framework */
+  CUSTOM,
 
-    /** Deep link navigation */
-    DEEP_LINK,
+  /** Deep link navigation */
+  DEEP_LINK,
 
-    /** Activity launch */
-    ACTIVITY
+  /** Activity launch */
+  ACTIVITY,
 }

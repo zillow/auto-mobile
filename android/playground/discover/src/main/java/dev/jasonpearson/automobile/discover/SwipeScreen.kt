@@ -38,19 +38,24 @@ class SwipeScreenViewModel : ViewModel() {
                   title = "Swipe Left/Right",
                   description = "Try swiping this card left or right to see the animation",
                   imageUrl = "https://picsum.photos/300/200?random=1",
-                  color = Color(0xFF6200EE)),
+                  color = Color(0xFF6200EE),
+              ),
               SwipeCard(
                   id = "2",
                   title = "Another Swipeable Card",
                   description = "This card also supports horizontal swipe gestures",
                   imageUrl = "https://picsum.photos/300/200?random=2",
-                  color = Color(0xFF03DAC5)),
+                  color = Color(0xFF03DAC5),
+              ),
               SwipeCard(
                   id = "3",
                   title = "Gesture Recognition",
                   description = "Each swipe is detected and animated smoothly",
                   imageUrl = "https://picsum.photos/300/200?random=3",
-                  color = Color(0xFFFF5722))))
+                  color = Color(0xFFFF5722),
+              ),
+          )
+      )
   val swipeCards: StateFlow<List<SwipeCard>> = _swipeCards.asStateFlow()
 
   private val _gridImages =
@@ -61,7 +66,9 @@ class SwipeScreenViewModel : ViewModel() {
               GridImage("grid3", "https://picsum.photos/200/200?random=23", "Image 3"),
               GridImage("grid4", "https://picsum.photos/200/200?random=24", "Image 4"),
               GridImage("grid5", "https://picsum.photos/200/200?random=25", "Image 5"),
-              GridImage("grid6", "https://picsum.photos/200/200?random=26", "Image 6")))
+              GridImage("grid6", "https://picsum.photos/200/200?random=26", "Image 6"),
+          )
+      )
   val gridImages: StateFlow<List<GridImage>> = _gridImages.asStateFlow()
 
   fun reorderGridImages(fromIndex: Int, toIndex: Int) {
@@ -81,40 +88,44 @@ class SwipeScreenViewModel : ViewModel() {
 @Composable
 fun SwipeScreen(viewModel: SwipeScreenViewModel = viewModel()) {
   TrackRecomposition(id = "screen.swipe", composableName = "SwipeScreen") {
-  val swipeCards by viewModel.swipeCards.collectAsState()
-  val gridImages by viewModel.gridImages.collectAsState()
+    val swipeCards by viewModel.swipeCards.collectAsState()
+    val gridImages by viewModel.gridImages.collectAsState()
 
-  LazyColumn(
-      modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(16.dp),
-      verticalArrangement = Arrangement.spacedBy(24.dp)) {
-        item {
-          Text(
-              text = "Swipeable Cards",
-              fontSize = 18.sp,
-              fontWeight = FontWeight.Bold,
-              modifier = Modifier.padding(bottom = 8.dp))
-        }
-
-        // Swipeable Cards
-        itemsIndexed(swipeCards) { index, card ->
-          SwipeableCard(card = card, onSwipeAway = { viewModel.removeSwipeCard(card.id) })
-        }
-
-        item {
-          Text(
-              text = "Reorderable Grid (3x2)",
-              fontSize = 18.sp,
-              fontWeight = FontWeight.Bold,
-              modifier = Modifier.padding(top = 16.dp, bottom = 8.dp))
-        }
-
-        item {
-          ReorderableGrid(
-              images = gridImages,
-              onReorder = { fromIndex, toIndex -> viewModel.reorderGridImages(fromIndex, toIndex) })
-        }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+    ) {
+      item {
+        Text(
+            text = "Swipeable Cards",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
       }
+
+      // Swipeable Cards
+      itemsIndexed(swipeCards) { index, card ->
+        SwipeableCard(card = card, onSwipeAway = { viewModel.removeSwipeCard(card.id) })
+      }
+
+      item {
+        Text(
+            text = "Reorderable Grid (3x2)",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
+        )
+      }
+
+      item {
+        ReorderableGrid(
+            images = gridImages,
+            onReorder = { fromIndex, toIndex -> viewModel.reorderGridImages(fromIndex, toIndex) },
+        )
+      }
+    }
   }
 }
 

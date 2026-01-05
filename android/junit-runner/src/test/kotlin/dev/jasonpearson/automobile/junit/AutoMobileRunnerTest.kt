@@ -1,10 +1,10 @@
 package dev.jasonpearson.automobile.junit
 
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Unit tests for the AutoMobileRunner.
@@ -21,7 +21,7 @@ class AutoMobileRunnerTest {
     // Clear cached properties and plans to ensure fresh reads
     SystemPropertyCache.clear()
     PlanCache.clear()
-    RegexCache.clear()  // Phase 6: Clear regex cache for test isolation
+    RegexCache.clear() // Phase 6: Clear regex cache for test isolation
   }
 
   @Test
@@ -104,13 +104,17 @@ fun AutoMobileRunner.invokeGetPlanPath(annotation: AutoMobileTest): String {
 fun AutoMobileRunner.invokeBuildDaemonExecutePlanArgs(
     base64PlanContent: String,
     annotation: AutoMobileTest,
-    sessionUuid: String
+    sessionUuid: String,
 ): JsonObject {
-  val method = this::class.java.getDeclaredMethod(
-      "buildDaemonExecutePlanArgs",
-      String::class.java,
-      AutoMobileTest::class.java,
-      String::class.java)
+  val method =
+      this::class
+          .java
+          .getDeclaredMethod(
+              "buildDaemonExecutePlanArgs",
+              String::class.java,
+              AutoMobileTest::class.java,
+              String::class.java,
+          )
   method.isAccessible = true
   return method.invoke(this, base64PlanContent, annotation, sessionUuid) as JsonObject
 }

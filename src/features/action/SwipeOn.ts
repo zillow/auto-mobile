@@ -235,7 +235,7 @@ export class SwipeOn extends BaseVisualChange {
           {
             text: options.lookFor?.text,
             resourceId: options.lookFor?.elementId || options.container?.elementId,
-            containerElementId: options.container?.elementId
+            container: options.container
           }
         )
         : undefined;
@@ -574,7 +574,7 @@ export class SwipeOn extends BaseVisualChange {
 
     // First check if element is already visible
     foundElement = await perf.track("initialSearch", () =>
-      this.findElementInHierarchy(options.lookFor!, lastObservation.viewHierarchy!, options.container?.elementId)
+      this.findElementInHierarchy(options.lookFor!, lastObservation.viewHierarchy!, options.container)
     );
 
     if (foundElement) {
@@ -666,7 +666,7 @@ export class SwipeOn extends BaseVisualChange {
       foundElement = await this.findElementInHierarchy(
         options.lookFor!,
         lastObservation.viewHierarchy!,
-        options.container?.elementId
+        options.container
       );
 
       if (foundElement) {
@@ -835,13 +835,13 @@ export class SwipeOn extends BaseVisualChange {
   private async findElementInHierarchy(
     lookFor: { text?: string; elementId?: string },
     viewHierarchy: ViewHierarchyResult,
-    containerElementId?: string
+    container?: { elementId?: string; text?: string }
   ): Promise<Element | null> {
     if (lookFor.text) {
       return this.elementUtils.findElementByText(
         viewHierarchy,
         lookFor.text,
-        containerElementId,
+        container,
         true,
         false
       );
@@ -849,7 +849,7 @@ export class SwipeOn extends BaseVisualChange {
       return this.elementUtils.findElementByResourceId(
         viewHierarchy,
         lookFor.elementId,
-        containerElementId,
+        container,
         true
       );
     }

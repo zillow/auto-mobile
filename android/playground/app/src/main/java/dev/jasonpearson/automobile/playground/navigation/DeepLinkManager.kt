@@ -385,7 +385,8 @@ object DeepLinkManager {
             "Slides (slide 0)" to generateSlidesUrl(0),
             "Slides (slide 3)" to generateSlidesUrl(3),
             "Video Player (sample)" to generateVideoPlayerUrl("sample123"),
-            "Settings" to generateSettingsUrl())
+            "Settings" to generateSettingsUrl(),
+        )
     Log.d(TAG, "Generated ${deepLinks.size} deep links")
     return deepLinks
   }

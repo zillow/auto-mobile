@@ -7,7 +7,10 @@ export interface TapOnElementOptions {
   elementId?: string;
 
   // Container to restrict search
-  containerElementId?: string;
+  container?: {
+    elementId?: string;
+    text?: string;
+  };
 
   // Action to perform
   action: "tap" | "doubleTap" | "longPress" | "longPressDrag" | "focus";

@@ -17,9 +17,12 @@ export interface DebugSearchOptions {
   resourceId?: string;
 
   /**
-   * Container element ID to restrict search within
+   * Container element to restrict search within
    */
-  containerElementId?: string;
+  container?: {
+    elementId?: string;
+    text?: string;
+  };
 
   /**
    * Whether to use fuzzy matching (default: true)
@@ -85,7 +88,7 @@ export class DebugSearch {
         query: {
           text: options.text,
           resourceId: options.resourceId,
-          containerElementId: options.containerElementId,
+          container: options.container,
           fuzzyMatch,
           caseSensitive
         },
@@ -105,22 +108,34 @@ export class DebugSearch {
     // Traverse the hierarchy and find all matches
     const rootNodes = this.extractRootNodes(hierarchy);
 
-    // If containerElementId is specified, find container first
+    // If container is specified, find container first
     let containerNode: any = null;
-    if (options.containerElementId) {
+    if (options.container) {
+      const containerMatcher = options.container.text
+        ? this.createTextMatcher(options.container.text, fuzzyMatch, caseSensitive)
+        : null;
       for (const rootNode of rootNodes) {
         this.traverseNode(rootNode, (node: any) => {
           if (containerNode) {return;}
           const props = this.extractNodeProperties(node);
-          if (props["resource-id"]?.includes(options.containerElementId!)) {
+          if (options.container?.elementId && props["resource-id"] === options.container.elementId) {
             containerNode = node;
+            return;
+          }
+          if (containerMatcher) {
+            const textMatches = typeof props.text === "string" && containerMatcher(props.text);
+            const contentDescMatches = typeof props["content-desc"] === "string" && containerMatcher(props["content-desc"]);
+            const iosLabelMatches = typeof props["ios-accessibility-label"] === "string" && containerMatcher(props["ios-accessibility-label"]);
+            if (textMatches || contentDescMatches || iosLabelMatches) {
+              containerNode = node;
+            }
           }
         });
         if (containerNode) {break;}
       }
 
       if (!containerNode) {
-        logger.warn(`[DebugSearch] Container "${options.containerElementId}" not found`);
+        logger.warn(`[DebugSearch] Container "${options.container.elementId || options.container.text}" not found`);
       }
     }
 
@@ -244,7 +259,7 @@ export class DebugSearch {
       query: {
         text: options.text,
         resourceId: options.resourceId,
-        containerElementId: options.containerElementId,
+        container: options.container,
         fuzzyMatch,
         caseSensitive
       },

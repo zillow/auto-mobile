@@ -54,7 +54,10 @@ export interface OpenLinkArgs {
 }
 
 export interface TapOnArgs {
-  containerElementId?: string;
+  container?: {
+    elementId?: string;
+    text?: string;
+  };
   text?: string;
   id?: string;
   action: "tap" | "doubleTap" | "longPress" | "longPressDrag" | "focus";
@@ -121,7 +124,10 @@ export const shakeSchema = z.object({
 });
 
 export const tapOnSchema = z.object({
-  containerElementId: z.string().optional().describe("Container element ID to restrict the search within"),
+  container: z.object({
+    elementId: z.string().optional().describe("Container element resource ID to restrict search within"),
+    text: z.string().optional().describe("Container element text to restrict search within")
+  }).optional().describe("Container element to scope the search - specify elementId or text to locate it"),
   action: z.enum(["tap", "doubleTap", "longPress", "longPressDrag", "focus"]).describe("Action to perform on the element"),
   text: z.string().optional().describe("Text to tap on"),
   id: z.string().optional().describe("Element ID to tap on"),
@@ -407,7 +413,7 @@ export function registerInteractionTools() {
     RecompositionTracker.getInstance().recordInteraction();
     const tapOnTextCommand = new TapOnElement(device);
     const result = await tapOnTextCommand.execute({
-      containerElementId: args.containerElementId,
+      container: args.container,
       text: args.text,
       elementId: args.id,
       action: args.action,

@@ -36,7 +36,9 @@ android {
 
 kotlin {
   compilerOptions {
-    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get()))
+    jvmTarget.set(
+        org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get())
+    )
   }
 }
 
@@ -70,7 +72,9 @@ tasks.withType<KotlinCompile>().configureEach {
   compilerOptions {
     languageVersion.set(
         KotlinVersion.valueOf(
-            "KOTLIN_${libs.versions.build.kotlin.language.get().replace(".", "_")}"))
+            "KOTLIN_${libs.versions.build.kotlin.language.get().replace(".", "_")}"
+        )
+    )
   }
 }
 
@@ -82,7 +86,9 @@ mavenPublishing {
 
   pom {
     name.set("AutoMobile SDK")
-    description.set("Android library SDK for hooking into navigation events across various frameworks (XML, Compose, Circuit, etc.)")
+    description.set(
+        "Android library SDK for hooking into navigation events across various frameworks (XML, Compose, Circuit, etc.)"
+    )
     inceptionYear.set("2025")
     url.set("https://kaeawc.github.io/auto-mobile/")
     licenses {

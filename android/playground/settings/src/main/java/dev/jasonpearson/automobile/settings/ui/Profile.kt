@@ -51,25 +51,29 @@ fun ProfileTopAppBar(name: String, email: String, scrollProgress: Float, onEmail
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween) {
-              Column {
-                Text(text = name, fontSize = titleSize, fontWeight = FontWeight.Bold)
-                if (emailAlpha > 0f) {
-                  Text(
-                      text = email,
-                      fontSize = 14.sp,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
-                      modifier = Modifier.alpha(emailAlpha).clickable { onEmailClick() })
-                }
-              }
-
-              Icon(
-                  imageVector = Icons.Filled.Person,
-                  contentDescription = "Profile Photo",
-                  modifier = Modifier.size(40.dp).clip(CircleShape),
-                  tint = MaterialTheme.colorScheme.primary)
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+          Column {
+            Text(text = name, fontSize = titleSize, fontWeight = FontWeight.Bold)
+            if (emailAlpha > 0f) {
+              Text(
+                  text = email,
+                  fontSize = 14.sp,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  modifier = Modifier.alpha(emailAlpha).clickable { onEmailClick() },
+              )
             }
-      })
+          }
+
+          Icon(
+              imageVector = Icons.Filled.Person,
+              contentDescription = "Profile Photo",
+              modifier = Modifier.size(40.dp).clip(CircleShape),
+              tint = MaterialTheme.colorScheme.primary,
+          )
+        }
+      }
+  )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,7 +82,7 @@ fun EmailEditBottomSheet(
     email: String,
     onEmailChange: (String) -> Unit,
     onDismiss: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
 ) {
   ModalBottomSheet(onDismissRequest = onDismiss) {
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
@@ -86,13 +90,15 @@ fun EmailEditBottomSheet(
           text = "Edit Email",
           fontSize = 20.sp,
           fontWeight = FontWeight.Bold,
-          modifier = Modifier.padding(bottom = 16.dp))
+          modifier = Modifier.padding(bottom = 16.dp),
+      )
 
       OutlinedTextField(
           value = email,
           onValueChange = onEmailChange,
           label = { Text("Email") },
-          modifier = Modifier.fillMaxWidth())
+          modifier = Modifier.fillMaxWidth(),
+      )
 
       Spacer(modifier = Modifier.height(16.dp))
 
@@ -100,9 +106,10 @@ fun EmailEditBottomSheet(
         Button(
             onClick = onDismiss,
             colors =
-                ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
-              Text("Cancel")
-            }
+                ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+        ) {
+          Text("Cancel")
+        }
 
         Button(onClick = onSave) { Text("Save") }
       }
@@ -117,7 +124,7 @@ fun ProfileSection(
     name: String,
     email: String,
     scrollProgress: Float,
-    onEmailUpdated: (String) -> Unit
+    onEmailUpdated: (String) -> Unit,
 ) {
   var isEditingEmail by remember { mutableStateOf(false) }
   var tempEmail by remember { mutableStateOf(email) }
@@ -129,7 +136,8 @@ fun ProfileSection(
       onEmailClick = {
         tempEmail = email
         isEditingEmail = true
-      })
+      },
+  )
 
   if (isEditingEmail) {
     EmailEditBottomSheet(
@@ -139,7 +147,8 @@ fun ProfileSection(
         onSave = {
           onEmailUpdated(tempEmail)
           isEditingEmail = false
-        })
+        },
+    )
   }
 }
 
@@ -148,7 +157,7 @@ fun ProfileWithBottomSheet(
     name: String,
     email: String,
     scrollProgress: Float,
-    onEmailUpdated: (String) -> Unit
+    onEmailUpdated: (String) -> Unit,
 ): @Composable () -> Unit {
   var isEditingEmail by remember { mutableStateOf(false) }
   var tempEmail by remember { mutableStateOf(email) }
@@ -161,7 +170,8 @@ fun ProfileWithBottomSheet(
         onSave = {
           onEmailUpdated(tempEmail)
           isEditingEmail = false
-        })
+        },
+    )
   }
 
   return {
@@ -172,7 +182,8 @@ fun ProfileWithBottomSheet(
         onEmailClick = {
           tempEmail = email
           isEditingEmail = true
-        })
+        },
+    )
   }
 }
 
@@ -184,7 +195,8 @@ fun ProfileTopAppBarPreview() {
         name = "John Doe",
         email = "john.doe@example.com",
         scrollProgress = 0f,
-        onEmailClick = { /* Preview email click */ })
+        onEmailClick = { /* Preview email click */ },
+    )
   }
 }
 
@@ -196,6 +208,7 @@ fun EmailEditBottomSheetPreview() {
         email = "john.doe@example.com",
         onEmailChange = { /* Preview email change */ },
         onDismiss = { /* Preview dismiss */ },
-        onSave = { /* Preview save */ })
+        onSave = { /* Preview save */ },
+    )
   }
 }
