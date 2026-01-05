@@ -8,6 +8,7 @@ import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilitySer
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { NavigationGraphManager, NavigationEvent } from "../navigation/NavigationGraphManager";
+import { HierarchyNavigationDetector } from "../navigation/HierarchyNavigationDetector";
 import { throwIfAborted } from "../../utils/toolUtils";
 
 /**
@@ -499,6 +500,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Timer for testing
   private timer: Timer;
 
+  // Hierarchy navigation detector for view hierarchy-based navigation
+  private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
+
   /**
    * Private constructor - use getInstance() instead
    * @param device - The booted device
@@ -559,6 +563,29 @@ export class AccessibilityServiceClient implements AccessibilityService {
     timer?: Timer
   ): AccessibilityServiceClient {
     return new AccessibilityServiceClient(device, adb, webSocketFactory, timer);
+  }
+
+  /**
+   * Get the hierarchy navigation detector, creating it lazily if needed.
+   * The detector monitors view hierarchy updates to detect screen changes.
+   */
+  public getHierarchyNavigationDetector(): HierarchyNavigationDetector {
+    if (!this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector = new HierarchyNavigationDetector(
+        NavigationGraphManager.getInstance()
+      );
+    }
+    return this.hierarchyNavigationDetector;
+  }
+
+  /**
+   * Reset the hierarchy navigation detector.
+   * Call this when switching apps or when you want to start fresh.
+   */
+  public resetHierarchyNavigationDetector(): void {
+    if (this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector.reset();
+    }
   }
 
   /**
@@ -761,6 +788,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
 
         logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.updatedAt})`);
+
+        // Notify hierarchy navigation detector for view hierarchy-based navigation detection
+        if (this.hierarchyNavigationDetector) {
+          this.hierarchyNavigationDetector.onHierarchyUpdate(message.data);
+        }
       }
 
       // Handle screenshot response
@@ -1620,6 +1652,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
         logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
         this.ws.close();
         this.ws = null;
+      }
+
+      // Dispose hierarchy navigation detector
+      if (this.hierarchyNavigationDetector) {
+        this.hierarchyNavigationDetector.dispose();
+        this.hierarchyNavigationDetector = null;
       }
 
       // Optionally remove port forwarding

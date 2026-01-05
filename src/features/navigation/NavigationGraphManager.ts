@@ -5,6 +5,7 @@ import type { NavigationEdge as DBNavigationEdge } from "../../db/types";
 import {
   NavigationGraph,
   NavigationEvent,
+  HierarchyNavigationEvent,
   NavigationNode,
   NavigationEdge,
   NavigationGraphStats,
@@ -20,6 +21,7 @@ import {
 export type {
   NavigationGraph,
   NavigationEvent,
+  HierarchyNavigationEvent,
   NavigationNode,
   NavigationEdge,
   NavigationGraphStats,
@@ -204,6 +206,103 @@ export class NavigationGraphManager implements NavigationGraph {
           timestamp
         );
       }
+    }
+
+    this.currentScreen = screenName;
+    await this.repository.touchApp(this.currentAppId);
+  }
+
+  /**
+   * Record a navigation event detected from view hierarchy changes.
+   * This is an alternative to SDK navigation events for apps without SDK integration.
+   * Uses the fingerprint hash as the screen name.
+   */
+  public async recordHierarchyNavigation(event: HierarchyNavigationEvent): Promise<void> {
+    // Auto-set current app from package name if provided
+    if (event.packageName && event.packageName !== this.currentAppId) {
+      await this.setCurrentApp(event.packageName);
+    }
+
+    if (!this.currentAppId) {
+      logger.warn(`[NAVIGATION_GRAPH] Cannot record hierarchy navigation - no current app set`);
+      return;
+    }
+
+    // Use a shortened fingerprint hash as the screen name for readability
+    const screenName = `screen_${event.toFingerprint.substring(0, 12)}`;
+    const timestamp = event.timestamp;
+
+    // Get or create node and update visit count
+    await this.repository.getOrCreateNode(
+      this.currentAppId,
+      screenName,
+      timestamp
+    );
+
+    // Get modal stack from the most recent tool call (if any)
+    const recentToolCall = this.findCorrelatedToolCall(timestamp);
+    const currentModalStack = recentToolCall?.uiState?.modalStack;
+
+    // Create edge from previous screen to current screen
+    const fromScreenName = event.fromFingerprint
+      ? `screen_${event.fromFingerprint.substring(0, 12)}`
+      : null;
+
+    if (fromScreenName && fromScreenName !== screenName) {
+      const interaction = this.findCorrelatedToolCall(timestamp);
+
+      const toolName = interaction?.toolName || null;
+      const toolArgs = interaction?.args || null;
+
+      const edge = await this.repository.createEdge(
+        this.currentAppId,
+        fromScreenName,
+        screenName,
+        toolName,
+        toolArgs,
+        timestamp
+      );
+
+      // Store UI elements if present in interaction
+      if (interaction?.uiState?.selectedElements) {
+        await this.storeUIElements(
+          edge.id,
+          interaction.uiState.selectedElements,
+          timestamp
+        );
+      }
+
+      // Store modal stacks for from/to
+      const fromNode = await this.repository.getNode(this.currentAppId, fromScreenName);
+      if (fromNode) {
+        const fromModals = await this.repository.getNodeModals(fromNode.id);
+        if (fromModals.length > 0) {
+          await this.repository.setEdgeModals(edge.id, "from", fromModals);
+        }
+      }
+
+      if (currentModalStack && currentModalStack.length > 0) {
+        const toModalIds = currentModalStack.map(
+          m => m.identifier || `${m.type}-${m.layer}`
+        );
+        await this.repository.setEdgeModals(edge.id, "to", toModalIds);
+      }
+
+      // Store scroll position if present
+      if (interaction?.uiState?.scrollPosition) {
+        await this.storeScrollPosition(
+          edge.id,
+          interaction.uiState.scrollPosition,
+          timestamp
+        );
+      }
+
+      logger.info(
+        `[NAVIGATION_GRAPH] Hierarchy navigation: ${fromScreenName} -> ${screenName}` +
+        (toolName ? ` (via ${toolName})` : " (no correlated tool call)")
+      );
+    } else if (!fromScreenName) {
+      logger.info(`[NAVIGATION_GRAPH] Initial hierarchy screen: ${screenName}`);
     }
 
     this.currentScreen = screenName;
