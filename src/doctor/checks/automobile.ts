@@ -144,6 +144,19 @@ export async function checkAccessibilityService(): Promise<CheckResult> {
     const attemptedDownloadOrInstall = Boolean(
       versionResult.attemptedDownload || versionResult.attemptedInstall || versionResult.attemptedReinstall
     );
+    const downloadUnavailable = Boolean(versionResult.downloadUnavailable);
+    if (downloadUnavailable) {
+      diagnostics.push("downloadUnavailable=offline");
+    }
+
+    if (downloadUnavailable) {
+      return {
+        name: "Accessibility Service",
+        status: "warn",
+        message: diagnostics.join("; "),
+        recommendation: "Newer accessibility service APK unavailable while offline. Connect to the internet and re-run doctor."
+      };
+    }
 
     if (isInstalled && isEnabled && (versionResult.status === "compatible" || versionResult.status === "upgraded" || versionResult.status === "reinstalled" || versionResult.status === "skipped")) {
       return {

@@ -176,6 +176,7 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
     attemptedDownload?: boolean;
     attemptedInstall?: boolean;
     attemptedReinstall?: boolean;
+    downloadUnavailable?: boolean;
     error?: string;
     upgradeError?: string;
     reinstallError?: string;

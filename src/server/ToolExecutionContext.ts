@@ -1,5 +1,8 @@
 import { SessionManager } from "../daemon/sessionManager";
 import { DevicePool } from "../daemon/devicePool";
+import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { ActionableError, BootedDevice } from "../models";
+import { logger } from "../utils/logger";
 
 /**
  * Tool Execution Context
@@ -31,8 +34,14 @@ export async function createToolExecutionContext(
     return {};
   }
 
+  const existingSession = sessionManager.getSession(sessionUuid);
+
   // Get or create session
   const session = await sessionManager.getOrCreateSession(sessionUuid, devicePool);
+
+  if (!existingSession) {
+    await ensureAccessibilityServiceReady(session.assignedDevice, sessionUuid);
+  }
 
   return {
     sessionId: sessionUuid,
@@ -40,6 +49,22 @@ export async function createToolExecutionContext(
     sessionManager,
     devicePool,
   };
+}
+
+async function ensureAccessibilityServiceReady(deviceId: string, sessionId: string): Promise<void> {
+  const device: BootedDevice = {
+    name: deviceId,
+    platform: "android",
+    deviceId
+  };
+  logger.info(`[ToolExecutionContext] Ensuring accessibility service is ready for session ${sessionId}`);
+  const serviceManager = AndroidAccessibilityServiceManager.getInstance(device);
+  const setupResult = await serviceManager.setup();
+  if (!setupResult.success) {
+    throw new ActionableError(
+      `Failed to setup accessibility service for session ${sessionId}: ${setupResult.error || setupResult.message}`
+    );
+  }
 }
 
 /**

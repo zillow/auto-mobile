@@ -33,7 +33,7 @@ export interface DeviceSessionManager {
    * Ensure a device is ready for the specified platform and return its ID
    * Throws an error if both Android and iOS devices are connected when auto-detecting platform
    */
-  ensureDeviceReady(platform: SomePlatform, providedDeviceId?: string): Promise<BootedDevice>;
+  ensureDeviceReady(platform: SomePlatform, providedDeviceId?: string, options?: DeviceReadyOptions): Promise<BootedDevice>;
 
   /**
    * Detect the platform of connected devices
@@ -43,12 +43,12 @@ export interface DeviceSessionManager {
   /**
    * Verify a specific device is connected and ready for the given platform
    */
-  verifyDevice(deviceId: string, platform: Platform): Promise<void>;
+  verifyDevice(deviceId: string, platform: Platform, options?: DeviceReadyOptions): Promise<void>;
 
   /**
    * Verify an Android device is connected and ready
    */
-  verifyAndroidDevice(deviceId: string): Promise<void>;
+  verifyAndroidDevice(deviceId: string, options?: DeviceReadyOptions): Promise<void>;
 
   /**
    * Verify an iOS device is connected and ready
@@ -58,17 +58,21 @@ export interface DeviceSessionManager {
   /**
    * Find an available device or start an emulator for the specified platform
    */
-  findOrStartDevice(platform: Platform): Promise<BootedDevice>;
+  findOrStartDevice(platform: Platform, options?: DeviceReadyOptions): Promise<BootedDevice>;
 
   /**
    * Find an available Android device or start an emulator
    */
-  findOrStartAndroidDevice(): Promise<BootedDevice>;
+  findOrStartAndroidDevice(options?: DeviceReadyOptions): Promise<BootedDevice>;
 
   /**
    * Find an available iOS device or start a simulator
    */
   findOrStartIosDevice(): Promise<BootedDevice>;
+}
+
+export interface DeviceReadyOptions {
+  skipAccessibilitySetup?: boolean;
 }
 
 export class DeviceSessionManager implements DeviceSessionManager {
@@ -175,7 +179,11 @@ export class DeviceSessionManager implements DeviceSessionManager {
    * Ensure a device is ready for the specified platform and return its ID
    * Throws an error if both Android and iOS devices are connected when auto-detecting platform
    */
-  public async ensureDeviceReady(platform: SomePlatform, providedDeviceId?: string): Promise<BootedDevice> {
+  public async ensureDeviceReady(
+    platform: SomePlatform,
+    providedDeviceId?: string,
+    options?: DeviceReadyOptions
+  ): Promise<BootedDevice> {
     logger.info(`[DeviceSessionManager] ensureDeviceReady called with platform=${platform}, providedDeviceId=${providedDeviceId}`);
 
     // Detect all connected devices
@@ -228,7 +236,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
         );
       }
 
-      await this.verifyDevice(providedDeviceId, resolvedPlatform);
+      await this.verifyDevice(providedDeviceId, resolvedPlatform, options);
       this.setCurrentDevice(providedDevice, resolvedPlatform);
       logger.info(`[DeviceSessionManager] Using provided device: ${providedDeviceId}`);
       return providedDevice;
@@ -238,7 +246,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     if (this.currentDevice && this.currentPlatform === platform) {
       logger.info(`[DeviceSessionManager] Found current device: ${this.currentDevice.deviceId}, verifying readiness`);
       try {
-        await this.verifyDevice(this.currentDevice.deviceId, platform);
+        await this.verifyDevice(this.currentDevice.deviceId, platform, options);
         logger.info(`[DeviceSessionManager] Using current device: ${this.currentDevice.deviceId}`);
         return this.currentDevice;
       } catch (error) {
@@ -250,7 +258,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
     // No device set - find or start one for the requested platform
     logger.info(`[DeviceSessionManager] No current device, finding or starting device for platform ${resolvedPlatform}`);
-    const device = await this.findOrStartDevice(resolvedPlatform);
+    const device = await this.findOrStartDevice(resolvedPlatform, options);
     this.setCurrentDevice(device, resolvedPlatform);
     logger.info(`[DeviceSessionManager] Using device from findOrStartDevice: ${device.deviceId}`);
     return device;
@@ -259,9 +267,9 @@ export class DeviceSessionManager implements DeviceSessionManager {
   /**
    * Verify a specific device is connected and ready for the given platform
    */
-  public async verifyDevice(deviceId: string, platform: Platform): Promise<void> {
+  public async verifyDevice(deviceId: string, platform: Platform, options?: DeviceReadyOptions): Promise<void> {
     if (platform === "android") {
-      await this.verifyAndroidDevice(deviceId);
+      await this.verifyAndroidDevice(deviceId, options);
     } else {
       await this.verifyIosDevice(deviceId);
     }
@@ -270,7 +278,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
   /**
    * Verify an Android device is connected and ready
    */
-  public async verifyAndroidDevice(deviceId: string): Promise<void> {
+  public async verifyAndroidDevice(deviceId: string, options?: DeviceReadyOptions): Promise<void> {
     const allDevices = await this.adb.getBootedAndroidDevices();
     const device = allDevices.find(device => device.name === deviceId);
 
@@ -308,6 +316,11 @@ export class DeviceSessionManager implements DeviceSessionManager {
       throw new ActionableError(
         `Failed to verify Android device ${deviceId} readiness: ${errorMessage}`
       );
+    }
+
+    if (options?.skipAccessibilitySetup) {
+      logger.info(`[DeviceSessionManager] Skipping accessibility service setup for ${deviceId}`);
+      return;
     }
 
     try {
@@ -353,9 +366,9 @@ export class DeviceSessionManager implements DeviceSessionManager {
   /**
    * Find an available device or start an emulator for the specified platform
    */
-  public async findOrStartDevice(platform: Platform): Promise<BootedDevice> {
+  public async findOrStartDevice(platform: Platform, options?: DeviceReadyOptions): Promise<BootedDevice> {
     if (platform === "android") {
-      return await this.findOrStartAndroidDevice();
+      return await this.findOrStartAndroidDevice(options);
     } else {
       return await this.findOrStartIosDevice();
     }
@@ -364,14 +377,14 @@ export class DeviceSessionManager implements DeviceSessionManager {
   /**
    * Find an available Android device or start an emulator
    */
-  public async findOrStartAndroidDevice(): Promise<BootedDevice> {
+  public async findOrStartAndroidDevice(options?: DeviceReadyOptions): Promise<BootedDevice> {
     const allDevices = await this.deviceUtils.getBootedDevices("android");
 
     if (allDevices.length > 0) {
       // Use the first available device
       const device = allDevices[0];
       const deviceId = device.deviceId!;
-      await this.verifyAndroidDevice(deviceId);
+      await this.verifyAndroidDevice(deviceId, options);
       return device;
     }
 
@@ -398,7 +411,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
       );
     }
 
-    await this.verifyAndroidDevice(newDevice.deviceId!);
+    await this.verifyAndroidDevice(newDevice.deviceId!, options);
     return newDevice;
   }
 

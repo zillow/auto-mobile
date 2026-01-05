@@ -111,7 +111,11 @@ class ToolRegistryClass {
 
       // Ensure device is ready and get the device ID
       logger.info(`[ToolRegistry] ${name}: Resolving device for platform=${platform}, providedDeviceId=${providedDeviceId}`);
-      const device = await this.deviceSessionManager.ensureDeviceReady(platform, providedDeviceId);
+      const device = await this.deviceSessionManager.ensureDeviceReady(
+        platform,
+        providedDeviceId,
+        { skipAccessibilitySetup: name === "observe" }
+      );
       logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
 
       try {

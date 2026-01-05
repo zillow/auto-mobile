@@ -1,4 +1,4 @@
-import { DeviceSessionManager } from "../../src/utils/interfaces";
+import { DeviceReadyOptions, DeviceSessionManager } from "../../src/utils/DeviceSessionManager";
 import { BootedDevice, Platform, SomePlatform, ActionableError } from "../../src/models";
 
 /**
@@ -25,6 +25,7 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
   private ensureDeviceReadyCalls: number = 0;
   private verificationAttempts: Map<string, number> = new Map();
   private deviceVerificationCalls: Map<string, Platform> = new Map();
+  private lastOptions: DeviceReadyOptions | undefined;
 
   /**
    * Configure the list of connected devices
@@ -147,6 +148,13 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
   }
 
   /**
+   * Get the last options passed to device methods.
+   */
+  getLastOptions(): DeviceReadyOptions | undefined {
+    return this.lastOptions;
+  }
+
+  /**
    * Clear all call history (for test cleanup)
    */
   clearHistory(): void {
@@ -154,6 +162,7 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
     this.ensureDeviceReadyCalls = 0;
     this.verificationAttempts.clear();
     this.deviceVerificationCalls.clear();
+    this.lastOptions = undefined;
   }
 
   // Implementation of DeviceSessionManager interface
@@ -174,9 +183,11 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
 
   async ensureDeviceReady(
     platform: SomePlatform,
-    providedDeviceId?: string
+    providedDeviceId?: string,
+    options?: DeviceReadyOptions
   ): Promise<BootedDevice> {
     this.ensureDeviceReadyCalls++;
+    this.lastOptions = options;
 
     if (this.simulateDisconnection) {
       throw new ActionableError("Device disconnected during verification");
@@ -230,7 +241,8 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
     return [...this.connectedPlatforms];
   }
 
-  async verifyDevice(deviceId: string, platform: Platform): Promise<void> {
+  async verifyDevice(deviceId: string, platform: Platform, options?: DeviceReadyOptions): Promise<void> {
+    this.lastOptions = options;
     const attempts = (this.verificationAttempts.get(deviceId) || 0) + 1;
     this.verificationAttempts.set(deviceId, attempts);
     this.deviceVerificationCalls.set(deviceId, platform);
@@ -256,7 +268,8 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
     }
   }
 
-  async verifyAndroidDevice(deviceId: string): Promise<void> {
+  async verifyAndroidDevice(deviceId: string, options?: DeviceReadyOptions): Promise<void> {
+    this.lastOptions = options;
     const attempts = (this.verificationAttempts.get(deviceId) || 0) + 1;
     this.verificationAttempts.set(deviceId, attempts);
     this.deviceVerificationCalls.set(deviceId, "android");
@@ -310,7 +323,8 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
     }
   }
 
-  async findOrStartDevice(platform: Platform): Promise<BootedDevice> {
+  async findOrStartDevice(platform: Platform, options?: DeviceReadyOptions): Promise<BootedDevice> {
+    this.lastOptions = options;
     if (this.deviceNotFound) {
       throw new ActionableError(`No device found for platform: ${platform}`);
     }
@@ -329,7 +343,8 @@ export class FakeDeviceSessionManager implements DeviceSessionManager {
     return availableDevices[0];
   }
 
-  async findOrStartAndroidDevice(): Promise<BootedDevice> {
+  async findOrStartAndroidDevice(options?: DeviceReadyOptions): Promise<BootedDevice> {
+    this.lastOptions = options;
     if (this.deviceNotFound) {
       throw new ActionableError("No Android device found");
     }

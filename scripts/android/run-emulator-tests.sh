@@ -38,6 +38,12 @@ if [ -z "$APK_PATH" ] || [ -z "$TEST_SCRIPT" ]; then
   exit 1
 fi
 
+if [ -n "$APK_PATH" ]; then
+  export AUTOMOBILE_ACCESSIBILITY_APK_PATH="$APK_PATH"
+  export AUTOMOBILE_SKIP_ACCESSIBILITY_CHECKSUM=1
+  export AUTOMOBILE_SKIP_ACCESSIBILITY_DOWNLOAD_IF_INSTALLED=1
+fi
+
 # Helper function for section headers
 print_section() {
   local title="$1"
