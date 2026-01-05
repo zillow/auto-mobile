@@ -196,6 +196,21 @@ export interface BackStackInfo {
 }
 
 /**
+ * Represents a navigation event detected from view hierarchy changes.
+ * This is an alternative to SDK navigation events for apps without SDK integration.
+ */
+export interface HierarchyNavigationEvent {
+  /** Screen fingerprint of the source screen (null if first screen) */
+  fromFingerprint: string | null;
+  /** Screen fingerprint of the destination screen */
+  toFingerprint: string;
+  /** Timestamp when the navigation was detected */
+  timestamp: number;
+  /** Package name of the app */
+  packageName?: string;
+}
+
+/**
  * Interface for navigation graph management.
  * Allows for easy mocking in tests.
  */
@@ -208,6 +223,9 @@ export interface NavigationGraph {
 
   /** Record a navigation event from WebSocket */
   recordNavigationEvent(event: NavigationEvent): Promise<void>;
+
+  /** Record a navigation event detected from view hierarchy changes */
+  recordHierarchyNavigation(event: HierarchyNavigationEvent): Promise<void>;
 
   /** Record back stack information for the current screen */
   recordBackStack(backStack: BackStackInfo): void;
