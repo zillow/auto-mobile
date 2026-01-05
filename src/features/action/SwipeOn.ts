@@ -4,6 +4,7 @@ import {
   BootedDevice,
   Element,
   ObserveResult,
+  SwipeDirection,
   SwipeOnOptions,
   SwipeOnResult,
   ScrollableCandidate,
@@ -21,6 +22,7 @@ import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 import { SwipeResult } from "../../models/SwipeResult";
 import { ObserveScreen } from "../observe/ObserveScreen";
+import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
 
 export interface GestureExecutor {
   swipe(
@@ -49,6 +51,8 @@ export interface SwipeOnDependencies {
   observeScreen?: ObserveScreenLike;
   elementUtils?: ElementUtils;
 }
+
+type SwipeOnResolvedOptions = SwipeOnOptions & { direction: SwipeDirection };
 
 /**
  * Unified command to swipe on screen or elements, with optional scroll-until-visible functionality
@@ -166,20 +170,31 @@ export class SwipeOn extends BaseVisualChange {
       return this.createErrorResult(validationError);
     }
 
+    const resolvedDirection = resolveSwipeDirection(options);
+    if (resolvedDirection.error) {
+      perf.end();
+      return this.createErrorResult(resolvedDirection.error);
+    }
+
+    const normalizedOptions: SwipeOnResolvedOptions = {
+      ...options,
+      direction: resolvedDirection.direction as SwipeDirection
+    };
+
     try {
       // Determine which mode to use
-      if (options.lookFor) {
+      if (normalizedOptions.lookFor) {
         // Scroll-until-visible mode
-        return await this.executeScrollUntilVisible(options, progress, perf);
-      } else if (!options.container) {
-        const autoTargetEnabled = options.autoTarget !== false;
+        return await this.executeScrollUntilVisible(normalizedOptions, progress, perf);
+      } else if (!normalizedOptions.container) {
+        const autoTargetEnabled = normalizedOptions.autoTarget !== false;
         if (!autoTargetEnabled) {
-          return await this.executeScreenSwipe(options, progress, perf);
+          return await this.executeScreenSwipe(normalizedOptions, progress, perf);
         }
 
         const scrollableContext = await this.getScrollableContext();
         if (scrollableContext.scrollables.length === 0) {
-          return await this.executeScreenSwipe(options, progress, perf);
+          return await this.executeScreenSwipe(normalizedOptions, progress, perf);
         }
 
         const screenBounds = scrollableContext.observeResult
@@ -188,11 +203,11 @@ export class SwipeOn extends BaseVisualChange {
         const autoTargetElement = this.selectAutoTargetScrollable(
           scrollableContext.scrollables,
           screenBounds,
-          options.direction
+          normalizedOptions.direction
         );
 
         if (!autoTargetElement) {
-          const result = await this.executeScreenSwipe(options, progress, perf);
+          const result = await this.executeScreenSwipe(normalizedOptions, progress, perf);
           return {
             ...result,
             warning: "Scrollable containers found but none matched the swipe direction; swiping the screen. Set autoTarget: false to force screen swipes.",
@@ -202,7 +217,7 @@ export class SwipeOn extends BaseVisualChange {
 
         const autoTargetContainer = this.buildContainerFromElement(autoTargetElement);
         if (!autoTargetContainer) {
-          const result = await this.executeScreenSwipe(options, progress, perf);
+          const result = await this.executeScreenSwipe(normalizedOptions, progress, perf);
           return {
             ...result,
             warning: "Auto-targeted scrollable container lacks a usable identifier; swiping the screen. Provide container.elementId or container.text to target it explicitly.",
@@ -211,7 +226,7 @@ export class SwipeOn extends BaseVisualChange {
         }
 
         const autoTargetResult = await this.executeElementSwipe(
-          { ...options, container: autoTargetContainer },
+          { ...normalizedOptions, container: autoTargetContainer },
           progress,
           perf
         );
@@ -223,19 +238,19 @@ export class SwipeOn extends BaseVisualChange {
         };
       } else {
         // Container specified = swipe within container
-        return await this.executeElementSwipe(options, progress, perf);
+        return await this.executeElementSwipe(normalizedOptions, progress, perf);
       }
     } catch (error) {
       perf.end();
 
       // Build debug context if debug mode is enabled and we have search criteria
-      const debugContext = options.lookFor || options.container
+      const debugContext = normalizedOptions.lookFor || normalizedOptions.container
         ? await buildElementSearchDebugContext(
           this.device,
           {
-            text: options.lookFor?.text,
-            resourceId: options.lookFor?.elementId || options.container?.elementId,
-            container: options.container
+            text: normalizedOptions.lookFor?.text,
+            resourceId: normalizedOptions.lookFor?.elementId || normalizedOptions.container?.elementId,
+            container: normalizedOptions.container
           }
         )
         : undefined;
@@ -245,7 +260,7 @@ export class SwipeOn extends BaseVisualChange {
       return {
         success: false,
         error: `Failed to perform swipeOn: ${errorMessage}`,
-        targetType: options.container ? "element" : "screen",
+        targetType: normalizedOptions.container ? "element" : "screen",
         x1: 0,
         y1: 0,
         x2: 0,
@@ -260,10 +275,6 @@ export class SwipeOn extends BaseVisualChange {
    * Validate swipeOn options
    */
   private validateOptions(options: SwipeOnOptions): string | null {
-    if (!options.direction) {
-      return "direction is required";
-    }
-
     // Validate container if specified
     if (options.container) {
       const containerFieldCount = [options.container.elementId, options.container.text].filter(Boolean).length;
@@ -302,7 +313,7 @@ export class SwipeOn extends BaseVisualChange {
   private selectAutoTargetScrollable(
     scrollables: Element[],
     screenBounds: Element["bounds"] | null,
-    direction: SwipeOnOptions["direction"]
+    direction: SwipeDirection
   ): Element | null {
     if (scrollables.length === 0) {
       return null;
@@ -340,7 +351,7 @@ export class SwipeOn extends BaseVisualChange {
     return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
   }
 
-  private matchesDirection(element: Element, direction: SwipeOnOptions["direction"]): boolean {
+  private matchesDirection(element: Element, direction: SwipeDirection): boolean {
     const width = Math.abs(element.bounds.right - element.bounds.left);
     const height = Math.abs(element.bounds.bottom - element.bounds.top);
 
@@ -384,7 +395,7 @@ export class SwipeOn extends BaseVisualChange {
    * Execute a full-screen swipe
    */
   private async executeScreenSwipe(
-    options: SwipeOnOptions,
+    options: SwipeOnResolvedOptions,
     progress?: ProgressCallback,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeOnResult> {
@@ -451,7 +462,7 @@ export class SwipeOn extends BaseVisualChange {
    * Execute a swipe on a specific element (with optional simple scroll)
    */
   private async executeElementSwipe(
-    options: SwipeOnOptions,
+    options: SwipeOnResolvedOptions,
     progress?: ProgressCallback,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeOnResult> {
@@ -516,7 +527,7 @@ export class SwipeOn extends BaseVisualChange {
    * Execute scroll-until-visible operation
    */
   private async executeScrollUntilVisible(
-    options: SwipeOnOptions,
+    options: SwipeOnResolvedOptions,
     progress?: ProgressCallback,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeOnResult> {
@@ -871,7 +882,7 @@ export class SwipeOn extends BaseVisualChange {
   /**
    * Get swipe duration from options
    */
-  private getDuration(options: SwipeOnOptions): number {
+  private getDuration(options: SwipeOnResolvedOptions): number {
     if (options.duration !== undefined) {
       return options.duration;
     }

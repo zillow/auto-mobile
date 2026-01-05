@@ -1,6 +1,7 @@
 import { UIState, SelectedElement, ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
 import { ViewHierarchyResult, WindowHierarchy } from "../../models";
 import { SwipeOnOptions } from "../../models";
+import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
 
 /**
  * Extracts UI state from a view hierarchy.
@@ -259,12 +260,17 @@ export class UIStateExtractor {
       return undefined;
     }
 
+    const resolvedDirection = resolveSwipeDirection(options);
+    if (!resolvedDirection.direction) {
+      return undefined;
+    }
+
     const scrollPosition: ScrollPosition = {
       targetElement: {
         text: options.lookFor.text,
         resourceId: options.lookFor.elementId
       },
-      direction: options.direction
+      direction: resolvedDirection.direction
     };
 
     // Add container information if specified

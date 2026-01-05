@@ -26,9 +26,9 @@ describe("SwipeOn autoTarget", () => {
   ) => ({
     $: {
       bounds,
-      scrollable: "true",
+      "scrollable": "true",
       "resource-id": resourceId,
-      class: "androidx.recyclerview.widget.RecyclerView"
+      "class": "androidx.recyclerview.widget.RecyclerView"
     }
   });
 

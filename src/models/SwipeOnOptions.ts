@@ -1,6 +1,15 @@
 /**
  * Options for swiping on screen or element
  */
+export type SwipeDirection = "up" | "down" | "left" | "right";
+
+/**
+ * Gesture type clarifies how to interpret the direction parameter:
+ * - "swipeFingerTowardsDirection": direction describes where the finger moves (default)
+ * - "scrollTowardsDirection": direction describes where the content scrolls to
+ */
+export type GestureType = "swipeFingerTowardsDirection" | "scrollTowardsDirection";
+
 export interface SwipeOnOptions {
   // Include system insets (status/navigation bars)
   includeSystemInsets?: boolean; // Include status/navigation bars (default false)
@@ -14,8 +23,11 @@ export interface SwipeOnOptions {
   // Auto-target a scrollable container when no container is specified (default true)
   autoTarget?: boolean;
 
-  // Direction (required)
-  direction: "up" | "down" | "left" | "right";
+  // Direction - interpretation depends on gestureType
+  direction?: SwipeDirection;
+
+  // How to interpret the direction parameter
+  gestureType?: GestureType;
 
   // Search for element while scrolling (optional)
   lookFor?: {
