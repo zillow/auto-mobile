@@ -25,6 +25,13 @@ jobs:
         with:
           bun-version: 1.3.5
 
+      - name: Install ripgrep
+        run: |
+          if ! command -v rg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ripgrep
+          fi
+
       - name: Bump versions
         run: bash scripts/versioning/bump-versions.sh --new-version "${{ inputs.version }}"
 
