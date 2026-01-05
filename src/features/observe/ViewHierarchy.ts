@@ -867,7 +867,7 @@ export class ViewHierarchy {
   /**
    * Filter the view hierarchy to only include elements that meet specific criteria:
    * - Have resourceId, text, or contentDesc
-   * - OR have clickable, scrollable, or focused set to true
+   * - OR have clickable, scrollable, focused, or selected set to true
    * - Include descendants that meet criteria even if parents don't
    * - Omit boolean fields not set to true and class="android.view.View"
    * @param viewHierarchy - The view hierarchy to filter
@@ -1107,7 +1107,9 @@ export class ViewHierarchy {
     return Boolean(
       (props.clickable === "true") ||
       (props.scrollable === "true") ||
-      (props.focused === "true")
+      (props.focused === "true") ||
+      (props.selected === "true") ||
+      (props.selected === true)
     );
   }
 
@@ -1386,6 +1388,7 @@ export class ViewHierarchy {
       "clickable",
       "scrollable",
       "enabled",
+      "selected",
       "bounds",
       "accessible",
       "test-tag",
