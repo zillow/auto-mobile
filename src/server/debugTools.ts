@@ -6,6 +6,13 @@ import { DebugSearch } from "../features/debug/DebugSearch";
 import { BugReport } from "../features/debug/BugReport";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice, Platform } from "../models";
+import { isDebugModeEnabled } from "../utils/debug";
+
+const ensureDebugEnabled = () => {
+  if (!isDebugModeEnabled()) {
+    throw new ActionableError("Debug mode is disabled. Enable the 'debug' feature flag to use this tool.");
+  }
+};
 
 // Type definitions for tool arguments
 export interface RawViewHierarchyArgs {
@@ -76,6 +83,7 @@ export function registerDebugTools() {
   // Raw View Hierarchy handler
   const rawViewHierarchyHandler = async (device: BootedDevice, args: RawViewHierarchyArgs) => {
     try {
+      ensureDebugEnabled();
       const rawViewHierarchy = new RawViewHierarchy(device);
       const result = await rawViewHierarchy.execute({
         source: args.source
@@ -89,6 +97,7 @@ export function registerDebugTools() {
   // Debug Search handler
   const debugSearchHandler = async (device: BootedDevice, args: DebugSearchArgs) => {
     try {
+      ensureDebugEnabled();
       if (!args.text && !args.resourceId) {
         throw new ActionableError("Either 'text' or 'resourceId' must be provided");
       }
@@ -115,6 +124,7 @@ export function registerDebugTools() {
   // Bug Report handler
   const bugReportHandler = async (device: BootedDevice, args: BugReportArgs) => {
     try {
+      ensureDebugEnabled();
       const bugReport = new BugReport(device);
       const result = await bugReport.execute({
         appId: args.appId,

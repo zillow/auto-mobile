@@ -27,6 +27,7 @@ import { registerNavigationTools } from "./navigationTools";
 import { registerDaemonTools } from "./daemonTools";
 import { registerPlanTools } from "./planTools";
 import { registerDoctorTools } from "./doctorTools";
+import { registerFeatureFlagTools } from "./featureFlagTools";
 
 // Import resource registration functions
 import { registerObservationResources } from "./observationResources";
@@ -34,6 +35,7 @@ import { registerBootedDeviceResources } from "./bootedDeviceResources";
 import { registerDeviceImageResources } from "./deviceImageResources";
 import { registerAppResources } from "./appResources";
 import { registerNavigationResources } from "./navigationResources";
+import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 
 export interface McpServerOptions {
   debug?: boolean;
@@ -67,6 +69,11 @@ function formatToolParamError(toolName: string, error: unknown): string {
 }
 
 export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
+  void FeatureFlagService.getInstance()
+    .initialize()
+    .catch(error => {
+      logger.warn(`Failed to initialize feature flags: ${error}`);
+    });
   // Get configuration and device session managers
 
   // Register all tool categories
@@ -80,6 +87,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDaemonTools();
   registerPlanTools();
   registerDoctorTools();
+  registerFeatureFlagTools();
 
   // Register all resources
   registerObservationResources();
@@ -88,10 +96,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerAppResources();
   registerNavigationResources();
 
-  // Only register debug tools when --debug flag is passed
-  if (options.debug) {
-    registerDebugTools();
-  }
+  registerDebugTools();
 
   // Create a new MCP server
   const server = new McpServer({

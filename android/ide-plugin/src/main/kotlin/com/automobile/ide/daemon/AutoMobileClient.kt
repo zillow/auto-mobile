@@ -1,8 +1,13 @@
 package com.automobile.ide.daemon
 
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 
 interface AutoMobileClient {
   val transportName: String
@@ -17,7 +22,8 @@ interface AutoMobileClient {
   fun readResource(uri: String): List<McpResourceContent>
 
   fun getNavigationGraph(platform: String = "android"): JsonElement
-
+  fun listFeatureFlags(): List<FeatureFlagState>
+  fun setFeatureFlag(key: String, enabled: Boolean, config: JsonObject? = null): FeatureFlagState
   fun close() {}
 }
 
@@ -46,6 +52,31 @@ data class McpResourceContent(
     val mimeType: String? = null,
     val text: String? = null,
     val blob: String? = null,
+)
+
+@Serializable
+data class McpToolContent(
+    val type: String,
+    val text: String? = null,
+)
+
+@Serializable
+data class McpToolResponse(
+    val content: List<McpToolContent>,
+)
+
+@Serializable
+data class FeatureFlagState(
+    val key: String,
+    val label: String,
+    val description: String? = null,
+    val enabled: Boolean,
+    val config: JsonObject? = null,
+)
+
+@Serializable
+data class FeatureFlagListResult(
+    val flags: List<FeatureFlagState>,
 )
 
 @Serializable
@@ -78,3 +109,14 @@ internal data class ListResourceTemplatesResult(val resourceTemplates: List<McpR
 @Serializable internal data class ReadResourceResult(val contents: List<McpResourceContent>)
 
 internal const val LATEST_MCP_PROTOCOL_VERSION = "2025-11-25"
+
+internal fun <T> decodeToolResponse(
+    json: Json,
+    element: JsonElement,
+    serializer: KSerializer<T>,
+): T {
+  val response = json.decodeFromJsonElement(McpToolResponse.serializer(), element)
+  val text = response.content.firstOrNull { it.type == "text" }?.text
+      ?: throw McpConnectionException("Tool response missing text content")
+  return json.decodeFromString(serializer, text)
+}

@@ -14,6 +14,7 @@ const DB_PATH = path.join(DB_DIR, "auto-mobile.db");
 
 let dbInstance: Kysely<DatabaseSchema> | null = null;
 let migrationsRun = false;
+let migrationsPromise: Promise<void> | null = null;
 
 /**
  * Get the singleton database instance.
@@ -39,18 +40,42 @@ export function getDatabase(): Kysely<DatabaseSchema> {
     });
 
     // Run migrations if not already run
-    if (!migrationsRun) {
-      runMigrations(dbInstance as Kysely<unknown>)
+    if (!migrationsRun && !migrationsPromise) {
+      migrationsPromise = runMigrations(dbInstance as Kysely<unknown>)
         .then(() => {
           migrationsRun = true;
         })
         .catch(error => {
           logger.error("Failed to run migrations on database initialization:", error);
+          throw error;
         });
     }
   }
 
   return dbInstance;
+}
+
+export async function ensureMigrations(): Promise<void> {
+  if (migrationsRun) {
+    return;
+  }
+
+  if (!dbInstance) {
+    getDatabase();
+  }
+
+  if (!migrationsPromise) {
+    migrationsPromise = runMigrations(dbInstance as Kysely<unknown>)
+      .then(() => {
+        migrationsRun = true;
+      })
+      .catch(error => {
+        logger.error("Failed to run migrations on database initialization:", error);
+        throw error;
+      });
+  }
+
+  await migrationsPromise;
 }
 
 /**

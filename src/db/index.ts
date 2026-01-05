@@ -50,4 +50,8 @@ export type {
   PredictionTransitionStats,
   NewPredictionTransitionStats,
   PredictionTransitionStatsUpdate,
+  FeatureFlagsTable,
+  FeatureFlag,
+  NewFeatureFlag,
+  FeatureFlagUpdate,
 } from "./types";

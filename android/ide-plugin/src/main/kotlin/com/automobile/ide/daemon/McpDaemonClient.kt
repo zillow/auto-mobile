@@ -73,6 +73,40 @@ class McpDaemonClient(
     return response.result ?: JsonObject(emptyMap())
   }
 
+  override fun listFeatureFlags(): List<FeatureFlagState> {
+    val response = callTool("listFeatureFlags", JsonObject(emptyMap()))
+    val result = decodeToolResponse(json, response, FeatureFlagListResult.serializer())
+    return result.flags
+  }
+
+  override fun setFeatureFlag(key: String, enabled: Boolean, config: JsonObject?): FeatureFlagState {
+    val response =
+        callTool(
+            "setFeatureFlag",
+            buildJsonObject {
+              put("key", JsonPrimitive(key))
+              put("enabled", JsonPrimitive(enabled))
+              if (config != null) {
+                put("config", config)
+              }
+            },
+        )
+    return decodeToolResponse(json, response, FeatureFlagState.serializer())
+  }
+
+  private fun callTool(name: String, arguments: JsonObject): JsonElement {
+    val response =
+        sendRequest(
+            "tools/call",
+            buildJsonObject {
+              put("name", JsonPrimitive(name))
+              put("arguments", arguments)
+            },
+        )
+    ensureSuccess(response)
+    return response.result ?: JsonObject(emptyMap())
+  }
+
   private fun sendRequest(
       method: String,
       params: JsonObject = JsonObject(emptyMap()),

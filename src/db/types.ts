@@ -259,6 +259,15 @@ export interface RecompositionMetricsTable {
   created_at: Generated<string>;
 }
 
+// Feature flags table
+export interface FeatureFlagsTable {
+  key: string;
+  enabled: number; // SQLite boolean (0/1)
+  config_json: string | null;
+  created_at: Generated<string>;
+  updated_at: string;
+}
+
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
@@ -279,6 +288,7 @@ export interface Database {
   memory_baselines: MemoryBaselinesTable;
   memory_audit_results: MemoryAuditResultsTable;
   recomposition_metrics: RecompositionMetricsTable;
+  feature_flags: FeatureFlagsTable;
 }
 
 // Convenience types for each table
@@ -348,3 +358,7 @@ export type MemoryAuditResultUpdate = Updateable<MemoryAuditResultsTable>;
 export type RecompositionMetrics = Selectable<RecompositionMetricsTable>;
 export type NewRecompositionMetrics = Insertable<RecompositionMetricsTable>;
 export type RecompositionMetricsUpdate = Updateable<RecompositionMetricsTable>;
+
+export type FeatureFlag = Selectable<FeatureFlagsTable>;
+export type NewFeatureFlag = Insertable<FeatureFlagsTable>;
+export type FeatureFlagUpdate = Updateable<FeatureFlagsTable>;

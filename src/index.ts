@@ -7,13 +7,12 @@ import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./server";
 import { logger } from "./utils/logger";
 import { runCliCommand } from "./cli";
-import { setDebugPerfEnabled } from "./utils/PerformanceTracker";
-import { setDebugModeEnabled } from "./utils/debug";
-import { serverConfig } from "./utils/ServerConfig";
 import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
 import { execSync } from "node:child_process";
 import { executionTracker } from "./server/executionTracker";
+import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
+import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefinitions";
 
 // Detect port from git branch name for worktree isolation
 // e.g., work/164-feature-name -> port 9164
@@ -595,60 +594,36 @@ async function main() {
       daemonArgs,
     } = parseArgs();
 
-    // Enable performance tracking if --debug-perf flag is set
-    if (debugPerf) {
-      setDebugPerfEnabled(true);
-      logger.info("Performance timing enabled (--debug-perf)");
-    }
+    const featureFlagService = FeatureFlagService.getInstance();
+    await featureFlagService.initialize();
 
-    // Enable debug mode if --debug flag is set
-    if (debug) {
-      setDebugModeEnabled(true);
-      logger.info("Debug mode enabled (--debug)");
-    }
-
-    // Enable UI performance audit mode if --ui-perf-mode flag is set
-    if (uiPerfMode) {
-      serverConfig.setUiPerfMode(true);
-      logger.info("UI performance audit mode enabled (--ui-perf-mode)");
-    }
-
-    // Enable UI performance debug mode if --ui-perf-debug flag is set
-    if (uiPerfDebug) {
-      serverConfig.setUiPerfDebugMode(true);
-      logger.info("UI performance debug mode enabled (--ui-perf-debug)");
-    }
-
-    // Enable memory performance audit mode if --mem-perf-audit flag is set
-    if (memPerfAuditMode) {
-      serverConfig.setMemPerfAuditMode(true);
-      logger.info("Memory performance audit mode enabled (--mem-perf-audit)");
-    }
-
-    if (strictAwait) {
-      serverConfig.setStrictAwaitEnabled(true);
-      logger.info("Strict await mode enabled (--strict-await)");
-    }
-
-    if (predictiveUi) {
-      serverConfig.setPredictiveUiEnabled(true);
-      logger.info("Predictive UI mode enabled (--predictive/--predictive-ui)");
-    }
-
-    // Enable accessibility audit mode if --accessibility-audit flag is set
-    if (a11yAuditMode) {
-      const level = (a11yLevel as "A" | "AA" | "AAA" | undefined) || "AA";
-      const failureMode = (a11yFailureMode as "report" | "threshold" | "strict" | undefined) || "report";
-      const minSeverity = (a11yMinSeverity as "error" | "warning" | "info" | undefined) || (failureMode === "strict" ? "error" : "warning");
-
-      serverConfig.setAccessibilityAuditConfig({
-        level,
-        failureMode,
+    const accessibilityConfig = a11yAuditMode
+      ? {
+        level: (a11yLevel as "A" | "AA" | "AAA" | undefined) || "AA",
+        failureMode: (a11yFailureMode as "report" | "threshold" | "strict" | undefined) || "report",
+        minSeverity: (a11yMinSeverity as "error" | "warning" | "info" | undefined) ||
+            ((a11yFailureMode as "report" | "threshold" | "strict" | undefined) === "strict" ? "error" : "warning"),
         useBaseline: a11yUseBaseline,
-        minSeverity,
-      });
+      }
+      : null;
 
-      logger.info(`Accessibility audit mode enabled (level: ${level}, failure mode: ${failureMode}, baseline: ${a11yUseBaseline})`);
+    const cliOverrides: Array<[FeatureFlagKey, boolean, string, Record<string, unknown> | null | undefined]> = [
+      ["debug", debug, "--debug"],
+      ["debug-perf", debugPerf, "--debug-perf"],
+      ["ui-perf-mode", uiPerfMode, "--ui-perf-mode"],
+      ["ui-perf-debug", uiPerfDebug, "--ui-perf-debug"],
+      ["mem-perf-audit", memPerfAuditMode, "--mem-perf-audit"],
+      ["strict-await", strictAwait, "--strict-await"],
+      ["accessibility-audit", a11yAuditMode, "--accessibility-audit", accessibilityConfig],
+      ["predictive-ui", predictiveUi, "--predictive/--predictive-ui"],
+    ];
+
+    for (const [key, enabled, flagLabel, config] of cliOverrides) {
+      if (!enabled) {
+        continue;
+      }
+      await featureFlagService.setFlag(key, true, config);
+      logger.info(`Feature flag enabled (${flagLabel})`);
     }
 
     if (daemonMode) {

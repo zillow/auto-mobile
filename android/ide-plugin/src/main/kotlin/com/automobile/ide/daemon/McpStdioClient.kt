@@ -59,13 +59,41 @@ class McpStdioClient(
   }
 
   override fun getNavigationGraph(platform: String): JsonElement {
+    val response = callTool(
+      "getNavigationGraph",
+      buildJsonObject { put("platform", JsonPrimitive(platform)) },
+    )
+    return response
+  }
+
+  override fun listFeatureFlags(): List<FeatureFlagState> {
+    val response = callTool("listFeatureFlags", JsonObject(emptyMap()))
+    val result = decodeToolResponse(json, response, FeatureFlagListResult.serializer())
+    return result.flags
+  }
+
+  override fun setFeatureFlag(key: String, enabled: Boolean, config: JsonObject?): FeatureFlagState {
+    val response = callTool(
+      "setFeatureFlag",
+      buildJsonObject {
+        put("key", JsonPrimitive(key))
+        put("enabled", JsonPrimitive(enabled))
+        if (config != null) {
+          put("config", config)
+        }
+      },
+    )
+    return decodeToolResponse(json, response, FeatureFlagState.serializer())
+  }
+
+  private fun callTool(name: String, arguments: JsonObject): JsonElement {
     ensureInitialized()
     val response =
         sendRequest(
             "tools/call",
             buildJsonObject {
-              put("name", JsonPrimitive("getNavigationGraph"))
-              put("arguments", buildJsonObject { put("platform", JsonPrimitive(platform)) })
+              put("name", JsonPrimitive(name))
+              put("arguments", arguments)
             },
         )
     return response.result ?: JsonObject(emptyMap())
