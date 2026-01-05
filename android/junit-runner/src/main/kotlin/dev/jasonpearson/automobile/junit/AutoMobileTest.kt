@@ -29,4 +29,16 @@ annotation class AutoMobileTest(
 
     /** Target device ID or "auto" for any available device. Default: "auto" */
     val device: String = "auto",
+
+    /**
+     * App package name to clean up after the test (terminate or clear app data).
+     * Required when cleanupAfter is enabled.
+     */
+    val appId: String = "",
+
+    /** Terminate app after the test completes. Default: true */
+    val cleanupAfter: Boolean = true,
+
+    /** Clear app data after the test completes. Default: false */
+    val clearAppData: Boolean = false,
 )

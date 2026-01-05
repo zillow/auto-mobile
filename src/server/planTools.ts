@@ -13,7 +13,9 @@ const executePlanSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   // Framework parameters for device management (optional)
   sessionUuid: z.string().optional().describe("Session UUID for parallel test execution"),
-  deviceId: z.string().optional().describe("Specific device ID to use")
+  deviceId: z.string().optional().describe("Specific device ID to use"),
+  cleanupAppId: z.string().optional().describe("App package ID to terminate after plan execution"),
+  cleanupClearAppData: z.boolean().optional().describe("Clear app data during cleanup (Android only)")
 });
 
 // Execute plan from YAML file or content
@@ -23,6 +25,8 @@ const executePlanTool = async (device: BootedDevice, params: {
   platform: Platform;
   sessionUuid?: string;
   deviceId?: string;
+  cleanupAppId?: string;
+  cleanupClearAppData?: boolean;
 }, _progress?: unknown, signal?: AbortSignal): Promise<any> => {
   try {
     logger.info("=== Starting executePlanTool ===");

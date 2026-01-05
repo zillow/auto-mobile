@@ -47,6 +47,9 @@ fun `create timer from prompt`() {
 - `aiAssistance`: Enable/disable AI agent recovery on failure (default: true)
 - `timeoutMs`: Maximum execution time per test in milliseconds (default: 60000 - 1 minute)
 - `device`: Target device ID or "auto" for any available device (default: "auto")
+- `appId`: App package name to clean up after the test (terminate or clear app data)
+- `cleanupAfter`: Terminate the app after the test completes (default: true)
+- `clearAppData`: Clear app data after the test completes (default: false, Android only)
 
 ### Plan Generation Logic
 
@@ -68,6 +71,14 @@ When using prompt-based testing:
 - `automobile.ci.mode`: Disable AI assistance in CI environments (default: false)
 - `automobile.plan.max.age.ms`: Max age for generated plans in milliseconds (default: 3600000 - 1 hour)
 - `automobile.daemon.startup.timeout.ms`: Daemon startup timeout in milliseconds (default: 10000)
+- `automobile.junit.shuffle.enabled`: Randomize test execution order (default: true)
+- `automobile.junit.shuffle.seed`: Seed for randomized order (default: current time)
+
+### Test Cleanup Behavior
+
+By default, tests with `appId` set will terminate the app after execution to reduce state leakage.
+To fully reset app state between tests, set `clearAppData = true` (Android only). If `cleanupAfter`
+is enabled but `appId` is blank, cleanup is skipped and a warning is logged.
 
 #### Generated Plans Directory Structure
 

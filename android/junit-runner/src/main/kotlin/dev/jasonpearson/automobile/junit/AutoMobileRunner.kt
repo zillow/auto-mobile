@@ -7,6 +7,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.jvm.java
+import kotlin.random.Random
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -37,6 +38,19 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   private val agent: AutoMobileAgent
     get() = LazyInitializer.getAgent()
 
+  private val randomizedChildren: List<FrameworkMethod> by lazy {
+    val children = super.getChildren()
+    val shuffleEnabled = SystemPropertyCache.getBoolean("automobile.junit.shuffle.enabled", true)
+    if (!shuffleEnabled || children.size <= 1) {
+      children
+    } else {
+      val seedProperty = SystemPropertyCache.get("automobile.junit.shuffle.seed", "").trim()
+      val seed = seedProperty.toLongOrNull() ?: System.currentTimeMillis()
+      println("AutoMobileRunner: Shuffling test order with seed=$seed")
+      children.shuffled(Random(seed))
+    }
+  }
+
   override fun run(notifier: RunNotifier) {
     // Skip the entire class if no devices are available
     if (!AutoMobileSharedUtils.deviceChecker.areDevicesAvailable()) {
@@ -60,7 +74,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   }
 
   override fun getChildren(): List<FrameworkMethod> {
-    return super.getChildren()
+    return randomizedChildren
   }
 
   override fun childrenInvoker(notifier: RunNotifier): org.junit.runners.model.Statement {
@@ -170,6 +184,11 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     notifier.fireTestStarted(description)
 
     try {
+      if (annotation.cleanupAfter && annotation.appId.isBlank()) {
+        println(
+            "[WARNING] AutoMobile test ${method.name} requested cleanup but appId is blank; skipping cleanup."
+        )
+      }
       val planPath = getPlanPathOrGenerate(method, annotation)
       val resolvedPlanPath = resolvePlanPath(planPath)
 
@@ -375,6 +394,11 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
     if (annotation.device != "auto") {
       values["deviceId"] = JsonPrimitive(annotation.device)
+    }
+
+    if (annotation.cleanupAfter && annotation.appId.isNotBlank()) {
+      values["cleanupAppId"] = JsonPrimitive(annotation.appId)
+      values["cleanupClearAppData"] = JsonPrimitive(annotation.clearAppData)
     }
 
     return JsonObject(values)

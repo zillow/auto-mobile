@@ -12,6 +12,7 @@ import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { logger } from "../utils/logger";
 import { DaemonState } from "../daemon/daemonState";
 import { createToolExecutionContext, updateSessionCache } from "./ToolExecutionContext";
+import { AppCleanupService, DefaultAppCleanupService } from "./AppCleanupService";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -43,9 +44,11 @@ export interface RegisteredTool {
 class ToolRegistryClass {
   private tools: Map<string, RegisteredTool> = new Map();
   private deviceSessionManager: DeviceSessionManager;
+  private cleanupService: AppCleanupService;
 
   constructor() {
     this.deviceSessionManager = DeviceSessionManager.getInstance();
+    this.cleanupService = new DefaultAppCleanupService();
   }
 
   // Register a new tool
@@ -221,6 +224,13 @@ class ToolRegistryClass {
         }
         throw new ActionableError(`Failed to execute tool ${name}: ${error}`);
       } finally {
+        if (name === "executePlan" && args?.cleanupAppId) {
+          await this.cleanupService.cleanup(device, {
+            appId: args.cleanupAppId,
+            clearAppData: args.cleanupClearAppData,
+          });
+        }
+
         // Auto-release session after executePlan completes
         // This frees the device immediately for parallel test execution
         if (sessionUuid && name === "executePlan" && DaemonState.getInstance().isInitialized()) {
@@ -304,6 +314,11 @@ class ToolRegistryClass {
   // Get the device session manager
   getDeviceSessionManager(): DeviceSessionManager {
     return this.deviceSessionManager;
+  }
+
+  // Allow tests to inject a cleanup implementation
+  setCleanupService(cleanupService: AppCleanupService): void {
+    this.cleanupService = cleanupService;
   }
 
   // Clear all registered tools (for testing)
