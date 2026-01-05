@@ -10,3 +10,7 @@ We have specific documentation for clients we have used AutoMobile with:
 * [Cursor](cursor.md)
 * [Firebender](firebender.md)
 * [Goose](goose.md) 
+
+## Implementation references
+
+- [`src/index.ts#L84-L169`](https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L84-L169) for default STDIO transport and CLI flags.

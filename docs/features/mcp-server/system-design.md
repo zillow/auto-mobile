@@ -44,3 +44,9 @@ stateDiagram-v2
         }
     }
 ```
+
+## Implementation references
+
+- [`src/server/index.ts#L1-L160`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/index.ts#L1-L160) for MCP request handling and tool/resource registration.
+- [`src/server/toolRegistry.ts#L33-L200`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/toolRegistry.ts#L33-L200) for device/session-aware tool execution.
+- [`src/features/action/BaseVisualChange.ts#L41-L210`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/BaseVisualChange.ts#L41-L210) for the observe → action → observe flow used by action tools.

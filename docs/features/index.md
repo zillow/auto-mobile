@@ -4,15 +4,8 @@
 
 AutoMobile's main usage is driven through its Model Context Protocol ([MCP](https://modelcontextprotocol.io/introduction))
 server. It has [observation](mcp-server/observation.md) built into its [interaction loop](mcp-server/interaction-loop.md)
-that is fast. This is supported with performant frame rate observation to determine UI idling. Together, that allows for
-accurate and precise exploration that gets better as more capabilities and heuristics are added. Every widget and
-interaction added to the [AutoMobile Playground app](https://github.com/kaeawc/auto-mobile/blob/main/android/playground/README.md)
-is tested with AutoMobile in order to keep improving.
-
-#### Source Mapping
-
-We combine project path config with deep view hierarchy analysis to determine the code is being rendered. This opens a
-lot of possibilities so we're looking for ways to improve indexing performance and accuracy.
+that is fast. This is supported with UI stability checks (gfxinfo-based on Android) to determine idling. Together, that
+allows for accurate and precise exploration that gets better as more capabilities and heuristics are added.
 
 #### Test Execution
 
@@ -25,8 +18,8 @@ scenarios by leveraging AI-driven analysis of test failures and UI changes.
 #### Device Management
 
 Multi-device support with emulator control and app lifecycle management. As long as you have available adb connections,
-AutoMobile can automatically track which one its using for which execution plan or MCP session. It also means that CI
-setup just requires an open adb connection and AutoMobile will do the rest.
+AutoMobile can automatically track which one its using for which execution plan or MCP session. CI still needs available
+device connections, but AutoMobile handles selection and readiness checks.
 
 #### Android Accessibility Service
 
@@ -34,18 +27,26 @@ The Android Accessibility Service provides real-time access to view hierarchy da
 requiring device rooting or special permissions beyond accessibility service enablement. This service acts as a bridge
 between the Android system's accessibility framework and AutoMobile's automation capabilities. When enabled, the
 accessibility service continuously monitors UI changes and provides detailed information about view hierarchies. It
-writes this file to disk on every update which AutoMobile can then query over adb. The service runs without additional
-performance overhead.
+writes the latest hierarchy to app-private storage and can stream updates over WebSocket for AutoMobile to consume.
 
 #### Batteries Included
 
-AutoMobile comes with extensive functionality to [minimize and automate setup](batteries-included.md) of required
+AutoMobile comes with extensive functionality to [minimize and streamline setup](batteries-included.md) of required
 platform tools.
 
 ## Components 
 
 #### MCP Server
 
-The Model Context Protocol ([MCP](https://modelcontextprotocol.io/introduction)) server is the core component of AutoMobile, built with Node.js and TypeScript using the
+The Model Context Protocol ([MCP](https://modelcontextprotocol.io/introduction)) server is the core component of AutoMobile, built with Bun and TypeScript using the
 MCP TypeScript SDK. It serves as both a server for AI agents to interact with Android devices and a command-line
 interface for direct usage. You can read more about its setup and system design in our [MCP server docs](mcp-server/index.md)
+
+## Implementation references
+
+- [`src/features/action/BaseVisualChange.ts#L41-L210`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/BaseVisualChange.ts#L41-L210) and [`src/features/observe/AwaitIdle.ts#L36-L170`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/AwaitIdle.ts#L36-L170) for the MCP interaction loop and UI idle checks.
+- [`android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileRunner.kt#L23-L120`](https://github.com/kaeawc/auto-mobile/blob/main/android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileRunner.kt#L23-L120) for the JUnitRunner execution flow.
+- [`android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileAgent.kt#L810-L875`](https://github.com/kaeawc/auto-mobile/blob/main/android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileAgent.kt#L810-L875) for AI agent configuration.
+- [`src/utils/DeviceSessionManager.ts#L182-L260`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/DeviceSessionManager.ts#L182-L260) for device selection and readiness checks.
+- [`android/accessibility-service/src/main/java/dev/jasonpearson/automobile/accessibilityservice/AutoMobileAccessibilityService.kt#L449-L486`](https://github.com/kaeawc/auto-mobile/blob/main/android/accessibility-service/src/main/java/dev/jasonpearson/automobile/accessibilityservice/AutoMobileAccessibilityService.kt#L449-L486) and [`src/features/observe/AccessibilityServiceClient.ts#L1426-L1465`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/AccessibilityServiceClient.ts#L1426-L1465) for hierarchy persistence and WebSocket retrieval.
+- [`package.json#L1-L25`](https://github.com/kaeawc/auto-mobile/blob/main/package.json#L1-L25) for the Bun runtime requirement.

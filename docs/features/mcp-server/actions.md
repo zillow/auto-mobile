@@ -2,34 +2,41 @@
 
 #### Observe
 
-In case of instances where the agent needs to make an observation to determine what interactions it should attempt we 
-expose the [observe](observation.md) ability as a tool call.
+In cases where the agent needs to determine what to do next, the [observe](observation.md) capability is exposed as the
+`observe` tool.
 
 #### Interactions
 
-- 👆 **Tap**: Intelligent text-based or resource-id tapping with fuzzy search and view hierarchy analysis. See
+- 👆 **Tap/long-press/drag**: `tapOn` supports tap, double-tap, long press, and long-press drag actions. See
   [tapOn details](tap-on.md) for container scoping and precedence.
-- 👉 **Swipe**: Directional swiping within element bounds with configurable release timing.
-- ⏰ **Long Press**: Extended touch gestures for context menus and advanced interactions.
-- 📜 **Scroll**: Intelligent scrolling until target text becomes visible.
-- 📳 **Shake**: Accelerometer simulation of shaking the device.
+- 👉 **Swipe/scroll**: `swipeOn` handles directional swipes and scrolling within container bounds.
+- ↔️ **Drag + drop**: `dragAndDrop` for element-to-element moves.
+- 🔍 **Pinch**: `pinchOn` for zoom in/out gestures.
+- 📳 **Shake**: `shake` for accelerometer simulation.
 
 #### App Management
 
-- 📱 **List Apps**: Enumerate all installed applications including system apps.
-- 🚀 **Launch App**: Start applications by package name.
-- ❌ **Terminate App**: Force-stop the specified application if its running.
-- 🗑️ **Clear App Data**: Reset application state and storage.
-- 📦 **Install App**: Deploy an app to the device
-- 🔗 **Query Deep Links**: Query the application for its registered deep links
+- 📱 **List Apps**: `listApps` enumerates installed apps (Android returns profiles + system app coverage).
+- 🚀 **Launch App**: `launchApp` starts apps by package name (with optional clear-app-data support).
+- ❌ **Terminate App**: `terminateApp` force-stops an app by package name.
+- 📦 **Install App**: `installApp` installs an APK.
+- 🔗 **Query Deep Links**: `getDeepLinks` reads registered deep links/intent filters for an Android package.
 
 #### Input Methods
 
-- ⌨️ **Send Keys**: Keyboard input, optionally using ADBKeyboard for unicode as needed on Android.
-- 🗑️ **Clear Text**: Deletes all text from a specified element, or the currently focused text field.
-- 🔘 **Press Button**: Hardware button simulation (home, back, menu, power, volume)
+- ⌨️ **Text Entry**: `inputText` and `imeAction` for typing and IME actions.
+- 🗑️ **Clear/Select Text**: `clearText` and `selectAllText` act on the focused field.
+- 🔘 **Hardware Buttons**: `pressButton` or `pressKey` for back/home/recent/power/volume.
 
 #### Device Configuration
 
-- 🔄 **Change Orientation**: Toggle between portrait and landscape modes
-- 🌐 **Open URL**: Launch URLs or deep links in default browser
+- 🔄 **Change Orientation**: `rotate` sets portrait or landscape.
+- 🌐 **Open URL**: `openLink` launches URLs or deep links.
+- 🧰 **System UI**: `openSystemTray`, `homeScreen`, and `recentApps` control system surfaces.
+
+## Implementation references
+
+- [`src/server/observeTools.ts#L16-L148`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/observeTools.ts#L16-L148) for observation tools like `observe` and `listApps`.
+- [`src/server/interactionTools.ts#L150-L960`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/interactionTools.ts#L150-L960) for interaction, input, and device UI tools (`tapOn`, `swipeOn`, `inputText`, `rotate`, etc.).
+- [`src/server/appTools.ts#L11-L126`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/appTools.ts#L11-L126) for app management tools (`launchApp`, `terminateApp`, `installApp`).
+- [`src/server/deepLinkTools.ts#L1-L60`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/deepLinkTools.ts#L1-L60) for `getDeepLinks`.

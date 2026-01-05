@@ -40,3 +40,12 @@ Device and Data Risks
 - Implement appropriate security measures in your testing environment, do not expose AutoMobile as a networked MCP.
 - Comply with all applicable laws and regulations
 - Obtain necessary approvals before deployment in any organizational context
+
+## Implementation References
+
+- ADB shell command execution: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/AdbClient.ts#L1-L260
+- Screenshot capture: https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/TakeScreenshot.ts#L1-L230
+- View hierarchy collection: https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/ViewHierarchy.ts#L1-L220
+- App install: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/InstallApp.ts#L1-L84
+- App uninstall: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/UninstallApp.ts#L1-L199
+- Clear app data: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/ClearAppData.ts#L1-L70

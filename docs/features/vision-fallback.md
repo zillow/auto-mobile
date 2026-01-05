@@ -2,11 +2,13 @@
 
 ## Overview
 
-Vision fallback uses Claude's vision API to help locate UI elements when traditional element finding methods fail. This feature analyzes screenshots to provide alternative selectors or navigation steps when elements can't be found.
+Vision fallback is an internal `tapOn` feature that uses Claude's vision API to help locate UI elements when traditional
+element finding methods fail. It is not exposed via the MCP server or CLI by default; it requires constructing
+`TapOnElement` with a custom vision configuration.
 
 ## How It Works
 
-When element finding fails after all retries (5 attempts):
+When element finding fails after all retries (5 attempts), `TapOnElement` will:
 
 1. **Screenshot capture**: A screenshot is automatically taken
 2. **Claude analysis**: The screenshot is analyzed using Claude's vision API
@@ -16,7 +18,8 @@ When element finding fails after all retries (5 attempts):
 
 ## Configuration
 
-Vision fallback is **disabled by default** to avoid unexpected API costs. Enable it per-tool or globally.
+Vision fallback is **disabled by default** to avoid unexpected API costs. It is only configurable per
+`TapOnElement` instance today.
 
 ### Default Configuration
 
@@ -24,28 +27,16 @@ Vision fallback is **disabled by default** to avoid unexpected API costs. Enable
 {
   enabled: false,              // Disabled by default
   provider: 'claude',          // Only Claude supported currently
-  confidenceThreshold: 'high', // Only suggest steps if high confidence
-  maxCostUsd: 1.0,            // Max $1 per call (conservative)
+  confidenceThreshold: 'high', // Reserved for future gating (not enforced yet)
+  maxCostUsd: 1.0,            // Warning threshold (does not block calls)
   cacheResults: true,          // Cache results to avoid repeated calls
   cacheTtlMinutes: 60         // Cache for 60 minutes
 }
 ```
 
-### Enabling Vision Fallback
-
-#### Option 1: Enable via Environment Variable (Coming Soon)
-
-```bash
-export VISION_FALLBACK_ENABLED=true
-export ANTHROPIC_API_KEY=your-key-here
-```
-
-#### Option 2: Enable Programmatically
+### Enabling Vision Fallback (Internal API)
 
 ```typescript
-import { TapOnElement } from '@kaeawc/auto-mobile';
-import { DEFAULT_VISION_CONFIG } from '@kaeawc/auto-mobile/vision';
-
 const tapTool = new TapOnElement(
   device,
   adb,
@@ -57,6 +48,9 @@ const tapTool = new TapOnElement(
   }
 );
 ```
+
+Note: The MCP server constructs `TapOnElement` with the default config, so vision fallback is not available through MCP
+tool calls unless you modify the server code.
 
 ## Example Scenarios
 
@@ -139,10 +133,10 @@ Results are cached to avoid repeated API calls for the same element search:
 ### Current Limitations
 
 1. **tapOn only**: Currently only integrated into `tapOn` tool
-   - Coming soon: `swipeOn`, `scrollUntil`, etc.
+   - Additional tools would need explicit integration.
 
 2. **Android screenshots**: Works best with clear Android UI screenshots
-   - May struggle with: Custom UI, game screens, WebViews
+   - iOS screenshot capture is not implemented yet (vision fallback will fail to read the image).
 
 3. **No auto-retry**: Suggestions are informational only
    - User must manually retry with suggested selectors
@@ -237,6 +231,14 @@ adb devices
 - Check if caching is enabled (`cacheResults: true`)
 - Reduce `maxCostUsd` to set limits
 - Monitor usage in Anthropic console
+
+## Implementation references
+
+- [`src/features/action/TapOnElement.ts#L31-L169`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/TapOnElement.ts#L31-L169) for retry count and vision fallback invocation.
+- [`src/vision/VisionFallback.ts#L14-L149`](https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionFallback.ts#L14-L149) for default config, caching, and max-cost warnings.
+- [`src/vision/ClaudeVisionClient.ts#L16-L84`](https://github.com/kaeawc/auto-mobile/blob/main/src/vision/ClaudeVisionClient.ts#L16-L84) for Anthropic API usage and token-based cost calculation.
+- [`src/vision/VisionTypes.ts#L1-L70`](https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionTypes.ts#L1-L70) for vision config and result types.
+- [`src/features/observe/TakeScreenshot.ts#L112-L170`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/TakeScreenshot.ts#L112-L170) for screenshot capture behavior (Android vs iOS).
 
 ## Future Enhancements
 

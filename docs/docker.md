@@ -22,14 +22,14 @@ The Docker setup provides a complete Android development environment with:
 
 ### Pre-built Images
 
-Official images are published to Docker Hub and support both AMD64 and ARM64 architectures:
+Official images are published to Docker Hub for linux/amd64. The Dockerfile is x86_64-only; ARM64 is not supported.
 
 ```bash
 # Pull the latest version
 docker pull kaeawc/auto-mobile:latest
 
 # Pull a specific version
-docker pull kaeawc/auto-mobile:0.0.6
+docker pull kaeawc/auto-mobile:v0.0.7
 ```
 
 **Available on Docker Hub**: https://hub.docker.com/r/kaeawc/auto-mobile
@@ -66,6 +66,9 @@ For development mode with auto-reload:
 docker-compose up auto-mobile-dev
 ```
 
+**Note**: The checked-in `docker-compose.yml` uses `npm` commands, but the image is Bun-based. If you're using the
+provided compose file, update the service commands to `bun` (or override them) to match the runtime.
+
 #### Using Docker Directly
 
 ```bash
@@ -73,6 +76,7 @@ docker run -it --rm \
   --privileged \
   --network host \
   -v ~/.android:/home/automobile/.android \
+  -v ~/.auto-mobile:/home/automobile/.auto-mobile \
   -v $(pwd)/scratch:/workspace/scratch \
   auto-mobile:latest
 ```
@@ -81,7 +85,8 @@ docker run -it --rm \
 
 ### Privileged Mode
 
-The container requires privileged mode (`--privileged`) for ADB to communicate with Android devices connected via USB.
+`--privileged` is the simplest option for USB ADB access, but you can also grant narrower access by mounting
+`/dev/bus/usb` and adding `MKNOD` capabilities (as shown in `docker-compose.yml`).
 
 ### Network Mode
 
@@ -107,7 +112,10 @@ The docker-compose configuration includes several volume mounts:
    - Shares ADB authorization keys with host
    - Devices authorized on host work in container
 
-5. **Scratch Directory** (`./scratch:/workspace/scratch`)
+5. **AutoMobile DB** (`~/.auto-mobile:/home/automobile/.auto-mobile`)
+   - Persists the SQLite database used for navigation graphs and audits
+
+6. **Scratch Directory** (`./scratch:/workspace/scratch`)
    - Outputs and temporary files accessible from host
 
 ## Using ADB with Docker
@@ -238,6 +246,14 @@ If builds fail with permission errors:
    docker-compose up --build
    ```
 
+## Implementation References
+
+- Dockerfile (tooling + SDK versions, x86_64-only): https://github.com/kaeawc/auto-mobile/blob/main/Dockerfile#L1-L220
+- docker-compose services and mounts: https://github.com/kaeawc/auto-mobile/blob/main/docker-compose.yml#L1-L90
+- Docker validation script: https://github.com/kaeawc/auto-mobile/blob/main/scripts/docker/validate_dockerfile.sh#L1-L71
+- Docker CI build/test workflow: https://github.com/kaeawc/auto-mobile/blob/main/.github/workflows/pull_request.yml#L328-L420
+- Docker publish workflow: https://github.com/kaeawc/auto-mobile/blob/main/.github/workflows/merge.yml#L389-L453
+
 ### Large Image Size
 
 The Docker image is large (~3-4 GB) due to the Android SDK. To minimize size:
@@ -260,7 +276,7 @@ For production deployments:
 
 3. **Use specific version tags**:
    ```bash
-   docker build -t auto-mobile:v0.0.6 .
+   docker build -t auto-mobile:v0.0.7 .
    ```
 
 4. **Security considerations**:
@@ -384,7 +400,7 @@ docker build -t auto-mobile:latest .
 
 Tests include:
 - Image existence and startup
-- Node.js and Java versions
+- Bun and Java versions
 - Android SDK components
 - Development tools availability
 - MCP stdio protocol communication
@@ -404,17 +420,12 @@ Expected response should be a JSON-RPC message with server capabilities.
 
 ### CI/CD Testing
 
-The project includes a GitHub Actions workflow (`.github/workflows/docker.yml`) that automatically:
-- Lints the Dockerfile with hadolint
-- Builds the Docker image
-- Runs container structure tests
-- Tests MCP stdio protocol
-- Scans for security vulnerabilities with Trivy
-- Validates docker-compose configuration
+The project includes GitHub Actions workflows in `.github/workflows/pull_request.yml` and `.github/workflows/merge.yml`
+that lint/build/test Docker images and publish to Docker Hub.
 
 ## Next Steps
 
 - [MCP Client Configuration](mcp-docker-config.md) - Configure MCP clients to use Docker
 - [Installation Guide](installation.md) - Native installation
-- [Getting Started](getting-started.md) - Using AutoMobile
-- [MCP Server Documentation](mcp-server.md) - Server capabilities
+- [Documentation Home](index.md) - Using AutoMobile
+- [MCP Server Documentation](features/mcp-server/index.md) - Server capabilities

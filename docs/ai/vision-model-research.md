@@ -7,6 +7,11 @@ This research evaluates open source vision models as faster, cheaper alternative
 1. **Tier 1 (Fast & Free)**: Open source models for common tasks (OCR, basic element detection)
 2. **Tier 2 (Intelligent Fallback)**: Claude vision API for complex analysis and navigation suggestions
 
+## Status (Not Yet Implemented)
+
+This document is research and proposal only. The current codebase uses a Claude-only vision fallback that is invoked
+from `tapOn` after element search retries, and there is no local-model Tier 1 integration yet.
+
 ## Open Source Models Comparison
 
 ### 1. Florence-2 (Microsoft) ⭐ RECOMMENDED
@@ -29,7 +34,7 @@ This research evaluates open source vision models as faster, cheaper alternative
 **Node.js Integration**:
 ```typescript
 // Using Hugging Face Transformers.js
-import { pipeline } from '@xenova/transformers';
+import { pipeline } from '@huggingface/transformers';
 
 const detector = await pipeline('image-to-text', 'microsoft/Florence-2-large');
 const result = await detector('screenshot.png', {
@@ -282,7 +287,7 @@ selectors                │
 
 ---
 
-## Implementation Recommendations
+## Proposed Implementation (Not Yet Implemented)
 
 ### 1. Start with Florence-2 (Phase 1)
 
@@ -499,6 +504,12 @@ export class VisionStrategySelector {
 - More complex implementation
 - Need to manage multiple models
 - Slightly lower accuracy than Claude-first (92% vs 95%)
-- But significantly better than current 0% recovery rate
+- But potentially better than the current Claude-only fallback coverage
 
 This hybrid approach provides the best balance of speed, cost, accuracy, and licensing compliance.
+
+## Implementation References
+
+- Vision fallback orchestration (Claude-only): https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionFallback.ts#L1-L149
+- Claude vision client: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/ClaudeVisionClient.ts#L1-L230
+- tapOn vision fallback invocation: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/TapOnElement.ts#L110-L190

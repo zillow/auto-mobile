@@ -1,9 +1,19 @@
 # Vision Fallback Architecture Design
 
 ## Overview
-Implements AI-powered element search fallbacks using a **hybrid vision approach** when traditional element finding methods fail:
+This is a **proposed** hybrid vision architecture for element search fallbacks. It is not implemented yet. The current
+codebase uses a Claude-only vision fallback that is invoked from `tapOn` after retries, and there is no local-model Tier 1.
+
+### Proposed Hybrid Approach
+When implemented, the design would add a **hybrid vision approach** after traditional element finding methods fail:
 - **Tier 1**: Fast, free local models (Florence-2, PaddleOCR) for common cases
 - **Tier 2**: Claude's vision API for complex navigation and analysis
+
+## Current Implementation (Today)
+
+- Claude-only fallback (`provider: "claude"`) with optional caching and cost thresholding.
+- Invoked only from `tapOn` after element search retries are exhausted.
+- No local-model Tier 1 integration or Set-of-Mark preprocessing.
 
 ## Design Principles
 1. **Last Resort**: Only activate after all existing fallback mechanisms exhausted
@@ -12,7 +22,7 @@ Implements AI-powered element search fallbacks using a **hybrid vision approach*
 4. **Transparent**: Clear error messages when fallback cannot help
 5. **Fast & Offline**: Local models provide <500ms responses without internet
 
-## Architecture
+## Proposed Architecture (Not Implemented)
 
 ### Data Flow (Hybrid Approach)
 
@@ -78,9 +88,9 @@ Implements AI-powered element search fallbacks using a **hybrid vision approach*
 - 15% cases: Tier 2 resolves (Claude provides navigation)
 - 5% cases: Genuine failures (element truly doesn't exist)
 
-### Component Structure
+### Proposed Component Structure (Not Implemented)
 
-#### 1. VisionFallback Module (`src/VisionFallback.ts`)
+#### 1. VisionFallback Module (`src/vision/VisionFallback.ts`)
 
 ```typescript
 export interface VisionFallbackConfig {
@@ -642,3 +652,10 @@ export class VisionCostTracker {
 3. **Visual regression detection**: Alert when UI changed significantly
 4. **Element highlighting**: Return annotated screenshots with element boxes
 5. **Batch analysis**: Analyze multiple missing elements in one call
+
+## Implementation References
+
+- Vision fallback config + cache behavior: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionFallback.ts#L1-L149
+- Vision fallback types: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionTypes.ts#L1-L83
+- Claude vision client: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/ClaudeVisionClient.ts#L1-L230
+- tapOn vision fallback invocation: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/TapOnElement.ts#L110-L190

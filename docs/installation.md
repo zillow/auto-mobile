@@ -5,7 +5,7 @@ Claude Code, Codex, or Firebender.
 
 ### MCP Server Configuration for your Agent
 
-AutoMobile is distributed mainly as an npm package.
+AutoMobile is distributed mainly as an npm package (`@kaeawc/auto-mobile`) and exposes the `auto-mobile` CLI.
 
 Its primary use case for local development environments is as an MCP server.
 
@@ -35,13 +35,11 @@ If your favorite MCP client doesn't have that capability yet, copy the following
 
 #### Android SDK + Emulator Setup
 
-AutoMobile will automatically download and install the following unless they already exist:
+AutoMobile expects the Android SDK/command-line tools to be installed already; the automatic installation path has been
+removed. Configure the SDK path with `ANDROID_HOME`, `ANDROID_SDK_ROOT`, or `ANDROID_SDK_HOME` so AutoMobile can find
+`adb`, or make sure `adb` is on your `PATH`.
 
-- Command line tools installed via Homebrew or manually in `$ANDROID_HOME/cmdline_tools`
-- Android SDK installed at `$ANDROID_HOME`
-- At least one Android device or emulator
-
-Physical devices do need USB debugging enabled for AutoMobile to function with them. Ripgrep makes it go faster.
+Physical devices do need USB debugging enabled for AutoMobile to function with them.
 
 
 If you have a private npm registry for proxying public npm:
@@ -75,3 +73,9 @@ For full integration:
 
 1. Follow [MCP client config](mcp-clients/index.md) guide.
 2. Add [AutoMobile JUnitRunner test dependency](features/test-execution/junitrunner.md) to all Android application and library modules.
+
+## Implementation references
+
+- [`package.json#L2-L43`](https://github.com/kaeawc/auto-mobile/blob/main/package.json#L2-L43) for the npm package name, Bun engine requirement, and CLI binary.
+- [`src/utils/android-cmdline-tools/install.ts#L11-L112`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/install.ts#L11-L112) for the removed Android tooling auto-installation flow.
+- [`src/utils/android-cmdline-tools/AdbClient.ts#L86-L124`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/AdbClient.ts#L86-L124) for SDK path detection via environment variables and `PATH`.

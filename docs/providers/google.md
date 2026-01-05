@@ -1,17 +1,32 @@
-# Model Providers - Google 🚧
+# Model Providers - Google
 
-🚧 Koog integration in progress
+The Android JUnitRunner uses Google when `automobile.ai.provider=google`.
 
 ## Environment setup
 
 ```shell
-export GOOGLE_GEMINI_API_KEY="your_api_key_here"
-export GOOGLE_GEMINI_PROXY_ENDPOINT="your_proxy_endpoint_here"
+export GOOGLE_API_KEY="your_api_key_here"
 ```
 
-On CI you should be providing these as environment injected secrets with masking to protect your credentials.
+You can also supply the API key via JVM system property:
 
-## Available Models
+```shell
+-Dautomobile.google.api.key=your_api_key_here
+```
 
-* Gemini 2.5 Pro
-* Gemini 2.5 Flash
+Optional proxy endpoint (all providers):
+
+```shell
+-Dautomobile.ai.proxy.endpoint=https://your-proxy.example.com
+```
+
+On CI you should provide these as environment-injected secrets with masking to protect your credentials.
+
+## Current model
+
+- `Gemini2_5Pro`
+
+## Implementation references
+
+- [`android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileAgent.kt#L811-L845`](https://github.com/kaeawc/auto-mobile/blob/main/android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileAgent.kt#L811-L845) for provider selection and API key lookup.
+- [`android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileAgent.kt#L893-L896`](https://github.com/kaeawc/auto-mobile/blob/main/android/junit-runner/src/main/kotlin/dev/jasonpearson/automobile/junit/AutoMobileAgent.kt#L893-L896) for the Google model mapping.

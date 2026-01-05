@@ -21,7 +21,8 @@ stateDiagram-v2
 
 ## Configuration
 
-AutoMobile MCP is designed to be run in STDIO mode in production settings like workstations and CI automation.
+AutoMobile MCP defaults to STDIO mode (good for workstations and CI automation). Streamable HTTP is available for
+clients that need HTTP transports; SSE exists but is deprecated in favor of streamable HTTP.
 
 ```shell
 npx -y @kaeawc/auto-mobile@latest
@@ -40,10 +41,17 @@ A lot of MCP clients configure MCP servers through JSON, this sample will work w
   "mcpServers": {
     "AutoMobile": {
       "command": "npx",
-      "args": ["-y", "auto-mobile@latest"]
+      "args": ["-y", "@kaeawc/auto-mobile@latest"]
     }
   }
 }
 ```
 
-Configuration is provided via CLI flags and environment variables; MCP does not expose configuration tool calls.
+Configuration is provided via CLI flags and environment variables, and runtime feature flags can be toggled through MCP
+tools when needed.
+
+## Implementation references
+
+- [`src/index.ts#L61-L169`](https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L61-L169) for transport defaults and CLI flags.
+- [`src/index.ts#L657-L681`](https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L657-L681) for STDIO default and streamable/SSE transport selection (including SSE deprecation logging).
+- [`src/server/featureFlagTools.ts#L11-L54`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/featureFlagTools.ts#L11-L54) for runtime feature-flag tool support.

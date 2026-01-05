@@ -15,19 +15,18 @@ AutoMobile automatically detects and handles work profiles across all app manage
 - **Auto-detection**: Features automatically detect the appropriate user profile
 - **Priority order**:
   1. If app is in foreground → use that user profile
-  2. Else if work profile exists → use first work profile
+  2. Else if a running work profile exists → use the first running work profile
   3. Else → use primary user (user 0)
-- **userId in responses**: All MCP tool responses include the `userId` field indicating which profile was used
+- **userId in responses**: App management tools include the `userId` field indicating which profile was used
+- **Note**: MCP tool schemas do not currently accept a `userId` override; selection is automatic
 
 ### Supported Features
 
-All app management features support work profiles:
-- `installApp` - Install APKs to specific profiles
-- `launchApp` - Launch apps in specific profiles
-- `terminateApp` - Terminate apps in specific profiles
-- `uninstallApp` - Uninstall apps from specific profiles
-- `clearAppData` - Clear app data in specific profiles
-- `listInstalledApps` - List apps from ALL profiles with userId, foreground, and recent status
+App management tools that support work profiles:
+- `installApp` - Install APKs to the auto-selected profile
+- `launchApp` - Launch apps in the auto-selected profile
+- `terminateApp` - Terminate apps in the auto-selected profile
+- `listApps` - List apps from all profiles with userId and foreground status (recent is a placeholder)
 
 ## Setting Up Work Profile on Android Emulator
 
@@ -117,32 +116,33 @@ const result = await installApp({ apkPath: "/path/to/app.apk" });
 console.log(result.userId); // 10 (work profile)
 ```
 
-### Example: Launch App in Specific Profile
+### Example: Launch App (Auto-detected Profile)
 
 ```typescript
-// Auto-detect (uses foreground profile or work profile if exists)
+// Auto-detects (uses foreground profile or a running work profile if present)
 await launchApp({ packageName: "com.example.app" });
-
-// Explicit user ID (advanced usage)
-await launchApp({
-  packageName: "com.example.app",
-  userId: 10  // Force work profile
-});
 ```
 
 ### Example: List Apps from All Profiles
 
 ```typescript
 // Lists apps from all profiles with detailed info
-const apps = await listInstalledApps();
+const apps = await listApps();
 
-// Result includes apps from both profiles:
-// [
-//   { packageName: "com.android.chrome", userId: 0, foreground: false, recent: false },
-//   { packageName: "com.example.personal", userId: 0, foreground: false, recent: false },
-//   { packageName: "com.android.chrome", userId: 10, foreground: true, recent: false },
-//   { packageName: "com.example.work", userId: 10, foreground: false, recent: false }
-// ]
+// Result includes grouped user apps and deduped system apps:
+// {
+//   profiles: {
+//     "0": [
+//       { packageName: "com.example.personal", userId: 0, foreground: false, recent: false }
+//     ],
+//     "10": [
+//       { packageName: "com.example.work", userId: 10, foreground: true, recent: false }
+//     ]
+//   },
+//   system: [
+//     { packageName: "com.android.chrome", userIds: [0, 10], foreground: false, recent: false }
+//   ]
+// }
 ```
 
 Note: Chrome can be installed in both profiles!
@@ -180,7 +180,7 @@ adb install --user 10 app.apk
 # List all installations
 adb shell pm list packages -f com.example.app --all-users
 
-# AutoMobile's listInstalledApps will return both with unique userIds
+# AutoMobile's listApps will return both with unique userIds
 ```
 
 ## Troubleshooting
@@ -252,3 +252,12 @@ adb shell dumpsys activity activities | grep -E "(mResumedActivity|mFocusedActiv
 - **Android 9.0+ (API 28+)**: Improved work profile UI
 
 AutoMobile's work profile features work on all Android versions that support work profiles (API 21+).
+
+## Implementation References
+
+- User/profile detection (foreground + running profiles): https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/AdbClient.ts#L525-L705
+- Auto-selection for install: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/InstallApp.ts#L1-L84
+- Auto-selection for launch: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/LaunchApp.ts#L249-L310
+- Auto-selection for terminate: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/TerminateApp.ts#L31-L120
+- listApps response shape: https://github.com/kaeawc/auto-mobile/blob/main/src/server/observeTools.ts#L90-L130
+- Installed app model fields (foreground/recent): https://github.com/kaeawc/auto-mobile/blob/main/src/models/InstalledApp.ts#L1-L61
