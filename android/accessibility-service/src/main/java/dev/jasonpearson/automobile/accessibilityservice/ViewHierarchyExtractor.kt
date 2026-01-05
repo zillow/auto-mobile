@@ -29,6 +29,9 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     private const val TAG = "ViewHierarchyExtractor"
     private const val MAX_DEPTH = 100 // Prevent infinite recursion
     private const val MAX_CHILDREN = 256 // Limit children to prevent memory issues
+    private const val OCCLUSION_FILTER_ENABLED = true
+    private const val OCCLUSION_THRESHOLD = 0.95
+    private const val DEFAULT_WINDOW_KEY = -1
 
     private val GENERIC_CLASS_NAMES =
         setOf(
@@ -64,12 +67,20 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       val rootElement =
           extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
       val optimizedElement = rootElement?.let { optimizeHierarchy(it) }
+      val filteredElement =
+          optimizedElement?.let {
+            if (OCCLUSION_FILTER_ENABLED) {
+              applyOcclusionFilteringSingleWindow(it)
+            } else {
+              it
+            }
+          }
       val intentChooserDetected =
-          optimizedElement?.let { detectIntentChooserIndicators(it) } ?: false
+          filteredElement?.let { detectIntentChooserIndicators(it) } ?: false
 
       ViewHierarchy(
           packageName = rootNode.packageName?.toString(),
-          hierarchy = optimizedElement,
+          hierarchy = filteredElement,
           intentChooserDetected = intentChooserDetected,
       )
     } catch (e: Exception) {
@@ -105,11 +116,20 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     var mainHierarchy: UIElementInfo? = null
     var mainPackageName: String? = null
     var intentChooserDetected = false
+    var activeWindowLayer = 0
+    var activeWindowKey: Int? = null
+    val windowLayers = mutableMapOf<Int, Int>()
 
     // Extract from each window
     for (window in windows) {
       try {
         val rootNode = window.root ?: continue
+        val windowLayer = window.layer
+        windowLayers[window.id] = windowLayer
+        if (window.isActive) {
+          activeWindowLayer = windowLayer
+          activeWindowKey = window.id
+        }
 
         val windowType =
             when (window.type) {
@@ -176,6 +196,41 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       mainPackageName = activeWindowRoot.packageName?.toString()
       if (!intentChooserDetected && mainHierarchy != null) {
         intentChooserDetected = detectIntentChooserIndicators(mainHierarchy!!)
+      }
+    }
+
+    if (OCCLUSION_FILTER_ENABLED) {
+      val resolvedWindowKey = activeWindowKey ?: DEFAULT_WINDOW_KEY
+      val occlusionInfo =
+          buildOcclusionInfo(
+              mainHierarchy,
+              resolvedWindowKey,
+              activeWindowLayer,
+              windowHierarchies,
+              windowLayers,
+          )
+      mainHierarchy =
+          mainHierarchy?.let {
+            filterOccludedHierarchy(it, occlusionInfo, resolvedWindowKey, path = "", isRoot = true)
+          }
+      if (windowHierarchies.isNotEmpty()) {
+        val filteredWindows =
+            windowHierarchies.map { windowHierarchy ->
+              val windowKey = windowHierarchy.windowId
+              val hierarchy =
+                  windowHierarchy.hierarchy?.let {
+                    filterOccludedHierarchy(
+                        it,
+                        occlusionInfo,
+                        windowKey,
+                        path = "",
+                        isRoot = true,
+                    )
+                  }
+              windowHierarchy.copy(hierarchy = hierarchy)
+            }
+        windowHierarchies.clear()
+        windowHierarchies.addAll(filteredWindows)
       }
     }
 
@@ -587,113 +642,6 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     }
   }
 
-  /** Processes the hierarchy to add accessibility information (z-index analysis) */
-  private fun processForAccessibility(element: UIElementInfo): UIElementInfo {
-    return if (
-        element.isClickable ||
-            element.isLongClickable ||
-            element.isCheckable ||
-            element.isSelected ||
-            element.isScrollable ||
-            element.isFocusable
-    ) {
-      val accessibilityScore = calculateAccessibilityScore(element)
-      element.copy(accessible = accessibilityScore)
-    } else {
-      // Process children - copy() preserves all fields by default
-      val processedNode = element.node?.let { processNodeForAccessibility(it) }
-      element.copy(node = processedNode)
-    }
-  }
-
-  /** Process node element for accessibility (handles both single and array cases) */
-  private fun processNodeForAccessibility(nodeElement: JsonElement): JsonElement {
-    return when {
-      nodeElement is JsonObject -> {
-        // Single child - convert to UIElementInfo and process
-        try {
-          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
-          val processedChild = processForAccessibility(child)
-          json.encodeToJsonElement(UIElementInfo.serializer(), processedChild)
-        } catch (e: Exception) {
-          nodeElement
-        }
-      }
-      nodeElement is JsonArray -> {
-        // Multiple children - process each
-        val processedChildren =
-            nodeElement.jsonArray.map { childJson ->
-              try {
-                val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
-                val processedChild = processForAccessibility(child)
-                json.encodeToJsonElement(UIElementInfo.serializer(), processedChild)
-              } catch (e: Exception) {
-                childJson
-              }
-            }
-        JsonArray(processedChildren)
-      }
-      else -> nodeElement
-    }
-  }
-
-  /** Calculate accessibility score for clickable elements based on z-index analysis */
-  private fun calculateAccessibilityScore(element: UIElementInfo): Double {
-    val bounds = element.bounds ?: return 1.0
-
-    // For now, implement basic accessibility scoring
-    // In a full implementation, this would analyze overlapping elements
-    val totalArea = bounds.width * bounds.height
-    if (totalArea <= 0) return 0.0
-
-    // Calculate covered area by analyzing overlapping elements
-    val coveredArea = calculateCoveredArea(element, bounds)
-    val accessibleArea = totalArea - coveredArea
-
-    val score = accessibleArea.toDouble() / totalArea.toDouble()
-    return max(
-        0.0,
-        min(1.0, kotlin.math.round(score * 1000.0) / 1000.0),
-    ) // Round to 3 decimal places
-  }
-
-  /** Calculate area covered by overlapping elements */
-  private fun calculateCoveredArea(element: UIElementInfo, bounds: ElementBounds): Int {
-    // This is a simplified implementation
-    // In practice, you'd need to traverse the full hierarchy to find overlapping elements
-
-    // For demonstration, simulate some coverage based on child elements
-    val children = extractChildrenFromNode(element.node)
-    var coveredArea = 0
-
-    for (child in children) {
-      val childBounds = child.bounds
-      if (childBounds != null && !child.isClickable) {
-        // Calculate intersection with parent bounds
-        val intersection = calculateIntersection(bounds, childBounds)
-        if (intersection > 0) {
-          coveredArea += intersection
-        }
-      }
-    }
-
-    return coveredArea
-  }
-
-  /** Calculate intersection area between two bounds */
-  private fun calculateIntersection(bounds1: ElementBounds, bounds2: ElementBounds): Int {
-    val left = max(bounds1.left, bounds2.left)
-    val top = max(bounds1.top, bounds2.top)
-    val right = min(bounds1.right, bounds2.right)
-    val bottom = min(bounds1.bottom, bounds2.bottom)
-
-    return if (left < right && top < bottom) {
-      (right - left) * (bottom - top)
-    } else {
-      0
-    }
-  }
-
   /** Extract children from node JsonElement */
   private fun extractChildrenFromNode(nodeElement: JsonElement?): List<UIElementInfo> {
     if (nodeElement == null) return emptyList()
@@ -826,7 +774,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     val optimizedNode = element.node?.let { optimizeNode(it) }
 
     // Check if this element is a bounds-only wrapper (has no useful properties)
-    val isBoundsOnlyWrapper = !meetsFilterCriteria(element) && element.accessible == null
+    val isBoundsOnlyWrapper = !meetsFilterCriteria(element)
 
     // If it's a bounds-only wrapper with exactly one optimized child, collapse to that child
     if (isBoundsOnlyWrapper && optimizedNode != null) {
@@ -900,5 +848,313 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       }
       else -> null
     }
+  }
+
+  private data class OrderCounter(var value: Int = 0)
+
+  private data class NodeKey(val windowKey: Int, val path: String)
+
+  private data class OcclusionNode(
+      val key: NodeKey,
+      val element: UIElementInfo,
+      val bounds: ElementBounds,
+      val windowLayer: Int,
+      val windowKey: Int,
+      val order: Int,
+      val subtreeEnd: Int
+  )
+
+  private data class OcclusionInfo(
+      val coverage: Double,
+      val occludedBy: String?
+  )
+
+  private fun applyOcclusionFilteringSingleWindow(element: UIElementInfo): UIElementInfo? {
+    val occlusionInfo =
+        buildOcclusionInfo(element, DEFAULT_WINDOW_KEY, 0, emptyList(), emptyMap())
+    return filterOccludedHierarchy(element, occlusionInfo, DEFAULT_WINDOW_KEY, path = "", isRoot = true)
+  }
+
+  private fun buildOcclusionInfo(
+      mainHierarchy: UIElementInfo?,
+      activeWindowKey: Int,
+      activeWindowLayer: Int,
+      windowHierarchies: List<WindowHierarchy>,
+      windowLayers: Map<Int, Int>
+  ): Map<NodeKey, OcclusionInfo> {
+    val nodes = mutableListOf<OcclusionNode>()
+    if (mainHierarchy != null) {
+      collectOcclusionNodes(
+          mainHierarchy,
+          activeWindowKey,
+          activeWindowLayer,
+          path = "",
+          orderCounter = OrderCounter(),
+          nodes = nodes
+      )
+    }
+    for (windowHierarchy in windowHierarchies) {
+      val hierarchy = windowHierarchy.hierarchy ?: continue
+      val windowKey = windowHierarchy.windowId
+      val windowLayer = windowLayers[windowKey] ?: windowHierarchy.windowLayer
+      collectOcclusionNodes(
+          hierarchy,
+          windowKey,
+          windowLayer,
+          path = "",
+          orderCounter = OrderCounter(),
+          nodes = nodes
+      )
+    }
+
+    if (nodes.isEmpty()) {
+      return emptyMap()
+    }
+
+    val sortedNodes =
+        nodes.sortedWith(compareBy<OcclusionNode> { it.windowLayer }.thenBy { it.order })
+    val occlusionInfo = mutableMapOf<NodeKey, OcclusionInfo>()
+
+    for (i in sortedNodes.indices) {
+      val node = sortedNodes[i]
+      val totalArea = node.bounds.width * node.bounds.height
+      if (totalArea <= 0) continue
+
+      val intersections = mutableListOf<ElementBounds>()
+      var maxOverlap = 0
+      var occludedBy: String? = null
+
+      for (j in i + 1 until sortedNodes.size) {
+        val occluder = sortedNodes[j]
+        if (occluder.windowKey == node.windowKey) {
+          val isDescendant = occluder.order > node.order && occluder.order <= node.subtreeEnd
+          if (isDescendant) {
+            continue
+          }
+        }
+
+        val intersection = intersectBounds(node.bounds, occluder.bounds) ?: continue
+        val overlapArea = intersection.width * intersection.height
+        if (overlapArea <= 0) continue
+
+        intersections.add(intersection)
+
+        if (overlapArea > maxOverlap) {
+          maxOverlap = overlapArea
+          occludedBy = resolveOccluderLabel(occluder)
+        }
+      }
+
+      if (intersections.isNotEmpty()) {
+        val coveredArea =
+            calculateUnionArea(intersections, maxArea = (totalArea * OCCLUSION_THRESHOLD).toInt())
+        val coverage = coveredArea.toDouble() / totalArea.toDouble()
+        if (coverage > 0.0) {
+          occlusionInfo[node.key] = OcclusionInfo(coverage = coverage, occludedBy = occludedBy)
+        }
+      }
+    }
+
+    return occlusionInfo
+  }
+
+  private fun collectOcclusionNodes(
+      element: UIElementInfo,
+      windowKey: Int,
+      windowLayer: Int,
+      path: String,
+      orderCounter: OrderCounter,
+      nodes: MutableList<OcclusionNode>
+  ): Int {
+    val start = orderCounter.value++
+    var end = start
+    val children = decodeChildrenFromNode(element.node)
+
+    for ((index, child) in children.withIndex()) {
+      val childPath = if (path.isBlank()) index.toString() else "$path.$index"
+      val childEnd =
+          collectOcclusionNodes(
+              child,
+              windowKey,
+              windowLayer,
+              childPath,
+              orderCounter,
+              nodes
+          )
+      end = max(end, childEnd)
+    }
+
+    val bounds = element.bounds
+    if (bounds != null && !bounds.hasZeroArea()) {
+      nodes.add(
+          OcclusionNode(
+              key = NodeKey(windowKey, path),
+              element = element,
+              bounds = bounds,
+              windowLayer = windowLayer,
+              windowKey = windowKey,
+              order = start,
+              subtreeEnd = end
+          )
+      )
+    }
+
+    return end
+  }
+
+  private fun filterOccludedHierarchy(
+      element: UIElementInfo,
+      occlusionInfo: Map<NodeKey, OcclusionInfo>,
+      windowKey: Int,
+      path: String,
+      isRoot: Boolean
+  ): UIElementInfo? {
+    val key = NodeKey(windowKey, path)
+    val info = occlusionInfo[key]
+    val occlusionState =
+        when {
+          info == null -> null
+          info.coverage >= OCCLUSION_THRESHOLD -> "hidden"
+          info.coverage > 0.0 -> "partial"
+          else -> null
+        }
+
+    val children = decodeChildrenFromNode(element.node)
+    val filteredChildren =
+        children.mapIndexedNotNull { index, child ->
+          val childPath = if (path.isBlank()) index.toString() else "$path.$index"
+          filterOccludedHierarchy(child, occlusionInfo, windowKey, childPath, isRoot = false)
+        }
+
+    val filteredNodeElement = encodeChildrenToNodeElement(filteredChildren)
+
+    if (occlusionState == "hidden" && !isRoot) {
+      return null
+    }
+
+    val nodeToUse = if (occlusionState == "hidden" && isRoot) null else filteredNodeElement
+
+    return element.copy(
+        node = nodeToUse,
+        occlusionState = occlusionState,
+        occludedBy = info?.occludedBy
+    )
+  }
+
+  private fun decodeChildrenFromNode(nodeElement: JsonElement?): List<UIElementInfo> {
+    if (nodeElement == null) return emptyList()
+
+    return try {
+      when {
+        nodeElement is JsonObject -> {
+          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
+          listOf(child)
+        }
+        nodeElement is JsonArray -> {
+          nodeElement.jsonArray.mapNotNull { childJson ->
+            try {
+              json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+            } catch (e: Exception) {
+              null
+            }
+          }
+        }
+        else -> emptyList()
+      }
+    } catch (e: Exception) {
+      emptyList()
+    }
+  }
+
+  private fun encodeChildrenToNodeElement(children: List<UIElementInfo>): JsonElement? {
+    return when {
+      children.isEmpty() -> null
+      children.size == 1 -> json.encodeToJsonElement(UIElementInfo.serializer(), children[0])
+      else -> json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
+    }
+  }
+
+  private fun intersectBounds(bounds: ElementBounds, other: ElementBounds): ElementBounds? {
+    val left = max(bounds.left, other.left)
+    val top = max(bounds.top, other.top)
+    val right = min(bounds.right, other.right)
+    val bottom = min(bounds.bottom, other.bottom)
+
+    if (left >= right || top >= bottom) {
+      return null
+    }
+
+    return ElementBounds(left, top, right, bottom)
+  }
+
+  private fun calculateUnionArea(rectangles: List<ElementBounds>, maxArea: Int? = null): Int {
+    data class Event(val x: Int, val y1: Int, val y2: Int, val delta: Int)
+
+    val events = rectangles.flatMap { rect ->
+      listOf(
+          Event(rect.left, rect.top, rect.bottom, 1),
+          Event(rect.right, rect.top, rect.bottom, -1)
+      )
+    }.sortedBy { it.x }
+
+    if (events.isEmpty()) return 0
+
+    val activeIntervals = mutableListOf<Pair<Int, Int>>()
+    var previousX = events.first().x
+    var area = 0
+
+    fun activeUnionLength(): Int {
+      if (activeIntervals.isEmpty()) return 0
+      val sorted = activeIntervals.sortedBy { it.first }
+      var total = 0
+      var currentStart = sorted[0].first
+      var currentEnd = sorted[0].second
+
+      for (i in 1 until sorted.size) {
+        val (start, end) = sorted[i]
+        if (start > currentEnd) {
+          total += currentEnd - currentStart
+          currentStart = start
+          currentEnd = end
+        } else {
+          currentEnd = max(currentEnd, end)
+        }
+      }
+      total += currentEnd - currentStart
+      return total
+    }
+
+    for (event in events) {
+      val dx = event.x - previousX
+      if (dx > 0 && activeIntervals.isNotEmpty()) {
+        val unionLength = activeUnionLength()
+        area += unionLength * dx
+        if (maxArea != null && area >= maxArea) {
+          return area
+        }
+      }
+
+      if (event.delta > 0) {
+        activeIntervals.add(event.y1 to event.y2)
+      } else {
+        val index = activeIntervals.indexOfFirst { it.first == event.y1 && it.second == event.y2 }
+        if (index >= 0) {
+          activeIntervals.removeAt(index)
+        }
+      }
+
+      previousX = event.x
+    }
+
+    return area
+  }
+
+  private fun resolveOccluderLabel(occluder: OcclusionNode): String {
+    val element = occluder.element
+    return element.resourceId?.takeIf { it.isNotBlank() }
+        ?: element.contentDesc?.takeIf { it.isNotBlank() }
+        ?: element.text?.takeIf { it.isNotBlank() }
+        ?: element.className?.takeIf { it.isNotBlank() }
+        ?: "unlabeled view"
   }
 }

@@ -30,7 +30,6 @@ data class UIElementInfo(
     val checked: String? = null,
     val selected: String? = null,
     @SerialName("long-clickable") val longClickable: String? = null,
-    val accessible: Double? = null, // Z-index accessibility percentage (0.0-1.0)
     val fragment: String? = null, // Fragment class name when applicable
 
     // Additional accessibility semantics fields
@@ -51,6 +50,8 @@ data class UIElementInfo(
     @SerialName("input-type") val inputType: String? = null, // Input type for text fields
     @SerialName("actions") val actions: List<String>? = null, // Available accessibility actions
     @SerialName("extras") val extras: Map<String, String>? = null, // Custom extras from semantics
+    val occlusionState: String? = null, // visible | partial | hidden
+    val occludedBy: String? = null, // Resource ID or label of the occluding view
     val recomposition: RecompositionEntry? = null,
 
     // Use JsonElement to allow flexible structure matching test expectations

@@ -45,7 +45,8 @@ interface AccessibilityNode {
     checked?: string;
     selected?: string;
     "long-clickable"?: string;
-  accessible?: number;
+  occlusionState?: string;
+  occludedBy?: string;
   extras?: Record<string, string>;
   recomposition?: RecompositionNodeInfo;
   node?: AccessibilityNode | AccessibilityNode[];
@@ -1245,9 +1246,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
       converted["long-clickable"] = node["long-clickable"];
     }
 
-    // Preserve the accessible property if it exists
-    if ((node as any).accessible !== undefined) {
-      converted.accessible = (node as any).accessible;
+    if (node.occlusionState) {
+      converted.occlusionState = node.occlusionState;
+    }
+    if (node.occludedBy) {
+      converted.occludedBy = node.occludedBy;
     }
     if (node.extras) {
       converted.extras = node.extras;

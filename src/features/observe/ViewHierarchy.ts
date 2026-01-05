@@ -27,16 +27,6 @@ interface ElementBounds {
   bottom: number;
 }
 
-/**
- * Interface for element with Z-order information
- */
-interface ElementWithZOrder {
-  element: any;
-  bounds: ElementBounds;
-  zOrder: number;
-  isClickable: boolean;
-}
-
 export class ViewHierarchy {
   private device: BootedDevice;
   private readonly adb: AdbClient;
@@ -90,160 +80,6 @@ export class ViewHierarchy {
     }
 
     await this.accessibilityServiceClient.setRecompositionTrackingEnabled(enabled, perf);
-  }
-
-  /**
-   * Parse bounds string to ElementBounds object
-   * @param boundsStr - Bounds string in format "[left,top][right,bottom]"
-   * @returns ElementBounds object or null if invalid
-   */
-  private parseBounds(boundsStr: string): ElementBounds | null {
-    if (!boundsStr) {return null;}
-
-    const match = boundsStr.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
-    if (!match) {return null;}
-
-    return {
-      left: parseInt(match[1], 10),
-      top: parseInt(match[2], 10),
-      right: parseInt(match[3], 10),
-      bottom: parseInt(match[4], 10)
-    };
-  }
-
-  /**
-   * Calculate the intersection area of two rectangles
-   * @param rect1 - First rectangle
-   * @param rect2 - Second rectangle
-   * @returns Intersection area or 0 if no intersection
-   */
-  private calculateIntersectionArea(rect1: ElementBounds, rect2: ElementBounds): number {
-    const left = Math.max(rect1.left, rect2.left);
-    const top = Math.max(rect1.top, rect2.top);
-    const right = Math.min(rect1.right, rect2.right);
-    const bottom = Math.min(rect1.bottom, rect2.bottom);
-
-    if (left >= right || top >= bottom) {
-      return 0; // No intersection
-    }
-
-    return (right - left) * (bottom - top);
-  }
-
-  /**
-   * Calculate the total area of a rectangle
-   * @param bounds - Rectangle bounds
-   * @returns Total area
-   */
-  private calculateArea(bounds: ElementBounds): number {
-    return (bounds.right - bounds.left) * (bounds.bottom - bounds.top);
-  }
-
-  /**
-   * Collect all elements with their Z-order information from the view hierarchy
-   * @param node - Root node to start traversal
-   * @param zOrder - Current Z-order (depth-first traversal order)
-   * @param result - Array to collect elements
-   */
-  private collectElementsWithZOrder(node: any, zOrder: { value: number }, result: ElementWithZOrder[]): void {
-    if (!node) {return;}
-
-    const bounds = this.parseBounds(node.bounds);
-    if (bounds) {
-      const isClickable = node.clickable === "true" || node.clickable === true;
-
-      result.push({
-        element: node,
-        bounds,
-        zOrder: zOrder.value++,
-        isClickable
-      });
-    }
-
-    // Process children (later children have higher Z-order)
-    if (node.node) {
-      const children = Array.isArray(node.node) ? node.node : [node.node];
-      for (const child of children) {
-        this.collectElementsWithZOrder(child, zOrder, result);
-      }
-    }
-  }
-
-  /**
-   * Calculate accessibility percentage for a clickable element
-   * @param targetElement - The clickable element to analyze
-   * @param allElements - All elements in the hierarchy with Z-order
-   * @returns Accessibility percentage (0.0 to 1.0)
-   */
-  private calculateAccessibility(targetElement: ElementWithZOrder, allElements: ElementWithZOrder[]): number {
-    const totalArea = this.calculateArea(targetElement.bounds);
-    if (totalArea === 0) {return 0;}
-
-    let coveredArea = 0;
-
-    // Find all elements that are above this element in Z-order and intersect with it
-    for (const otherElement of allElements) {
-      // Skip if it's the same element or if the other element is below in Z-order
-      if (otherElement === targetElement || otherElement.zOrder <= targetElement.zOrder) {
-        continue;
-      }
-
-      // Calculate intersection area
-      const intersectionArea = this.calculateIntersectionArea(targetElement.bounds, otherElement.bounds);
-      coveredArea += intersectionArea;
-    }
-
-    // Calculate accessible percentage (ensure it doesn't exceed 100% due to floating point errors)
-    const accessibleArea = Math.max(0, totalArea - coveredArea);
-    const accessibilityPercentage = Math.min(1.0, accessibleArea / totalArea);
-
-    // Round to 3 decimal places
-    return Math.round(accessibilityPercentage * 1000) / 1000;
-  }
-
-  /**
-   * Analyze Z-index accessibility for all clickable elements in the view hierarchy
-   * @param viewHierarchy - The view hierarchy to analyze
-   */
-  private analyzeZIndexAccessibility(viewHierarchy: ViewHierarchyResult): void {
-    if (!viewHierarchy) {
-      return;
-    }
-
-    const startTime = Date.now();
-
-    // Collect all elements with their Z-order information
-    const allElements: ElementWithZOrder[] = [];
-    const zOrder = { value: 0 };
-
-    // Collect from main hierarchy first
-    if (viewHierarchy.hierarchy) {
-      this.collectElementsWithZOrder(viewHierarchy.hierarchy, zOrder, allElements);
-    }
-
-    // Also collect from all windows (popups, toolbars, etc. have higher z-order)
-    if (viewHierarchy.windows) {
-      for (const window of viewHierarchy.windows) {
-        if (window.hierarchy) {
-          // Windows are rendered on top of main hierarchy
-          this.collectElementsWithZOrder(window.hierarchy, zOrder, allElements);
-        }
-      }
-    }
-
-    logger.debug(`[Z_INDEX_ANALYSIS] Collected ${allElements.length} elements for Z-index analysis`);
-
-    // Filter clickable elements
-    const clickableElements = allElements.filter(el => el.isClickable);
-    logger.debug(`[Z_INDEX_ANALYSIS] Found ${clickableElements.length} clickable elements`);
-
-    // Calculate accessibility for each clickable element
-    for (const clickableElement of clickableElements) {
-      clickableElement.element.accessible = this.calculateAccessibility(clickableElement, allElements);
-    }
-
-    const duration = Date.now() - startTime;
-    logger.debug(`[Z_INDEX_ANALYSIS] Z-index accessibility analysis completed in ${duration}ms`);
   }
 
   /**
@@ -800,9 +636,6 @@ export class ViewHierarchy {
     logger.debug("Starting analysis on view hierarchy");
     const analysisStart = Date.now();
     const result = await this.parseXmlToViewHierarchy(xmlData);
-
-    // Add Z-index accessibility analysis
-    this.analyzeZIndexAccessibility(result);
 
     logger.debug(`hierarchy analysis took ${Date.now() - analysisStart}ms`);
 
@@ -1390,7 +1223,6 @@ export class ViewHierarchy {
       "enabled",
       "selected",
       "bounds",
-      "accessible",
       "test-tag",
       "extras",
       "recomposition",

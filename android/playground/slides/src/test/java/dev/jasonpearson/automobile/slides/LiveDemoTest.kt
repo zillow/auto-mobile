@@ -4,9 +4,11 @@ import dev.jasonpearson.automobile.junit.AutoMobilePlan
 import dev.jasonpearson.automobile.junit.AutoMobileRunner
 import dev.jasonpearson.automobile.junit.AutoMobileTest
 import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@Ignore("Live demo tests - require connected device and specific apps installed")
 @RunWith(AutoMobileRunner::class)
 class LiveDemoTest {
 

@@ -46,6 +46,8 @@ export interface ViewHierarchyNode {
   bounds?: ElementBounds;
   recomposition?: RecompositionNodeInfo;
   recompositionMetrics?: RecompositionMetrics;
+  occlusionState?: string;
+  occludedBy?: string;
   "test-tag"?: string;
   extras?: Record<string, string>;
 }

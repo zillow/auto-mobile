@@ -171,21 +171,6 @@ class ViewHierarchyExtractorTest {
   }
 
   @Test
-  fun `accessibility score is calculated for clickable elements`() = runTest {
-    // This test would need a more complex setup to test accessibility scoring
-    // For now, just verify that the structure supports it
-    val clickableElement =
-        UIElementInfo(
-            text = "Button",
-            clickable = "true",
-            bounds = ElementBounds(0, 0, 100, 50),
-            accessible = 0.75, // 75% accessible
-        )
-
-    assertEquals(0.75, clickableElement.accessible!!, 0.001)
-  }
-
-  @Test
   fun `meetsFilterCriteria excludes UIElementInfo with no values`() = runTest {
     val plainElement = UIElementInfo()
 
@@ -290,41 +275,6 @@ class ViewHierarchyExtractorTest {
     assertEquals("text", element.inputType)
     assertEquals(listOf("click", "focus"), element.actions)
     assertEquals(mapOf("custom-property" to "custom-value"), element.extras)
-  }
-
-  @Test
-  fun `processForAccessibility preserves semantic fields`() = runTest {
-    // Create an element with semantic properties
-    val originalElement =
-        UIElementInfo(
-            text = "Test Button",
-            testTag = "test-button",
-            role = "button",
-            stateDescription = "Enabled",
-            hintText = "Click me",
-            actions = listOf("click", "focus"),
-            clickable = "false", // Not clickable so it goes through the non-clickable path
-            bounds = ElementBounds(0, 0, 100, 50),
-        )
-
-    // Use reflection to access the private processForAccessibility method
-    val extractor = ViewHierarchyExtractor()
-    val method =
-        extractor.javaClass.getDeclaredMethod("processForAccessibility", UIElementInfo::class.java)
-    method.isAccessible = true
-
-    val processedElement = method.invoke(extractor, originalElement) as UIElementInfo
-
-    // Verify all semantic fields are preserved
-    assertEquals("test-button", processedElement.testTag)
-    assertEquals("button", processedElement.role)
-    assertEquals("Enabled", processedElement.stateDescription)
-    assertEquals("Click me", processedElement.hintText)
-    assertEquals(listOf("click", "focus"), processedElement.actions)
-
-    // Verify other fields are also preserved
-    assertEquals("Test Button", processedElement.text)
-    assertEquals("false", processedElement.clickable)
   }
 
   @Test
