@@ -13,7 +13,7 @@ class AutoMobileToolWindowFactory : ToolWindowFactory, DumbAware {
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
     val panel = ComposePanel()
     panel.setContent {
-      AutoMobileToolWindowContent()
+      AutoMobileToolWindowContent(project)
     }
 
     val content = toolWindow.contentManager.factory.createContent(panel, "", false)
