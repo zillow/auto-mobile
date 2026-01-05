@@ -4,6 +4,7 @@
 - Multi-language monorepo: TypeScript for core tooling, Kotlin for `android/` projects.
 - Do not add JavaScript (prefer TypeScript or Kotlin as appropriate).
 - `android/` is an Android Kotlin Gradle project containing apps and libraries.
+- IntelliJ IDE plugin lives in `android/ide-plugin` (Gradle project).
 - After implementation changes, run relevant validation commands.
 - Write terminal output to `scratch/` when command output is not visible in the session.
 - Validation guidance: `docs/ai/validation.md`.
