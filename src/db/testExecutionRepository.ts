@@ -1,9 +1,10 @@
+import { sql } from "kysely";
 import { getDatabase } from "./database";
 import type { NewTestExecution } from "./types";
 import { logger } from "../utils/logger";
 
-const RETENTION_MAX_ROWS = 10_000;
-const RETENTION_MAX_DAYS = 90;
+export const TEST_EXECUTION_RETENTION_MAX_ROWS = 10_000;
+export const TEST_EXECUTION_RETENTION_MAX_DAYS = 90;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 let cleanupInProgress = false;
@@ -28,6 +29,40 @@ export interface TestExecutionRecord {
   gradleVersion?: string | null;
   isCi?: boolean | null;
   sessionUuid?: string | null;
+}
+
+export interface TestTimingQueryOptions {
+  lookbackDays?: number;
+  testClass?: string;
+  testMethod?: string;
+  deviceId?: string;
+  deviceName?: string;
+  devicePlatform?: "android" | "ios";
+  deviceType?: "emulator" | "simulator" | "device";
+  appVersion?: string;
+  gitCommit?: string;
+  targetSdk?: number;
+  jdkVersion?: string;
+  jvmTarget?: string;
+  gradleVersion?: string;
+  isCi?: boolean;
+  sessionUuid?: string;
+  minSamples?: number;
+  limit?: number;
+  orderBy?: "lastRun" | "averageDuration" | "sampleSize";
+  orderDirection?: "asc" | "desc";
+}
+
+export interface TestTimingStats {
+  testClass: string;
+  testMethod: string;
+  averageDurationMs: number;
+  sampleSize: number;
+  lastRunTimestampMs: number;
+  passedCount: number;
+  failedCount: number;
+  skippedCount: number;
+  stdDevDurationMs: number;
 }
 
 export class TestExecutionRepository {
@@ -67,7 +102,7 @@ export class TestExecutionRepository {
     cleanupInProgress = true;
     try {
       const db = getDatabase();
-      const cutoff = Date.now() - RETENTION_MAX_DAYS * MS_PER_DAY;
+      const cutoff = Date.now() - TEST_EXECUTION_RETENTION_MAX_DAYS * MS_PER_DAY;
 
       await db
         .deleteFrom("test_executions")
@@ -80,7 +115,7 @@ export class TestExecutionRepository {
         .orderBy("timestamp", "desc")
         .orderBy("id", "desc")
         .limit(1)
-        .offset(RETENTION_MAX_ROWS - 1)
+        .offset(TEST_EXECUTION_RETENTION_MAX_ROWS - 1)
         .executeTakeFirst();
 
       if (!threshold) {
@@ -102,5 +137,129 @@ export class TestExecutionRepository {
     } finally {
       cleanupInProgress = false;
     }
+  }
+
+  async getTimingStats(options: TestTimingQueryOptions): Promise<TestTimingStats[]> {
+    const db = getDatabase();
+
+    let query = db
+      .selectFrom("test_executions")
+      .select([
+        "test_class as testClass",
+        "test_method as testMethod",
+        db.fn.avg<number>("duration_ms").as("avgDurationMs"),
+        db.fn.avg<number>(sql`duration_ms * duration_ms`).as("avgDurationMsSquared"),
+        db.fn.countAll<number>().as("sampleSize"),
+        db.fn.max<number>("timestamp").as("lastRunTimestampMs"),
+        db.fn.sum<number>(sql`case when status = 'passed' then 1 else 0 end`).as("passedCount"),
+        db.fn.sum<number>(sql`case when status = 'failed' then 1 else 0 end`).as("failedCount"),
+        db.fn.sum<number>(sql`case when status = 'skipped' then 1 else 0 end`).as("skippedCount"),
+      ])
+      .groupBy(["test_class", "test_method"]);
+
+    if (options.lookbackDays && options.lookbackDays > 0) {
+      const cutoff = Date.now() - options.lookbackDays * MS_PER_DAY;
+      query = query.where("timestamp", ">=", cutoff);
+    }
+
+    if (options.testClass) {
+      query = query.where("test_class", "=", options.testClass);
+    }
+
+    if (options.testMethod) {
+      query = query.where("test_method", "=", options.testMethod);
+    }
+
+    if (options.deviceId) {
+      query = query.where("device_id", "=", options.deviceId);
+    }
+
+    if (options.deviceName) {
+      query = query.where("device_name", "=", options.deviceName);
+    }
+
+    if (options.devicePlatform) {
+      query = query.where("device_platform", "=", options.devicePlatform);
+    }
+
+    if (options.deviceType) {
+      query = query.where("device_type", "=", options.deviceType);
+    }
+
+    if (options.appVersion) {
+      query = query.where("app_version", "=", options.appVersion);
+    }
+
+    if (options.gitCommit) {
+      query = query.where("git_commit", "=", options.gitCommit);
+    }
+
+    if (options.targetSdk !== undefined) {
+      query = query.where("target_sdk", "=", options.targetSdk);
+    }
+
+    if (options.jdkVersion) {
+      query = query.where("jdk_version", "=", options.jdkVersion);
+    }
+
+    if (options.jvmTarget) {
+      query = query.where("jvm_target", "=", options.jvmTarget);
+    }
+
+    if (options.gradleVersion) {
+      query = query.where("gradle_version", "=", options.gradleVersion);
+    }
+
+    if (options.sessionUuid) {
+      query = query.where("session_uuid", "=", options.sessionUuid);
+    }
+
+    if (typeof options.isCi === "boolean") {
+      query = query.where("is_ci", "=", options.isCi ? 1 : 0);
+    }
+
+    if (options.minSamples && options.minSamples > 1) {
+      query = query.having(db.fn.countAll(), ">=", options.minSamples);
+    }
+
+    const orderBy = options.orderBy ?? "lastRun";
+    const orderDirection = options.orderDirection ?? "desc";
+
+    switch (orderBy) {
+      case "averageDuration":
+        query = query.orderBy("avgDurationMs", orderDirection);
+        break;
+      case "sampleSize":
+        query = query.orderBy("sampleSize", orderDirection);
+        break;
+      default:
+        query = query.orderBy("lastRunTimestampMs", orderDirection);
+        break;
+    }
+
+    if (options.limit && options.limit > 0) {
+      query = query.limit(options.limit);
+    }
+
+    const rows = await query.execute();
+
+    return rows.map(row => {
+      const avgDuration = Number(row.avgDurationMs ?? 0);
+      const avgSquare = Number(row.avgDurationMsSquared ?? 0);
+      const variance = Math.max(0, avgSquare - avgDuration * avgDuration);
+      const stdDev = Math.sqrt(variance);
+
+      return {
+        testClass: row.testClass,
+        testMethod: row.testMethod,
+        averageDurationMs: Math.round(avgDuration),
+        sampleSize: Number(row.sampleSize ?? 0),
+        lastRunTimestampMs: Number(row.lastRunTimestampMs ?? 0),
+        passedCount: Number(row.passedCount ?? 0),
+        failedCount: Number(row.failedCount ?? 0),
+        skippedCount: Number(row.skippedCount ?? 0),
+        stdDevDurationMs: Math.round(stdDev),
+      };
+    });
   }
 }
