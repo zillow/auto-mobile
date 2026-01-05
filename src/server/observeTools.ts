@@ -9,6 +9,7 @@ import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
+import { IdentifyInteractions, IdentifyInteractionsOptions } from "../features/observe/IdentifyInteractions";
 import { addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
@@ -18,6 +19,22 @@ export const observeSchema = addSessionUuidToSchema(z.object({
 
 export const listAppsSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
+}));
+
+export const identifyInteractionsSchema = addSessionUuidToSchema(z.object({
+  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  filter: z.object({
+    types: z.array(z.enum(["navigation", "input", "action", "scroll", "toggle"]))
+      .optional()
+      .describe("Interaction types to include"),
+    minConfidence: z.number().min(0).max(1).optional().describe("Minimum confidence threshold"),
+    limit: z.number().int().positive().optional().describe("Limit total number of interactions returned")
+  }).optional().describe("Filtering options"),
+  includeContext: z.object({
+    navigationGraph: z.boolean().optional().describe("Include predicted destinations from navigation graph"),
+    elementDetails: z.boolean().optional().describe("Include full element info"),
+    suggestedParams: z.boolean().optional().describe("Include ready-to-use tool params")
+  }).optional().describe("Additional context to include")
 }));
 
 // Register tools (this will be called when this file is imported)
@@ -47,6 +64,28 @@ export function registerObserveTools() {
       return createJSONToolResponse(result);
     } catch (error) {
       throw new ActionableError(`Failed to execute observe: ${error}`);
+    }
+  };
+
+  const identifyInteractionsHandler = async (
+    device: BootedDevice,
+    args: IdentifyInteractionsOptions
+  ) => {
+    try {
+      const observeScreen = new ObserveScreen(device);
+      const cachedResult = await observeScreen.getMostRecentCachedObserveResult();
+      const navigationGraph = NavigationGraphManager.getInstance();
+      const currentScreen = navigationGraph.getCurrentScreen();
+      const navigationEdges = args.includeContext?.navigationGraph !== false && currentScreen
+        ? await navigationGraph.getEdgesFrom(currentScreen)
+        : [];
+
+      const analyzer = new IdentifyInteractions();
+      const result = analyzer.analyze(cachedResult, args, currentScreen, navigationEdges);
+
+      return createJSONToolResponse(result);
+    } catch (error) {
+      throw new ActionableError(`Failed to execute identifyInteractions: ${error}`);
     }
   };
 
@@ -91,5 +130,12 @@ export function registerObserveTools() {
     "List all apps installed on the device. For Android, returns user apps grouped by profile and system apps under a separate key with profile coverage. For iOS, returns package names only.",
     listAppsSchema,
     listAppsHandler
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "identifyInteractions",
+    "Analyze the most recent observation and suggest likely interactions with ready-to-use tool calls.",
+    identifyInteractionsSchema,
+    identifyInteractionsHandler
   );
 }
