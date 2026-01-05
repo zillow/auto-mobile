@@ -26,6 +26,7 @@ export const exploreSchema = addSessionUuidToSchema(z.object({
   resetInterval: z.number().optional().describe("How often to reset in number of interactions (default: 15)"),
   mode: z.enum(["discover", "validate", "hybrid"]).optional().describe("Exploration mode (default: hybrid)"),
   packageName: z.string().optional().describe("Package name to limit exploration to"),
+  dryRun: z.boolean().optional().describe("Dry run mode (no interactions performed)"),
   platform: z.enum(["android", "ios"]).default("android")
 }));
 
@@ -148,9 +149,17 @@ export function registerNavigationTools() {
         resetToHome: args.resetToHome,
         resetInterval: args.resetInterval,
         mode: args.mode,
-        packageName: args.packageName
+        packageName: args.packageName,
+        dryRun: args.dryRun
       };
       const result = await explore.execute(options, progress, signal);
+
+      if ("dryRun" in result && result.dryRun) {
+        return createJSONToolResponse({
+          message: `Exploration dry run completed: ${result.plannedInteractions.length} planned interactions`,
+          ...result
+        });
+      }
 
       return createJSONToolResponse({
         message: `Exploration completed: ${result.interactionsPerformed} interactions, ${result.screensDiscovered} new screens discovered, ${result.coverage.percentage}% coverage`,
