@@ -11,7 +11,7 @@ Add AutoMobile via the terminal:
 codex mcp add auto-mobile --env ANDROID_HOME=/Users/<username>/Library/Android/sdk -- npx -y @kaeawc/auto-mobile@latest
 ```
 
-Replace `/Users/<username>/Library/Android/sdk` with your actual Android SDK path:
+Replace `/Users/<username>/Library/Android/sdk` with your actual Android SDK path (or use `ANDROID_SDK_ROOT`/`ANDROID_SDK_HOME` instead of `ANDROID_HOME`):
 - **macOS**: Usually `~/Library/Android/sdk`
 - **Linux**: Usually `~/Android/Sdk`
 - **Windows**: Usually `C:\Users\<username>\AppData\Local\Android\Sdk`
@@ -35,7 +35,7 @@ args = ["-y", "@kaeawc/auto-mobile@latest"]
 ANDROID_HOME = "/Users/<username>/Library/Android/sdk"
 ```
 
-Replace `/Users/<username>/Library/Android/sdk` with your actual Android SDK path:
+Replace `/Users/<username>/Library/Android/sdk` with your actual Android SDK path (or use `ANDROID_SDK_ROOT`/`ANDROID_SDK_HOME` instead of `ANDROID_HOME`):
 - **macOS**: Usually `~/Library/Android/sdk`
 - **Linux**: Usually `~/Android/Sdk`
 - **Windows**: Usually `C:\Users\<username>\AppData\Local\Android\Sdk`
@@ -61,3 +61,7 @@ ANDROID_HOME = "/Users/<username>/Library/Android/sdk"
 ```
 
 After saving the config, restart Codex and the AutoMobile server will start automatically.
+
+## Implementation references
+
+- [`src/utils/android-cmdline-tools/AdbClient.ts#L83-L124`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/AdbClient.ts#L83-L124) for Android SDK environment variable detection.

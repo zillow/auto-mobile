@@ -1,6 +1,7 @@
 # MCP Client Configuration Examples
 
 This document provides example configurations for connecting MCP clients (like Claude Desktop) to the AutoMobile Docker container.
+The published image is linux/amd64 only; ARM64 hosts should use `--platform linux/amd64` (emulated) or a x86_64 machine.
 
 ## Claude Desktop Configuration
 
@@ -78,7 +79,7 @@ To pin to a specific version for production:
         "--privileged",
         "--network", "host",
         "-v", "${HOME}/.android:/home/automobile/.android",
-        "kaeawc/auto-mobile:0.0.6"
+        "kaeawc/auto-mobile:v0.0.7"
       ]
     }
   }
@@ -170,6 +171,7 @@ docker run -i --rm --init --privileged --network host auto-mobile:latest adb dev
 | `--privileged` | USB device access for ADB | Only if using physical devices |
 | `--network host` | Share host network for ADB | Only if using physical devices |
 | `-v ~/.android:...` | Share ADB keys | Only if using physical devices |
+| `--platform linux/amd64` | Run the x86_64 image on ARM hosts | Only on ARM64 |
 
 ## Troubleshooting
 
@@ -251,7 +253,7 @@ If the container starts slowly:
       "command": "docker",
       "args": [
         "run", "-i", "--rm", "--init",
-        "auto-mobile:v0.0.6"
+        "auto-mobile:v0.0.7"
       ]
     }
   }
@@ -298,5 +300,10 @@ If the container starts slowly:
 ## See Also
 
 - [Docker Documentation](docker.md) - Comprehensive Docker guide
-- [MCP Server Documentation](mcp-server.md) - Server capabilities and usage
-- [Getting Started](getting-started.md) - General AutoMobile setup
+- [MCP Server Documentation](features/mcp-server/index.md) - Server capabilities and usage
+- [Installation](installation.md) - General AutoMobile setup
+
+## Implementation References
+
+- Dockerfile (x86_64-only + SDK install): https://github.com/kaeawc/auto-mobile/blob/main/Dockerfile#L1-L220
+- MCP stdio entrypoint (default command): https://github.com/kaeawc/auto-mobile/blob/main/Dockerfile#L254-L259

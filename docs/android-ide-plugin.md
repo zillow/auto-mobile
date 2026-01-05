@@ -35,3 +35,10 @@ and show server status.
 ## Notes
 - Streamable HTTP endpoints are assumed to live at `http://localhost:<port>/auto-mobile/streamable`.
 - MCP stdio and daemon transports are still available for non-dev workflows.
+
+## Implementation References
+
+- Transport selection order and env/system properties: https://github.com/kaeawc/auto-mobile/blob/main/android/ide-plugin/src/main/kotlin/com/automobile/ide/daemon/McpClientFactory.kt#L1-L80
+- Worktree discovery + health probing: https://github.com/kaeawc/auto-mobile/blob/main/android/ide-plugin/src/main/kotlin/com/automobile/ide/daemon/McpDiscovery.kt#L1-L190
+- Port scanning (lsof/ss/netstat): https://github.com/kaeawc/auto-mobile/blob/main/android/ide-plugin/src/main/kotlin/com/automobile/ide/daemon/McpDiscovery.kt#L237-L320
+- Health endpoint fields used by the plugin: https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L244-L270

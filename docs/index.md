@@ -3,7 +3,7 @@
 AutoMobile is a set of tools for mobile automation. You can use it for UI testing or as a development workflow
 assistant.
 
-The first platform supported is Android with plans to extend to iOS.
+Android is the primary supported platform today; iOS support exists but is partial and evolving.
 
 **How do I get started?**
 
@@ -29,7 +29,7 @@ stateDiagram-v2
 - [FAQ](faq.md) - Frequently asked questions
 - [Why build this?](origin.md) - Motivation and origin story
 - [Features](features/index.md) - Understand how AutoMobile works 
-- [Contributing](contributing/index.md) - If you're looking to contribute to the project
+- [Contributing](contributing/overview.md) - If you're looking to contribute to the project
 
 ## Acknowledgement
 
@@ -52,3 +52,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
+
+## Implementation References
+
+- MCP request handling: https://github.com/kaeawc/auto-mobile/blob/main/src/server/index.ts#L90-L180
+- Device session management: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/DeviceSessionManager.ts#L1-L220
+- Interaction/observation loop: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/BaseVisualChange.ts#L1-L220
+- iOS automation plumbing: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/ios-cmdline-tools/WebDriverAgent.ts#L1-L200

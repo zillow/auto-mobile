@@ -4,7 +4,9 @@ Automated UI performance testing that detects jank, poor FPS, and other renderin
 
 ## Overview
 
-The UI Performance Audit mode monitors Android app performance during `observe` tool calls and reports violations when performance metrics exceed device-specific thresholds. This enables automated detection of UI responsiveness issues that would otherwise require manual testing.
+The UI Performance Audit mode monitors Android app performance during observations (including `observe` tool calls and
+action-triggered observations) and reports violations when performance metrics exceed device-specific thresholds. This
+enables automated detection of UI responsiveness issues that would otherwise require manual testing.
 
 ## Features
 
@@ -231,3 +233,11 @@ When --ui-perf-mode is enabled, touch latency is measured by:
 - #36: Initial implementation
 - #67: Global configuration system
 - #85: Touch latency testing implementation
+
+## Implementation references
+
+- [`src/features/observe/ObserveScreen.ts#L640-L700`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/ObserveScreen.ts#L640-L700) for performance audit integration during observations.
+- [`src/features/performance/PerformanceAudit.ts#L10-L200`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/performance/PerformanceAudit.ts#L10-L200) for metric collection and validation.
+- [`src/features/performance/TouchLatencyTracker.ts#L32-L200`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/performance/TouchLatencyTracker.ts#L32-L200) for touch latency measurement behavior.
+- [`src/features/performance/ThresholdManager.ts#L8-L262`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/performance/ThresholdManager.ts#L8-L262) for threshold storage, TTL, and weighted averaging.
+- [`src/index.ts#L111-L118`](https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L111-L118) and [`src/features/featureFlags/FeatureFlagApplier.ts#L24-L48`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/featureFlags/FeatureFlagApplier.ts#L24-L48) for the `--ui-perf-mode` flag wiring.

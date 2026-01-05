@@ -4,16 +4,19 @@ Add this test Gradle dependency to all Android apps and libraries in your codeba
 modules that cover the UI you want to test.
 
 ```gradle
-testImplementation("dev.jasonpearson.automobile.junitrunner:x.y.z")
+testImplementation("dev.jasonpearson.automobile:junit-runner:x.y.z")
 ```
 
-Note that this artifact hasn't been published to Maven Central just yet and is forthcoming.  
+The coordinates and current version are defined in `android/junit-runner/build.gradle.kts`.
 
+To publish locally (for `~/.m2`) from the repo:
 
-In the meantime, publish to your mavenLocal (`~/.m2`) via:
-
+```bash
+(cd android && ./gradlew :junit-runner:publishToMavenLocal)
 ```
-./gradlew publishToMavenLocal
-```
 
-and use the above testImplementation dependency with `x.y.z` version from `android/junit-runner/build.gradle.kts`.
+Then replace `x.y.z` with the version from `android/junit-runner/build.gradle.kts`.
+
+## Implementation references
+
+- [`android/junit-runner/build.gradle.kts#L18-L58`](https://github.com/kaeawc/auto-mobile/blob/main/android/junit-runner/build.gradle.kts#L18-L58) for version and Maven coordinates.

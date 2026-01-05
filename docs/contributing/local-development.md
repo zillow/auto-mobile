@@ -22,9 +22,9 @@ This script:
 1. Installs dependencies if needed
 2. Builds the project
 3. Creates a unique executable for this worktree (e.g., `auto-mobile-186` for issue #186)
-4. Configures `.claude/settings.local.json` for Claude Code to use this worktree's build
+4. Configures `.mcp.local.json` for this worktree's build (Claude Code, Cursor, etc.)
 
-After running the script, restart Claude Code to pick up the new MCP server configuration.
+After running the script, restart your MCP client to pick up the new configuration.
 
 ## Manual Setup
 
@@ -68,7 +68,7 @@ simultaneously without port conflicts:
 **How it works:**
 - Extracts the first number (1-999) from the branch name
 - Adds it to base port 9000 (e.g., issue #164 → port 9164)
-- Falls back to 9000 if no number is found
+- Falls back to 9000 if no number is found (or if the number is 1000+)
 
 **Override options:**
 ```shell
@@ -123,12 +123,12 @@ Response:
 
 ## MCP Client Configuration
 
-The setup script automatically creates `.claude/settings.local.json` with the correct configuration.
+The setup script automatically creates `.mcp.local.json` with the correct configuration.
 If you need to configure manually, here are the options:
 
 ### Option 1: Direct Executable (Created by setup script)
 
-The setup script creates a worktree-specific executable and configures it in `.claude/settings.local.json`:
+The setup script creates a worktree-specific executable and configures it in `.mcp.local.json`:
 
 ```json
 {
@@ -147,8 +147,8 @@ The setup script creates a worktree-specific executable and configures it in `.c
 
 ### Option 2: Streamable HTTP (Best for Hot Reload)
 
-For hot-reload development with `bun run dev`, use HTTP transport. Add to your project's
-`.claude/settings.local.json`:
+For hot-reload development with `bun run dev`, use HTTP transport. Add to
+`.mcp.local.json`:
 
 ```json
 {
@@ -327,3 +327,9 @@ Server logs are written to stdout. For persistent logging, you can redirect:
 ```shell
 bun run dev 2>&1 | tee dev-server.log
 ```
+
+## Implementation References
+
+- Worktree setup script: https://github.com/kaeawc/auto-mobile/blob/main/scripts/setup-worktree.sh#L1-L301
+- Dev scripts (`dev`, `dev:port`): https://github.com/kaeawc/auto-mobile/blob/main/package.json#L5-L20
+- Port detection and health endpoint: https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L17-L274

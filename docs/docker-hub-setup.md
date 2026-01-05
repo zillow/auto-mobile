@@ -96,15 +96,15 @@ After the workflow completes successfully:
    - Go to: https://hub.docker.com/r/kaeawc/auto-mobile/tags
    - You should see tags like:
      - `latest` - Latest build from main
-     - `0.0.6` - Version from package.json
-     - `0.0` - Major.minor version
+     - `v0.0.7` - Version from package.json
+     - `v0.0` - Major.minor version
      - `0` - Major version
      - `main-<sha>` - Git commit SHA
 
 2. **Test pulling the image**
    ```bash
    docker pull kaeawc/auto-mobile:latest
-   docker pull kaeawc/auto-mobile:0.0.6
+   docker pull kaeawc/auto-mobile:v0.0.7
    ```
 
 3. **Verify the image works**
@@ -119,18 +119,16 @@ The workflow automatically creates multiple tags:
 | Tag Pattern | Example | Description |
 |------------|---------|-------------|
 | `latest` | `latest` | Latest build from main branch |
-| `{version}` | `0.0.6` | Exact version from package.json |
-| `{major}.{minor}` | `0.0` | Major and minor version |
-| `{major}` | `0` | Major version only |
+| `{version}` | `v0.0.7` | Exact version from package.json |
+| `{major}.{minor}` | `v0.0` | Major and minor version |
+| `{major}` | `v0` | Major version only |
 | `{branch}-{sha}` | `main-a1b2c3d` | Git commit identifier |
 
-### Multi-platform Support
+### Platform Support
 
-Images are built for both architectures:
-- `linux/amd64` - Intel/AMD x86_64 processors
-- `linux/arm64` - ARM processors (Apple Silicon, AWS Graviton, etc.)
-
-Docker automatically pulls the correct architecture for your platform.
+The Dockerfile is x86_64-only (`linux/amd64`). The workflow currently attempts `linux/arm64` builds, but those images
+are not expected to run correctly because the Android SDK tooling is x86_64-only. Use `--platform linux/amd64` on ARM
+hosts if you need emulation.
 
 ## Using the Published Image
 
@@ -167,7 +165,7 @@ The `--pull=always` flag ensures you get the latest version.
 docker pull kaeawc/auto-mobile:latest
 
 # Pull specific version
-docker pull kaeawc/auto-mobile:0.0.6
+docker pull kaeawc/auto-mobile:v0.0.7
 
 # Run interactively
 docker run -it --rm --init kaeawc/auto-mobile:latest bash
@@ -184,7 +182,7 @@ Pin to a specific version in production:
       "command": "docker",
       "args": [
         "run", "-i", "--rm", "--init",
-        "kaeawc/auto-mobile:0.0.6"
+        "kaeawc/auto-mobile:v0.0.7"
       ]
     }
   }
@@ -219,16 +217,16 @@ Pin to a specific version in production:
 **Solutions**:
 1. Verify you merged to the `main` branch (not another branch)
 2. Check that Docker-related files were modified (Dockerfile, etc.)
-3. Review the workflow conditions in `.github/workflows/docker.yml`
+3. Review the workflow conditions in `.github/workflows/merge.yml` (job: `publish-docker-hub`)
 
 ### Multi-platform Build Fails
 
 **Problem**: ARM64 build fails or times out
 
 **Solutions**:
-1. This is expected for large images - ARM builds can take 30+ minutes
-2. The workflow has appropriate timeouts configured
-3. If persistent, you can remove `linux/arm64` from the `platforms` line temporarily
+1. ARM64 is not supported by the Dockerfile (Android SDK tooling is x86_64-only)
+2. Remove `linux/arm64` from the `platforms` line in `.github/workflows/merge.yml`
+3. Keep `linux/amd64` only until ARM64 support is explicitly added
 
 ### Docker Hub Description Not Updated
 
@@ -284,7 +282,7 @@ The workflow includes Trivy security scanning:
 
 ## Updating the Workflow
 
-The workflow is defined in `.github/workflows/docker.yml`. Common modifications:
+The workflow is defined in `.github/workflows/merge.yml`. Common modifications:
 
 ### Change Repository Name
 
@@ -315,6 +313,11 @@ Remove ARM64 if builds are too slow:
 ```yaml
 platforms: linux/amd64
 ```
+
+## Implementation References
+
+- Docker publish workflow: https://github.com/kaeawc/auto-mobile/blob/main/.github/workflows/merge.yml#L380-L470
+- Dockerfile (x86_64-only): https://github.com/kaeawc/auto-mobile/blob/main/Dockerfile#L1-L220
 
 ## Next Steps
 

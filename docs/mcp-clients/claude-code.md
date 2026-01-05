@@ -15,7 +15,7 @@ claude mcp add --type stdio auto-mobile \
   --env ANDROID_HOME=/path/to/Android/sdk
 ```
 
-Replace `/path/to/Android/sdk` with your actual Android SDK path:
+Replace `/path/to/Android/sdk` with your actual Android SDK path (or use `ANDROID_SDK_ROOT`/`ANDROID_SDK_HOME` instead of `ANDROID_HOME`):
 - **macOS**: Usually `~/Library/Android/sdk`
 - **Linux**: Usually `~/Android/Sdk`
 - **Windows**: Usually `C:\Users\YourName\AppData\Local\Android\Sdk`
@@ -41,9 +41,13 @@ Add the following to your Claude Code configuration file:
 }
 ```
 
-Replace `/path/to/Android/sdk` with your actual Android SDK path:
+Replace `/path/to/Android/sdk` with your actual Android SDK path (or use `ANDROID_SDK_ROOT`/`ANDROID_SDK_HOME` instead of `ANDROID_HOME`):
 - **macOS**: Usually `~/Library/Android/sdk`
 - **Linux**: Usually `~/Android/Sdk`
 - **Windows**: Usually `C:\Users\YourName\AppData\Local\Android\Sdk`
 
 After saving the config, restart Claude Code and the AutoMobile server will start automatically.
+
+## Implementation references
+
+- [`src/utils/android-cmdline-tools/AdbClient.ts#L83-L124`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/AdbClient.ts#L83-L124) for Android SDK environment variable detection.

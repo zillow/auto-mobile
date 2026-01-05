@@ -13,7 +13,8 @@ compatible with multiple foundation model providers.
 No, AutoMobile is designed to work entirely within standard `adb` permissions. All functionality operates without requiring
 device root access, making it suitable for both physical devices and emulators. If you can access it over `adb`, it works.
 
-And if you don't have Android command line or platform tools installed, AutoMobile can find them and set them up for you.
+AutoMobile detects existing Android SDK/ADB installs via environment variables and common locations, but it does not
+install the SDK or command line tools for you.
 
 ### Which AI clients are supported?
 
@@ -32,11 +33,8 @@ to do integration testing against `fast-agent` because it has a complete MCP cli
 
 ### What are the system requirements?
 
-- Node.js 20 or later
-
-AutoMobile will automatically download and install the following unless they already exist.
-- Command line tools installed via Homebrew or manually in $ANDROID_HOME/cmdline_tools
-- Android SDK installed at ANDROID_HOME, 
+- Bun 1.3.5+ (required by the package engines field)
+- Android SDK + platform tools (ADB)
 - At least one Android device or emulator
 
 Physical devices do need USB debugging enabled for AutoMobile to function with them.
@@ -66,40 +64,34 @@ Looking forward to proving that with data.
 
 ### How accurate is text-based tapping?
 
-Text-based tapping uses fuzzy search algorithms and view hierarchy analysis to find the best matching elements. It
-handles variations in text, partial matches, and different UI frameworks (XML and Compose). It prefers to use context
-description values if they are available, so the more effort you put into accessibility the better this works. In my
-experience it's great.
+Text-based tapping uses fuzzy matching against view hierarchy attributes (text, content-desc, iOS accessibility labels)
+and falls back to clickable-element heuristics when needed. Accessibility labeling helps because content descriptions are
+part of the search surface.
 
 ### What happens if an interaction fails?
 
-When AutoMobile is invoked as an MCP it gives feedback as to why the interaction failed with relevant detail about the
-current view hierarchy, 
+When AutoMobile is invoked as an MCP it returns structured errors and context about why the interaction failed, often
+including details from the current view hierarchy.
 
 ### How fast are the interactions?
 
-Interaction speed depends on device performance and complexity. Typical operations:
-
-- Simple taps: 98-167ms
-- Complex scrolling: 1-3 seconds, longer if you need to search for a specific element in a long list
-- App launches: What is your app startup speed?
-- View hierarchy analysis: 9-48ms
-
-I'm constantly looking to improve the speed of operations, suggestions and contributions welcome.
+Interaction speed depends on device performance and task complexity. If you need real timings for your environment,
+enable `--debug-perf` and inspect timing output in logs and tool responses.
 
 ### Does it affect app performance?
 
-Nope.
+There is overhead: AutoMobile pulls view hierarchies, takes screenshots, and can run optional audits via `adb`/`dumpsys`.
+Expect some impact on device performance when these features are enabled.
 
 ### How much device storage is used?
 
-AutoMobile stores temporary files for screenshots, logs, etc, typically using less than 100MB of device storage. It cleans
-up old files automatically once you reach the storage limit by using internal heuristics on what information is the least 
-valuable to keep (screenshots and view hierarchy). This is all stored 
+AutoMobile stores logs and caches on the host machine (not on the device), primarily under `/tmp/auto-mobile`.
+Log files rotate at 10MB, observe caches expire after a short TTL, and screenshot caching uses an in-memory LRU.
+Disk cache cleanup for observe results is not automatic yet.
 
 ### Tool calls are failing
 
-If running as an MCP
+If running as an MCP:
 1. Check the MCP tool call output, usually the explanation is it didn't find the element specified or it's a WebView which is not supported yet.
 2. Check MCP server logs at `/tmp/auto-mobile/logs/server.log`
 
@@ -107,7 +99,7 @@ If running as an MCP
 
 Assuming you've already tried looking at MCP tool call output:
 1. Turn on "Show Taps" and "Show Pointer" to visually watch the gestures that AutoMobile is attempting.
-2. Record a video via `srccpy` and file an issue.
+2. Record a video via `scrcpy` and file an issue.
 
 ### App crashes during testing?
 
@@ -146,22 +138,21 @@ how it gets used. If there are components worth extracting we'll extract them.
 
 ### What data is collected?
 
-AutoMobile collects whatever happens to be displayed in the view hierarchy of the current top app or launcher. It only
-stores this data on the machine its being invoked and there is no outside processing service, no analytics whatsoever.
-It is designed to be used with a foundation model and its up to you how you share your data with model providers.
+AutoMobile collects view hierarchy and screenshot data for the foreground app to power observation and interaction. By
+default this data stays on the host machine, but if you enable vision fallback it will send screenshots and prompts to
+the configured model provider. There is no built-in analytics service.
 
 ### Can it access sensitive app data?
 
-AutoMobile uses `adb` for all operations. It cannot access encrypted app data or system-level information without
-appropriate permissions. If you grant those, then it can access that sensitive information.
+AutoMobile uses `adb` on Android and WebDriverAgent on iOS. It cannot access encrypted app data or system-level
+information without appropriate permissions. If you grant those, then it can access that sensitive information.
 
 ### What do we do with androidTest now?
 
 [`rm -rf`](https://www.github.com/kaeawc/auto-mobile/blob/main/scripts/delete_androidTest.sh)
 
-No seriously, once you're fully on AutoMobile you should just delete them. Use the above script, by default it will perform
-a dry-run to tell you explicitly what its about to delete. Only do this after you've fully migrated your project to not
-need them anymore.
+No seriously, once you're fully on AutoMobile you should just delete them. Use the above script; by default it performs
+a dry run and tells you exactly what it would delete. Only do this after you've fully migrated your project.
 
 ```shell
 ../scripts/delete_androidTest.sh --execute
@@ -173,3 +164,19 @@ need them anymore.
 ✅ Cleanup complete!
 🔍 You may want to review changes before committing
 ```
+
+## Implementation References
+
+- SDK/ADB detection: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/detection.ts#L1-L418
+- Bun requirement: https://github.com/kaeawc/auto-mobile/blob/main/package.json#L1-L39
+- Text matching logic: https://github.com/kaeawc/auto-mobile/blob/main/src/features/utility/ElementFinder.ts#L1-L212
+- Performance timing + debug-perf: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/PerformanceTracker.ts#L326-L366
+- Debug-perf flag wiring: https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L101-L645
+- Log file location/rotation: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/logger.ts#L1-L110
+- Observe cache TTL and disk cache: https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/ObserveScreen.ts#L54-L640
+- Screenshot cache LRU: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/screenshot-utils.ts#L32-L90
+- Vision fallback (Claude) and screenshot flow: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/TapOnElement.ts#L110-L190
+- Vision fallback provider and response types: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionFallback.ts#L1-L149
+- Claude vision client: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/ClaudeVisionClient.ts#L1-L230
+- iOS WebDriverAgent integration: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/ios-cmdline-tools/WebDriverAgent.ts#L1-L200
+- androidTest cleanup script: https://github.com/kaeawc/auto-mobile/blob/main/scripts/delete_androidTest.sh#L1-L170

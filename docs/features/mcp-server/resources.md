@@ -10,16 +10,17 @@ AutoMobile exposes MCP resources that provide direct access to the current devic
 
 **Type:** JSON (text)
 
-**Description:** The most recent screen observation including view hierarchy, elements, and metadata. Updated automatically after each `observe()` tool call.
+**Description:** The most recent screen observation returned by the `observe` tool. Updated automatically after each
+`observe` call.
 
-**Contents:**
+**Contents (non-exhaustive):**
 - `updatedAt`: Timestamp of the observation
 - `screenSize`: Current screen dimensions (rotation-aware)
 - `systemInsets`: UI insets for all screen edges (status bar, navigation bar, etc.)
 - `rotation`: Current device rotation value (0-3)
 - `activeWindow`: Current app and activity information
 - `viewHierarchy`: Complete UI hierarchy
-- `elements`: Categorized UI elements (clickable, scrollable, text)
+- `elements`: Categorized UI elements (clickable, scrollable, text) when available
 - `focusedElement`: Currently focused UI element (if any)
 - `intentChooserDetected`: Whether a system intent chooser is visible
 - `wakefulness`: Device wake state ("Awake", "Asleep", "Dozing")
@@ -27,6 +28,7 @@ AutoMobile exposes MCP resources that provide direct access to the current devic
 - `backStack`: Activity back stack information
 - `performanceAudit`: UI performance metrics (if enabled)
 - `accessibilityAudit`: WCAG accessibility audit results (if enabled)
+- `perfTiming`, `recompositionSummary`, `predictions`: present when related modes are enabled
 
 **Example Usage:**
 
@@ -50,7 +52,7 @@ console.log("Clickable elements:", observation.elements.clickable);
 
 **Type:** Image (PNG or WebP as base64 blob)
 
-**Description:** The most recent screen capture. Updated automatically after each `observe()` tool call.
+**Description:** The most recent screen capture. Updated automatically after each `observe` tool call.
 
 **Example Usage:**
 
@@ -70,7 +72,7 @@ console.log("Screenshot format:", screenshot.mimeType); // "image/png" or "image
 
 ## Resource Updates
 
-Resources are automatically updated whenever the `observe()` tool is called. After each observation:
+Resources are automatically updated whenever the `observe` tool is called. After each observation:
 
 1. The observation data is cached in memory and on disk
 2. The screenshot is saved to the cache directory
@@ -87,7 +89,8 @@ MCP clients can subscribe to resource updates using the standard MCP notificatio
 }
 ```
 
-Navigation graph resources publish update notifications when navigation events are recorded, debounced to at most once per second.
+Navigation graph resources publish update notifications when navigation events are recorded, debounced to at most once
+per second.
 
 ## Use Cases
 
@@ -150,8 +153,6 @@ assert(diff.percentDifferent < 0.01);
 **Type:** JSON (text)
 
 **Description:** High-level navigation graph for the current app. Includes node IDs, screen names, visit counts, and edge transitions with tool names. Updates are debounced to once per second while navigation events are recorded.
-
-**Reference:** Introduced in issue #128 and implemented in PR #284 for IntelliJ plugin integration.
 
 **Contents:**
 - `appId`: Current application package ID (or null if unset)
@@ -236,6 +237,14 @@ For screenshots:
 - **Screenshot Cache:** Stored in `/tmp/auto-mobile/screenshots/` with a 128MB size limit (LRU cleanup)
 
 The caches are shared across all MCP connections to the same AutoMobile server instance.
+
+## Implementation references
+
+- [`src/server/observationResources.ts#L7-L109`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/observationResources.ts#L7-L109) for observation and screenshot resource definitions and error payloads.
+- [`src/features/observe/ObserveScreen.ts#L24-L115`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/ObserveScreen.ts#L24-L115) for observation caching and reuse.
+- [`src/features/observe/TakeScreenshot.ts#L11-L98`](https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/TakeScreenshot.ts#L11-L98) for screenshot cache location and cleanup limits.
+- [`src/server/navigationResources.ts#L8-L196`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/navigationResources.ts#L8-L196) for navigation graph resource URIs, templates, and debounced updates.
+- [`src/server/resourceRegistry.ts#L148-L246`](https://github.com/kaeawc/auto-mobile/blob/main/src/server/resourceRegistry.ts#L148-L246) for resource update notifications.
 
 ## Implementation Notes
 

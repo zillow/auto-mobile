@@ -1,67 +1,29 @@
 # Batteries Included
 
-AutoMobile comes with extensive built-in functionality to minimize setup friction and provide a seamless
-out-of-the-box experience. These "batteries included" features automatically handle common configuration tasks and
-provide intelligent fallbacks.
+AutoMobile tries to reduce setup friction by detecting Android SDK components automatically, but it does **not**
+download or configure the SDK for you. You still need to install the Android SDK/command-line tools yourself and make
+`adb` available.
 
-## Android SDK Management
+## Android SDK Detection
 
-### Automatic SDK Detection
+AutoMobile looks for SDK and command-line tools in common locations:
 
-- `$ANDROID_HOME/platform-tools`
-- `$HOME/Android/Sdk/platform-tools` (Linux/macOS)
-- `%LOCALAPPDATA%\Android\Sdk\platform-tools` (Windows)
-- System PATH locations
+- `ANDROID_HOME` / `ANDROID_SDK_ROOT` (and `ANDROID_SDK_HOME` for `adb` fallback)
+- Typical SDK paths per OS (macOS/Linux/Windows)
+- Homebrew command-line tools path on macOS
+- `PATH` (via `which`/`where` for `adb`)
 
-### SDK Download and Setup
+## Manual Configuration
 
-When no Android SDK is detected, AutoMobile can automatically download and configure the required components.
-
-TODO: Add documentation based on real implementation
-
-### ANDROID_HOME Configuration
-
-If `$ANDROID_HOME` is not set, AutoMobile will:
-
-1. Attempt to locate the SDK automatically
-2. Set the environment variable for the current session
-3. Provide guidance for permanent configuration
+If detection fails, set the SDK path and ensure `adb` is on your `PATH`:
 
 ```bash
-# AutoMobile will automatically configure these paths:
 export ANDROID_HOME=/path/to/android/sdk
 export PATH=$PATH:$ANDROID_HOME/platform-tools
-export PATH=$PATH:$ANDROID_HOME/tools
 ```
 
-## Taking Out the Batteries
+## Implementation references
 
-### Selective Feature Disabling
-
-You can opt out of any or all automated behaviors via CLI arguments:
-
-#### SDK Management
-
-```bash
-# Disable automatic SDK detection
-npx @kaeawc/auto-mobile --no-auto-sdk
-
-# Use specific SDK path without validation
-npx @kaeawc/auto-mobile --android-home /custom/path --no-validate-sdk
-```
-
-#### Device Management
-
-```bash
-# Disable device auto-detection
-npx @kaeawc/auto-mobile --no-auto-device
-
-# Skip USB debugging setup assistance
-npx @kaeawc/auto-mobile --no-setup-assistance
-
-# Disable emulator auto-start
-npx @kaeawc/auto-mobile --no-auto-emulator
-```
-
-By leveraging these batteries-included features, AutoMobile provides a smooth onboarding experience while 
-maintaining the flexibility to customize behavior for specific requirements and environments.
+- [`src/utils/android-cmdline-tools/detection.ts#L82-L155`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/detection.ts#L82-L155) for SDK detection paths and PATH probing.
+- [`src/utils/android-cmdline-tools/AdbClient.ts#L83-L124`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/AdbClient.ts#L83-L124) for `ANDROID_HOME`/`ANDROID_SDK_ROOT`/`ANDROID_SDK_HOME` fallback logic.
+- [`src/utils/android-cmdline-tools/install.ts#L11-L112`](https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/install.ts#L11-L112) noting that automatic SDK installation has been removed.

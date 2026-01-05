@@ -1,10 +1,26 @@
-# Daemon CLI Plan
+# Daemon CLI Notes
 
-## Next Steps
+AutoMobile's CLI routes tool execution through the daemon by default (the `doctor` command can fall back to direct
+execution if the daemon is unavailable). Use the `--daemon` subcommands to manage the background process.
 
-1. Start the daemon and verify a tool call routes through it:
-   ```bash
-   auto-mobile --daemon start
-   auto-mobile --cli listDevices
-   ```
-2. Validate state persistence across CLI invocations by running a sequence that relies on in-memory state, and confirm it survives multiple calls.
+## Common Commands
+
+```bash
+auto-mobile --daemon start
+auto-mobile --daemon status
+auto-mobile --daemon health
+auto-mobile --daemon restart
+auto-mobile --daemon stop
+```
+
+CLI tool calls will start the daemon automatically if needed:
+
+```bash
+auto-mobile --cli listDevices
+```
+
+## Implementation References
+
+- CLI daemon routing and doctor fallback: https://github.com/kaeawc/auto-mobile/blob/main/src/cli/index.ts#L80-L320
+- Daemon lifecycle commands: https://github.com/kaeawc/auto-mobile/blob/main/src/daemon/manager.ts#L27-L519
+- Daemon socket path + PID file: https://github.com/kaeawc/auto-mobile/blob/main/src/daemon/constants.ts#L1-L50

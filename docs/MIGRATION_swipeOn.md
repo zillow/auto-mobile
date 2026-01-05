@@ -11,9 +11,7 @@ This migration guide will help you transition from the old tools to the new unif
 
 ## Deprecation Timeline
 
-- **Phase 1 (Current)**: New `swipeOn` tool is available
-- **Phase 2 (Current)**: Old tools marked as deprecated but still functional
-- **Phase 3 (Future v2.0.0)**: Old tools will be removed
+- **Current**: `swipeOn` is the unified tool; legacy `swipeOnScreen`, `swipeOnElement`, and `scroll` are no longer registered in the MCP tool list
 
 ## Migration Examples
 
@@ -26,7 +24,6 @@ This migration guide will help you transition from the old tools to the new unif
   "arguments": {
     "direction": "up",
     "includeSystemInsets": false,
-    "duration": 300,
     "platform": "android"
   }
 }
@@ -39,7 +36,6 @@ This migration guide will help you transition from the old tools to the new unif
   "arguments": {
     "direction": "up",
     "includeSystemInsets": false,
-    "duration": 300,
     "platform": "android"
   }
 }
@@ -58,7 +54,6 @@ This migration guide will help you transition from the old tools to the new unif
   "arguments": {
     "elementId": "com.example:id/carousel",
     "direction": "left",
-    "duration": 300,
     "platform": "android"
   }
 }
@@ -73,7 +68,6 @@ This migration guide will help you transition from the old tools to the new unif
       "elementId": "com.example:id/carousel"
     },
     "direction": "left",
-    "duration": 300,
     "platform": "android"
   }
 }
@@ -131,11 +125,9 @@ This migration guide will help you transition from the old tools to the new unif
     },
     "direction": "down",
     "lookFor": {
-      "text": "Submit",
-      "maxTime": 15000
+      "text": "Submit"
     },
     "speed": "fast",
-    "scrollMode": "a11y",
     "platform": "android"
   }
 }
@@ -151,11 +143,9 @@ This migration guide will help you transition from the old tools to the new unif
     },
     "direction": "down",
     "lookFor": {
-      "text": "Submit",
-      "maxTime": 15000
+      "text": "Submit"
     },
     "speed": "fast",
-    "scrollMode": "a11y",
     "platform": "android"
   }
 }
@@ -163,8 +153,8 @@ This migration guide will help you transition from the old tools to the new unif
 
 **Changes:**
 - Keep `container.elementId` under `container`
-- `lookFor` structure remains the same
-- Speed and scrollMode parameters remain the same
+- `lookFor` accepts only `text`/`elementId` in `swipeOn`
+- `scrollMode` and `lookFor.maxTime` are not part of the MCP tool schema
 
 ### 5. scroll (by container text) → swipeOn
 
@@ -214,14 +204,13 @@ This migration guide will help you transition from the old tools to the new unif
 | `lookFor` | object | No | Search for element while scrolling |
 | `lookFor.text` | string | No* | Text to search for |
 | `lookFor.elementId` | string | No* | Element ID to search for |
-| `lookFor.maxTime` | number | No | Max search time (default: 15000ms) |
 | `speed` | enum | No | Speed: "slow", "normal", "fast" |
-| `duration` | number | No | Manual duration override (ms) |
-| `scrollMode` | enum | No | Mode: "adb", "a11y" |
 | `includeSystemInsets` | boolean | No | Include status/nav bars (screen swipes) |
 | `platform` | enum | **Yes** | Platform: "android", "ios" |
 
 \* When using `container`, specify exactly one of `container.elementId` or `container.text`
+
+\* When using `lookFor`, specify exactly one of `lookFor.elementId` or `lookFor.text`
 
 ## Container Parameter Shape
 
@@ -272,7 +261,7 @@ The `swipeOn` tool automatically determines the operation mode based on paramete
 
 ### 1. Screen Swipe Mode
 - **Trigger**: `container` omitted and no `lookFor`
-- **Behavior**: Swipes across the entire screen (respects system insets by default)
+- **Behavior**: Swipes across the entire screen (system insets excluded by default)
 - **Use case**: Page scrolling, app navigation
 
 ### 2. Element Swipe Mode
@@ -282,7 +271,7 @@ The `swipeOn` tool automatically determines the operation mode based on paramete
 
 ### 3. Scroll-Until-Visible Mode
 - **Trigger**: `lookFor` object specified (optionally with `container`)
-- **Behavior**: Repeatedly scrolls until target element is found or timeout
+- **Behavior**: Repeatedly scrolls until target element is found or an internal timeout elapses
 - **Use case**: Finding elements in long lists
 
 ## Best Practices
@@ -317,16 +306,6 @@ The `swipeOn` tool automatically determines the operation mode based on paramete
    { "direction": "up", "gestureType": "scrollTowardsDirection", "platform": "android" }
    ```
    This scrolls content upward (finger swipes down) to reveal content above.
-
-6. **Prefer `speed` over `duration` for readability:**
-   ```json
-   { "speed": "fast" }  // Instead of { "duration": 100 }
-   ```
-
-7. **Use `scrollMode: "a11y"` for faster scrolling on Android:**
-   ```json
-   { "scrollMode": "a11y" }  // ~50-150ms vs ~540ms with adb
-   ```
 
 ## Common Use Cases
 
@@ -421,3 +400,9 @@ If you encounter issues during migration or have questions, please:
 1. Check the [full swipeOn documentation](../README.md)
 2. Review these migration examples
 3. Open an issue on GitHub with your specific use case
+
+## Implementation References
+
+- swipeOn MCP schema + registration: https://github.com/kaeawc/auto-mobile/blob/main/src/server/interactionTools.ts#L217-L950
+- Internal swipe options (duration/scrollMode): https://github.com/kaeawc/auto-mobile/blob/main/src/models/SwipeOnOptions.ts#L1-L43
+- Scroll-until-visible defaults: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/SwipeOn.ts#L560-L640
