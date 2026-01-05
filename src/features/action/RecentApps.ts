@@ -91,7 +91,12 @@ export class RecentApps extends BaseVisualChange {
 
     // Check for legacy navigation bar with recent apps button
     for (const buttonId of recentAppsButtonIds) {
-      const element = this.elementUtils.findElementByResourceId(viewHierarchy, buttonId, "@android:id/content", true);
+      const element = this.elementUtils.findElementByResourceId(
+        viewHierarchy,
+        buttonId,
+        { elementId: "@android:id/content" },
+        true
+      );
       if (element) {
         return "legacy";
       }
@@ -99,7 +104,12 @@ export class RecentApps extends BaseVisualChange {
 
     // Check for navigation bar presence (indicates gesture navigation if no recent button found)
     for (const navId of navigationBarIds) {
-      const element = this.elementUtils.findElementByResourceId(viewHierarchy, navId, "@android:id/content", true);
+      const element = this.elementUtils.findElementByResourceId(
+        viewHierarchy,
+        navId,
+        { elementId: "@android:id/content" },
+        true
+      );
       if (element) {
         return "gesture";
       }
@@ -114,7 +124,12 @@ export class RecentApps extends BaseVisualChange {
     ];
 
     for (const indicator of gestureIndicators) {
-      const element = this.elementUtils.findElementByResourceId(viewHierarchy, indicator, "@android:id/content", true);
+      const element = this.elementUtils.findElementByResourceId(
+        viewHierarchy,
+        indicator,
+        { elementId: "@android:id/content" },
+        true
+      );
       if (element) {
         return "gesture";
       }
@@ -182,7 +197,12 @@ export class RecentApps extends BaseVisualChange {
     // Find the recent apps button
     let recentButton = null;
     for (const buttonId of recentAppsButtonIds) {
-      const element = this.elementUtils.findElementByResourceId(viewHierarchy, buttonId, "@android:id/content", true);
+      const element = this.elementUtils.findElementByResourceId(
+        viewHierarchy,
+        buttonId,
+        { elementId: "@android:id/content" },
+        true
+      );
       if (element) {
         recentButton = element;
         break;

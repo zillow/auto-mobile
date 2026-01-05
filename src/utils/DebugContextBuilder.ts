@@ -12,7 +12,10 @@ export interface ElementSearchDebugInfo {
   searchCriteria: {
     text?: string;
     resourceId?: string;
-    containerElementId?: string;
+    container?: {
+      elementId?: string;
+      text?: string;
+    };
   };
 
   /**
@@ -48,7 +51,10 @@ export async function buildElementSearchDebugContext(
   searchCriteria: {
     text?: string;
     resourceId?: string;
-    containerElementId?: string;
+    container?: {
+      elementId?: string;
+      text?: string;
+    };
   }
 ): Promise<ElementSearchDebugInfo | undefined> {
   // Only build debug context if debug mode is enabled
@@ -70,7 +76,7 @@ export async function buildElementSearchDebugContext(
     const result = await debugSearch.execute({
       text: searchCriteria.text,
       resourceId: searchCriteria.resourceId,
-      containerElementId: searchCriteria.containerElementId,
+      container: searchCriteria.container,
       includeNearMisses: true,
       maxNearMisses: 10,
       fuzzyMatch: true,

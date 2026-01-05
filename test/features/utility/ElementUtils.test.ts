@@ -333,7 +333,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Item 1",
-        "main_container",
+        { elementId: "com.example:id/main_container" },
         true,
         false
       );
@@ -348,7 +348,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Header Text",
-        "main_container",
+        { elementId: "com.example:id/main_container" },
         true,
         false
       );
@@ -361,7 +361,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Item 1",
-        "non_existent_container",
+        { elementId: "com.example:id/non_existent_container" },
         true,
         false
       );
@@ -374,7 +374,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Item 2",
-        "main_container",
+        { elementId: "com.example:id/main_container" },
         true,
         false
       );
@@ -389,7 +389,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Item",
-        "main_container",
+        { elementId: "com.example:id/main_container" },
         true, // fuzzy match enabled
         false
       );
@@ -403,7 +403,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Item",
-        "main_container",
+        { elementId: "com.example:id/main_container" },
         false, // fuzzy match disabled
         false
       );
@@ -416,7 +416,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "item 1", // lowercase
-        "main_container",
+        { elementId: "com.example:id/main_container" },
         true,
         true // case sensitive
       );
@@ -429,7 +429,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "item 1", // lowercase
-        "main_container",
+        { elementId: "com.example:id/main_container" },
         true,
         false // case-insensitive
       );
@@ -471,7 +471,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Click me",
-        "container",
+        { elementId: "com.example:id/container" },
         true,
         false
       );
@@ -507,7 +507,7 @@ describe("ElementUtils", () => {
       const result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Profile Picture",
-        "container",
+        { elementId: "com.example:id/container" },
         true,
         false
       );
@@ -521,7 +521,7 @@ describe("ElementUtils", () => {
       let result = elementUtils.findElementByText(
         null as any,
         "text",
-        "container",
+        { elementId: "com.example:id/container" },
         true,
         false
       );
@@ -532,7 +532,7 @@ describe("ElementUtils", () => {
       result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "",
-        "container",
+        { elementId: "com.example:id/container" },
         true,
         false
       );
@@ -585,7 +585,7 @@ describe("ElementUtils", () => {
       let result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Nested Text",
-        "inner_container",
+        { elementId: "com.example:id/inner_container" },
         true,
         false
       );
@@ -595,7 +595,7 @@ describe("ElementUtils", () => {
       result = elementUtils.findElementByText(
         mockObserveResult.viewHierarchy,
         "Nested Text",
-        "outer_container",
+        { elementId: "com.example:id/outer_container" },
         true,
         false
       );

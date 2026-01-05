@@ -1,5 +1,5 @@
 import { Element } from "../../models/Element";
-import { ViewHierarchyResult } from "../../models";
+import { ViewHierarchyNode, ViewHierarchyResult } from "../../models";
 import { logger } from "../../utils/logger";
 import { ElementParser } from "./ElementParser";
 import { TextMatcher } from "./TextMatcher";
@@ -16,11 +16,73 @@ export class ElementFinder {
     this.textMatcher = new TextMatcher();
   }
 
+  hasContainerElement(
+    viewHierarchy: ViewHierarchyResult,
+    container?: { elementId?: string; text?: string }
+  ): boolean {
+    if (!viewHierarchy || !container) {
+      return false;
+    }
+
+    return this.findContainerNode(viewHierarchy, container) !== null;
+  }
+
+  private findContainerNode(
+    viewHierarchy: ViewHierarchyResult,
+    container: { elementId?: string; text?: string }
+  ): ViewHierarchyNode | null {
+    if (!viewHierarchy || !container) {
+      return null;
+    }
+
+    const matchesContainerText = container.text
+      ? this.textMatcher.createTextMatcher(container.text, true, false)
+      : null;
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+
+    for (const rootNode of rootNodes) {
+      let containerNode: ViewHierarchyNode | null = null;
+      this.parser.traverseNode(rootNode, (node: ViewHierarchyNode) => {
+        if (containerNode) {
+          return; // Already found
+        }
+
+        const nodeProperties = this.parser.extractNodeProperties(node);
+        const nodeResourceId = nodeProperties["resource-id"];
+        const nodeText = nodeProperties.text;
+        const nodeContentDesc = nodeProperties["content-desc"];
+        const nodeIosLabel = nodeProperties["ios-accessibility-label"];
+
+        if (container.elementId && nodeResourceId === container.elementId) {
+          containerNode = node;
+          return;
+        }
+
+        if (
+          matchesContainerText &&
+          (
+            (typeof nodeText === "string" && matchesContainerText(nodeText)) ||
+            (typeof nodeContentDesc === "string" && matchesContainerText(nodeContentDesc)) ||
+            (typeof nodeIosLabel === "string" && matchesContainerText(nodeIosLabel))
+          )
+        ) {
+          containerNode = node;
+        }
+      });
+
+      if (containerNode) {
+        return containerNode;
+      }
+    }
+
+    return null;
+  }
+
   /**
    * Find an element in the view hierarchy that matches the specified text
    * @param viewHierarchy - The view hierarchy to search
    * @param text - The text to search for
-   * @param containerElementId - Container element resource ID to restrict the search within its child nodes
+   * @param container - Container element selector to restrict the search within its child nodes
    * @param fuzzyMatch - Whether to use fuzzy matching (partial text match)
    * @param caseSensitive - Whether to use case-sensitive matching
    * @returns The found element or null
@@ -28,7 +90,7 @@ export class ElementFinder {
   findElementByText(
     viewHierarchy: ViewHierarchyResult,
     text: string,
-    containerElementId: string | null = null,
+    container: { elementId?: string; text?: string } | null = null,
     fuzzyMatch: boolean = true,
     caseSensitive: boolean = false
   ): Element | null {
@@ -42,31 +104,13 @@ export class ElementFinder {
     const matches: Element[] = [];
     const exactMatches: Element[] = [];
 
-    // First find the container node
-    let containerNode: any = null;
-    if (containerElementId) {
-      for (const rootNode of rootNodes) {
-        this.parser.traverseNode(rootNode, (node: any) => {
-          if (containerNode) {
-            return; // Already found
-          }
+    const containerNode = container
+      ? this.findContainerNode(viewHierarchy, container)
+      : null;
 
-          const nodeProperties = this.parser.extractNodeProperties(node);
-          const nodeResourceId = nodeProperties["resource-id"];
-
-          if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
-            containerNode = node;
-          }
-        });
-        if (containerNode) {
-          break;
-        }
-      }
-
-      if (!containerNode) {
-        // Container not found, return null
-        return null;
-      }
+    if (container && !containerNode) {
+      // Container not found, return null
+      return null;
     }
 
     // Search only within the container node's subtree
@@ -165,14 +209,14 @@ export class ElementFinder {
    * Find elements by resource ID
    * @param viewHierarchy - The view hierarchy to search
    * @param resourceId - Resource ID to search for
-   * @param containerElementId - Container element resource ID to restrict the search within its child nodes
+   * @param container - Container element selector to restrict the search within its child nodes
    * @param partialMatch - Whether to allow partial ID matching
    * @returns Array of matching elements
    */
   findElementByResourceId(
     viewHierarchy: ViewHierarchyResult,
     resourceId: string,
-    containerElementId: string | null = null,
+    container: { elementId?: string; text?: string } | null = null,
     partialMatch: boolean = false
   ): Element | null {
     if (!viewHierarchy || !resourceId) {
@@ -182,36 +226,19 @@ export class ElementFinder {
     const rootNodes = this.parser.extractRootNodes(viewHierarchy);
     const matches: Element[] = [];
 
-    // First find the container node
-    let containerNode: any = null;
-    if (containerElementId) {
-      for (const rootNode of rootNodes) {
-        this.parser.traverseNode(rootNode, (node: any) => {
-          if (containerNode) {
-            return; // Already found
-          }
+    const containerNode = container
+      ? this.findContainerNode(viewHierarchy, container)
+      : null;
 
-          const nodeProperties = this.parser.extractNodeProperties(node);
-          const nodeResourceId = nodeProperties["resource-id"];
-
-          if (nodeResourceId && nodeResourceId.includes(containerElementId)) {
-            containerNode = node;
-          }
-        });
-        if (containerNode) {
-          break;
-        }
-      }
-
-      if (!containerNode) {
-        // Container not found, return empty list
-        return null;
-      }
+    if (container && !containerNode) {
+      // Container not found, return empty list
+      return null;
     }
 
-    // Search only within the container node's subtree
-    for (const rootNode of rootNodes) {
-      this.parser.traverseNode(rootNode, (node: any) => {
+    const searchNodes = containerNode ? [containerNode] : rootNodes;
+
+    for (const searchNode of searchNodes) {
+      this.parser.traverseNode(searchNode, (node: any) => {
         const nodeProperties = this.parser.extractNodeProperties(node);
         if (nodeProperties["resource-id"] && typeof nodeProperties["resource-id"] === "string") {
           const nodeResourceId = nodeProperties["resource-id"];
