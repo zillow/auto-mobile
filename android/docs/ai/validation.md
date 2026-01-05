@@ -16,9 +16,9 @@ and all tests pass. After writing some implementation you should select the most
 # Run all tests
 ./gradlew test
 
-# Run specific test class
-./gradlew test --tests "com.automobile.junit.AutoMobileJUnitRunnerTest"
+# Run specific test class (scope to junit-runner to avoid passing --tests to non-JUnit tasks)
+./gradlew :junit-runner:test --tests "dev.jasonpearson.automobile.junit.AutoMobileRunnerTest"
 
 # Run specific test method
-./gradlew test --tests "com.automobile.junit.AutoMobileJUnitRunnerTest.testYamlPlanExecution"
+./gradlew :junit-runner:test --tests "dev.jasonpearson.automobile.junit.AutoMobileRunnerTest.testBuildDaemonExecutePlanArgsIncludesDefaults"
 ```
