@@ -293,7 +293,8 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       )
 
       val requestBuildStart = System.currentTimeMillis()
-      val daemonRequestArgs = buildDaemonExecutePlanArgs(base64Content, annotation, sessionUuid)
+      val daemonRequestArgs =
+          buildDaemonExecutePlanArgs(base64Content, annotation, sessionUuid, testName, klass.simpleName)
       PerformanceTracker.measure("Daemon request build", requestBuildStart)
 
       val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
@@ -383,6 +384,8 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       base64PlanContent: String,
       annotation: AutoMobileTest,
       sessionUuid: String,
+      testName: String,
+      className: String,
   ): JsonObject {
     val values =
         mutableMapOf<String, kotlinx.serialization.json.JsonElement>(
@@ -391,6 +394,8 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
             "startStep" to JsonPrimitive(0),
             "sessionUuid" to JsonPrimitive(sessionUuid),
         )
+
+    values["testMetadata"] = buildTestMetadata(testName, className)
 
     if (annotation.device != "auto") {
       values["deviceId"] = JsonPrimitive(annotation.device)
@@ -402,6 +407,85 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
 
     return JsonObject(values)
+  }
+
+  private fun buildTestMetadata(testName: String, className: String): JsonObject {
+    val metadata =
+        mutableMapOf<String, kotlinx.serialization.json.JsonElement>(
+            "testClass" to JsonPrimitive(className),
+            "testMethod" to JsonPrimitive(testName),
+            "isCi" to JsonPrimitive(resolveCiMode()),
+        )
+
+    val appVersion =
+        firstNonBlank(
+            SystemPropertyCache.get("automobile.app.version", ""),
+            System.getenv("AUTO_MOBILE_APP_VERSION"),
+            System.getenv("APP_VERSION"),
+        )
+    if (appVersion != null) {
+      metadata["appVersion"] = JsonPrimitive(appVersion)
+    }
+
+    val gitCommit =
+        firstNonBlank(
+            SystemPropertyCache.get("automobile.git.commit", ""),
+            System.getenv("AUTO_MOBILE_GIT_COMMIT"),
+            System.getenv("GITHUB_SHA"),
+            System.getenv("GIT_COMMIT"),
+            System.getenv("CI_COMMIT_SHA"),
+        )
+    if (gitCommit != null) {
+      metadata["gitCommit"] = JsonPrimitive(gitCommit)
+    }
+
+    val targetSdk = resolveTargetSdk()
+    if (targetSdk != null) {
+      metadata["targetSdk"] = JsonPrimitive(targetSdk)
+    }
+
+    val jdkVersion =
+        firstNonBlank(System.getProperty("java.version"), System.getProperty("java.runtime.version"))
+    if (jdkVersion != null) {
+      metadata["jdkVersion"] = JsonPrimitive(jdkVersion)
+    }
+
+    val jvmTarget =
+        firstNonBlank(System.getProperty("kotlin.jvm.target"), System.getProperty("java.specification.version"))
+    if (jvmTarget != null) {
+      metadata["jvmTarget"] = JsonPrimitive(jvmTarget)
+    }
+
+    val gradleVersion =
+        firstNonBlank(System.getProperty("org.gradle.version"), System.getProperty("gradle.version"))
+    if (gradleVersion != null) {
+      metadata["gradleVersion"] = JsonPrimitive(gradleVersion)
+    }
+
+    return JsonObject(metadata)
+  }
+
+  private fun resolveTargetSdk(): Int? {
+    val candidate =
+        firstNonBlank(
+            SystemPropertyCache.get("automobile.android.targetSdk", ""),
+            SystemPropertyCache.get("automobile.targetSdk", ""),
+            System.getenv("AUTO_MOBILE_TARGET_SDK"),
+            System.getenv("ANDROID_TARGET_SDK"),
+        )
+    return candidate?.toIntOrNull()
+  }
+
+  private fun resolveCiMode(): Boolean {
+    if (SystemPropertyCache.getBoolean("automobile.ci.mode", false)) {
+      return true
+    }
+    val envValue = System.getenv("CI") ?: return false
+    return envValue.equals("true", ignoreCase = true) || envValue == "1"
+  }
+
+  private fun firstNonBlank(vararg values: String?): String? {
+    return values.firstOrNull { !it.isNullOrBlank() }
   }
 
   private fun parseDaemonToolResult(response: DaemonResponse, json: Json): ParsedToolResult {

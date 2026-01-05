@@ -259,6 +259,29 @@ export interface RecompositionMetricsTable {
   created_at: Generated<string>;
 }
 
+// Test execution timing table
+export interface TestExecutionsTable {
+  id: Generated<number>;
+  test_class: string;
+  test_method: string;
+  duration_ms: number;
+  status: "passed" | "failed" | "skipped";
+  timestamp: number;
+  device_id: string | null;
+  device_name: string | null;
+  device_platform: "android" | "ios" | null;
+  device_type: "emulator" | "simulator" | "device" | null;
+  app_version: string | null;
+  git_commit: string | null;
+  target_sdk: number | null;
+  jdk_version: string | null;
+  jvm_target: string | null;
+  gradle_version: string | null;
+  is_ci: number | null;
+  session_uuid: string | null;
+  created_at: Generated<string>;
+}
+
 // Feature flags table
 export interface FeatureFlagsTable {
   key: string;
@@ -288,6 +311,7 @@ export interface Database {
   memory_baselines: MemoryBaselinesTable;
   memory_audit_results: MemoryAuditResultsTable;
   recomposition_metrics: RecompositionMetricsTable;
+  test_executions: TestExecutionsTable;
   feature_flags: FeatureFlagsTable;
 }
 
@@ -362,3 +386,6 @@ export type RecompositionMetricsUpdate = Updateable<RecompositionMetricsTable>;
 export type FeatureFlag = Selectable<FeatureFlagsTable>;
 export type NewFeatureFlag = Insertable<FeatureFlagsTable>;
 export type FeatureFlagUpdate = Updateable<FeatureFlagsTable>;
+export type TestExecution = Selectable<TestExecutionsTable>;
+export type NewTestExecution = Insertable<TestExecutionsTable>;
+export type TestExecutionUpdate = Updateable<TestExecutionsTable>;

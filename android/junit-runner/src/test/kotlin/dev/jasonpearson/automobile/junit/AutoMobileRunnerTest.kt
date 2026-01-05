@@ -1,6 +1,7 @@
 package dev.jasonpearson.automobile.junit
 
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.*
@@ -55,7 +56,14 @@ class AutoMobileRunnerTest {
     val runner = AutoMobileRunner(TestTargetClass::class.java)
     val method = TestTargetClass::class.java.getMethod("testWithAutoMobileAnnotation")
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
-    val args = runner.invokeBuildDaemonExecutePlanArgs("Zm9v", annotation, "session-123")
+    val args =
+        runner.invokeBuildDaemonExecutePlanArgs(
+            "Zm9v",
+            annotation,
+            "session-123",
+            method.name,
+            TestTargetClass::class.java.simpleName,
+        )
 
     assertEquals("base64:Zm9v", args["planContent"]?.jsonPrimitive?.content)
     assertEquals("android", args["platform"]?.jsonPrimitive?.content)
@@ -63,6 +71,11 @@ class AutoMobileRunnerTest {
     assertEquals("session-123", args["sessionUuid"]?.jsonPrimitive?.content)
     assertNull("deviceId should be omitted when device=auto", args["deviceId"])
     assertNull("cleanupAppId should be omitted when appId is blank", args["cleanupAppId"])
+
+    val metadata = args["testMetadata"]?.jsonObject
+    assertNotNull("testMetadata should be included by default", metadata)
+    assertEquals("TestTargetClass", metadata?.get("testClass")?.jsonPrimitive?.content)
+    assertEquals("testWithAutoMobileAnnotation", metadata?.get("testMethod")?.jsonPrimitive?.content)
   }
 
   @Test
@@ -70,7 +83,14 @@ class AutoMobileRunnerTest {
     val runner = AutoMobileRunner(TestTargetClass::class.java)
     val method = TestTargetClass::class.java.getMethod("testWithSpecificDevice")
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
-    val args = runner.invokeBuildDaemonExecutePlanArgs("Zm9v", annotation, "session-456")
+    val args =
+        runner.invokeBuildDaemonExecutePlanArgs(
+            "Zm9v",
+            annotation,
+            "session-456",
+            method.name,
+            TestTargetClass::class.java.simpleName,
+        )
 
     assertEquals("emulator-5554", args["deviceId"]?.jsonPrimitive?.content)
   }
@@ -80,7 +100,14 @@ class AutoMobileRunnerTest {
     val runner = AutoMobileRunner(TestTargetClass::class.java)
     val method = TestTargetClass::class.java.getMethod("testWithCleanup")
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
-    val args = runner.invokeBuildDaemonExecutePlanArgs("Zm9v", annotation, "session-789")
+    val args =
+        runner.invokeBuildDaemonExecutePlanArgs(
+            "Zm9v",
+            annotation,
+            "session-789",
+            method.name,
+            TestTargetClass::class.java.simpleName,
+        )
 
     assertEquals("com.example.app", args["cleanupAppId"]?.jsonPrimitive?.content)
     assertEquals("true", args["cleanupClearAppData"]?.jsonPrimitive?.content)
@@ -124,6 +151,8 @@ fun AutoMobileRunner.invokeBuildDaemonExecutePlanArgs(
     base64PlanContent: String,
     annotation: AutoMobileTest,
     sessionUuid: String,
+    testName: String,
+    className: String,
 ): JsonObject {
   val method =
       this::class
@@ -133,7 +162,10 @@ fun AutoMobileRunner.invokeBuildDaemonExecutePlanArgs(
               String::class.java,
               AutoMobileTest::class.java,
               String::class.java,
+              String::class.java,
+              String::class.java,
           )
   method.isAccessible = true
-  return method.invoke(this, base64PlanContent, annotation, sessionUuid) as JsonObject
+  return method.invoke(this, base64PlanContent, annotation, sessionUuid, testName, className)
+      as JsonObject
 }
