@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,8 +16,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.automobile.ide.daemon.DaemonUnavailableException
-import com.automobile.ide.daemon.McpDaemonClient
+import com.automobile.ide.daemon.McpClientFactory
+import com.automobile.ide.daemon.McpConnectionException
 import com.automobile.ide.daemon.McpResource
 import com.automobile.ide.daemon.McpResourceTemplate
 import kotlinx.coroutines.Dispatchers
@@ -30,12 +31,18 @@ import org.jetbrains.jewel.ui.component.Text
 @Composable
 fun AutoMobileToolWindowContent() {
   val scope = rememberCoroutineScope()
-  val daemonClient = remember { McpDaemonClient() }
+  val client = remember { McpClientFactory.create() }
   var statusText by remember { mutableStateOf("Not connected") }
   var lastError by remember { mutableStateOf<String?>(null) }
   var resources by remember { mutableStateOf<List<McpResource>>(emptyList()) }
   var templates by remember { mutableStateOf<List<McpResourceTemplate>>(emptyList()) }
   var navGraphSnippet by remember { mutableStateOf<String?>(null) }
+
+  DisposableEffect(Unit) {
+    onDispose {
+      client.close()
+    }
+  }
 
   IntUiTheme {
     Column(
@@ -44,7 +51,8 @@ fun AutoMobileToolWindowContent() {
     ) {
       Text("AutoMobile")
       Text("Status: $statusText")
-      Text("Socket: ${daemonClient.socketPath}")
+      Text("Transport: ${client.transportName}")
+      Text("Endpoint: ${client.connectionDescription}")
       if (lastError != null) {
         Text("Error: ${lastError ?: ""}")
       }
@@ -57,12 +65,12 @@ fun AutoMobileToolWindowContent() {
             navGraphSnippet = null
             try {
               withContext(Dispatchers.IO) {
-                daemonClient.ping()
-                resources = daemonClient.listResources()
-                templates = daemonClient.listResourceTemplates()
+                client.ping()
+                resources = client.listResources()
+                templates = client.listResourceTemplates()
               }
               statusText = "Connected"
-            } catch (e: DaemonUnavailableException) {
+            } catch (e: McpConnectionException) {
               statusText = "Not connected"
               lastError = e.message
             }
@@ -75,10 +83,10 @@ fun AutoMobileToolWindowContent() {
             lastError = null
             try {
               withContext(Dispatchers.IO) {
-                resources = daemonClient.listResources()
-                templates = daemonClient.listResourceTemplates()
+                resources = client.listResources()
+                templates = client.listResourceTemplates()
               }
-            } catch (e: DaemonUnavailableException) {
+            } catch (e: McpConnectionException) {
               lastError = e.message
             }
           }
@@ -106,9 +114,9 @@ fun AutoMobileToolWindowContent() {
           scope.launch {
             lastError = null
             try {
-              val result = withContext(Dispatchers.IO) { daemonClient.getNavigationGraph() }
+              val result = withContext(Dispatchers.IO) { client.getNavigationGraph() }
               navGraphSnippet = result.toString().take(500)
-            } catch (e: DaemonUnavailableException) {
+            } catch (e: McpConnectionException) {
               lastError = e.message
             }
           }

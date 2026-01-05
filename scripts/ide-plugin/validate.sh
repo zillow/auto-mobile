@@ -6,4 +6,6 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 (
   cd "$ROOT_DIR/android"
   ./gradlew -p ide-plugin build
+  ./gradlew -p ide-plugin buildPlugin
+  ./gradlew -p ide-plugin verifyPlugin
 )
