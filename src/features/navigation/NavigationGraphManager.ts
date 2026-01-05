@@ -11,6 +11,10 @@ import {
   PathResult,
   ToolCallInteraction,
   ExportedGraph,
+  NavigationGraphSummary,
+  NavigationGraphSummaryEdge,
+  NavigationGraphSummaryNode,
+  NavigationGraphSummaryProvider,
   UIState,
   ScrollPosition,
   SelectedElement,
@@ -26,6 +30,10 @@ export type {
   PathResult,
   ToolCallInteraction,
   ExportedGraph,
+  NavigationGraphSummary,
+  NavigationGraphSummaryEdge,
+  NavigationGraphSummaryNode,
+  NavigationGraphSummaryProvider,
   UIState,
 };
 
@@ -33,12 +41,13 @@ export type {
  * Manages the navigation graph with SQLite persistence.
  * Tracks screen visits and correlates navigation events with tool calls.
  */
-export class NavigationGraphManager implements NavigationGraph {
+export class NavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider {
   private static instance: NavigationGraphManager | null = null;
 
   private repository: NavigationRepository;
   private currentAppId: string | null = null;
   private currentScreen: string | null = null;
+  private graphUpdateListener?: () => void;
 
   // Tool call history kept in memory for correlation (transient data)
   private toolCallHistory: ToolCallInteraction[] = [];
@@ -84,6 +93,7 @@ export class NavigationGraphManager implements NavigationGraph {
     // Ensure app exists in database
     await this.repository.getOrCreateApp(appId);
     logger.info(`[NAVIGATION_GRAPH] Set current app: ${appId}`);
+    this.notifyGraphUpdated();
   }
 
   /**
@@ -208,6 +218,7 @@ export class NavigationGraphManager implements NavigationGraph {
 
     this.currentScreen = screenName;
     await this.repository.touchApp(this.currentAppId);
+    this.notifyGraphUpdated();
   }
 
   /**
@@ -662,6 +673,7 @@ export class NavigationGraphManager implements NavigationGraph {
       await this.repository.clearAppGraph(this.currentAppId);
       this.currentScreen = null;
       logger.info(`[NAVIGATION_GRAPH] Cleared graph for app: ${this.currentAppId}`);
+      this.notifyGraphUpdated();
     }
   }
 
@@ -675,6 +687,7 @@ export class NavigationGraphManager implements NavigationGraph {
     this.currentScreen = null;
     this.toolCallHistory = [];
     logger.info(`[NAVIGATION_GRAPH] Cleared all navigation graphs`);
+    this.notifyGraphUpdated();
   }
 
   /**
@@ -719,5 +732,55 @@ export class NavigationGraphManager implements NavigationGraph {
       edges,
       currentScreen: this.currentScreen,
     };
+  }
+
+  /**
+   * Export a high-level graph summary for MCP resources.
+   */
+  public async exportGraphSummary(): Promise<NavigationGraphSummary> {
+    if (!this.currentAppId) {
+      return {
+        appId: null,
+        nodes: [],
+        edges: [],
+        currentScreen: null,
+      };
+    }
+
+    const dbNodes = await this.repository.getNodes(this.currentAppId);
+    const dbEdges = await this.repository.getEdges(this.currentAppId);
+
+    const nodes: NavigationGraphSummaryNode[] = dbNodes.map(node => ({
+      id: node.id,
+      screenName: node.screen_name,
+      visitCount: node.visit_count,
+    }));
+
+    const edges: NavigationGraphSummaryEdge[] = dbEdges.map(edge => ({
+      id: edge.id,
+      from: edge.from_screen,
+      to: edge.to_screen,
+      toolName: edge.tool_name,
+    }));
+
+    return {
+      appId: this.currentAppId,
+      nodes,
+      edges,
+      currentScreen: this.currentScreen,
+    };
+  }
+
+  /**
+   * Register a listener for graph update notifications.
+   */
+  public setGraphUpdateListener(listener: (() => void) | null): void {
+    this.graphUpdateListener = listener ?? undefined;
+  }
+
+  private notifyGraphUpdated(): void {
+    if (this.graphUpdateListener) {
+      this.graphUpdateListener();
+    }
   }
 }

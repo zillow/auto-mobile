@@ -151,6 +151,43 @@ export interface ExportedGraph {
 }
 
 /**
+ * High-level summary node for navigation graph resources.
+ */
+export interface NavigationGraphSummaryNode {
+  id: number;
+  screenName: string;
+  visitCount: number;
+}
+
+/**
+ * High-level summary edge for navigation graph resources.
+ */
+export interface NavigationGraphSummaryEdge {
+  id: number;
+  from: string;
+  to: string;
+  toolName: string | null;
+}
+
+/**
+ * High-level summary of the navigation graph for MCP resources.
+ */
+export interface NavigationGraphSummary {
+  appId: string | null;
+  nodes: NavigationGraphSummaryNode[];
+  edges: NavigationGraphSummaryEdge[];
+  currentScreen: string | null;
+}
+
+/**
+ * Provider interface for navigation graph summaries.
+ */
+export interface NavigationGraphSummaryProvider {
+  exportGraphSummary(): Promise<NavigationGraphSummary>;
+  setGraphUpdateListener?(listener: (() => void) | null): void;
+}
+
+/**
  * Represents back stack information
  */
 export interface BackStackInfo {

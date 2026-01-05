@@ -7,19 +7,29 @@ import {
   PathResult,
   ToolCallInteraction,
   ExportedGraph,
-  UIState
+  UIState,
+  BackStackInfo,
+  NavigationGraphSummary,
+  NavigationGraphSummaryEdge,
+  NavigationGraphSummaryNode,
+  NavigationGraphSummaryProvider
 } from "../../src/utils/interfaces/NavigationGraph";
 
 /**
  * Fake implementation of NavigationGraph for testing.
  * Allows full control over navigation graph state and behavior.
  */
-export class FakeNavigationGraphManager implements NavigationGraph {
+export class FakeNavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider {
   private currentAppId: string | null = null;
   private currentScreen: string | null = null;
   private nodes: Map<string, NavigationNode> = new Map();
   private edges: NavigationEdge[] = [];
   private toolCallHistory: ToolCallInteraction[] = [];
+  private nodeSummaryIds: Map<string, number> = new Map();
+  private edgeSummaries: NavigationGraphSummaryEdge[] = [];
+  private nextNodeId = 1;
+  private nextEdgeId = 1;
+  private graphUpdateListener?: () => void;
 
   // Call tracking
   private methodCalls: Map<string, any[][]> = new Map();
@@ -48,6 +58,9 @@ export class FakeNavigationGraphManager implements NavigationGraph {
    */
   addNode(node: NavigationNode): void {
     this.nodes.set(node.screenName, node);
+    if (!this.nodeSummaryIds.has(node.screenName)) {
+      this.nodeSummaryIds.set(node.screenName, this.nextNodeId++);
+    }
   }
 
   /**
@@ -55,6 +68,12 @@ export class FakeNavigationGraphManager implements NavigationGraph {
    */
   addEdge(edge: NavigationEdge): void {
     this.edges.push(edge);
+    this.edgeSummaries.push({
+      id: this.nextEdgeId++,
+      from: edge.from,
+      to: edge.to,
+      toolName: edge.interaction?.toolName ?? null
+    });
   }
 
   /**
@@ -117,6 +136,11 @@ export class FakeNavigationGraphManager implements NavigationGraph {
     this.nodes.clear();
     this.edges = [];
     this.toolCallHistory = [];
+    this.nodeSummaryIds.clear();
+    this.edgeSummaries = [];
+    this.nextNodeId = 1;
+    this.nextEdgeId = 1;
+    this.graphUpdateListener = undefined;
     this.pathResult = null;
     this.methodCalls.clear();
   }
@@ -126,6 +150,7 @@ export class FakeNavigationGraphManager implements NavigationGraph {
   setCurrentApp(appId: string): void {
     this.trackCall("setCurrentApp", [appId]);
     this.currentAppId = appId;
+    this.emitGraphUpdated();
   }
 
   getCurrentAppId(): string | null {
@@ -147,11 +172,18 @@ export class FakeNavigationGraphManager implements NavigationGraph {
         lastSeenAt: event.timestamp,
         visitCount: 1
       });
+      this.nodeSummaryIds.set(event.destination, this.nextNodeId++);
     } else {
       const node = this.nodes.get(event.destination)!;
       node.lastSeenAt = event.timestamp;
       node.visitCount++;
     }
+
+    this.emitGraphUpdated();
+  }
+
+  recordBackStack(backStack: BackStackInfo): void {
+    this.trackCall("recordBackStack", [backStack]);
   }
 
   recordToolCall(toolName: string, args: Record<string, any>, uiState?: UIState): void {
@@ -255,12 +287,18 @@ export class FakeNavigationGraphManager implements NavigationGraph {
     this.edges = [];
     this.currentScreen = null;
     this.toolCallHistory = [];
+    this.nodeSummaryIds.clear();
+    this.edgeSummaries = [];
+    this.nextNodeId = 1;
+    this.nextEdgeId = 1;
+    this.emitGraphUpdated();
   }
 
   clearAllGraphs(): void {
     this.trackCall("clearAllGraphs", []);
     this.clearCurrentGraph();
     this.currentAppId = null;
+    this.emitGraphUpdated();
   }
 
   exportGraph(): ExportedGraph {
@@ -271,5 +309,31 @@ export class FakeNavigationGraphManager implements NavigationGraph {
       edges: [...this.edges],
       currentScreen: this.currentScreen
     };
+  }
+
+  async exportGraphSummary(): Promise<NavigationGraphSummary> {
+    this.trackCall("exportGraphSummary", []);
+    const nodes: NavigationGraphSummaryNode[] = Array.from(this.nodes.values()).map(node => ({
+      id: this.nodeSummaryIds.get(node.screenName) ?? this.nextNodeId++,
+      screenName: node.screenName,
+      visitCount: node.visitCount
+    }));
+
+    return {
+      appId: this.currentAppId,
+      nodes,
+      edges: [...this.edgeSummaries],
+      currentScreen: this.currentScreen
+    };
+  }
+
+  setGraphUpdateListener(listener: (() => void) | null): void {
+    this.graphUpdateListener = listener ?? undefined;
+  }
+
+  private emitGraphUpdated(): void {
+    if (this.graphUpdateListener) {
+      this.graphUpdateListener();
+    }
   }
 }

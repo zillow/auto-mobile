@@ -203,13 +203,18 @@ class ResourceRegistryClass {
       return;
     }
 
-    // Send notification to clients that resource has changed
-    await this.server.server.notification({
-      method: "notifications/resources/updated",
-      params: {
-        uri: resource.uri
-      }
-    });
+    try {
+      // Send notification to clients that resource has changed
+      await this.server.server.notification({
+        method: "notifications/resources/updated",
+        params: {
+          uri: resource.uri
+        }
+      });
+    } catch (error) {
+      // Silently ignore notification errors (e.g., when transport is not connected during tests)
+      logger.debug(`[ResourceRegistry] Failed to notify resource update for ${uri}: ${error}`);
+    }
   }
 
   // Send notifications for multiple resources

@@ -87,6 +87,8 @@ MCP clients can subscribe to resource updates using the standard MCP notificatio
 }
 ```
 
+Navigation graph resources publish update notifications when navigation events are recorded, debounced to at most once per second.
+
 ## Use Cases
 
 ### Test Assertions
@@ -139,6 +141,36 @@ const currentImage = Buffer.from(screenshot.blob, "base64");
 // Compare with baseline
 const diff = await compareImages(baselineImage, currentImage);
 assert(diff.percentDifferent < 0.01);
+```
+
+### Navigation Graph
+
+**URI:** `automobile://navigation/graph`
+
+**Type:** JSON (text)
+
+**Description:** High-level navigation graph for the current app. Includes node IDs, screen names, visit counts, and edge transitions with tool names. Updates are debounced to once per second while navigation events are recorded.
+
+**Contents:**
+- `appId`: Current application package ID (or null if unset)
+- `currentScreen`: Most recently observed screen name
+- `nodes`: Array of `{ id, screenName, visitCount }`
+- `edges`: Array of `{ id, from, to, toolName }`
+
+**Example Usage:**
+
+```typescript
+// Read navigation graph summary
+const response = await client.request({
+  method: "resources/read",
+  params: {
+    uri: "automobile://navigation/graph"
+  }
+});
+
+const graph = JSON.parse(response.contents[0].text);
+console.log("Graph nodes:", graph.nodes.length);
+console.log("Graph edges:", graph.edges.length);
 ```
 
 ## Error Handling

@@ -33,6 +33,7 @@ import { registerObservationResources } from "./observationResources";
 import { registerBootedDeviceResources } from "./bootedDeviceResources";
 import { registerDeviceImageResources } from "./deviceImageResources";
 import { registerAppResources } from "./appResources";
+import { registerNavigationResources } from "./navigationResources";
 
 export interface McpServerOptions {
   debug?: boolean;
@@ -85,6 +86,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerBootedDeviceResources();
   registerDeviceImageResources();
   registerAppResources();
+  registerNavigationResources();
 
   // Only register debug tools when --debug flag is passed
   if (options.debug) {
