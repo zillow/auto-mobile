@@ -11,7 +11,6 @@ import java.nio.channels.SocketChannel
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.UUID
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -25,29 +24,34 @@ import kotlinx.serialization.json.decodeFromJsonElement
 class McpDaemonClient(
     private val socketPathValue: String = DaemonSocketPaths.socketPath(),
     private val json: Json = Json { ignoreUnknownKeys = true },
-) {
+) : AutoMobileClient {
   val socketPath: String
     get() = socketPathValue
 
-  fun ping(): DaemonResponse {
-    return sendRequest("ide/ping")
+  override val transportName: String = "Unix Socket"
+  override val connectionDescription: String
+    get() = socketPathValue
+
+  override fun ping() {
+    val response = sendRequest("ide/ping")
+    ensureSuccess(response)
   }
 
-  fun listResources(): List<McpResource> {
+  override fun listResources(): List<McpResource> {
     val response = sendRequest("resources/list")
     ensureSuccess(response)
     val result = json.decodeFromJsonElement(ListResourcesResult.serializer(), response.result!!)
     return result.resources
   }
 
-  fun listResourceTemplates(): List<McpResourceTemplate> {
+  override fun listResourceTemplates(): List<McpResourceTemplate> {
     val response = sendRequest("resources/list-templates")
     ensureSuccess(response)
     val result = json.decodeFromJsonElement(ListResourceTemplatesResult.serializer(), response.result!!)
     return result.resourceTemplates
   }
 
-  fun readResource(uri: String): List<McpResourceContent> {
+  override fun readResource(uri: String): List<McpResourceContent> {
     val response = sendRequest(
         "resources/read",
         buildJsonObject { put("uri", JsonPrimitive(uri)) },
@@ -57,7 +61,7 @@ class McpDaemonClient(
     return result.contents
   }
 
-  fun getNavigationGraph(platform: String = "android"): JsonElement {
+  override fun getNavigationGraph(platform: String): JsonElement {
     val response = sendRequest(
         "ide/getNavigationGraph",
         buildJsonObject { put("platform", JsonPrimitive(platform)) },
@@ -153,37 +157,4 @@ data class DaemonResponse(
     val error: String? = null,
 )
 
-class DaemonUnavailableException(message: String) : Exception(message)
-
-@Serializable
-data class McpResource(
-    val uri: String,
-    val name: String,
-    val description: String? = null,
-    val mimeType: String? = null,
-)
-
-@Serializable
-data class McpResourceTemplate(
-    @SerialName("uriTemplate") val uriTemplate: String,
-    val name: String,
-    val description: String? = null,
-    val mimeType: String? = null,
-)
-
-@Serializable
-data class McpResourceContent(
-    val uri: String,
-    val mimeType: String? = null,
-    val text: String? = null,
-    val blob: String? = null,
-)
-
-@Serializable
-private data class ListResourcesResult(val resources: List<McpResource>)
-
-@Serializable
-private data class ListResourceTemplatesResult(val resourceTemplates: List<McpResourceTemplate>)
-
-@Serializable
-private data class ReadResourceResult(val contents: List<McpResourceContent>)
+class DaemonUnavailableException(message: String) : McpConnectionException(message)
