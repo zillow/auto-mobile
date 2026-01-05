@@ -38,16 +38,31 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   private val agent: AutoMobileAgent
     get() = LazyInitializer.getAgent()
 
-  private val randomizedChildren: List<FrameworkMethod> by lazy {
+  private val orderedChildren: List<FrameworkMethod> by lazy {
     val children = super.getChildren()
+
+    TestTimingCache.prefetchIfEnabled()
+    val orderingStrategy = resolveTimingOrderingStrategy()
+    val timingOrderedChildren =
+        if (orderingStrategy == TimingOrderingStrategy.NONE || !TestTimingCache.hasTimings()) {
+          children
+        } else {
+          val ordered = orderChildrenByTiming(children, orderingStrategy)
+          println("AutoMobileRunner: Ordering tests by historical duration (${orderingStrategy.label})")
+          ordered
+        }
+
     val shuffleEnabled = SystemPropertyCache.getBoolean("automobile.junit.shuffle.enabled", true)
-    if (!shuffleEnabled || children.size <= 1) {
-      children
+    if (!shuffleEnabled || timingOrderedChildren.size <= 1 || orderingStrategy != TimingOrderingStrategy.NONE) {
+      if (shuffleEnabled && orderingStrategy != TimingOrderingStrategy.NONE) {
+        println("AutoMobileRunner: Shuffle enabled but timing ordering is active; preserving timing order.")
+      }
+      timingOrderedChildren
     } else {
       val seedProperty = SystemPropertyCache.get("automobile.junit.shuffle.seed", "").trim()
       val seed = seedProperty.toLongOrNull() ?: System.currentTimeMillis()
       println("AutoMobileRunner: Shuffling test order with seed=$seed")
-      children.shuffled(Random(seed))
+      timingOrderedChildren.shuffled(Random(seed))
     }
   }
 
@@ -74,7 +89,81 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   }
 
   override fun getChildren(): List<FrameworkMethod> {
-    return randomizedChildren
+    return orderedChildren
+  }
+
+  private enum class TimingOrderingStrategy(val label: String) {
+    NONE("none"),
+    DURATION_ASC("shortest-first"),
+    DURATION_DESC("longest-first"),
+  }
+
+  private data class TimingCandidate(
+      val method: FrameworkMethod,
+      val index: Int,
+      val durationMs: Int?,
+  )
+
+  private fun resolveTimingOrderingStrategy(): TimingOrderingStrategy {
+    val rawValue =
+        SystemPropertyCache.get("automobile.junit.timing.ordering", "none").trim().lowercase()
+    return when (rawValue) {
+      "duration-asc",
+      "duration_asc",
+      "shortest-first",
+      "shortest_first",
+      "shortest" -> TimingOrderingStrategy.DURATION_ASC
+      "duration-desc",
+      "duration_desc",
+      "longest-first",
+      "longest_first",
+      "longest" -> TimingOrderingStrategy.DURATION_DESC
+      else -> TimingOrderingStrategy.NONE
+    }
+  }
+
+  private fun orderChildrenByTiming(
+      children: List<FrameworkMethod>,
+      strategy: TimingOrderingStrategy,
+  ): List<FrameworkMethod> {
+    if (strategy == TimingOrderingStrategy.NONE || children.isEmpty()) {
+      return children
+    }
+
+    val className = klass.simpleName
+    val candidates =
+        children.mapIndexed { index, method ->
+          TimingCandidate(
+              method = method,
+              index = index,
+              durationMs = TestTimingCache.getTiming(className, method.name)?.averageDurationMs,
+          )
+        }
+
+    val withTiming = candidates.filter { it.durationMs != null }
+    val withoutTiming = candidates.filter { it.durationMs == null }
+
+    if (withTiming.isEmpty()) {
+      return children
+    }
+
+    val sortedWithTiming =
+        when (strategy) {
+          TimingOrderingStrategy.DURATION_DESC ->
+              withTiming.sortedWith(
+                  compareByDescending<TimingCandidate> { it.durationMs }
+                      .thenBy { it.index }
+              )
+          TimingOrderingStrategy.DURATION_ASC ->
+              withTiming.sortedWith(
+                  compareBy<TimingCandidate> { it.durationMs }.thenBy { it.index }
+              )
+          TimingOrderingStrategy.NONE -> withTiming
+        }
+
+    val sortedWithoutTiming = withoutTiming.sortedBy { it.index }
+
+    return sortedWithTiming.map { it.method } + sortedWithoutTiming.map { it.method }
   }
 
   override fun childrenInvoker(notifier: RunNotifier): org.junit.runners.model.Statement {

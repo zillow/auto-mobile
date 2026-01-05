@@ -73,6 +73,38 @@ When using prompt-based testing:
 - `automobile.daemon.startup.timeout.ms`: Daemon startup timeout in milliseconds (default: 10000)
 - `automobile.junit.shuffle.enabled`: Randomize test execution order (default: true)
 - `automobile.junit.shuffle.seed`: Seed for randomized order (default: current time)
+- `automobile.junit.timing.enabled`: Fetch historical timing data from the daemon (default: true)
+- `automobile.junit.timing.lookback.days`: Days of history to include (default: 90)
+- `automobile.junit.timing.limit`: Max tests returned from timing query (default: 1000)
+- `automobile.junit.timing.min.samples`: Minimum sample size per test (default: 1)
+- `automobile.junit.timing.ordering`: Test order strategy based on historical duration (`none`, `duration-asc`, `duration-desc`; default: `none`)
+- `automobile.junit.timing.fetch.timeout.ms`: Timing query timeout in milliseconds (default: 5000)
+  - Timing fetch is automatically disabled when CI is detected (`automobile.ci.mode=true` or `CI=true`).
+
+### Historical Test Timing
+
+On startup, the runner requests historical execution timing data from the AutoMobile daemon using the
+`getTestTimings` MCP tool. This data is cached for the JVM and can optionally drive test ordering
+when `automobile.junit.timing.ordering` is set.
+
+Example response format:
+
+```json
+{
+  "testTimings": [
+    {
+      "testClass": "com.example.LoginTest",
+      "testMethod": "testSuccessfulLogin",
+      "averageDurationMs": 1250,
+      "sampleSize": 15,
+      "lastRun": "2026-01-05T12:00:00Z",
+      "successRate": 0.93
+    }
+  ],
+  "generatedAt": "2026-01-05T13:00:00Z",
+  "totalTests": 150
+}
+```
 
 ### Test Cleanup Behavior
 

@@ -23,6 +23,7 @@ class AutoMobileRunnerTest {
     SystemPropertyCache.clear()
     PlanCache.clear()
     RegexCache.clear() // Phase 6: Clear regex cache for test isolation
+    TestTimingCache.clear()
   }
 
   @Test

@@ -28,6 +28,7 @@ import { registerDaemonTools } from "./daemonTools";
 import { registerPlanTools } from "./planTools";
 import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
+import { registerTestTimingTools } from "./testTimingTools";
 
 // Import resource registration functions
 import { registerObservationResources } from "./observationResources";
@@ -86,6 +87,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerNavigationTools();
   registerDaemonTools();
   registerPlanTools();
+  registerTestTimingTools();
   registerDoctorTools();
   registerFeatureFlagTools();
 
