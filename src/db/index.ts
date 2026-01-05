@@ -43,4 +43,11 @@ export type {
   ScrollPositionsTable,
   ScrollPosition,
   NewScrollPosition,
+  PredictionOutcomesTable,
+  PredictionOutcome,
+  NewPredictionOutcome,
+  PredictionTransitionStatsTable,
+  PredictionTransitionStats,
+  NewPredictionTransitionStats,
+  PredictionTransitionStatsUpdate,
 } from "./types";

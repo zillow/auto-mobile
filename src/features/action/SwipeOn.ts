@@ -391,6 +391,18 @@ export class SwipeOn extends BaseVisualChange {
     return "unknown";
   }
 
+  private buildPredictionArgs(options: SwipeOnOptions): Record<string, any> {
+    return {
+      includeSystemInsets: options.includeSystemInsets,
+      container: options.container,
+      autoTarget: options.autoTarget,
+      direction: options.direction,
+      lookFor: options.lookFor,
+      speed: options.speed,
+      platform: this.device.platform
+    };
+  }
+
   /**
    * Execute a full-screen swipe
    */
@@ -453,7 +465,11 @@ export class SwipeOn extends BaseVisualChange {
         changeExpected: false,
         timeoutMs: 500,
         progress,
-        perf
+        perf,
+        predictionContext: {
+          toolName: "swipeOn",
+          toolArgs: this.buildPredictionArgs(options)
+        }
       }
     );
   }
@@ -518,7 +534,11 @@ export class SwipeOn extends BaseVisualChange {
         changeExpected: false,
         timeoutMs: 500,
         progress,
-        perf
+        perf,
+        predictionContext: {
+          toolName: "swipeOn",
+          toolArgs: this.buildPredictionArgs(options)
+        }
       }
     );
   }
@@ -642,7 +662,11 @@ export class SwipeOn extends BaseVisualChange {
           timeoutMs: 500,
           progress,
           perf,
-          skipPreviousObserve: scrollIteration > 1 // Skip previous observe after first iteration
+          skipPreviousObserve: scrollIteration > 1, // Skip previous observe after first iteration
+          predictionContext: {
+            toolName: "swipeOn",
+            toolArgs: this.buildPredictionArgs(options)
+          }
         }
       );
 

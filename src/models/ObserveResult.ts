@@ -31,6 +31,7 @@ export interface PredictedAction {
   target: PredictionTarget;
   predictedScreen: string;
   predictedElements?: string[];
+  confidence: number;
 }
 
 export interface InteractablePrediction {

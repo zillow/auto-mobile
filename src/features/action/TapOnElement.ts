@@ -341,7 +341,20 @@ export class TapOnElement extends BaseVisualChange {
           timeoutMs: 800, // Reduce timeout for faster execution
           progress,
           perf,
-          signal
+          signal,
+          predictionContext: {
+            toolName: "tapOn",
+            toolArgs: {
+              text: options.text,
+              id: options.elementId,
+              action: options.action,
+              duration: options.duration,
+              container: options.container,
+              dragTo: options.dragTo,
+              await: options.await,
+              platform: this.device.platform
+            }
+          }
         }
       );
       if (options.action === "longPress" || options.action === "longPressDrag") {

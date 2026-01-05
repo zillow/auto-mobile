@@ -10,6 +10,8 @@ import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOption
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { NodeCryptoService } from "../../utils/crypto";
 import { throwIfAborted } from "../../utils/toolUtils";
+import { NavigationGraphManager } from "../navigation/NavigationGraphManager";
+import { PredictionAnalyzer, PredictionActionContext } from "../observe/PredictionAnalyzer";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -26,6 +28,10 @@ export interface ObservedChangeOptions {
   skipPreviousObserve?: boolean;
   skipUiStability?: boolean;
   signal?: AbortSignal;
+  predictionContext?: {
+    toolName: string;
+    toolArgs: Record<string, any>;
+  };
 }
 
 export class BaseVisualChange {
@@ -35,6 +41,7 @@ export class BaseVisualChange {
   awaitIdle: AwaitIdle;
   observeScreen: ObserveScreen;
   window: Window;
+  private predictionAnalyzer: PredictionAnalyzer;
 
   /**
    * Create an BaseVisualChange instance
@@ -53,6 +60,7 @@ export class BaseVisualChange {
     this.awaitIdle = new AwaitIdle(device, this.adb);
     this.observeScreen = new ObserveScreen(device, this.adb);
     this.window = new Window(device, this.adb);
+    this.predictionAnalyzer = new PredictionAnalyzer();
   }
 
   /**
@@ -76,6 +84,7 @@ export class BaseVisualChange {
 
     // Fetch cached view hierarchy (skip if we just terminated/cleared the app)
     let previousObserveResult: ObserveResult | null = null;
+    const predictionContext = this.buildPredictionContext(options.predictionContext);
     if (options.skipPreviousObserve) {
       logger.info("[BaseVisualChange] Skipping previous observe (app was terminated/cleared)");
     } else {
@@ -172,7 +181,8 @@ export class BaseVisualChange {
       queryOptions: options.queryOptions,
       gfxMetrics,
       perf,
-      actionStartTime
+      actionStartTime,
+      predictionContext
     });
   }
 
@@ -186,6 +196,7 @@ export class BaseVisualChange {
       gfxMetrics?: GfxMetrics | null;
       perf?: PerformanceTracker;
       actionStartTime?: number;
+      predictionContext?: PredictionActionContext;
     }
   ): Promise<any> {
     const perf = options.perf ?? new NoOpPerformanceTracker();
@@ -264,6 +275,14 @@ export class BaseVisualChange {
 
     blockResult.observation = latestObservation;
 
+    if (options.predictionContext) {
+      await this.predictionAnalyzer.recordOutcomeForAction(
+        previousObserveResult,
+        latestObservation,
+        options.predictionContext
+      );
+    }
+
     return blockResult;
   }
 
@@ -277,5 +296,28 @@ export class BaseVisualChange {
       logger.debug(`[BaseVisualChange] Failed to hash view hierarchy: ${error}`);
       return null;
     }
+  }
+
+  private buildPredictionContext(
+    context?: ObservedChangeOptions["predictionContext"]
+  ): PredictionActionContext | undefined {
+    if (!context) {
+      return undefined;
+    }
+
+    const navigationGraph = NavigationGraphManager.getInstance();
+    const appId = navigationGraph.getCurrentAppId();
+    const fromScreen = navigationGraph.getCurrentScreen();
+
+    if (!appId || !fromScreen) {
+      return undefined;
+    }
+
+    return {
+      appId,
+      fromScreen,
+      toolName: context.toolName,
+      toolArgs: context.toolArgs
+    };
   }
 }
