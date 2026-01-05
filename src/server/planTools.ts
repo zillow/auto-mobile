@@ -5,6 +5,21 @@ import { importPlanFromYaml, executePlan } from "../utils/planUtils";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
+import { TestExecutionRepository, TestExecutionStatus } from "../db/testExecutionRepository";
+
+const testMetadataSchema = z.object({
+  testClass: z.string(),
+  testMethod: z.string(),
+  appVersion: z.string().optional(),
+  gitCommit: z.string().optional(),
+  targetSdk: z.coerce.number().int().positive().optional(),
+  jdkVersion: z.string().optional(),
+  jvmTarget: z.string().optional(),
+  gradleVersion: z.string().optional(),
+  isCi: z.boolean().optional(),
+});
+
+type TestExecutionMetadata = z.infer<typeof testMetadataSchema>;
 
 // Execute plan tool schema
 const executePlanSchema = z.object({
@@ -14,9 +29,19 @@ const executePlanSchema = z.object({
   // Framework parameters for device management (optional)
   sessionUuid: z.string().optional().describe("Session UUID for parallel test execution"),
   deviceId: z.string().optional().describe("Specific device ID to use"),
+  testMetadata: testMetadataSchema.optional().describe("Optional test metadata for execution timing history"),
   cleanupAppId: z.string().optional().describe("App package ID to terminate after plan execution"),
   cleanupClearAppData: z.boolean().optional().describe("Clear app data during cleanup (Android only)")
 });
+
+const testExecutionRepository = new TestExecutionRepository();
+
+const getDeviceType = (device: BootedDevice): "emulator" | "simulator" | "device" => {
+  if (device.platform === "android") {
+    return device.deviceId.startsWith("emulator-") ? "emulator" : "device";
+  }
+  return device.deviceId.includes("-") && device.deviceId.length > 30 ? "simulator" : "device";
+};
 
 // Execute plan from YAML file or content
 const executePlanTool = async (device: BootedDevice, params: {
@@ -25,9 +50,40 @@ const executePlanTool = async (device: BootedDevice, params: {
   platform: Platform;
   sessionUuid?: string;
   deviceId?: string;
+  testMetadata?: TestExecutionMetadata;
   cleanupAppId?: string;
   cleanupClearAppData?: boolean;
 }, _progress?: unknown, signal?: AbortSignal): Promise<any> => {
+  const startTime = Date.now();
+  const recordTestExecution = async (status: TestExecutionStatus, durationMs: number) => {
+    if (!params.testMetadata) {
+      return;
+    }
+    try {
+      await testExecutionRepository.recordExecution({
+        testClass: params.testMetadata.testClass,
+        testMethod: params.testMetadata.testMethod,
+        durationMs,
+        status,
+        timestamp: Date.now(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        devicePlatform: device.platform,
+        deviceType: getDeviceType(device),
+        appVersion: params.testMetadata.appVersion,
+        gitCommit: params.testMetadata.gitCommit,
+        targetSdk: params.testMetadata.targetSdk,
+        jdkVersion: params.testMetadata.jdkVersion,
+        jvmTarget: params.testMetadata.jvmTarget,
+        gradleVersion: params.testMetadata.gradleVersion,
+        isCi: params.testMetadata.isCi,
+        sessionUuid: params.sessionUuid,
+      });
+    } catch (error) {
+      logger.warn(`Failed to record test execution timing: ${error}`);
+    }
+  };
+
   try {
     logger.info("=== Starting executePlanTool ===");
     logger.info(`Device: ${device.platform} (${device.deviceId}), Start Step: ${params.startStep}, SessionUUID: ${params.sessionUuid}`);
@@ -53,6 +109,8 @@ const executePlanTool = async (device: BootedDevice, params: {
     const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal);
     logger.info(`Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
 
+    await recordTestExecution(result.success ? "passed" : "failed", Date.now() - startTime);
+
     const response: ExecutePlanResult = {
       success: result.success,
       executedSteps: result.executedSteps,
@@ -66,6 +124,8 @@ const executePlanTool = async (device: BootedDevice, params: {
     return createJSONToolResponse(response);
   } catch (error) {
     logger.error("=== Failed to execute plan ===", error);
+
+    await recordTestExecution("failed", Date.now() - startTime);
 
     const response: ExecutePlanResult = {
       success: false,

@@ -20,6 +20,7 @@ import { writeFile, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { PID_FILE_PATH, DAEMON_VERSION } from "./constants";
 import { executionTracker } from "../server/executionTracker";
+import { closeDatabase, getDatabase } from "../db";
 
 /**
  * Main daemon process
@@ -57,6 +58,8 @@ export class Daemon {
    */
   async start(): Promise<void> {
     logger.info("Starting AutoMobile daemon...");
+
+    this.initializeDatabase();
 
     // Find an available port
     this.port = await this.findAvailablePort(this.port);
@@ -540,6 +543,14 @@ export class Daemon {
     }
   }
 
+  private initializeDatabase(): void {
+    try {
+      getDatabase();
+    } catch (error) {
+      logger.error(`Failed to initialize database: ${error}`);
+    }
+  }
+
   /**
    * Setup graceful shutdown handlers
    */
@@ -600,6 +611,8 @@ export class Daemon {
 
     // Remove PID file
     await this.removePidFile();
+
+    await closeDatabase();
 
     logger.info("Daemon stopped");
     logger.close();

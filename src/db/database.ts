@@ -8,9 +8,14 @@ import { runMigrations } from "./migrator";
 import { logger } from "../utils/logger";
 import { BunSqliteDialect } from "./bunSqliteDialect";
 
-// Database file location
-const DB_DIR = path.join(os.homedir(), ".auto-mobile");
-const DB_PATH = path.join(DB_DIR, "auto-mobile.db");
+// Database file location (defaults to ~/.auto-mobile/auto-mobile.db)
+const DEFAULT_DB_DIR = path.join(os.homedir(), ".auto-mobile");
+const ENV_DB_PATH = process.env.AUTO_MOBILE_DB_PATH ?? process.env.AUTOMOBILE_DB_PATH;
+const ENV_DB_DIR = process.env.AUTO_MOBILE_DB_DIR ?? process.env.AUTOMOBILE_DB_DIR;
+const DB_PATH = ENV_DB_PATH
+  ? path.resolve(ENV_DB_PATH)
+  : path.join(ENV_DB_DIR ? path.resolve(ENV_DB_DIR) : DEFAULT_DB_DIR, "auto-mobile.db");
+const DB_DIR = path.dirname(DB_PATH);
 
 let dbInstance: Kysely<DatabaseSchema> | null = null;
 let migrationsRun = false;
