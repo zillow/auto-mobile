@@ -176,6 +176,48 @@ console.log("Graph nodes:", graph.nodes.length);
 console.log("Graph edges:", graph.edges.length);
 ```
 
+### Navigation History
+
+**URI:** `automobile://navigation/history`
+
+**URI Templates:**
+- `automobile://navigation/history?cursor={cursor}`
+- `automobile://navigation/history?limit={limit}`
+- `automobile://navigation/history?cursor={cursor}&limit={limit}`
+
+**Type:** JSON (text)
+
+**Description:** Ordered navigation history for the current app, suitable for playback. Use `nextCursor` to page through older transitions. The cursor is opaque and should be passed back exactly as returned.
+
+**Contents:**
+- `appId`: Current application package ID (or null if unset)
+- `currentScreen`: Most recently observed screen name
+- `cursor`: Cursor used for this page (or null for the first page)
+- `nextCursor`: Cursor for the next page (or null if no more history)
+- `nodes`: Ordered list of `{ id, screenName, timestamp, edgeId? }`
+- `edges`: Ordered list of `{ id, from, to, toolName, timestamp }`
+
+**Example Usage:**
+
+```typescript
+// Read navigation history with pagination
+let cursor: string | null = null;
+
+do {
+  const uri = cursor
+    ? `automobile://navigation/history?cursor=${encodeURIComponent(cursor)}&limit=50`
+    : "automobile://navigation/history?limit=50";
+  const response = await client.request({
+    method: "resources/read",
+    params: { uri }
+  });
+
+  const history = JSON.parse(response.contents[0].text);
+  console.log("Edges in page:", history.edges.length);
+  cursor = history.nextCursor;
+} while (cursor);
+```
+
 ### Navigation Graph Nodes
 
 **URI Templates:**

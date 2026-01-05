@@ -4,7 +4,8 @@ import {
   NavigationGraphSummary,
   NavigationGraphSummaryProvider,
   NavigationGraphNodeResource,
-  NavigationGraphNodeResourceProvider
+  NavigationGraphNodeResourceProvider,
+  NavigationGraphHistoryProvider
 } from "../utils/interfaces/NavigationGraph";
 import { logger } from "../utils/logger";
 
@@ -12,6 +13,10 @@ export const NAVIGATION_RESOURCE_URIS = {
   GRAPH: "automobile://navigation/graph",
   NODE_BY_ID: "automobile://navigation/nodes/{nodeId}",
   NODE_BY_SCREEN: "automobile://navigation/nodes?screen={screenName}",
+  HISTORY: "automobile://navigation/history",
+  HISTORY_WITH_CURSOR: "automobile://navigation/history?cursor={cursor}",
+  HISTORY_WITH_LIMIT: "automobile://navigation/history?limit={limit}",
+  HISTORY_WITH_CURSOR_AND_LIMIT: "automobile://navigation/history?cursor={cursor}&limit={limit}",
 } as const;
 
 export type NavigationGraphResourceContent = NavigationGraphSummary;
@@ -19,7 +24,10 @@ export type NavigationNodeResourceContent = NavigationGraphNodeResource;
 
 const GRAPH_RESOURCE_UPDATE_DEBOUNCE_MS = 1000;
 
-type NavigationGraphResourceProvider = NavigationGraphSummaryProvider & NavigationGraphNodeResourceProvider;
+type NavigationGraphResourceProvider =
+  NavigationGraphSummaryProvider &
+  NavigationGraphNodeResourceProvider &
+  NavigationGraphHistoryProvider;
 
 let navigationGraphProvider: NavigationGraphResourceProvider = NavigationGraphManager.getInstance();
 let updateListenerProvider: NavigationGraphSummaryProvider | null = null;
@@ -33,7 +41,10 @@ function scheduleNavigationGraphUpdate(): void {
 
   updateTimeout = setTimeout(() => {
     updateTimeout = null;
-    void ResourceRegistry.notifyResourceUpdated(NAVIGATION_RESOURCE_URIS.GRAPH);
+    void ResourceRegistry.notifyResourcesUpdated([
+      NAVIGATION_RESOURCE_URIS.GRAPH,
+      NAVIGATION_RESOURCE_URIS.HISTORY,
+    ]);
   }, GRAPH_RESOURCE_UPDATE_DEBOUNCE_MS);
 }
 
@@ -70,6 +81,32 @@ async function getNavigationGraphResource(): Promise<ResourceContent> {
       mimeType: "application/json",
       text: JSON.stringify({
         error: `Failed to retrieve navigation graph: ${error}`
+      }, null, 2)
+    };
+  }
+}
+
+async function getNavigationGraphHistoryResource(
+  uri: string,
+  options: {
+    cursor?: string;
+    limit?: number;
+  } = {}
+): Promise<ResourceContent> {
+  try {
+    const history = await navigationGraphProvider.exportGraphHistory(options);
+    return {
+      uri,
+      mimeType: "application/json",
+      text: JSON.stringify(history, null, 2)
+    };
+  } catch (error) {
+    logger.error(`[NavigationResources] Failed to get navigation history: ${error}`);
+    return {
+      uri,
+      mimeType: "application/json",
+      text: JSON.stringify({
+        error: `Failed to retrieve navigation history: ${error}`
       }, null, 2)
     };
   }
@@ -123,6 +160,29 @@ async function getNavigationNodeByScreenResource(screenName: string): Promise<Re
   }
 }
 
+function parseHistoryParams(params: Record<string, string>): {
+  cursor?: string;
+  limit?: number;
+} {
+  const cursorRaw = params.cursor ? decodeURIComponent(params.cursor).trim() : "";
+  const limitRaw = params.limit ? decodeURIComponent(params.limit).trim() : "";
+
+  const cursor = cursorRaw || undefined;
+  if (!limitRaw) {
+    return { cursor };
+  }
+
+  const parsedLimit = Number(limitRaw);
+  if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
+    throw new Error(`Invalid history limit: ${params.limit}`);
+  }
+
+  return {
+    cursor,
+    limit: Math.floor(parsedLimit)
+  };
+}
+
 export function registerNavigationResources(options: {
   navigationGraph?: NavigationGraphResourceProvider;
 } = {}): void {
@@ -141,6 +201,54 @@ export function registerNavigationResources(options: {
     "High-level navigation graph for the current app (nodes and edges).",
     "application/json",
     getNavigationGraphResource
+  );
+
+  ResourceRegistry.register(
+    NAVIGATION_RESOURCE_URIS.HISTORY,
+    "Navigation History",
+    "Ordered navigation history for the current app (nodes and edges).",
+    "application/json",
+    () => getNavigationGraphHistoryResource(NAVIGATION_RESOURCE_URIS.HISTORY)
+  );
+
+  const historyHandler = async (params: Record<string, string>) => {
+    const { cursor, limit } = parseHistoryParams(params);
+    const query = new URLSearchParams();
+    if (cursor) {
+      query.set("cursor", cursor);
+    }
+    if (limit) {
+      query.set("limit", limit.toString());
+    }
+    const queryString = query.toString();
+    const uri = queryString
+      ? `${NAVIGATION_RESOURCE_URIS.HISTORY}?${queryString}`
+      : NAVIGATION_RESOURCE_URIS.HISTORY;
+    return getNavigationGraphHistoryResource(uri, { cursor, limit });
+  };
+
+  ResourceRegistry.registerTemplate(
+    NAVIGATION_RESOURCE_URIS.HISTORY_WITH_CURSOR_AND_LIMIT,
+    "Navigation History",
+    "Ordered navigation history with pagination support.",
+    "application/json",
+    historyHandler
+  );
+
+  ResourceRegistry.registerTemplate(
+    NAVIGATION_RESOURCE_URIS.HISTORY_WITH_CURSOR,
+    "Navigation History",
+    "Ordered navigation history with pagination support.",
+    "application/json",
+    historyHandler
+  );
+
+  ResourceRegistry.registerTemplate(
+    NAVIGATION_RESOURCE_URIS.HISTORY_WITH_LIMIT,
+    "Navigation History",
+    "Ordered navigation history with pagination support.",
+    "application/json",
+    historyHandler
   );
 
   ResourceRegistry.registerTemplate(

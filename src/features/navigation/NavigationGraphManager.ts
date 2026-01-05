@@ -16,6 +16,10 @@ import {
   NavigationGraphSummaryEdge,
   NavigationGraphSummaryNode,
   NavigationGraphSummaryProvider,
+  NavigationGraphHistoryEdge,
+  NavigationGraphHistoryNode,
+  NavigationGraphHistoryPage,
+  NavigationGraphHistoryProvider,
   NavigationGraphNodeDetail,
   NavigationGraphNodeResource,
   NavigationGraphNodeResourceProvider,
@@ -39,17 +43,26 @@ export type {
   NavigationGraphSummaryEdge,
   NavigationGraphSummaryNode,
   NavigationGraphSummaryProvider,
+  NavigationGraphHistoryEdge,
+  NavigationGraphHistoryNode,
+  NavigationGraphHistoryPage,
+  NavigationGraphHistoryProvider,
   NavigationGraphNodeDetail,
   NavigationGraphNodeResource,
   NavigationGraphNodeResourceProvider,
   UIState,
 };
 
+type HistoryCursor = {
+  timestamp: number;
+  id: number;
+};
+
 /**
  * Manages the navigation graph with SQLite persistence.
  * Tracks screen visits and correlates navigation events with tool calls.
  */
-export class NavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider, NavigationGraphNodeResourceProvider {
+export class NavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider, NavigationGraphHistoryProvider, NavigationGraphNodeResourceProvider {
   private static instance: NavigationGraphManager | null = null;
 
   private repository: NavigationRepository;
@@ -59,6 +72,9 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
 
   // Tool call history kept in memory for correlation (transient data)
   private toolCallHistory: ToolCallInteraction[] = [];
+
+  private readonly HISTORY_PAGE_DEFAULT = 50;
+  private readonly HISTORY_PAGE_MAX = 200;
 
   // Correlation window: tool call must occur 0-2000ms before navigation event
   private readonly TOOL_CALL_CORRELATION_WINDOW_MS = 2000;
@@ -942,6 +958,102 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
   }
 
   /**
+   * Export a paginated navigation history for MCP resources.
+   */
+  public async exportGraphHistory(options: {
+    cursor?: string;
+    limit?: number;
+  } = {}): Promise<NavigationGraphHistoryPage> {
+    if (!this.currentAppId) {
+      return {
+        appId: null,
+        currentScreen: null,
+        cursor: options.cursor ?? null,
+        nextCursor: null,
+        nodes: [],
+        edges: [],
+      };
+    }
+
+    const limit = this.normalizeHistoryLimit(options.limit);
+    const cursor = options.cursor ? this.parseHistoryCursor(options.cursor) : null;
+
+    const { edges: dbEdges, hasMore } = await this.repository.getEdgesPage(
+      this.currentAppId,
+      {
+        cursor,
+        limit,
+      }
+    );
+
+    const historyEdges: NavigationGraphHistoryEdge[] = dbEdges.map(edge => ({
+      id: edge.id,
+      from: edge.from_screen,
+      to: edge.to_screen,
+      toolName: edge.tool_name,
+      timestamp: edge.timestamp,
+    }));
+
+    const nodeNames = new Set<string>();
+    if (dbEdges.length > 0) {
+      nodeNames.add(dbEdges[0].from_screen);
+      dbEdges.forEach(edge => nodeNames.add(edge.to_screen));
+    }
+
+    const nodeIdMap = new Map<string, number>();
+    if (nodeNames.size > 0) {
+      const dbNodes = await this.repository.getNodesByScreenNames(
+        this.currentAppId,
+        Array.from(nodeNames)
+      );
+      dbNodes.forEach(node => {
+        nodeIdMap.set(node.screen_name, node.id);
+      });
+    }
+
+    const historyNodes: NavigationGraphHistoryNode[] = [];
+    if (dbEdges.length > 0) {
+      const firstEdge = dbEdges[0];
+      historyNodes.push({
+        id: nodeIdMap.get(firstEdge.from_screen) ?? null,
+        screenName: firstEdge.from_screen,
+        timestamp: firstEdge.timestamp,
+        edgeId: null,
+      });
+      dbEdges.forEach(edge => {
+        historyNodes.push({
+          id: nodeIdMap.get(edge.to_screen) ?? null,
+          screenName: edge.to_screen,
+          timestamp: edge.timestamp,
+          edgeId: edge.id,
+        });
+      });
+    } else if (this.currentScreen) {
+      const node = await this.repository.getNode(this.currentAppId, this.currentScreen);
+      if (node) {
+        historyNodes.push({
+          id: node.id,
+          screenName: node.screen_name,
+          timestamp: node.last_seen_at,
+          edgeId: null,
+        });
+      }
+    }
+
+    const nextCursor =
+      hasMore && dbEdges.length > 0 ? this.encodeHistoryCursor(dbEdges[dbEdges.length - 1]) : null;
+
+    return {
+      appId: this.currentAppId,
+      currentScreen: this.currentScreen,
+      cursor: options.cursor ?? null,
+      nextCursor,
+      nodes: historyNodes,
+      edges: historyEdges,
+    };
+  }
+
+  /**
    * Register a listener for graph update notifications.
    */
   public setGraphUpdateListener(listener: (() => void) | null): void {
@@ -952,5 +1064,30 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
     if (this.graphUpdateListener) {
       this.graphUpdateListener();
     }
+  }
+
+  private parseHistoryCursor(cursor: string): HistoryCursor {
+    const [timestampRaw, idRaw] = cursor.split(":");
+    const timestamp = Number(timestampRaw);
+    const id = Number(idRaw);
+    if (!Number.isFinite(timestamp) || !Number.isFinite(id)) {
+      throw new Error(`Invalid history cursor: ${cursor}`);
+    }
+    return { timestamp, id };
+  }
+
+  private encodeHistoryCursor(edge: DBNavigationEdge): string {
+    return `${edge.timestamp}:${edge.id}`;
+  }
+
+  private normalizeHistoryLimit(limit?: number): number {
+    if (!limit || !Number.isFinite(limit)) {
+      return this.HISTORY_PAGE_DEFAULT;
+    }
+    const normalized = Math.floor(limit);
+    if (normalized <= 0) {
+      return this.HISTORY_PAGE_DEFAULT;
+    }
+    return Math.min(normalized, this.HISTORY_PAGE_MAX);
   }
 }

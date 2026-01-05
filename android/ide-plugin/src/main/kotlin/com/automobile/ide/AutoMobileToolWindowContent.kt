@@ -5,17 +5,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.automobile.ide.graph.NavigationGraphLegend
+import com.automobile.ide.graph.NavigationGraphSummary
+import com.automobile.ide.graph.NavigationGraphView
+import com.automobile.ide.graph.RecentTransition
 import com.automobile.ide.daemon.McpClientFactory
 import com.automobile.ide.daemon.McpConnectionException
 import com.automobile.ide.daemon.McpDiscoverySnapshot
@@ -25,13 +33,23 @@ import com.automobile.ide.daemon.McpResourceTemplate
 import com.automobile.ide.daemon.McpServerOption
 import com.intellij.openapi.project.Project
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.parseToJsonElement
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun AutoMobileToolWindowContent(project: Project) {
@@ -41,10 +59,16 @@ fun AutoMobileToolWindowContent(project: Project) {
   var selectedOptionId by remember { mutableStateOf<String?>(null) }
   var client by remember { mutableStateOf(McpClientFactory.createPreferred(null)) }
   var statusText by remember { mutableStateOf("Not connected") }
+  var isConnected by remember { mutableStateOf(false) }
   var lastError by remember { mutableStateOf<String?>(null) }
   var resources by remember { mutableStateOf<List<McpResource>>(emptyList()) }
   var templates by remember { mutableStateOf<List<McpResourceTemplate>>(emptyList()) }
-  var navGraphSnippet by remember { mutableStateOf<String?>(null) }
+  var graphSummary by remember { mutableStateOf<NavigationGraphSummary?>(null) }
+  var graphError by remember { mutableStateOf<String?>(null) }
+  var graphUpdatedAt by remember { mutableStateOf<String?>(null) }
+  var lastCurrentScreen by remember { mutableStateOf<String?>(null) }
+  val recentTransitions = remember { mutableStateListOf<RecentTransition>() }
+  val graphJson = remember { Json { ignoreUnknownKeys = true } }
 
   DisposableEffect(client) { onDispose { client.close() } }
 
@@ -82,6 +106,44 @@ fun AutoMobileToolWindowContent(project: Project) {
     return snapshot
   }
 
+  suspend fun fetchNavigationGraph() {
+    val contents = withContext(Dispatchers.IO) { client.readResource(NAV_GRAPH_RESOURCE_URI) }
+    val payload = contents.firstOrNull()?.text?.trim().orEmpty()
+    if (payload.isBlank()) {
+      graphError = "Navigation graph resource returned no data."
+      return
+    }
+
+    val jsonElement = graphJson.parseToJsonElement(payload)
+    if (jsonElement is JsonObject) {
+      val errorMessage = jsonElement["error"]?.jsonPrimitive?.contentOrNull
+      if (!errorMessage.isNullOrBlank()) {
+        graphError = errorMessage
+        return
+      }
+    }
+
+    val summary =
+        graphJson.decodeFromJsonElement(NavigationGraphSummary.serializer(), jsonElement)
+    graphSummary = summary
+    graphError = null
+    graphUpdatedAt = LocalTime.now().format(GRAPH_TIME_FORMATTER)
+
+    val updatedTransitions =
+        updateTransitionHistory(
+            lastCurrentScreen,
+            summary,
+            recentTransitions.toList(),
+        )
+    if (updatedTransitions.isNotEmpty()) {
+      recentTransitions.clear()
+      recentTransitions.addAll(updatedTransitions)
+    } else if (recentTransitions.isNotEmpty()) {
+      recentTransitions.clear()
+    }
+    lastCurrentScreen = summary.currentScreen
+  }
+
   val options = discoverySnapshot.options
   val selectedOption = options.firstOrNull { it.id == selectedOptionId }
   val selectedIndex = options.indexOfFirst { it.id == selectedOptionId }.takeIf { it >= 0 } ?: 0
@@ -89,6 +151,22 @@ fun AutoMobileToolWindowContent(project: Project) {
       if (options.isNotEmpty()) options.map { it.label } else listOf("No worktrees detected")
 
   androidx.compose.runtime.LaunchedEffect(Unit) { refreshDiscovery() }
+  androidx.compose.runtime.LaunchedEffect(client, isConnected) {
+    if (!isConnected) {
+      return@LaunchedEffect
+    }
+
+    while (isActive) {
+      try {
+        fetchNavigationGraph()
+      } catch (e: McpConnectionException) {
+        graphError = e.message
+      } catch (e: Exception) {
+        graphError = e.message
+      }
+      delay(GRAPH_POLL_INTERVAL_MS)
+    }
+  }
 
   IntUiTheme {
     Column(
@@ -108,7 +186,16 @@ fun AutoMobileToolWindowContent(project: Project) {
         ListComboBox(
             optionLabels,
             selectedIndex,
-            { index -> selectedOptionId = options.getOrNull(index)?.id },
+            { index ->
+              selectedOptionId = options.getOrNull(index)?.id
+              statusText = "Not connected"
+              isConnected = false
+              graphSummary = null
+              graphError = null
+              graphUpdatedAt = null
+              lastCurrentScreen = null
+              recentTransitions.clear()
+            },
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = { scope.launch { refreshDiscovery() } }) {
@@ -126,7 +213,11 @@ fun AutoMobileToolWindowContent(project: Project) {
               scope.launch {
                 statusText = "Connecting..."
                 lastError = null
-                navGraphSnippet = null
+                graphSummary = null
+                graphError = null
+                graphUpdatedAt = null
+                lastCurrentScreen = null
+                recentTransitions.clear()
                 try {
                   val snapshot = refreshDiscovery()
                   val resolvedId = resolveSelectionId(snapshot.options)
@@ -140,9 +231,18 @@ fun AutoMobileToolWindowContent(project: Project) {
                     templates = nextClient.listResourceTemplates()
                   }
                   statusText = "Connected"
+                  isConnected = true
                 } catch (e: McpConnectionException) {
                   statusText = "Not connected"
+                  isConnected = false
                   lastError = e.message
+                }
+                if (isConnected) {
+                  try {
+                    fetchNavigationGraph()
+                  } catch (e: Exception) {
+                    graphError = e.message
+                  }
                 }
               }
             }
@@ -179,33 +279,75 @@ fun AutoMobileToolWindowContent(project: Project) {
         }
       }
 
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(8.dp))
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         DefaultButton(
-            onClick = {
-              scope.launch {
-                lastError = null
-                try {
-                  val result = withContext(Dispatchers.IO) { client.getNavigationGraph() }
-                  navGraphSnippet = result.toString().take(500)
-                } catch (e: McpConnectionException) {
-                  lastError = e.message
-                }
-              }
-            }
+            onClick = { scope.launch { lastError = "Feature flags are not wired yet" } }
         ) {
-          Text("Import Graph")
+          Text("Toggle Perf Debug")
         }
-        OutlinedButton(onClick = { scope.launch { lastError = "Export not wired yet" } }) {
-          Text("Export Graph")
+        OutlinedButton(
+            onClick = { scope.launch { lastError = "Feature flags are not wired yet" } }
+        ) {
+          Text("Toggle Traces")
         }
       }
 
-      if (navGraphSnippet != null) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("Navigation Graph (preview):")
-        Text(navGraphSnippet ?: "")
+      Spacer(modifier = Modifier.height(12.dp))
+      Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text("Navigation Graph")
+          if (graphUpdatedAt != null) {
+            Text("Updated $graphUpdatedAt")
+          }
+          Text("Auto-refresh 1s")
+        }
+        Text(
+            "Nodes: ${graphSummary?.nodes?.size ?: 0} | " +
+                "Edges: ${graphSummary?.edges?.size ?: 0} | " +
+                "Current: ${graphSummary?.currentScreen ?: "-"}"
+        )
+        NavigationGraphLegend(modifier = Modifier.fillMaxWidth())
       }
+      NavigationGraphView(
+          summary = graphSummary,
+          recentTransitions = recentTransitions.toList(),
+          errorMessage = graphError,
+          modifier = Modifier.fillMaxWidth().weight(1f),
+      )
     }
   }
+}
+
+private const val NAV_GRAPH_RESOURCE_URI = "automobile://navigation/graph"
+private const val GRAPH_POLL_INTERVAL_MS = 1000L
+private const val MAX_RECENT_TRANSITIONS = 10
+private val GRAPH_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+
+private fun updateTransitionHistory(
+    previousScreen: String?,
+    summary: NavigationGraphSummary,
+    existing: List<RecentTransition>,
+): List<RecentTransition> {
+  val currentScreen = summary.currentScreen
+  if (previousScreen.isNullOrBlank() || currentScreen.isNullOrBlank()) {
+    return existing
+  }
+  if (previousScreen == currentScreen) {
+    return existing
+  }
+
+  val matchingEdge =
+      summary.edges.firstOrNull { it.from == previousScreen && it.to == currentScreen }
+  val updated =
+      existing +
+          RecentTransition(
+              from = previousScreen,
+              to = currentScreen,
+              edgeId = matchingEdge?.id,
+          )
+  return updated.takeLast(MAX_RECENT_TRANSITIONS)
 }
