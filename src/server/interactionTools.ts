@@ -125,14 +125,25 @@ export const shakeSchema = z.object({
   deviceId: z.string().optional()
 });
 
+const tapOnContainerSchema = z.object({
+  elementId: z.string().optional().describe("Container element resource ID to restrict search within"),
+  text: z.string().optional().describe("Container element text to restrict search within")
+}).superRefine((value, ctx) => {
+  if (!value.elementId && !value.text) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "container must include elementId or text"
+    });
+  }
+});
+
 export const tapOnSchema = z.object({
-  container: z.object({
-    elementId: z.string().optional().describe("Container element resource ID to restrict search within"),
-    text: z.string().optional().describe("Container element text to restrict search within")
-  }).optional().describe("Container element to scope the search - specify elementId or text to locate it"),
+  container: tapOnContainerSchema.optional().describe(
+    "Container element to scope the search. Provide elementId or text to locate it."
+  ),
   action: z.enum(["tap", "doubleTap", "longPress", "longPressDrag", "focus"]).describe("Action to perform on the element"),
-  text: z.string().optional().describe("Text to tap on"),
-  id: z.string().optional().describe("Element ID to tap on"),
+  text: z.string().optional().describe("Text to tap on. Takes precedence over id if both are provided."),
+  id: z.string().optional().describe("Element ID to tap on. Ignored when text is provided."),
   duration: z.number().optional().describe("Long press duration in milliseconds"),
   dragTo: z.object({
     x: z.number().optional().describe("Drag target X coordinate"),
@@ -788,7 +799,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "tapOn",
-    "Tap supporting text or resourceId",
+    "Tap UI elements by text or resource ID, optionally scoped to a container",
     tapOnSchema,
     tapOnHandler,
     true // Supports progress notifications

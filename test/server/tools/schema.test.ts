@@ -182,6 +182,28 @@ describe("MCP Tools Schema", () => {
     }
   });
 
+  test("tapOn should report helpful errors for malformed container", async () => {
+    const { client } = fixture.getContext();
+
+    try {
+      const { z } = await import("zod");
+      await client.request({
+        method: "tools/call",
+        params: {
+          name: "tapOn",
+          arguments: {
+            platform: "android",
+            text: "Duluth",
+            container: "MN"
+          }
+        }
+      }, z.any());
+      expect.fail("Should have thrown an error for invalid container");
+    } catch (error: any) {
+      expect(error.message).toContain("container must be an object");
+    }
+  });
+
   test("given a request contains fields that are defined by the schema but have incorrect values, should return an error response", async function() {
 
     const { client } = fixture.getContext();
