@@ -62,6 +62,7 @@ class AutoMobileRunnerTest {
     assertEquals(0, args["startStep"]?.jsonPrimitive?.content?.toInt())
     assertEquals("session-123", args["sessionUuid"]?.jsonPrimitive?.content)
     assertNull("deviceId should be omitted when device=auto", args["deviceId"])
+    assertNull("cleanupAppId should be omitted when appId is blank", args["cleanupAppId"])
   }
 
   @Test
@@ -72,6 +73,17 @@ class AutoMobileRunnerTest {
     val args = runner.invokeBuildDaemonExecutePlanArgs("Zm9v", annotation, "session-456")
 
     assertEquals("emulator-5554", args["deviceId"]?.jsonPrimitive?.content)
+  }
+
+  @Test
+  fun testBuildDaemonExecutePlanArgsWithCleanup() {
+    val runner = AutoMobileRunner(TestTargetClass::class.java)
+    val method = TestTargetClass::class.java.getMethod("testWithCleanup")
+    val annotation = method.getAnnotation(AutoMobileTest::class.java)
+    val args = runner.invokeBuildDaemonExecutePlanArgs("Zm9v", annotation, "session-789")
+
+    assertEquals("com.example.app", args["cleanupAppId"]?.jsonPrimitive?.content)
+    assertEquals("true", args["cleanupClearAppData"]?.jsonPrimitive?.content)
   }
 }
 
@@ -87,6 +99,13 @@ class TestTargetClass {
 
   @AutoMobileTest(plan = "test-plans/launch-clock.yaml", device = "emulator-5554")
   fun testWithSpecificDevice() {}
+
+  @AutoMobileTest(
+      plan = "test-plans/launch-clock.yaml",
+      appId = "com.example.app",
+      clearAppData = true,
+  )
+  fun testWithCleanup() {}
 
   fun testMethodWithoutAnnotation() {}
 }
