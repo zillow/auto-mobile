@@ -125,7 +125,11 @@ jobs:
 
           # Extract changelog for this version if it exists
           if [ -f CHANGELOG.md ]; then
-            NOTES=$(awk "/## \[${VERSION}\]/,/## \[/" CHANGELOG.md | sed '1d;$d' | sed '/^$/d')
+            NOTES=$(awk -v version="$VERSION" '
+              $0 ~ "^## \\[v?"version"\\]" {in_section=1; next}
+              in_section && $0 ~ "^## \\[" {exit}
+              in_section {print}
+            ' CHANGELOG.md | sed '/^$/d')
             if [ -z "$NOTES" ]; then
               NOTES="Release v${VERSION}"
             fi
