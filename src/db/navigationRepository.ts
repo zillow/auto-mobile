@@ -190,6 +190,26 @@ export class NavigationRepository {
   }
 
   /**
+   * Get nodes by screen name.
+   */
+  async getNodesByScreenNames(
+    appId: string,
+    screenNames: string[]
+  ): Promise<NavigationNode[]> {
+    if (screenNames.length === 0) {
+      return [];
+    }
+
+    const db = getDatabase();
+    return db
+      .selectFrom("navigation_nodes")
+      .selectAll()
+      .where("app_id", "=", appId)
+      .where("screen_name", "in", screenNames)
+      .execute();
+  }
+
+  /**
    * Create a navigation edge.
    */
   async createEdge(
@@ -236,6 +256,46 @@ export class NavigationRepository {
       .where("app_id", "=", appId)
       .orderBy("timestamp", "asc")
       .execute();
+  }
+
+  /**
+   * Get edges for an app with pagination support.
+   */
+  async getEdgesPage(
+    appId: string,
+    options: {
+      cursor?: { timestamp: number; id: number } | null;
+      limit: number;
+    }
+  ): Promise<{ edges: NavigationEdge[]; hasMore: boolean }> {
+    const db = getDatabase();
+    let query = db
+      .selectFrom("navigation_edges")
+      .selectAll()
+      .where("app_id", "=", appId);
+
+    if (options.cursor) {
+      query = query.where(({ eb, or, and }) =>
+        or([
+          eb("timestamp", ">", options.cursor!.timestamp),
+          and([
+            eb("timestamp", "=", options.cursor!.timestamp),
+            eb("id", ">", options.cursor!.id),
+          ]),
+        ])
+      );
+    }
+
+    const rows = await query
+      .orderBy("timestamp", "asc")
+      .orderBy("id", "asc")
+      .limit(options.limit + 1)
+      .execute();
+
+    const hasMore = rows.length > options.limit;
+    const edges = hasMore ? rows.slice(0, options.limit) : rows;
+
+    return { edges, hasMore };
   }
 
   /**

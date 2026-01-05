@@ -198,6 +198,39 @@ export interface NavigationGraphNodeResource {
 }
 
 /**
+ * Ordered navigation edge for history playback.
+ */
+export interface NavigationGraphHistoryEdge {
+  id: number;
+  from: string;
+  to: string;
+  toolName: string | null;
+  timestamp: number;
+}
+
+/**
+ * Ordered navigation node for history playback.
+ */
+export interface NavigationGraphHistoryNode {
+  id: number | null;
+  screenName: string;
+  timestamp: number;
+  edgeId?: number | null;
+}
+
+/**
+ * Paginated navigation history resource.
+ */
+export interface NavigationGraphHistoryPage {
+  appId: string | null;
+  currentScreen: string | null;
+  cursor: string | null;
+  nextCursor: string | null;
+  nodes: NavigationGraphHistoryNode[];
+  edges: NavigationGraphHistoryEdge[];
+}
+
+/**
  * Provider interface for navigation graph summaries.
  */
 export interface NavigationGraphSummaryProvider {
@@ -211,6 +244,16 @@ export interface NavigationGraphSummaryProvider {
 export interface NavigationGraphNodeResourceProvider {
   getNodeResourceById(nodeId: number): Promise<NavigationGraphNodeResource | null>;
   getNodeResourceByScreen(screenName: string): Promise<NavigationGraphNodeResource | null>;
+}
+
+/**
+ * Provider interface for navigation graph history resources.
+ */
+export interface NavigationGraphHistoryProvider {
+  exportGraphHistory(options?: {
+    cursor?: string;
+    limit?: number;
+  }): Promise<NavigationGraphHistoryPage>;
 }
 
 /**
