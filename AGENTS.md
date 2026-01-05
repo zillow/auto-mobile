@@ -2,6 +2,7 @@
 
 ## Project rules
 - TypeScript only; do not add JavaScript.
+- `android/` is an Android Kotlin Gradle project containing apps and libraries.
 - After implementation changes, run relevant validation commands.
 - Write terminal output to `scratch/` when command output is not visible in the session.
 - Validation guidance: `docs/ai/validation.md`.

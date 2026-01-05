@@ -29,3 +29,5 @@ docs/contributing/index.md
 
 /.cache
 .mcp.local.json
+# IntelliJ Platform Gradle plugin artifacts
+android/ide-plugin/.intellijPlatform/

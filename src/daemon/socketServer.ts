@@ -144,11 +144,7 @@ export class UnixSocketServer {
         // Get or create MCP client for this session
         const mcpClient = await this.getMcpClient();
 
-        // Forward the tool call to the MCP server
-        const result = await mcpClient.callTool({
-          name: request.params.name,
-          arguments: request.params.arguments,
-        });
+        const result = await this.handleIdeRequest(mcpClient, request);
 
         return {
           id: request.id,
@@ -170,6 +166,41 @@ export class UnixSocketServer {
         };
       }
     });
+  }
+
+  private async handleIdeRequest(
+    mcpClient: Client,
+    request: DaemonRequest
+  ): Promise<any> {
+    switch (request.method) {
+      case "tools/call": {
+        return await mcpClient.callTool({
+          name: request.params.name,
+          arguments: request.params.arguments,
+        });
+      }
+      case "resources/list": {
+        return await mcpClient.listResources();
+      }
+      case "resources/read": {
+        if (!request.params?.uri) {
+          throw new Error("resources/read requires params.uri");
+        }
+        return await mcpClient.readResource({ uri: request.params.uri });
+      }
+      case "resources/list-templates": {
+        return await mcpClient.listResourceTemplates();
+      }
+      case "ide/getNavigationGraph": {
+        const args = request.params ?? {};
+        return await mcpClient.callTool({ name: "getNavigationGraph", arguments: args });
+      }
+      case "ide/ping": {
+        return { ok: true, timestamp: Date.now() };
+      }
+      default:
+        throw new Error(`Unsupported daemon method: ${request.method}`);
+    }
   }
 
   /**

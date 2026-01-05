@@ -1,0 +1,15 @@
+<idea-plugin>
+  <id>com.automobile.ide</id>
+  <name>AutoMobile</name>
+  <vendor email="support@automobile.dev" url="https://github.com/kaeawc/auto-mobile">AutoMobile</vendor>
+
+  <description><![CDATA[
+    AutoMobile IDE integration for authoring automated tests and visualizing navigation graphs.
+  ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <toolWindow id="AutoMobile" anchor="right" icon="/icons/toolWindow.svg" factoryClass="com.automobile.ide.AutoMobileToolWindowFactory" />
+  </extensions>
+</idea-plugin>
