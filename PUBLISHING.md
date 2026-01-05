@@ -5,8 +5,9 @@ This guide covers publishing `@kaeawc/auto-mobile` to npm.
 ## Prerequisites
 
 - npm account with access to the `@kaeawc` scope.
-- Logged in locally: `npm login` and `npm whoami`.
+- Logged in locally: `npm login` and `npm whoami` (local publishing only).
 - Clean working tree and an up-to-date build.
+- Trusted Publisher configured for GitHub Actions (`.github/workflows/release.yml`) for automated releases.
 
 ## Build and verify
 
@@ -31,6 +32,12 @@ This updates `package.json` and creates a git tag.
 
 ## Publish
 
+### GitHub Actions (Trusted Publisher)
+
+Publishing on tags uses GitHub Actions OIDC credentials. No npm token is required.
+
+### Local publish
+
 ```sh
 npm publish --access public
 ```
@@ -42,6 +49,7 @@ npm publish --access public
 - `prepublishOnly` temporarily rewrites `README.md` via `scripts/npm/transform-readme.js`.
 - `postpublish` restores `README.md` from the backup.
 - Release workflow updates `src/constants/release.ts` using `scripts/generate-release-constants.sh` with `RELEASE_VERSION` set.
+- Release workflow uses `npm publish --provenance` with npm CLI 11.5.1+.
 
 ## Troubleshooting
 
