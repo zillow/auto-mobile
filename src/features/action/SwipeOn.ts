@@ -6,6 +6,7 @@ import {
   ObserveResult,
   SwipeOnOptions,
   SwipeOnResult,
+  ScrollableCandidate,
   ViewHierarchyResult,
   GestureOptions
 } from "../../models";
@@ -18,6 +19,36 @@ import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTrac
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
+import { SwipeResult } from "../../models/SwipeResult";
+import { ObserveScreen } from "../observe/ObserveScreen";
+
+export interface GestureExecutor {
+  swipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    options?: GestureOptions,
+    perf?: PerformanceTracker
+  ): Promise<SwipeResult>;
+}
+
+export interface ObserveScreenLike {
+  execute(
+    queryOptions?: import("../../models").ViewHierarchyQueryOptions,
+    perf?: PerformanceTracker,
+    skipWaitForFresh?: boolean,
+    minTimestamp?: number,
+    signal?: AbortSignal
+  ): Promise<ObserveResult>;
+  getMostRecentCachedObserveResult(): Promise<ObserveResult>;
+}
+
+export interface SwipeOnDependencies {
+  executeGesture?: GestureExecutor;
+  observeScreen?: ObserveScreenLike;
+  elementUtils?: ElementUtils;
+}
 
 /**
  * Unified command to swipe on screen or elements, with optional scroll-until-visible functionality
@@ -28,7 +59,7 @@ import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder"
  * - scroll: Scrolling with optional element search
  */
 export class SwipeOn extends BaseVisualChange {
-  private executeGesture: ExecuteGesture;
+  private executeGesture: GestureExecutor;
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
   private webdriver: WebDriverAgent;
@@ -38,22 +69,31 @@ export class SwipeOn extends BaseVisualChange {
     device: BootedDevice,
     adb: AdbClient | null = null,
     axe: AxeClient | null = null,
-    webdriver: WebDriverAgent | null = null
+    webdriver: WebDriverAgent | null = null,
+    dependencies: SwipeOnDependencies = {}
   ) {
     super(device, adb, axe);
-    this.executeGesture = new ExecuteGesture(device, adb);
-    this.elementUtils = new ElementUtils();
+    this.executeGesture = dependencies.executeGesture ?? new ExecuteGesture(device, adb);
+    this.elementUtils = dependencies.elementUtils ?? new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.webdriver = webdriver || new WebDriverAgent(device);
+    if (dependencies.observeScreen) {
+      this.observeScreen = dependencies.observeScreen as unknown as ObserveScreen;
+    }
   }
 
   /**
    * Create an error result with consistent structure
    */
-  private createErrorResult(error: string): SwipeOnResult {
+  private createErrorResult(
+    error: string,
+    extras: { warning?: string; scrollableCandidates?: ScrollableCandidate[] } = {}
+  ): SwipeOnResult {
     return {
       success: false,
       error,
+      warning: extras.warning,
+      scrollableCandidates: extras.scrollableCandidates,
       targetType: "screen",
       x1: 0,
       y1: 0,
@@ -61,6 +101,52 @@ export class SwipeOn extends BaseVisualChange {
       y2: 0,
       duration: 0
     };
+  }
+
+  private async getScrollableContext(): Promise<{
+    scrollables: Element[];
+    candidates: ScrollableCandidate[];
+    observeResult?: ObserveResult;
+  }> {
+    let observeResult = await this.observeScreen.getMostRecentCachedObserveResult();
+    if (!observeResult.viewHierarchy || observeResult.viewHierarchy.hierarchy?.error) {
+      observeResult = await this.observeScreen.execute();
+    }
+
+    if (!observeResult.viewHierarchy) {
+      return { scrollables: [], candidates: [], observeResult };
+    }
+
+    const scrollables = this.elementUtils.findScrollableElements(observeResult.viewHierarchy);
+    const candidates = this.buildScrollableCandidates(scrollables);
+    return { scrollables, candidates, observeResult };
+  }
+
+  private buildScrollableCandidates(scrollables: Element[]): ScrollableCandidate[] {
+    const candidates: ScrollableCandidate[] = [];
+    const seen = new Set<string>();
+
+    for (const scrollable of scrollables) {
+      const candidate: ScrollableCandidate = {
+        elementId: scrollable["resource-id"],
+        text: scrollable.text,
+        contentDesc: scrollable["content-desc"],
+        className: scrollable.class
+      };
+
+      if (!candidate.elementId && !candidate.text && !candidate.contentDesc && !candidate.className) {
+        continue;
+      }
+
+      const key = `${candidate.elementId ?? ""}|${candidate.text ?? ""}|${candidate.contentDesc ?? ""}|${candidate.className ?? ""}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      candidates.push(candidate);
+    }
+
+    return candidates;
   }
 
   /**
@@ -86,8 +172,55 @@ export class SwipeOn extends BaseVisualChange {
         // Scroll-until-visible mode
         return await this.executeScrollUntilVisible(options, progress, perf);
       } else if (!options.container) {
-        // No container = screen swipe
-        return await this.executeScreenSwipe(options, progress, perf);
+        const autoTargetEnabled = options.autoTarget !== false;
+        if (!autoTargetEnabled) {
+          return await this.executeScreenSwipe(options, progress, perf);
+        }
+
+        const scrollableContext = await this.getScrollableContext();
+        if (scrollableContext.scrollables.length === 0) {
+          return await this.executeScreenSwipe(options, progress, perf);
+        }
+
+        const screenBounds = scrollableContext.observeResult
+          ? this.getScreenBounds(scrollableContext.observeResult)
+          : null;
+        const autoTargetElement = this.selectAutoTargetScrollable(
+          scrollableContext.scrollables,
+          screenBounds,
+          options.direction
+        );
+
+        if (!autoTargetElement) {
+          const result = await this.executeScreenSwipe(options, progress, perf);
+          return {
+            ...result,
+            warning: "Scrollable containers found but none matched the swipe direction; swiping the screen. Set autoTarget: false to force screen swipes.",
+            scrollableCandidates: scrollableContext.candidates
+          };
+        }
+
+        const autoTargetContainer = this.buildContainerFromElement(autoTargetElement);
+        if (!autoTargetContainer) {
+          const result = await this.executeScreenSwipe(options, progress, perf);
+          return {
+            ...result,
+            warning: "Auto-targeted scrollable container lacks a usable identifier; swiping the screen. Provide container.elementId or container.text to target it explicitly.",
+            scrollableCandidates: scrollableContext.candidates
+          };
+        }
+
+        const autoTargetResult = await this.executeElementSwipe(
+          { ...options, container: autoTargetContainer },
+          progress,
+          perf
+        );
+
+        return {
+          ...autoTargetResult,
+          warning: `Auto-targeted scrollable container (${this.describeContainer(autoTargetContainer)}). Set autoTarget: false to force full-screen swipes.`,
+          scrollableCandidates: scrollableContext.candidates
+        };
       } else {
         // Container specified = swipe within container
         return await this.executeElementSwipe(options, progress, perf);
@@ -150,6 +283,101 @@ export class SwipeOn extends BaseVisualChange {
     }
 
     return null;
+  }
+
+  private getScreenBounds(observeResult: ObserveResult): Element["bounds"] | null {
+    if (!observeResult.screenSize) {
+      return null;
+    }
+
+    const insets = observeResult.systemInsets || { top: 0, right: 0, bottom: 0, left: 0 };
+    return {
+      left: insets.left,
+      top: insets.top,
+      right: observeResult.screenSize.width - insets.right,
+      bottom: observeResult.screenSize.height - insets.bottom
+    };
+  }
+
+  private selectAutoTargetScrollable(
+    scrollables: Element[],
+    screenBounds: Element["bounds"] | null,
+    direction: SwipeOnOptions["direction"]
+  ): Element | null {
+    if (scrollables.length === 0) {
+      return null;
+    }
+
+    if (scrollables.length === 1) {
+      return this.matchesDirection(scrollables[0], direction) ? scrollables[0] : null;
+    }
+
+    const nonScreenScrollables = screenBounds
+      ? scrollables.filter(scrollable => !this.boundsEqual(scrollable.bounds, screenBounds))
+      : scrollables.slice();
+
+    const candidates = nonScreenScrollables.length > 0 ? nonScreenScrollables : scrollables;
+    return this.pickLargestScrollable(candidates);
+  }
+
+  private pickLargestScrollable(scrollables: Element[]): Element | null {
+    if (scrollables.length === 0) {
+      return null;
+    }
+
+    return scrollables.reduce((largest, current) => {
+      const largestArea = this.boundsArea(largest.bounds);
+      const currentArea = this.boundsArea(current.bounds);
+      return currentArea > largestArea ? current : largest;
+    });
+  }
+
+  private boundsArea(bounds: Element["bounds"]): number {
+    return Math.max(0, bounds.right - bounds.left) * Math.max(0, bounds.bottom - bounds.top);
+  }
+
+  private boundsEqual(a: Element["bounds"], b: Element["bounds"]): boolean {
+    return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
+  }
+
+  private matchesDirection(element: Element, direction: SwipeOnOptions["direction"]): boolean {
+    const width = Math.abs(element.bounds.right - element.bounds.left);
+    const height = Math.abs(element.bounds.bottom - element.bounds.top);
+
+    if (direction === "up" || direction === "down") {
+      return height >= width;
+    }
+
+    return width >= height;
+  }
+
+  private buildContainerFromElement(element: Element): SwipeOnOptions["container"] | null {
+    if (element["resource-id"]) {
+      return { elementId: element["resource-id"] };
+    }
+    if (element.text) {
+      return { text: element.text };
+    }
+    if (element["content-desc"]) {
+      return { text: element["content-desc"] };
+    }
+    if (element["ios-accessibility-label"]) {
+      return { text: element["ios-accessibility-label"] };
+    }
+    return null;
+  }
+
+  private describeContainer(container: SwipeOnOptions["container"]): string {
+    if (!container) {
+      return "unknown";
+    }
+    if (container.elementId) {
+      return `elementId="${container.elementId}"`;
+    }
+    if (container.text) {
+      return `text="${container.text}"`;
+    }
+    return "unknown";
   }
 
   /**

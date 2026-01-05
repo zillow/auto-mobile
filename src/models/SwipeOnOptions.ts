@@ -11,6 +11,9 @@ export interface SwipeOnOptions {
     text?: string; // Text within container
   };
 
+  // Auto-target a scrollable container when no container is specified (default true)
+  autoTarget?: boolean;
+
   // Direction (required)
   direction: "up" | "down" | "left" | "right";
 

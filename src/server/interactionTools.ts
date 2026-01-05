@@ -81,6 +81,7 @@ export interface SwipeOnArgs {
     elementId?: string;
     text?: string;
   };
+  autoTarget?: boolean;
   direction: "up" | "down" | "left" | "right";
   lookFor?: {
     elementId?: string;
@@ -162,7 +163,8 @@ export const swipeOnSchema = z.object({
   container: z.object({
     elementId: z.string().optional().describe("Resource ID of the container element (finds nearest scrollable parent if element is not scrollable)"),
     text: z.string().optional().describe("Text within the container (finds nearest scrollable parent of element containing this text)")
-  }).optional().describe("Container element to swipe within - specify elementId or text to locate it. If not specified swipe on window"),
+  }).optional().describe("Container element to swipe within. REQUIRED for scrolling lists (RecyclerView/ScrollView/ListView). Omit only for intentional full-screen swipes like page navigation or dismissing sheets."),
+  autoTarget: z.boolean().optional().describe("Auto-target a scrollable container when container is omitted (default true). Set to false only if you intend to swipe the entire screen after autoTarget selected a list unexpectedly."),
   direction: z.enum(["up", "down", "left", "right"]).describe("Direction to swipe finger: 'up' swipes finger up (content moves down, reveals content from above), 'down' swipes finger down (content moves up, reveals content from below)"),
   lookFor: z.object({
     elementId: z.string().optional().describe("ID of the element to look for"),
@@ -517,6 +519,7 @@ export function registerInteractionTools() {
     const options: import("../models").SwipeOnOptions = {
       includeSystemInsets: args.includeSystemInsets,
       container: args.container,
+      autoTarget: args.autoTarget,
       direction: args.direction,
       lookFor: args.lookFor,
       speed: args.speed
@@ -527,7 +530,9 @@ export function registerInteractionTools() {
 
     // Determine message based on operation type
     let message = "";
-    if (result.found !== undefined) {
+    if (!result.success && result.error) {
+      message = `Swipe failed: ${result.error}`;
+    } else if (result.found !== undefined) {
       // Scroll-until-visible operation
       if (result.found) {
         const target = args.lookFor?.text
@@ -546,6 +551,10 @@ export function registerInteractionTools() {
       message = `Swiped ${args.direction} in container with id "${args.container.elementId}"`;
     } else {
       message = `Swiped ${args.direction}`;
+    }
+
+    if (result.warning) {
+      message = `${message} Warning: ${result.warning}`;
     }
 
     return createJSONToolResponse({
@@ -742,7 +751,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "swipeOn",
-    "Unified swipe/scroll tool - swipe on screen or elements, with optional scroll-until-visible",
+    "Unified swipe/scroll tool - swipe on screen or elements, with optional scroll-until-visible. IMPORTANT: use container when scrolling lists; omit only for full-screen swipes.",
     swipeOnSchema,
     swipeOnHandler,
     true // Supports progress notifications

@@ -107,7 +107,13 @@ export class FakeObserveScreen {
 
   // Implementation of ObserveScreen interface
 
-  async execute(): Promise<ObserveResult> {
+  async execute(
+    _queryOptions?: any,
+    _perf?: any,
+    _skipWaitForFresh?: boolean,
+    _minTimestamp?: number,
+    _signal?: AbortSignal
+  ): Promise<ObserveResult> {
     this.executedOperations.push("execute");
     this.executeCallCount++;
 

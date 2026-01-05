@@ -8,6 +8,10 @@ import { ToolDebugInfo } from "../utils/DebugContextBuilder";
 export interface SwipeOnResult {
   success: boolean;
   error?: string;
+  warning?: string;
+
+  // Context to help callers target scrollable containers
+  scrollableCandidates?: ScrollableCandidate[];
 
   // Target information
   targetType: "screen" | "element";
@@ -40,4 +44,11 @@ export interface SwipeOnResult {
 
   // Debug information (when debug mode is enabled)
   debug?: ToolDebugInfo;
+}
+
+export interface ScrollableCandidate {
+  elementId?: string;
+  text?: string;
+  contentDesc?: string;
+  className?: string;
 }

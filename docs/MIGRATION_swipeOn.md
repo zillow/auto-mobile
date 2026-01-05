@@ -37,7 +37,6 @@ This migration guide will help you transition from the old tools to the new unif
 {
   "tool": "swipeOn",
   "arguments": {
-    "screen": true,
     "direction": "up",
     "includeSystemInsets": false,
     "duration": 300,
@@ -47,7 +46,7 @@ This migration guide will help you transition from the old tools to the new unif
 ```
 
 **Changes:**
-- Add `"screen": true` to indicate full-screen swipe
+- Omit `container` to indicate a full-screen swipe
 - All other parameters remain the same
 
 ### 2. swipeOnElement → swipeOn
@@ -70,7 +69,9 @@ This migration guide will help you transition from the old tools to the new unif
 {
   "tool": "swipeOn",
   "arguments": {
-    "elementId": "com.example:id/carousel",
+    "container": {
+      "elementId": "com.example:id/carousel"
+    },
     "direction": "left",
     "duration": 300,
     "platform": "android"
@@ -79,8 +80,7 @@ This migration guide will help you transition from the old tools to the new unif
 ```
 
 **Changes:**
-- Remove `screen` field (or set to `false`)
-- Specify element via `elementId` or `text`
+- Specify the swipe target using `container.elementId` or `container.text`
 - Duration and direction remain the same
 
 ### 3. scroll (simple) → swipeOn
@@ -105,7 +105,9 @@ This migration guide will help you transition from the old tools to the new unif
 {
   "tool": "swipeOn",
   "arguments": {
-    "elementId": "com.example:id/list",
+    "container": {
+      "elementId": "com.example:id/list"
+    },
     "direction": "down",
     "speed": "normal",
     "platform": "android"
@@ -114,8 +116,7 @@ This migration guide will help you transition from the old tools to the new unif
 ```
 
 **Changes:**
-- Flatten `container.elementId` to just `elementId`
-- Can also use `containerText` instead of `containerElementId`
+- Keep `container.elementId` under `container`
 - Speed parameter remains the same
 
 ### 4. scroll (with lookFor) → swipeOn
@@ -145,7 +146,9 @@ This migration guide will help you transition from the old tools to the new unif
 {
   "tool": "swipeOn",
   "arguments": {
-    "containerElementId": "com.example:id/list",
+    "container": {
+      "elementId": "com.example:id/list"
+    },
     "direction": "down",
     "lookFor": {
       "text": "Submit",
@@ -159,7 +162,7 @@ This migration guide will help you transition from the old tools to the new unif
 ```
 
 **Changes:**
-- Change `container.elementId` to `containerElementId`
+- Keep `container.elementId` under `container`
 - `lookFor` structure remains the same
 - Speed and scrollMode parameters remain the same
 
@@ -184,7 +187,9 @@ This migration guide will help you transition from the old tools to the new unif
 {
   "tool": "swipeOn",
   "arguments": {
-    "containerText": "Products",
+    "container": {
+      "text": "Products"
+    },
     "direction": "up",
     "platform": "android"
   }
@@ -192,7 +197,7 @@ This migration guide will help you transition from the old tools to the new unif
 ```
 
 **Changes:**
-- Change `container.text` to `containerText`
+- Keep `container.text` under `container`
 
 ## Complete Parameter Reference
 
@@ -200,11 +205,10 @@ This migration guide will help you transition from the old tools to the new unif
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `screen` | boolean | No | Set to `true` for full-screen swipe |
-| `text` | string | No* | Text of element to swipe on |
-| `elementId` | string | No* | Resource ID of element to swipe on |
-| `containerElementId` | string | No | Container element ID to restrict search |
-| `containerText` | string | No | Container text to restrict search |
+| `container` | object | No | Container element to swipe within. REQUIRED for list scrolling; omit for full-screen swipes. |
+| `container.elementId` | string | No* | Resource ID of container element |
+| `container.text` | string | No* | Text within container element (finds nearest scrollable parent) |
+| `autoTarget` | boolean | No | Auto-target a scrollable container when `container` is omitted (default true). Set to false only if you intend to swipe the entire screen after autoTarget selected a list unexpectedly. |
 | `direction` | enum | **Yes** | Direction: "up", "down", "left", "right" |
 | `lookFor` | object | No | Search for element while scrolling |
 | `lookFor.text` | string | No* | Text to search for |
@@ -216,86 +220,111 @@ This migration guide will help you transition from the old tools to the new unif
 | `includeSystemInsets` | boolean | No | Include status/nav bars (screen swipes) |
 | `platform` | enum | **Yes** | Platform: "android", "ios" |
 
-\* At least one target type must be specified: `screen`, `text`, `elementId`, or use `lookFor` for scroll-until-visible
+\* When using `container`, specify exactly one of `container.elementId` or `container.text`
 
 ## Operation Modes
 
 The `swipeOn` tool automatically determines the operation mode based on parameters:
 
 ### 1. Screen Swipe Mode
-- **Trigger**: `screen: true`
+- **Trigger**: `container` omitted and no `lookFor`
 - **Behavior**: Swipes across the entire screen (respects system insets by default)
 - **Use case**: Page scrolling, app navigation
 
 ### 2. Element Swipe Mode
-- **Trigger**: `text` or `elementId` specified (without `lookFor`)
+- **Trigger**: `container` specified (without `lookFor`)
 - **Behavior**: Swipes within the specified element's bounds
 - **Use case**: Carousel swiping, horizontal scrolling
 
 ### 3. Scroll-Until-Visible Mode
-- **Trigger**: `lookFor` object specified
+- **Trigger**: `lookFor` object specified (optionally with `container`)
 - **Behavior**: Repeatedly scrolls until target element is found or timeout
 - **Use case**: Finding elements in long lists
 
 ## Best Practices
 
-1. **Use screen swipes for page navigation:**
+1. **Use screen swipes for page navigation (omit `container`; set `autoTarget: false` if a list is auto-selected):**
    ```json
-   { "screen": true, "direction": "up" }
+   { "direction": "up", "platform": "android", "autoTarget": false }
    ```
 
-2. **Use element swipes for carousels:**
+2. **Use container swipes for lists and feeds:**
    ```json
-   { "elementId": "carousel", "direction": "left" }
+   { "container": { "elementId": "list" }, "direction": "down", "platform": "android" }
    ```
 
-3. **Use lookFor for finding elements in lists:**
+3. **Use element swipes for carousels:**
+   ```json
+   { "container": { "elementId": "carousel" }, "direction": "left", "platform": "android" }
+   ```
+
+4. **Use lookFor for finding elements in lists:**
    ```json
    {
-     "containerElementId": "list",
+     "container": { "elementId": "list" },
      "direction": "down",
-     "lookFor": { "text": "Item 42" }
+     "lookFor": { "text": "Item 42" },
+     "platform": "android"
    }
    ```
 
-4. **Prefer `speed` over `duration` for readability:**
+5. **Prefer `speed` over `duration` for readability:**
    ```json
    { "speed": "fast" }  // Instead of { "duration": 100 }
    ```
 
-5. **Use `scrollMode: "a11y"` for faster scrolling on Android:**
+6. **Use `scrollMode: "a11y"` for faster scrolling on Android:**
    ```json
    { "scrollMode": "a11y" }  // ~50-150ms vs ~540ms with adb
    ```
 
 ## Common Migration Mistakes
 
-### ❌ Don't nest container in an object
+### ❌ Don't scroll lists without a container
 ```json
 {
-  "container": { "elementId": "list" }  // OLD WAY
+  "direction": "up",
+  "platform": "android"
 }
 ```
 
-### ✅ Use flat structure
+### ✅ Target the list container explicitly
 ```json
 {
-  "containerElementId": "list"  // NEW WAY
+  "container": { "elementId": "list" },
+  "direction": "up",
+  "platform": "android"
 }
 ```
 
-### ❌ Don't forget to specify target type
+### ❌ Don't disable autoTarget unless you want a full-screen swipe
 ```json
 {
-  "direction": "up"  // ERROR: No target specified
+  "direction": "up",
+  "autoTarget": false,
+  "platform": "android"
 }
 ```
 
-### ✅ Always specify at least one target
+### ✅ Keep autoTarget enabled for list scrolling when container is unknown
 ```json
 {
-  "screen": true,  // Target type
-  "direction": "up"
+  "direction": "up",
+  "platform": "android"
+}
+```
+
+### ❌ Don't set both container fields
+```json
+{
+  "container": { "elementId": "list", "text": "Items" }
+}
+```
+
+### ✅ Provide exactly one container locator
+```json
+{
+  "container": { "text": "Items" }
 }
 ```
 
