@@ -183,7 +183,7 @@ describe("ViewHierarchy - Sample Data", function() {
     const filteredHierarchy = viewHierarchy.filterViewHierarchy(mapHierarchy);
 
     let hasUnwantedProperties = false;
-    const unwantedProps = ["checkable", "checked", "password", "long-clickable", "selected", "index"];
+    const unwantedProps = ["checkable", "checked", "password", "long-clickable", "index"];
 
     viewHierarchy.traverseViewHierarchy(filteredHierarchy.hierarchy, node => {
       if (node.$) {
@@ -204,5 +204,21 @@ describe("ViewHierarchy - Sample Data", function() {
     });
 
     expect(hasUnwantedProperties).toBe(false), "Filtered hierarchy should not contain unwanted properties";
+  });
+
+  test("should preserve selected attribute when filtering", async function() {
+    const selectedPath = path.join(__dirname, "../../sampleData/viewHierarchy/selectedElement.xml");
+    const selectedHierarchy = await readAndParseXmlFile(selectedPath);
+
+    const filteredHierarchy = viewHierarchy.filterViewHierarchy(selectedHierarchy);
+
+    let foundSelected = false;
+    viewHierarchy.traverseViewHierarchy(filteredHierarchy.hierarchy, node => {
+      if (node.$?.selected === "true" || node.selected === "true") {
+        foundSelected = true;
+      }
+    });
+
+    expect(foundSelected).toBe(true, "Selected nodes should be retained after filtering");
   });
 });

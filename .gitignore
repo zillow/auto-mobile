@@ -12,6 +12,7 @@ node_modules
 npm-debug.log*
 /.gitlab-ci-local
 *.tgz
+*.hprof
 
 # Places to locally write while thinking or planning
 /scratch
