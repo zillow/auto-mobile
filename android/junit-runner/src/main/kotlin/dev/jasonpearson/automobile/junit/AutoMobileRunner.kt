@@ -51,7 +51,12 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
 
     // Proceed with normal execution if devices are available
-    super.run(notifier)
+    val heartbeat = DaemonHeartbeat.startBackground()
+    try {
+      super.run(notifier)
+    } finally {
+      heartbeat.close()
+    }
   }
 
   override fun getChildren(): List<FrameworkMethod> {
@@ -252,12 +257,12 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         println("Executing via daemon socket: executePlan")
       }
 
+      DaemonHeartbeat.registerSession(sessionUuid)
       val execStart = System.currentTimeMillis()
-      val heartbeat = DaemonHeartbeat.start(sessionUuid)
       val response = try {
         DaemonSocketClientManager.callTool("executePlan", daemonRequestArgs, annotation.timeoutMs)
       } finally {
-        heartbeat.close()
+        DaemonHeartbeat.unregisterSession(sessionUuid)
       }
       PerformanceTracker.measure("Daemon request execution", execStart)
 

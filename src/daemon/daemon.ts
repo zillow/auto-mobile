@@ -451,12 +451,19 @@ export class Daemon {
    */
   private startHeartbeatMonitor(): void {
     const HEARTBEAT_CHECK_INTERVAL_MS = 10000;
+    const INITIAL_HEARTBEAT_GRACE_MS = 20_000;
 
     this.heartbeatMonitorTimer = setInterval(async () => {
       const now = Date.now();
       const sessions = this.sessionManager.getAllSessions();
 
       for (const session of sessions) {
+        if (!session.hasReceivedHeartbeat && now - session.createdAt < INITIAL_HEARTBEAT_GRACE_MS) {
+          continue;
+        }
+        if (executionTracker.hasActiveSessionUuidExecutions(session.sessionId)) {
+          continue;
+        }
         const timeoutMs = session.heartbeatTimeoutMs ?? SessionManager.DEFAULT_HEARTBEAT_TIMEOUT_MS;
         const lastHeartbeat = session.lastHeartbeat ?? session.lastUsedAt;
         if (now - lastHeartbeat > timeoutMs) {

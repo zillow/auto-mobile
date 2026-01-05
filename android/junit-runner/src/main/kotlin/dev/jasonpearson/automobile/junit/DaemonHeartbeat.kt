@@ -4,7 +4,9 @@ import java.io.Closeable
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.intOrNull
@@ -12,8 +14,21 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 internal object DaemonHeartbeat {
-  private const val DEFAULT_INTERVAL_MS = 10_000L
+  private const val DEFAULT_INTERVAL_MS = 1_000L
   private val json = Json { ignoreUnknownKeys = true }
+  private val backgroundHeartbeat = BackgroundHeartbeatManager()
+
+  fun startBackground(intervalMs: Long = DEFAULT_INTERVAL_MS): Closeable {
+    return backgroundHeartbeat.start(intervalMs)
+  }
+
+  fun registerSession(sessionId: String) {
+    backgroundHeartbeat.addSession(sessionId)
+  }
+
+  fun unregisterSession(sessionId: String) {
+    backgroundHeartbeat.removeSession(sessionId)
+  }
 
   fun start(sessionId: String, intervalMs: Long = DEFAULT_INTERVAL_MS): Closeable {
     val running = AtomicBoolean(true)
@@ -39,6 +54,80 @@ internal object DaemonHeartbeat {
     return Closeable {
       running.set(false)
       heartbeatThread.interrupt()
+    }
+  }
+
+  private class BackgroundHeartbeatManager {
+    private val sessions = ConcurrentHashMap.newKeySet<String>()
+    private val running = AtomicBoolean(false)
+    private val startLock = Any()
+    private val refCount = AtomicInteger(0)
+    @Volatile private var intervalMs: Long = DEFAULT_INTERVAL_MS
+    @Volatile private var heartbeatThread: Thread? = null
+
+    fun start(intervalMs: Long): Closeable {
+      this.intervalMs = intervalMs
+      ensureRunning()
+      refCount.incrementAndGet()
+      return Closeable { stop() }
+    }
+
+    fun addSession(sessionId: String) {
+      sessions.add(sessionId)
+      ensureRunning()
+    }
+
+    fun removeSession(sessionId: String) {
+      sessions.remove(sessionId)
+    }
+
+    private fun ensureRunning() {
+      if (running.get()) {
+        return
+      }
+      synchronized(startLock) {
+        if (running.get()) {
+          return
+        }
+        running.set(true)
+        heartbeatThread =
+            thread(start = true, isDaemon = true, name = "auto-mobile-daemon-heartbeat") {
+              runLoop()
+            }
+      }
+    }
+
+    private fun stop() {
+      if (refCount.decrementAndGet() > 0) {
+        return
+      }
+      synchronized(startLock) {
+        if (!running.get()) {
+          return
+        }
+        running.set(false)
+        heartbeatThread?.interrupt()
+        heartbeatThread = null
+      }
+    }
+
+    private fun runLoop() {
+      while (running.get()) {
+        val snapshot = sessions.toList()
+        snapshot.forEach { sessionId ->
+          try {
+            sendHeartbeat(sessionId)
+          } catch (_: Exception) {
+            // Best-effort heartbeat; ignore failures
+          }
+        }
+
+        try {
+          Thread.sleep(intervalMs)
+        } catch (_: InterruptedException) {
+          // Allow loop to exit if stopped.
+        }
+      }
     }
   }
 

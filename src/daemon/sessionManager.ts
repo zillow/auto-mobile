@@ -28,6 +28,7 @@ export interface Session {
   cacheData: SessionCacheData; // Cached data for this session
   lastHeartbeat: number;       // Timestamp of last heartbeat
   heartbeatTimeoutMs: number;  // Heartbeat timeout for this session
+  hasReceivedHeartbeat: boolean; // Whether any heartbeat has been received
 }
 
 /**
@@ -54,7 +55,7 @@ export class SessionManager {
   // Cleanup interval: every 5 minutes
   private readonly CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
-  static readonly DEFAULT_HEARTBEAT_TIMEOUT_MS = 60 * 1000;
+  static readonly DEFAULT_HEARTBEAT_TIMEOUT_MS = 10 * 1000;
 
   constructor() {
     // Start periodic cleanup of expired sessions
@@ -86,6 +87,7 @@ export class SessionManager {
       cacheData: {},
       lastHeartbeat: now,
       heartbeatTimeoutMs: SessionManager.DEFAULT_HEARTBEAT_TIMEOUT_MS,
+      hasReceivedHeartbeat: false,
     };
 
     this.sessions.set(sessionId, session);
@@ -241,6 +243,7 @@ export class SessionManager {
     session.lastHeartbeat = now;
     session.lastUsedAt = now;
     session.expiresAt = now + this.SESSION_TIMEOUT_MS;
+    session.hasReceivedHeartbeat = true;
   }
 
   /**
