@@ -31,8 +31,8 @@ annotation class AutoMobileTest(
     val device: String = "auto",
 
     /**
-     * App package name to clean up after the test (terminate or clear app data).
-     * Required when cleanupAfter is enabled.
+     * App package name to clean up after the test (terminate or clear app data). Required when
+     * cleanupAfter is enabled.
      */
     val appId: String = "",
 

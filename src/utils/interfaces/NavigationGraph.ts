@@ -180,11 +180,37 @@ export interface NavigationGraphSummary {
 }
 
 /**
+ * Detailed navigation node representation for MCP resources.
+ */
+export interface NavigationGraphNodeDetail extends NavigationNode {
+  id: number;
+}
+
+/**
+ * Node-level navigation graph resource for MCP.
+ */
+export interface NavigationGraphNodeResource {
+  appId: string | null;
+  node: NavigationGraphNodeDetail;
+  isCurrentScreen: boolean;
+  edgesFrom: NavigationEdge[];
+  edgesTo: NavigationEdge[];
+}
+
+/**
  * Provider interface for navigation graph summaries.
  */
 export interface NavigationGraphSummaryProvider {
   exportGraphSummary(): Promise<NavigationGraphSummary>;
   setGraphUpdateListener?(listener: (() => void) | null): void;
+}
+
+/**
+ * Provider interface for navigation graph node resources.
+ */
+export interface NavigationGraphNodeResourceProvider {
+  getNodeResourceById(nodeId: number): Promise<NavigationGraphNodeResource | null>;
+  getNodeResourceByScreen(screenName: string): Promise<NavigationGraphNodeResource | null>;
 }
 
 /**

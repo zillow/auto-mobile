@@ -9,14 +9,20 @@ interface AutoMobileClient {
   val connectionDescription: String
 
   fun ping()
+
   fun listResources(): List<McpResource>
+
   fun listResourceTemplates(): List<McpResourceTemplate>
+
   fun readResource(uri: String): List<McpResourceContent>
+
   fun getNavigationGraph(platform: String = "android"): JsonElement
+
   fun close() {}
 }
 
-open class McpConnectionException(message: String, cause: Throwable? = null) : Exception(message, cause)
+open class McpConnectionException(message: String, cause: Throwable? = null) :
+    Exception(message, cause)
 
 @Serializable
 data class McpResource(
@@ -64,13 +70,11 @@ data class JsonRpcError(
     val message: String,
 )
 
-@Serializable
-internal data class ListResourcesResult(val resources: List<McpResource>)
+@Serializable internal data class ListResourcesResult(val resources: List<McpResource>)
 
 @Serializable
 internal data class ListResourceTemplatesResult(val resourceTemplates: List<McpResourceTemplate>)
 
-@Serializable
-internal data class ReadResourceResult(val contents: List<McpResourceContent>)
+@Serializable internal data class ReadResourceResult(val contents: List<McpResourceContent>)
 
 internal const val LATEST_MCP_PROTOCOL_VERSION = "2025-11-25"

@@ -47,36 +47,48 @@ class McpDaemonClient(
   override fun listResourceTemplates(): List<McpResourceTemplate> {
     val response = sendRequest("resources/list-templates")
     ensureSuccess(response)
-    val result = json.decodeFromJsonElement(ListResourceTemplatesResult.serializer(), response.result!!)
+    val result =
+        json.decodeFromJsonElement(ListResourceTemplatesResult.serializer(), response.result!!)
     return result.resourceTemplates
   }
 
   override fun readResource(uri: String): List<McpResourceContent> {
-    val response = sendRequest(
-        "resources/read",
-        buildJsonObject { put("uri", JsonPrimitive(uri)) },
-    )
+    val response =
+        sendRequest(
+            "resources/read",
+            buildJsonObject { put("uri", JsonPrimitive(uri)) },
+        )
     ensureSuccess(response)
     val result = json.decodeFromJsonElement(ReadResourceResult.serializer(), response.result!!)
     return result.contents
   }
 
   override fun getNavigationGraph(platform: String): JsonElement {
-    val response = sendRequest(
-        "ide/getNavigationGraph",
-        buildJsonObject { put("platform", JsonPrimitive(platform)) },
-    )
+    val response =
+        sendRequest(
+            "ide/getNavigationGraph",
+            buildJsonObject { put("platform", JsonPrimitive(platform)) },
+        )
     ensureSuccess(response)
     return response.result ?: JsonObject(emptyMap())
   }
 
-  private fun sendRequest(method: String, params: JsonObject = JsonObject(emptyMap())): DaemonResponse {
+  private fun sendRequest(
+      method: String,
+      params: JsonObject = JsonObject(emptyMap()),
+  ): DaemonResponse {
     ensureSocketExists()
 
     val address = UnixDomainSocketAddress.of(socketPathValue)
     SocketChannel.open(address).use { channel ->
-      val reader = BufferedReader(InputStreamReader(Channels.newInputStream(channel), StandardCharsets.UTF_8))
-      val writer = BufferedWriter(OutputStreamWriter(Channels.newOutputStream(channel), StandardCharsets.UTF_8))
+      val reader =
+          BufferedReader(
+              InputStreamReader(Channels.newInputStream(channel), StandardCharsets.UTF_8)
+          )
+      val writer =
+          BufferedWriter(
+              OutputStreamWriter(Channels.newOutputStream(channel), StandardCharsets.UTF_8)
+          )
 
       val request =
           DaemonRequest(

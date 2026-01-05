@@ -139,6 +139,19 @@ export class NavigationRepository {
   }
 
   /**
+   * Get a node by app and node ID.
+   */
+  async getNodeById(appId: string, nodeId: number): Promise<NavigationNode | undefined> {
+    const db = getDatabase();
+    return db
+      .selectFrom("navigation_nodes")
+      .selectAll()
+      .where("app_id", "=", appId)
+      .where("id", "=", nodeId)
+      .executeTakeFirst();
+  }
+
+  /**
    * Update back stack information for a node.
    */
   async updateNodeBackStack(

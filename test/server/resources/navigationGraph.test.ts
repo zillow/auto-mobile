@@ -3,6 +3,7 @@ import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import {
   NAVIGATION_RESOURCE_URIS,
   NavigationGraphResourceContent,
+  NavigationNodeResourceContent,
   setNavigationGraphProvider
 } from "../../../src/server/navigationResources";
 import { FakeNavigationGraphManager } from "../../fakes/FakeNavigationGraphManager";
@@ -109,5 +110,143 @@ describe("MCP Navigation Graph Resource", () => {
     expect(graph.edges).toHaveLength(1);
     expect(graph.nodes[0]?.id).toBeDefined();
     expect(graph.edges[0]?.toolName).toBe("tapOn");
+  });
+
+  test("should include navigation node templates in list", async () => {
+    const { client } = fixture.getContext();
+
+    const { z } = await import("zod");
+    const listResourceTemplatesResponseSchema = z.object({
+      resourceTemplates: z.array(z.object({
+        uriTemplate: z.string(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        mimeType: z.string().optional()
+      }))
+    });
+
+    const result = await client.request({
+      method: "resources/templates/list",
+      params: {}
+    }, listResourceTemplatesResponseSchema);
+
+    const nodeByIdTemplate = result.resourceTemplates.find(
+      (t: any) => t.uriTemplate === NAVIGATION_RESOURCE_URIS.NODE_BY_ID
+    );
+    const nodeByScreenTemplate = result.resourceTemplates.find(
+      (t: any) => t.uriTemplate === NAVIGATION_RESOURCE_URIS.NODE_BY_SCREEN
+    );
+
+    expect(nodeByIdTemplate).toBeDefined();
+    expect(nodeByScreenTemplate).toBeDefined();
+  });
+
+  test("should return navigation node resource by id", async () => {
+    fakeGraph.setCurrentAppId("com.example.app");
+    fakeGraph.setCurrentScreenValue("Home");
+    fakeGraph.addNode({
+      screenName: "Home",
+      firstSeenAt: 100,
+      lastSeenAt: 200,
+      visitCount: 2
+    });
+    fakeGraph.addNode({
+      screenName: "Settings",
+      firstSeenAt: 150,
+      lastSeenAt: 250,
+      visitCount: 1
+    });
+    fakeGraph.addEdge({
+      from: "Home",
+      to: "Settings",
+      timestamp: 250,
+      edgeType: "tool",
+      interaction: {
+        toolName: "tapOn",
+        args: {},
+        timestamp: 250
+      }
+    });
+
+    const { client } = fixture.getContext();
+    const { z } = await import("zod");
+    const readResourceResponseSchema = z.object({
+      contents: z.array(z.object({
+        uri: z.string(),
+        mimeType: z.string().optional(),
+        text: z.string().optional()
+      }))
+    });
+
+    const result = await client.request({
+      method: "resources/read",
+      params: {
+        uri: "automobile://navigation/nodes/1"
+      }
+    }, readResourceResponseSchema);
+
+    const content = result.contents[0];
+    expect(content.text).toBeDefined();
+
+    const nodeResource: NavigationNodeResourceContent = JSON.parse(content.text!);
+    expect(nodeResource.node.id).toBe(1);
+    expect(nodeResource.node.screenName).toBe("Home");
+    expect(nodeResource.isCurrentScreen).toBe(true);
+    expect(nodeResource.edgesFrom).toHaveLength(1);
+    expect(nodeResource.edgesTo).toHaveLength(0);
+  });
+
+  test("should return navigation node resource by screen name", async () => {
+    fakeGraph.setCurrentAppId("com.example.app");
+    fakeGraph.setCurrentScreenValue("Home");
+    fakeGraph.addNode({
+      screenName: "Home",
+      firstSeenAt: 100,
+      lastSeenAt: 200,
+      visitCount: 2
+    });
+    fakeGraph.addNode({
+      screenName: "Settings",
+      firstSeenAt: 150,
+      lastSeenAt: 250,
+      visitCount: 1
+    });
+    fakeGraph.addEdge({
+      from: "Home",
+      to: "Settings",
+      timestamp: 250,
+      edgeType: "tool",
+      interaction: {
+        toolName: "tapOn",
+        args: {},
+        timestamp: 250
+      }
+    });
+
+    const { client } = fixture.getContext();
+    const { z } = await import("zod");
+    const readResourceResponseSchema = z.object({
+      contents: z.array(z.object({
+        uri: z.string(),
+        mimeType: z.string().optional(),
+        text: z.string().optional()
+      }))
+    });
+
+    const result = await client.request({
+      method: "resources/read",
+      params: {
+        uri: "automobile://navigation/nodes?screen=Settings"
+      }
+    }, readResourceResponseSchema);
+
+    const content = result.contents[0];
+    expect(content.text).toBeDefined();
+
+    const nodeResource: NavigationNodeResourceContent = JSON.parse(content.text!);
+    expect(nodeResource.node.screenName).toBe("Settings");
+    expect(nodeResource.isCurrentScreen).toBe(false);
+    expect(nodeResource.edgesFrom).toHaveLength(0);
+    expect(nodeResource.edgesTo).toHaveLength(1);
   });
 });

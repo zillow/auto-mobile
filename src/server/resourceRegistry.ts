@@ -92,10 +92,12 @@ class ResourceRegistryClass {
     // Convert URI template to regex pattern
     // E.g., "automobile://emulators/{platform}" -> "automobile://emulators/([^/]+)"
     const paramNames: string[] = [];
-    const regexPattern = template.replace(/\{(\w+)\}/g, (_, paramName) => {
+    const tokenizedTemplate = template.replace(/\{(\w+)\}/g, (_, paramName) => {
       paramNames.push(paramName);
-      return "([^/]+)";
+      return `__PARAM_${paramNames.length - 1}__`;
     });
+    const escapedTemplate = tokenizedTemplate.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+    const regexPattern = escapedTemplate.replace(/__PARAM_(\d+)__/g, () => "([^/]+)");
 
     const regex = new RegExp(`^${regexPattern}$`);
     const match = uri.match(regex);

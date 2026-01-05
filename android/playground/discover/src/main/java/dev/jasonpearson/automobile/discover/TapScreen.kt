@@ -573,7 +573,8 @@ fun TapScreen() {
           text = "Try long press gestures to validate timing and behavior",
           fontSize = 14.sp,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.fillMaxWidth().semantics { testTag = "long_press_section_description" },
+          modifier =
+              Modifier.fillMaxWidth().semantics { testTag = "long_press_section_description" },
       )
 
       LongPressContent(modifier = Modifier.fillMaxWidth())

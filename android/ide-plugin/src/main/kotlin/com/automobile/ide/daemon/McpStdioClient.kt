@@ -42,37 +42,39 @@ class McpStdioClient(
   override fun listResourceTemplates(): List<McpResourceTemplate> {
     ensureInitialized()
     val response = sendRequest("resources/list-templates")
-    val result = json.decodeFromJsonElement(ListResourceTemplatesResult.serializer(), response.result!!)
+    val result =
+        json.decodeFromJsonElement(ListResourceTemplatesResult.serializer(), response.result!!)
     return result.resourceTemplates
   }
 
   override fun readResource(uri: String): List<McpResourceContent> {
     ensureInitialized()
-    val response = sendRequest(
-        "resources/read",
-        buildJsonObject { put("uri", JsonPrimitive(uri)) },
-    )
+    val response =
+        sendRequest(
+            "resources/read",
+            buildJsonObject { put("uri", JsonPrimitive(uri)) },
+        )
     val result = json.decodeFromJsonElement(ReadResourceResult.serializer(), response.result!!)
     return result.contents
   }
 
   override fun getNavigationGraph(platform: String): JsonElement {
     ensureInitialized()
-    val response = sendRequest(
-        "tools/call",
-        buildJsonObject {
-          put("name", JsonPrimitive("getNavigationGraph"))
-          put("arguments", buildJsonObject { put("platform", JsonPrimitive(platform)) })
-        },
-    )
+    val response =
+        sendRequest(
+            "tools/call",
+            buildJsonObject {
+              put("name", JsonPrimitive("getNavigationGraph"))
+              put("arguments", buildJsonObject { put("platform", JsonPrimitive(platform)) })
+            },
+        )
     return response.result ?: JsonObject(emptyMap())
   }
 
   override fun close() {
     try {
       writer?.flush()
-    } catch (_: Exception) {
-    }
+    } catch (_: Exception) {}
     process?.destroy()
     process = null
     reader = null
@@ -85,20 +87,21 @@ class McpStdioClient(
     }
     ensureProcessStarted()
 
-    val response = sendRequest(
-        "initialize",
-        buildJsonObject {
-          put("protocolVersion", JsonPrimitive(LATEST_MCP_PROTOCOL_VERSION))
-          put("capabilities", JsonObject(emptyMap()))
-          put(
-              "clientInfo",
-              buildJsonObject {
-                put("name", JsonPrimitive("auto-mobile-ide-plugin"))
-                put("version", JsonPrimitive("0.1.0"))
-              },
-          )
-        },
-    )
+    val response =
+        sendRequest(
+            "initialize",
+            buildJsonObject {
+              put("protocolVersion", JsonPrimitive(LATEST_MCP_PROTOCOL_VERSION))
+              put("capabilities", JsonObject(emptyMap()))
+              put(
+                  "clientInfo",
+                  buildJsonObject {
+                    put("name", JsonPrimitive("auto-mobile-ide-plugin"))
+                    put("version", JsonPrimitive("0.1.0"))
+                  },
+              )
+            },
+        )
     if (response.result == null) {
       throw McpConnectionException("Initialize response missing result")
     }
@@ -107,21 +110,23 @@ class McpStdioClient(
   }
 
   private fun sendNotification(method: String, params: JsonElement? = null) {
-    val request = JsonRpcRequest(
-        id = null,
-        method = method,
-        params = params,
-    )
+    val request =
+        JsonRpcRequest(
+            id = null,
+            method = method,
+            params = params,
+        )
     sendRequest(request, expectResponse = false)
   }
 
   private fun sendRequest(method: String, params: JsonElement? = null): JsonRpcResponse {
     val requestId = JsonPrimitive(UUID.randomUUID().toString())
-    val request = JsonRpcRequest(
-        id = requestId,
-        method = method,
-        params = params,
-    )
+    val request =
+        JsonRpcRequest(
+            id = requestId,
+            method = method,
+            params = params,
+        )
     return sendRequest(request, expectResponse = true)
   }
 
@@ -151,7 +156,9 @@ class McpStdioClient(
         continue
       }
       if (response.error != null) {
-        throw McpConnectionException("MCP stdio error ${response.error.code}: ${response.error.message}")
+        throw McpConnectionException(
+            "MCP stdio error ${response.error.code}: ${response.error.message}"
+        )
       }
       if (response.result == null) {
         throw McpConnectionException("MCP stdio response missing result")
@@ -170,9 +177,8 @@ class McpStdioClient(
       throw McpConnectionException("MCP stdio command is empty")
     }
 
-    val newProcess = ProcessBuilder(commandParts)
-        .redirectError(ProcessBuilder.Redirect.INHERIT)
-        .start()
+    val newProcess =
+        ProcessBuilder(commandParts).redirectError(ProcessBuilder.Redirect.INHERIT).start()
     process = newProcess
     reader = BufferedReader(InputStreamReader(newProcess.inputStream))
     writer = BufferedWriter(OutputStreamWriter(newProcess.outputStream))
@@ -221,7 +227,9 @@ class McpStdioClient(
             current.append(char)
           }
         }
-        ' ', '\t', '\n' -> {
+        ' ',
+        '\t',
+        '\n' -> {
           if (inSingle || inDouble) {
             current.append(char)
           } else {

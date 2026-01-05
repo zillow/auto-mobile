@@ -66,20 +66,26 @@ class WebSocketServer(
         ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? =
         null,
     private val onRequestDrag:
-        ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, holdTime: Long) -> Unit)? =
+        ((
+            requestId: String?,
+            x1: Int,
+            y1: Int,
+            x2: Int,
+            y2: Int,
+            duration: Long,
+            holdTime: Long,
+        ) -> Unit)? =
         null,
     private val onRequestPinch:
-        (
-            (
-                requestId: String?,
-                centerX: Int,
-                centerY: Int,
-                distanceStart: Int,
-                distanceEnd: Int,
-                rotationDegrees: Float,
-                duration: Long,
-            ) -> Unit
-        )? =
+        ((
+            requestId: String?,
+            centerX: Int,
+            centerY: Int,
+            distanceStart: Int,
+            distanceEnd: Int,
+            rotationDegrees: Float,
+            duration: Long,
+        ) -> Unit)? =
         null,
     private val onRequestSetText:
         ((requestId: String?, text: String, resourceId: String?) -> Unit)? =

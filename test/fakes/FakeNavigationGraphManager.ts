@@ -12,14 +12,17 @@ import {
   NavigationGraphSummary,
   NavigationGraphSummaryEdge,
   NavigationGraphSummaryNode,
-  NavigationGraphSummaryProvider
+  NavigationGraphSummaryProvider,
+  NavigationGraphNodeDetail,
+  NavigationGraphNodeResource,
+  NavigationGraphNodeResourceProvider
 } from "../../src/utils/interfaces/NavigationGraph";
 
 /**
  * Fake implementation of NavigationGraph for testing.
  * Allows full control over navigation graph state and behavior.
  */
-export class FakeNavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider {
+export class FakeNavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider, NavigationGraphNodeResourceProvider {
   private currentAppId: string | null = null;
   private currentScreen: string | null = null;
   private nodes: Map<string, NavigationNode> = new Map();
@@ -335,5 +338,61 @@ export class FakeNavigationGraphManager implements NavigationGraph, NavigationGr
     if (this.graphUpdateListener) {
       this.graphUpdateListener();
     }
+  }
+
+  private buildNodeResource(node: NavigationNode, nodeId: number): NavigationGraphNodeResource {
+    const detail: NavigationGraphNodeDetail = {
+      id: nodeId,
+      ...node
+    };
+
+    return {
+      appId: this.currentAppId,
+      node: detail,
+      isCurrentScreen: this.currentScreen === node.screenName,
+      edgesFrom: this.edges.filter(edge => edge.from === node.screenName),
+      edgesTo: this.edges.filter(edge => edge.to === node.screenName),
+    };
+  }
+
+  async getNodeResourceById(nodeId: number): Promise<NavigationGraphNodeResource | null> {
+    this.trackCall("getNodeResourceById", [nodeId]);
+
+    if (!this.currentAppId) {
+      return null;
+    }
+
+    const screenName = Array.from(this.nodeSummaryIds.entries()).find(
+      ([, id]) => id === nodeId
+    )?.[0];
+
+    if (!screenName) {
+      return null;
+    }
+
+    const node = this.nodes.get(screenName);
+    if (!node) {
+      return null;
+    }
+
+    return this.buildNodeResource(node, nodeId);
+  }
+
+  async getNodeResourceByScreen(screenName: string): Promise<NavigationGraphNodeResource | null> {
+    this.trackCall("getNodeResourceByScreen", [screenName]);
+
+    if (!this.currentAppId) {
+      return null;
+    }
+
+    const node = this.nodes.get(screenName);
+    if (!node) {
+      return null;
+    }
+
+    const nodeId = this.nodeSummaryIds.get(screenName) ?? this.nextNodeId++;
+    this.nodeSummaryIds.set(screenName, nodeId);
+
+    return this.buildNodeResource(node, nodeId);
   }
 }

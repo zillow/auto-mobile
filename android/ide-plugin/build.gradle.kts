@@ -12,14 +12,10 @@ repositories {
   google()
   mavenCentral()
   maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-  intellijPlatform {
-    defaultRepositories()
-  }
+  intellijPlatform { defaultRepositories() }
 }
 
-kotlin {
-  jvmToolchain(17)
-}
+kotlin { jvmToolchain(17) }
 
 dependencies {
   implementation(compose.desktop.currentOs)
@@ -42,7 +38,9 @@ intellijPlatform {
     id.set("com.automobile.ide")
     name.set("AutoMobile")
     version.set("0.1.0")
-    description.set("AutoMobile IDE integration for authoring tests and visualizing navigation graphs.")
+    description.set(
+        "AutoMobile IDE integration for authoring tests and visualizing navigation graphs."
+    )
 
     ideaVersion {
       sinceBuild.set("253")
@@ -56,9 +54,5 @@ intellijPlatform {
     }
   }
 
-  pluginVerification {
-    ides {
-      recommended()
-    }
-  }
+  pluginVerification { ides { recommended() } }
 }

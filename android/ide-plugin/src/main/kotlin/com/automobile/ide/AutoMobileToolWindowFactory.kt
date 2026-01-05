@@ -12,15 +12,11 @@ class AutoMobileToolWindowFactory : ToolWindowFactory, DumbAware {
   @OptIn(ExperimentalComposeUiApi::class)
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
     val panel = ComposePanel()
-    panel.setContent {
-      AutoMobileToolWindowContent(project)
-    }
+    panel.setContent { AutoMobileToolWindowContent(project) }
 
     val content = toolWindow.contentManager.factory.createContent(panel, "", false)
     toolWindow.contentManager.addContent(content)
 
-    Disposer.register(content) {
-      panel.dispose()
-    }
+    Disposer.register(content) { panel.dispose() }
   }
 }

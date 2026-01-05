@@ -1,7 +1,7 @@
 import { logger } from "../../utils/logger";
 import { BackStackInfo } from "../../models";
 import { NavigationRepository } from "../../db/navigationRepository";
-import type { NavigationEdge as DBNavigationEdge } from "../../db/types";
+import type { NavigationEdge as DBNavigationEdge, NavigationNode as DBNavigationNode } from "../../db/types";
 import {
   NavigationGraph,
   NavigationEvent,
@@ -16,6 +16,9 @@ import {
   NavigationGraphSummaryEdge,
   NavigationGraphSummaryNode,
   NavigationGraphSummaryProvider,
+  NavigationGraphNodeDetail,
+  NavigationGraphNodeResource,
+  NavigationGraphNodeResourceProvider,
   UIState,
   ScrollPosition,
   SelectedElement,
@@ -36,6 +39,9 @@ export type {
   NavigationGraphSummaryEdge,
   NavigationGraphSummaryNode,
   NavigationGraphSummaryProvider,
+  NavigationGraphNodeDetail,
+  NavigationGraphNodeResource,
+  NavigationGraphNodeResourceProvider,
   UIState,
 };
 
@@ -43,7 +49,7 @@ export type {
  * Manages the navigation graph with SQLite persistence.
  * Tracks screen visits and correlates navigation events with tool calls.
  */
-export class NavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider {
+export class NavigationGraphManager implements NavigationGraph, NavigationGraphSummaryProvider, NavigationGraphNodeResourceProvider {
   private static instance: NavigationGraphManager | null = null;
 
   private repository: NavigationRepository;
@@ -669,6 +675,50 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
     return edges;
   }
 
+  private async buildNodeDetail(dbNode: DBNavigationNode): Promise<NavigationGraphNodeDetail> {
+    const modals = await this.repository.getNodeModals(dbNode.id);
+
+    return {
+      id: dbNode.id,
+      screenName: dbNode.screen_name,
+      firstSeenAt: dbNode.first_seen_at,
+      lastSeenAt: dbNode.last_seen_at,
+      visitCount: dbNode.visit_count,
+      backStackDepth: dbNode.back_stack_depth ?? undefined,
+      taskId: dbNode.task_id ?? undefined,
+      modalStack: modals.length > 0
+        ? modals.map((id, layer) => ({
+          type: "overlay" as const,
+          identifier: id,
+          layer,
+        }))
+        : undefined,
+    };
+  }
+
+  private async buildNodeResource(
+    dbNode: DBNavigationNode
+  ): Promise<NavigationGraphNodeResource> {
+    const [node, dbEdgesFrom, dbEdgesTo] = await Promise.all([
+      this.buildNodeDetail(dbNode),
+      this.repository.getEdgesFrom(this.currentAppId!, dbNode.screen_name),
+      this.repository.getEdgesTo(this.currentAppId!, dbNode.screen_name),
+    ]);
+
+    const [edgesFrom, edgesTo] = await Promise.all([
+      this.convertDBEdgesToNavigationEdges(dbEdgesFrom),
+      this.convertDBEdgesToNavigationEdges(dbEdgesTo),
+    ]);
+
+    return {
+      appId: this.currentAppId,
+      node,
+      isCurrentScreen: this.currentScreen === dbNode.screen_name,
+      edgesFrom,
+      edgesTo,
+    };
+  }
+
   /**
    * Get all known screen names.
    */
@@ -694,23 +744,44 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
       return undefined;
     }
 
-    const modals = await this.repository.getNodeModals(dbNode.id);
+    const detail = await this.buildNodeDetail(dbNode);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, ...node } = detail;
+    return node;
+  }
 
-    return {
-      screenName: dbNode.screen_name,
-      firstSeenAt: dbNode.first_seen_at,
-      lastSeenAt: dbNode.last_seen_at,
-      visitCount: dbNode.visit_count,
-      backStackDepth: dbNode.back_stack_depth ?? undefined,
-      taskId: dbNode.task_id ?? undefined,
-      modalStack: modals.length > 0
-        ? modals.map((id, layer) => ({
-          type: "overlay" as const,
-          identifier: id,
-          layer,
-        }))
-        : undefined,
-    };
+  /**
+   * Get a node resource by node ID.
+   */
+  public async getNodeResourceById(nodeId: number): Promise<NavigationGraphNodeResource | null> {
+    if (!this.currentAppId) {
+      return null;
+    }
+
+    const dbNode = await this.repository.getNodeById(this.currentAppId, nodeId);
+    if (!dbNode) {
+      return null;
+    }
+
+    return this.buildNodeResource(dbNode);
+  }
+
+  /**
+   * Get a node resource by screen name.
+   */
+  public async getNodeResourceByScreen(
+    screenName: string
+  ): Promise<NavigationGraphNodeResource | null> {
+    if (!this.currentAppId) {
+      return null;
+    }
+
+    const dbNode = await this.repository.getNode(this.currentAppId, screenName);
+    if (!dbNode) {
+      return null;
+    }
+
+    return this.buildNodeResource(dbNode);
   }
 
   /**

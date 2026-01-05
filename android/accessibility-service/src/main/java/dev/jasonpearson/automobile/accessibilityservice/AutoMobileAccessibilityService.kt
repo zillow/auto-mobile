@@ -265,8 +265,23 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onRequestSwipe = { requestId, x1, y1, x2, y2, duration ->
                 performSwipe(requestId, x1, y1, x2, y2, duration)
               },
-              onRequestPinch = { requestId, centerX, centerY, distanceStart, distanceEnd, rotationDegrees, duration ->
-                performPinch(requestId, centerX, centerY, distanceStart, distanceEnd, rotationDegrees, duration)
+              onRequestPinch = {
+                  requestId,
+                  centerX,
+                  centerY,
+                  distanceStart,
+                  distanceEnd,
+                  rotationDegrees,
+                  duration ->
+                performPinch(
+                    requestId,
+                    centerX,
+                    centerY,
+                    distanceStart,
+                    distanceEnd,
+                    rotationDegrees,
+                    duration,
+                )
               },
               onRequestSetText = { requestId, text, resourceId ->
                 performSetText(requestId, text, resourceId)
@@ -756,9 +771,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
-  /**
-   * Perform a pinch gesture using AccessibilityService's dispatchGesture API.
-   */
+  /** Perform a pinch gesture using AccessibilityService's dispatchGesture API. */
   private fun performPinch(
       requestId: String?,
       centerX: Int,

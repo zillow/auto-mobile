@@ -151,6 +151,8 @@ assert(diff.percentDifferent < 0.01);
 
 **Description:** High-level navigation graph for the current app. Includes node IDs, screen names, visit counts, and edge transitions with tool names. Updates are debounced to once per second while navigation events are recorded.
 
+**Reference:** Introduced in issue #128 and implemented in PR #284 for IntelliJ plugin integration.
+
 **Contents:**
 - `appId`: Current application package ID (or null if unset)
 - `currentScreen`: Most recently observed screen name
@@ -171,6 +173,43 @@ const response = await client.request({
 const graph = JSON.parse(response.contents[0].text);
 console.log("Graph nodes:", graph.nodes.length);
 console.log("Graph edges:", graph.edges.length);
+```
+
+### Navigation Graph Nodes
+
+**URI Templates:**
+- `automobile://navigation/nodes/{nodeId}`
+- `automobile://navigation/nodes?screen={screenName}`
+
+**Type:** JSON (text)
+
+**Description:** Detailed navigation graph node resource with metadata, relationships, and screen state. Use the navigation graph summary (`automobile://navigation/graph`) to discover node IDs and screen names for lookup.
+
+**Contents:**
+- `appId`: Current application package ID (or null if unset)
+- `isCurrentScreen`: Whether the node is the current screen
+- `node`: `{ id, screenName, firstSeenAt, lastSeenAt, visitCount, backStackDepth?, taskId?, modalStack? }`
+- `edgesFrom`: Array of navigation edges originating from this node
+- `edgesTo`: Array of navigation edges targeting this node
+
+**Example Usage:**
+
+```typescript
+// Read a node by ID
+const nodeById = await client.request({
+  method: "resources/read",
+  params: {
+    uri: "automobile://navigation/nodes/1"
+  }
+});
+
+// Read a node by screen name
+const nodeByScreen = await client.request({
+  method: "resources/read",
+  params: {
+    uri: "automobile://navigation/nodes?screen=Home"
+  }
+});
 ```
 
 ## Error Handling

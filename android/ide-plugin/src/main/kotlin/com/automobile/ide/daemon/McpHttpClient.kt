@@ -43,29 +43,32 @@ class McpHttpClient(
   override fun listResourceTemplates(): List<McpResourceTemplate> {
     ensureInitialized()
     val response = sendRequest("resources/list-templates")
-    val result = json.decodeFromJsonElement(ListResourceTemplatesResult.serializer(), response.result!!)
+    val result =
+        json.decodeFromJsonElement(ListResourceTemplatesResult.serializer(), response.result!!)
     return result.resourceTemplates
   }
 
   override fun readResource(uri: String): List<McpResourceContent> {
     ensureInitialized()
-    val response = sendRequest(
-        "resources/read",
-        buildJsonObject { put("uri", JsonPrimitive(uri)) },
-    )
+    val response =
+        sendRequest(
+            "resources/read",
+            buildJsonObject { put("uri", JsonPrimitive(uri)) },
+        )
     val result = json.decodeFromJsonElement(ReadResourceResult.serializer(), response.result!!)
     return result.contents
   }
 
   override fun getNavigationGraph(platform: String): JsonElement {
     ensureInitialized()
-    val response = sendRequest(
-        "tools/call",
-        buildJsonObject {
-          put("name", JsonPrimitive("getNavigationGraph"))
-          put("arguments", buildJsonObject { put("platform", JsonPrimitive(platform)) })
-        },
-    )
+    val response =
+        sendRequest(
+            "tools/call",
+            buildJsonObject {
+              put("name", JsonPrimitive("getNavigationGraph"))
+              put("arguments", buildJsonObject { put("platform", JsonPrimitive(platform)) })
+            },
+        )
     return response.result ?: JsonObject(emptyMap())
   }
 
@@ -74,47 +77,55 @@ class McpHttpClient(
       return
     }
 
-    val response = sendRequest(
-        "initialize",
-        buildJsonObject {
-          put("protocolVersion", JsonPrimitive(LATEST_MCP_PROTOCOL_VERSION))
-          put("capabilities", JsonObject(emptyMap()))
-          put(
-              "clientInfo",
-              buildJsonObject {
-                put("name", JsonPrimitive("auto-mobile-ide-plugin"))
-                put("version", JsonPrimitive("0.1.0"))
-              },
-          )
-        },
-        includeSession = false,
-    )
+    val response =
+        sendRequest(
+            "initialize",
+            buildJsonObject {
+              put("protocolVersion", JsonPrimitive(LATEST_MCP_PROTOCOL_VERSION))
+              put("capabilities", JsonObject(emptyMap()))
+              put(
+                  "clientInfo",
+                  buildJsonObject {
+                    put("name", JsonPrimitive("auto-mobile-ide-plugin"))
+                    put("version", JsonPrimitive("0.1.0"))
+                  },
+              )
+            },
+            includeSession = false,
+        )
 
-    val result = response.result?.jsonObject
-        ?: throw McpConnectionException("Initialize response missing result")
-    protocolVersion = result["protocolVersion"]?.jsonPrimitive?.content
-        ?: LATEST_MCP_PROTOCOL_VERSION
+    val result =
+        response.result?.jsonObject
+            ?: throw McpConnectionException("Initialize response missing result")
+    protocolVersion =
+        result["protocolVersion"]?.jsonPrimitive?.content ?: LATEST_MCP_PROTOCOL_VERSION
     initialized = true
 
     sendNotification("notifications/initialized")
   }
 
   private fun sendNotification(method: String, params: JsonElement? = null) {
-    val request = JsonRpcRequest(
-        id = null,
-        method = method,
-        params = params,
-    )
+    val request =
+        JsonRpcRequest(
+            id = null,
+            method = method,
+            params = params,
+        )
     sendRequest(request, includeSession = true, expectResponse = false)
   }
 
-  private fun sendRequest(method: String, params: JsonElement? = null, includeSession: Boolean = true): JsonRpcResponse {
+  private fun sendRequest(
+      method: String,
+      params: JsonElement? = null,
+      includeSession: Boolean = true,
+  ): JsonRpcResponse {
     val requestId = JsonPrimitive(UUID.randomUUID().toString())
-    val request = JsonRpcRequest(
-        id = requestId,
-        method = method,
-        params = params,
-    )
+    val request =
+        JsonRpcRequest(
+            id = requestId,
+            method = method,
+            params = params,
+        )
     return sendRequest(request, includeSession = includeSession, expectResponse = true)
   }
 
@@ -124,8 +135,8 @@ class McpHttpClient(
       expectResponse: Boolean,
   ): JsonRpcResponse {
     val requestBody = json.encodeToString(JsonRpcRequest.serializer(), request)
-    val builder = HttpRequest.newBuilder(URI.create(endpoint))
-        .header("Content-Type", "application/json")
+    val builder =
+        HttpRequest.newBuilder(URI.create(endpoint)).header("Content-Type", "application/json")
 
     if (includeSession && sessionId != null) {
       builder.header("mcp-session-id", sessionId!!)
@@ -134,10 +145,11 @@ class McpHttpClient(
       builder.header("mcp-protocol-version", protocolVersion!!)
     }
 
-    val response = httpClient.send(
-        builder.POST(HttpRequest.BodyPublishers.ofString(requestBody)).build(),
-        HttpResponse.BodyHandlers.ofString(),
-    )
+    val response =
+        httpClient.send(
+            builder.POST(HttpRequest.BodyPublishers.ofString(requestBody)).build(),
+            HttpResponse.BodyHandlers.ofString(),
+        )
 
     response.headers().firstValue("mcp-session-id").ifPresent { header ->
       if (header.isNotBlank()) {
@@ -156,7 +168,9 @@ class McpHttpClient(
 
     val rpcResponse = json.decodeFromString(JsonRpcResponse.serializer(), body)
     if (rpcResponse.error != null) {
-      throw McpConnectionException("MCP HTTP error ${rpcResponse.error.code}: ${rpcResponse.error.message}")
+      throw McpConnectionException(
+          "MCP HTTP error ${rpcResponse.error.code}: ${rpcResponse.error.message}"
+      )
     }
     if (rpcResponse.result == null) {
       throw McpConnectionException("MCP HTTP response missing result")

@@ -861,18 +861,20 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       val windowLayer: Int,
       val windowKey: Int,
       val order: Int,
-      val subtreeEnd: Int
+      val subtreeEnd: Int,
   )
 
-  private data class OcclusionInfo(
-      val coverage: Double,
-      val occludedBy: String?
-  )
+  private data class OcclusionInfo(val coverage: Double, val occludedBy: String?)
 
   private fun applyOcclusionFilteringSingleWindow(element: UIElementInfo): UIElementInfo? {
-    val occlusionInfo =
-        buildOcclusionInfo(element, DEFAULT_WINDOW_KEY, 0, emptyList(), emptyMap())
-    return filterOccludedHierarchy(element, occlusionInfo, DEFAULT_WINDOW_KEY, path = "", isRoot = true)
+    val occlusionInfo = buildOcclusionInfo(element, DEFAULT_WINDOW_KEY, 0, emptyList(), emptyMap())
+    return filterOccludedHierarchy(
+        element,
+        occlusionInfo,
+        DEFAULT_WINDOW_KEY,
+        path = "",
+        isRoot = true,
+    )
   }
 
   private fun buildOcclusionInfo(
@@ -880,7 +882,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       activeWindowKey: Int,
       activeWindowLayer: Int,
       windowHierarchies: List<WindowHierarchy>,
-      windowLayers: Map<Int, Int>
+      windowLayers: Map<Int, Int>,
   ): Map<NodeKey, OcclusionInfo> {
     val nodes = mutableListOf<OcclusionNode>()
     if (mainHierarchy != null) {
@@ -890,7 +892,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
           activeWindowLayer,
           path = "",
           orderCounter = OrderCounter(),
-          nodes = nodes
+          nodes = nodes,
       )
     }
     for (windowHierarchy in windowHierarchies) {
@@ -903,7 +905,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
           windowLayer,
           path = "",
           orderCounter = OrderCounter(),
-          nodes = nodes
+          nodes = nodes,
       )
     }
 
@@ -964,7 +966,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       windowLayer: Int,
       path: String,
       orderCounter: OrderCounter,
-      nodes: MutableList<OcclusionNode>
+      nodes: MutableList<OcclusionNode>,
   ): Int {
     val start = orderCounter.value++
     var end = start
@@ -973,14 +975,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     for ((index, child) in children.withIndex()) {
       val childPath = if (path.isBlank()) index.toString() else "$path.$index"
       val childEnd =
-          collectOcclusionNodes(
-              child,
-              windowKey,
-              windowLayer,
-              childPath,
-              orderCounter,
-              nodes
-          )
+          collectOcclusionNodes(child, windowKey, windowLayer, childPath, orderCounter, nodes)
       end = max(end, childEnd)
     }
 
@@ -994,7 +989,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               windowLayer = windowLayer,
               windowKey = windowKey,
               order = start,
-              subtreeEnd = end
+              subtreeEnd = end,
           )
       )
     }
@@ -1007,7 +1002,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       occlusionInfo: Map<NodeKey, OcclusionInfo>,
       windowKey: Int,
       path: String,
-      isRoot: Boolean
+      isRoot: Boolean,
   ): UIElementInfo? {
     val key = NodeKey(windowKey, path)
     val info = occlusionInfo[key]
@@ -1037,7 +1032,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     return element.copy(
         node = nodeToUse,
         occlusionState = occlusionState,
-        occludedBy = info?.occludedBy
+        occludedBy = info?.occludedBy,
     )
   }
 
@@ -1090,12 +1085,15 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   private fun calculateUnionArea(rectangles: List<ElementBounds>, maxArea: Int? = null): Int {
     data class Event(val x: Int, val y1: Int, val y2: Int, val delta: Int)
 
-    val events = rectangles.flatMap { rect ->
-      listOf(
-          Event(rect.left, rect.top, rect.bottom, 1),
-          Event(rect.right, rect.top, rect.bottom, -1)
-      )
-    }.sortedBy { it.x }
+    val events =
+        rectangles
+            .flatMap { rect ->
+              listOf(
+                  Event(rect.left, rect.top, rect.bottom, 1),
+                  Event(rect.right, rect.top, rect.bottom, -1),
+              )
+            }
+            .sortedBy { it.x }
 
     if (events.isEmpty()) return 0
 
