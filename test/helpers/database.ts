@@ -1,6 +1,7 @@
 import { getDatabase } from "../../src/db/database";
 import { up as initialMigration } from "../../src/db/migrations/2025_12_28_000_initial_schema";
 import { up as navigationMigration } from "../../src/db/migrations/2025_12_30_001_navigation_graph";
+import { up as predictionHistoryMigration } from "../../src/db/migrations/2026_01_02_000_prediction_history";
 
 /**
  * Run all database migrations for testing.
@@ -12,6 +13,7 @@ export async function runMigrations(): Promise<void> {
   // Only run migrations if tables don't exist yet
   const deviceConfigsExists = await tableExists("device_configs");
   const navigationAppsExists = await tableExists("navigation_apps");
+  const predictionOutcomesExists = await tableExists("prediction_outcomes");
 
   if (!deviceConfigsExists) {
     await initialMigration(db);
@@ -19,6 +21,10 @@ export async function runMigrations(): Promise<void> {
 
   if (!navigationAppsExists) {
     await navigationMigration(db);
+  }
+
+  if (!predictionOutcomesExists) {
+    await predictionHistoryMigration(db);
   }
 }
 

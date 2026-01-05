@@ -136,6 +136,42 @@ export interface ScrollPositionsTable {
   created_at: Generated<string>;
 }
 
+// Prediction accuracy tables
+export interface PredictionOutcomesTable {
+  id: Generated<number>;
+  app_id: string;
+  prediction_id: string;
+  timestamp: number;
+  from_screen: string;
+  predicted_screen: string;
+  actual_screen: string;
+  tool_name: string;
+  tool_args: string;
+  predicted_elements: string | null;
+  found_elements: string | null;
+  confidence: number;
+  match_score: number;
+  correct: number;
+  partial_match: number;
+  error_type: string | null;
+  created_at: Generated<string>;
+}
+
+export interface PredictionTransitionStatsTable {
+  id: Generated<number>;
+  app_id: string;
+  from_screen: string;
+  to_screen: string;
+  tool_name: string;
+  tool_args: string;
+  attempts: number;
+  successes: number;
+  total_confidence: number;
+  brier_score_sum: number;
+  updated_at: string;
+  created_at: Generated<string>;
+}
+
 // Accessibility baseline tables
 export interface AccessibilityBaselinesTable {
   id: Generated<number>;
@@ -236,6 +272,8 @@ export interface Database {
   node_modals: NodeModalsTable;
   edge_modals: EdgeModalsTable;
   scroll_positions: ScrollPositionsTable;
+  prediction_outcomes: PredictionOutcomesTable;
+  prediction_transition_stats: PredictionTransitionStatsTable;
   accessibility_baselines: AccessibilityBaselinesTable;
   memory_thresholds: MemoryThresholdsTable;
   memory_baselines: MemoryBaselinesTable;
@@ -283,6 +321,13 @@ export type NewEdgeModal = Insertable<EdgeModalsTable>;
 
 export type ScrollPosition = Selectable<ScrollPositionsTable>;
 export type NewScrollPosition = Insertable<ScrollPositionsTable>;
+
+export type PredictionOutcome = Selectable<PredictionOutcomesTable>;
+export type NewPredictionOutcome = Insertable<PredictionOutcomesTable>;
+
+export type PredictionTransitionStats = Selectable<PredictionTransitionStatsTable>;
+export type NewPredictionTransitionStats = Insertable<PredictionTransitionStatsTable>;
+export type PredictionTransitionStatsUpdate = Updateable<PredictionTransitionStatsTable>;
 
 export type AccessibilityBaseline = Selectable<AccessibilityBaselinesTable>;
 export type NewAccessibilityBaseline = Insertable<AccessibilityBaselinesTable>;

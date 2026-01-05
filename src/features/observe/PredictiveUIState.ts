@@ -8,6 +8,8 @@ import {
   Predictions
 } from "../../models";
 import { NavigationEdge, NavigationGraphManager, UIState } from "../navigation/NavigationGraphManager";
+import { PredictionHistoryRepository } from "../../db/predictionHistoryRepository";
+import { normalizeToolArgs } from "../../utils/predictionUtils";
 
 interface InteractableElement {
   element: Element;
@@ -20,6 +22,8 @@ interface InteractableElement {
 
 export class PredictiveUIState {
   private elementParser = new ElementParser();
+  private historyRepository = new PredictionHistoryRepository();
+  private readonly DEFAULT_CONFIDENCE = 0.5;
 
   async generate(result: ObserveResult): Promise<Predictions | undefined> {
     if (!result.viewHierarchy) {
@@ -54,6 +58,14 @@ export class PredictiveUIState {
     const interactableElements: InteractablePrediction[] = [];
     const matchedEdges = new Set<string>();
     const predictedElementsByScreen = new Map<string, string[]>();
+    const transitionStats = appId
+      ? await this.historyRepository.getTransitionStatsForScreen(appId, currentScreen)
+      : [];
+    const transitionStatsByKey = new Map<string, typeof transitionStats[number]>();
+    for (const stat of transitionStats) {
+      const key = this.buildTransitionKey(stat.from_screen, stat.to_screen, stat.tool_name, stat.tool_args);
+      transitionStatsByKey.set(key, stat);
+    }
 
     for (const interactable of interactables) {
       const match = this.findMatchingEdge(interactable, actionableEdges);
@@ -73,11 +85,20 @@ export class PredictiveUIState {
           match.to,
           predictedElementsByScreen
         );
+        const confidence = this.getAdjustedConfidence(
+          transitionStatsByKey.get(this.buildTransitionKey(
+            currentScreen,
+            match.to,
+            match.interaction.toolName,
+            normalizeToolArgs(match.interaction.args)
+          ))
+        );
         likelyActions.push({
           action: match.interaction.toolName,
           target: predictionTarget,
           predictedScreen: match.to,
-          predictedElements: predictedElements.length > 0 ? predictedElements : undefined
+          predictedElements: predictedElements.length > 0 ? predictedElements : undefined,
+          confidence
         });
         matchedEdges.add(edgeKey);
       }
@@ -272,6 +293,41 @@ export class PredictiveUIState {
   private buildEdgeKey(edge: NavigationEdge): string {
     const args = edge.interaction?.args ?? {};
     return `${edge.from}:${edge.to}:${edge.interaction?.toolName}:${JSON.stringify(args)}`;
+  }
+
+  private buildTransitionKey(
+    fromScreen: string,
+    toScreen: string,
+    toolName: string,
+    toolArgs: string
+  ): string {
+    return `${fromScreen}:${toScreen}:${toolName}:${toolArgs}`;
+  }
+
+  private getAdjustedConfidence(
+    stats?: {
+      attempts: number;
+      successes: number;
+    }
+  ): number {
+    if (!stats) {
+      return this.DEFAULT_CONFIDENCE;
+    }
+
+    const attempts = stats.attempts;
+    const accuracy = attempts > 0 ? stats.successes / attempts : this.DEFAULT_CONFIDENCE;
+    return this.adjustConfidence(this.DEFAULT_CONFIDENCE, accuracy, attempts);
+  }
+
+  private adjustConfidence(
+    baseConfidence: number,
+    historicalAccuracy: number,
+    sampleSize: number
+  ): number {
+    const historyWeight = Math.min(sampleSize / 100, 0.8);
+    const baseWeight = 1 - historyWeight;
+    const adjusted = (baseConfidence * baseWeight) + (historicalAccuracy * historyWeight);
+    return Math.max(0, Math.min(1, adjusted));
   }
 
   private async getPredictedElements(
