@@ -7,7 +7,8 @@ expose the [observe](observation.md) ability as a tool call.
 
 #### Interactions
 
-- 👆 **Tap**: Intelligent text-based or resource-id tapping with fuzzy search and view hierarchy analysis.
+- 👆 **Tap**: Intelligent text-based or resource-id tapping with fuzzy search and view hierarchy analysis. See
+  [tapOn details](tap-on.md) for container scoping and precedence.
 - 👉 **Swipe**: Directional swiping within element bounds with configurable release timing.
 - ⏰ **Long Press**: Extended touch gestures for context menus and advanced interactions.
 - 📜 **Scroll**: Intelligent scrolling until target text becomes visible.

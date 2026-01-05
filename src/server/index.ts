@@ -3,6 +3,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
+import { ZodError } from "zod";
 import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
 import { executionTracker } from "./executionTracker";
@@ -37,6 +38,29 @@ export interface McpServerOptions {
   debug?: boolean;
   sessionContext?: { sessionId?: string };
 }
+
+const formatZodValidationError = (toolName: string, error: ZodError): string => {
+  const issues = error.issues.map(issue => {
+    const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+    let message = issue.message;
+
+    if (toolName === "tapOn" && issue.path[0] === "container") {
+      if (issue.code === "invalid_type" && issue.expected === "object") {
+        message = "container must be an object like { elementId: \"...\" } or { text: \"...\" }";
+      } else if (issue.code === "custom") {
+        message = "container must include elementId or text (example: { text: \"Results\" })";
+      }
+    }
+
+    return `${path}: ${message}`;
+  });
+
+  if (issues.length === 0) {
+    return `Invalid parameters for tool ${toolName}.`;
+  }
+
+  return `Invalid parameters for tool ${toolName}:\n- ${issues.join("\n- ")}`;
+};
 
 export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   // Get configuration and device session managers
@@ -128,6 +152,9 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
     try {
       parsedParams = tool.schema.parse(toolParams);
     } catch (error) {
+      if (error instanceof ZodError) {
+        throw new ActionableError(formatZodValidationError(name, error));
+      }
       throw new ActionableError(`Invalid parameters for tool ${name}: ${error}`);
     }
 
