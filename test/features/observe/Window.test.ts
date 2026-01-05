@@ -207,7 +207,7 @@ describe("Window", () => {
       const result = await window.getActive(true);
 
       // Should extract the package and activity from the mActivityRecord line within the Pop-Up Window block
-      expect(result.appId).toBe("dev.jasonpearson.android.zillowmap");
+      expect(result.appId).toBe("dev.jasonpearson.automobile.playground");
       expect(result.activityName).toBe("dev.jasonpearson.android.appshell.MainTabActivity");
       expect(result.layoutSeqSum).toBeGreaterThan(0);
     });
@@ -220,11 +220,11 @@ describe("Window", () => {
 
         Window #9 Window{ddf8489 u0 Pop-Up Window}:
           mDisplayId=0 rootTaskId=8 mSession=Session{8b3234c 4199:u0a10207}
-          mOwnerUid=10207 showForAllUsers=false package=dev.jasonpearson.android.zillowmap appop=NONE
-          mActivityRecord=ActivityRecord{5cd319f u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity t8}
+          mOwnerUid=10207 showForAllUsers=false package=dev.jasonpearson.automobile.playground appop=NONE
+          mActivityRecord=ActivityRecord{5cd319f u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.android.appshell.MainTabActivity t8}
           mViewVisibility=0x0 mHaveFrame=true mObscured=false
 
-        Window #10 Window{10634fe u0 dev.jasonpearson.android.zillowmap/dev.jasonpearson.android.appshell.MainTabActivity}:
+        Window #10 Window{10634fe u0 dev.jasonpearson.automobile.playground/dev.jasonpearson.android.appshell.MainTabActivity}:
           mDisplayId=0 rootTaskId=8
           mLayoutSeq=258
       `;
@@ -239,7 +239,7 @@ describe("Window", () => {
 
       const result = await window.getActive(true);
 
-      expect(result.appId).toBe("dev.jasonpearson.android.zillowmap");
+      expect(result.appId).toBe("dev.jasonpearson.automobile.playground");
       expect(result.activityName).toBe("dev.jasonpearson.android.appshell.MainTabActivity");
       expect(result.layoutSeqSum).toBe(258);
     });

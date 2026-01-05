@@ -132,7 +132,7 @@ how it gets used. If there are components worth extracting we'll extract them.
 
 - [File issues on the GitHub repository](https://github.com/kaeawc/auto-mobile/issues)
 - Include device information, logs, and reproduction steps. For bonus points include an AutoMobile plan. It would be best
-  if reproductions could point at publicly available apps that have been released. I've done my testing against Zillow,
+  if reproductions could point at publicly available apps that have been released. I've done my testing against Jason Pearson,
   Slack, Google Keep, YouTube Music, Bluesky, Google Calendar, and more.  
 - Feature requests are welcomed as are contributions. Please file an issue before starting a contribution.
 

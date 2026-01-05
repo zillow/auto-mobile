@@ -38,7 +38,7 @@ By continuing to use AutoMobile, [you acknowledge and agree to the warnings and 
 ## License
 
 ```text
-Copyright (C) 2025 Zillow Group
+Copyright (C) 2025 Jason Pearson
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

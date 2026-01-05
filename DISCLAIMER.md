@@ -1,9 +1,9 @@
 # RESPONSIBLE USE DISCLAIMER
 
 AutoMobile is an experimental software project designed to enable AI agent interaction with mobile devices. This software
-is provided "AS IS" for research, development, and testing purposes only. Zillow and the AutoMobile maintainers provide
+is provided "AS IS" for research, development, and testing purposes only. Jason Pearson and the AutoMobile maintainers provide
 NO WARRANTIES of any kind, express or implied, including but not limited to warranties of merchantability, fitness for
-a particular purpose, or non-infringement. Under no circumstances shall Zillow or the AutoMobile maintainers be liable
+a particular purpose, or non-infringement. Under no circumstances shall Jason Pearson or the AutoMobile maintainers be liable
 for any direct, indirect, incidental, special, or consequential damages arising from the use of this software.
 
 ## IMPORTANT WARNINGS AND LIMITATIONS
