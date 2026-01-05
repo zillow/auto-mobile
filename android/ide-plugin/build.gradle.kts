@@ -1,10 +1,11 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 
 plugins {
-  kotlin("jvm") version "1.9.24"
-  kotlin("plugin.serialization") version "1.9.24"
+  kotlin("jvm") version "2.2.20"
+  kotlin("plugin.serialization") version "2.2.20"
+  kotlin("plugin.compose") version "2.2.20"
   id("org.jetbrains.intellij.platform") version "2.10.5"
-  id("org.jetbrains.compose") version "1.7.3"
+  id("org.jetbrains.compose") version "1.8.0"
 }
 
 repositories {
@@ -22,15 +23,14 @@ kotlin {
 
 dependencies {
   implementation(compose.desktop.currentOs)
-  implementation("org.jetbrains.jewel:jewel-foundation:0.28.0-243.27100")
-  implementation("org.jetbrains.jewel:jewel-ui:0.28.0-243.27100")
-  implementation("org.jetbrains.jewel:jewel-int-ui-standalone:0.28.0-243.27100")
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
-  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+  implementation("org.jetbrains.jewel:jewel-foundation:0.33.0-253.29795")
+  implementation("org.jetbrains.jewel:jewel-ui:0.33.0-253.29795")
+  implementation("org.jetbrains.jewel:jewel-int-ui-standalone:0.33.0-253.29795")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
   intellijPlatform {
-    intellijIdea("2024.3")
-    instrumentationTools()
+    intellijIdea("2025.3")
     pluginVerifier()
   }
 }
@@ -43,8 +43,8 @@ intellijPlatform {
     description.set("AutoMobile IDE integration for authoring tests and visualizing navigation graphs.")
 
     ideaVersion {
-      sinceBuild.set("243")
-      untilBuild.set("243.*")
+      sinceBuild.set("253")
+      untilBuild.set("253.*")
     }
 
     vendor {
