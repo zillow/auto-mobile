@@ -128,6 +128,17 @@ export interface A11yDragResult {
 }
 
 /**
+ * Interface for pinch result from accessibility service
+ */
+export interface A11yPinchResult {
+  success: boolean;
+  totalTimeMs: number;
+  gestureTimeMs?: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
  * Interface for set text result from accessibility service
  */
 export interface A11ySetTextResult {
@@ -281,6 +292,29 @@ export interface AccessibilityService {
     timeoutMs?: number,
     perf?: PerformanceTracker
   ): Promise<A11ySwipeResult>;
+
+  /**
+   * Request a pinch gesture from the accessibility service using dispatchGesture API.
+   * @param centerX - Center X coordinate
+   * @param centerY - Center Y coordinate
+   * @param distanceStart - Starting distance between fingers in pixels
+   * @param distanceEnd - Ending distance between fingers in pixels
+   * @param rotationDegrees - Rotation in degrees during gesture
+   * @param duration - Gesture duration in milliseconds (default: 300)
+   * @param timeoutMs - Maximum time to wait for pinch completion in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11yPinchResult> - The pinch result with timing information
+   */
+  requestPinch(
+    centerX: number,
+    centerY: number,
+    distanceStart: number,
+    distanceEnd: number,
+    rotationDegrees: number,
+    duration?: number,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yPinchResult>;
 
   /**
    * Request text input via the accessibility service using ACTION_SET_TEXT
@@ -438,6 +472,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private pendingSwipeRequestId: string | null = null;
   private pendingDragResolve: ((result: A11yDragResult) => void) | null = null;
   private pendingDragRequestId: string | null = null;
+
+  // Pinch handling
+  private pendingPinchResolve: ((result: A11yPinchResult) => void) | null = null;
+  private pendingPinchRequestId: string | null = null;
 
   // Set text handling
   private pendingSetTextResolve: ((result: A11ySetTextResult) => void) | null = null;
@@ -789,6 +827,24 @@ export class AccessibilityServiceClient implements AccessibilityService {
           totalTimeMs: dragMessage.totalTimeMs,
           gestureTimeMs: dragMessage.gestureTimeMs,
           error: dragMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle pinch result
+      if (message.type === "pinch_result" && this.pendingPinchResolve) {
+        const pinchMessage = message as any;
+        const perfTiming = pinchMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Pinch result (requestId: ${pinchMessage.requestId}, success: ${pinchMessage.success}, totalTimeMs: ${pinchMessage.totalTimeMs}, gestureTimeMs: ${pinchMessage.gestureTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingPinchResolve;
+        this.pendingPinchResolve = null;
+        this.pendingPinchRequestId = null;
+        resolve({
+          success: pinchMessage.success,
+          totalTimeMs: pinchMessage.totalTimeMs,
+          gestureTimeMs: pinchMessage.gestureTimeMs,
+          error: pinchMessage.error,
           perfTiming
         });
       }
@@ -1835,6 +1891,90 @@ export class AccessibilityServiceClient implements AccessibilityService {
       return {
         success: false,
         totalTimeMs: durationMs,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request a pinch gesture from the accessibility service using dispatchGesture API.
+   */
+  async requestPinch(
+    centerX: number,
+    centerY: number,
+    distanceStart: number,
+    distanceEnd: number,
+    rotationDegrees: number,
+    duration: number = 300,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yPinchResult> {
+    const startTime = Date.now();
+
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for pinch");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      const requestId = `pinch_${Date.now()}_${generateSecureId()}`;
+      this.pendingPinchRequestId = requestId;
+
+      const pinchPromise = new Promise<A11yPinchResult>(resolve => {
+        this.pendingPinchResolve = resolve;
+
+        this.timer.setTimeout(() => {
+          if (this.pendingPinchResolve === resolve) {
+            this.pendingPinchResolve = null;
+            this.pendingPinchRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Pinch timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_pinch",
+          requestId,
+          centerX: Math.round(centerX),
+          centerY: Math.round(centerY),
+          distanceStart: Math.round(distanceStart),
+          distanceEnd: Math.round(distanceEnd),
+          rotationDegrees,
+          duration
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent pinch request (requestId: ${requestId}, center=${centerX},${centerY}, distanceStart=${distanceStart}, distanceEnd=${distanceEnd}, rotation=${rotationDegrees}, duration: ${duration}ms)`);
+      });
+
+      const result = await perf.track("waitForPinch", () => pinchPromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Pinch completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Pinch failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Pinch request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        totalTimeMs: duration,
         error: `${error}`
       };
     }

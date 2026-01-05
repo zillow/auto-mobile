@@ -33,6 +33,12 @@ data class WebSocketRequest(
     val y2: Int? = null,
     val duration: Long? = null,
     val holdTime: Long? = null,
+    // Pinch parameters
+    val centerX: Int? = null,
+    val centerY: Int? = null,
+    val distanceStart: Int? = null,
+    val distanceEnd: Int? = null,
+    val rotationDegrees: Float? = null,
     // Text input parameters
     val text: String? = null,
     val resourceId: String? = null, // Optional: target specific element by resource-id
@@ -61,6 +67,19 @@ class WebSocketServer(
         null,
     private val onRequestDrag:
         ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, holdTime: Long) -> Unit)? =
+        null,
+    private val onRequestPinch:
+        (
+            (
+                requestId: String?,
+                centerX: Int,
+                centerY: Int,
+                distanceStart: Int,
+                distanceEnd: Int,
+                rotationDegrees: Float,
+                duration: Long,
+            ) -> Unit
+        )? =
         null,
     private val onRequestSetText:
         ((requestId: String?, text: String, resourceId: String?) -> Unit)? =
@@ -317,6 +336,28 @@ class WebSocketServer(
             onRequestDrag?.invoke(request.requestId, x1, y1, x2, y2, duration, holdTime)
           } else {
             Log.w(TAG, "Drag request missing required coordinates")
+          }
+        }
+        "request_pinch" -> {
+          Log.d(TAG, "Received pinch request (requestId: ${request.requestId})")
+          val centerX = request.centerX
+          val centerY = request.centerY
+          val distanceStart = request.distanceStart
+          val distanceEnd = request.distanceEnd
+          val rotationDegrees = request.rotationDegrees ?: 0f
+          val duration = request.duration ?: 300L
+          if (centerX != null && centerY != null && distanceStart != null && distanceEnd != null) {
+            onRequestPinch?.invoke(
+                request.requestId,
+                centerX,
+                centerY,
+                distanceStart,
+                distanceEnd,
+                rotationDegrees,
+                duration,
+            )
+          } else {
+            Log.w(TAG, "Pinch request missing required parameters")
           }
         }
         "request_set_text" -> {

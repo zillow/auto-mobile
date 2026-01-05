@@ -33,6 +33,8 @@ export * from "./ObserveResult";
 export * from "./Recomposition";
 export * from "./OpenURLResult";
 export * from "./PinchResult";
+export * from "./PinchOnOptions";
+export * from "./PinchOnResult";
 export * from "./Point";
 export * from "./Platform";
 export * from "./PressButtonResult";
