@@ -279,10 +279,10 @@ export class SwipeOn extends BaseVisualChange {
     if (options.container) {
       const containerFieldCount = [options.container.elementId, options.container.text].filter(Boolean).length;
       if (containerFieldCount === 0) {
-        return "container must specify either elementId or text";
+        return "container must specify exactly one of elementId or text";
       }
       if (containerFieldCount > 1) {
-        return "container can only specify one of: elementId or text";
+        return "container must specify exactly one of elementId or text";
       }
     }
 

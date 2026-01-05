@@ -39,28 +39,31 @@ export interface McpServerOptions {
   sessionContext?: { sessionId?: string };
 }
 
-const formatZodValidationError = (toolName: string, error: ZodError): string => {
-  const issues = error.issues.map(issue => {
-    const path = issue.path.length > 0 ? issue.path.join(".") : "root";
-    let message = issue.message;
-
-    if (toolName === "tapOn" && issue.path[0] === "container") {
-      if (issue.code === "invalid_type" && issue.expected === "object") {
-        message = "container must be an object like { elementId: \"...\" } or { text: \"...\" }";
-      } else if (issue.code === "custom") {
-        message = "container must include elementId or text (example: { text: \"Results\" })";
-      }
-    }
-
-    return `${path}: ${message}`;
-  });
-
-  if (issues.length === 0) {
-    return `Invalid parameters for tool ${toolName}.`;
+function formatToolParamError(toolName: string, error: unknown): string {
+  if (!(error instanceof ZodError)) {
+    return String(error);
   }
 
-  return `Invalid parameters for tool ${toolName}:\n- ${issues.join("\n- ")}`;
-};
+  const issues = error.issues.map(issue => {
+    const path = issue.path.length ? issue.path.join(".") : "parameters";
+    if (issue.code === "invalid_type") {
+      return `${path} expected ${issue.expected}, received ${issue.received}`;
+    }
+    return `${path} ${issue.message}`;
+  });
+
+  const hints: string[] = [];
+  if (toolName === "swipeOn") {
+    const containerIssue = error.issues.find(issue => issue.path[0] === "container");
+    if (containerIssue) {
+      hints.push("container must be an object like { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }");
+    }
+  }
+
+  const issueSummary = issues.join("; ");
+  const hintSummary = hints.length > 0 ? ` Hint: ${hints.join(" ")}` : "";
+  return `${issueSummary}${hintSummary}`;
+}
 
 export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   // Get configuration and device session managers
@@ -152,10 +155,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
     try {
       parsedParams = tool.schema.parse(toolParams);
     } catch (error) {
-      if (error instanceof ZodError) {
-        throw new ActionableError(formatZodValidationError(name, error));
-      }
-      throw new ActionableError(`Invalid parameters for tool ${name}: ${error}`);
+      throw new ActionableError(`Invalid parameters for tool ${name}: ${formatToolParamError(name, error)}`);
     }
 
     const sessionId = options.sessionContext?.sessionId;

@@ -202,7 +202,16 @@ export const swipeOnSchema = z.object({
   container: z.object({
     elementId: z.string().optional().describe("Resource ID of the container element (finds nearest scrollable parent if element is not scrollable)"),
     text: z.string().optional().describe("Text within the container (finds nearest scrollable parent of element containing this text)")
-  }).optional().describe("Container element to swipe within. REQUIRED for scrolling lists (RecyclerView/ScrollView/ListView). Omit only for intentional full-screen swipes like page navigation or dismissing sheets."),
+  })
+    .refine(
+      value => [value.elementId, value.text].filter(Boolean).length === 1,
+      "container must specify exactly one of elementId or text"
+    )
+    .optional()
+    .describe(
+      "Container element to swipe within. Provide an object with exactly one of elementId or text. " +
+      "REQUIRED for scrolling lists (RecyclerView/ScrollView/ListView). Omit only for intentional full-screen swipes."
+    ),
   autoTarget: z.boolean().optional().describe("Auto-target a scrollable container when container is omitted (default true). Set to false only if you intend to swipe the entire screen after autoTarget selected a list unexpectedly."),
   direction: z.enum(["up", "down", "left", "right"]).describe(
     `Direction YOUR FINGER moves on the screen.

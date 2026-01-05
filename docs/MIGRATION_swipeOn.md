@@ -223,6 +223,49 @@ This migration guide will help you transition from the old tools to the new unif
 
 \* When using `container`, specify exactly one of `container.elementId` or `container.text`
 
+## Container Parameter Shape
+
+`container` must be an object (not a string) and must include exactly one of `elementId` or `text`.
+
+**By element ID (RecyclerView/ScrollView/ListView):**
+```json
+{
+  "container": { "elementId": "com.google.android.apps.maps:id/expandingscrollview_container" },
+  "direction": "up",
+  "platform": "android"
+}
+```
+
+**By text inside the container:**
+```json
+{
+  "container": { "text": "Photos" },
+  "direction": "left",
+  "platform": "android"
+}
+```
+
+**RecyclerView vs full-screen swipe:**
+```json
+// RecyclerView/list scrolling (scoped to container)
+{ "container": { "elementId": "list" }, "direction": "up", "platform": "android" }
+
+// Full-screen swipe (disable autoTarget to avoid list auto-selection)
+{ "direction": "up", "autoTarget": false, "platform": "android" }
+```
+
+## Gesture Type Explained
+
+`direction` describes finger movement. Use `gestureType` to switch between finger-first and content-first mental models.
+
+```json
+// Finger moves up; content moves down (default behavior)
+{ "direction": "up", "gestureType": "swipeFingerTowardsDirection", "platform": "android" }
+
+// Content moves up; finger moves down (useful when you think in content direction)
+{ "direction": "up", "gestureType": "scrollTowardsDirection", "platform": "android" }
+```
+
 ## Operation Modes
 
 The `swipeOn` tool automatically determines the operation mode based on parameters:
@@ -283,6 +326,35 @@ The `swipeOn` tool automatically determines the operation mode based on paramete
 7. **Use `scrollMode: "a11y"` for faster scrolling on Android:**
    ```json
    { "scrollMode": "a11y" }  // ~50-150ms vs ~540ms with adb
+   ```
+
+## Common Use Cases
+
+1. **Scroll lists inside modal dialogs/sheets:**
+   ```json
+   {
+     "container": { "elementId": "modal_list" },
+     "direction": "up",
+     "platform": "android"
+   }
+   ```
+
+2. **Scroll nested containers (pick the inner one explicitly):**
+   ```json
+   {
+     "container": { "text": "Photo Gallery" },
+     "direction": "left",
+     "platform": "android"
+   }
+   ```
+
+3. **Auto-targeting behavior (when container is unknown):**
+   ```json
+   // Let swipeOn choose the most likely scrollable list
+   { "direction": "up", "platform": "android", "autoTarget": true }
+
+   // Force full-screen swipe if autoTarget picks a list you did not want
+   { "direction": "up", "platform": "android", "autoTarget": false }
    ```
 
 ## Common Migration Mistakes
