@@ -126,16 +126,24 @@ object DeepLinkManager {
   /** Parse deep link URL and return the corresponding navigation destination */
   fun parseDeepLink(uri: Uri): AppDestination? {
     Log.d(TAG, "Parsing deep link URI: $uri")
-    Log.d(TAG, "URI scheme: ${uri.scheme}, host: ${uri.host}, path: ${uri.path}")
+    Log.d(TAG, "URI scheme: ${uri.scheme}, host: ${uri.host}, path: ${uri.path}, ssp: ${uri.schemeSpecificPart}")
 
-    if (uri.scheme != SCHEME || uri.host != HOST) {
-      Log.d(TAG, "Invalid scheme or host. Expected: $SCHEME://$HOST")
+    if (uri.scheme != SCHEME) {
+      Log.d(TAG, "Invalid scheme. Expected: $SCHEME")
       return null
     }
 
-    val path = uri.path
-    if (path == null) {
-      Log.d(TAG, "URI path is null")
+    // For opaque URIs (automobile:playground/path), extract host and path from scheme-specific part
+    val ssp = uri.schemeSpecificPart
+    if (ssp == null || !ssp.startsWith(HOST)) {
+      Log.d(TAG, "Invalid host. Expected scheme-specific part to start with: $HOST")
+      return null
+    }
+
+    // Extract path from scheme-specific part (remove "playground" prefix)
+    val path = if (ssp.length > HOST.length) ssp.substring(HOST.length) else ""
+    if (path.isEmpty() && ssp != HOST) {
+      Log.d(TAG, "Invalid URI format")
       return null
     }
 
@@ -223,7 +231,7 @@ object DeepLinkManager {
   /** Validate if a URI is a valid deep link for this app */
   fun isValidDeepLink(uri: Uri): Boolean {
     Log.d(TAG, "Validating deep link: $uri")
-    val isValid = uri.scheme == SCHEME && uri.host == HOST && parseDeepLink(uri) != null
+    val isValid = uri.scheme == SCHEME && uri.schemeSpecificPart?.startsWith(HOST) == true && parseDeepLink(uri) != null
     Log.d(TAG, "Deep link validation result: $isValid")
     return isValid
   }
@@ -237,11 +245,14 @@ object DeepLinkManager {
       return null
     }
 
-    val path = uri.path
-    if (path == null) {
-      Log.d(TAG, "URI path is null, returning null destination name")
+    // Extract path from scheme-specific part for opaque URIs
+    val ssp = uri.schemeSpecificPart
+    if (ssp == null || !ssp.startsWith(HOST)) {
+      Log.d(TAG, "Invalid URI format, returning null destination name")
       return null
     }
+
+    val path = if (ssp.length > HOST.length) ssp.substring(HOST.length) else ""
 
     val destinationName =
         when {
