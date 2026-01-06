@@ -38,11 +38,10 @@ Any MCP-compatible client can use AutoMobile. Configuration guides for specific 
 ### MCP Client Documentation
 
 - **Claude Desktop** - [MCP Configuration Guide](https://modelcontextprotocol.io/quickstart/user)
-- **Claude Code** - [MCP Server Setup](claude-code.md)
+- **Claude Code** - [MCP Servers Guide](https://github.com/anthropics/claude-code#mcp-servers)
 - **Cursor** - [MCP Integration](https://docs.cursor.com/context/context-mcp)
-- **Codex** - [MCP Setup](codex.md)
-- **Firebender** - [MCP Config](firebender.md)
-- **Goose** - [MCP Configuration](goose.md)
+- **Firebender** - [MCP Documentation](https://github.com/sirmews/firebender)
+- **Goose** - [MCP Configuration](https://github.com/square/goose#model-context-protocol-mcp)
 
 ### Model Provider API Keys
 

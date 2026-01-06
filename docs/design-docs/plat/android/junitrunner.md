@@ -72,4 +72,4 @@ Configure via system property:
 automobile.ai.provider=anthropic
 ```
 
-For API key setup, see [AI Agent Setup](../../../install/ai-agents/index.md#model-provider-api-keys).
+For API key setup, see [AI Agent Setup](../../../install/ai-agents.md#model-provider-api-keys).

@@ -74,23 +74,17 @@ nav:
   - 'Overview': index.md
   - 'Install':
       - 'Overview': install/overview.md
-      - 'AI Agents':
-          - 'Overview': install/ai-agents/index.md
-          - 'Claude Code': install/ai-agents/claude-code.md
-          - 'Codex': install/ai-agents/codex.md
-          - 'Cursor': install/ai-agents/cursor.md
-          - 'Firebender ': install/ai-agents/firebender.md
-          - 'Goose': install/ai-agents/goose.md
+      - 'AI Agents': install/ai-agents.md
       - 'Platform Specific':
-          - 'Android': install/platform-specific/android.md
-          - 'iOS': install/platform-specific/ios.md
+          - 'Android': install/plat/android.md
+          - 'iOS': install/plat/ios.md
   - 'Using AutoMobile':
       - 'Overview': using/index.md
       - 'UX Exploration': using/ux-exploration.md
       - 'Reproducing Bugs': using/reproducting-bugs.md
       - 'Performance Analysis':
-          - 'Startup': using/perf-analysis/scroll-framerate.md
-          - 'Screen Transition': using/perf-analysis/scroll-framerate.md
+          - 'Startup': using/perf-analysis/startup.md
+          - 'Screen Transition': using/perf-analysis/screen-transition.md
           - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
       - 'Accessibility':
           - 'Contrast': using/a11y/contrast.md

@@ -21,12 +21,9 @@ AutoMobile can audit:
 
 ## Using AutoMobile
 
-Enable accessibility auditing:
+Enable UI performance auditing in the IntelliJ IDE Plugin
 
-```typescript
-// Enable accessibility audit mode
-setFeatureFlag("accessibility-audit", true)
-```
+See [Feature Flags](../../design-docs/mcp/feature-flags.md) for more details.
 
 Ask your AI agent:
 

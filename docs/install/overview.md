@@ -71,5 +71,5 @@ auto-mobile --cli
 
 For full integration:
 
-1. Follow [MCP client config](ai-agents/index.md) guide.
+1. Follow [MCP client config](ai-agents.md) guide.
 2. Add [AutoMobile JUnitRunner test dependency](../design-docs/plat/android/junitrunner.md) to all Android application and library modules.
