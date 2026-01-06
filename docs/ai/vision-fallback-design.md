@@ -652,10 +652,3 @@ export class VisionCostTracker {
 3. **Visual regression detection**: Alert when UI changed significantly
 4. **Element highlighting**: Return annotated screenshots with element boxes
 5. **Batch analysis**: Analyze multiple missing elements in one call
-
-## Implementation References
-
-- Vision fallback config + cache behavior: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionFallback.ts#L1-L149
-- Vision fallback types: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionTypes.ts#L1-L83
-- Claude vision client: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/ClaudeVisionClient.ts#L1-L230
-- tapOn vision fallback invocation: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/TapOnElement.ts#L110-L190

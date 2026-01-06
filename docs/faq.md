@@ -107,15 +107,14 @@ That's your app implementation. If AutoMobile can cause it to crash, a user can 
 
 ### Can I integrate with CI/CD systems?
 
-See [ci setup docs](features/test-execution/ci.md).
+Yes, AutoMobile can be integrated with CI/CD systems. Configuration details are coming soon.
 
 ### Is there API documentation?
 
-AutoMobile's [MCP Server](features/mcp-server/index.md) is fully documented with system design diagrams and
+AutoMobile's [MCP Server](design-docs/mcp/index.md) is fully documented with system design diagrams and
 explanations. If you find any of this wanting feel free to file an issue.
 
-For AutoMobile's CLI you can always run the tool without commands to get helpful explanations. It is not going to have
-a dedicated documentation page beyond running tool output and updating [this page](features/cli.md).
+For AutoMobile's CLI you can always run the tool without commands to get helpful explanations (`auto-mobile --help`).
 
 ```text
 bun install -g @kaeawc/auto-mobile@latest
@@ -164,19 +163,3 @@ a dry run and tells you exactly what it would delete. Only do this after you've 
 ✅ Cleanup complete!
 🔍 You may want to review changes before committing
 ```
-
-## Implementation References
-
-- SDK/ADB detection: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/android-cmdline-tools/detection.ts#L1-L418
-- Bun requirement: https://github.com/kaeawc/auto-mobile/blob/main/package.json#L1-L39
-- Text matching logic: https://github.com/kaeawc/auto-mobile/blob/main/src/features/utility/ElementFinder.ts#L1-L212
-- Performance timing + debug-perf: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/PerformanceTracker.ts#L326-L366
-- Debug-perf flag wiring: https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L101-L645
-- Log file location/rotation: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/logger.ts#L1-L110
-- Observe cache TTL and disk cache: https://github.com/kaeawc/auto-mobile/blob/main/src/features/observe/ObserveScreen.ts#L54-L640
-- Screenshot cache LRU: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/screenshot-utils.ts#L32-L90
-- Vision fallback (Claude) and screenshot flow: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/TapOnElement.ts#L110-L190
-- Vision fallback provider and response types: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/VisionFallback.ts#L1-L149
-- Claude vision client: https://github.com/kaeawc/auto-mobile/blob/main/src/vision/ClaudeVisionClient.ts#L1-L230
-- iOS WebDriverAgent integration: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/ios-cmdline-tools/WebDriverAgent.ts#L1-L200
-- androidTest cleanup script: https://github.com/kaeawc/auto-mobile/blob/main/scripts/delete_androidTest.sh#L1-L170

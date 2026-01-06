@@ -72,31 +72,58 @@ markdown_extensions:
 
 nav:
   - 'Overview': index.md
-  - 'Installation': installation.md
-  - 'Features':
-      - 'Overview': features/index.md
-      - 'MCP Server':
-          - 'Overview': features/mcp-server/index.md
-          - 'Actions': features/mcp-server/actions.md
-          - 'Resources': features/mcp-server/resources.md
-          - 'Observation': features/mcp-server/observation.md
-          - 'Interaction Loop': features/mcp-server/interaction-loop.md
-      - 'Test Execution':
-          - 'Overview': features/test-execution/index.md
-          - 'JUnitRunner': features/test-execution/junitrunner.md
-          - 'CI': features/test-execution/ci.md
-          - 'Options': features/test-execution/options.md
-      - 'Batteries Included': features/batteries-included.md
-      - 'CLI': features/cli.md
-  - 'MCP Client Support':
-      - 'Overview': mcp-clients/index.md
-      - 'Firebender ': mcp-clients/firebender.md
-      - 'Cursor': mcp-clients/cursor.md
-      - 'Goose': mcp-clients/goose.md
+  - 'Install':
+      - 'Overview': install/overview.md
+      - 'AI Agents':
+          - 'Overview': install/ai-agents/index.md
+          - 'Claude Code': install/ai-agents/claude-code.md
+          - 'Codex': install/ai-agents/codex.md
+          - 'Cursor': install/ai-agents/cursor.md
+          - 'Firebender ': install/ai-agents/firebender.md
+          - 'Goose': install/ai-agents/goose.md
+      - 'Platform Specific':
+          - 'Android': install/platform-specific/android.md
+          - 'iOS': install/platform-specific/ios.md
+  - 'Using AutoMobile':
+      - 'Overview': using/index.md
+      - 'UX Exploration': using/ux-exploration.md
+      - 'Reproducing Bugs': using/reproducting-bugs.md
+      - 'Performance Analysis':
+          - 'Startup': using/perf-analysis/scroll-framerate.md
+          - 'Screen Transition': using/perf-analysis/scroll-framerate.md
+          - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
+      - 'Accessibility':
+          - 'Contrast': using/a11y/contrast.md
+          - 'Tap Targets': using/a11y/tap-targets.md
+      - 'UI Tests': using/ui-tests.md
+  - 'Design Docs':
+      - 'Overview': design-docs/index.md
+      - 'MCP':
+          - 'Overview': design-docs/mcp/index.md
+          - 'Actions': design-docs/mcp/actions.md
+          - 'Observation': design-docs/mcp/observation.md
+          - 'Interaction Loop': design-docs/mcp/interaction-loop.md
+          - 'Daemon': design-docs/mcp/daemon.md
+          - 'Navigation Graph': design-docs/mcp/navigation-graph.md
+          - 'Feature Flags': design-docs/mcp/feature-flags.md
+          - 'Resources': design-docs/mcp/resources.md
+      - 'Platform Specific':
+          - 'Android':
+            - 'Overview': design-docs/plat/android/index.md
+            - 'Accessibility Service': design-docs/plat/android/accessibility-service.md
+            - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
+            - 'JUnitRunner': design-docs/plat/android/junitrunner.md
+            - 'IDE Plugin':
+              - 'Overview': design-docs/plat/android/ide-plugin/overview.md
+              - 'Test Recording': design-docs/plat/android/ide-plugin/test-recording.md
+              - 'Navigation Graph Render': design-docs/plat/android/ide-plugin/test-recording.md
+              - 'Control Feature Flags': design-docs/plat/android/ide-plugin/test-recording.md
+            - 'Work Profiles': design-docs/plat/android/work-profiles.md
+          - 'iOS':
+            - 'Overview': design-docs/plat/ios/index.md
   - 'Contributing':
       - 'How': contributing/index.md
       - 'Local Development': contributing/local-development.md
       - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md
-  - 'Security': security.md
   - 'Change Log': changelog.md
