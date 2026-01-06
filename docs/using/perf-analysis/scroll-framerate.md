@@ -15,7 +15,7 @@ AutoMobile collects frame rendering metrics during scroll interactions:
 - **UI Stability**: Time until rendering stabilizes after scroll completes
 - **Frame Drops**: Total count of dropped or janky frames during interaction
 
-### Example Usage
+## Example Usage
 
 Enable UI performance auditing in the IntelliJ IDE Plugin [feature flags](../../design-docs/mcp/feature-flags.md).
 
@@ -39,21 +39,6 @@ AutoMobile tracks:
 - **Frame Drops**: Number of dropped/janky frames
 - **Render Times**: P50, P90, P99 frame render times
 - **UI Idle Detection**: When UI becomes stable
-
-## Performance Audit
-
-Enable UI performance auditing in the IntelliJ IDE Plugin
-
-See [Feature Flags](../../design-docs/mcp/feature-flags.md) for more details.
-
-## CI Integration
-
-Performance tests can run in CI to catch regressions:
-
-```bash
-# Run performance tests
-./gradlew connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.PerformanceTests
-```
 
 ## Best Practices
 

@@ -363,7 +363,7 @@ export class Daemon {
     return new Promise((resolve, reject) => {
       this.httpServer!.listen(this.port, this.host, () => {
         logger.info(
-          `AutoMobile MCP Streamable HTTP server running on http://${this.host}:${this.port}${MCP_STREAMABLE_PATH}`
+          `automobile:${this.host}:${this.port}${MCP_STREAMABLE_PATH}`
         );
         resolve();
       });

@@ -2,9 +2,9 @@
 
 Background daemon service for device pooling and parallel test execution.
 
-## Overview
 
 The AutoMobile daemon provides:
+
 - **Device Pool Management** - Manages available Android/iOS devices
 - **Session Isolation** - Multiple parallel test sessions
 - **Test Timing History** - Aggregated execution metrics
@@ -45,12 +45,14 @@ await daemon.releaseSession(sessionId)
 ## Test Timing History
 
 The daemon tracks test execution metrics:
+
 - Average duration per test
 - Device-specific performance
 - Historical trends
 - Failure rates
 
 This data helps:
+
 - Optimize CI test distribution
 - Identify slow tests
 - Predict execution times
@@ -77,6 +79,7 @@ Release a session and return device to pool.
 ## Implementation
 
 The daemon is implemented in the main AutoMobile MCP server and can run:
+
 - **Standalone** - As a background service
 - **Embedded** - Within the MCP server process
 - **CI Mode** - Temporary pools for CI environments

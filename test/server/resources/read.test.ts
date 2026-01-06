@@ -48,7 +48,7 @@ describe("MCP Resources Read", () => {
     const result = await client.request({
       method: "resources/read",
       params: {
-        uri: "automobile://observation/latest"
+        uri: "automobile:observation/latest"
       }
     }, readResourceResponseSchema);
 
@@ -60,7 +60,7 @@ describe("MCP Resources Read", () => {
 
     // Verify content
     const content = result.contents[0];
-    expect(content.uri).toBe("automobile://observation/latest");
+    expect(content.uri).toBe("automobile:observation/latest");
     expect(content.mimeType).toBe("application/json");
     expect(content.text).toBeDefined();
 
@@ -87,7 +87,7 @@ describe("MCP Resources Read", () => {
     const result = await client.request({
       method: "resources/read",
       params: {
-        uri: "automobile://observation/latest/screenshot"
+        uri: "automobile:observation/latest/screenshot"
       }
     }, readResourceResponseSchema);
 
@@ -99,7 +99,7 @@ describe("MCP Resources Read", () => {
 
     // Verify content
     const content = result.contents[0];
-    expect(content.uri).toBe("automobile://observation/latest/screenshot");
+    expect(content.uri).toBe("automobile:observation/latest/screenshot");
 
     // Content can be either an error message (if no screenshot) or actual image data
     if (content.mimeType === "application/json") {
@@ -135,7 +135,7 @@ describe("MCP Resources Read", () => {
       await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://observation/invalid"
+          uri: "automobile:observation/invalid"
         }
       }, readResourceResponseSchema);
     }).toThrow();

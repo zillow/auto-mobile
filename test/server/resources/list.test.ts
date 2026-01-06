@@ -45,13 +45,13 @@ describe("MCP Resources List", () => {
     expect(result.resources.length).toBeGreaterThanOrEqual(2);
 
     // Verify latest observation resource is present
-    const obsResource = result.resources.find((r: any) => r.uri === "automobile://observation/latest");
+    const obsResource = result.resources.find((r: any) => r.uri === "automobile:observation/latest");
     expect(obsResource).toBeDefined();
     expect(obsResource?.name).toBe("Latest Observation");
     expect(obsResource?.mimeType).toBe("application/json");
 
     // Verify latest screenshot resource is present
-    const screenshotResource = result.resources.find((r: any) => r.uri === "automobile://observation/latest/screenshot");
+    const screenshotResource = result.resources.find((r: any) => r.uri === "automobile:observation/latest/screenshot");
     expect(screenshotResource).toBeDefined();
     expect(screenshotResource?.name).toBe("Latest Screenshot");
     expect(screenshotResource?.mimeType).toBe("image/png");

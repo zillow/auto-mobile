@@ -8,27 +8,22 @@ Android is the primary supported platform today; iOS support is on the roadmap.
 **How do I get started?**
 
 - [Installation](install/overview.md) - Install AutoMobile in your environment or IDE
-- [Design Docs](design-docs/index.md) - Understand how AutoMobile works
 
-```mermaid
-stateDiagram-v2
-    Agent: Agent
-    RequestHandler: Request Handler
-    DeviceSessionManager: Device Session Manager
-    InteractionLoop: Interaction Loop
-    
-    Agent --> RequestHandler
-    RequestHandler --> Agent
-    RequestHandler --> DeviceSessionManager
-    InteractionLoop --> RequestHandler: 🖼️ Processed Results 
-    DeviceSessionManager --> InteractionLoop: 📱
-```
+### What can I use this to do?
+
+- [Interactive Exploration](using/ux-exploration.md) Use AI agents to explore your app and discover issues
+- [Automated Testing](using/ui-tests.md) Write reproducible UI tests that run in CI/CD
+- Performance Monitoring of [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [transitions](using/perf-analysis/screen-transition.md).
+- [Accessibility Auditing](using/ux-exploration.md) Validate contrast ratios and touch target sizes
+
+### How does AutoMobile work?
+
+All of the [design docs](design-docs/index.md) are included in the repository.
 
 **Additional Resources**
 
 - [FAQ](faq.md) - Frequently asked questions
 - [Why build this?](origin.md) - Motivation and origin story
-- [Design Docs](design-docs/index.md) - Technical architecture and implementation details
 - [Contributing](contributing/index.md) - If you're looking to contribute to the project
 
 ## License

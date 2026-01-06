@@ -5,6 +5,7 @@ This guide explains how to set up and test Android work profiles with AutoMobile
 ## What is a Work Profile?
 
 An Android work profile is a separate user profile on a device that allows organizations to manage work-related apps and data separately from personal apps. Each profile has its own user ID:
+
 - **User 0**: Primary/Personal profile
 - **User 10+**: Work profiles or other managed profiles
 
@@ -23,6 +24,7 @@ AutoMobile automatically detects and handles work profiles across all app manage
 ### Supported Features
 
 App management tools that support work profiles:
+
 - `installApp` - Install APKs to the auto-selected profile
 - `launchApp` - Launch apps in the auto-selected profile
 - `terminateApp` - Terminate apps in the auto-selected profile
@@ -85,6 +87,7 @@ adb shell pm list users
 ```
 
 The output shows:
+
 - `0` = Personal profile (primary user)
 - `10` = Work profile (managed profile)
 

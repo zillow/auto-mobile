@@ -2,9 +2,6 @@
 
 Use AutoMobile to systematically reproduce bugs and create reproducible test cases.
 
-## Overview
-
-AutoMobile helps you:
 - Capture exact steps to reproduce bugs
 - Generate test cases from bug reports
 - Verify bug fixes
@@ -14,35 +11,24 @@ AutoMobile helps you:
 
 When you receive a bug report, ask your AI agent:
 
-```
-Reproduce this bug: "App crashes when submitting a form with an empty email field"
-```
+> Here is a bug report that a user reproduced in production. /details
 
 The agent will:
-1. Navigate to the form
-2. Leave the email field empty
-3. Submit the form
-4. Observe and report the result
+1. Navigate to screen (if specified), otherwise it will attempt to find the behavior in the app
+2. Take a snapshot of device state using the [takeDeviceSnapshot]() MCP tool call.
+2. Reproduce any steps or context provided to approximate the state.
 
-## Creating Reproducible Tests
-
-Once a bug is reproduced, you can create an automated test:
-
-```
-Create a test case for this bug so we can verify it's fixed
-```
-
-See [UI Tests](ui-tests.md) for more on writing automated tests.
+Once a bug is reproduced, you can create an [automated test](ui-tests.md).
 
 ## Debugging Workflow
 
-1. **Reproduce** - Verify the bug exists
-2. **Document** - Capture exact steps and device state
-3. **Test** - Create automated regression test
-4. **Verify** - Confirm the fix resolves the issue
+1. Verify the bug exists
+2. Capture exact steps and device state
+3. Create automated regression test
+4. Confirm the fix resolves the issue
 
 ## Best Practices
 
-- **Provide context**: Include app state, user actions, expected vs actual behavior
-- **Isolate variables**: Test one thing at a time
-- **Document environment**: Note device, OS version, app version
+- Include app state, user actions, expected vs actual behavior, stacktraces, any additional context.
+- Isolate variables by testing one thing at a time.
+- Document the environment by noting device, OS version, app version.

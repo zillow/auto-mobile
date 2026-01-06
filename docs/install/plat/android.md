@@ -17,15 +17,6 @@ AutoMobile detects Android SDK components automatically but does **not** install
 3. **Enable USB Debugging** (for physical devices)
    See [Enable USB debugging](https://developer.android.com/studio/debug/dev-options#enable)
 
-## Manual Configuration
-
-If auto-detection fails:
-
-```bash
-export ANDROID_HOME=/path/to/android/sdk
-export PATH=$PATH:$ANDROID_HOME/platform-tools
-```
-
 ## Docker Setup
 
 For Docker-based MCP server setup, see [Android Docker Configuration](../../design-docs/plat/android/docker.md).
@@ -47,6 +38,12 @@ Quick example:
   }
 }
 ```
+
+## Optional Components
+
+1. Install the [IntelliJ IDE Plugin](../design-docs/plat/android/ide-plugin/overview.md) to gain the ability to toggle feature flags, record tests, visualize the real-time navigation graph, and inspect app performance.
+2. Add the [JUnitRunner](../design-docs/plat/android/junitrunner.md) test dependency to all Android application and library modules you want to run AutoMobile tests from.
+3. Add the [Android SDK](../design-docs/plat/android/auto-mobile-sdk.md) Android library to add recomposition tracking.
 
 ## Troubleshooting
 

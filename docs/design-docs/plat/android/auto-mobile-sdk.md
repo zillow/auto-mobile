@@ -2,9 +2,9 @@
 
 The AutoMobile SDK provides Android-specific components for integrating AutoMobile into your Android applications and test suites.
 
-## Overview
 
 The SDK consists of:
+
 - **JUnitRunner** - Test execution framework with AI self-healing capabilities
 - **Accessibility Service** - Real-time view hierarchy access and UI monitoring
 - **Gradle Integration** - Build configuration and dependency management
@@ -30,6 +30,7 @@ Then use the version from `android/junit-runner/build.gradle.kts`.
 ### Accessibility Service
 
 The AutoMobile Accessibility Service is included in the SDK and provides:
+
 - Real-time view hierarchy access
 - UI change monitoring
 - WebSocket streaming to MCP Server
@@ -73,7 +74,7 @@ Or via system property:
 
 Optional proxy endpoint:
 ```bash
--Dautomobile.ai.proxy.endpoint=https://your-proxy.example.com
+-Dautomobile:your-proxy.example.com
 ```
 
 #### Historical Timing
@@ -90,6 +91,7 @@ Timing fetch is automatically disabled in CI environments (`automobile.ci.mode=t
 ### Accessibility Service
 
 The Accessibility Service provides:
+
 - **Real-time Hierarchy** - Continuous UI monitoring without polling
 - **WebSocket Streaming** - Live updates to MCP Server
 - **File-based Fallback** - Writes hierarchy to app-private storage

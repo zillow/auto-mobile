@@ -2,9 +2,22 @@
 
 Technical design documents and architecture details for AutoMobile.
 
-## Overview
 
 AutoMobile is a mobile UI automation framework built around the Model Context Protocol (MCP). It enables AI agents to interact with Android and iOS devices for testing, exploration, and automation.
+
+```mermaid
+stateDiagram-v2
+    Agent: Agent
+    RequestHandler: Request Handler
+    DeviceSessionManager: Device Session Manager
+    InteractionLoop: Interaction Loop
+    
+    Agent --> RequestHandler
+    RequestHandler --> Agent
+    RequestHandler --> DeviceSessionManager
+    InteractionLoop --> RequestHandler: 🖼️ Processed Results 
+    DeviceSessionManager --> InteractionLoop: 📱
+```
 
 ## Architecture
 

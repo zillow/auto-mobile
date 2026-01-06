@@ -90,7 +90,7 @@ class ResourceRegistryClass {
   // Extract parameters from a URI using a URI template pattern
   private extractTemplateParams(template: string, uri: string): Record<string, string> | null {
     // Convert URI template to regex pattern
-    // E.g., "automobile://emulators/{platform}" -> "automobile://emulators/([^/]+)"
+    // E.g., "automobile:emulators/([^/]+)"
     const paramNames: string[] = [];
     const tokenizedTemplate = template.replace(/\{(\w+)\}/g, (_, paramName) => {
       paramNames.push(paramName);

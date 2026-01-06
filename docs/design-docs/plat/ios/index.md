@@ -2,7 +2,6 @@
 
 A high-performance iOS simulator automation approach combining native WebSocket server with TypeScript MCP.
 
-## Overview
 
 AutoMobile's iOS automation uses a hybrid architecture that splits responsibilities into two specialized components:
 
@@ -375,6 +374,7 @@ The hybrid iOS automation architecture is **in active development**:
 ### macOS Required
 
 This approach requires macOS for:
+
 - Xcode and iOS Simulator
 - macOS automation tools (simctl, cliclick, AppleScript)
 - Touch injection via CGEvent
@@ -382,6 +382,7 @@ This approach requires macOS for:
 ### Docker Not Supported
 
 Unlike Android, iOS automation **cannot run in Docker** because:
+
 - iOS Simulator requires macOS and Apple hardware
 - Xcode is required for building and running the native app
 - No viable containerization solution exists
@@ -389,6 +390,7 @@ Unlike Android, iOS automation **cannot run in Docker** because:
 ### Simulator Only (Initially)
 
 Physical device support requires:
+
 - WebDriverAgent or similar solution for touch injection
 - USB/network communication to device
 - Proper code signing and provisioning

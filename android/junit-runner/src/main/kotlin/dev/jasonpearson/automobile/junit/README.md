@@ -65,7 +65,7 @@ When using prompt-based testing:
 
 #### System Properties
 
-- `automobile.mcp.server`: MCP server URL (default: `ws://localhost:3000`)
+- `automobile:localhost:3000`)
 - `automobile.mcp.max.iterations`: Maximum AI agent iterations (default: `10`)
 - `automobile.debug`: Enable debug logging (default: false)
 - `automobile.ci.mode`: Disable AI assistance in CI environments (default: false)
@@ -131,7 +131,7 @@ The runner connects to the AutoMobile MCP server and uses an AI agent to iterati
 
 **Architecture Flow:**
 
-1. **MCP Connection**: JUnitRunner connects to AutoMobile MCP WebSocket server (default: `ws://localhost:3000`)
+1. **MCP Connection**: JUnitRunner connects to automobile:localhost:3000`)
 2. **AI Agent Session**: Starts AI agent session with the prompt as the goal
 3. **Iterative Exploration**: AI agent uses AutoMobile MCP tools to explore and discover steps
 4. **Plan Generation**: AI agent generates YAML plan based on iterative learning
@@ -139,7 +139,7 @@ The runner connects to the AutoMobile MCP server and uses an AI agent to iterati
 
 **Configuration:**
 
-- `automobile.mcp.server`: MCP server URL (default: `ws://localhost:3000`)
+- `automobile:localhost:3000`)
 - `automobile.mcp.max.iterations`: Maximum AI agent iterations (default: `10`)
 
 **Note**: The AI agent generates plans through iterative exploration using the AutoMobile MCP server, not through direct

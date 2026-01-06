@@ -2,9 +2,9 @@
 
 AutoMobile exposes resources through the Model Context Protocol for AI agents to access.
 
-## Overview
 
 MCP Resources provide read-only access to:
+
 - Navigation graph data
 - Test execution history
 - Performance metrics
@@ -14,9 +14,11 @@ MCP Resources provide read-only access to:
 
 ### Navigation Graph
 
-**URI**: `automob://navigation-graph`
+**URI**: `
+automobile:navigation-graph`
 
 Returns the current navigation graph showing:
+
 - Known screens and their IDs
 - Screen transitions and triggers
 - UI elements that cause navigation
@@ -25,9 +27,11 @@ See [Navigation Graph](navigation-graph.md) for details.
 
 ### Test Timing History
 
-**URI**: `automob://test-timings`
+**URI**: `
+automobile:test-timings`
 
 Returns historical test execution data:
+
 - Test class and method names
 - Average execution duration
 - Success/failure rates
@@ -37,9 +41,11 @@ See [Daemon](daemon.md) for test timing aggregation.
 
 ### Performance Results
 
-**URI**: `automob://performance-results`
+**URI**: `
+automobile:performance-results`
 
 Returns recent UI performance audit results:
+
 - Scroll framerate measurements
 - Frame drop counts
 - Render time statistics
@@ -52,7 +58,8 @@ AI agents can request resources via MCP:
 {
   "method": "resources/read",
   "params": {
-    "uri": "automob://navigation-graph"
+    "uri": "
+automobile:navigation-graph"
   }
 }
 ```

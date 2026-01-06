@@ -1,27 +1,16 @@
 # Screen Transition Performance
 
-Analyze navigation smoothness and transition animations in your app.
-
-## Overview
-
 Screen transitions should be smooth and responsive. Janky transitions hurt user experience and make your app feel slow.
 
-## What to Measure
+## What is Measured
 
-Transition performance includes:
 - **Navigation Duration**: Time from tap to next screen stable
 - **Animation Smoothness**: Frame drops during transition
 - **Touch Responsiveness**: Delay between tap and visual feedback
 
-## Using AutoMobile
+## Example Usage
 
-AutoMobile measures transitions through:
-
-1. **Tap + Idle Detection**: Measure time from interaction to stable UI
-2. **Frame Metrics**: Monitor rendering performance during transition
-3. **Touch Latency**: Measure input responsiveness
-
-### Example Workflow
+Enable UI performance auditing in the IntelliJ IDE Plugin [feature flags](../../design-docs/mcp/feature-flags.md).
 
 Ask your AI agent:
 
@@ -61,6 +50,7 @@ Example from observe result:
 ## Performance Thresholds
 
 Target metrics:
+
 - **Transition Time**: < 300ms for simple navigation
 - **Frame Time P90**: < 16ms (60 FPS)
 - **Frame Time P99**: < 20ms

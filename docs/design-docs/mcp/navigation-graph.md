@@ -2,9 +2,9 @@
 
 Automatic mapping of app screen flows and navigation patterns.
 
-## Overview
 
 The navigation graph captures:
+
 - **Screens**: Unique UI states identified by activity/view hierarchy
 - **Transitions**: Navigation between screens
 - **Triggers**: Actions that cause navigation
@@ -55,6 +55,7 @@ As AutoMobile explores an app:
 ### Navigation Detection
 
 Transitions are detected by:
+
 - Activity/fragment changes (Android)
 - View controller changes (iOS)
 - Significant UI hierarchy changes
@@ -82,6 +83,7 @@ AutoMobile:
 ### Explore Efficiently
 
 The `explore` tool uses the graph to:
+
 - Avoid revisiting known screens
 - Prioritize unexplored branches
 - Track coverage of app features
@@ -89,6 +91,7 @@ The `explore` tool uses the graph to:
 ## Graph Persistence
 
 The navigation graph is:
+
 - Built incrementally during exploration
 - Stored in memory during MCP session
 - Available via MCP resources
@@ -108,6 +111,7 @@ Automatically explore the app and build the graph.
 ## Rendering
 
 The navigation graph can be visualized in:
+
 - **IDE Plugin** - Real-time graph rendering in Android Studio
 - **Export** - GraphViz DOT format for external visualization
 - **MCP Resource** - JSON format for AI agent analysis
@@ -117,6 +121,7 @@ See [IDE Plugin](../plat/android/ide-plugin/overview.md) for graph visualization
 ## Implementation Details
 
 The navigation graph is built using:
+
 - UI idle detection (gfxinfo-based)
 - Screen fingerprinting (view hierarchy hashing)
 - Transition timing (performance tracking)

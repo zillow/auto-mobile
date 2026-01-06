@@ -2,7 +2,7 @@
 #
 # apply_lychee.sh
 #
-# Automatically fixes broken file:// links in documentation by applying suggestions
+# automobile: links in documentation by applying suggestions
 # from lychee link checker. Uses sed to replace broken links with corrected paths.
 #
 # This script focuses on fixing relative path issues by calculating the correct

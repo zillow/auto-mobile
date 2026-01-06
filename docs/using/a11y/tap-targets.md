@@ -2,9 +2,9 @@
 
 Ensure interactive elements meet minimum size requirements for accessibility.
 
-## Overview
 
 AutoMobile can audit:
+
 - Tap target dimensions
 - Touch target spacing
 - WCAG 2.1 compliance
@@ -34,6 +34,7 @@ Check if all buttons and links meet the minimum tap target size of 48x48dp
 ## Common Issues
 
 AutoMobile can detect:
+
 - Small icon buttons (<44dp)
 - Closely spaced list items
 - Tiny checkboxes or radio buttons

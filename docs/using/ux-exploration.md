@@ -2,9 +2,9 @@
 
 Use AutoMobile with AI agents to interactively explore and understand your app's user experience.
 
-## Overview
 
 AutoMobile's exploration capabilities allow AI agents to:
+
 - Navigate through your app autonomously
 - Discover UI flows and interaction patterns
 - Identify potential UX issues
@@ -27,6 +27,7 @@ The agent will:
 ## Navigation Graph
 
 AutoMobile builds a navigation graph as it explores, tracking:
+
 - Screen transitions
 - User actions that trigger navigation
 - UI elements that lead to each screen

@@ -6,8 +6,8 @@ import * as path from "path";
 
 // Resource URIs
 export const RESOURCE_URIS = {
-  LATEST_OBSERVATION: "automobile://observation/latest",
-  LATEST_SCREENSHOT: "automobile://observation/latest/screenshot"
+  LATEST_OBSERVATION: "automobile:observation/latest",
+  LATEST_SCREENSHOT: "automobile:observation/latest/screenshot"
 } as const;
 
 // Helper to get the latest screenshot path from cache

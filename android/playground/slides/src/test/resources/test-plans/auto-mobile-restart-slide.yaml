@@ -10,7 +10,7 @@ steps:
     label: Stop the AutoMobile playground app
 
   - tool: openLink
-    url: "automobile://playground/slides/${slide}"
+    url: "automobile:playground/slides/${slide}"
 
   - tool: rotate
     orientation: landscape

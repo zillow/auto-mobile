@@ -46,7 +46,7 @@ describe("MCP Templates List", () => {
 
     // Verify booted devices template is present
     const bootedDevicesTemplate = result.resourceTemplates.find(
-      (t: any) => t.uriTemplate === "automobile://devices/booted/{platform}"
+      (t: any) => t.uriTemplate === "automobile:devices/booted/{platform}"
     );
     expect(bootedDevicesTemplate).toBeDefined();
     expect(bootedDevicesTemplate?.name).toBe("Platform-specific Booted Devices");

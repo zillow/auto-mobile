@@ -22,16 +22,16 @@ class SlidesNavigationTest {
 
   @Test
   fun `DeepLinkManager should generate slides URLs correctly`() {
-    assertEquals("automobile://playground/slides/0", DeepLinkManager.generateSlidesUrl())
-    assertEquals("automobile://playground/slides/1", DeepLinkManager.generateSlidesUrl(1))
-    assertEquals("automobile://playground/slides/42", DeepLinkManager.generateSlidesUrl(42))
+    assertEquals("automobile:playground/slides/0", DeepLinkManager.generateSlidesUrl())
+    assertEquals("automobile:playground/slides/1", DeepLinkManager.generateSlidesUrl(1))
+    assertEquals("automobile:playground/slides/42", DeepLinkManager.generateSlidesUrl(42))
   }
 
   @Test
   fun `DeepLinkManager should parse slides deep links correctly`() {
-    val slideUri0 = Uri.parse("automobile://playground/slides/0")
-    val slideUri5 = Uri.parse("automobile://playground/slides/5")
-    val slideUriInvalid = Uri.parse("automobile://playground/slides/invalid")
+    val slideUri0 = Uri.parse("automobile:playground/slides/0")
+    val slideUri5 = Uri.parse("automobile:playground/slides/5")
+    val slideUriInvalid = Uri.parse("automobile:playground/slides/invalid")
 
     assertEquals(SlidesDestination(0), DeepLinkManager.parseDeepLink(slideUri0))
     assertEquals(SlidesDestination(5), DeepLinkManager.parseDeepLink(slideUri5))
@@ -43,10 +43,10 @@ class SlidesNavigationTest {
 
   @Test
   fun `DeepLinkManager should validate slides deep links correctly`() {
-    val validSlideUri = Uri.parse("automobile://playground/slides/3")
+    val validSlideUri = Uri.parse("automobile:playground/slides/3")
     val invalidSchemeUri = Uri.parse("http://playground/slides/3")
-    val invalidHostUri = Uri.parse("automobile://other/slides/3")
-    val invalidPathUri = Uri.parse("automobile://playground/other/3")
+    val invalidHostUri = Uri.parse("automobile:other/slides/3")
+    val invalidPathUri = Uri.parse("automobile:playground/other/3")
 
     assertTrue("Valid slide URI should be valid", DeepLinkManager.isValidDeepLink(validSlideUri))
     assertTrue(
@@ -59,7 +59,7 @@ class SlidesNavigationTest {
 
   @Test
   fun `DeepLinkManager should get correct destination name for slides`() {
-    val slideUri = Uri.parse("automobile://playground/slides/2")
+    val slideUri = Uri.parse("automobile:playground/slides/2")
     val invalidUri = Uri.parse("invalid://uri")
 
     assertEquals("Slides", DeepLinkManager.getDestinationName(slideUri))
@@ -82,8 +82,8 @@ class SlidesNavigationTest {
     assertNotNull("Should have slide 0 link", slide0Link)
     assertNotNull("Should have slide 3 link", slide3Link)
 
-    assertEquals("automobile://playground/slides/0", slide0Link?.second)
-    assertEquals("automobile://playground/slides/3", slide3Link?.second)
+    assertEquals("automobile:playground/slides/0", slide0Link?.second)
+    assertEquals("automobile:playground/slides/3", slide3Link?.second)
   }
 
   @Test
@@ -91,8 +91,8 @@ class SlidesNavigationTest {
     // This test verifies the method signature and URL generation
     // Actual navigation would require Android Context
 
-    val expectedUrl0 = "automobile://playground/slides/0"
-    val expectedUrl5 = "automobile://playground/slides/5"
+    val expectedUrl0 = "automobile:playground/slides/0"
+    val expectedUrl5 = "automobile:playground/slides/5"
 
     assertEquals(expectedUrl0, DeepLinkManager.generateSlidesUrl(0))
     assertEquals(expectedUrl5, DeepLinkManager.generateSlidesUrl(5))
@@ -101,17 +101,17 @@ class SlidesNavigationTest {
   @Test
   fun `Slides navigation should handle edge cases`() {
     // Test negative slide index
-    val negativeIndexUri = Uri.parse("automobile://playground/slides/-1")
+    val negativeIndexUri = Uri.parse("automobile:playground/slides/-1")
     val parsedNegative = DeepLinkManager.parseDeepLink(negativeIndexUri)
     assertEquals(SlidesDestination(0), parsedNegative) // Should default to 0
 
     // Test very large slide index
-    val largeIndexUri = Uri.parse("automobile://playground/slides/999999")
+    val largeIndexUri = Uri.parse("automobile:playground/slides/999999")
     val parsedLarge = DeepLinkManager.parseDeepLink(largeIndexUri)
     assertEquals(SlidesDestination(999999), parsedLarge) // Should preserve the number
 
     // Test missing slide index
-    val missingIndexUri = Uri.parse("automobile://playground/slides/")
+    val missingIndexUri = Uri.parse("automobile:playground/slides/")
     val parsedMissing = DeepLinkManager.parseDeepLink(missingIndexUri)
     assertEquals(SlidesDestination(0), parsedMissing) // Should default to 0
   }

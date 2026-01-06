@@ -2,9 +2,9 @@
 
 Ensure your app meets WCAG contrast ratio requirements for text and UI elements.
 
-## Overview
 
 AutoMobile can audit:
+
 - Text contrast ratios
 - Interactive element contrast
 - WCAG 2.1 Level AA/AAA compliance
@@ -19,6 +19,7 @@ AutoMobile can audit:
 - **UI Components**: Minimum 3:1 contrast ratio
 
 Large text is defined as:
+
 - 18pt (24px) or larger
 - 14pt (18.5px) bold or larger
 
@@ -37,6 +38,7 @@ Audit the login screen for contrast ratio accessibility issues
 ## Common Issues
 
 AutoMobile can detect:
+
 - Light gray text on white backgrounds
 - Low-contrast buttons
 - Disabled form fields with insufficient contrast

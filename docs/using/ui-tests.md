@@ -2,13 +2,11 @@
 
 Write and run automated UI tests using AutoMobile's testing framework.
 
-## Overview
 
 AutoMobile supports:
-- Automated UI test execution
-- Integration with JUnit on Android
-- Test recording via IDE plugin
-- CI/CD integration
+* Automated UI test execution
+* Integration with JUnit on Android
+* Test recording via IDE plugin
 
 ## Writing Tests
 
@@ -32,18 +30,18 @@ See [JUnitRunner documentation](../design-docs/plat/android/junitrunner.md) for 
 
 ```bash
 # Run all UI tests
-./gradlew connectedAndroidTest
+./gradlew testDebugUnitTest
 
-# Run specific test
-./gradlew connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.example.LoginTest
+# Run specific tests
+./gradlew testDebugUnitTest --tests '*AutoMobileTest'
 ```
 
 ### IDE Plugin
 
 Use the Android Studio plugin to:
-- Record user interactions as tests
-- Run tests from the IDE
-- View test results
+
+* Record user interactions as tests
+* Inspect historical test timing data
 
 See [IDE Plugin](../design-docs/plat/android/ide-plugin/overview.md) for setup.
 
@@ -52,14 +50,18 @@ See [IDE Plugin](../design-docs/plat/android/ide-plugin/overview.md) for setup.
 Organize tests by feature:
 
 ```
-androidTest/
-  ├── auth/
-  │   ├── LoginTest.kt
-  │   └── SignupTest.kt
-  ├── checkout/
-  │   └── PaymentFlowTest.kt
-  └── navigation/
-      └── MainNavigationTest.kt
+test/
+  ├── kotlin/
+  │   └── auth/
+  │       ├── SignupFlowTests.kt
+  └── resources/
+      └── test-plans/
+          └── signupFlow/
+              ├── login-success.yaml
+              ├── login-forgot-password.yaml
+              ├── login-bad-credentials.yaml
+              ├── signup-success.yaml
+              └── signup-invalid-email.yaml
 ```
 
 ## Best Practices

@@ -2,9 +2,9 @@
 
 The AutoMobile IDE Plugin includes test recording capabilities to capture user interactions and generate executable test plans.
 
-## Overview
 
 Test recording allows developers to:
+
 - **Record interactions** - Capture taps, swipes, and inputs as they interact with the app
 - **Generate YAML plans** - Automatically create executable test plans from recordings
 - **Replay tests** - Execute recorded plans via `executePlan` tool
@@ -22,12 +22,14 @@ From the IDE plugin tool window:
 ### 2. Perform Interactions
 
 Interact with your app normally:
+
 - Tap buttons and UI elements
 - Swipe and scroll through lists
 - Enter text into fields
 - Navigate between screens
 
 The plugin captures each interaction and records:
+
 - Element identifiers (resource ID, text, content description)
 - Action type (tap, swipe, input)
 - Screen context (current activity, view hierarchy signature)
@@ -36,6 +38,7 @@ The plugin captures each interaction and records:
 ### 3. Stop Recording
 
 Click "Stop Recording" when finished. The plugin will:
+
 - Generate a YAML test plan from the recorded interactions
 - Display the plan in the editor
 - Validate the plan structure
@@ -173,6 +176,7 @@ tests/
 ### Naming Conventions
 
 Use descriptive names for test plans:
+
 - `feature-scenario.yaml` format
 - Include happy path and error cases
 - Group related tests in directories

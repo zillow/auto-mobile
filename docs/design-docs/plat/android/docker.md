@@ -2,7 +2,6 @@
 
 This guide covers how to use Docker to run AutoMobile with all required Android development tools pre-installed.
 
-## Overview
 
 The Docker setup provides a complete Android development environment with:
 

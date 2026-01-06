@@ -6,34 +6,34 @@ navigation steps.
 
 ## Deep Link URL Structure
 
-All deep links use the custom scheme: `automobile://playground/[path]`
+All deep links use the custom scheme: `automobile:playground/[path]`
 
 ## Available Deep Links
 
 ### 1. Onboarding Screen
 
-- **URL**: `automobile://playground/onboarding`
+- **URL**: `automobile:playground/onboarding`
 - **Description**: Navigate directly to the onboarding screen
 - **Usage**: Test onboarding flow or reset app state to initial setup
 
 ### 2. Login Screen
 
-- **URL**: `automobile://playground/login`
+- **URL**: `automobile:playground/login`
 - **Description**: Navigate directly to the login screen
 - **Usage**: Test authentication flows or bypass onboarding
 
 ### 3. Home Screen
 
-- **URL**: `automobile://playground/home`
+- **URL**: `automobile:playground/home`
 - **Description**: Navigate directly to the home screen
 - **Usage**: Test main app functionality or bypass authentication
 
 ### 4. Video Player Screen
 
-- **URL**: `automobile://playground/video_player/{videoId}`
+- **URL**: `automobile:playground/video_player/{videoId}`
 - **Description**: Navigate directly to the video player with a specific video
 - **Usage**: Test video playback functionality
-- **Example**: `automobile://playground/video_player/sample123`
+- **Example**: `automobile:playground/video_player/sample123`
 
 ## Testing with ADB
 
@@ -41,16 +41,16 @@ You can test deep links using ADB commands:
 
 ```bash
 # Navigate to onboarding
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/onboarding" dev.jasonpearson.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile:playground/onboarding" dev.jasonpearson.automobile.playground
 
 # Navigate to login
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/login" dev.jasonpearson.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile:playground/login" dev.jasonpearson.automobile.playground
 
 # Navigate to home
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/home" dev.jasonpearson.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile:playground/home" dev.jasonpearson.automobile.playground
 
 # Navigate to video player
-adb shell am start -a android.intent.action.VIEW -d "automobile://playground/video_player/test123" dev.jasonpearson.automobile.playground
+adb shell am start -a android.intent.action.VIEW -d "automobile:playground/video_player/test123" dev.jasonpearson.automobile.playground
 ```
 
 ## AutoMobile Test Integration
@@ -79,7 +79,7 @@ val allDeepLinks = DeepLinkManager.getAllDeepLinks()
 ### Intent Handling
 
 - **MainActivity**: Processes incoming deep link intents
-- **AndroidManifest.xml**: Declares intent filters for `automobile://playground` scheme
+- **AndroidManifest.xml**: Declares intent filters for `automobile:playground` scheme
 
 ### Navigation State
 

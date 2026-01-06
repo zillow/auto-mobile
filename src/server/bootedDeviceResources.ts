@@ -5,8 +5,8 @@ import { BootedDevice, Platform } from "../models";
 
 // Resource URIs
 export const BOOTED_DEVICE_RESOURCE_URIS = {
-  ALL_BOOTED: "automobile://devices/booted",
-  PLATFORM_TEMPLATE: "automobile://devices/booted/{platform}"
+  ALL_BOOTED: "automobile:devices/booted",
+  PLATFORM_TEMPLATE: "automobile:devices/booted/{platform}"
 } as const;
 
 // Booted device info for resource response
@@ -75,7 +75,7 @@ async function getBootedDevicesByPlatform(params: Record<string, string>): Promi
   // Validate platform parameter
   if (platform !== "android" && platform !== "ios") {
     return {
-      uri: `automobile://devices/booted/${platform}`,
+      uri: `automobile:devices/booted/${platform}`,
       mimeType: "application/json",
       text: JSON.stringify({
         error: `Invalid platform: ${platform}. Must be 'android' or 'ios'.`
@@ -85,7 +85,7 @@ async function getBootedDevicesByPlatform(params: Record<string, string>): Promi
 
   const result = await getBootedDevicesForPlatforms([platform as Platform]);
   return {
-    uri: `automobile://devices/booted/${platform}`,
+    uri: `automobile:devices/booted/${platform}`,
     mimeType: "application/json",
     text: JSON.stringify(result, null, 2)
   };

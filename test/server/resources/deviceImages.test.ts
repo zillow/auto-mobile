@@ -298,7 +298,7 @@ describe("Device Image Resources with Fakes", () => {
 
       const result = await handler.getAllDeviceImages();
 
-      expect(result.uri).toBe("automobile://devices/images");
+      expect(result.uri).toBe("automobile:devices/images");
       expect(result.mimeType).toBe("application/json");
       expect(result.text).toBeDefined();
 
@@ -325,7 +325,7 @@ describe("Device Image Resources with Fakes", () => {
 
       const result = await handler.getDeviceImagesByPlatform({ platform: "android" });
 
-      expect(result.uri).toBe("automobile://devices/images/android");
+      expect(result.uri).toBe("automobile:devices/images/android");
       expect(result.mimeType).toBe("application/json");
 
       const data: DeviceImagesResourceContent = JSON.parse(result.text!);
@@ -348,7 +348,7 @@ describe("Device Image Resources with Fakes", () => {
 
       const result = await handler.getDeviceImagesByPlatform({ platform: "ios" });
 
-      expect(result.uri).toBe("automobile://devices/images/ios");
+      expect(result.uri).toBe("automobile:devices/images/ios");
       expect(result.mimeType).toBe("application/json");
 
       const data: DeviceImagesResourceContent = JSON.parse(result.text!);
@@ -364,7 +364,7 @@ describe("Device Image Resources with Fakes", () => {
 
       const result = await handler.getDeviceImagesByPlatform({ platform: "windows" });
 
-      expect(result.uri).toBe("automobile://devices/images/windows");
+      expect(result.uri).toBe("automobile:devices/images/windows");
       expect(result.mimeType).toBe("application/json");
 
       const data = JSON.parse(result.text!);

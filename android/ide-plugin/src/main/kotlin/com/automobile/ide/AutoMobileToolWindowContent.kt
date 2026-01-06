@@ -542,7 +542,7 @@ fun AutoMobileToolWindowContent(project: Project) {
   }
 }
 
-private const val NAV_GRAPH_RESOURCE_URI = "automobile://navigation/graph"
+private const val NAV_GRAPH_RESOURCE_URI = "automobile:navigation/graph"
 private const val GRAPH_POLL_INTERVAL_MS = 1000L
 private const val MAX_RECENT_TRANSITIONS = 10
 private val GRAPH_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
