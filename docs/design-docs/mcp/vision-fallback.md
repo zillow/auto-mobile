@@ -1,40 +1,30 @@
 # Vision Fallback for Element Detection
 
-## Overview
+Vision fallback uses Claude's vision API to help locate UI elements when traditional element finding methods fail.
 
-Vision fallback is an internal `tapOn` feature that uses Claude's vision API to help locate UI elements when traditional
-element finding methods fail. It is not exposed via the MCP server or CLI by default; it requires constructing
-`TapOnElement` with a custom vision configuration.
+## Current Implementation
 
-## How It Works
+### Status
 
-When element finding fails after all retries (5 attempts), `TapOnElement` will:
+Vision fallback is an **internal feature** that is:
 
-1. **Screenshot capture**: A screenshot is automatically taken
-2. **Claude analysis**: The screenshot is analyzed using Claude's vision API
+- **Disabled by default** to avoid unexpected API costs
+- Only available when constructing `TapOnElement` with custom vision configuration
+- Not exposed via MCP server or CLI by default
+- Currently integrated into `tapOn` only (invoked after 5 retry attempts fail)
+- Android screenshots only (iOS not yet implemented)
+
+### How It Works
+
+When element finding fails after retries, `TapOnElement` will:
+
+1. **Screenshot capture**: Screenshot automatically taken (~100-200ms)
+2. **Claude analysis**: Screenshot analyzed using Claude vision API (~2-5 seconds)
 3. **Smart response**: Based on confidence level, Claude provides:
-   - **High confidence**: Step-by-step navigation instructions
-   - **Medium/Low confidence**: Alternative selectors or detailed error explanation
+   - **High confidence**: Alternative selectors or navigation instructions
+   - **Low confidence**: Detailed error explanation with screen context
 
-## Configuration
-
-Vision fallback is **disabled by default** to avoid unexpected API costs. It is only configurable per
-`TapOnElement` instance today.
-
-### Default Configuration
-
-```typescript
-{
-  enabled: false,              // Disabled by default
-  provider: 'claude',          // Only Claude supported currently
-  confidenceThreshold: 'high', // Reserved for future gating (not enforced yet)
-  maxCostUsd: 1.0,            // Warning threshold (does not block calls)
-  cacheResults: true,          // Cache results to avoid repeated calls
-  cacheTtlMinutes: 60         // Cache for 60 minutes
-}
-```
-
-### Enabling Vision Fallback (Internal API)
+### Configuration
 
 ```typescript
 const tapTool = new TapOnElement(
@@ -43,192 +33,179 @@ const tapTool = new TapOnElement(
   axe,
   webdriver,
   {
-    ...DEFAULT_VISION_CONFIG,
-    enabled: true  // Enable vision fallback
+    enabled: true,              // Enable vision fallback
+    provider: 'claude',         // Only Claude supported currently
+    confidenceThreshold: 'high', // Reserved for future gating
+    maxCostUsd: 1.0,            // Warning threshold (does not block)
+    cacheResults: true,         // Cache to avoid repeated calls
+    cacheTtlMinutes: 60         // Cache for 60 minutes
   }
 );
 ```
 
-Note: The MCP server constructs `TapOnElement` with the default config, so vision fallback is not available through MCP
-tool calls unless you modify the server code.
+**Note**: MCP server constructs `TapOnElement` with default config (enabled: false), so vision fallback is not available through MCP unless you modify the server code.
 
-## Example Scenarios
+### Example Scenarios
 
-### Scenario 1: Element Text Changed
-
-**Input**: `tapOn({ text: "Login" })`
-
-**Traditional Error**:
+**Element Text Changed**:
 ```
+Input: tapOn({ text: "Login" })
+
+Traditional Error:
 Element not found with provided text 'Login'
-```
 
-**With Vision Fallback** (if enabled):
-```
+With Vision Fallback:
 Element not found. AI suggests trying:
 - text: "Sign In" (Text label changed from 'Login' to 'Sign In')
-
 (Cost: $0.0234, Confidence: high)
 ```
 
-### Scenario 2: Element Requires Navigation
-
-**Input**: `tapOn({ text: "Advanced Settings" })`
-
-**With Vision Fallback**:
+**Element Requires Navigation**:
 ```
+Input: tapOn({ text: "Advanced Settings" })
+
+With Vision Fallback:
 Element not found, but AI suggests these steps:
 1. Scroll down in the settings menu to reveal more options
 2. Look for "Advanced Settings" in the newly visible section
-
 (Cost: $0.0312, Confidence: high)
 ```
 
-### Scenario 3: Element Doesn't Exist
-
-**Input**: `tapOn({ text: "Nonexistent Button" })`
-
-**With Vision Fallback**:
+**Element Doesn't Exist**:
 ```
+Input: tapOn({ text: "Nonexistent Button" })
+
+With Vision Fallback:
 Element not found. The current screen shows a login form with
 'Username', 'Password', and 'Sign In' elements. The requested
 'Nonexistent Button' is not visible on this screen.
-
 (Cost: $0.0198, Confidence: high)
 ```
 
-## Cost Tracking
+### Cost and Performance
 
-Vision fallback tracks and reports costs for each API call:
+**Typical costs per failed search**:
+- Input tokens: Screenshot + view hierarchy + prompt (~5,000-10,000 tokens)
+- Output tokens: Analysis response (~500-1,000 tokens)
+- **Cost**: $0.02-0.05 per vision fallback call
 
-- **Input tokens**: Screenshot + view hierarchy + prompt (~5,000-10,000 tokens)
-- **Output tokens**: Analysis response (~500-1,000 tokens)
-- **Typical cost**: $0.02-0.05 per failed element search
+**Performance**:
+- Screenshot capture: ~100-200ms
+- Claude API call: ~2-5 seconds
+- **Total**: ~2-5 seconds (only when traditional methods fail)
 
-## Performance
+**Caching**:
+- Cache key: Screenshot path + search criteria (text/resourceId)
+- TTL: 60 minutes (configurable)
+- Benefit: Instant response for repeated failures
 
-- **Screenshot capture**: ~100-200ms
-- **Claude API call**: ~2-5 seconds
-- **Total fallback time**: ~2-5 seconds (only when traditional methods fail)
+### API Key Setup
 
-## Caching
+Vision fallback requires an Anthropic API key:
 
-Results are cached to avoid repeated API calls for the same element search:
+```bash
+export ANTHROPIC_API_KEY=sk-ant-xxxxx
+```
 
-- **Cache key**: Screenshot path + search criteria (text/resourceId)
-- **TTL**: 60 minutes (configurable)
-- **Benefit**: Instant response for repeated failures
+Get an API key at: https://console.anthropic.com/
 
-## Limitations
+### Limitations
 
-### Current Limitations
+**Current Limitations**:
+1. **tapOn only**: Not integrated into other tools (swipeOn, scrollUntil, etc.)
+2. **Android only**: iOS screenshot capture not implemented
+3. **No auto-retry**: Suggestions are informational - user must manually retry with suggested selectors
+4. **Not in MCP**: Requires custom TapOnElement construction, not available via MCP server by default
 
-1. **tapOn only**: Currently only integrated into `tapOn` tool
-   - Additional tools would need explicit integration.
-
-2. **Android screenshots**: Works best with clear Android UI screenshots
-   - iOS screenshot capture is not implemented yet (vision fallback will fail to read the image).
-
-3. **No auto-retry**: Suggestions are informational only
-   - User must manually retry with suggested selectors
-   - Future: Auto-retry with suggested alternatives
-
-### When Vision Fallback Won't Help
-
+**When Vision Fallback Won't Help**:
 - Element truly doesn't exist on screen
 - Screenshot quality is poor
 - Custom/non-standard UI elements
 - Dynamic content that changes rapidly
 
-## API Key Setup
+## Proposed Future Architecture
 
-Vision fallback requires an Anthropic API key:
+The following hybrid vision approach is **not implemented** - it is a design proposal for future enhancement.
 
-```bash
-# Set API key
-export ANTHROPIC_API_KEY=sk-ant-xxxxx
+### Design Principles
 
-# Verify it's set
-echo $ANTHROPIC_API_KEY
-```
+1. **Last Resort**: Only activate after all existing fallback mechanisms exhausted
+2. **Cost Conscious**: Prefer local models (80% cases), escalate to Claude only when needed
+3. **High Confidence**: Only suggest navigation steps when confidence is high
+4. **Transparent**: Clear error messages when fallback cannot help
+5. **Fast & Offline**: Local models provide <500ms responses without internet
 
-Get an API key at: https://console.anthropic.com/
+### Proposed Hybrid Approach
 
-## Monitoring Usage
+When implemented, add a **Tier 1** local model layer before Claude:
 
-### Check Cache Stats
+- **Tier 1**: Fast, free local models (Florence-2, PaddleOCR) for common cases (~80%)
+  - OCR + object detection + element descriptions
+  - <500ms response time, $0 cost
+  - Handles text extraction and simple element matching
 
-```typescript
-const visionFallback = new VisionFallback(config);
-const stats = visionFallback.getCacheStats();
+- **Tier 2**: Claude vision API for complex cases (~15%)
+  - Advanced navigation and spatial reasoning
+  - 2-5s response time, $0.02-0.05 cost
+  - Optional Set-of-Mark preprocessing
 
-console.log(`Cache size: ${stats.size}`);
-console.log(`Cached keys: ${stats.keys.join(', ')}`);
-```
+**Expected Distribution**:
+- 80% resolved by Tier 1 (local models find alternative selectors)
+- 15% resolved by Tier 2 (Claude provides navigation)
+- 5% genuine failures (element truly doesn't exist)
 
-### Clear Cache
-
-```typescript
-visionFallback.clearCache();
-```
-
-## Advanced Configuration
-
-### Adjust Confidence Threshold
+### Proposed Component Structure
 
 ```typescript
-{
-  enabled: true,
-  confidenceThreshold: 'medium'  // More suggestions, possibly lower quality
+export interface VisionFallbackConfig {
+  enabled: boolean;
+
+  // Tier 1: Local models
+  tier1: {
+    enabled: boolean;
+    models: Array<'florence2' | 'paddleocr'>;
+    confidenceThreshold: number;  // 0-1
+    timeoutMs: number;
+  };
+
+  // Tier 2: Claude vision API
+  tier2: {
+    enabled: boolean;
+    useSoM: boolean;  // Set-of-Mark preprocessing
+    confidenceThreshold: "high" | "medium" | "low";
+    maxCostUsd: number;
+  };
+
+  cacheResults: boolean;
+  cacheTtlMinutes: number;
 }
 ```
 
-- `'high'`: Only suggest when >90% confident
-- `'medium'`: Suggest when >70% confident
-- `'low'`: Suggest when >50% confident
+### Local Model Integration
 
-### Increase Cost Limit
+**Florence-2** for OCR + object detection:
+- Extract all text with bounding boxes
+- Detect UI elements (buttons, inputs, menus)
+- Generate element descriptions
+- ONNX runtime with CUDA/CPU execution
 
-```typescript
-{
-  enabled: true,
-  maxCostUsd: 5.0  // Allow up to $5 per call
-}
-```
+**PaddleOCR** as fallback:
+- Deep text extraction for complex/multi-language cases
+- Layout analysis (text, title, list, table, figure)
+- Used when Florence-2 confidence < 0.7
 
-**Warning**: A single call shouldn't exceed ~$0.10 under normal circumstances. Higher limits protect against edge cases.
+### Future Enhancements
 
-## Troubleshooting
-
-### "Vision fallback is not enabled"
-
-Enable it in the configuration (see above).
-
-### "ANTHROPIC_API_KEY not set"
-
-```bash
-export ANTHROPIC_API_KEY=your-key-here
-```
-
-### "Screenshot capture failed"
-
-Ensure device is connected and accessible:
-```bash
-adb devices
-```
-
-### High costs
-
-- Check if caching is enabled (`cacheResults: true`)
-- Reduce `maxCostUsd` to set limits
-- Monitor usage in Anthropic console
-
-## Future Enhancements
-
-Planned improvements (not yet implemented):
+Planned improvements:
 
 1. **Auto-retry**: Automatically retry with suggested selectors
 2. **More tools**: Integrate into `swipeOn`, `scrollUntil`, etc.
-3. **Local models**: Add Florence-2/PaddleOCR for faster, free fallback
-4. **Set-of-Mark**: Enhanced spatial understanding with visual markers
-5. **Learning**: Track corrections to improve suggestions over time
+3. **Set-of-Mark**: Enhanced spatial understanding with visual markers
+4. **Learning**: Track corrections to improve suggestions over time
+5. **Multi-screenshot analysis**: Compare before/after states
+6. **Visual regression detection**: Alert when UI changed significantly
+
+## See Also
+
+- [MCP Actions](actions.md) - Tool implementation details
+- [Feature Flags](feature-flags.md) - Runtime configuration
