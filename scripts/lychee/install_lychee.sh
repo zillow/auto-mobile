@@ -154,14 +154,17 @@ install_manual() {
     arch=$(detect_arch)
 
     # Map OS and architecture to GitHub release naming
+    # Note: GitHub release tag is "lychee-v${VERSION}" but asset names are "lychee-${ARCH}..."
     case "$os" in
         macos)
             case "$arch" in
                 x86_64)
-                    binary_name="lychee-v${LYCHEE_VERSION}-x86_64-apple-darwin.tar.gz"
+                    # No x86_64 macOS binary, use arm64 (Rosetta can run it)
+                    echo -e "${YELLOW}No native x86_64 macOS binary. Using arm64 (Rosetta 2 required)${NC}"
+                    binary_name="lychee-arm64-macos.tar.gz"
                     ;;
                 aarch64)
-                    binary_name="lychee-v${LYCHEE_VERSION}-aarch64-apple-darwin.tar.gz"
+                    binary_name="lychee-arm64-macos.tar.gz"
                     ;;
                 *)
                     echo -e "${RED}Unsupported architecture: $arch${NC}"
@@ -172,13 +175,13 @@ install_manual() {
         linux)
             case "$arch" in
                 x86_64)
-                    binary_name="lychee-v${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+                    binary_name="lychee-x86_64-unknown-linux-gnu.tar.gz"
                     ;;
                 aarch64)
-                    binary_name="lychee-v${LYCHEE_VERSION}-aarch64-unknown-linux-gnu.tar.gz"
+                    binary_name="lychee-aarch64-unknown-linux-gnu.tar.gz"
                     ;;
                 armv7)
-                    binary_name="lychee-v${LYCHEE_VERSION}-armv7-unknown-linux-gnueabihf.tar.gz"
+                    binary_name="lychee-armv7-unknown-linux-gnueabihf.tar.gz"
                     ;;
                 *)
                     echo -e "${RED}Unsupported architecture: $arch${NC}"
@@ -189,7 +192,7 @@ install_manual() {
         windows)
             case "$arch" in
                 x86_64)
-                    binary_name="lychee-v${LYCHEE_VERSION}-x86_64-pc-windows-msvc.zip"
+                    binary_name="lychee-x86_64-windows.exe"
                     ;;
                 *)
                     echo -e "${RED}Unsupported architecture: $arch${NC}"
@@ -207,8 +210,8 @@ install_manual() {
     install_dir="$HOME/.local/bin"
     mkdir -p "$install_dir"
 
-    # Download URL
-    download_url="https://github.com/lycheeverse/lychee/releases/download/v${LYCHEE_VERSION}/${binary_name}"
+    # Download URL - tag is "lychee-v${VERSION}" but asset names don't include version
+    download_url="https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/${binary_name}"
 
     echo -e "${GREEN}Downloading lychee binary from GitHub releases...${NC}"
     echo "URL: $download_url"
@@ -234,36 +237,57 @@ install_manual() {
         return 1
     fi
 
-    # Extract the archive
+    # Extract the archive or handle direct executable
     cd "$temp_dir" || exit
     case "$binary_name" in
         *.tar.gz)
-            tar -xzf "$binary_name"
+            if ! tar -xzf "$binary_name"; then
+                echo -e "${RED}Failed to extract archive${NC}"
+                return 1
+            fi
             ;;
         *.zip)
             if command_exists unzip; then
-                unzip "$binary_name"
+                if ! unzip "$binary_name"; then
+                    echo -e "${RED}Failed to extract archive${NC}"
+                    return 1
+                fi
             else
                 echo -e "${RED}unzip command not found. Please install unzip or extract manually.${NC}"
                 return 1
             fi
             ;;
+        *.exe)
+            # Windows executable - no extraction needed, just rename
+            mv "$binary_name" lychee.exe
+            ;;
         *)
-            echo -e "${RED}Unsupported archive format${NC}"
+            echo -e "${RED}Unsupported archive format: $binary_name${NC}"
             return 1
             ;;
     esac
 
     # Find the lychee binary and move it to install directory
-    lychee_binary=$(find . -name "lychee" -type f | head -1)
+    if [[ "$binary_name" == *.exe ]]; then
+        lychee_binary="./lychee.exe"
+    else
+        lychee_binary=$(find . -name "lychee" -o -name "lychee.exe" | grep -v ".tar.gz" | head -1)
+    fi
+
     if [[ -z "$lychee_binary" ]]; then
         echo -e "${RED}Could not find lychee binary in extracted archive${NC}"
+        echo -e "${YELLOW}Contents of temp directory:${NC}"
+        ls -la
         return 1
     fi
 
     # Make executable and move to install directory
     chmod +x "$lychee_binary"
-    mv "$lychee_binary" "$install_dir/lychee"
+    if [[ "$binary_name" == *.exe ]]; then
+        mv "$lychee_binary" "$install_dir/lychee.exe"
+    else
+        mv "$lychee_binary" "$install_dir/lychee"
+    fi
 
     echo -e "${GREEN}lychee installed successfully to $install_dir${NC}"
 
