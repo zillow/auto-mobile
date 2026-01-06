@@ -3,6 +3,7 @@ import { TakeScreenshot } from "../../../src/features/observe/TakeScreenshot";
 import { BootedDevice } from "../../../src/models/DeviceInfo";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeFileSystem } from "../../fakes/FakeFileSystem";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("TakeScreenshot", function() {
   describe("Unit Tests for Extracted Methods", function() {
@@ -44,13 +45,14 @@ describe("TakeScreenshot", function() {
     });
 
     test("should generate different timestamps for consecutive calls", async function() {
-      const timestamp1 = Date.now();
+      const fakeTimer = new FakeTimer();
+      fakeTimer.setManualMode();
+      const timestamp1 = fakeTimer.now();
       const options = { format: "png" as const };
 
       const result1 = takeScreenshot.generateScreenshotPath(timestamp1, options);
-      // Add a small delay to ensure different timestamps
-      await new Promise(resolve => setTimeout(resolve, 10));
-      const timestamp2 = Date.now();
+      fakeTimer.advanceTime(1);
+      const timestamp2 = fakeTimer.now();
       const result2 = takeScreenshot.generateScreenshotPath(timestamp2, options);
 
       expect(result1).not.toBe(result2);

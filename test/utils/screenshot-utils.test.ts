@@ -4,13 +4,17 @@ import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../src/utils/constants
 import fs from "fs-extra";
 import path from "path";
 import sharp from "sharp";
+import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("ScreenshotUtils", function() {
   const testDir = "/tmp/test-screenshots";
+  let fakeTimer: FakeTimer;
 
   beforeEach(async function() {
     // Create test directory
     await fs.ensureDir(testDir);
+    fakeTimer = new FakeTimer();
+    fakeTimer.setManualMode();
   });
 
   afterEach(async function() {
@@ -228,7 +232,7 @@ describe("ScreenshotUtils", function() {
         }
       }).png().toBuffer();
 
-      const timestamp = Date.now();
+      const timestamp = fakeTimer.now();
       const testFilename = `screenshot_${timestamp}.png`;
       await fs.writeFile(path.join(testDir, testFilename), baseImage);
 
@@ -264,7 +268,7 @@ describe("ScreenshotUtils", function() {
       }).png().toBuffer();
 
       // Save a very different image
-      const timestamp = Date.now();
+      const timestamp = fakeTimer.now();
       await fs.writeFile(path.join(testDir, `screenshot_${timestamp}.png`), differentImage);
 
       const result = await ScreenshotUtils.findSimilarScreenshots(
@@ -313,11 +317,10 @@ describe("ScreenshotUtils", function() {
 
       // Create 10 different screenshot files
       for (let i = 0; i < 10; i++) {
-        const timestamp = Date.now() + i;
+        fakeTimer.advanceTime(1);
+        const timestamp = fakeTimer.now();
         const filename = `screenshot_${timestamp}.png`;
         await fs.writeFile(path.join(testDir, filename), testImage);
-        // Add small delay to ensure different timestamps
-        await new Promise(resolve => setTimeout(resolve, 1));
       }
 
       const result = await ScreenshotUtils.findSimilarScreenshots(

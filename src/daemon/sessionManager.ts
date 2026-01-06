@@ -1,3 +1,4 @@
+import { defaultTimer, Timer } from "../utils/SystemTimer";
 import { logger } from "../utils/logger";
 
 /**
@@ -48,6 +49,7 @@ export class SessionManager {
   private sessionDeviceMap: Map<string, string> = new Map(); // sessionId -> deviceId
   private deviceSessionMap: Map<string, string> = new Map(); // deviceId -> sessionId (reverse lookup)
   private cleanupTimer: NodeJS.Timeout | null = null;
+  private timer: Timer;
 
   // Session timeout: 30 minutes
   private readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000;
@@ -57,7 +59,8 @@ export class SessionManager {
 
   static readonly DEFAULT_HEARTBEAT_TIMEOUT_MS = 10 * 1000;
 
-  constructor() {
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
     // Start periodic cleanup of expired sessions
     this.startCleanupTimer();
   }
@@ -77,7 +80,7 @@ export class SessionManager {
       return this.sessions.get(sessionId)!;
     }
 
-    const now = Date.now();
+    const now = this.timer.now();
     const session: Session = {
       sessionId,
       assignedDevice,
@@ -128,8 +131,8 @@ export class SessionManager {
     if (existing) {
       logger.info(`[SessionManager] Found existing session ${sessionId} with device ${existing.assignedDevice}`);
       // Update last used time
-      existing.lastUsedAt = Date.now();
-      existing.expiresAt = Date.now() + this.SESSION_TIMEOUT_MS;
+      existing.lastUsedAt = this.timer.now();
+      existing.expiresAt = this.timer.now() + this.SESSION_TIMEOUT_MS;
       return existing;
     }
 
@@ -208,8 +211,8 @@ export class SessionManager {
       ...session.cacheData,
       ...updates,
     };
-    session.lastUsedAt = Date.now();
-    session.lastHeartbeat = Date.now();
+    session.lastUsedAt = this.timer.now();
+    session.lastHeartbeat = this.timer.now();
 
     logger.debug(`Updated cache for session ${sessionId}`);
   }
@@ -224,8 +227,8 @@ export class SessionManager {
     }
 
     // Update last used time when accessing cache
-    session.lastUsedAt = Date.now();
-    session.lastHeartbeat = Date.now();
+    session.lastUsedAt = this.timer.now();
+    session.lastHeartbeat = this.timer.now();
 
     return session.cacheData;
   }
@@ -239,7 +242,7 @@ export class SessionManager {
       logger.warn(`Cannot record heartbeat for session ${sessionId}: not found`);
       return;
     }
-    const now = Date.now();
+    const now = this.timer.now();
     session.lastHeartbeat = now;
     session.lastUsedAt = now;
     session.expiresAt = now + this.SESSION_TIMEOUT_MS;
@@ -297,7 +300,7 @@ export class SessionManager {
    * Check if session is expired
    */
   private isSessionExpired(session: Session): boolean {
-    return Date.now() > session.expiresAt;
+    return this.timer.now() > session.expiresAt;
   }
 
   /**
@@ -316,7 +319,7 @@ export class SessionManager {
    * Start periodic cleanup of expired sessions
    */
   private startCleanupTimer(): void {
-    this.cleanupTimer = setInterval(() => {
+    this.cleanupTimer = this.timer.setInterval(() => {
       const expiredSessions: string[] = [];
 
       for (const [sessionId, session] of this.sessions) {
@@ -338,7 +341,9 @@ export class SessionManager {
     }, this.CLEANUP_INTERVAL_MS);
 
     // Allow process to exit even if timer is running
-    this.cleanupTimer.unref();
+    if (this.cleanupTimer && typeof (this.cleanupTimer as { unref?: () => void }).unref === "function") {
+      this.cleanupTimer.unref();
+    }
   }
 
   /**
@@ -346,7 +351,7 @@ export class SessionManager {
    */
   stopCleanupTimer(): void {
     if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
+      this.timer.clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
     }
   }

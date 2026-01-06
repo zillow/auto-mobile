@@ -5,6 +5,7 @@
  * - Serial operations (executed sequentially) -> JSON arrays
  * - Parallel operations (executed concurrently) -> JSON objects
  */
+import { Timer, defaultTimer } from "./SystemTimer";
 
 /**
  * Represents a single timing entry in the performance data
@@ -111,13 +112,16 @@ export interface PerformanceTracker {
 export class DefaultPerformanceTracker implements PerformanceTracker {
   private root: TimingBlock;
   private current: TimingBlock;
+  private timer: Timer;
 
-  constructor() {
+  constructor(timer: Timer = defaultTimer) {
+    this.timer = timer;
+    const startMs = this.timer.now();
     // Initialize with a root serial block
     this.root = {
       name: "root",
       type: "serial",
-      startMs: Date.now(),
+      startMs,
       entries: [],
       parent: null
     };
@@ -128,7 +132,7 @@ export class DefaultPerformanceTracker implements PerformanceTracker {
     const block: TimingBlock = {
       name,
       type: "serial",
-      startMs: Date.now(),
+      startMs: this.timer.now(),
       entries: [],
       parent: this.current
     };
@@ -140,7 +144,7 @@ export class DefaultPerformanceTracker implements PerformanceTracker {
     const block: TimingBlock = {
       name,
       type: "parallel",
-      startMs: Date.now(),
+      startMs: this.timer.now(),
       entries: {},
       parent: this.current
     };
@@ -149,11 +153,11 @@ export class DefaultPerformanceTracker implements PerformanceTracker {
   }
 
   async track<T>(name: string, fn: () => Promise<T>): Promise<T> {
-    const startMs = Date.now();
+    const startMs = this.timer.now();
     try {
       return await fn();
     } finally {
-      const durationMs = Date.now() - startMs;
+      const durationMs = this.timer.now() - startMs;
       const entry: TimingEntry = { name, durationMs };
 
       if (Array.isArray(this.current.entries)) {
@@ -167,11 +171,11 @@ export class DefaultPerformanceTracker implements PerformanceTracker {
   }
 
   trackSync<T>(name: string, fn: () => T): T {
-    const startMs = Date.now();
+    const startMs = this.timer.now();
     try {
       return fn();
     } finally {
-      const durationMs = Date.now() - startMs;
+      const durationMs = this.timer.now() - startMs;
       const entry: TimingEntry = { name, durationMs };
 
       if (Array.isArray(this.current.entries)) {
@@ -186,7 +190,7 @@ export class DefaultPerformanceTracker implements PerformanceTracker {
 
   end(): PerformanceTracker {
     if (this.current.parent) {
-      const durationMs = Date.now() - this.current.startMs;
+      const durationMs = this.timer.now() - this.current.startMs;
       const entry: TimingEntry = {
         name: this.current.name,
         durationMs,
@@ -238,7 +242,7 @@ export class DefaultPerformanceTracker implements PerformanceTracker {
   private operationStarts: Map<string, number> = new Map();
 
   startOperation(name: string): void {
-    this.operationStarts.set(name, Date.now());
+    this.operationStarts.set(name, this.timer.now());
   }
 
   endOperation(name: string): void {
@@ -248,7 +252,7 @@ export class DefaultPerformanceTracker implements PerformanceTracker {
     }
     this.operationStarts.delete(name);
 
-    const durationMs = Date.now() - startMs;
+    const durationMs = this.timer.now() - startMs;
     const entry: TimingEntry = { name, durationMs };
 
     if (Array.isArray(this.current.entries)) {
@@ -318,8 +322,8 @@ export class NoOpPerformanceTracker implements PerformanceTracker {
 /**
  * Factory function to create appropriate tracker based on enabled flag
  */
-export function createPerformanceTracker(enabled: boolean): PerformanceTracker {
-  return enabled ? new DefaultPerformanceTracker() : new NoOpPerformanceTracker();
+export function createPerformanceTracker(enabled: boolean, timer: Timer = defaultTimer): PerformanceTracker {
+  return enabled ? new DefaultPerformanceTracker(timer) : new NoOpPerformanceTracker();
 }
 
 /**

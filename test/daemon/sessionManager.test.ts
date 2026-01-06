@@ -1,11 +1,15 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { SessionManager } from "../../src/daemon/sessionManager";
+import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("SessionManager", () => {
   let sessionManager: SessionManager;
+  let fakeTimer: FakeTimer;
 
   beforeEach(() => {
-    sessionManager = new SessionManager();
+    fakeTimer = new FakeTimer();
+    fakeTimer.setManualMode();
+    sessionManager = new SessionManager(fakeTimer);
   });
 
   afterEach(() => {
@@ -32,13 +36,10 @@ describe("SessionManager", () => {
     });
 
     test("should set correct expiration time for session", async () => {
-      const beforeCreate = Date.now();
+      const beforeCreate = fakeTimer.now();
       const session = await sessionManager.createSession("session-1", "emulator-5554");
-      const afterCreate = Date.now();
-      const expectedMinExpiry = beforeCreate + 30 * 60 * 1000; // 30 minutes
-      const expectedMaxExpiry = afterCreate + 30 * 60 * 1000;
-      expect(session.expiresAt).toBeGreaterThanOrEqual(expectedMinExpiry);
-      expect(session.expiresAt).toBeLessThanOrEqual(expectedMaxExpiry);
+      const expectedExpiry = beforeCreate + 30 * 60 * 1000; // 30 minutes
+      expect(session.expiresAt).toBe(expectedExpiry);
     });
   });
 
@@ -54,10 +55,10 @@ describe("SessionManager", () => {
       const session1 = await sessionManager.createSession("session-1", "emulator-5554");
       const initialLastUsed = session1.lastUsedAt;
       const initialExpiry = session1.expiresAt;
-      await new Promise(resolve => setTimeout(resolve, 10)); // Small delay
+      fakeTimer.advanceTime(10);
       const session2 = await sessionManager.getOrCreateSession("session-1");
-      expect(session2.lastUsedAt).toBeGreaterThanOrEqual(initialLastUsed);
-      expect(session2.expiresAt).toBeGreaterThan(initialExpiry);
+      expect(session2.lastUsedAt).toBe(initialLastUsed + 10);
+      expect(session2.expiresAt).toBe(initialExpiry + 10);
     });
 
     test("should throw error for non-existent session without device pool", async () => {
@@ -73,7 +74,8 @@ describe("SessionManager", () => {
     test("should return null session when expired session requested", async () => {
       const session = await sessionManager.createSession("session-1", "emulator-5554");
       // Force expiration by setting expiresAt to past
-      const oneSecondAgo = Date.now() - 1000;
+      fakeTimer.advanceTime(2000);
+      const oneSecondAgo = fakeTimer.now() - 1000;
       (session as any).expiresAt = oneSecondAgo;
       const retrieved = sessionManager.getSession("session-1");
       expect(retrieved).toBeNull();
@@ -99,11 +101,11 @@ describe("SessionManager", () => {
       });
       const session1 = sessionManager.getSession("session-1");
       const initialLastUsed = session1?.lastUsedAt ?? 0;
-      await new Promise(resolve => setTimeout(resolve, 10));
+      fakeTimer.advanceTime(10);
       const cache = sessionManager.getSessionCache("session-1");
       const session2 = sessionManager.getSession("session-1");
       expect(cache?.customData).toEqual({ key: "value" });
-      expect((session2?.lastUsedAt ?? 0)).toBeGreaterThan(initialLastUsed);
+      expect((session2?.lastUsedAt ?? 0)).toBe(initialLastUsed + 10);
     });
 
     test("should clear specific cache key", async () => {

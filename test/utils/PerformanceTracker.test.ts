@@ -13,13 +13,17 @@ import {
   setMaxPerfTimingSizeBytes,
   getMaxPerfTimingSizeBytes
 } from "../../src/utils/PerformanceTracker";
+import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("PerformanceTracker", function() {
   describe("PerformanceTracker (enabled)", function() {
     let tracker: PerformanceTracker;
+    let fakeTimer: FakeTimer;
 
     beforeEach(function() {
-      tracker = new DefaultPerformanceTracker();
+      fakeTimer = new FakeTimer();
+      fakeTimer.setManualMode();
+      tracker = new DefaultPerformanceTracker(fakeTimer);
     });
 
     test("should be enabled", function() {
@@ -27,16 +31,18 @@ describe("PerformanceTracker", function() {
     });
 
     test("should track a simple operation", async function() {
-      await tracker.track("simpleOp", async () => {
-        await sleep(10);
+      const resultPromise = tracker.track("simpleOp", async () => {
+        await fakeTimer.sleep(10);
         return "result";
       });
+      fakeTimer.advanceTime(10);
+      await resultPromise;
 
       const timings = tracker.getTimings() as TimingEntry[];
       expect(Array.isArray(timings)).toBe(true);
       expect(timings).toHaveLength(1);
       expect(timings[0].name).toBe("simpleOp");
-      expect(timings[0].durationMs).toBeGreaterThanOrEqual(9);
+      expect(timings[0].durationMs).toBe(10);
     });
 
     test("should return function result from track", async function() {
@@ -50,9 +56,9 @@ describe("PerformanceTracker", function() {
     test("should track serial operations as array", async function() {
       tracker.serial("serialBlock");
 
-      await tracker.track("step1", async () => sleep(5));
-      await tracker.track("step2", async () => sleep(5));
-      await tracker.track("step3", async () => sleep(5));
+      await trackWithDelay(fakeTimer, tracker, "step1", 5);
+      await trackWithDelay(fakeTimer, tracker, "step2", 5);
+      await trackWithDelay(fakeTimer, tracker, "step3", 5);
 
       tracker.end();
 
@@ -74,11 +80,17 @@ describe("PerformanceTracker", function() {
     test("should track parallel operations as object", async function() {
       tracker.parallel("parallelBlock");
 
-      await Promise.all([
-        tracker.track("opA", async () => sleep(5)),
-        tracker.track("opB", async () => sleep(5)),
-        tracker.track("opC", async () => sleep(5)),
-      ]);
+      const opA = tracker.track("opA", async () => {
+        await fakeTimer.sleep(5);
+      });
+      const opB = tracker.track("opB", async () => {
+        await fakeTimer.sleep(5);
+      });
+      const opC = tracker.track("opC", async () => {
+        await fakeTimer.sleep(5);
+      });
+      fakeTimer.advanceTime(5);
+      await Promise.all([opA, opB, opC]);
 
       tracker.end();
 
@@ -100,16 +112,20 @@ describe("PerformanceTracker", function() {
     test("should handle nested serial and parallel blocks", async function() {
       tracker.serial("outer");
 
-      await tracker.track("first", async () => sleep(2));
+      await trackWithDelay(fakeTimer, tracker, "first", 2);
 
       tracker.parallel("parallel");
-      await Promise.all([
-        tracker.track("pA", async () => sleep(5)),
-        tracker.track("pB", async () => sleep(5)),
-      ]);
+      const parallelA = tracker.track("pA", async () => {
+        await fakeTimer.sleep(5);
+      });
+      const parallelB = tracker.track("pB", async () => {
+        await fakeTimer.sleep(5);
+      });
+      fakeTimer.advanceTime(5);
+      await Promise.all([parallelA, parallelB]);
       tracker.end();
 
-      await tracker.track("last", async () => sleep(2));
+      await trackWithDelay(fakeTimer, tracker, "last", 2);
 
       tracker.end();
 
@@ -135,7 +151,7 @@ describe("PerformanceTracker", function() {
 
     test("should auto-close unclosed blocks on getTimings", async function() {
       tracker.serial("unclosed");
-      await tracker.track("op", async () => sleep(1));
+      await trackWithDelay(fakeTimer, tracker, "op", 1);
       // Don't call end()
 
       const timings = tracker.getTimings() as TimingEntry[];
@@ -454,7 +470,15 @@ describe("PerformanceTracker", function() {
   });
 });
 
-// Helper function
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+async function trackWithDelay(
+  timer: FakeTimer,
+  tracker: PerformanceTracker,
+  name: string,
+  ms: number
+): Promise<void> {
+  const promise = tracker.track(name, async () => {
+    await timer.sleep(ms);
+  });
+  timer.advanceTime(ms);
+  await promise;
 }

@@ -2,6 +2,7 @@ import fs from "fs-extra";
 import path from "path";
 import { logger } from "../logger";
 import { readFileAsync, readdirAsync } from "../io";
+import { Timer, defaultTimer } from "../SystemTimer";
 import { PerceptualHasher } from "./PerceptualHasher";
 
 export class ScreenshotCache {
@@ -13,11 +14,15 @@ export class ScreenshotCache {
   /**
    * Get screenshot from cache or load from disk
    * @param filePath Path to screenshot file
+   * @param timer Optional timer for testing
    * @returns Promise with screenshot buffer and perceptual hash
    */
-  static async getCachedScreenshot(filePath: string): Promise<{ buffer: Buffer; hash: string }> {
+  static async getCachedScreenshot(
+    filePath: string,
+    timer: Timer = defaultTimer
+  ): Promise<{ buffer: Buffer; hash: string }> {
     const normalizedPath = path.normalize(filePath);
-    const now = Date.now();
+    const now = timer.now();
 
     // Check memory cache first
     const cached = ScreenshotCache.screenshotCache.get(normalizedPath);
@@ -64,6 +69,13 @@ export class ScreenshotCache {
       hash,
       lastAccess: timestamp
     });
+  }
+
+  /**
+   * Clear the in-memory cache (useful for tests)
+   */
+  static clearCache(): void {
+    ScreenshotCache.screenshotCache.clear();
   }
 
   /**

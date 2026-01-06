@@ -17,7 +17,7 @@ describe("Shake", () => {
 
   // Helper function to create mock ObserveResult
   const createObserveResult = (): ObserveResult => ({
-    timestamp: Date.now(),
+    timestamp: 1700000000000,
     screenSize: { width: 1080, height: 1920 },
     systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
     viewHierarchy: { node: {} }
@@ -57,11 +57,6 @@ describe("Shake", () => {
 
       // Start the execution
       const resultPromise = shake.execute();
-
-      // Wait a bit for sleep to be called, then resolve all pending sleeps
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
-
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -85,8 +80,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({ duration: 100 }); // Reduced for faster test
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -102,8 +95,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({ intensity: 200, duration: 100 }); // Reduced duration
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -118,8 +109,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({ duration: 100, intensity: 150 }); // Reduced duration
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -134,8 +123,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({});
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -153,8 +140,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({ duration: 0 });
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -168,8 +153,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({ intensity: 0, duration: 100 });
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -188,8 +171,6 @@ describe("Shake", () => {
         callbackCalled = true;
       };
       const resultPromise = shake.execute({ duration: 50 }, progressCallback);
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -205,8 +186,6 @@ describe("Shake", () => {
 
       try {
         const resultPromise = shake.execute({ duration: 100 });
-        await new Promise(resolve => setTimeout(resolve, 10));
-        fakeTimer.resolveAll();
         const result = await resultPromise;
         // If we get here, command succeeded despite fake error
         expect(result.duration).toBe(100);
@@ -226,8 +205,6 @@ describe("Shake", () => {
 
       try {
         const resultPromise = shake.execute({ duration: 50 }); // Very short duration
-        await new Promise(resolve => setTimeout(resolve, 10));
-        fakeTimer.resolveAll();
         const result = await resultPromise;
         // If we get here, BaseVisualChange caught the error
         expect(result).toBeDefined();
@@ -266,8 +243,6 @@ describe("Shake", () => {
       const duration = 100;
 
       const resultPromise = shake.execute({ duration });
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -287,8 +262,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({ intensity: 9999, duration: 100 });
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -306,8 +279,6 @@ describe("Shake", () => {
 
       // Use shorter duration to avoid test timeout
       const resultPromise = shake.execute({ duration: 200 });
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
@@ -325,8 +296,6 @@ describe("Shake", () => {
       fakeObserveScreen.setObserveResult(mockObservation);
 
       const resultPromise = shake.execute({ duration: 100, intensity: -50 }); // Use positive duration
-      await new Promise(resolve => setTimeout(resolve, 10));
-      fakeTimer.resolveAll();
       const result = await resultPromise;
 
       expect(result.success).toBe(true);
