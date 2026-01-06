@@ -41,13 +41,15 @@ Physical devices do need USB debugging enabled for AutoMobile to function with t
 
 ### How do I enable USB debugging?
 
-TODO: Can I automate this with AutoMobile
+**No, this cannot be automated with AutoMobile** - USB debugging requires manual user interaction on the device for security reasons. You must enable it manually:
 
 1. Go to Settings > About Phone
 2. Tap "Build Number" 7 times to enable Developer Options
 3. Go to Settings > Developer Options
 4. Enable "USB Debugging"
 5. Connect your device and accept the debugging prompt
+
+Once enabled, the USB debugging authorization is remembered for your computer, so you only need to do this once per device.
 
 ### Can I use multiple devices simultaneously?
 

@@ -1,6 +1,45 @@
 AutoMobile has a lot of custom tooling, libraries, and various communication protocols
 
-TODO: Mermaid graph showing the relationships between MCP Server, JUnitRunner, Connected Devices, IDE Plugin
+```mermaid
+graph TB
+    subgraph "AI Agents"
+        Agent[AI Agent<br/>Claude, GPT, etc.]
+    end
+
+    subgraph "AutoMobile Platform"
+        MCP[MCP Server<br/>Bun + TypeScript]
+        Daemon[Daemon<br/>Device Pool & Session Mgmt]
+        IDE[IDE Plugin<br/>Android Studio]
+    end
+
+    subgraph "Test Execution"
+        JUnit[JUnitRunner<br/>AI Self-Healing Tests]
+    end
+
+    subgraph "Android Devices"
+        Device1[Physical Device]
+        Device2[Emulator]
+        AccessService[Accessibility Service<br/>View Hierarchy]
+    end
+
+    Agent -->|MCP Protocol| MCP
+    IDE -->|HTTP/STDIO/Socket| MCP
+    MCP -->|Manages| Daemon
+    MCP -->|ADB Commands| Device1
+    MCP -->|ADB Commands| Device2
+    JUnit -->|MCP Tools| MCP
+    Daemon -->|Allocates| Device1
+    Daemon -->|Allocates| Device2
+    Device1 -->|WebSocket/File| AccessService
+    Device2 -->|WebSocket/File| AccessService
+    AccessService -->|UI State| MCP
+
+    style MCP fill:#4A90E2,color:#fff
+    style Agent fill:#50E3C2,color:#000
+    style IDE fill:#F5A623,color:#000
+    style JUnit fill:#BD10E0,color:#fff
+    style Daemon fill:#7ED321,color:#000
+```
 
 #### MCP Server
 
