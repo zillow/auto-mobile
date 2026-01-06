@@ -187,7 +187,7 @@ print_status "Checking for duplicate entries in mkdocs.yml..."
 DUPLICATES=$(mktemp)
 extract_nav_files | sort | uniq -d > "$DUPLICATES"
 if [[ -s "$DUPLICATES" ]]; then
-    print_warning "Duplicate entries found in mkdocs.yml:"
+    print_error "Duplicate entries found in mkdocs.yml:"
     while IFS= read -r file; do
         echo "  - $file"
     done < "$DUPLICATES"
@@ -267,6 +267,10 @@ else
     echo "To fix missing files:"
     echo "  1. Create the missing files"
     echo "  2. Remove the references from mkdocs.yml if no longer needed"
+    echo ""
+    echo "To fix duplicate entries:"
+    echo "  1. Remove duplicate references from mkdocs.yml"
+    echo "  2. Each file should only appear once in the navigation"
     echo ""
     echo "To fix TODO markers:"
     echo "  1. Complete the TODO items and remove the markers"
