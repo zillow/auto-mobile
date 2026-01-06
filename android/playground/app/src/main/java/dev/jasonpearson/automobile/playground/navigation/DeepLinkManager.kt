@@ -392,7 +392,8 @@ object DeepLinkManager {
   }
 
   private fun buildUri(path: String): String {
-    val uri = Uri.Builder().scheme(SCHEME).authority(HOST).path(path).build().toString()
+    // Build opaque URI in format "automobile:playground/path" instead of "automobile://playground/path"
+    val uri = "$SCHEME:$HOST$path"
     Log.d(TAG, "Built URI with path '$path': $uri")
     return uri
   }
