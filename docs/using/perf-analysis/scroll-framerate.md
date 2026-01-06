@@ -1,20 +1,21 @@
-# Performance Analysis with AutoMobile
-
-Analyze your app's performance metrics including startup time, screen transitions, and scroll framerate.
+# Scroll Performance
 
 ## Overview
 
-AutoMobile can measure:
-- **Startup Performance**: App launch time and initial render
-- **Screen Transitions**: Navigation and animation smoothness
-- **Scroll Framerate**: FPS during list/grid scrolling
-- **UI Responsiveness**: Frame drops and jank detection
+Scroll performance is critical to user experience. Janky scrolling is one of the most noticeable performance issues - users immediately feel stuttering and frame drops when swiping through lists, feeds, or grids.
 
-## Measuring Scroll Performance
+AutoMobile measures scroll framerate using Android's `gfxinfo` to catch performance regressions before they reach production.
 
-AutoMobile uses Android's `gfxinfo` to measure scroll performance in real-time.
+## Why Measure Scroll Performance
+
+- **User Experience**: Smooth 60 FPS scrolling feels responsive; janky scrolling feels broken
+- **App Store Rankings**: Performance issues lead to poor reviews and lower ratings
+- **Catch Regressions**: Automated tests prevent performance degradation over time
+- **Real User Conditions**: Test with actual data volumes and rendering complexity
 
 ### Example Usage
+
+Enable UI performance auditing in the IntelliJ IDE Plugin [feature flags](../../design-docs/mcp/feature-flags.md).
 
 Ask your AI agent:
 
@@ -31,6 +32,7 @@ The agent will:
 ## Performance Metrics
 
 AutoMobile tracks:
+
 - **Average FPS**: Frames per second during scrolling
 - **Frame Drops**: Number of dropped/janky frames
 - **Render Times**: P50, P90, P99 frame render times
@@ -38,12 +40,7 @@ AutoMobile tracks:
 
 ## Performance Audit
 
-Enable performance auditing via feature flags:
-
-```typescript
-// Enable UI performance monitoring
-setFeatureFlag("ui-perf-mode", true)
-```
+Enable UI performance auditing in the IntelliJ IDE Plugin
 
 See [Feature Flags](../../design-docs/mcp/feature-flags.md) for more details.
 
