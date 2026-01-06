@@ -1,17 +1,19 @@
 # Scroll Performance
 
-## Overview
 
 Scroll performance is critical to user experience. Janky scrolling is one of the most noticeable performance issues - users immediately feel stuttering and frame drops when swiping through lists, feeds, or grids.
 
 AutoMobile measures scroll framerate using Android's `gfxinfo` to catch performance regressions before they reach production.
 
-## Why Measure Scroll Performance
+## What is Measured
 
-- **User Experience**: Smooth 60 FPS scrolling feels responsive; janky scrolling feels broken
-- **App Store Rankings**: Performance issues lead to poor reviews and lower ratings
-- **Catch Regressions**: Automated tests prevent performance degradation over time
-- **Real User Conditions**: Test with actual data volumes and rendering complexity
+AutoMobile collects frame rendering metrics during scroll interactions:
+
+- **Frame Time Percentiles**: P50, P90, P95, P99 render times in milliseconds
+- **Jank Indicators**: Missed vsync count, slow UI thread count, frame deadline misses
+- **FPS Calculation**: Average frames per second during scrolling
+- **UI Stability**: Time until rendering stabilizes after scroll completes
+- **Frame Drops**: Total count of dropped or janky frames during interaction
 
 ### Example Usage
 
