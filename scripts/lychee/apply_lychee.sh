@@ -23,7 +23,6 @@ set -euo pipefail
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
@@ -47,10 +46,6 @@ print_status() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
@@ -67,7 +62,6 @@ relpath() {
 # Get script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-LYCHEE_CONFIG="$PROJECT_ROOT/.lycherc.toml"
 
 if [[ "$DRY_RUN" == true ]]; then
     print_status "Running in DRY RUN mode - no files will be modified"
@@ -86,7 +80,7 @@ fi
 
 # Run validation script to get suggestions
 VALIDATION_OUTPUT=$(mktemp)
-./scripts/lychee/validate_lychee.sh 2>&1 > "$VALIDATION_OUTPUT" || true
+./scripts/lychee/validate_lychee.sh > "$VALIDATION_OUTPUT" 2>&1 || true
 
 # Parse validation output to extract broken links and suggestions
 FIXES_APPLIED=0
@@ -104,18 +98,18 @@ while IFS= read -r line; do
     if [[ "$line" =~ ✗\ (.+/docs/.+) ]]; then
         CURRENT_BROKEN_PATH="${BASH_REMATCH[1]}"
         # Strip the PROJECT_ROOT prefix
-        CURRENT_BROKEN_PATH="${CURRENT_BROKEN_PATH#$PROJECT_ROOT/}"
+        CURRENT_BROKEN_PATH="${CURRENT_BROKEN_PATH#"$PROJECT_ROOT"/}"
         IN_GIT_HISTORY_SECTION=false
     fi
 
     # Check if we're entering git history section (prioritize these suggestions)
-    if [[ "$line" =~ "File was moved (from git history):" ]]; then
+    if [[ "$line" =~ File\ was\ moved\ \(from\ git\ history\): ]]; then
         IN_GIT_HISTORY_SECTION=true
         continue
     fi
 
     # Check if we're leaving git history section
-    if [[ "$IN_GIT_HISTORY_SECTION" == true ]] && [[ "$line" =~ "Possible matches:" || "$line" =~ "Other possible matches:" ]]; then
+    if [[ "$IN_GIT_HISTORY_SECTION" == true ]] && [[ "$line" =~ Possible\ matches: || "$line" =~ Other\ possible\ matches: ]]; then
         IN_GIT_HISTORY_SECTION=false
     fi
 
@@ -134,7 +128,7 @@ while IFS= read -r line; do
             # Find the line containing this basename in the source file
             if grep -q "$BASENAME" "$CURRENT_SOURCE_FILE" 2>/dev/null; then
                 # Extract the old relative path from the source file
-                OLD_RELATIVE_PATH=$(grep -o "[^(\"']*$BASENAME[^)\"']*" "$CURRENT_SOURCE_FILE" | head -1)
+                OLD_RELATIVE_PATH=$(grep -o "[^(\"']*${BASENAME}[^)\"']*" "$CURRENT_SOURCE_FILE" | head -1)
 
                 if [[ -n "$OLD_RELATIVE_PATH" && "$OLD_RELATIVE_PATH" != "$NEW_RELATIVE_PATH" ]]; then
                     # Indicate if this is from git history

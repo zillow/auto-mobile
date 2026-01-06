@@ -65,39 +65,11 @@ Example response format:
 
 # Model Providers
 
-AutoMobile’s AI agent is bundled with the Android JUnitRunner. Provider selection and credentials are configured via
-system properties or environment variables in the JUnitRunner process.
+The JUnitRunner supports OpenAI, Anthropic, Google Gemini, and AWS Bedrock for AI self-healing capabilities.
 
-Supported providers:
-
-- ✅ OpenAI
-- ✅ Anthropic
-- ✅ Google
-- ✅ AWS Bedrock
-
-## Common Configuration
-
-Use the system property `automobile.ai.provider` to select a provider (`openai`, `anthropic`, `google`). The agent
-reads provider-specific API keys from environment variables or `automobile.<provider>.api.key` system properties. An
-optional proxy endpoint can be set with `automobile.ai.proxy.endpoint`.
-
-
-In gradle.properties set `automobile.ai.provider=anthropic`
-
-```shell
-export ANTHROPIC_API_KEY="your_api_key_here"
+Configure via system property:
+```properties
+automobile.ai.provider=anthropic
 ```
 
-You can also supply the API key via JVM system property:
-
-```shell
--Dautomobile.anthropic.api.key=your_api_key_here
-```
-
-Optional proxy endpoint (all providers):
-
-```shell
--Dautomobile.ai.proxy.endpoint=https://your-proxy.example.com
-```
-
-On CI you should provide these as environment-injected secrets with masking to protect your credentials.
+For API key setup, see [AI Agent Setup](../../../install/ai-agents/index.md#model-provider-api-keys).

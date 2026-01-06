@@ -99,16 +99,9 @@ The service writes view hierarchy data that the MCP Server consumes for observat
 
 ## Supported Model Providers
 
-The JUnitRunner includes built-in agent support for:
+The JUnitRunner supports OpenAI, Anthropic, Google Gemini, and AWS Bedrock.
 
-| Provider | Configuration |
-|----------|---------------|
-| ✅ OpenAI | `automobile.ai.provider=openai` |
-| ✅ Anthropic | `automobile.ai.provider=anthropic` |
-| ✅ Google | `automobile.ai.provider=google` |
-| ✅ AWS Bedrock | `automobile.ai.provider=bedrock` |
-
-Each provider requires its respective API key via environment variable or system property.
+For API key setup and provider configuration, see [AI Agent Setup](../../../install/ai-agents/index.md#model-provider-api-keys).
 
 ## CI/CD Integration
 

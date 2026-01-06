@@ -2,14 +2,6 @@
 
 This section provides practical guides for using AutoMobile in different scenarios.
 
-## Quick Links
-
-- [UX Exploration](ux-exploration.md) - Explore and understand your app's user experience
-- [Reproducing Bugs](reproducting-bugs.md) - Use AutoMobile to reproduce and debug issues
-- [Performance Analysis](perf-analysis/scroll-framerate.md) - Analyze app performance metrics
-- [Accessibility Testing](a11y/contrast.md) - Ensure your app meets accessibility standards
-- [UI Tests](ui-tests.md) - Write and run automated UI tests
-
 ## Getting Started
 
 AutoMobile can be used in several ways:
