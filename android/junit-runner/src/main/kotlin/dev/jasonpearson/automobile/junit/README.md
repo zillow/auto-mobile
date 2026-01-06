@@ -77,15 +77,17 @@ When using prompt-based testing:
 - `automobile.junit.timing.lookback.days`: Days of history to include (default: 90)
 - `automobile.junit.timing.limit`: Max tests returned from timing query (default: 1000)
 - `automobile.junit.timing.min.samples`: Minimum sample size per test (default: 1)
-- `automobile.junit.timing.ordering`: Test order strategy based on historical duration (`none`, `duration-asc`, `duration-desc`; default: `none`)
+- `automobile.junit.timing.ordering`: Test order strategy based on historical duration (`auto`, `none`, `duration-asc`, `duration-desc`; default: `auto`)
 - `automobile.junit.timing.fetch.timeout.ms`: Timing query timeout in milliseconds (default: 5000)
   - Timing fetch is automatically disabled when CI is detected (`automobile.ci.mode=true` or `CI=true`).
 
 ### Historical Test Timing
 
 On startup, the runner requests historical execution timing data from the AutoMobile daemon using the
-`getTestTimings` MCP tool. This data is cached for the JVM and can optionally drive test ordering
-when `automobile.junit.timing.ordering` is set.
+`getTestTimings` MCP tool. This data is cached for the JVM and can optionally drive test ordering.
+When `automobile.junit.timing.ordering=auto`, the runner chooses longest-first when effective parallel
+forks are greater than 1 after device availability is applied, otherwise shortest-first. Set
+`automobile.junit.timing.ordering=none` to disable ordering.
 
 Example response format:
 

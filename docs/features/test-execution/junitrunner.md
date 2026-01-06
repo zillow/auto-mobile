@@ -22,9 +22,10 @@ and use the above testImplementation dependency with `x.y.z` version from `andro
 
 The AutoMobile daemon exposes historical test timing summaries to the JUnitRunner via the
 `getTestTimings` MCP tool. The runner fetches this data on startup (per JVM) and can optionally
-use it to order tests based on historical duration. Set the system property
-`automobile.junit.timing.ordering` to `duration-desc` (longest-first) or `duration-asc` (shortest-first)
-to enable ordering.
+use it to order tests based on historical duration. The default is `automobile.junit.timing.ordering=auto`,
+which chooses longest-first when effective parallel forks are greater than 1 after device availability
+is applied, and shortest-first otherwise. Set `automobile.junit.timing.ordering=none` to disable ordering,
+or explicitly set `duration-desc` (longest-first) / `duration-asc` (shortest-first).
 
 Timing fetch is automatically disabled when CI is detected (`automobile.ci.mode=true` or `CI=true`).
 

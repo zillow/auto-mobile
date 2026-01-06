@@ -109,30 +109,19 @@ internal object TestTimingCache {
   }
 
   private fun loadFromDaemon() {
-    val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
     val args = buildRequestArgs()
     try {
       val response =
           DaemonSocketClientManager.callTool("getTestTimings", args, resolveTimeoutMs())
       val payload = extractToolPayload(response)
       if (payload.isNullOrBlank()) {
-        if (debugMode) {
-          println("AutoMobileRunner: No timing data returned from daemon.")
-        }
         return
       }
 
       val parsed = json.decodeFromString(TestTimingSummary.serializer(), payload)
       summary = parsed
       timingMap = parsed.testTimings.associateBy { TestTimingKey(it.testClass, it.testMethod) }
-
-      if (debugMode) {
-        println("AutoMobileRunner: Loaded ${parsed.testTimings.size} historical test timings.")
-      }
     } catch (e: Exception) {
-      if (debugMode) {
-        println("AutoMobileRunner: Failed to load historical timings: ${e.message}")
-      }
     }
   }
 
