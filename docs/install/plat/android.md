@@ -41,9 +41,9 @@ Quick example:
 
 ## Optional Components
 
-1. Install the [IntelliJ IDE Plugin](../design-docs/plat/android/ide-plugin/overview.md) to gain the ability to toggle feature flags, record tests, visualize the real-time navigation graph, and inspect app performance.
-2. Add the [JUnitRunner](../design-docs/plat/android/junitrunner.md) test dependency to all Android application and library modules you want to run AutoMobile tests from.
-3. Add the [Android SDK](../design-docs/plat/android/auto-mobile-sdk.md) Android library to add recomposition tracking.
+1. Install the [IntelliJ IDE Plugin](../../design-docs/plat/android/ide-plugin/overview.md) to gain the ability to toggle feature flags, record tests, visualize the real-time navigation graph, and inspect app performance.
+2. Add the [JUnitRunner](../../design-docs/plat/android/junitrunner.md) test dependency to all Android application and library modules you want to run AutoMobile tests from.
+3. Add the [Android SDK](../../design-docs/plat/android/auto-mobile-sdk.md) Android library to add recomposition tracking.
 
 ## Troubleshooting
 

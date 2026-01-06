@@ -103,7 +103,7 @@ The service writes view hierarchy data that the MCP Server consumes for observat
 
 The JUnitRunner supports OpenAI, Anthropic, Google Gemini, and AWS Bedrock.
 
-For API key setup and provider configuration, see [AI Agent Setup](../../../install/ai-agents.md#model-provider-api-keys).
+For API key setup and provider configuration, see [AI Agent Setup](../../../install/overview.md#model-provider-api-keys).
 
 ## CI/CD Integration
 

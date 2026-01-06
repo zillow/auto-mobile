@@ -12,7 +12,7 @@ install the SDK or command line tools for you.
 
 ### Which AI clients are supported?
 
-See [installation](install/index.md) docs.
+See [installation](install/overview.md) docs.
 
 ### What are the system requirements?
 
