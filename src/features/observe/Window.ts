@@ -167,17 +167,17 @@ export class Window {
         activityName = imeControlMatch[2];
       } else {
         // Handle Pop-Up Window case
-        const popupControlMatch = stdout.match(/imeControlTarget in display# 0 Window\{([a-f0-9]+) u0 Pop-Up Window\}/);
+        const popupControlMatch = stdout.match(/imeControlTarget in display# 0 Window\{([a-f0-9]+) u\d+ Pop-Up Window\}/);
 
         if (popupControlMatch) {
           const hexRef = popupControlMatch[1];
           // Find the corresponding Window entry for this hex reference
-          const windowRegex = new RegExp(`Window #\\d+ Window\\{${hexRef} u0 Pop-Up Window\\}:([\\s\\S]*?)(?=Window #\\d+|$)`);
+          const windowRegex = new RegExp(`Window #\\d+ Window\\{${hexRef} u\\d+ Pop-Up Window\\}:([\\s\\S]*?)(?=Window #\\d+|$)`);
           const windowMatch = stdout.match(windowRegex);
 
           if (windowMatch) {
             // Look for mActivityRecord line within this window block
-            const activityRecordMatch = windowMatch[1].match(/mActivityRecord=ActivityRecord\{[^}]+ u0 ([\w\.]+)\/([\w\.]+) t\d+\}/);
+            const activityRecordMatch = windowMatch[1].match(/mActivityRecord=ActivityRecord\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+) t\d+\}/);
 
             if (activityRecordMatch && activityRecordMatch.length >= 3) {
               packageName = activityRecordMatch[1];
@@ -189,7 +189,7 @@ export class Window {
         // If still no match, try fallback approaches
         if (!packageName || !activityName) {
           // Fallback: Look for visible application windows (not system UI)
-          const visibleAppMatches = stdout.matchAll(/Window\{[^}]+ u0 ([\w\.]+)\/([\w\.]+)\}:[^}]+?mViewVisibility=0x0[^}]+?isOnScreen=true[^}]+?isVisible=true/gs);
+          const visibleAppMatches = stdout.matchAll(/Window\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+)\}:[^}]+?mViewVisibility=0x0[^}]+?isOnScreen=true[^}]+?isVisible=true/gs);
 
           for (const match of visibleAppMatches) {
             if (match[1] && match[2] && !match[1].includes("android.systemui") && !match[1].includes("nexuslauncher")) {
@@ -201,7 +201,7 @@ export class Window {
 
           // If still no match, try a broader pattern for any application window
           if (!packageName || !activityName) {
-            const anyAppMatch = stdout.match(/Window\{[^}]+ u0 ([\w\.]+)\/([\w\.]+)\}:[^}]+?ty=BASE_APPLICATION/);
+            const anyAppMatch = stdout.match(/Window\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+)\}:[^}]+?ty=BASE_APPLICATION/);
             if (anyAppMatch && anyAppMatch.length >= 3) {
               packageName = anyAppMatch[1];
               activityName = anyAppMatch[2];
@@ -212,7 +212,7 @@ export class Window {
         // If still no match, look for the first visible application window that's on screen
         if (!packageName || !activityName) {
           // Look for windows with isOnScreen=true and isVisible=true and ty=BASE_APPLICATION
-          const visibleAppRegex = /Window #\d+ Window\{[^}]+ u0 ([\w\.]+)\/([\w\.]+)\}:[\s\S]*?ty=BASE_APPLICATION[\s\S]*?isOnScreen=true[\s\S]*?isVisible=true/gs;
+          const visibleAppRegex = /Window #\d+ Window\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+)\}:[\s\S]*?ty=BASE_APPLICATION[\s\S]*?isOnScreen=true[\s\S]*?isVisible=true/gs;
           const visibleMatch = visibleAppRegex.exec(stdout);
 
           if (visibleMatch && visibleMatch.length >= 3) {
