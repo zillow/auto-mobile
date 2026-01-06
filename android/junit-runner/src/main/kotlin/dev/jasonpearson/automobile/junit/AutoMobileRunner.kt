@@ -41,20 +41,32 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
   private val orderedChildren: List<FrameworkMethod> by lazy {
     val children = super.getChildren()
 
-    TestTimingCache.prefetchIfEnabled()
-    val orderingStrategy = resolveTimingOrderingStrategy()
+    val requestedStrategy =
+        parseTimingOrderingStrategy(
+            SystemPropertyCache.get("automobile.junit.timing.ordering", "auto").trim().lowercase()
+        )
+    val parallelForks =
+        if (requestedStrategy == TimingOrderingStrategy.AUTO) {
+          resolveEffectiveParallelForks()
+        } else {
+          1
+        }
+    val selection = resolveTimingOrderingSelection(requestedStrategy, parallelForks)
+    val timingAvailable = TestTimingCache.hasTimings()
+    logTimingOrdering(selection, timingAvailable)
+
+    val timingOrderingActive =
+        selection.resolved != TimingOrderingStrategy.NONE && timingAvailable
     val timingOrderedChildren =
-        if (orderingStrategy == TimingOrderingStrategy.NONE || !TestTimingCache.hasTimings()) {
+        if (!timingOrderingActive) {
           children
         } else {
-          val ordered = orderChildrenByTiming(children, orderingStrategy)
-          println("AutoMobileRunner: Ordering tests by historical duration (${orderingStrategy.label})")
-          ordered
+          orderChildrenByTiming(children, selection.resolved)
         }
 
     val shuffleEnabled = SystemPropertyCache.getBoolean("automobile.junit.shuffle.enabled", true)
-    if (!shuffleEnabled || timingOrderedChildren.size <= 1 || orderingStrategy != TimingOrderingStrategy.NONE) {
-      if (shuffleEnabled && orderingStrategy != TimingOrderingStrategy.NONE) {
+    if (!shuffleEnabled || timingOrderedChildren.size <= 1 || timingOrderingActive) {
+      if (shuffleEnabled && timingOrderingActive) {
         println("AutoMobileRunner: Shuffle enabled but timing ordering is active; preserving timing order.")
       }
       timingOrderedChildren
@@ -94,9 +106,15 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
   private enum class TimingOrderingStrategy(val label: String) {
     NONE("none"),
+    AUTO("auto"),
     DURATION_ASC("shortest-first"),
     DURATION_DESC("longest-first"),
   }
+
+  private data class TimingOrderingSelection(
+      val requested: TimingOrderingStrategy,
+      val resolved: TimingOrderingStrategy,
+  )
 
   private data class TimingCandidate(
       val method: FrameworkMethod,
@@ -104,10 +122,9 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       val durationMs: Int?,
   )
 
-  private fun resolveTimingOrderingStrategy(): TimingOrderingStrategy {
-    val rawValue =
-        SystemPropertyCache.get("automobile.junit.timing.ordering", "none").trim().lowercase()
+  private fun parseTimingOrderingStrategy(rawValue: String): TimingOrderingStrategy {
     return when (rawValue) {
+      "auto" -> TimingOrderingStrategy.AUTO
       "duration-asc",
       "duration_asc",
       "shortest-first",
@@ -118,8 +135,55 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       "longest-first",
       "longest_first",
       "longest" -> TimingOrderingStrategy.DURATION_DESC
+      "none",
+      "off",
+      "false",
+      "disabled" -> TimingOrderingStrategy.NONE
       else -> TimingOrderingStrategy.NONE
     }
+  }
+
+  private fun resolveTimingOrderingSelection(
+      requested: TimingOrderingStrategy,
+      parallelForks: Int,
+  ): TimingOrderingSelection {
+    val resolved =
+        when (requested) {
+          TimingOrderingStrategy.AUTO ->
+              if (parallelForks > 1) {
+                TimingOrderingStrategy.DURATION_DESC
+              } else {
+                TimingOrderingStrategy.DURATION_ASC
+              }
+          else -> requested
+        }
+    return TimingOrderingSelection(requested, resolved)
+  }
+
+  private fun resolveEffectiveParallelForks(): Int {
+    val configuredForks =
+        SystemPropertyCache.get(
+                "junit.parallel.forks",
+                Runtime.getRuntime().availableProcessors().toString(),
+            )
+            .toIntOrNull() ?: 2
+    val safeConfiguredForks = if (configuredForks > 0) configuredForks else 1
+    val deviceCount = AutoMobileSharedUtils.deviceChecker.getDeviceCount()
+    return if (deviceCount > 0) {
+      safeConfiguredForks.coerceAtMost(deviceCount)
+    } else {
+      safeConfiguredForks
+    }
+  }
+
+  private fun logTimingOrdering(selection: TimingOrderingSelection, timingAvailable: Boolean) {
+    val message =
+        if (selection.requested == TimingOrderingStrategy.AUTO) {
+          "AutoMobileRunner: Timing ordering=auto (resolved=${selection.resolved.label}), timing data available=$timingAvailable"
+        } else {
+          "AutoMobileRunner: Timing ordering=${selection.requested.label}, timing data available=$timingAvailable"
+        }
+    println(message)
   }
 
   private fun orderChildrenByTiming(
@@ -158,6 +222,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
               withTiming.sortedWith(
                   compareBy<TimingCandidate> { it.durationMs }.thenBy { it.index }
               )
+          TimingOrderingStrategy.AUTO,
           TimingOrderingStrategy.NONE -> withTiming
         }
 
