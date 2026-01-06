@@ -23,6 +23,8 @@ exclude_path = [
     "node_modules/",
     # Git
     ".git/",
+    # Files not deployed (in .gitignore)
+    "docs/contributing/index.md",
 ]
 
 # Accept status codes
