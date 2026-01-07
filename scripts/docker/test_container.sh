@@ -11,6 +11,7 @@ NC='\033[0m' # No Color
 
 IMAGE_NAME="${IMAGE_NAME:-auto-mobile:latest}"
 CONTAINER_NAME="auto-mobile-test-$$"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 
 # Cleanup function
 cleanup() {
@@ -32,7 +33,7 @@ fi
 
 # Test 2: Container starts successfully
 echo -e "\n${YELLOW}Test 2: Starting container...${NC}"
-if docker run -d --name "${CONTAINER_NAME}" "${IMAGE_NAME}" sleep 300; then
+if docker run --platform "${DOCKER_PLATFORM}" -d --name "${CONTAINER_NAME}" "${IMAGE_NAME}" sleep 300; then
   echo -e "${GREEN}✓ Container started${NC}"
 else
   echo -e "${RED}✗ Failed to start container${NC}"
@@ -129,7 +130,7 @@ echo -e "\n${YELLOW}Test 11: Testing MCP stdio protocol...${NC}"
 INIT_REQUEST='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
 
 # Test stdio communication (run container with -i flag, send request, check for response)
-RESPONSE=$(echo "${INIT_REQUEST}" | docker run -i --rm "${IMAGE_NAME}" 2>/dev/null | head -1 || true)
+RESPONSE=$(echo "${INIT_REQUEST}" | docker run --platform "${DOCKER_PLATFORM}" -i --rm "${IMAGE_NAME}" 2>/dev/null | head -1 || true)
 
 if echo "${RESPONSE}" | grep -q '"jsonrpc":"2.0"'; then
   echo -e "${GREEN}✓ MCP server responds to stdio protocol${NC}"

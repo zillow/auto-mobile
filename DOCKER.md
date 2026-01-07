@@ -86,7 +86,7 @@ For complete documentation, see [docs/docker.md](docs/docker.md)
 ## Platform Notes
 
 - **Linux**: Full support
-- **macOS**: Limited ADB device access (Docker Desktop limitation)
+- **macOS**: Limited ADB device access (Docker Desktop limitation). Use `--platform=linux/amd64` on Apple Silicon.
 - **Windows**: Requires WSL2 with USB passthrough
 - **iOS**: Not supported (requires macOS and Apple hardware)
 
@@ -119,10 +119,10 @@ docker-compose up
 ### Test MCP stdio Protocol
 ```bash
 # Build image
-docker build -t auto-mobile:latest .
+docker build --platform=linux/amd64 -t auto-mobile:latest .
 
 # Test stdio communication
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | docker run -i --rm --init auto-mobile:latest
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | docker run --platform=linux/amd64 -i --rm --init auto-mobile:latest
 ```
 
 For more help, see the [full Docker documentation](docs/docker.md) and [MCP configuration guide](docs/mcp-docker-config.md).

@@ -22,6 +22,7 @@ stateDiagram-v2
 ## Additional features
 
 - [Video recording](video-recording.md) for low-overhead capture and CI artifacts.
+- [Database migrations](migrations.md) for MCP server persistence.
 
 ## Configuration
 

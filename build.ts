@@ -5,7 +5,7 @@
  * Replaces the previous tsc-based build process
  */
 
-import { existsSync, rmSync } from "fs";
+import { cpSync, existsSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { spawnSync } from "child_process";
 
@@ -37,6 +37,17 @@ if (!result.success) {
 }
 
 console.log(`✓ Built ${result.outputs.length} files`);
+
+// Copy migrations for runtime usage (FileMigrationProvider reads from disk)
+const migrationsSource = join(import.meta.dir, "src", "db", "migrations");
+const migrationsDest = join(import.meta.dir, "dist", "src", "db", "migrations");
+if (existsSync(migrationsSource)) {
+  mkdirSync(migrationsDest, { recursive: true });
+  cpSync(migrationsSource, migrationsDest, { recursive: true });
+  console.log("✓ Copied database migrations");
+} else {
+  console.warn(`Database migrations not found at ${migrationsSource}`);
+}
 
 // Build iOS assets using the same bun executable that's running this script
 console.log("Building iOS assets...");

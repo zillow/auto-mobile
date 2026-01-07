@@ -36,7 +36,7 @@ docker pull kaeawc/auto-mobile:v0.0.7
 ### Build the Docker Image
 
 ```bash
-docker build -t auto-mobile:latest .
+docker build --platform=linux/amd64 -t auto-mobile:latest .
 ```
 
 Or using docker-compose:
@@ -65,7 +65,7 @@ provided compose file, update the service commands to `bun` (or override them) t
 #### Using Docker Directly
 
 ```bash
-docker run -it --rm \
+docker run --platform=linux/amd64 -it --rm \
   --privileged \
   --network host \
   -v ~/.android:/home/automobile/.android \
