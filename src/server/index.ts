@@ -39,6 +39,8 @@ import { registerBootedDeviceResources } from "./bootedDeviceResources";
 import { registerDeviceImageResources } from "./deviceImageResources";
 import { registerAppResources } from "./appResources";
 import { registerNavigationResources } from "./navigationResources";
+import { registerTestTimingResources } from "./testTimingResources";
+import { registerPerformanceResources } from "./performanceResources";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 
 export interface McpServerOptions {
@@ -103,6 +105,8 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDeviceImageResources();
   registerAppResources();
   registerNavigationResources();
+  registerTestTimingResources();
+  registerPerformanceResources();
 
   registerDebugTools();
 
