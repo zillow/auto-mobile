@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.OutlinedTextField
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,10 +71,10 @@ fun TestTimingPanel(
   var timings by remember { mutableStateOf<List<TestTimingEntry>>(emptyList()) }
   var status by remember { mutableStateOf("Idle") }
   var error by remember { mutableStateOf<String?>(null) }
-  var lookbackDaysText by remember { mutableStateOf(DEFAULT_LOOKBACK_DAYS.toString()) }
-  var minSamplesText by remember { mutableStateOf(DEFAULT_MIN_SAMPLES.toString()) }
-  var limitText by remember { mutableStateOf(DEFAULT_LIMIT.toString()) }
-  var filterText by remember { mutableStateOf("") }
+  val lookbackDaysText = rememberTextFieldState(DEFAULT_LOOKBACK_DAYS.toString())
+  val minSamplesText = rememberTextFieldState(DEFAULT_MIN_SAMPLES.toString())
+  val limitText = rememberTextFieldState(DEFAULT_LIMIT.toString())
+  val filterText = rememberTextFieldState("")
   var sortKey by remember { mutableStateOf(TestTimingSortKey.AVG_DURATION) }
   var sortDirection by remember { mutableStateOf(TestTimingSortDirection.DESC) }
   var selectedEntry by remember { mutableStateOf<TestTimingEntry?>(null) }
@@ -108,9 +109,11 @@ fun TestTimingPanel(
     }
 
     error = null
-    val lookbackDays = parseOptionalInt("Lookback days", lookbackDaysText, minValue = 1)
-    val minSamples = parseOptionalInt("Min samples", minSamplesText, minValue = 0)
-    val limit = parseOptionalInt("Limit", limitText, minValue = 1)
+    val lookbackDays =
+        parseOptionalInt("Lookback days", lookbackDaysText.text.toString(), minValue = 1)
+    val minSamples =
+        parseOptionalInt("Min samples", minSamplesText.text.toString(), minValue = 0)
+    val limit = parseOptionalInt("Limit", limitText.text.toString(), minValue = 1)
     if (error != null) {
       status = "Invalid input"
       return
@@ -152,8 +155,9 @@ fun TestTimingPanel(
   }
 
   val queryKey =
-      "${lookbackDaysText.trim()}:${minSamplesText.trim()}:" +
-          "${limitText.trim()}:${sortKey.name}:${sortDirection.name}"
+      "${lookbackDaysText.text.toString().trim()}:" +
+          "${minSamplesText.text.toString().trim()}:" +
+          "${limitText.text.toString().trim()}:${sortKey.name}:${sortDirection.name}"
 
   LaunchedEffect(autoPollEnabled, isConnected, client, queryKey) {
     if (!autoPollEnabled || !isConnected) {
@@ -166,8 +170,8 @@ fun TestTimingPanel(
   }
 
   val filteredTimings =
-      remember(timings, filterText, sortKey, sortDirection) {
-        val filter = filterText.trim().lowercase()
+      remember(timings, filterText.text, sortKey, sortDirection) {
+        val filter = filterText.text.toString().trim().lowercase()
         val filtered =
             if (filter.isBlank()) {
               timings
@@ -224,26 +228,20 @@ fun TestTimingPanel(
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-      OutlinedTextField(
-          value = lookbackDaysText,
-          onValueChange = { lookbackDaysText = it },
-          label = { Text("Lookback days") },
+      LabeledTextField(
+          label = "Lookback days",
+          state = lookbackDaysText,
           modifier = Modifier.width(140.dp),
-          singleLine = true,
       )
-      OutlinedTextField(
-          value = minSamplesText,
-          onValueChange = { minSamplesText = it },
-          label = { Text("Min samples") },
+      LabeledTextField(
+          label = "Min samples",
+          state = minSamplesText,
           modifier = Modifier.width(120.dp),
-          singleLine = true,
       )
-      OutlinedTextField(
-          value = limitText,
-          onValueChange = { limitText = it },
-          label = { Text("Limit") },
+      LabeledTextField(
+          label = "Limit",
+          state = limitText,
           modifier = Modifier.width(100.dp),
-          singleLine = true,
       )
       OutlinedButton(onClick = { autoPollEnabled = !autoPollEnabled }) {
         Text(if (autoPollEnabled) "Pause polling" else "Resume polling")
@@ -254,12 +252,10 @@ fun TestTimingPanel(
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-      OutlinedTextField(
-          value = filterText,
-          onValueChange = { filterText = it },
-          label = { Text("Filter (class/method)") },
+      LabeledTextField(
+          label = "Filter (class/method)",
+          state = filterText,
           modifier = Modifier.width(280.dp),
-          singleLine = true,
       )
       ListComboBox(
           sortLabels,
@@ -274,7 +270,7 @@ fun TestTimingPanel(
                 directionOptions.getOrNull(index)?.direction ?: TestTimingSortDirection.DESC
           },
       )
-      OutlinedButton(onClick = { filterText = "" }) {
+      OutlinedButton(onClick = { filterText.setTextAndPlaceCursorAtEnd("") }) {
         Text("Clear filter")
       }
     }
