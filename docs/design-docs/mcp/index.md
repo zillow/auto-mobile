@@ -19,6 +19,10 @@ stateDiagram-v2
   DeviceSessionManager --> InteractionLoop: 📱
 ```
 
+## Additional features
+
+- [Video recording](video-recording.md) for low-overhead capture and CI artifacts.
+
 ## Configuration
 
 AutoMobile MCP defaults to STDIO mode (good for workstations and CI automation). Streamable HTTP is available for
