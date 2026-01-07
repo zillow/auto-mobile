@@ -99,6 +99,7 @@ nav:
           - 'Daemon': design-docs/mcp/daemon.md
           - 'Navigation Graph': design-docs/mcp/navigation-graph.md
           - 'Feature Flags': design-docs/mcp/feature-flags.md
+          - 'Migrations': design-docs/mcp/migrations.md
           - 'Video Recording': design-docs/mcp/video-recording.md
           - 'Resources': design-docs/mcp/resources.md
       - 'Platform Specific':

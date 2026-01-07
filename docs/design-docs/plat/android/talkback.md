@@ -23,7 +23,7 @@ Real TalkBack (best-effort, emulator):
   - `adb -s <device> shell settings put secure enabled_accessibility_services <service>`
   - `adb -s <device> shell settings put secure accessibility_enabled 1`
 - Disable:
-  - `adb -s <device> shell settings put secure enabled_accessibility_services ''`
+  - `adb -s <device> shell settings delete secure enabled_accessibility_services`
   - `adb -s <device> shell settings put secure accessibility_enabled 0`
 
 Simulated TalkBack (reliable, helper-based):
@@ -31,6 +31,37 @@ Simulated TalkBack (reliable, helper-based):
 - Use AccessibilityService to move focus and announce text via TTS.
 - `setA11yFocus` searches nodes and requests focus.
 - `announce` uses TextToSpeech to emit the same strings an agent would hear.
+
+## ADB validation (API 35)
+
+Status:
+
+- API 29 not validated yet (no local AVD available).
+
+Confirmed commands:
+
+- Read current accessibility state:
+  - `adb -s <device> shell dumpsys accessibility`
+- Enable TalkBack:
+  - `adb -s <device> shell settings put secure enabled_accessibility_services com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService`
+  - `adb -s <device> shell settings put secure accessibility_enabled 1`
+  - `adb -s <device> shell dumpsys accessibility`
+- Disable TalkBack:
+  - `adb -s <device> shell settings delete secure enabled_accessibility_services`
+  - `adb -s <device> shell settings put secure accessibility_enabled 0`
+  - `adb -s <device> shell dumpsys accessibility`
+
+Observed results:
+
+- `dumpsys accessibility` shows TalkBack enabled after the enable commands.
+- `dumpsys accessibility` shows no enabled services after disable.
+
+Notes:
+
+- Enabling TalkBack triggers the Android Accessibility Suite permission
+  dialog and must be accepted via UI automation.
+- `settings put secure enabled_accessibility_services ''` does not clear on
+  API 35; use `settings delete` instead.
 
 ## Plan
 

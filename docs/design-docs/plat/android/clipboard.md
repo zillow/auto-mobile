@@ -37,6 +37,29 @@ Notes:
 - Newer Android versions restrict clipboard reads for background apps.
   The helper should run in the foreground when possible.
 
+## ADB validation (API 35)
+
+Status:
+
+- API 29 not validated yet (no local AVD available).
+
+Attempted commands:
+
+- `adb -s <device> shell cmd clipboard set "Hello AutoMobile"`
+- `adb -s <device> shell cmd clipboard get`
+- `adb -s <device> shell cmd clipboard clear`
+- `adb -s <device> shell cmd clipboard get`
+
+Observed results:
+
+- `cmd clipboard` returns "No shell command implementation" on API 35.
+- `dumpsys clipboard` returns empty output.
+
+Notes:
+
+- ADB-only clipboard manipulation appears unsupported on this emulator/API
+  level; a helper APK fallback is likely required.
+
 ## Plan
 
 1. Implement adb `cmd clipboard` support with capability detection.

@@ -39,6 +39,24 @@ Selector resolution:
 - Reuse existing element finding logic (text/resourceId/regex/class).
 - The tool should return `lastObservationId` for debugging.
 
+## ADB validation (API 35)
+
+Status:
+
+- API 29 not validated yet (no local AVD available).
+
+Confirmed commands:
+
+- Open Settings and dump UI:
+  - `adb -s <device> shell am start -n com.android.settings/.Settings`
+  - `adb -s <device> shell uiautomator dump /sdcard/settings_dump.xml`
+  - `adb -s <device> shell cat /sdcard/settings_dump.xml`
+
+Observed results:
+
+- The UI dump contains stable text ("Settings") suitable for await/assert
+  selectors.
+
 ## Plan
 
 1. Extend executePlan schema to include `await` and `assert` steps.

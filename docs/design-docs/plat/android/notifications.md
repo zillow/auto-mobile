@@ -53,6 +53,32 @@ not available (does not look like app-under-test).
 This path should be flagged as `supported: partial` and discouraged
 in tool descriptions.
 
+## ADB validation (API 35)
+
+Status:
+
+- API 29 not validated yet (no local AVD available).
+
+Confirmed commands:
+
+- Post basic notification:
+  - `adb -s <device> shell cmd notification post -t "Test Title" automobiledoc "Test Body"`
+- Post big text notification:
+  - `adb -s <device> shell cmd notification post -S bigtext -t "Big Title" automobiledoc "Big Body"`
+- Inspect via system tray UI dump:
+  - `adb -s <device> shell cmd statusbar expand-notifications`
+  - `adb -s <device> shell uiautomator dump /sdcard/notification_dump.xml`
+  - `adb -s <device> shell cat /sdcard/notification_dump.xml`
+  - `adb -s <device> shell cmd statusbar collapse`
+
+Observed results:
+
+- Notifications appear with provided titles/bodies.
+- Big text style renders expanded content in the shade.
+- The uiautomator dump includes the notification text for matching.
+- Multi-word titles appear truncated in the grouped list view (first token),
+  but full text is present in the dump.
+
 ## Plan
 
 1. Implement SDK notification hook (debug-only).
