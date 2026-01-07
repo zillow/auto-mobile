@@ -18,6 +18,16 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.*
 import androidx.navigation3.ui.NavDisplay
+import dev.jasonpearson.automobile.demos.BugReproScreen
+import dev.jasonpearson.automobile.demos.ContrastDemoScreen
+import dev.jasonpearson.automobile.demos.DemoIndexScreen
+import dev.jasonpearson.automobile.demos.PerformanceDetailScreen
+import dev.jasonpearson.automobile.demos.PerformanceListScreen
+import dev.jasonpearson.automobile.demos.StartupDemoScreen
+import dev.jasonpearson.automobile.demos.TapTargetsDemoScreen
+import dev.jasonpearson.automobile.demos.UxFlowDetailsScreen
+import dev.jasonpearson.automobile.demos.UxFlowStartScreen
+import dev.jasonpearson.automobile.demos.UxFlowSummaryScreen
 import dev.jasonpearson.automobile.home.HomeScreen
 import dev.jasonpearson.automobile.login.ui.LoginScreen
 import dev.jasonpearson.automobile.mediaplayer.VideoPlayerScreen
@@ -126,7 +136,17 @@ fun determineStartDestinationWithDeepLink(
             is HomeDestination,
             is SlidesDestination,
             is VideoPlayerDestination,
-            is SettingsDestination -> {
+            is SettingsDestination,
+            is DemoIndexDestination,
+            is DemoUxStartDestination,
+            is DemoUxDetailsDestination,
+            is DemoUxSummaryDestination,
+            is DemoStartupDestination,
+            is DemoPerformanceListDestination,
+            is DemoPerformanceDetailDestination,
+            is DemoContrastDestination,
+            is DemoTapTargetsDestination,
+            is DemoBugReproDestination -> {
               // For protected destinations, ensure user is authenticated
               when {
                 !hasCompletedOnboarding -> {
@@ -234,7 +254,17 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
               is HomeDestination,
               is SlidesDestination,
               is VideoPlayerDestination,
-              is SettingsDestination -> {
+              is SettingsDestination,
+              is DemoIndexDestination,
+              is DemoUxStartDestination,
+              is DemoUxDetailsDestination,
+              is DemoUxSummaryDestination,
+              is DemoStartupDestination,
+              is DemoPerformanceListDestination,
+              is DemoPerformanceDetailDestination,
+              is DemoContrastDestination,
+              is DemoTapTargetsDestination,
+              is DemoBugReproDestination -> {
                 // For protected destinations, ensure user is authenticated
                 when {
                   !userPreferences.hasCompletedOnboarding -> {
@@ -365,6 +395,15 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                           "video_selection",
                       )
                       backStack.add(VideoPlayerDestination(videoId))
+                    },
+                    onNavigateToDemos = {
+                      Log.d(TAG, "Navigating to DemoIndexScreen")
+                      NavigationTracker.trackNavigation(
+                          "HomeScreen",
+                          "DemoIndexScreen",
+                          "demo_selection",
+                      )
+                      backStack.add(DemoIndexDestination)
                     },
                     onNavigateToSlides = { slideIndex ->
                       Log.d(TAG, "Navigating to SlidesScreen with slideIndex: $slideIndex")
@@ -499,6 +538,155 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                       backStack.add(LoginDestination)
                     },
                 )
+              }
+            }
+
+            entry<DemoIndexDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to DemoIndexScreen")
+                analyticsTracker.trackScreenView("DemoIndexScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoIndexDestination>()) {
+                DemoIndexScreen(
+                    onNavigateToUxFlow = { backStack.add(DemoUxStartDestination) },
+                    onNavigateToStartup = { backStack.add(DemoStartupDestination) },
+                    onNavigateToPerformanceList = {
+                      backStack.add(DemoPerformanceListDestination)
+                    },
+                    onNavigateToContrast = { backStack.add(DemoContrastDestination) },
+                    onNavigateToTapTargets = { backStack.add(DemoTapTargetsDestination) },
+                    onNavigateToBugRepro = { backStack.add(DemoBugReproDestination) },
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                )
+              }
+            }
+
+            entry<DemoUxStartDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to DemoUxStartScreen")
+                analyticsTracker.trackScreenView("DemoUxStartScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoUxStartDestination>()) {
+                UxFlowStartScreen(
+                    onNavigateNext = { backStack.add(DemoUxDetailsDestination) },
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                )
+              }
+            }
+
+            entry<DemoUxDetailsDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to DemoUxDetailsScreen")
+                analyticsTracker.trackScreenView("DemoUxDetailsScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoUxDetailsDestination>()) {
+                UxFlowDetailsScreen(
+                    onNavigateNext = { backStack.add(DemoUxSummaryDestination) },
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                )
+              }
+            }
+
+            entry<DemoUxSummaryDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to DemoUxSummaryScreen")
+                analyticsTracker.trackScreenView("DemoUxSummaryScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoUxSummaryDestination>()) {
+                UxFlowSummaryScreen(
+                    onRestartFlow = {
+                      repeat(2) { backStack.removeLastOrNull() }
+                    },
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                )
+              }
+            }
+
+            entry<DemoStartupDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to StartupDemoScreen")
+                analyticsTracker.trackScreenView("StartupDemoScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoStartupDestination>()) {
+                StartupDemoScreen(onNavigateBack = { backStack.removeLastOrNull() })
+              }
+            }
+
+            entry<DemoPerformanceListDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to PerformanceListScreen")
+                analyticsTracker.trackScreenView("PerformanceListScreen")
+              }
+              Box(
+                  modifier = Modifier.destinationSemanticModifier<DemoPerformanceListDestination>()
+              ) {
+                PerformanceListScreen(
+                    onNavigateToDetail = { itemId ->
+                      backStack.add(DemoPerformanceDetailDestination(itemId))
+                    },
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                )
+              }
+            }
+
+            entry<DemoPerformanceDetailDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(
+                  destination = destination,
+                  extractArguments = { mapOf("itemId" to it.itemId) },
+              )
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to PerformanceDetailScreen with itemId: ${destination.itemId}")
+                analyticsTracker.trackScreenView("PerformanceDetailScreen")
+              }
+              Box(
+                  modifier =
+                      Modifier.destinationSemanticModifier<DemoPerformanceDetailDestination>(
+                          "item_${destination.itemId}"
+                      )
+              ) {
+                PerformanceDetailScreen(
+                    itemId = destination.itemId,
+                    onNavigateBack = { backStack.removeLastOrNull() },
+                )
+              }
+            }
+
+            entry<DemoContrastDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to ContrastDemoScreen")
+                analyticsTracker.trackScreenView("ContrastDemoScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoContrastDestination>()) {
+                ContrastDemoScreen(onNavigateBack = { backStack.removeLastOrNull() })
+              }
+            }
+
+            entry<DemoTapTargetsDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to TapTargetsDemoScreen")
+                analyticsTracker.trackScreenView("TapTargetsDemoScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoTapTargetsDestination>()) {
+                TapTargetsDemoScreen(onNavigateBack = { backStack.removeLastOrNull() })
+              }
+            }
+
+            entry<DemoBugReproDestination> { destination ->
+              Navigation3Adapter.TrackNavigation(destination)
+              LaunchedEffect(Unit) {
+                Log.d(TAG, "Navigated to BugReproScreen")
+                analyticsTracker.trackScreenView("BugReproScreen")
+              }
+              Box(modifier = Modifier.destinationSemanticModifier<DemoBugReproDestination>()) {
+                BugReproScreen(onNavigateBack = { backStack.removeLastOrNull() })
               }
             }
           },

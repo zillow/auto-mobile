@@ -97,6 +97,7 @@ dependencies {
   implementation(projects.playground.onboarding)
   implementation(projects.playground.slides)
   implementation(projects.playground.storage)
+  implementation(projects.playground.demos)
   implementation(projects.playground.experimentation)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3.android)
 

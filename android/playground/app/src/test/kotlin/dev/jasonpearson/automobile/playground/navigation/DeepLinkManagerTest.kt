@@ -86,6 +86,20 @@ class DeepLinkManagerTest {
   }
 
   @Test
+  fun testParseDemoIndexDeepLink() {
+    val uri = Uri.parse("automobile:playground/demos")
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertEquals(DemoIndexDestination, destination)
+  }
+
+  @Test
+  fun testParseDemoPerformanceDetailDeepLink() {
+    val uri = Uri.parse("automobile:playground/demos/perf/detail/7")
+    val destination = DeepLinkManager.parseDeepLink(uri)
+    assertEquals(DemoPerformanceDetailDestination(7), destination)
+  }
+
+  @Test
   fun testParseInvalidScheme() {
     val uri = Uri.parse("https://playground/onboarding")
     val destination = DeepLinkManager.parseDeepLink(uri)
@@ -139,6 +153,12 @@ class DeepLinkManagerTest {
     val settingsUri = Uri.parse("automobile:playground/settings")
     assertEquals("Settings", DeepLinkManager.getDestinationName(settingsUri))
 
+    val demoIndexUri = Uri.parse("automobile:playground/demos")
+    assertEquals("Demo Index", DeepLinkManager.getDestinationName(demoIndexUri))
+
+    val demoPerfUri = Uri.parse("automobile:playground/demos/perf/detail/2")
+    assertEquals("Demo Performance Detail", DeepLinkManager.getDestinationName(demoPerfUri))
+
     val invalidUri = Uri.parse("https://invalid.com")
     assertNull(DeepLinkManager.getDestinationName(invalidUri))
   }
@@ -146,7 +166,7 @@ class DeepLinkManagerTest {
   @Test
   fun testGetAllDeepLinks() {
     val allLinks = DeepLinkManager.getAllDeepLinks()
-    assertEquals(14, allLinks.size)
+    assertEquals(24, allLinks.size)
 
     val linkUrls = allLinks.map { it.second }
     assertTrue(linkUrls.contains("automobile:playground/onboarding"))
@@ -156,5 +176,11 @@ class DeepLinkManagerTest {
     assertTrue(linkUrls.contains("automobile:playground/video_player/sample123"))
     assertTrue(linkUrls.contains("automobile:playground/slides/0"))
     assertTrue(linkUrls.contains("automobile:playground/slides/3"))
+    assertTrue(linkUrls.contains("automobile:playground/demos"))
+    assertTrue(linkUrls.contains("automobile:playground/demos/ux/start"))
+    assertTrue(linkUrls.contains("automobile:playground/demos/perf/list"))
+    assertTrue(linkUrls.contains("automobile:playground/demos/perf/detail/4"))
+    assertTrue(linkUrls.contains("automobile:playground/demos/a11y/contrast"))
+    assertTrue(linkUrls.contains("automobile:playground/demos/bugs/repro"))
   }
 }

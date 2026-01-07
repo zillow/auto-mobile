@@ -46,6 +46,8 @@ include(":playground:design:system")
 
 include(":playground:discover")
 
+include(":playground:demos")
+
 include(":playground:experimentation")
 
 include(":playground:home")

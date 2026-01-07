@@ -22,3 +22,16 @@ It also includes the original Droidcon NYC 2025 slides with complex presentation
 <img src="../art/presentation-start-dark.png" width="400" alt="presentation-start-dark.png" />
 <img src="../art/presentation-chart-light.png" width="400" alt="presentation-chart-light.png" />
 <img src="../art/presentation-code-light.png" width="400" alt="presentation-code-light.png" />
+
+## Docs Workflow Demos
+
+The app includes a Docs Demo Index screen (Home > Demos) with deterministic demo flows for the
+`docs/using` workflows:
+
+- UX exploration flow (start, details, summary)
+- Performance startup, list scrolling, and list-to-detail transitions
+- Accessibility contrast failures and small tap targets
+- Bug reproduction with an intentional toggleable bug
+
+Demo screens use stable labels and Compose test tags for repeatable automation. Deep links are
+listed in `android/docs/playground-deep-links.md`.

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Slideshow
 import androidx.compose.material3.Icon
@@ -41,6 +42,7 @@ fun HomeScreen(
     initialSelectedTab: Int = 0,
     initialSelectedSubTab: Int? = null,
     onNavigateToVideoPlayer: (String) -> Unit = {},
+    onNavigateToDemos: () -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
     onLogout: () -> Unit = {},
     onGuestModeNavigateToLogin: () -> Unit = {},
@@ -53,6 +55,7 @@ fun HomeScreen(
         setBottomNavSelection = { bottomNavSelection = it },
         initialSelectedSubTab = initialSelectedSubTab,
         onNavigateToVideoPlayer = onNavigateToVideoPlayer,
+        onNavigateToDemos = onNavigateToDemos,
         onNavigateToSlides = onNavigateToSlides,
         onLogout = onLogout,
         onGuestModeNavigateToLogin = onGuestModeNavigateToLogin,
@@ -67,6 +70,7 @@ fun HomeScreenCore(
     setBottomNavSelection: (Int) -> Unit = {},
     initialSelectedSubTab: Int? = null,
     onNavigateToVideoPlayer: (String) -> Unit = {},
+    onNavigateToDemos: () -> Unit = {},
     onNavigateToSlides: (Int) -> Unit = {},
     onLogout: () -> Unit = {},
     onGuestModeNavigateToLogin: () -> Unit = {},
@@ -77,6 +81,7 @@ fun HomeScreenCore(
   val navItems =
       listOf(
           BottomNavItem("Discover", Icons.Filled.Search, "discover"),
+          BottomNavItem("Demos", Icons.Filled.PlayArrow, "demos"),
           BottomNavItem("Slides", Icons.Filled.Slideshow, "slides"),
           BottomNavItem("Settings", Icons.Filled.Settings, "settings"),
       )
@@ -85,7 +90,7 @@ fun HomeScreenCore(
   LaunchedEffect(bottomNavSelected) {
     when (bottomNavSelected) {
       0 -> analyticsTracker.trackScreenView("DiscoverScreen")
-      2 -> analyticsTracker.trackScreenView("SettingsScreen")
+      3 -> analyticsTracker.trackScreenView("SettingsScreen")
     }
   }
 
@@ -97,10 +102,10 @@ fun HomeScreenCore(
             NavigationBarItem(
                 selected = bottomNavSelected == index,
                 onClick = {
-                  if (item.route == "slides") {
-                    onNavigateToSlides(0) // Navigate to first slide
-                  } else {
-                    setBottomNavSelection(index)
+                  when (item.route) {
+                    "demos" -> onNavigateToDemos()
+                    "slides" -> onNavigateToSlides(0) // Navigate to first slide
+                    else -> setBottomNavSelection(index)
                   }
                 },
                 icon = { Icon(item.icon, contentDescription = item.label) },
@@ -119,10 +124,13 @@ fun HomeScreenCore(
                 initialSelectedSubTab = initialSelectedSubTab,
             )
         1 -> {
+          // Demos handled by navigation - this case shouldn't be reached
+        }
+        2 -> {
           // Slides handled by navigation - this case shouldn't be reached
           // since we navigate away when slides is selected
         }
-        2 ->
+        3 ->
             SettingsScreen(
                 onLogout = onLogout,
                 onGuestModeNavigateToLogin = onGuestModeNavigateToLogin,
@@ -173,5 +181,5 @@ fun HomeScreenSettingsPreview() {
         else -> false
       }
 
-  AutoMobileTheme(darkTheme = isDarkMode) { HomeScreenCore(bottomNavSelected = 2) }
+  AutoMobileTheme(darkTheme = isDarkMode) { HomeScreenCore(bottomNavSelected = 3) }
 }

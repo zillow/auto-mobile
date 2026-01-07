@@ -35,6 +35,21 @@ All deep links use the custom scheme: `automobile:playground/[path]`
 - **Usage**: Test video playback functionality
 - **Example**: `automobile:playground/video_player/sample123`
 
+### 5. Demo Workflow Screens
+
+Use these for stable, repeatable AutoMobile demos tied to docs/using workflows.
+
+- **Demo Index**: `automobile:playground/demos`
+- **UX Flow Start**: `automobile:playground/demos/ux/start`
+- **UX Flow Details**: `automobile:playground/demos/ux/details`
+- **UX Flow Summary**: `automobile:playground/demos/ux/summary`
+- **Startup Demo**: `automobile:playground/demos/perf/startup`
+- **Performance List**: `automobile:playground/demos/perf/list`
+- **Performance Detail**: `automobile:playground/demos/perf/detail/{itemId}`
+- **Contrast Demo**: `automobile:playground/demos/a11y/contrast`
+- **Tap Targets Demo**: `automobile:playground/demos/a11y/tap_targets`
+- **Bug Repro Demo**: `automobile:playground/demos/bugs/repro`
+
 ## Testing with ADB
 
 You can test deep links using ADB commands:

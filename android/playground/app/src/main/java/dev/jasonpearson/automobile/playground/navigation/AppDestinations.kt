@@ -21,3 +21,23 @@ data class HomeDestination(
 @Serializable data class SlidesDestination(val slideIndex: Int = 0) : AppDestination
 
 @Serializable data class VideoPlayerDestination(val videoId: String) : AppDestination
+
+@Serializable data object DemoIndexDestination : AppDestination
+
+@Serializable data object DemoUxStartDestination : AppDestination
+
+@Serializable data object DemoUxDetailsDestination : AppDestination
+
+@Serializable data object DemoUxSummaryDestination : AppDestination
+
+@Serializable data object DemoStartupDestination : AppDestination
+
+@Serializable data object DemoPerformanceListDestination : AppDestination
+
+@Serializable data class DemoPerformanceDetailDestination(val itemId: Int) : AppDestination
+
+@Serializable data object DemoContrastDestination : AppDestination
+
+@Serializable data object DemoTapTargetsDestination : AppDestination
+
+@Serializable data object DemoBugReproDestination : AppDestination

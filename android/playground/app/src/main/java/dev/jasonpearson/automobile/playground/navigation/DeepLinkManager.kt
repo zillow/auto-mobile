@@ -31,6 +31,16 @@ object DeepLinkManager {
   private const val PATH_SLIDES = "/slides"
   private const val PATH_VIDEO_PLAYER = "/video_player"
   private const val PATH_SETTINGS = "/settings"
+  private const val PATH_DEMOS = "/demos"
+  private const val PATH_DEMO_UX_START = "/demos/ux/start"
+  private const val PATH_DEMO_UX_DETAILS = "/demos/ux/details"
+  private const val PATH_DEMO_UX_SUMMARY = "/demos/ux/summary"
+  private const val PATH_DEMO_STARTUP = "/demos/perf/startup"
+  private const val PATH_DEMO_PERF_LIST = "/demos/perf/list"
+  private const val PATH_DEMO_PERF_DETAIL = "/demos/perf/detail"
+  private const val PATH_DEMO_A11Y_CONTRAST = "/demos/a11y/contrast"
+  private const val PATH_DEMO_A11Y_TAP_TARGETS = "/demos/a11y/tap_targets"
+  private const val PATH_DEMO_BUG_REPRO = "/demos/bugs/repro"
 
   /** Generate deep link URL for onboarding screen */
   fun generateOnboardingUrl(): String {
@@ -120,6 +130,76 @@ object DeepLinkManager {
   fun generateSettingsUrl(): String {
     val url = buildUri(PATH_SETTINGS)
     Log.d(TAG, "Generated settings URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo index screen */
+  fun generateDemosIndexUrl(): String {
+    val url = buildUri(PATH_DEMOS)
+    Log.d(TAG, "Generated demos index URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo UX flow start screen */
+  fun generateDemoUxStartUrl(): String {
+    val url = buildUri(PATH_DEMO_UX_START)
+    Log.d(TAG, "Generated demo UX start URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo UX flow details screen */
+  fun generateDemoUxDetailsUrl(): String {
+    val url = buildUri(PATH_DEMO_UX_DETAILS)
+    Log.d(TAG, "Generated demo UX details URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo UX flow summary screen */
+  fun generateDemoUxSummaryUrl(): String {
+    val url = buildUri(PATH_DEMO_UX_SUMMARY)
+    Log.d(TAG, "Generated demo UX summary URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo startup screen */
+  fun generateDemoStartupUrl(): String {
+    val url = buildUri(PATH_DEMO_STARTUP)
+    Log.d(TAG, "Generated demo startup URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo performance list screen */
+  fun generateDemoPerformanceListUrl(): String {
+    val url = buildUri(PATH_DEMO_PERF_LIST)
+    Log.d(TAG, "Generated demo performance list URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo performance detail screen */
+  fun generateDemoPerformanceDetailUrl(itemId: Int): String {
+    val url = buildUri("$PATH_DEMO_PERF_DETAIL/$itemId")
+    Log.d(TAG, "Generated demo performance detail URL for itemId $itemId: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo contrast screen */
+  fun generateDemoContrastUrl(): String {
+    val url = buildUri(PATH_DEMO_A11Y_CONTRAST)
+    Log.d(TAG, "Generated demo contrast URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo tap targets screen */
+  fun generateDemoTapTargetsUrl(): String {
+    val url = buildUri(PATH_DEMO_A11Y_TAP_TARGETS)
+    Log.d(TAG, "Generated demo tap targets URL: $url")
+    return url
+  }
+
+  /** Generate deep link URL for demo bug reproduction screen */
+  fun generateDemoBugReproUrl(): String {
+    val url = buildUri(PATH_DEMO_BUG_REPRO)
+    Log.d(TAG, "Generated demo bug repro URL: $url")
     return url
   }
 
@@ -218,6 +298,52 @@ object DeepLinkManager {
             Log.d(TAG, "Parsed as SettingsDestination")
             SettingsDestination
           }
+          path == PATH_DEMOS -> {
+            Log.d(TAG, "Parsed as DemoIndexDestination")
+            DemoIndexDestination
+          }
+          path == PATH_DEMO_UX_START -> {
+            Log.d(TAG, "Parsed as DemoUxStartDestination")
+            DemoUxStartDestination
+          }
+          path == PATH_DEMO_UX_DETAILS -> {
+            Log.d(TAG, "Parsed as DemoUxDetailsDestination")
+            DemoUxDetailsDestination
+          }
+          path == PATH_DEMO_UX_SUMMARY -> {
+            Log.d(TAG, "Parsed as DemoUxSummaryDestination")
+            DemoUxSummaryDestination
+          }
+          path == PATH_DEMO_STARTUP -> {
+            Log.d(TAG, "Parsed as DemoStartupDestination")
+            DemoStartupDestination
+          }
+          path == PATH_DEMO_PERF_LIST -> {
+            Log.d(TAG, "Parsed as DemoPerformanceListDestination")
+            DemoPerformanceListDestination
+          }
+          path.startsWith(PATH_DEMO_PERF_DETAIL) -> {
+            val itemId = path.substringAfterLast("/").toIntOrNull()
+            if (itemId != null && itemId > 0) {
+              Log.d(TAG, "Parsed as DemoPerformanceDetailDestination with itemId: $itemId")
+              DemoPerformanceDetailDestination(itemId)
+            } else {
+              Log.d(TAG, "Invalid itemId for demo performance detail path")
+              null
+            }
+          }
+          path == PATH_DEMO_A11Y_CONTRAST -> {
+            Log.d(TAG, "Parsed as DemoContrastDestination")
+            DemoContrastDestination
+          }
+          path == PATH_DEMO_A11Y_TAP_TARGETS -> {
+            Log.d(TAG, "Parsed as DemoTapTargetsDestination")
+            DemoTapTargetsDestination
+          }
+          path == PATH_DEMO_BUG_REPRO -> {
+            Log.d(TAG, "Parsed as DemoBugReproDestination")
+            DemoBugReproDestination
+          }
           else -> {
             Log.d(TAG, "No matching destination for path: $path")
             null
@@ -269,6 +395,16 @@ object DeepLinkManager {
           path.startsWith(PATH_SLIDES) -> "Slides"
           path.startsWith(PATH_VIDEO_PLAYER) -> "Video Player"
           path == PATH_SETTINGS -> "Settings"
+          path == PATH_DEMOS -> "Demo Index"
+          path == PATH_DEMO_UX_START -> "Demo UX Start"
+          path == PATH_DEMO_UX_DETAILS -> "Demo UX Details"
+          path == PATH_DEMO_UX_SUMMARY -> "Demo UX Summary"
+          path == PATH_DEMO_STARTUP -> "Demo Startup"
+          path == PATH_DEMO_PERF_LIST -> "Demo Performance List"
+          path.startsWith(PATH_DEMO_PERF_DETAIL) -> "Demo Performance Detail"
+          path == PATH_DEMO_A11Y_CONTRAST -> "Demo Contrast"
+          path == PATH_DEMO_A11Y_TAP_TARGETS -> "Demo Tap Targets"
+          path == PATH_DEMO_BUG_REPRO -> "Demo Bug Repro"
           else -> null
         }
 
@@ -356,6 +492,66 @@ object DeepLinkManager {
     launchDeepLink(context, generateSettingsUrl())
   }
 
+  /** Navigate to demos index screen via deep link for AutoMobile tests */
+  fun navigateToDemosIndexForTest(context: Context) {
+    Log.d(TAG, "Navigating to demos index for test")
+    launchDeepLink(context, generateDemosIndexUrl())
+  }
+
+  /** Navigate to demo UX flow start via deep link for AutoMobile tests */
+  fun navigateToDemoUxStartForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo UX start for test")
+    launchDeepLink(context, generateDemoUxStartUrl())
+  }
+
+  /** Navigate to demo UX flow details via deep link for AutoMobile tests */
+  fun navigateToDemoUxDetailsForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo UX details for test")
+    launchDeepLink(context, generateDemoUxDetailsUrl())
+  }
+
+  /** Navigate to demo UX flow summary via deep link for AutoMobile tests */
+  fun navigateToDemoUxSummaryForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo UX summary for test")
+    launchDeepLink(context, generateDemoUxSummaryUrl())
+  }
+
+  /** Navigate to demo startup screen via deep link for AutoMobile tests */
+  fun navigateToDemoStartupForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo startup for test")
+    launchDeepLink(context, generateDemoStartupUrl())
+  }
+
+  /** Navigate to demo performance list screen via deep link for AutoMobile tests */
+  fun navigateToDemoPerformanceListForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo performance list for test")
+    launchDeepLink(context, generateDemoPerformanceListUrl())
+  }
+
+  /** Navigate to demo performance detail screen via deep link for AutoMobile tests */
+  fun navigateToDemoPerformanceDetailForTest(context: Context, itemId: Int) {
+    Log.d(TAG, "Navigating to demo performance detail for test with itemId: $itemId")
+    launchDeepLink(context, generateDemoPerformanceDetailUrl(itemId))
+  }
+
+  /** Navigate to demo contrast screen via deep link for AutoMobile tests */
+  fun navigateToDemoContrastForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo contrast for test")
+    launchDeepLink(context, generateDemoContrastUrl())
+  }
+
+  /** Navigate to demo tap targets screen via deep link for AutoMobile tests */
+  fun navigateToDemoTapTargetsForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo tap targets for test")
+    launchDeepLink(context, generateDemoTapTargetsUrl())
+  }
+
+  /** Navigate to demo bug reproduction screen via deep link for AutoMobile tests */
+  fun navigateToDemoBugReproForTest(context: Context) {
+    Log.d(TAG, "Navigating to demo bug repro for test")
+    launchDeepLink(context, generateDemoBugReproUrl())
+  }
+
   /** Generic method to launch a deep link intent for testing */
   fun launchDeepLink(context: Context, deepLinkUrl: String) {
     Log.d(TAG, "Launching deep link: $deepLinkUrl")
@@ -397,6 +593,16 @@ object DeepLinkManager {
             "Slides (slide 3)" to generateSlidesUrl(3),
             "Video Player (sample)" to generateVideoPlayerUrl("sample123"),
             "Settings" to generateSettingsUrl(),
+            "Demos Index" to generateDemosIndexUrl(),
+            "Demo UX Start" to generateDemoUxStartUrl(),
+            "Demo UX Details" to generateDemoUxDetailsUrl(),
+            "Demo UX Summary" to generateDemoUxSummaryUrl(),
+            "Demo Startup" to generateDemoStartupUrl(),
+            "Demo Performance List" to generateDemoPerformanceListUrl(),
+            "Demo Performance Detail (item 4)" to generateDemoPerformanceDetailUrl(4),
+            "Demo Contrast" to generateDemoContrastUrl(),
+            "Demo Tap Targets" to generateDemoTapTargetsUrl(),
+            "Demo Bug Repro" to generateDemoBugReproUrl(),
         )
     Log.d(TAG, "Generated ${deepLinks.size} deep links")
     return deepLinks
