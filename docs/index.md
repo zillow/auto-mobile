@@ -24,7 +24,7 @@ All of the [design docs](design-docs/index.md) are included in the repository.
 
 - [FAQ](faq.md) - Frequently asked questions
 - [Why build this?](origin.md) - Motivation and origin story
-- [Contributing](contributing/index.md) - If you're looking to contribute to the project
+- [Contributing](contributing/overview.md) - If you're looking to contribute to the project
 
 ## License
 

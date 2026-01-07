@@ -34,6 +34,7 @@ stateDiagram-v2
 - **[Navigation Graph](mcp/navigation-graph.md)** - Automatic screen flow mapping
 - **[Daemon](mcp/daemon.md)** - Background service for device pooling and test execution
 - **[Feature Flags](mcp/feature-flags.md)** - Runtime configuration and experimental features
+- **[Video Recording](mcp/video-recording.md)** - Low-overhead capture and CI artifacts
 
 ## Platform-Specific
 
@@ -44,7 +45,10 @@ stateDiagram-v2
 - **[Work Profiles](plat/android/work-profiles.md)** - Enterprise device support
 
 ### iOS
-- **[iOS Support](plat/ios/index.md)** - iOS automation capabilities (in development)
+- **[iOS Overview](plat/ios/index.md)** - Hybrid automation architecture
+- **[Automation Server](plat/ios/accessibility-service.md)** - WebSocket accessibility bridge
+- **[XCTest Runner](plat/ios/xctestrunner.md)** - Test execution framework
+- **[Xcode Integration](plat/ios/ide-plugin/overview.md)** - Companion app and editor extension
 
 ## System Design Principles
 
@@ -55,4 +59,4 @@ stateDiagram-v2
 
 ## Contributing
 
-See [Contributing Guide](../contributing/index.md) for how to contribute to AutoMobile.
+See [Contributing Guide](../contributing/overview.md) for how to contribute to AutoMobile.

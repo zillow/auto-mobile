@@ -1,0 +1,60 @@
+# iOS Automation Server (Accessibility Bridge)
+
+The iOS automation server is a native iOS app that exposes the accessibility tree and element
+queries over a WebSocket connection. It is the iOS counterpart to the Android accessibility
+service and focuses on reliable observation delivery.
+
+## Responsibilities
+
+- Serve the accessibility tree via WebSocket.
+- Support element lookup by id, text, and type.
+- Provide element bounds for touch injection.
+- Emit view hierarchy updates when the UI changes.
+- Track first responder and focus state.
+
+## WebSocket protocol
+
+Client to server command:
+
+```json
+{
+  "id": "cmd_abc123",
+  "action": "getViewHierarchy",
+  "params": {}
+}
+```
+
+Server to client response:
+
+```json
+{
+  "id": "cmd_abc123",
+  "status": "success",
+  "result": {
+    "timestamp": 1704067200.5,
+    "screenSize": { "width": 390, "height": 844 },
+    "elements": [
+      {
+        "id": "UIButton_67890",
+        "type": "UIButton",
+        "label": "Submit",
+        "identifier": "submitButton",
+        "frame": { "x": 100, "y": 400, "width": 190, "height": 44 },
+        "isEnabled": true,
+        "isVisible": true,
+        "traits": ["button"]
+      }
+    ]
+  }
+}
+```
+
+## Limitations
+
+- Simulator-only initially.
+- Physical device support requires additional provisioning and touch injection.
+
+## See also
+
+- [AXe automation](axe-automation.md)
+- [MCP actions](../../mcp/actions.md)
