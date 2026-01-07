@@ -113,6 +113,11 @@ class McpHttpClient(
     return decodeToolResponse(json, response, PerformanceAuditHistoryResult.serializer())
   }
 
+  override fun getTestTimings(query: TestTimingQuery): TestTimingSummary {
+    val response = callTool("getTestTimings", query.toJsonObject())
+    return decodeToolResponse(json, response, TestTimingSummary.serializer())
+  }
+
   private fun callTool(name: String, arguments: JsonObject): JsonElement {
     ensureInitialized()
     val response =

@@ -31,6 +31,7 @@ interface AutoMobileClient {
       limit: Int? = null,
       offset: Int? = null,
   ): PerformanceAuditHistoryResult
+  fun getTestTimings(query: TestTimingQuery = TestTimingQuery()): TestTimingSummary
   fun close() {}
 }
 
