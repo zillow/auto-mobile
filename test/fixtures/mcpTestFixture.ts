@@ -15,8 +15,12 @@ export class McpTestFixture {
   public serverTransport!: any;
   public clientTransport!: any;
 
+  constructor(
+    private readonly serverOptions: Parameters<typeof createMcpServer>[0] = {}
+  ) {}
+
   async setup(): Promise<void> {
-    this.server = createMcpServer();
+    this.server = createMcpServer(this.serverOptions);
     [this.serverTransport, this.clientTransport] = InMemoryTransport.createLinkedPair();
 
     await this.server.connect(this.serverTransport);

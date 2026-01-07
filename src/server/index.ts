@@ -8,6 +8,7 @@ import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
 import { executionTracker } from "./executionTracker";
 import { runWithAbortSignal } from "../utils/AbortContext";
+import { createDefaultPlanExecutionLock, type PlanExecutionLock } from "./PlanExecutionLock";
 
 // Import the tool registry
 import { ToolRegistry } from "./toolRegistry";
@@ -43,6 +44,7 @@ import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService"
 export interface McpServerOptions {
   debug?: boolean;
   sessionContext?: { sessionId?: string };
+  planExecutionLock?: PlanExecutionLock;
 }
 
 function formatToolParamError(toolName: string, error: unknown): string {
@@ -72,6 +74,7 @@ function formatToolParamError(toolName: string, error: unknown): string {
 }
 
 export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
+  const planExecutionLock = options.planExecutionLock ?? createDefaultPlanExecutionLock();
   void FeatureFlagService.getInstance()
     .initialize()
     .catch(error => {
@@ -162,14 +165,6 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
       throw new ActionableError(`Unknown tool: ${name}`);
     }
 
-    // Parse and validate the parameters
-    let parsedParams;
-    try {
-      parsedParams = tool.schema.parse(toolParams);
-    } catch (error) {
-      throw new ActionableError(`Invalid parameters for tool ${name}: ${formatToolParamError(name, error)}`);
-    }
-
     const sessionId = options.sessionContext?.sessionId;
     const rawSessionUuid =
       toolParams &&
@@ -178,6 +173,26 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
         ? (toolParams as { sessionUuid?: string }).sessionUuid
         : undefined;
     const sessionUuid = typeof rawSessionUuid === "string" ? rawSessionUuid : undefined;
+
+    const decision = planExecutionLock.evaluate({
+      toolName: name,
+      sessionId,
+      sessionUuid,
+    });
+    if (decision.blocked) {
+      logger.warn(
+        `[MCP] Rejecting tool ${name} due to active executePlan (scope=${decision.scope}, sessionId=${sessionId ?? "none"}, sessionUuid=${sessionUuid ?? "none"})`
+      );
+      throw new ActionableError(decision.reason ?? "plan execution in progress");
+    }
+
+    // Parse and validate the parameters
+    let parsedParams;
+    try {
+      parsedParams = tool.schema.parse(toolParams);
+    } catch (error) {
+      throw new ActionableError(`Invalid parameters for tool ${name}: ${formatToolParamError(name, error)}`);
+    }
 
     const execution = executionTracker.startExecution(name, sessionId, sessionUuid);
 

@@ -10,7 +10,15 @@ export interface ActiveExecution {
   abortController: AbortController;
 }
 
-class ExecutionTracker {
+export type ExecutionScope = "session" | "global";
+
+export interface ExecutionScopeOptions {
+  scope: ExecutionScope;
+  sessionId?: string;
+  sessionUuid?: string;
+}
+
+export class ExecutionTracker {
   private executions = new Map<string, ActiveExecution>();
   private sessionExecutions = new Map<string, Set<string>>();
   private sessionUuidExecutions = new Map<string, Set<string>>();
@@ -83,6 +91,51 @@ class ExecutionTracker {
   hasActiveSessionUuidExecutions(sessionUuid: string): boolean {
     const executions = this.sessionUuidExecutions.get(sessionUuid);
     return executions !== undefined && executions.size > 0;
+  }
+
+  hasActiveToolExecution(toolName: string, options: ExecutionScopeOptions): boolean {
+    if (options.scope === "global") {
+      return this.hasActiveToolExecutionGlobal(toolName);
+    }
+
+    if (options.sessionUuid) {
+      return this.hasActiveToolExecutionForKey(toolName, this.sessionUuidExecutions, options.sessionUuid);
+    }
+
+    if (options.sessionId) {
+      return this.hasActiveToolExecutionForKey(toolName, this.sessionExecutions, options.sessionId);
+    }
+
+    return this.hasActiveToolExecutionGlobal(toolName);
+  }
+
+  private hasActiveToolExecutionGlobal(toolName: string): boolean {
+    for (const execution of this.executions.values()) {
+      if (execution.toolName === toolName) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private hasActiveToolExecutionForKey(
+    toolName: string,
+    executionMap: Map<string, Set<string>>,
+    key: string
+  ): boolean {
+    const executions = executionMap.get(key);
+    if (!executions || executions.size === 0) {
+      return false;
+    }
+
+    for (const executionId of executions) {
+      const execution = this.executions.get(executionId);
+      if (execution?.toolName === toolName) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private async cancelExecutionsForKey(
