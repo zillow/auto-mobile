@@ -7,6 +7,7 @@ export * from "./ClearAppDataResult";
 export * from "./ClearTextResult";
 export * from "./DeepLinkResult";
 export * from "./DemoModeResult";
+export * from "./DisplayedTimeMetric";
 export * from "./Device";
 export * from "./DeviceSession";
 export * from "./DragAndDropOptions";
