@@ -76,6 +76,8 @@ export interface DaemonOptions {
   debugPerf?: boolean;
   /** Enable strict await mode for tapOn await timeouts */
   strictAwait?: boolean;
+  /** Plan execution lock scope (session or global) */
+  planExecutionLockScope?: "session" | "global";
 }
 
 /**

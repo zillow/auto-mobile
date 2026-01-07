@@ -2,6 +2,8 @@ import type {
   AccessibilityAuditConfig,
 } from "../models/AccessibilityAudit";
 
+export type PlanExecutionLockScope = "session" | "global";
+
 /**
  * Global server configuration state
  * Set once during server initialization
@@ -14,6 +16,7 @@ class ServerConfig {
   private _memPerfAuditEnabled: boolean = false;
   private _strictAwaitEnabled: boolean = false;
   private _predictiveUiEnabled: boolean = false;
+  private _planExecutionLockScope: PlanExecutionLockScope = "session";
 
   private constructor() {}
 
@@ -74,6 +77,14 @@ class ServerConfig {
 
   isPredictiveUiEnabled(): boolean {
     return this._predictiveUiEnabled;
+  }
+
+  setPlanExecutionLockScope(scope: PlanExecutionLockScope): void {
+    this._planExecutionLockScope = scope;
+  }
+
+  getPlanExecutionLockScope(): PlanExecutionLockScope {
+    return this._planExecutionLockScope;
   }
 }
 

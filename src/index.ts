@@ -13,6 +13,7 @@ import { execSync } from "node:child_process";
 import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
 import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefinitions";
+import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig";
 
 // Detect port from git branch name for worktree isolation
 // e.g., work/164-feature-name -> port 9164
@@ -75,6 +76,7 @@ function parseArgs(): {
   a11yMinSeverity?: string;
   a11yUseBaseline: boolean;
   predictiveUi: boolean;
+  planExecutionLockScope: PlanExecutionLockScope;
   daemonMode: boolean;
   daemonCommand?: string;
   daemonArgs: string[];
@@ -125,6 +127,7 @@ function parseArgs(): {
   let a11yMinSeverity: string | undefined;
   let a11yUseBaseline = false;
   const predictiveUi = args.includes("--predictive") || args.includes("--predictive-ui");
+  let planExecutionLockScope: PlanExecutionLockScope = "session";
 
   // Extract CLI-specific arguments (everything after --cli)
   const cliIndex = args.indexOf("--cli");
@@ -178,6 +181,14 @@ function parseArgs(): {
       i++;
     } else if (arg === "--a11y-use-baseline") {
       a11yUseBaseline = true;
+    } else if (arg === "--plan-execution-lock-scope") {
+      const scope = args[i + 1];
+      if (scope === "global" || scope === "session") {
+        planExecutionLockScope = scope;
+      } else {
+        logger.warn(`Invalid plan execution lock scope: ${scope}. Using default: ${planExecutionLockScope}`);
+      }
+      i++;
     }
   }
 
@@ -197,6 +208,7 @@ function parseArgs(): {
     a11yMinSeverity,
     a11yUseBaseline,
     predictiveUi,
+    planExecutionLockScope,
     daemonMode,
     daemonCommand,
     daemonArgs,
@@ -589,10 +601,13 @@ async function main() {
       a11yMinSeverity,
       a11yUseBaseline,
       predictiveUi,
+      planExecutionLockScope,
       daemonMode,
       daemonCommand,
       daemonArgs,
     } = parseArgs();
+
+    serverConfig.setPlanExecutionLockScope(planExecutionLockScope);
 
     const featureFlagService = FeatureFlagService.getInstance();
     await featureFlagService.initialize();

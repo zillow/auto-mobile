@@ -82,6 +82,9 @@ export class DaemonManager {
     if (options.strictAwait) {
       args.push("--strict-await");
     }
+    if (options.planExecutionLockScope) {
+      args.push("--plan-execution-lock-scope", options.planExecutionLockScope);
+    }
 
     // Create secure temp directory with random suffix to prevent symlink attacks
     const tempDir = mkdtempSync(join(tmpdir(), "auto-mobile-daemon-"));
@@ -316,6 +319,12 @@ export async function runDaemonCommand(
             options.debugPerf = true;
           } else if (args[i] === "--strict-await") {
             options.strictAwait = true;
+          } else if (args[i] === "--plan-execution-lock-scope") {
+            const scope = args[i + 1];
+            if (scope === "global" || scope === "session") {
+              options.planExecutionLockScope = scope;
+            }
+            i++;
           }
         }
 
@@ -358,6 +367,12 @@ export async function runDaemonCommand(
             options.debugPerf = true;
           } else if (args[i] === "--strict-await") {
             options.strictAwait = true;
+          } else if (args[i] === "--plan-execution-lock-scope") {
+            const scope = args[i + 1];
+            if (scope === "global" || scope === "session") {
+              options.planExecutionLockScope = scope;
+            }
+            i++;
           }
         }
 
