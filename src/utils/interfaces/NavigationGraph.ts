@@ -31,10 +31,17 @@ export interface ModalState {
 /**
  * Represents a selected UI element (tab, menu item, etc.) captured at the time of a tool call.
  */
+export interface SelectedElementDetection {
+  method: "accessibility" | "visual";
+  confidence: number;
+  reason?: string;
+}
+
 export interface SelectedElement {
   text?: string;
   resourceId?: string;
   contentDesc?: string;
+  selectedState?: SelectedElementDetection;
 }
 
 /**

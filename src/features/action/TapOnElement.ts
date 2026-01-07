@@ -19,6 +19,7 @@ import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from
 import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 import { throwIfAborted } from "../../utils/toolUtils";
+import { SelectionStateTracker, SelectionCaptureState, TakeScreenshotCapturer } from "../navigation/SelectionStateTracker";
 
 /**
  * Command to tap on UI element containing specified text
@@ -28,6 +29,7 @@ export class TapOnElement extends BaseVisualChange {
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
   private visionConfig: VisionFallbackConfig;
+  private selectionStateTracker: SelectionStateTracker;
   private static readonly MAX_ATTEMPTS = 5;
   private static readonly AWAIT_POLL_INTERVAL_MS = 100;
 
@@ -36,13 +38,17 @@ export class TapOnElement extends BaseVisualChange {
     adb: AdbClient | null = null,
     axe: AxeClient | null = null,
     webdriver: WebDriverAgent | null = null,
-    visionConfig?: VisionFallbackConfig
+    visionConfig?: VisionFallbackConfig,
+    selectionStateTracker?: SelectionStateTracker
   ) {
     super(device, adb, axe);
     this.elementUtils = new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.webdriver = webdriver || new WebDriverAgent(device);
     this.visionConfig = visionConfig || DEFAULT_VISION_CONFIG;
+    this.selectionStateTracker = selectionStateTracker ?? new SelectionStateTracker({
+      screenshotCapturer: new TakeScreenshotCapturer(device, this.adb)
+    });
   }
 
   /**
@@ -256,6 +262,7 @@ export class TapOnElement extends BaseVisualChange {
     const perf = createGlobalPerformanceTracker();
     perf.serial("tapOnElement");
     let previousObserveResult: ObserveResult | null = null;
+    let selectionCapture: SelectionCaptureState | null = null;
 
     try {
       throwIfAborted(signal);
@@ -275,7 +282,7 @@ export class TapOnElement extends BaseVisualChange {
             this.findElementToTap(options, viewHierarchy, 0, observeResult, signal)
           );
           const tapPoint = this.elementUtils.getElementCenter(element);
-          const action = options.action;
+          let action = options.action;
           const longPressDuration = this.getLongPressDuration(options, this.device.platform);
           const dragTarget = action === "longPressDrag"
             ? this.resolveDragTarget(options, viewHierarchy)
@@ -299,15 +306,23 @@ export class TapOnElement extends BaseVisualChange {
             }
 
             // if not, change action to tap
+            action = "tap";
             options.action = "tap";
           }
+
+          selectionCapture = await this.selectionStateTracker.prepare({
+            action,
+            observation: observeResult,
+            element,
+            signal
+          });
 
           // Platform-specific tap execution
           await perf.track("executeTap", async () => {
             switch (this.device.platform) {
               case "android":
                 await this.executeAndroidTap(
-                  options.action,
+                  action,
                   tapPoint.x,
                   tapPoint.y,
                   longPressDuration,
@@ -317,7 +332,7 @@ export class TapOnElement extends BaseVisualChange {
                 );
                 break;
               case "ios":
-                await this.executeiOSTap(options.action, tapPoint.x, tapPoint.y, longPressDuration, dragTarget);
+                await this.executeiOSTap(action, tapPoint.x, tapPoint.y, longPressDuration, dragTarget);
                 break;
               default:
                 throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
@@ -327,7 +342,7 @@ export class TapOnElement extends BaseVisualChange {
           perf.end();
           return {
             success: true,
-            action: options.action,
+            action,
             element,
           };
         },
@@ -357,6 +372,21 @@ export class TapOnElement extends BaseVisualChange {
           }
         }
       );
+
+      if (result.success && result.observation && result.element) {
+        const selectedElements = await this.selectionStateTracker.finalize({
+          action: options.action,
+          selectionState: selectionCapture,
+          currentObservation: result.observation,
+          previousObservation: previousObserveResult,
+          element: result.element,
+          signal
+        });
+        if (selectedElements.length > 0) {
+          result.observation.selectedElements = selectedElements;
+        }
+      }
+
       if (options.action === "longPress" || options.action === "longPressDrag") {
         const metadata = this.detectLongPressMetadata(previousObserveResult, result.observation);
         return {

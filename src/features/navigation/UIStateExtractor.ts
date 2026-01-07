@@ -1,5 +1,5 @@
-import { UIState, SelectedElement, ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
-import { ViewHierarchyResult, WindowHierarchy } from "../../models";
+import { UIState, SelectedElement, SelectedElementDetection, ModalState, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
+import { ObserveResult, ViewHierarchyResult, WindowHierarchy } from "../../models";
 import { SwipeOnOptions } from "../../models";
 import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
 
@@ -73,6 +73,46 @@ export class UIStateExtractor {
   }
 
   /**
+   * Extract UI state from an observation, using visual fallback selections if accessibility data is missing.
+   */
+  static extractFromObservation(observation?: ObserveResult): UIState | undefined {
+    if (!observation?.viewHierarchy) {
+      return undefined;
+    }
+
+    const baseState = this.extract(observation.viewHierarchy);
+    const accessibilitySelected = baseState?.selectedElements ?? [];
+
+    if (accessibilitySelected.length > 0) {
+      const selectedElements = this.applySelectedState(accessibilitySelected, {
+        method: "accessibility",
+        confidence: 1,
+        reason: "selected attribute present in view hierarchy"
+      });
+      return {
+        ...baseState,
+        selectedElements
+      };
+    }
+
+    const fallbackSelected = observation.selectedElements ?? [];
+    if (fallbackSelected.length > 0) {
+      if (baseState) {
+        return {
+          ...baseState,
+          selectedElements: fallbackSelected
+        };
+      }
+
+      return {
+        selectedElements: fallbackSelected
+      };
+    }
+
+    return baseState;
+  }
+
+  /**
    * Traverse the view hierarchy and call visitor for each node.
    */
   private static traverseHierarchy(
@@ -90,6 +130,16 @@ export class UIStateExtractor {
       // Handle single child node
       this.traverseHierarchy(node.node, visitor);
     }
+  }
+
+  private static applySelectedState(
+    selectedElements: SelectedElement[],
+    selectedState: SelectedElementDetection
+  ): SelectedElement[] {
+    return selectedElements.map(element => ({
+      ...element,
+      selectedState: element.selectedState ?? selectedState
+    }));
   }
 
   /**

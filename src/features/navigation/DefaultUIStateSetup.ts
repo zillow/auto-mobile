@@ -162,7 +162,7 @@ export class DefaultUIStateSetup implements UIStateSetup {
         return undefined;
       }
 
-      return UIStateExtractor.extract(result.viewHierarchy);
+      return UIStateExtractor.extractFromObservation(result);
     } catch (error) {
       logger.warn(`[UI_STATE_SETUP] Error getting current UI state: ${error}`);
       return undefined;

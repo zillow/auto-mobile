@@ -10,6 +10,7 @@ import { PerformanceAuditResult } from "../features/performance/PerformanceAudit
 import { AccessibilityAuditResult } from "./AccessibilityAudit";
 import { RecompositionSummary } from "./Recomposition";
 import { DisplayedTimeMetric } from "./DisplayedTimeMetric";
+import { SelectedElement } from "../utils/interfaces/NavigationGraph";
 
 export interface PredictionTarget {
   text?: string;
@@ -84,6 +85,11 @@ export interface ObserveResult {
     scrollable: Element[];
     text: Element[];
   };
+
+  /**
+   * Selected elements detected for this observation (accessibility or visual fallback)
+   */
+  selectedElements?: SelectedElement[];
 
   /**
    * The single currently focused UI element from the view hierarchy

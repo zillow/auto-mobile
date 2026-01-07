@@ -176,7 +176,7 @@ class ToolRegistryClass {
         if (navigationRelevantTools.includes(name)) {
           // Extract UI state from the most recent cached observation
           const cachedResult = ObserveScreen.getRecentCachedResult();
-          const uiState = UIStateExtractor.extract(cachedResult?.viewHierarchy);
+          const uiState = UIStateExtractor.extractFromObservation(cachedResult);
           NavigationGraphManager.getInstance().recordToolCall(name, args, uiState);
         }
 
