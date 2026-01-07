@@ -48,11 +48,13 @@ Quick example:
 ## Troubleshooting
 
 **ADB not found:**
+
 1. Verify installation: `which adb` or `where adb` (Windows)
 2. Check environment variables are set
 3. Restart terminal after setting `PATH`
 
 **Devices not showing:**
+
 1. Run `adb devices` to verify connection
 2. Accept USB debugging prompt on device
 3. Try `adb kill-server && adb start-server`
