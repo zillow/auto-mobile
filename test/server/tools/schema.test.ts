@@ -1,12 +1,25 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createMcpServer } from "../../../src/server/index";
+import { resetDeviceToolsDependencies, setDeviceToolsDependencies } from "../../../src/server/deviceTools";
 import { ToolRegistry } from "../../../src/server/toolRegistry";
+import { DeviceInfo } from "../../../src/models";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
+import { FakeDeviceUtils } from "../../fakes/FakeDeviceUtils";
 
 describe("MCP Tools Schema", () => {
   let fixture: McpTestFixture;
+  let fakeDeviceUtils: FakeDeviceUtils;
 
   beforeEach(async () => {
+    fakeDeviceUtils = new FakeDeviceUtils();
+    const androidDevices: DeviceInfo[] = [
+      { name: "Pixel_6_API_34", platform: "android", isRunning: false, source: "local" }
+    ];
+    fakeDeviceUtils.setDeviceImages("android", androidDevices);
+    setDeviceToolsDependencies({
+      deviceManagerFactory: () => fakeDeviceUtils
+    });
+
     fixture = new McpTestFixture();
     await fixture.setup();
   });
@@ -15,18 +28,8 @@ describe("MCP Tools Schema", () => {
     if (fixture) {
       await fixture.teardown();
     }
+    resetDeviceToolsDependencies();
   });
-
-  // Helper function to check if emulator CLI is available
-  async function checkEmulatorAvailable(): Promise<boolean> {
-    try {
-      const { execSync } = await import("child_process");
-      execSync("emulator -version", { stdio: "ignore" });
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
 
   test("should validate tool schema definitions conform to MCP standards", () => {
     createMcpServer();
@@ -70,13 +73,6 @@ describe("MCP Tools Schema", () => {
       })).optional()
     }).passthrough();
 
-    // Test listDeviceImages tool which requires emulator CLI
-    const emulatorAvailable = await checkEmulatorAvailable();
-    if (!emulatorAvailable) {
-      // Note: Bun does not support dynamic test skipping // Skip test if emulator CLI is not available
-      return;
-    }
-
     const result = await client.request({
       method: "tools/call",
       params: {
@@ -102,13 +98,6 @@ describe("MCP Tools Schema", () => {
       })).optional()
     }).passthrough();
 
-    // Test listDeviceImages without optional parameters (listDeviceImages has no required params)
-    const emulatorAvailable = await checkEmulatorAvailable();
-    if (!emulatorAvailable) {
-      // Note: Bun does not support dynamic test skipping // Skip test if emulator CLI is not available
-      return;
-    }
-
     const result = await client.request({
       method: "tools/call",
       params: {
@@ -125,13 +114,6 @@ describe("MCP Tools Schema", () => {
   test("given a request contains fields that are not defined by the schema, should return an error response", async function() {
 
     const { client } = fixture.getContext();
-
-    // Test with listDeviceImages and unknown parameter to avoid device dependency
-    const emulatorAvailable = await checkEmulatorAvailable();
-    if (!emulatorAvailable) {
-      // Note: Bun does not support dynamic test skipping // Skip test if emulator CLI is not available
-      return;
-    }
 
     try {
       const { z } = await import("zod");

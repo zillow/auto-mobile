@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ToolRegistry, ProgressCallback } from "./toolRegistry";
-import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
+import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
 import { notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
@@ -52,11 +52,37 @@ export interface ListDeviceImagesArgs {
   platform: SomePlatform;
 }
 
+export interface DeviceToolsDependencies {
+  deviceManagerFactory: () => PlatformDeviceManager;
+}
+
+let moduleDependencies: DeviceToolsDependencies | null = null;
+
+function getDeviceToolsDependencies(): DeviceToolsDependencies {
+  if (!moduleDependencies) {
+    moduleDependencies = {
+      deviceManagerFactory: () => new MultiPlatformDeviceManager()
+    };
+  }
+  return moduleDependencies;
+}
+
+export function setDeviceToolsDependencies(deps: Partial<DeviceToolsDependencies>): void {
+  const currentDeps = getDeviceToolsDependencies();
+  moduleDependencies = {
+    deviceManagerFactory: deps.deviceManagerFactory ?? currentDeps.deviceManagerFactory
+  };
+}
+
+export function resetDeviceToolsDependencies(): void {
+  moduleDependencies = null;
+}
+
 export function registerDeviceTools() {
   // List all connected devices (physical and emulators) handler
   const listBootedDevicesHandler = async (args: ListDevicesArgs) => {
     try {
-      const deviceUtils = new MultiPlatformDeviceManager();
+      const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
       const bootedDevices = await deviceUtils.getBootedDevices(args.platform);
 
       // Categorize devices by type
@@ -93,7 +119,7 @@ export function registerDeviceTools() {
   const listDeviceImagesHandler = async (args: ListDeviceImagesArgs) => {
     try {
 
-      const deviceUtils = new MultiPlatformDeviceManager();
+      const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
       const imageList = await deviceUtils.listDeviceImages(args.platform);
 
       return createJSONToolResponse({
@@ -110,7 +136,7 @@ export function registerDeviceTools() {
   // Start emulator handler
   const startDeviceHandler = async (args: StartDeviceArgs, progress?: ProgressCallback) => {
     try {
-      const deviceUtils = new MultiPlatformDeviceManager();
+      const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
       const childProcess = await deviceUtils.startDevice(args.device);
 
       if (progress) {
@@ -147,7 +173,7 @@ export function registerDeviceTools() {
 
   const killDeviceHandler = async (args: KillDeviceArgs) => {
     try {
-      const deviceUtils = new MultiPlatformDeviceManager();
+      const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
       await deviceUtils.killDevice(args.device);
 
       // Notify that booted device resources have changed

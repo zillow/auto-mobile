@@ -1,5 +1,6 @@
 import { expect, describe, test, beforeEach } from "bun:test";
 import { AvdManagerDependencies } from "../../../src/utils/android-cmdline-tools/avdmanager";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("AVDManager", function() {
   let mockLocation: any;
@@ -103,20 +104,35 @@ describe("AVDManager", function() {
     };
   }
 
+  function createFakeTimer(): FakeTimer {
+    return new FakeTimer();
+  }
+
+  async function resolveWithFakeTimer<T>(
+    timer: FakeTimer,
+    promise: Promise<T>,
+    advanceMs: number = 0
+  ): Promise<T> {
+    await Promise.resolve();
+    timer.advanceTime(advanceMs);
+    return await promise;
+  }
+
   describe("acceptLicenses", () => {
     test("should accept licenses successfully", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerClose(0);
         }, 0);
         return child;
       };
 
-      const result = await avdmanager.acceptLicenses(mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.acceptLicenses(mockDeps));
 
       expect(result.success).toBe(true);
       expect(result.message).toBe("Android SDK licenses accepted");
@@ -125,17 +141,18 @@ describe("AVDManager", function() {
     test("should handle license acceptance failure", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerStderr(Buffer.from("License error"));
           child.triggerClose(1);
         }, 0);
         return child;
       };
 
-      const result = await avdmanager.acceptLicenses(mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.acceptLicenses(mockDeps));
 
       expect(result.success).toBe(false);
       expect(result.message).toContain("License acceptance failed");
@@ -158,10 +175,11 @@ describe("AVDManager", function() {
     test("should list system images successfully", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           const mockOutput = `
 Available Packages:
   system-images;android-33;google_apis;arm64-v8a | 9
@@ -173,7 +191,7 @@ Available Packages:
         return child;
       };
 
-      const result = await avdmanager.listSystemImages(undefined, mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.listSystemImages(undefined, mockDeps));
 
       expect(result).toHaveLength(2);
       expect(result[0].packageName).toBe("system-images;android-33;google_apis;arm64-v8a");
@@ -189,10 +207,11 @@ Available Packages:
     test("should filter system images by criteria", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           const mockOutput = `
 Available Packages:
   system-images;android-33;google_apis;arm64-v8a | 9
@@ -205,10 +224,13 @@ Available Packages:
         return child;
       };
 
-      const result = await avdmanager.listSystemImages({
-        apiLevel: 33,
-        tag: "google_apis"
-      }, mockDeps);
+      const result = await resolveWithFakeTimer(
+        fakeTimer,
+        avdmanager.listSystemImages({
+          apiLevel: 33,
+          tag: "google_apis"
+        }, mockDeps)
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].apiLevel).toBe(33);
@@ -220,10 +242,11 @@ Available Packages:
     test("should create AVD successfully", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerClose(0);
         }, 0);
         return child;
@@ -236,7 +259,7 @@ Available Packages:
         force: true
       };
 
-      const result = await avdmanager.createAvd(params, mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.createAvd(params, mockDeps));
 
       expect(result.success).toBe(true);
       expect(result.avdName).toBe("test_avd");
@@ -245,10 +268,11 @@ Available Packages:
     test("should include all optional parameters", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerClose(0);
         }, 0);
         return child;
@@ -264,7 +288,7 @@ Available Packages:
         abi: "arm64-v8a"
       };
 
-      const result = await avdmanager.createAvd(params, mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.createAvd(params, mockDeps));
 
       expect(result.success).toBe(true);
     });
@@ -272,10 +296,11 @@ Available Packages:
     test("should handle AVD creation failure", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerStderr(Buffer.from("AVD creation failed"));
           child.triggerClose(1);
         }, 0);
@@ -287,7 +312,7 @@ Available Packages:
         package: "system-images;android-33;google_apis;arm64-v8a"
       };
 
-      const result = await avdmanager.createAvd(params, mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.createAvd(params, mockDeps));
 
       expect(result.success).toBe(false);
       expect(result.message).toContain("AVD creation failed");
@@ -298,16 +323,17 @@ Available Packages:
     test("should delete AVD successfully", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerClose(0);
         }, 0);
         return child;
       };
 
-      const result = await avdmanager.deleteAvd("test_avd", mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.deleteAvd("test_avd", mockDeps));
 
       expect(result.success).toBe(true);
       expect(result.message).toContain("deleted successfully");
@@ -318,10 +344,11 @@ Available Packages:
     test("should parse AVD list correctly", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           const mockOutput = `
 Available Android Virtual Devices:
     Name: test_avd_1
@@ -347,7 +374,7 @@ Available Android Virtual Devices:
         return child;
       };
 
-      const result = await avdmanager.listDeviceImages(mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.listDeviceImages(mockDeps));
 
       expect(result).toHaveLength(3);
 
@@ -371,10 +398,11 @@ Available Android Virtual Devices:
     test("should parse device list correctly", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           const mockOutput = `
 Available devices:
 id: 0
@@ -395,7 +423,7 @@ id: pixel_4
         return child;
       };
 
-      const result = await avdmanager.listDevices(mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.listDevices(mockDeps));
 
       expect(result).toHaveLength(3);
 
@@ -417,17 +445,21 @@ id: pixel_4
     test("should install system image successfully", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerClose(0);
         }, 0);
         return child;
       };
 
       const packageName = "system-images;android-33;google_apis;arm64-v8a";
-      const result = await avdmanager.installSystemImage(packageName, true, mockDeps);
+      const result = await resolveWithFakeTimer(
+        fakeTimer,
+        avdmanager.installSystemImage(packageName, true, mockDeps)
+      );
 
       expect(result.success).toBe(true);
       expect(result.message).toContain("installed successfully");
@@ -436,17 +468,21 @@ id: pixel_4
     test("should install without accepting license when specified", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerClose(0);
         }, 0);
         return child;
       };
 
       const packageName = "system-images;android-33;google_apis;arm64-v8a";
-      const result = await avdmanager.installSystemImage(packageName, false, mockDeps);
+      const result = await resolveWithFakeTimer(
+        fakeTimer,
+        avdmanager.installSystemImage(packageName, false, mockDeps)
+      );
 
       expect(result.success).toBe(true);
     });
@@ -505,16 +541,17 @@ id: pixel_4
     test("should handle command spawn errors", async () => {
       const mockDeps = createDependencies();
       const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
 
       mockDeps.spawn = (command: string, args: string[], options?: any) => {
         const child: any = originalSpawn(command, args, options);
-        setTimeout(() => {
+        fakeTimer.setTimeout(() => {
           child.triggerError(new Error("Spawn failed"));
         }, 0);
         return child;
       };
 
-      const result = await avdmanager.acceptLicenses(mockDeps);
+      const result = await resolveWithFakeTimer(fakeTimer, avdmanager.acceptLicenses(mockDeps));
 
       expect(result.success).toBe(false);
       expect(result.message).toContain("Failed to spawn command");
