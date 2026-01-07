@@ -21,11 +21,9 @@ AutoMobile can audit:
 
 ## Using AutoMobile
 
-Enable UI performance auditing in the IntelliJ IDE Plugin
+Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
 
-See [Feature Flags](../../design-docs/mcp/feature-flags.md) for more details.
-
-Ask your AI agent:
+Example prompt:
 
 ```
 Check if all buttons and links meet the minimum tap target size of 48x48dp

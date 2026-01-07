@@ -80,6 +80,7 @@ nav:
   - 'Using AutoMobile':
       - 'UX Exploration': using/ux-exploration.md
       - 'Reproducing Bugs': using/reproducting-bugs.md
+      - 'UI Auditing Prereqs': using/ui-auditing-prereqs.md
       - 'Performance Analysis':
           - 'Startup': using/perf-analysis/startup.md
           - 'Screen Transition': using/perf-analysis/screen-transition.md

@@ -10,9 +10,9 @@ Screen transitions should be smooth and responsive. Janky transitions hurt user 
 
 ## Example Usage
 
-Enable UI performance auditing in the IntelliJ IDE Plugin [feature flags](../../design-docs/mcp/feature-flags.md).
+Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
 
-Ask your AI agent:
+Example prompt:
 
 ```
 Tap the settings button and measure how long the transition takes

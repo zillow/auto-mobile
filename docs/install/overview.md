@@ -1,6 +1,6 @@
 # AI Agent Setup
 
-AutoMobile runs as an MCP (Model Context Protocol) server in STDIO mode. Configure your AI agent to connect to AutoMobile using the examples below.
+AutoMobile runs as an MCP (Model Context Protocol) server in STDIO mode. Configure your AI agent to connect to AutoMobile using the example below.
 
 ### Prerequisites
 
@@ -19,7 +19,9 @@ AutoMobile runs as an MCP (Model Context Protocol) server in STDIO mode. Configu
 }
 ```
 
-If Android SDK is not on `PATH`:
+## Advanced Configuration
+
+If you need to point at a specific Android SDK path, set `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) in the MCP server env:
 
 ```json
 {
@@ -40,7 +42,7 @@ If you have a private npm registry for proxying public npm:
 ```json
 {
   "mcpServers": {
-    "AutoMobile": {
+    "auto-mobile": {
       "command": "npx",
       "args": [
         "-y",
@@ -53,22 +55,10 @@ If you have a private npm registry for proxying public npm:
 }
 ```
 
-#### Android Setup
+## Platform Setup
 
-AutoMobile expects the Android SDK & command-line tools to be installed already; the automatic installation path has been
-removed. Configure the SDK path with `ANDROID_HOME`, `ANDROID_SDK_ROOT`, or `ANDROID_SDK_HOME` so AutoMobile can find
-`adb`, or make sure `adb` is on your `PATH`.
-
-Physical devices do need USB debugging enabled for AutoMobile to function with them.
-
-Additionally you can
-* Install the [IntelliJ IDE Plugin](../design-docs/plat/android/ide-plugin/overview.md) to gain the ability to toggle feature flags, record tests, visualize the real-time navigation graph, and inspect app performance.
-* Add the [JUnitRunner](../design-docs/plat/android/junitrunner.md) test dependency to all Android application and library modules.
-* Add the [Android SDK](../design-docs/plat/android/auto-mobile-sdk.md) Android library to add recomposition tracking.
-
-#### iOS Setup
-
-Unsupported at the moment but the [design doc](../design-docs/plat/ios/index.md) outlines plans.
+- Android: [Android setup](plat/android.md)
+- iOS: unsupported at the moment, but the [design doc](../design-docs/plat/ios/index.md) outlines plans.
 
 ### AI Agent & Model Providers
 
@@ -87,19 +77,6 @@ For model provider supported features like JUnitRunner AI self-healing tests you
 - **Google Gemini** - [Get API Key](https://aistudio.google.com/app/apikey) | [Docs](https://ai.google.dev/gemini-api/docs/api-key)
 - **AWS Bedrock** - [Setup Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/setting-up.html)
 
-Set API keys via environment variables or system properties. See [AutoMobile SDK](../design-docs/plat/android/auto-mobile-sdk.md#model-providers) for configuration details.
-
-
-
-
-
-
-
-
-
-
-
-
-
+Set API keys via environment variables or system properties. See [JUnitRunner](../design-docs/plat/android/junitrunner.md#model-providers) for configuration details.
 
 

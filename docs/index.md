@@ -11,10 +11,13 @@ Android is the primary supported platform today; iOS support is on the roadmap.
 
 ### What can I use this to do?
 
-- [Interactive Exploration](using/ux-exploration.md) Use AI agents to explore your app and discover issues
-- [Automated Testing](using/ui-tests.md) Write reproducible UI tests that run in CI/CD
-- Performance Monitoring of [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [transitions](using/perf-analysis/screen-transition.md).
-- [Accessibility Auditing](using/ux-exploration.md) Validate contrast ratios and touch target sizes
+- [Explore your app interactively](using/ux-exploration.md) - Discover UI flows and issues with an AI agent
+- [Create reproducible UI tests](using/ui-tests.md) - Automate UI flows in CI/CD
+- [Measure startup performance](using/perf-analysis/startup.md) - Track time to first frame and interactivity
+- [Measure scroll framerate](using/perf-analysis/scroll-framerate.md) - Detect jank and dropped frames
+- [Measure screen transitions](using/perf-analysis/screen-transition.md) - Evaluate navigation latency and smoothness
+- [Audit contrast ratios](using/a11y/contrast.md) - Validate WCAG contrast compliance
+- [Audit tap target sizes](using/a11y/tap-targets.md) - Verify touch target size and spacing
 
 ### How does AutoMobile work?
 

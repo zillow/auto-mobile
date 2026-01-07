@@ -17,9 +17,9 @@ AutoMobile collects frame rendering metrics during scroll interactions:
 
 ## Example Usage
 
-Enable UI performance auditing in the IntelliJ IDE Plugin [feature flags](../../design-docs/mcp/feature-flags.md).
+Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
 
-Ask your AI agent:
+Example prompt:
 
 ```
 Scroll through the product list and measure the framerate

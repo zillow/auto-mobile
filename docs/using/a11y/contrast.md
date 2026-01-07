@@ -25,11 +25,9 @@ Large text is defined as:
 
 ## Using AutoMobile
 
-Enable UI performance auditing in the IntelliJ IDE Plugin
+Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
 
-See [Feature Flags](../../design-docs/mcp/feature-flags.md) for more details.
-
-Ask your AI agent:
+Example prompt:
 
 ```
 Audit the login screen for contrast ratio accessibility issues

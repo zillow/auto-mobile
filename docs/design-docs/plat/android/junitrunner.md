@@ -1,5 +1,7 @@
 # Test Execution - JUnitRunner
 
+## Installation
+
 Add this test Gradle dependency to all Android apps and libraries in your codebase. You can also add it only to the
 modules that cover the UI you want to test.
 
@@ -7,8 +9,7 @@ modules that cover the UI you want to test.
 testImplementation("dev.jasonpearson.automobile.junitrunner:x.y.z")
 ```
 
-Note that this artifact hasn't been published to Maven Central just yet and is forthcoming.  
-
+Note that this artifact hasn't been published to Maven Central just yet and is forthcoming.
 
 In the meantime, publish to your mavenLocal (`~/.m2`) via:
 
@@ -18,20 +19,41 @@ In the meantime, publish to your mavenLocal (`~/.m2`) via:
 
 and use the above testImplementation dependency with `x.y.z` version from `android/junit-runner/build.gradle.kts`.
 
+## Configuration
 
-#### AI Recovery
+Configure the runner via system properties or environment variables:
+
+```properties
+# gradle.properties
+automobile.ai.provider=anthropic
+automobile.junit.timing.ordering=duration-desc
+```
+
+Set API keys via environment variables:
+```bash
+export ANTHROPIC_API_KEY="your_api_key_here"
+```
+
+Or via system property:
+```bash
+-Dautomobile.anthropic.api.key=your_api_key_here
+```
+
+Optional proxy endpoint:
+```bash
+-Dautomobile:your-proxy.example.com
+```
+
+## AI Recovery
 
 The runner is designed to eventually support agentic self-healing capabilities, allowing tests to
 automatically adapt and recover from common failure scenarios by leveraging AI-driven analysis of test failures and UI changes.
 
-#### Pooled Device Management
+## Pooled Device Management
 
 Multi-device support with emulator control and app lifecycle management. As long as you have available adb connections,
 AutoMobile can automatically track which one its using for which execution plan or MCP session. CI still needs available
 device connections, but AutoMobile handles selection and readiness checks. During STDIO MCP sessions the tool call `setActiveDevice` will be done and kept for the duration of your session.
-
-
-
 
 ## Historical Timing Data
 
@@ -63,7 +85,7 @@ Example response format:
 }
 ```
 
-# Model Providers
+## Model Providers
 
 The JUnitRunner supports OpenAI, Anthropic, Google Gemini, and AWS Bedrock for AI self-healing capabilities.
 
@@ -72,4 +94,38 @@ Configure via system property:
 automobile.ai.provider=anthropic
 ```
 
-For API key setup, see [AI Agent Setup](../../../install/overview.md#model-provider-api-keys).
+For API key setup, see [Configuration](#configuration).
+
+## CI/CD Integration
+
+### Environment Variables
+
+For CI environments, use environment-injected secrets:
+
+```yaml
+# GitHub Actions example
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  AUTOMOBILE_CI_MODE: true
+```
+
+### Gradle Configuration
+
+```gradle
+android {
+    testOptions {
+        unitTests.all {
+            systemProperty "automobile.ai.provider", "anthropic"
+            systemProperty "automobile.ci.mode", "true"
+        }
+    }
+}
+```
+
+## Best Practices
+
+1. **Use mavenLocal for development** - Until published to Maven Central
+2. **Enable the [Accessibility Service](accessibility-service.md)** - Required for real-time view hierarchy access
+3. **Configure API keys securely** - Use environment variables in CI, avoid hardcoding
+4. **Enable timing optimization** - Use historical timing data to order tests efficiently
+5. **Monitor device pool** - Ensure enough devices are available for parallel execution

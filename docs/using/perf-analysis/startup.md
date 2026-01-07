@@ -14,7 +14,9 @@ App startup performance affects user experience and app store ratings. AutoMobil
 
 ## Example Workflow
 
-Ask your AI agent:
+Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
+
+Example prompt:
 
 ```
 Launch the app and measure how long until the home screen is interactive
