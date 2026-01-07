@@ -93,6 +93,15 @@ tasks.configureEach {
 tasks.withType<Test> {
   // Enable parallel test execution across multiple devices
   maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
+  dependsOn(":accessibility-service:assembleDebug")
+  val accessibilityApk =
+      project(":accessibility-service")
+          .layout
+          .buildDirectory
+          .file("outputs/apk/debug/accessibility-service-debug.apk")
+  environment("AUTOMOBILE_ACCESSIBILITY_APK_PATH", accessibilityApk.get().asFile.absolutePath)
+  systemProperty("automobile.accessibility.apk.path", accessibilityApk.get().asFile.absolutePath)
+  systemProperty("automobile.daemon.force.restart", "true")
 
   testLogging {
     // Show standard output and error for tests

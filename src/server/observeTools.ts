@@ -10,18 +10,18 @@ import { BootedDevice } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { IdentifyInteractions, IdentifyInteractionsOptions } from "../features/observe/IdentifyInteractions";
-import { addSessionUuidToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const observeSchema = addSessionUuidToSchema(z.object({
+export const observeSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const listAppsSchema = addSessionUuidToSchema(z.object({
+export const listAppsSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const identifyInteractionsSchema = addSessionUuidToSchema(z.object({
+export const identifyInteractionsSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   filter: z.object({
     types: z.array(z.enum(["navigation", "input", "action", "scroll", "toggle"]))

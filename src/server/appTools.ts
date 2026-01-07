@@ -5,22 +5,22 @@ import { LaunchApp } from "../features/action/LaunchApp";
 import { TerminateApp } from "../features/action/TerminateApp";
 import { InstallApp } from "../features/action/InstallApp";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { addSessionUuidToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { invalidateInstalledAppsCache, notifyInstalledAppResourceUpdated } from "./appResources";
 import { logger } from "../utils/logger";
 
 // Schema definitions
-export const packageNameSchema = addSessionUuidToSchema(z.object({
+export const packageNameSchema = addDeviceTargetingToSchema(z.object({
   appId: z.string().describe("App package ID of the app"),
 }));
 
-export const launchAppSchema = addSessionUuidToSchema(z.object({
+export const launchAppSchema = addDeviceTargetingToSchema(z.object({
   appId: z.string().describe("App package ID of the app"),
   clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false"),
   coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default false"),
 }));
 
-export const installAppSchema = addSessionUuidToSchema(z.object({
+export const installAppSchema = addDeviceTargetingToSchema(z.object({
   apkPath: z.string().describe("Path to the APK file to install"),
 }));
 

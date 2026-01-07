@@ -48,21 +48,33 @@ internal object DaemonSocketClientManager {
   }
 
   private fun ensureDaemonRunning() {
-    if (DaemonSocketClient.isAvailable(DaemonSocketPaths.socketPath())) {
+    val socketPath = DaemonSocketPaths.socketPath()
+    val forceRestart = SystemPropertyCache.getBoolean("automobile.daemon.force.restart", false)
+    if (!forceRestart && DaemonSocketClient.isAvailable(socketPath)) {
       return
     }
 
-    val startCommand = DaemonSocketPaths.buildDaemonStartCommand()
+    val startCommand =
+        if (forceRestart) {
+          DaemonSocketPaths.buildDaemonRestartCommand()
+        } else {
+          DaemonSocketPaths.buildDaemonStartCommand()
+        }
     val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
     if (debugMode) {
       println("Starting AutoMobile daemon with: ${startCommand.joinToString(" ")}")
     }
 
-    AutoMobileSharedUtils.executeCommand(startCommand, DaemonSocketPaths.daemonStartTimeoutMs())
+    val environmentOverrides = resolveDaemonEnvironmentOverrides()
+    AutoMobileSharedUtils.executeCommand(
+        startCommand,
+        DaemonSocketPaths.daemonStartTimeoutMs(),
+        environmentOverrides,
+    )
 
     val started =
         DaemonSocketClient.waitForAvailability(
-            DaemonSocketPaths.socketPath(),
+            socketPath,
             DaemonSocketPaths.daemonStartTimeoutMs(),
         )
     if (!started) {
@@ -70,6 +82,33 @@ internal object DaemonSocketClientManager {
           "Daemon failed to start within ${DaemonSocketPaths.daemonStartTimeoutMs()}ms"
       )
     }
+  }
+
+  private fun resolveDaemonEnvironmentOverrides(): Map<String, String> {
+    val resolvedOverrides = mutableMapOf<String, String>()
+    val accessibilityApkProperty =
+        SystemPropertyCache.get("automobile.accessibility.apk.path", "").trim()
+    val accessibilityApkEnv = System.getenv("AUTOMOBILE_ACCESSIBILITY_APK_PATH")?.trim().orEmpty()
+    val accessibilityApkPath =
+        when {
+          accessibilityApkProperty.isNotEmpty() -> accessibilityApkProperty
+          accessibilityApkEnv.isNotEmpty() -> accessibilityApkEnv
+          else -> findLocalAccessibilityApkPath().orEmpty()
+        }
+    if (accessibilityApkPath.isNotEmpty()) {
+      resolvedOverrides["AUTOMOBILE_ACCESSIBILITY_APK_PATH"] = accessibilityApkPath
+    }
+    return resolvedOverrides
+  }
+
+  private fun findLocalAccessibilityApkPath(): String? {
+    val candidates =
+        listOf(
+            File("accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"),
+            File("../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"),
+            File("../../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"),
+        )
+    return candidates.firstOrNull { it.exists() }?.absolutePath
   }
 }
 
@@ -94,6 +133,14 @@ internal object DaemonSocketPaths {
   }
 
   fun buildDaemonStartCommand(): List<String> {
+    return buildDaemonCommand("start")
+  }
+
+  fun buildDaemonRestartCommand(): List<String> {
+    return buildDaemonCommand("restart")
+  }
+
+  private fun buildDaemonCommand(subCommand: String): List<String> {
     val command = ArrayList<String>(4)
     if (localAutoMobileExists()) {
       command.add("bun")
@@ -103,7 +150,7 @@ internal object DaemonSocketPaths {
       command.add("auto-mobile")
     }
     command.add("--daemon")
-    command.add("start")
+    command.add(subCommand)
     return command
   }
 

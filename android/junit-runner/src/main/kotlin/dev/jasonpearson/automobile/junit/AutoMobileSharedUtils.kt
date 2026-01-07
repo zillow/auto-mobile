@@ -7,8 +7,21 @@ object AutoMobileSharedUtils {
   // Phase 5: Lazy device checker initialization
   val deviceChecker: DeviceAvailabilityChecker by lazy { DeviceAvailabilityChecker() }
 
-  fun executeCommand(command: List<String>, timeoutMs: Long): CommandResult {
-    val process = ProcessBuilder(command).start()
+  fun executeCommand(
+      command: List<String>,
+      timeoutMs: Long,
+      environmentOverrides: Map<String, String> = emptyMap(),
+  ): CommandResult {
+    val processBuilder = ProcessBuilder(command)
+    if (environmentOverrides.isNotEmpty()) {
+      val environment = processBuilder.environment()
+      environmentOverrides.forEach { (key, value) ->
+        if (value.isNotBlank()) {
+          environment[key] = value
+        }
+      }
+    }
+    val process = processBuilder.start()
 
     // CRITICAL FIX: Close stdin immediately to prevent the process from hanging
     // waiting for input. This is essential for non-interactive command execution.
