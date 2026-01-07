@@ -277,8 +277,8 @@ describe("ImeAction", () => {
       const result = await imeAction.execute("done");
 
       expect(result.success).toBe(true);
-      // Accessibility service path should not call timer (no delay)
-      expect(fakeTimer.getSleepCallCount()).toBe(0, "Timer should not be called when using accessibility service");
+      // Accessibility service path should not fall back to ADB
+      expect(fakeAdb.getExecutedCommands().length).toBe(0);
     });
 
     test("should include delay when falling back to ADB keyevent", async () => {

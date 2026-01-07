@@ -5,6 +5,7 @@ import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { ExecResult, BootedDevice, ObserveResult } from "../../../src/models";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("Rotate", () => {
   let rotate: Rotate;
@@ -12,6 +13,7 @@ describe("Rotate", () => {
   let fakeAwaitIdle: FakeAwaitIdle;
   let fakeObserveScreen: FakeObserveScreen;
   let fakeWindow: FakeWindow;
+  let fakeTimer: FakeTimer;
   let mockDevice: BootedDevice;
 
   // Helper function to create mock ExecResult
@@ -46,6 +48,7 @@ describe("Rotate", () => {
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeObserveScreen = new FakeObserveScreen();
     fakeWindow = new FakeWindow();
+    fakeTimer = new FakeTimer();
 
     // Configure default responses
     fakeWindow.setCachedActiveWindow(null);
@@ -61,7 +64,7 @@ describe("Rotate", () => {
     fakeAdb.setCommandResponse("shell settings get system accelerometer_rotation", createExecResult("1"));
 
     // Instantiate Rotate with fake ADB
-    rotate = new Rotate(mockDevice, fakeAdb);
+    rotate = new Rotate(mockDevice, fakeAdb, null, fakeTimer);
 
     // Inject all fakes to avoid real device operations
     (rotate as any).awaitIdle = fakeAwaitIdle;
@@ -219,7 +222,7 @@ describe("Rotate", () => {
         deviceId: "test-device",
         source: "local"
       };
-      const rotateInstance = new Rotate(device);
+      const rotateInstance = new Rotate(device, null, null, fakeTimer);
       expect(rotateInstance).toBeDefined();
     });
 
@@ -231,7 +234,7 @@ describe("Rotate", () => {
         source: "local"
       };
       const customAdb = new FakeAdbExecutor();
-      const rotateInstance = new Rotate(device, customAdb);
+      const rotateInstance = new Rotate(device, customAdb, null, fakeTimer);
       expect(rotateInstance).toBeDefined();
     });
   });

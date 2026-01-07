@@ -6,6 +6,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Opens the recent apps screen using intelligent navigation detection
@@ -14,8 +15,13 @@ export class RecentApps extends BaseVisualChange {
   private pressButton: PressButton;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(
+    device: BootedDevice,
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null,
+    timer: Timer = defaultTimer
+  ) {
+    super(device, adb, axe, timer);
     this.pressButton = new PressButton(device, adb);
     this.elementUtils = new ElementUtils();
   }

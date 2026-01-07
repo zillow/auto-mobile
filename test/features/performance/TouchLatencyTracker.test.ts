@@ -3,6 +3,7 @@ import { TouchLatencyTracker } from "../../../src/features/performance/TouchLate
 import { BootedDevice, ScreenSize } from "../../../src/models";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
 import { NoOpPerformanceTracker } from "../../../src/utils/PerformanceTracker";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("TouchLatencyTracker - Unit Tests", function() {
   let tracker: TouchLatencyTracker;
@@ -10,6 +11,40 @@ describe("TouchLatencyTracker - Unit Tests", function() {
   let device: BootedDevice;
   let screenSize: ScreenSize;
   let perf: NoOpPerformanceTracker;
+  let fakeTimer: FakeTimer;
+
+  async function runWithFakeTimer<T>(promise: Promise<T>, timer: FakeTimer, stepMs: number = 10): Promise<T> {
+    let settled = false;
+    let result: T | undefined;
+    let error: unknown;
+
+    promise
+      .then(value => {
+        settled = true;
+        result = value;
+      })
+      .catch(caught => {
+        settled = true;
+        error = caught;
+      });
+
+    let steps = 0;
+    while (!settled) {
+      if (timer.getPendingSleepCount() > 0) {
+        timer.advanceTime(stepMs);
+      }
+      await Promise.resolve();
+      steps += 1;
+      if (steps > 2000) {
+        throw new Error("FakeTimer pump exceeded max steps");
+      }
+    }
+
+    if (error) {
+      throw error;
+    }
+    return result as T;
+  }
 
   beforeEach(function() {
     device = {
@@ -24,12 +59,14 @@ describe("TouchLatencyTracker - Unit Tests", function() {
     };
 
     perf = new NoOpPerformanceTracker();
+    fakeTimer = new FakeTimer();
+    fakeTimer.setManualMode();
   });
 
   describe("selectSafeTouchLocation", function() {
     test("should select a location in the top-right corner", function() {
       adb = new AdbClient(device, async () => ({ stdout: "", stderr: "" }));
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
       // Access private method via type assertion for testing
       const location = (tracker as any).selectSafeTouchLocation(screenSize);
@@ -41,7 +78,7 @@ describe("TouchLatencyTracker - Unit Tests", function() {
 
     test("should handle different screen sizes", function() {
       adb = new AdbClient(device, async () => ({ stdout: "", stderr: "" }));
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
       const smallScreen: ScreenSize = { width: 720, height: 1280 };
       const location = (tracker as any).selectSafeTouchLocation(smallScreen);
@@ -100,13 +137,16 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         return { stdout: "", stderr: "" };
       });
 
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
-      const result = await tracker.measureLatency(
-        "com.example.app",
-        screenSize,
-        { sampleCount: 1, maxWaitMs: 200 },
-        perf
+      const result = await runWithFakeTimer(
+        tracker.measureLatency(
+          "com.example.app",
+          screenSize,
+          { sampleCount: 1, maxWaitMs: 200 },
+          perf
+        ),
+        fakeTimer
       );
 
       expect(result.success).toBe(true);
@@ -154,13 +194,16 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         return { stdout: "", stderr: "" };
       });
 
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
-      const result = await tracker.measureLatency(
-        "com.example.app",
-        screenSize,
-        { sampleCount: 3, maxWaitMs: 200 },
-        perf
+      const result = await runWithFakeTimer(
+        tracker.measureLatency(
+          "com.example.app",
+          screenSize,
+          { sampleCount: 3, maxWaitMs: 200 },
+          perf
+        ),
+        fakeTimer
       );
 
       expect(result.success).toBe(true);
@@ -191,13 +234,16 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         return { stdout: "", stderr: "" };
       });
 
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
-      const result = await tracker.measureLatency(
-        "com.example.app",
-        screenSize,
-        { sampleCount: 1, maxWaitMs: 50 }, // Short timeout for fast test
-        perf
+      const result = await runWithFakeTimer(
+        tracker.measureLatency(
+          "com.example.app",
+          screenSize,
+          { sampleCount: 1, maxWaitMs: 50 }, // Short timeout for fast test
+          perf
+        ),
+        fakeTimer
       );
 
       expect(result.success).toBe(false);
@@ -241,13 +287,16 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         return { stdout: "", stderr: "" };
       });
 
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
-      const result = await tracker.measureLatency(
-        "com.example.app",
-        screenSize,
-        { sampleCount: 1, maxWaitMs: 200 },
-        perf
+      const result = await runWithFakeTimer(
+        tracker.measureLatency(
+          "com.example.app",
+          screenSize,
+          { sampleCount: 1, maxWaitMs: 200 },
+          perf
+        ),
+        fakeTimer
       );
 
       expect(result.success).toBe(true);
@@ -290,13 +339,16 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         return { stdout: "", stderr: "" };
       });
 
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
-      const result = await tracker.measureLatency(
-        "com.example.app",
-        screenSize,
-        { sampleCount: 1, maxWaitMs: 200 },
-        perf
+      const result = await runWithFakeTimer(
+        tracker.measureLatency(
+          "com.example.app",
+          screenSize,
+          { sampleCount: 1, maxWaitMs: 200 },
+          perf
+        ),
+        fakeTimer
       );
 
       expect(result.success).toBe(true);
@@ -308,13 +360,16 @@ describe("TouchLatencyTracker - Unit Tests", function() {
         throw new Error("ADB connection failed");
       });
 
-      tracker = new TouchLatencyTracker(device, adb);
+      tracker = new TouchLatencyTracker(device, adb, fakeTimer);
 
-      const result = await tracker.measureLatency(
-        "com.example.app",
-        screenSize,
-        { sampleCount: 1, maxWaitMs: 200 },
-        perf
+      const result = await runWithFakeTimer(
+        tracker.measureLatency(
+          "com.example.app",
+          screenSize,
+          { sampleCount: 1, maxWaitMs: 200 },
+          perf
+        ),
+        fakeTimer
       );
 
       expect(result.success).toBe(false);

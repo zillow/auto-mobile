@@ -3,6 +3,7 @@ import { logger } from "../../utils/logger";
 import { BootedDevice, ScreenSize } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Idle } from "../observe/Idle";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Result of a touch latency measurement
@@ -28,11 +29,13 @@ export class TouchLatencyTracker {
   private adb: AdbClient;
   private device: BootedDevice;
   private idle: Idle;
+  private timer: Timer;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, timer: Timer = defaultTimer) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
     this.idle = new Idle(device, this.adb);
+    this.timer = timer;
   }
 
   /**
@@ -82,11 +85,11 @@ export class TouchLatencyTracker {
     maxWaitMs: number,
     perf: PerformanceTracker
   ): Promise<number | null> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const pollIntervalMs = 10; // Poll every 10ms for quick response
 
-    while (Date.now() - startTime < maxWaitMs) {
-      await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    while (this.timer.now() - startTime < maxWaitMs) {
+      await this.timer.sleep(pollIntervalMs);
 
       try {
         const { stdout } = await perf.track("adbGfxinfoCheck", () =>
@@ -105,7 +108,7 @@ export class TouchLatencyTracker {
            currentStats.frameDeadlineMissed > beforeStats.frameDeadlineMissed);
 
         if (hasFrameActivity) {
-          const latency = Date.now() - startTime;
+          const latency = this.timer.now() - startTime;
           logger.debug(`[TouchLatency] Frame activity detected after ${latency}ms`);
           return latency;
         }
@@ -154,7 +157,7 @@ export class TouchLatencyTracker {
         );
 
         // Small delay to ensure reset is processed
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await this.timer.sleep(50);
 
         // Get baseline frame stats
         const { stdout: baselineStdout } = await perf.track("adbGfxinfoBaseline", () =>
@@ -182,7 +185,7 @@ export class TouchLatencyTracker {
 
         // Wait between samples to avoid interference
         if (i < sampleCount - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await this.timer.sleep(100);
         }
       }
 

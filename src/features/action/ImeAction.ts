@@ -20,7 +20,7 @@ export class ImeAction extends BaseVisualChange {
     a11yService: AccessibilityService | null = null,
     timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe);
+    super(device, adb, axe, timer);
     this.a11yService = a11yService;
     this.timer = timer;
   }

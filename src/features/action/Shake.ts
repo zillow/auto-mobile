@@ -16,7 +16,7 @@ export class Shake extends BaseVisualChange {
     axe: AxeClient | null = null,
     timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe);
+    super(device, adb, axe, timer);
     this.timer = timer;
   }
 

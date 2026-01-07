@@ -12,6 +12,7 @@ import { NodeCryptoService } from "../../utils/crypto";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { NavigationGraphManager } from "../navigation/NavigationGraphManager";
 import { PredictionAnalyzer, PredictionActionContext } from "../observe/PredictionAnalyzer";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface ProgressCallback {
   (progress: number, total?: number, message?: string): Promise<void>;
@@ -42,6 +43,7 @@ export class BaseVisualChange {
   observeScreen: ObserveScreen;
   window: Window;
   private predictionAnalyzer: PredictionAnalyzer;
+  private timer: Timer;
 
   /**
    * Create an BaseVisualChange instance
@@ -52,7 +54,8 @@ export class BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null
+    axe: AxeClient | null = null,
+    timer: Timer = defaultTimer
   ) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
@@ -61,6 +64,7 @@ export class BaseVisualChange {
     this.observeScreen = new ObserveScreen(device, this.adb);
     this.window = new Window(device, this.adb);
     this.predictionAnalyzer = new PredictionAnalyzer();
+    this.timer = timer;
   }
 
   /**
@@ -228,7 +232,7 @@ export class BaseVisualChange {
     for (let attempt = 0; attempt < retryDelaysMs.length && shouldRetry(latestObservation); attempt++) {
       const delayMs = retryDelaysMs[attempt];
       logger.info(`[BaseVisualChange] Observation appears stale/unchanged, retrying in ${delayMs}ms (attempt ${attempt + 1}/${retryDelaysMs.length})`);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+      await this.timer.sleep(delayMs);
       perf.serial(`finalObserve_retry_${attempt + 1}`);
       latestObservation = await this.observeScreen.execute(options.queryOptions, perf, false, minTimestamp, options.signal);
       perf.end();

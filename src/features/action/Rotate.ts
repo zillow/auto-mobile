@@ -5,14 +5,16 @@ import { logger } from "../../utils/logger";
 import { ProgressCallback } from "./BaseVisualChange";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export class Rotate extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null
+    axe: AxeClient | null = null,
+    timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe);
+    super(device, adb, axe, timer);
   }
 
   /**

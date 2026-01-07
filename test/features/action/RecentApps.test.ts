@@ -5,6 +5,7 @@ import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("RecentApps", () => {
   let recentApps: RecentApps;
@@ -12,6 +13,7 @@ describe("RecentApps", () => {
   let fakeObserveScreen: FakeObserveScreen;
   let fakeWindow: FakeWindow;
   let fakeAwaitIdle: FakeAwaitIdle;
+  let fakeTimer: FakeTimer;
 
   beforeEach(() => {
     // Create fakes for testing
@@ -19,6 +21,7 @@ describe("RecentApps", () => {
     fakeObserveScreen = new FakeObserveScreen();
     fakeWindow = new FakeWindow();
     fakeAwaitIdle = new FakeAwaitIdle();
+    fakeTimer = new FakeTimer();
 
     // Configure default responses
     fakeWindow.setCachedActiveWindow(null);
@@ -34,7 +37,7 @@ describe("RecentApps", () => {
     });
 
     // Inject the fakes into the feature
-    recentApps = new RecentApps("test-device", fakeAdb);
+    recentApps = new RecentApps("test-device", fakeAdb, null, fakeTimer);
     (recentApps as any).observeScreen = fakeObserveScreen;
     (recentApps as any).window = fakeWindow;
     (recentApps as any).awaitIdle = fakeAwaitIdle;
@@ -341,13 +344,13 @@ describe("RecentApps", () => {
 
   describe("constructor", () => {
     test("should work with null deviceId", () => {
-      const recentAppsInstance = new RecentApps("test-device", fakeAdb);
+      const recentAppsInstance = new RecentApps("test-device", fakeAdb, null, fakeTimer);
       expect(recentAppsInstance).toBeDefined();
     });
 
     test("should work with custom AdbClient", () => {
       const customAdb = new FakeAdbExecutor();
-      const recentAppsInstance = new RecentApps("test-device", customAdb);
+      const recentAppsInstance = new RecentApps("test-device", customAdb, null, fakeTimer);
       expect(recentAppsInstance).toBeDefined();
     });
   });
