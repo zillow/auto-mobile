@@ -20,7 +20,6 @@ ANDROID_SDK_DETECTED=false
 ANDROID_SDK_ROOT_SELECTED=""
 INSTALL_ANDROID_PLATFORM_TOOLS=false
 INSTALL_ACCESSIBILITY_SERVICE=false
-AUTO_START_EMULATOR=false
 INSTALL_IDE_PLUGIN=false
 IDE_PLUGIN_METHOD=""
 IDE_PLUGIN_ZIP_URL=""
@@ -209,6 +208,12 @@ install_gum() {
         return 0
     fi
 
+    if [[ "${os}" == "linux" ]]; then
+        if install_gum_linux; then
+            return 0
+        fi
+    fi
+
     install_gum_manual "${os}" "${arch}"
 }
 
@@ -244,6 +249,63 @@ log_warn() {
 
 log_error() {
     gum log --level error "$1"
+}
+
+install_gum_linux() {
+    local -a sudo_cmd=()
+
+    if [[ "${EUID}" -ne 0 ]]; then
+        if command_exists sudo; then
+            sudo_cmd=(sudo)
+        else
+            plain_warn "sudo not available; falling back to manual gum install."
+            return 1
+        fi
+    fi
+
+    if command_exists apt-get; then
+        plain_info "Installing gum with apt-get..."
+        if ! "${sudo_cmd[@]}" apt-get update; then
+            plain_warn "apt-get update failed; falling back to manual gum install."
+            return 1
+        fi
+        if "${sudo_cmd[@]}" apt-get install -y gum; then
+            return 0
+        fi
+        plain_warn "apt-get install failed; falling back to manual gum install."
+    elif command_exists dnf; then
+        plain_info "Installing gum with dnf..."
+        if "${sudo_cmd[@]}" dnf install -y gum; then
+            return 0
+        fi
+        plain_warn "dnf install failed; falling back to manual gum install."
+    elif command_exists yum; then
+        plain_info "Installing gum with yum..."
+        if "${sudo_cmd[@]}" yum install -y gum; then
+            return 0
+        fi
+        plain_warn "yum install failed; falling back to manual gum install."
+    elif command_exists pacman; then
+        plain_info "Installing gum with pacman..."
+        if "${sudo_cmd[@]}" pacman -S --noconfirm gum; then
+            return 0
+        fi
+        plain_warn "pacman install failed; falling back to manual gum install."
+    elif command_exists zypper; then
+        plain_info "Installing gum with zypper..."
+        if "${sudo_cmd[@]}" zypper --non-interactive install gum; then
+            return 0
+        fi
+        plain_warn "zypper install failed; falling back to manual gum install."
+    elif command_exists apk; then
+        plain_info "Installing gum with apk..."
+        if "${sudo_cmd[@]}" apk add --no-cache gum; then
+            return 0
+        fi
+        plain_warn "apk install failed; falling back to manual gum install."
+    fi
+
+    return 1
 }
 
 run_spinner() {
@@ -292,34 +354,66 @@ run_with_progress() {
     return "${status}"
 }
 
+run_download_with_progress() {
+    local title="$1"
+    shift
+
+    run_spinner "Preparing ${title}" sleep 0.3
+    run_with_progress "${title}" "$@"
+}
+
 play_logo_animation() {
     local -a logo_lines=(
-        "  __AutoMobile__"
-        " /_|_o_o_|_\\"
-        "   O   O"
+        "    _________"
+        " __/  _   _ \\__"
+        "/__ / \\_/ \\__\\"
+        "\\__\\__/ \\__/__/"
+        "   O       O"
     )
-    local width=12
     local offset=0
     local direction=1
-    local frames=30
+    local frames=40
     local delay=0.05
+    local max_offset=12
+    local logo_width=0
+    local term_cols=80
+    local color_start=""
+    local color_reset=""
 
-    if ! command_exists tput; then
+    if ! command_exists tput || [[ ! -t 1 ]]; then
         printf "%s\n" "${logo_lines[@]}"
         return 0
     fi
+
+    term_cols=$(tput cols 2>/dev/null || echo 80)
+    for line in "${logo_lines[@]}"; do
+        if (( ${#line} > logo_width )); then
+            logo_width=${#line}
+        fi
+    done
+
+    local available=$((term_cols - logo_width - 1))
+    if (( available < 0 )); then
+        available=0
+    fi
+    if (( available < max_offset )); then
+        max_offset=${available}
+    fi
+
+    color_start=$(tput setaf 1 2>/dev/null || true)
+    color_reset=$(tput sgr0 2>/dev/null || true)
 
     tput civis || true
 
     for ((i = 0; i < frames; i++)); do
         for line in "${logo_lines[@]}"; do
-            printf "\033[2K%*s%s\n" "${offset}" "" "${line}"
+            printf "\033[2K%*s%s%s%s\n" "${offset}" "" "${color_start}" "${line}" "${color_reset}"
         done
         tput cuu "${#logo_lines[@]}" || true
 
         if (( offset <= 0 )); then
             direction=1
-        elif (( offset >= width )); then
+        elif (( offset >= max_offset )); then
             direction=-1
         fi
 
@@ -591,14 +685,14 @@ install_accessibility_service() {
     local apk_path="${temp_dir}/accessibility-service.apk"
 
     if command_exists curl; then
-        if ! run_with_progress "Downloading Accessibility Service APK" \
+        if ! run_download_with_progress "Downloading Accessibility Service APK" \
             curl -fsSL "${ACCESSIBILITY_APK_URL}" -o "${apk_path}"; then
             log_error "Failed to download Accessibility Service APK."
             rm -rf "${temp_dir}"
             return 1
         fi
     elif command_exists wget; then
-        if ! run_with_progress "Downloading Accessibility Service APK" \
+        if ! run_download_with_progress "Downloading Accessibility Service APK" \
             wget -qO "${apk_path}" "${ACCESSIBILITY_APK_URL}"; then
             log_error "Failed to download Accessibility Service APK."
             rm -rf "${temp_dir}"
@@ -695,14 +789,14 @@ install_ide_plugin() {
         plugin_zip="${temp_dir}/auto-mobile-ide-plugin.zip"
 
         if command_exists curl; then
-            if ! run_with_progress "Downloading IDE plugin" \
+            if ! run_download_with_progress "Downloading IDE plugin" \
                 curl -fsSL "${IDE_PLUGIN_ZIP_URL}" -o "${plugin_zip}"; then
                 log_error "Failed to download IDE plugin."
                 rm -rf "${temp_dir}"
                 return 1
             fi
         elif command_exists wget; then
-            if ! run_with_progress "Downloading IDE plugin" \
+            if ! run_download_with_progress "Downloading IDE plugin" \
                 wget -qO "${plugin_zip}" "${IDE_PLUGIN_ZIP_URL}"; then
                 log_error "Failed to download IDE plugin."
                 rm -rf "${temp_dir}"
@@ -996,14 +1090,14 @@ install_android_cmdline_tools() {
     local zip_path="${temp_dir}/commandlinetools.zip"
 
     if command_exists curl; then
-        if ! run_with_progress "Downloading Android command line tools" \
+        if ! run_download_with_progress "Downloading Android command line tools" \
             curl -fsSL "${download_url}" -o "${zip_path}"; then
             log_error "Failed to download Android command line tools."
             rm -rf "${temp_dir}"
             return 1
         fi
     elif command_exists wget; then
-        if ! run_with_progress "Downloading Android command line tools" \
+        if ! run_download_with_progress "Downloading Android command line tools" \
             wget -qO "${zip_path}" "${download_url}"; then
             log_error "Failed to download Android command line tools."
             rm -rf "${temp_dir}"
