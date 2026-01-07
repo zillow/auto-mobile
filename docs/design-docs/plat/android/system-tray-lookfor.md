@@ -45,6 +45,30 @@ Finding notifications:
   `com.android.systemui`.
 - Return bounding box + hierarchy path for use in follow-up taps.
 
+## ADB validation (API 35)
+
+Status:
+
+- API 29 not validated yet (no local AVD available).
+
+Confirmed commands:
+
+- Expand/collapse notification shade:
+  - `adb -s <device> shell cmd statusbar expand-notifications`
+  - `adb -s <device> shell uiautomator dump /sdcard/notification_dump.xml`
+  - `adb -s <device> shell cat /sdcard/notification_dump.xml`
+  - `adb -s <device> shell cmd statusbar collapse`
+
+Observed results:
+
+- Notification shade expands and collapses on command.
+- uiautomator dump contains notification text suitable for lookFor matching.
+
+Notes:
+
+- `adb shell cmd statusbar expand-settings` is also available to expand quick
+  settings when needed.
+
 ## Plan
 
 1. Add `lookFor` and timeout handling to tray open.

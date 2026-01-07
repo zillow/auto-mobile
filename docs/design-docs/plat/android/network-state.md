@@ -57,6 +57,42 @@ Notes:
 - Physical devices often restrict airplane mode toggles; report
   `supported: false` with a reason when blocked.
 
+## ADB validation (API 35)
+
+Status:
+
+- API 29 not validated yet (no local AVD available).
+
+Confirmed commands:
+
+- Wi-Fi toggle:
+  - `adb -s <device> shell svc wifi disable`
+  - `adb -s <device> shell settings get global wifi_on`
+  - `adb -s <device> shell svc wifi enable`
+  - `adb -s <device> shell settings get global wifi_on`
+- Cellular data toggle:
+  - `adb -s <device> shell svc data disable`
+  - `adb -s <device> shell settings get global mobile_data`
+  - `adb -s <device> shell svc data enable`
+  - `adb -s <device> shell settings get global mobile_data`
+- Airplane mode:
+  - `adb -s <device> shell cmd connectivity airplane-mode enable`
+  - `adb -s <device> shell settings get global airplane_mode_on`
+  - `adb -s <device> shell cmd connectivity airplane-mode disable`
+  - `adb -s <device> shell settings get global airplane_mode_on`
+- Emulator speed/delay profiles:
+  - `adb -s <device> emu network speed lte`
+  - `adb -s <device> emu network delay umts`
+  - `adb -s <device> emu network status`
+
+Observed results:
+
+- `wifi_on` toggles 0/1 after `svc wifi` disable/enable.
+- `mobile_data` toggles 0/1 after `svc data` disable/enable.
+- `airplane_mode_on` toggles 1/0 after enable/disable.
+- `emu network speed`/`delay` return OK and `emu network status` reports
+  LTE/UMTS values.
+
 ## Plan
 
 1. Implement toggles with capability reporting.
