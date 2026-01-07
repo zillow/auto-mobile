@@ -404,7 +404,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
 
   // Start HTTP server
   server.listen(transport.port!, transport.host!, () => {
-    logger.info(`AutoMobile MCP Streamable HTTP server running on http://${transport.host}:${transport.port}/auto-mobile/streamable`);
+    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/streamable`);
     logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/streamable`);
   });
 
@@ -518,7 +518,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
 
   // Start HTTP server
   server.listen(transport.port!, transport.host!, () => {
-    logger.info(`AutoMobile MCP SSE server running on http://${transport.host}:${transport.port}/auto-mobile/sse`);
+    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/sse`);
     logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/sse`);
   });
 

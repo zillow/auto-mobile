@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-LYCHEE_VERSION="0.19.1" # Change this to the desired version
+LYCHEE_VERSION="0.22.0" # Change this to the desired version
 
 # Colors for output
 RED='\033[0;31m'
@@ -55,13 +55,26 @@ install_macos() {
 
     if command_exists brew; then
         echo -e "${GREEN}Using Homebrew to install lychee${NC}"
-        brew install lychee
+        if brew install lychee; then
+            return 0
+        else
+            echo -e "${YELLOW}Homebrew installation failed. Using manual installation...${NC}"
+            install_manual
+            return $?
+        fi
     elif command_exists port; then
         echo -e "${GREEN}Using MacPorts to install lychee${NC}"
-        sudo port install lychee
+        if sudo port install lychee; then
+            return 0
+        else
+            echo -e "${YELLOW}MacPorts installation failed. Using manual installation...${NC}"
+            install_manual
+            return $?
+        fi
     else
         echo -e "${YELLOW}No package manager found. Using manual installation...${NC}"
         install_manual
+        return $?
     fi
 }
 
@@ -69,38 +82,46 @@ install_macos() {
 install_linux() {
     echo -e "${YELLOW}Installing lychee on Linux...${NC}"
 
-    # Check for package managers in order of preference
+    # For GitHub Actions and other Debian/Ubuntu systems, go straight to manual installation
+    # as lychee is not in default apt repositories
+    if command_exists apt-get || command_exists yum || command_exists dnf; then
+        echo -e "${YELLOW}Debian/Ubuntu/RHEL detected. Using manual installation for latest version...${NC}"
+        install_manual
+        return $?
+    fi
+
+    # Check for package managers that have lychee in repositories
     if command_exists pacman; then
         echo -e "${GREEN}Using pacman to install lychee${NC}"
-        sudo pacman -S lychee
+        if sudo pacman -S --noconfirm lychee; then
+            return 0
+        fi
     elif command_exists zypper; then
         echo -e "${GREEN}Using zypper to install lychee${NC}"
-        sudo zypper in lychee
+        if sudo zypper in -y lychee; then
+            return 0
+        fi
     elif command_exists apk; then
         echo -e "${GREEN}Using apk to install lychee${NC}"
-        sudo apk add lychee
+        if sudo apk add lychee; then
+            return 0
+        fi
     elif command_exists pkg; then
         echo -e "${GREEN}Using pkg to install lychee${NC}"
-        sudo pkg install lychee
+        if sudo pkg install -y lychee; then
+            return 0
+        fi
     elif command_exists nix-env; then
         echo -e "${GREEN}Using nix to install lychee${NC}"
-        nix-env -iA nixos.lychee
-    elif command_exists apt-get; then
-        echo -e "${YELLOW}APT package manager detected, but lychee may not be available in default repositories.${NC}"
-        echo -e "${YELLOW}Falling back to manual installation...${NC}"
-        install_manual
-    elif command_exists yum; then
-        echo -e "${YELLOW}YUM package manager detected, but lychee may not be available in default repositories.${NC}"
-        echo -e "${YELLOW}Falling back to manual installation...${NC}"
-        install_manual
-    elif command_exists dnf; then
-        echo -e "${YELLOW}DNF package manager detected, but lychee may not be available in default repositories.${NC}"
-        echo -e "${YELLOW}Falling back to manual installation...${NC}"
-        install_manual
-    else
-        echo -e "${YELLOW}No supported package manager found. Using manual installation...${NC}"
-        install_manual
+        if nix-env -iA nixos.lychee; then
+            return 0
+        fi
     fi
+
+    # Fallback to manual if package manager installation failed or not available
+    echo -e "${YELLOW}Package manager installation not available or failed. Using manual installation...${NC}"
+    install_manual
+    return $?
 }
 
 # Install lychee on Windows
@@ -133,14 +154,17 @@ install_manual() {
     arch=$(detect_arch)
 
     # Map OS and architecture to GitHub release naming
+    # Note: GitHub release tag is "lychee-v${VERSION}" but asset names are "lychee-${ARCH}..."
     case "$os" in
         macos)
             case "$arch" in
                 x86_64)
-                    binary_name="lychee-lychee-v${LYCHEE_VERSION}-x86_64-apple-darwin.tar.gz"
+                    # No x86_64 macOS binary, use arm64 (Rosetta can run it)
+                    echo -e "${YELLOW}No native x86_64 macOS binary. Using arm64 (Rosetta 2 required)${NC}"
+                    binary_name="lychee-arm64-macos.tar.gz"
                     ;;
                 aarch64)
-                    binary_name="lychee-lychee-v${LYCHEE_VERSION}-aarch64-apple-darwin.tar.gz"
+                    binary_name="lychee-arm64-macos.tar.gz"
                     ;;
                 *)
                     echo -e "${RED}Unsupported architecture: $arch${NC}"
@@ -151,13 +175,13 @@ install_manual() {
         linux)
             case "$arch" in
                 x86_64)
-                    binary_name="lychee-lychee-v${LYCHEE_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+                    binary_name="lychee-x86_64-unknown-linux-gnu.tar.gz"
                     ;;
                 aarch64)
-                    binary_name="lychee-lychee-v${LYCHEE_VERSION}-aarch64-unknown-linux-gnu.tar.gz"
+                    binary_name="lychee-aarch64-unknown-linux-gnu.tar.gz"
                     ;;
                 armv7)
-                    binary_name="lychee-lychee-v${LYCHEE_VERSION}-armv7-unknown-linux-gnueabihf.tar.gz"
+                    binary_name="lychee-armv7-unknown-linux-gnueabihf.tar.gz"
                     ;;
                 *)
                     echo -e "${RED}Unsupported architecture: $arch${NC}"
@@ -168,7 +192,7 @@ install_manual() {
         windows)
             case "$arch" in
                 x86_64)
-                    binary_name="lychee-lychee-v${LYCHEE_VERSION}-x86_64-pc-windows-msvc.zip"
+                    binary_name="lychee-x86_64-windows.exe"
                     ;;
                 *)
                     echo -e "${RED}Unsupported architecture: $arch${NC}"
@@ -186,7 +210,7 @@ install_manual() {
     install_dir="$HOME/.local/bin"
     mkdir -p "$install_dir"
 
-    # Download URL
+    # Download URL - tag is "lychee-v${VERSION}" but asset names don't include version
     download_url="https://github.com/lycheeverse/lychee/releases/download/lychee-v${LYCHEE_VERSION}/${binary_name}"
 
     echo -e "${GREEN}Downloading lychee binary from GitHub releases...${NC}"
@@ -213,43 +237,72 @@ install_manual() {
         return 1
     fi
 
-    # Extract the archive
+    # Extract the archive or handle direct executable
     cd "$temp_dir" || exit
     case "$binary_name" in
         *.tar.gz)
-            tar -xzf "$binary_name"
+            if ! tar -xzf "$binary_name"; then
+                echo -e "${RED}Failed to extract archive${NC}"
+                return 1
+            fi
             ;;
         *.zip)
             if command_exists unzip; then
-                unzip "$binary_name"
+                if ! unzip "$binary_name"; then
+                    echo -e "${RED}Failed to extract archive${NC}"
+                    return 1
+                fi
             else
                 echo -e "${RED}unzip command not found. Please install unzip or extract manually.${NC}"
                 return 1
             fi
             ;;
+        *.exe)
+            # Windows executable - no extraction needed, just rename
+            mv "$binary_name" lychee.exe
+            ;;
         *)
-            echo -e "${RED}Unsupported archive format${NC}"
+            echo -e "${RED}Unsupported archive format: $binary_name${NC}"
             return 1
             ;;
     esac
 
     # Find the lychee binary and move it to install directory
-    lychee_binary=$(find . -name "lychee" -type f | head -1)
+    if [[ "$binary_name" == *.exe ]]; then
+        lychee_binary="./lychee.exe"
+    else
+        lychee_binary=$(find . -name "lychee" -o -name "lychee.exe" | grep -v ".tar.gz" | head -1)
+    fi
+
     if [[ -z "$lychee_binary" ]]; then
         echo -e "${RED}Could not find lychee binary in extracted archive${NC}"
+        echo -e "${YELLOW}Contents of temp directory:${NC}"
+        ls -la
         return 1
     fi
 
     # Make executable and move to install directory
     chmod +x "$lychee_binary"
-    mv "$lychee_binary" "$install_dir/lychee"
+    if [[ "$binary_name" == *.exe ]]; then
+        mv "$lychee_binary" "$install_dir/lychee.exe"
+    else
+        mv "$lychee_binary" "$install_dir/lychee"
+    fi
 
     echo -e "${GREEN}lychee installed successfully to $install_dir${NC}"
-    echo -e "${YELLOW}Make sure $install_dir is in your PATH environment variable.${NC}"
+
+    # Add to PATH for current session
+    export PATH="$install_dir:$PATH"
+
+    # Add to GitHub Actions PATH if running in GitHub Actions
+    if [[ -n "${GITHUB_PATH:-}" ]]; then
+        echo "$install_dir" >> "$GITHUB_PATH"
+        echo -e "${GREEN}Added $install_dir to GITHUB_PATH${NC}"
+    fi
 
     # Check if directory is in PATH
     if [[ ":$PATH:" != *":$install_dir:"* ]]; then
-        echo -e "${YELLOW}To add $install_dir to your PATH, add this line to your shell configuration:${NC}"
+        echo -e "${YELLOW}To add $install_dir to your PATH permanently, add this line to your shell configuration:${NC}"
         echo "export PATH=\"\$PATH:$install_dir\""
     fi
 
@@ -275,6 +328,13 @@ main() {
     echo -e "${GREEN}Lychee Installation Script${NC}"
     echo -e "${GREEN}==========================${NC}"
 
+    # Check if lychee is already installed
+    if command_exists lychee; then
+        echo -e "${GREEN}lychee is already installed${NC}"
+        lychee --version
+        return 0
+    fi
+
     local os
     os=$(detect_os)
     local arch
@@ -282,24 +342,29 @@ main() {
     echo -e "${YELLOW}Detected OS: $os${NC}"
     echo -e "${YELLOW}Detected Architecture: $arch${NC}"
 
+    local install_result=1
     case $os in
         macos)
             install_macos
+            install_result=$?
             ;;
         linux)
             install_linux
+            install_result=$?
             ;;
         windows)
             install_windows
+            install_result=$?
             ;;
         *)
             echo -e "${RED}Unsupported operating system: $os${NC}"
             echo -e "${YELLOW}Falling back to manual installation...${NC}"
             install_manual
+            install_result=$?
             ;;
     esac
 
-    if install_manual; then
+    if [ $install_result -eq 0 ]; then
         echo -e "${GREEN}Installation completed successfully!${NC}"
         verify_installation
     else

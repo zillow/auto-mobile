@@ -181,7 +181,7 @@ describe("MCP Navigation Graph Resource", () => {
     const result = await client.request({
       method: "resources/read",
       params: {
-        uri: "automobile://navigation/nodes/1"
+        uri: "automobile:navigation/nodes/1"
       }
     }, readResourceResponseSchema);
 
@@ -236,7 +236,7 @@ describe("MCP Navigation Graph Resource", () => {
     const result = await client.request({
       method: "resources/read",
       params: {
-        uri: "automobile://navigation/nodes?screen=Settings"
+        uri: "automobile:navigation/nodes?screen=Settings"
       }
     }, readResourceResponseSchema);
 

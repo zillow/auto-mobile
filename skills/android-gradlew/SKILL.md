@@ -9,4 +9,4 @@ Run Android tasks from the `android/` directory using the Gradle wrapper.
 
 - Use `(cd android && ./gradlew <task>)` for Android-only builds, tests, and lint.
 - Avoid running Gradle tasks from the repo root.
-- Prefer explicit tasks (e.g., `assemble`, `test`, `lint`, `connectedAndroidTest`) based on the requested verification.
+- Prefer explicit tasks (e.g., `assemble`, `test`, `lint`) based on the requested verification.

@@ -76,7 +76,7 @@ describe("MCP Booted Device Resources", () => {
 
       // Verify booted devices resource is present
       const bootedDevicesResource = result.resources.find(
-        (r: any) => r.uri === "automobile://devices/booted"
+        (r: any) => r.uri === "automobile:devices/booted"
       );
       expect(bootedDevicesResource).toBeDefined();
       expect(bootedDevicesResource?.name).toBe("Booted Devices");
@@ -103,7 +103,7 @@ describe("MCP Booted Device Resources", () => {
 
       // Verify booted devices template is present
       const bootedDevicesTemplate = result.resourceTemplates.find(
-        (t: any) => t.uriTemplate === "automobile://devices/booted/{platform}"
+        (t: any) => t.uriTemplate === "automobile:devices/booted/{platform}"
       );
       expect(bootedDevicesTemplate).toBeDefined();
       expect(bootedDevicesTemplate?.name).toBe("Platform-specific Booted Devices");
@@ -132,14 +132,14 @@ describe("MCP Booted Device Resources", () => {
       const result = await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted"
+          uri: "automobile:devices/booted"
         }
       }, readResourceResponseSchema);
 
       // Verify response structure
       expect(result.contents).toHaveLength(1);
       const content = result.contents[0];
-      expect(content.uri).toBe("automobile://devices/booted");
+      expect(content.uri).toBe("automobile:devices/booted");
       expect(content.mimeType).toBe("application/json");
       expect(content.text).toBeDefined();
 
@@ -171,7 +171,7 @@ describe("MCP Booted Device Resources", () => {
       const result = await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted"
+          uri: "automobile:devices/booted"
         }
       }, readResourceResponseSchema);
 
@@ -202,14 +202,14 @@ describe("MCP Booted Device Resources", () => {
       const result = await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted/android"
+          uri: "automobile:devices/booted/android"
         }
       }, readResourceResponseSchema);
 
       // Verify response structure
       expect(result.contents).toHaveLength(1);
       const content = result.contents[0];
-      expect(content.uri).toBe("automobile://devices/booted/android");
+      expect(content.uri).toBe("automobile:devices/booted/android");
 
       // Parse and verify content
       const data: BootedDevicesResourceContent = JSON.parse(content.text!);
@@ -244,14 +244,14 @@ describe("MCP Booted Device Resources", () => {
       const result = await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted/ios"
+          uri: "automobile:devices/booted/ios"
         }
       }, readResourceResponseSchema);
 
       // Verify response structure
       expect(result.contents).toHaveLength(1);
       const content = result.contents[0];
-      expect(content.uri).toBe("automobile://devices/booted/ios");
+      expect(content.uri).toBe("automobile:devices/booted/ios");
 
       // Parse and verify content
       const data: BootedDevicesResourceContent = JSON.parse(content.text!);
@@ -285,7 +285,7 @@ describe("MCP Booted Device Resources", () => {
       const result = await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted"
+          uri: "automobile:devices/booted"
         }
       }, readResourceResponseSchema);
 
@@ -315,7 +315,7 @@ describe("MCP Booted Device Resources", () => {
       const result = await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted/invalid"
+          uri: "automobile:devices/booted/invalid"
         }
       }, readResourceResponseSchema);
 
@@ -347,7 +347,7 @@ describe("MCP Booted Device Resources", () => {
       await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted/android"
+          uri: "automobile:devices/booted/android"
         }
       }, readResourceResponseSchema);
 
@@ -376,7 +376,7 @@ describe("MCP Booted Device Resources", () => {
       await client.request({
         method: "resources/read",
         params: {
-          uri: "automobile://devices/booted"
+          uri: "automobile:devices/booted"
         }
       }, readResourceResponseSchema);
 

@@ -31,3 +31,4 @@ docs/contributing/index.md
 .mcp.local.json
 # IntelliJ Platform Gradle plugin artifacts
 android/ide-plugin/.intellijPlatform/
+.lycheecache

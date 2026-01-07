@@ -1,7 +1,7 @@
 <idea-plugin>
   <id>com.automobile.ide</id>
   <name>AutoMobile</name>
-  <vendor email="support@automobile.dev" url="https://github.com/kaeawc/auto-mobile">AutoMobile</vendor>
+  <vendor email="support@automobile:github.com/kaeawc/auto-mobile">AutoMobile</vendor>
 
   <description><![CDATA[
     AutoMobile IDE integration for authoring automated tests and visualizing navigation graphs.

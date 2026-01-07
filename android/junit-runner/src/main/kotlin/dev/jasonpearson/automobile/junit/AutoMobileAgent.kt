@@ -859,7 +859,7 @@ class AutoMobileAgent(
     }
 
     override fun getMcpServerUrl(): String {
-      return System.getProperty("automobile.mcp.server.url", "http://localhost:3000")
+      return System.getProperty("automobile:localhost:3000")
     }
   }
 

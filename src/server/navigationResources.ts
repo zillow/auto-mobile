@@ -10,13 +10,13 @@ import {
 import { logger } from "../utils/logger";
 
 export const NAVIGATION_RESOURCE_URIS = {
-  GRAPH: "automobile://navigation/graph",
-  NODE_BY_ID: "automobile://navigation/nodes/{nodeId}",
-  NODE_BY_SCREEN: "automobile://navigation/nodes?screen={screenName}",
-  HISTORY: "automobile://navigation/history",
-  HISTORY_WITH_CURSOR: "automobile://navigation/history?cursor={cursor}",
-  HISTORY_WITH_LIMIT: "automobile://navigation/history?limit={limit}",
-  HISTORY_WITH_CURSOR_AND_LIMIT: "automobile://navigation/history?cursor={cursor}&limit={limit}",
+  GRAPH: "automobile:navigation/graph",
+  NODE_BY_ID: "automobile:navigation/nodes/{nodeId}",
+  NODE_BY_SCREEN: "automobile:navigation/nodes?screen={screenName}",
+  HISTORY: "automobile:navigation/history",
+  HISTORY_WITH_CURSOR: "automobile:navigation/history?cursor={cursor}",
+  HISTORY_WITH_LIMIT: "automobile:navigation/history?limit={limit}",
+  HISTORY_WITH_CURSOR_AND_LIMIT: "automobile:navigation/history?cursor={cursor}&limit={limit}",
 } as const;
 
 export type NavigationGraphResourceContent = NavigationGraphSummary;
@@ -121,7 +121,7 @@ function buildNavigationNodeError(uri: string, error: string): ResourceContent {
 }
 
 async function getNavigationNodeByIdResource(nodeId: number): Promise<ResourceContent> {
-  const uri = `automobile://navigation/nodes/${nodeId}`;
+  const uri = `automobile:navigation/nodes/${nodeId}`;
 
   try {
     const nodeResource = await navigationGraphProvider.getNodeResourceById(nodeId);
@@ -141,7 +141,7 @@ async function getNavigationNodeByIdResource(nodeId: number): Promise<ResourceCo
 }
 
 async function getNavigationNodeByScreenResource(screenName: string): Promise<ResourceContent> {
-  const uri = `automobile://navigation/nodes?screen=${encodeURIComponent(screenName)}`;
+  const uri = `automobile:navigation/nodes?screen=${encodeURIComponent(screenName)}`;
 
   try {
     const nodeResource = await navigationGraphProvider.getNodeResourceByScreen(screenName);
@@ -260,7 +260,7 @@ export function registerNavigationResources(options: {
       const nodeId = Number(params.nodeId);
       if (!Number.isFinite(nodeId)) {
         return buildNavigationNodeError(
-          `automobile://navigation/nodes/${params.nodeId}`,
+          `automobile:navigation/nodes/${params.nodeId}`,
           `Invalid navigation node id: ${params.nodeId}`
         );
       }
@@ -277,7 +277,7 @@ export function registerNavigationResources(options: {
       const screenName = decodeURIComponent(params.screenName ?? "").trim();
       if (!screenName) {
         return buildNavigationNodeError(
-          "automobile://navigation/nodes?screen=",
+          "automobile:navigation/nodes?screen=",
           "Screen name is required."
         );
       }

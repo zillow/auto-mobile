@@ -327,9 +327,3 @@ Server logs are written to stdout. For persistent logging, you can redirect:
 ```shell
 bun run dev 2>&1 | tee dev-server.log
 ```
-
-## Implementation References
-
-- Worktree setup script: https://github.com/kaeawc/auto-mobile/blob/main/scripts/setup-worktree.sh#L1-L301
-- Dev scripts (`dev`, `dev:port`): https://github.com/kaeawc/auto-mobile/blob/main/package.json#L5-L20
-- Port detection and health endpoint: https://github.com/kaeawc/auto-mobile/blob/main/src/index.ts#L17-L274

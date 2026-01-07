@@ -1,44 +1,36 @@
 # AutoMobile
 
-AutoMobile is a set of tools for mobile automation. You can use it for UI testing or as a development workflow
-assistant.
+AutoMobile is a set of tools for mobile automation. You can use it for UI testing, development workflow
+assistant, performance inspection tool, or accessibility audit.
 
-Android is the primary supported platform today; iOS support exists but is partial and evolving.
+Android is the primary supported platform today; iOS support is on the roadmap.
 
 **How do I get started?**
 
-- [Installation](installation.md) - Install AutoMobile in your environment or IDE
-- [Test Execution](features/test-execution/index.md) - Run tests locally or on CI
+- [Installation](install/overview.md) - Install AutoMobile in your environment or IDE
 
-```mermaid
-stateDiagram-v2
-    Agent: Agent
-    RequestHandler: Request Handler
-    DeviceSessionManager: Device Session Manager
-    InteractionLoop: Interaction Loop
-    
-    Agent --> RequestHandler
-    RequestHandler --> Agent
-    RequestHandler --> DeviceSessionManager
-    InteractionLoop --> RequestHandler: 🖼️ Processed Results 
-    DeviceSessionManager --> InteractionLoop: 📱
-```
+### What can I use this to do?
+
+- [Interactive Exploration](using/ux-exploration.md) Use AI agents to explore your app and discover issues
+- [Automated Testing](using/ui-tests.md) Write reproducible UI tests that run in CI/CD
+- Performance Monitoring of [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [transitions](using/perf-analysis/screen-transition.md).
+- [Accessibility Auditing](using/ux-exploration.md) Validate contrast ratios and touch target sizes
+
+### How does AutoMobile work?
+
+All of the [design docs](design-docs/index.md) are included in the repository.
 
 **Additional Resources**
 
 - [FAQ](faq.md) - Frequently asked questions
 - [Why build this?](origin.md) - Motivation and origin story
-- [Features](features/index.md) - Understand how AutoMobile works 
-- [Contributing](contributing/overview.md) - If you're looking to contribute to the project
-
-## Acknowledgement
-
-By continuing to use AutoMobile, [you acknowledge and agree to the warnings and responsible use requirements](security.md).
+- [Contributing](contributing/index.md) - If you're looking to contribute to the project
 
 ## License
 
 ```text
-Copyright (C) 2025 Zillow Group
+Copyright 2025 Zillow, Inc.
+Copyright 2025-2026 Jason Pearson
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,10 +44,3 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
-
-## Implementation References
-
-- MCP request handling: https://github.com/kaeawc/auto-mobile/blob/main/src/server/index.ts#L90-L180
-- Device session management: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/DeviceSessionManager.ts#L1-L220
-- Interaction/observation loop: https://github.com/kaeawc/auto-mobile/blob/main/src/features/action/BaseVisualChange.ts#L1-L220
-- iOS automation plumbing: https://github.com/kaeawc/auto-mobile/blob/main/src/utils/ios-cmdline-tools/WebDriverAgent.ts#L1-L200

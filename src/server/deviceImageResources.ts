@@ -8,8 +8,8 @@ import { AvdInfo } from "../utils/android-cmdline-tools/avdmanager";
 
 // Resource URIs
 export const DEVICE_IMAGE_RESOURCE_URIS = {
-  ALL_IMAGES: "automobile://devices/images",
-  PLATFORM_TEMPLATE: "automobile://devices/images/{platform}"
+  ALL_IMAGES: "automobile:devices/images",
+  PLATFORM_TEMPLATE: "automobile:devices/images/{platform}"
 } as const;
 
 // Device image info for resource response
@@ -168,7 +168,7 @@ export function createDeviceImageResourcesHandler(
     // Validate platform parameter
     if (platform !== "android" && platform !== "ios") {
       return {
-        uri: `automobile://devices/images/${platform}`,
+        uri: `automobile:devices/images/${platform}`,
         mimeType: "application/json",
         text: JSON.stringify({
           error: `Invalid platform: ${platform}. Must be 'android' or 'ios'.`
@@ -178,7 +178,7 @@ export function createDeviceImageResourcesHandler(
 
     const result = await getDeviceImagesForPlatformsImpl([platform as Platform]);
     return {
-      uri: `automobile://devices/images/${platform}`,
+      uri: `automobile:devices/images/${platform}`,
       mimeType: "application/json",
       text: JSON.stringify(result, null, 2)
     };
@@ -223,7 +223,7 @@ async function getDeviceImagesByPlatform(params: Record<string, string>): Promis
   // Validate platform parameter
   if (platform !== "android" && platform !== "ios") {
     return {
-      uri: `automobile://devices/images/${platform}`,
+      uri: `automobile:devices/images/${platform}`,
       mimeType: "application/json",
       text: JSON.stringify({
         error: `Invalid platform: ${platform}. Must be 'android' or 'ios'.`
@@ -233,7 +233,7 @@ async function getDeviceImagesByPlatform(params: Record<string, string>): Promis
 
   const result = await getDeviceImagesForPlatforms([platform as Platform]);
   return {
-    uri: `automobile://devices/images/${platform}`,
+    uri: `automobile:devices/images/${platform}`,
     mimeType: "application/json",
     text: JSON.stringify(result, null, 2)
   };

@@ -1,0 +1,56 @@
+# Lychee link checker configuration
+# https://lychee.cli.rs/
+
+# Maximum number of concurrent network requests
+max_concurrency = 10
+
+# Exclude URL patterns (regex)
+exclude = [
+    # Ignore common localhost URLs
+    "^http://localhost",
+    "^http://127\\.0\\.0\\.1",
+    # Ignore example domains
+    "^https?://example\\.com",
+]
+
+# Exclude specific paths
+exclude_path = [
+    # Build artifacts
+    "site/",
+    "build/",
+    "dist/",
+    # Dependencies
+    "node_modules/",
+    # Git
+    ".git/",
+    # Files not deployed (in .gitignore)
+    "docs/contributing/index.md",
+]
+
+# Accept status codes
+accept = [
+    "200..=299",  # 2xx success
+    "403",        # Forbidden (auth-protected URLs like console.anthropic.com)
+    "429",        # Too Many Requests (common for rate-limited APIs)
+]
+
+# Timeout for each request in seconds
+timeout = 20
+
+# Number of retries per link
+max_retries = 3
+
+# HTTP method to use for checking links
+method = "get"
+
+# User agent string
+user_agent = "Mozilla/5.0 (compatible; lychee/AutoMobile)"
+
+# Cache results to speed up repeated checks
+cache = true
+
+# Verbose output level: "error", "warn", "info", "debug", or "trace"
+# verbose = "warn"
+
+# Base URL for relative links (useful for local docs)
+# base = "https://kaeawc.github.io/auto-mobile/"

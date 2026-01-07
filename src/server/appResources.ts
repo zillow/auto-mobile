@@ -6,8 +6,8 @@ import { logger } from "../utils/logger";
 
 // Resource URI templates
 export const APP_RESOURCE_TEMPLATES = {
-  DEVICE_APPS: "automobile://devices/{deviceId}/apps",
-  DEVICE_APP: "automobile://devices/{deviceId}/apps/{packageName}"
+  DEVICE_APPS: "automobile:devices/{deviceId}/apps",
+  DEVICE_APP: "automobile:devices/{deviceId}/apps/{packageName}"
 } as const;
 
 // Resource content schema
@@ -67,7 +67,7 @@ function buildAppsByPackage(apps: InstalledAppInfo[]): Map<string, InstalledAppI
 }
 
 function getDeviceAppsUri(deviceId: string): string {
-  return `automobile://devices/${deviceId}/apps`;
+  return `automobile:devices/${deviceId}/apps`;
 }
 
 function createAppsResourceContent(

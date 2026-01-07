@@ -20,7 +20,3 @@ bun run test -- --grep "Name of the test suite or test case"
 # Reinstall MCP server
 bun install
 ```
-
-## Implementation References
-
-- Validation scripts and toolchain: https://github.com/kaeawc/auto-mobile/blob/main/package.json#L1-L40

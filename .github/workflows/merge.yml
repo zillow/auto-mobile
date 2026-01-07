@@ -67,6 +67,40 @@ jobs:
         run: |
           scripts/shellcheck/validate_shell_scripts.sh
 
+  validate-mkdocs-nav:
+    name: "Validate MkDocs Navigation"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Validate MkDocs Navigation"
+        shell: "bash"
+        run: |
+          scripts/validate_mkdocs_nav.sh
+
+  validate-documentation-links:
+    name: "Validate Documentation Links"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Create contributing index file"
+        shell: "bash"
+        run: |
+          touch docs/contributing/index.md
+
+      - name: "Install Lychee"
+        shell: "bash"
+        run: |
+          scripts/lychee/install_lychee.sh
+
+      - name: "Validate Links"
+        shell: "bash"
+        run: |
+          scripts/lychee/validate_lychee.sh
+
   mcp-build-and-test:
     name: "Node TypeScript Build and Test"
     runs-on: ubuntu-latest
