@@ -27,7 +27,10 @@ cd android
 ```
 
 ## UI stack
-The tool window uses Compose with JetBrains Jewel for rendering.
+The tool window and settings pages use Compose with JetBrains Jewel for rendering.
+
+## Non-Compose surfaces
+- The IntelliJ settings dialog and tool window containers are Swing provided by the IDE; plugin UI is embedded via ComposePanel.
 
 ## References
 - Slack Foundry repository (Skate IntelliJ plugin) for Gradle/plugin best practices: https://github.com/slackhq/foundry

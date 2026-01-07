@@ -7,16 +7,26 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import org.jetbrains.jewel.bridge.JewelComposePanel
 
 class AutoMobileToolWindowFactory : ToolWindowFactory, DumbAware {
   @OptIn(ExperimentalComposeUiApi::class)
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-    val panel = ComposePanel()
-    panel.setContent { AutoMobileToolWindowContent(project) }
-
-    val content = toolWindow.contentManager.factory.createContent(panel, "", false)
+    var panel: ComposePanel? = null
+    val component =
+        JewelComposePanel(
+            config = {
+              panel = this
+            },
+        ) {
+          AutoMobileToolWindowContent(project)
+        }
+    val content = toolWindow.contentManager.factory.createContent(component, "", false)
     toolWindow.contentManager.addContent(content)
 
-    Disposer.register(content) { panel.dispose() }
+    Disposer.register(content) {
+      panel?.dispose()
+      panel = null
+    }
   }
 }
