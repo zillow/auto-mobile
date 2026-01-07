@@ -33,6 +33,14 @@ specific and will likely require a different ordering of steps per platform. All
     class B,C,F decision;
     ```
 
+  - Latest iteration (WebSocket freshness)
+    - After interactions, the observer waits for a WebSocket push from the accessibility service to deliver a fresh
+      view hierarchy.
+    - The wait uses a 5-second timeout. If no push arrives, the server falls back to a synchronous request to fetch
+      the latest view hierarchy.
+    - Debouncing is applied so rapid consecutive interactions do not trigger multiple overlapping fetches. The most
+      recent pending request wins, and stale requests are dropped.
+
   - If the accessibility service is not installed or not enabled yet, we fall back to `uiautomator` output that is
     cached based on a perceptual hash plus pixel matching within a tolerance threshold.
 
