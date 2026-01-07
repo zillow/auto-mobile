@@ -39,5 +39,5 @@ to fetch and update feature flags. Avoid MCP tool calls for this surface.
 
 ## See also
 
-- [Feature Flags](../../mcp/feature-flags.md)
+- [Feature Flags](../../../mcp/feature-flags.md)
 - [IDE Plugin Overview](overview.md)
