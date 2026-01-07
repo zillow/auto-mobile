@@ -37,6 +37,7 @@ export class AdbClient implements AdbExecutor {
   private adbPath: string;
   private isTestMode: boolean;
   private activeProcesses: Set<ChildProcess> = new Set();
+  private apiLevelCache: number | null | undefined;
 
   // Static cache for device list
   private static deviceListCache: { devices: BootedDevice[], timestamp: number } | null = null;
@@ -203,6 +204,7 @@ export class AdbClient implements AdbExecutor {
    */
   setDevice(device: BootedDevice): void {
     this.device = device;
+    this.apiLevelCache = undefined;
   }
 
   /**
@@ -262,6 +264,31 @@ export class AdbClient implements AdbExecutor {
 
     logger.debug("[ADB] Falling back to host time for device timestamp");
     return Date.now();
+  }
+
+  /**
+   * Get the Android API level for the connected device.
+   */
+  async getAndroidApiLevel(): Promise<number | null> {
+    if (this.apiLevelCache !== undefined) {
+      return this.apiLevelCache;
+    }
+
+    try {
+      const result = await this.executeCommand(
+        "shell getprop ro.build.version.sdk",
+        undefined,
+        undefined,
+        true
+      );
+      const parsed = Number.parseInt(result.stdout.trim(), 10);
+      this.apiLevelCache = Number.isNaN(parsed) ? null : parsed;
+      return this.apiLevelCache;
+    } catch (error) {
+      logger.warn(`[ADB] Failed to read API level: ${error}`);
+      this.apiLevelCache = null;
+      return null;
+    }
   }
 
   /**

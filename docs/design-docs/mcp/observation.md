@@ -66,7 +66,7 @@ All collected data is assembled into an object containing (fields may be omitted
 - `focusedElement`: currently focused UI element (if any)
 - `intentChooserDetected`: whether a system intent chooser is visible
 - `wakefulness` and `backStack`: Android-specific state
-- `perfTiming`, `performanceAudit`, and `accessibilityAudit`: present when the relevant modes are enabled
+- `perfTiming`, `displayedTimeMetrics` (Android launchApp "Displayed" startup timings), `performanceAudit`, and `accessibilityAudit`: present when the relevant modes are enabled
 - `error`: error messages encountered during observation
 
 The observation gracefully handles various error conditions:

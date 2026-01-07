@@ -9,6 +9,7 @@ import { BackStackInfo } from "./BackStack";
 import { PerformanceAuditResult } from "../features/performance/PerformanceAudit";
 import { AccessibilityAuditResult } from "./AccessibilityAudit";
 import { RecompositionSummary } from "./Recomposition";
+import { DisplayedTimeMetric } from "./DisplayedTimeMetric";
 
 export interface PredictionTarget {
   text?: string;
@@ -126,6 +127,9 @@ export interface ObserveResult {
 
   /** Graphics frame metrics from gfxinfo (only present when --debug-perf is enabled) */
   gfxMetrics?: GfxMetrics;
+
+  /** Android "Displayed" metrics captured during launch (when ui-perf-mode is enabled). */
+  displayedTimeMetrics?: DisplayedTimeMetric[];
 
   /**
    * Performance audit results (when UI performance audit mode is enabled)

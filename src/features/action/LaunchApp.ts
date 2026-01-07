@@ -9,6 +9,8 @@ import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
+import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetricsCollector";
+import { serverConfig } from "../../utils/ServerConfig";
 
 export type ForegroundCheckMode = "parallel" | "single";
 
@@ -381,8 +383,20 @@ export class LaunchApp extends BaseVisualChange {
 
     logger.info(`[LaunchApp] Proceeding with app launch`);
 
-    return this.observedInteraction(
+    const captureDisplayedMetrics = serverConfig.isUiPerfModeEnabled();
+    const displayedMetricsCollector = captureDisplayedMetrics
+      ? new DisplayedTimeMetricsCollector(this.device, this.adb)
+      : null;
+    let displayedMetricsStartMs: number | null = null;
+
+    const launchResult = await this.observedInteraction(
       async () => {
+        if (displayedMetricsCollector) {
+          displayedMetricsStartMs = await perf.track(
+            "displayedLogcatStartTime",
+            () => this.adb.getDeviceTimestampMs()
+          );
+        }
         return this.performLaunch(packageName, activityName, targetUserId, perf);
       },
       {
@@ -392,6 +406,24 @@ export class LaunchApp extends BaseVisualChange {
         skipUiStability: skipUiStability ?? false
       }
     );
+
+    if (displayedMetricsCollector && displayedMetricsStartMs !== null && launchResult?.observation) {
+      const displayedMetricsEndMs = await perf.track(
+        "displayedLogcatEndTime",
+        () => this.adb.getDeviceTimestampMs()
+      );
+      const displayedTimeMetrics = await displayedMetricsCollector.captureDisplayedMetrics(
+        {
+          packageName,
+          startTimestampMs: displayedMetricsStartMs,
+          endTimestampMs: displayedMetricsEndMs
+        },
+        perf
+      );
+      launchResult.observation.displayedTimeMetrics = displayedTimeMetrics;
+    }
+
+    return launchResult;
   }
 
   /**
