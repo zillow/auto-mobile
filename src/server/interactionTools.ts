@@ -21,6 +21,7 @@ import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
 import { resolveSwipeDirection } from "../utils/swipeOnUtils";
 import { RecompositionTracker } from "../features/performance/RecompositionTracker";
+import { DEVICE_LABEL_DESCRIPTION } from "./toolSchemaHelpers";
 
 // Type definitions for better TypeScript support
 export interface ClearTextArgs {
@@ -155,7 +156,8 @@ export const shakeSchema = z.object({
   intensity: z.number().optional().describe("Intensity of the shake acceleration (default: 100)"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 const tapOnContainerSchema = z.object({
@@ -194,7 +196,8 @@ export const tapOnSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   // Framework parameters for device management (optional)
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const dragAndDropSchema = z.object({
@@ -211,7 +214,8 @@ export const dragAndDropSchema = z.object({
   dropDelay: z.number().optional().describe("Delay after dropping in milliseconds (default: 100)"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const swipeOnSchema = z.object({
@@ -255,7 +259,8 @@ To see more content ABOVE: use direction "down".`
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   // Framework parameters for device management (optional)
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const pinchOnSchema = z.object({
@@ -273,19 +278,22 @@ export const pinchOnSchema = z.object({
   autoTarget: z.boolean().optional().describe("Auto-target a large, tappable surface when container is omitted (default true)"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const clearTextSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const selectAllTextSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const pressButtonSchema = z.object({
@@ -293,13 +301,15 @@ export const pressButtonSchema = z.object({
     .describe("The button to press"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const openSystemTraySchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const pressKeySchema = z.object({
@@ -307,14 +317,16 @@ export const pressKeySchema = z.object({
     .describe("The key to press"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const stopAppSchema = z.object({
   appId: z.string().describe("App package ID to stop"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const clearStateSchema = z.object({
@@ -322,7 +334,8 @@ export const clearStateSchema = z.object({
   clearKeychain: z.boolean().optional().describe("Also clear iOS keychain (iOS only)"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const inputTextSchema = z.object({
@@ -331,40 +344,46 @@ export const inputTextSchema = z.object({
     .describe("Optional IME action to perform after text input"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const openLinkSchema = z.object({
   url: z.string().describe("URL to open in the default browser"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const imeActionSchema = z.object({
   action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action to perform"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const recentAppsSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const homeScreenSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 export const rotateSchema = z.object({
   orientation: z.enum(["portrait", "landscape"]).describe("The orientation to set"),
   platform: z.enum(["android", "ios"]).describe("Platform of the device"),
   sessionUuid: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION)
 });
 
 const SYSTEM_TRAY_PACKAGE = "com.android.systemui";

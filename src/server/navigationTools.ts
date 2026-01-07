@@ -6,19 +6,19 @@ import { NavigationGraphManager } from "../features/navigation/NavigationGraphMa
 import { Explore, ExploreOptions } from "../features/navigation/Explore";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
-import { addSessionUuidToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const navigateToSchema = addSessionUuidToSchema(z.object({
+export const navigateToSchema = addDeviceTargetingToSchema(z.object({
   targetScreen: z.string().describe("The destination screen name to navigate to"),
   platform: z.enum(["android", "ios"]).default("android")
 }));
 
-export const getNavigationGraphSchema = addSessionUuidToSchema(z.object({
+export const getNavigationGraphSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).default("android")
 }));
 
-export const exploreSchema = addSessionUuidToSchema(z.object({
+export const exploreSchema = addDeviceTargetingToSchema(z.object({
   maxInteractions: z.number().optional().describe("Maximum number of interactions to perform (default: 50)"),
   timeoutMs: z.number().optional().describe("Maximum time in milliseconds (default: 300000 - 5 minutes)"),
   strategy: z.enum(["breadth-first", "depth-first", "weighted"]).optional().describe("Exploration strategy (default: weighted)"),

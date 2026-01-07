@@ -14,6 +14,7 @@ import { DaemonState } from "../daemon/daemonState";
 import { createToolExecutionContext, updateSessionCache } from "./ToolExecutionContext";
 import { AppCleanupService, DefaultAppCleanupService } from "./AppCleanupService";
 import { ToolCallRepository } from "../db/toolCallRepository";
+import { getDeviceLabelMap, releaseDeviceLabelSessions } from "./deviceLabelMapping";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -94,7 +95,41 @@ class ToolRegistryClass {
     const wrappedHandler: ToolHandler = async (args: any, progress?: ProgressCallback, signal?: AbortSignal) => {
       // Check for session UUID and create execution context
       let providedDeviceId = args.deviceId;
-      const sessionUuid = args.sessionUuid;
+      const baseSessionUuid = args.sessionUuid;
+      const deviceLabel = typeof args.device === "string" ? args.device : undefined;
+      const declaredDeviceLabels = Array.isArray(args.devices) ? args.devices : undefined;
+      let sessionUuid = baseSessionUuid;
+
+      if (deviceLabel) {
+        if (!DaemonState.getInstance().isInitialized()) {
+          throw new ActionableError("Device labels require an active daemon session.");
+        }
+        if (!baseSessionUuid) {
+          throw new ActionableError(`Device label '${deviceLabel}' requires sessionUuid to be provided.`);
+        }
+
+        const deviceLabelMap = getDeviceLabelMap(baseSessionUuid);
+        if (deviceLabelMap) {
+          const mappedSession = deviceLabelMap[deviceLabel];
+          if (!mappedSession) {
+            const available = Object.keys(deviceLabelMap);
+            const suffix = available.length > 0 ? ` Available labels: ${available.join(", ")}` : "";
+            throw new ActionableError(`Unknown device label '${deviceLabel}'.${suffix}`);
+          }
+          sessionUuid = mappedSession;
+        } else if (name === "executePlan" && declaredDeviceLabels?.includes(deviceLabel)) {
+          sessionUuid = baseSessionUuid;
+        } else {
+          throw new ActionableError(
+            `Device label '${deviceLabel}' is not allocated. Provide a devices list to executePlan before using device labels.`
+          );
+        }
+
+        if (providedDeviceId) {
+          logger.warn(`[ToolRegistry] Ignoring deviceId because device label '${deviceLabel}' was provided.`);
+          providedDeviceId = undefined;
+        }
+      }
 
       logger.info(`[ToolRegistry] Tool ${name} called, sessionUuid=${sessionUuid}, daemonInitialized=${DaemonState.getInstance().isInitialized()}`);
       void this.toolCallRepository.recordToolCall({
@@ -245,12 +280,17 @@ class ToolRegistryClass {
           try {
             const sessionManager = DaemonState.getInstance().getSessionManager();
             const devicePool = DaemonState.getInstance().getDevicePool();
-            const session = sessionManager.getSession(sessionUuid);
+            const releaseSessionUuid = baseSessionUuid ?? sessionUuid;
+            if (releaseSessionUuid) {
+              await releaseDeviceLabelSessions(releaseSessionUuid);
+            }
+
+            const session = releaseSessionUuid ? sessionManager.getSession(releaseSessionUuid) : null;
             if (session) {
               const deviceId = session.assignedDevice;
-              sessionManager.releaseSession(sessionUuid);
+              sessionManager.releaseSession(session.sessionId);
               await devicePool.releaseDevice(deviceId);
-              logger.info(`Auto-released session ${sessionUuid} and freed device ${deviceId} after executePlan`);
+              logger.info(`Auto-released session ${session.sessionId} and freed device ${deviceId} after executePlan`);
             }
           } catch (releaseError) {
             // Don't fail the tool if session release fails

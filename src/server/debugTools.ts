@@ -6,6 +6,7 @@ import { DebugSearch } from "../features/debug/DebugSearch";
 import { BugReport } from "../features/debug/BugReport";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice, Platform } from "../models";
+import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { isDebugModeEnabled } from "../utils/debug";
 
 const ensureDebugEnabled = () => {
@@ -46,14 +47,14 @@ export interface BugReportArgs {
 }
 
 // Schema definitions
-export const rawViewHierarchySchema = z.object({
+export const rawViewHierarchySchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   source: z.enum(["uiautomator", "accessibility-service", "both"])
     .optional()
     .describe("Source for hierarchy extraction: 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison")
-});
+}));
 
-export const debugSearchSchema = z.object({
+export const debugSearchSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   text: z.string().optional().describe("Text to search for in elements"),
   resourceId: z.string().optional().describe("Resource ID to search for"),
@@ -65,9 +66,9 @@ export const debugSearchSchema = z.object({
   caseSensitive: z.boolean().optional().describe("Whether to use case-sensitive matching (default: false)"),
   includeNearMisses: z.boolean().optional().describe("Include elements that almost matched (default: true)"),
   maxNearMisses: z.number().optional().describe("Maximum number of near-misses to include (default: 10)")
-});
+}));
 
-export const bugReportSchema = z.object({
+export const bugReportSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   appId: z.string().optional().describe("App package ID to filter logcat for specific app"),
   includeScreenshot: z.boolean().optional().describe("Whether to include screenshot (default: true)"),
@@ -76,7 +77,7 @@ export const bugReportSchema = z.object({
   logcatLines: z.number().optional().describe("Number of recent logcat lines to include (default: 100)"),
   saveToFile: z.boolean().optional().describe("Whether to save full report to a file (default: false)"),
   saveDir: z.string().optional().describe("Directory to save report to")
-});
+}));
 
 // Register debug tools
 export function registerDebugTools() {

@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
-import { BootedDevice, ExecutePlanResult } from "../models";
+import { ActionableError, BootedDevice, ExecutePlanResult } from "../models";
 import { importPlanFromYaml, executePlan } from "../utils/planUtils";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
 import { TestExecutionRepository, TestExecutionStatus } from "../db/testExecutionRepository";
+import { DEVICE_LABEL_DESCRIPTION } from "./toolSchemaHelpers";
+import { registerDeviceLabelMap } from "./deviceLabelMapping";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -29,6 +31,8 @@ const executePlanSchema = z.object({
   // Framework parameters for device management (optional)
   sessionUuid: z.string().optional().describe("Session UUID for parallel test execution"),
   deviceId: z.string().optional().describe("Specific device ID to use"),
+  device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION),
+  devices: z.array(z.string()).optional().describe("Device labels to allocate for multi-device plans (e.g., [\"A\", \"B\"]). Use only when controlling multiple devices."),
   testMetadata: testMetadataSchema.optional().describe("Optional test metadata for execution timing history"),
   cleanupAppId: z.string().optional().describe("App package ID to terminate after plan execution"),
   cleanupClearAppData: z.boolean().optional().describe("Clear app data during cleanup (Android only)")
@@ -50,6 +54,8 @@ const executePlanTool = async (device: BootedDevice, params: {
   platform: Platform;
   sessionUuid?: string;
   deviceId?: string;
+  device?: string;
+  devices?: string[];
   testMetadata?: TestExecutionMetadata;
   cleanupAppId?: string;
   cleanupClearAppData?: boolean;
@@ -103,6 +109,20 @@ const executePlanTool = async (device: BootedDevice, params: {
     logger.info("=== Parsing plan from YAML ===");
     const plan = importPlanFromYaml(yamlContent);
     logger.info(`Plan parsed successfully: '${plan.name}' with ${plan.steps.length} steps`);
+
+    if (params.devices && params.devices.length > 0) {
+      if (!params.sessionUuid) {
+        throw new ActionableError("Device labels require a sessionUuid to be provided.");
+      }
+      if (params.device && !params.devices.includes(params.device)) {
+        throw new ActionableError(
+          `Device label '${params.device}' was not declared in devices list: ${params.devices.join(", ")}`
+        );
+      }
+      await registerDeviceLabelMap(params.sessionUuid, params.devices, params.device);
+    } else if (params.device) {
+      throw new ActionableError("Device label requires a devices list to be provided.");
+    }
 
     // Execute the plan with device context
     logger.info(`=== Starting plan execution on device ${device.deviceId} ===`);

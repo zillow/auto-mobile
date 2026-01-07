@@ -7,10 +7,10 @@ import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { BootedDevice, Platform } from "../models";
-import { addSessionUuidToSchema } from "./toolSchemaHelpers";
+import { addDeviceTargetingToSchema, addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const enableDemoModeSchema = addSessionUuidToSchema(z.object({
+export const enableDemoModeSchema = addDeviceTargetingToSchema(z.object({
   time: z.string().optional().describe("Time to display in statusbar in HHMM format (e.g., 1000 for 10:00)"),
   batteryLevel: z.number().min(0).max(100).optional().describe("Battery level percentage (0-100)"),
   batteryPlugged: z.boolean().optional().describe("Whether the device appears to be charging"),
@@ -21,7 +21,7 @@ export const enableDemoModeSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const disableDemoModeSchema = addSessionUuidToSchema(z.object({
+export const disableDemoModeSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
@@ -30,27 +30,27 @@ export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const setLocaleSchema = addSessionUuidToSchema(z.object({
+export const setLocaleSchema = addDeviceTargetingToSchema(z.object({
   languageTag: z.string().min(1).describe("Locale language tag (e.g., \"ar-SA\", \"ja-JP\")"),
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const setTimeZoneSchema = addSessionUuidToSchema(z.object({
+export const setTimeZoneSchema = addDeviceTargetingToSchema(z.object({
   zoneId: z.string().min(1).describe("Time zone ID (e.g., \"America/Los_Angeles\")"),
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const setTextDirectionSchema = addSessionUuidToSchema(z.object({
+export const setTextDirectionSchema = addDeviceTargetingToSchema(z.object({
   rtl: z.boolean().describe("Enable or disable RTL layout"),
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const set24HourFormatSchema = addSessionUuidToSchema(z.object({
+export const set24HourFormatSchema = addDeviceTargetingToSchema(z.object({
   enabled: z.boolean().describe("Enable or disable 24-hour time format"),
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 
-export const getCalendarSystemSchema = addSessionUuidToSchema(z.object({
+export const getCalendarSystemSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform")
 }));
 

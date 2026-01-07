@@ -129,7 +129,7 @@ export class DefaultPlanExecutor implements PlanExecutor {
             }
 
             // Inject deviceId if provided and not already set - this ensures the tool uses the correct device
-            if (deviceId && !enhancedParams.deviceId) {
+            if (deviceId && !enhancedParams.deviceId && !enhancedParams.device) {
               enhancedParams.deviceId = deviceId;
               logger.info(`[PlanExecutor] Injecting deviceId ${deviceId} into ${step.tool}`);
             }
