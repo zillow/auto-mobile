@@ -6,6 +6,24 @@ AutoMobile runs as an MCP (Model Context Protocol) server in STDIO mode. Configu
 
 - Bun 1.3.5 or later
 
+## Interactive Installer (macOS/Linux)
+
+Prefer a guided setup? Run the interactive installer (Bash + Gum) to check dependencies, install Gum/Bun if missing,
+optionally download Android command line tools, install the Accessibility Service APK, install the IDE plugin, and start
+the MCP daemon, all while showing an animated AutoMobile logo during setup.
+
+From a cloned repo:
+
+```bash
+./scripts/install/interactive.sh
+```
+
+Or run it directly:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/install/interactive.sh | bash
+```
+
 ## Quick Setup
 
 ```json
@@ -78,5 +96,4 @@ For model provider supported features like JUnitRunner AI self-healing tests you
 - **AWS Bedrock** - [Setup Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/setting-up.html)
 
 Set API keys via environment variables or system properties. See [JUnitRunner](../design-docs/plat/android/junitrunner.md#model-providers) for configuration details.
-
 

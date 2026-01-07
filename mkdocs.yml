@@ -102,6 +102,7 @@ nav:
           - 'Migrations': design-docs/mcp/migrations.md
           - 'Video Recording': design-docs/mcp/video-recording.md
           - 'Resources': design-docs/mcp/resources.md
+          - 'Migrations': design-docs/mcp/migrations.md
       - 'Platform Specific':
           - 'Android':
             - 'Overview': design-docs/plat/android/index.md

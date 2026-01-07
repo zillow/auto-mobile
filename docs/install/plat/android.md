@@ -1,6 +1,16 @@
 # Android Setup
 
-AutoMobile detects Android SDK components automatically but does **not** install them for you.
+AutoMobile detects Android SDK components automatically but does **not** install them for you by default. If you want a
+guided setup, the interactive installer can optionally download command line tools and platform-tools, install the
+Accessibility Service APK, install the IDE plugin, and start the MCP daemon.
+
+## Interactive Installer (macOS/Linux)
+
+```bash
+./scripts/install/interactive.sh
+```
+
+The installer will prompt before installing anything and will highlight the SDK path it uses.
 
 ## Prerequisites
 
