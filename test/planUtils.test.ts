@@ -58,6 +58,7 @@ describe("Plan Utils", () => {
       expect(result.success).toBe(true);
       expect(result.stepCount).toBe(3); // launchApp, tapOnText, last observe
       expect(result.planContent).toContain("Test Plan");
+      expect(result.planContent).toContain("mcpVersion:");
       expect(result.planContent).toContain("launchApp");
       expect(result.planContent).toContain("tapOnText");
     });
@@ -186,8 +187,9 @@ metadata:
       expect(plan.steps).toHaveLength(2);
       expect(plan.steps[0].tool).toBe("launchApp");
       expect(plan.steps[0].params.appId).toBe("com.example.app");
-      expect(plan.steps[1].tool).toBe("tapOnText");
+      expect(plan.steps[1].tool).toBe("tapOn");
       expect(plan.steps[1].params.text).toBe("Login");
+      expect(plan.steps[1].params.action).toBe("tap");
     });
 
     test("should throw error for invalid YAML", () => {
@@ -213,6 +215,40 @@ steps:
 `;
 
       expect(() => importPlanFromYaml(yamlContent)).toThrow("Invalid step");
+    });
+
+    test("should migrate legacy plan fields and params", () => {
+      const yamlContent = `
+planName: Legacy Plan
+metadata:
+  description: Legacy description
+steps:
+  - command: launchApp
+    packageName: com.example.app
+  - tool: scroll
+    containerElementId: list-id
+    direction: down
+  - tool: swipeOnScreen
+    direction: up
+    duration: 900
+  - tool: tapOnText
+    text: Login
+`;
+
+      const plan = importPlanFromYaml(yamlContent);
+
+      expect(plan.name).toBe("Legacy Plan");
+      expect(plan.description).toBe("Legacy description");
+      expect(plan.steps[0].tool).toBe("launchApp");
+      expect(plan.steps[0].params.appId).toBe("com.example.app");
+      expect(plan.steps[1].tool).toBe("swipeOn");
+      expect(plan.steps[1].params.container.elementId).toBe("list-id");
+      expect(plan.steps[1].params.gestureType).toBe("scrollTowardsDirection");
+      expect(plan.steps[2].tool).toBe("swipeOn");
+      expect(plan.steps[2].params.autoTarget).toBe(false);
+      expect(plan.steps[2].params.speed).toBe("slow");
+      expect(plan.steps[3].tool).toBe("tapOn");
+      expect(plan.steps[3].params.action).toBe("tap");
     });
   });
 

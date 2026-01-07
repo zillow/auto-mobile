@@ -30,6 +30,7 @@ import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
 import { registerTestTimingTools } from "./testTimingTools";
 import { registerPerformanceTools } from "./performanceTools";
+import { getMcpServerVersion } from "../utils/mcpVersion";
 
 // Import resource registration functions
 import { registerObservationResources } from "./observationResources";
@@ -105,7 +106,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   // Create a new MCP server
   const server = new McpServer({
     name: "AutoMobile",
-    version: "0.0.1"
+    version: getMcpServerVersion()
   }, {
     capabilities: {
       resources: {},

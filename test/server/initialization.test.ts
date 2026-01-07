@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../fixtures/mcpTestFixture";
+import { getMcpServerVersion } from "../../src/utils/mcpVersion";
 
 describe("MCP Server Initialization", () => {
   let fixture: McpTestFixture;
@@ -57,7 +58,7 @@ describe("MCP Server Initialization", () => {
 
     // Verify server info
     expect(result.serverInfo).toHaveProperty("name", "AutoMobile");
-    expect(result.serverInfo).toHaveProperty("version", "0.0.1");
+    expect(result.serverInfo).toHaveProperty("version", getMcpServerVersion());
   });
 
 });

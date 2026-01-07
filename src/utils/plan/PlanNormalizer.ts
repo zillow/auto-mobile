@@ -6,6 +6,10 @@ import { logger } from "../logger";
  * Converts legacy formats to current PlanStep structure
  */
 export class PlanNormalizer {
+  private static isRecord(value: unknown): value is Record<string, any> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
   /**
    * Normalize a raw step object into a PlanStep
    * Handles conversion of 'command' to 'tool' and moves parameters into params object
@@ -22,18 +26,27 @@ export class PlanNormalizer {
       throw new Error(`Invalid step at index ${index}: missing or invalid tool/command name`);
     }
 
-    // Create normalized step - start with empty params object
-    const normalizedStep: PlanStep = {
-      tool: toolName,
-      params: {}
-    };
-
-    // Copy all properties except tool, command, and label into params
+    const inlineParams: Record<string, any> = {};
     Object.keys(step).forEach(key => {
-      if (key !== "tool" && key !== "command" && key !== "label") {
-        normalizedStep.params[key] = step[key];
+      if (key !== "tool" && key !== "command" && key !== "label" && key !== "params") {
+        inlineParams[key] = step[key];
       }
     });
+
+    const paramsFromStep = PlanNormalizer.isRecord(step.params) ? step.params : {};
+
+    // Create normalized step - prefer explicit params over inline fields
+    const normalizedStep: PlanStep = {
+      tool: toolName,
+      params: {
+        ...inlineParams,
+        ...paramsFromStep
+      }
+    };
+
+    if (typeof step.label === "string") {
+      normalizedStep.label = step.label;
+    }
 
     logger.info(`Normalized step ${index}:`, JSON.stringify(normalizedStep, null, 2));
     return normalizedStep;

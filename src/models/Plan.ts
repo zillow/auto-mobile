@@ -1,12 +1,14 @@
 export interface PlanStep {
   tool: string;
   params: Record<string, any>;
+  label?: string;
 }
 
 export interface Plan {
   name: string;
   description?: string;
   steps: PlanStep[];
+  mcpVersion?: string;
   metadata?: {
     createdAt: string;
     version: string;

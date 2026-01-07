@@ -4,6 +4,8 @@ import yaml from "js-yaml";
 import { Plan, PlanStep } from "../../models/Plan";
 import { logger } from "../logger";
 import { PlanNormalizer } from "./PlanNormalizer";
+import { migratePlan } from "./PlanMigrator";
+import { getMcpServerVersion } from "../mcpVersion";
 
 /**
  * Interface for plan serialization/deserialization
@@ -160,10 +162,12 @@ export class YamlPlanSerializer implements PlanSerializer {
       }
 
       // Create the plan
+      const mcpVersion = getMcpServerVersion();
       const plan: Plan = {
         name: planName,
         description: `Exported plan with ${planSteps.length} steps`,
         steps: planSteps,
+        mcpVersion,
         metadata: {
           createdAt: new Date().toISOString(),
           version: "1.0.0"
@@ -215,13 +219,29 @@ export class YamlPlanSerializer implements PlanSerializer {
 
       logger.info("Raw plan loaded:", JSON.stringify(rawPlan, null, 2));
 
+      const { plan: migratedPlan, report } = migratePlan(rawPlan);
+
       // Handle both legacy and new field names
-      const planName = rawPlan.name || rawPlan.planName;
-      const steps = rawPlan.steps;
+      const planName = migratedPlan.name;
+      const steps = migratedPlan.steps;
 
       // Validate basic structure
       if (!planName || !steps || !Array.isArray(steps)) {
-        throw new Error("Invalid plan structure: missing name/planName or steps");
+        throw new Error("Invalid plan structure: missing name or steps");
+      }
+
+      if (report.migrated) {
+        const applied = report.appliedMigrations.length > 0 ? report.appliedMigrations.join(", ") : "none";
+        logger.info(
+          `[PLAN_MIGRATION] Plan '${planName}' migrated (${report.originalVersion} -> ${report.targetVersion}). Applied: ${applied}`
+        );
+      }
+
+      if (report.warnings.length > 0) {
+        report.warnings.forEach(warning => {
+          const location = warning.stepIndex !== undefined ? `step ${warning.stepIndex}` : "plan";
+          logger.warn(`[PLAN_MIGRATION] ${location}: ${warning.message}`);
+        });
       }
 
       logger.info(`Processing ${steps.length} steps`);
@@ -238,9 +258,10 @@ export class YamlPlanSerializer implements PlanSerializer {
 
       const plan: Plan = {
         name: planName,
-        description: rawPlan.description || `Plan with ${normalizedSteps.length} steps`,
+        description: migratedPlan.description || `Plan with ${normalizedSteps.length} steps`,
         steps: normalizedSteps,
-        metadata: rawPlan.metadata || {
+        mcpVersion: migratedPlan.mcpVersion,
+        metadata: migratedPlan.metadata || {
           createdAt: new Date().toISOString(),
           version: "1.0.0"
         }
