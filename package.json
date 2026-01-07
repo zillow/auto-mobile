@@ -16,6 +16,7 @@
     "dev:sse": "bun --watch src/index.ts --transport sse",
     "dev:streamable": "bun --watch src/index.ts --transport streamable",
     "dev:streamable:port": "bun --watch src/index.ts --transport streamable --port",
+    "estimate-context": "bun scripts/estimate-context-usage.ts",
     "prepublishOnly": "cp README.md README.md.backup && bun scripts/npm/transform-readme.js",
     "postpublish": "mv README.md.backup README.md || true"
   },
@@ -68,6 +69,7 @@
     "fs-extra": "^11.3.2",
     "glob": "^11.1.0",
     "jimp": "^1.6.0",
+    "js-tiktoken": "^1.0.21",
     "js-yaml": "^4.1.1",
     "kysely": "^0.28.9",
     "onnxruntime-node": "^1.23.2",
