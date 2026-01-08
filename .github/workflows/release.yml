@@ -162,6 +162,20 @@ jobs:
       - name: Publish to npm
         run: npm publish --provenance --access public
 
+      - name: Free Disk Space
+        uses: endersonmenezes/free-disk-space@v3
+        with:
+          remove_android: true      # ~14 GB
+          remove_dotnet: true       # ~2.7 GB
+          remove_haskell: true      # Minimal
+          remove_tool_cache: false  # Keep Node.js since we need it
+          remove_swap: true         # ~4 GB
+          remove_codeql: true       # ~5.9 GB (we run CodeQL separately)
+          use_rmz: true            # 3x faster deletion
+
+      - name: Clean up Docker
+        run: docker system prune -af --volumes
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
