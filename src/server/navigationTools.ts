@@ -10,7 +10,7 @@ import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
 export const navigateToSchema = addDeviceTargetingToSchema(z.object({
-  targetScreen: z.string().describe("The destination screen name to navigate to"),
+  targetScreen: z.string().describe("Target screen name"),
   platform: z.enum(["android", "ios"]).default("android")
 }));
 
@@ -19,14 +19,14 @@ export const getNavigationGraphSchema = addDeviceTargetingToSchema(z.object({
 }));
 
 export const exploreSchema = addDeviceTargetingToSchema(z.object({
-  maxInteractions: z.number().optional().describe("Maximum number of interactions to perform (default: 50)"),
-  timeoutMs: z.number().optional().describe("Maximum time in milliseconds (default: 300000 - 5 minutes)"),
-  strategy: z.enum(["breadth-first", "depth-first", "weighted"]).optional().describe("Exploration strategy (default: weighted)"),
-  resetToHome: z.boolean().optional().describe("Whether to reset to home screen periodically (default: false)"),
-  resetInterval: z.number().optional().describe("How often to reset in number of interactions (default: 15)"),
-  mode: z.enum(["discover", "validate", "hybrid"]).optional().describe("Exploration mode (default: hybrid)"),
-  packageName: z.string().optional().describe("Package name to limit exploration to"),
-  dryRun: z.boolean().optional().describe("Dry run mode (no interactions performed)"),
+  maxInteractions: z.number().optional().describe("Max interactions (default: 50)"),
+  timeoutMs: z.number().optional().describe("Timeout ms (default: 300000)"),
+  strategy: z.enum(["breadth-first", "depth-first", "weighted"]).optional().describe("Strategy (default: weighted)"),
+  resetToHome: z.boolean().optional().describe("Reset to home periodically (default: false)"),
+  resetInterval: z.number().optional().describe("Reset interval (default: 15)"),
+  mode: z.enum(["discover", "validate", "hybrid"]).optional().describe("Mode (default: hybrid)"),
+  packageName: z.string().optional().describe("Package to limit exploration"),
+  dryRun: z.boolean().optional().describe("Dry run (no interactions)"),
   platform: z.enum(["android", "ios"]).default("android")
 }));
 
@@ -116,10 +116,7 @@ export function registerNavigationTools() {
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "navigateTo",
-    "Navigate to a specific screen in the app using the learned navigation graph. " +
-    "Uses previously recorded navigation paths and UI interactions. " +
-    "If no known path exists, reports available screens. " +
-    "Maximum timeout of 30 seconds.",
+    "Navigate to screen using navigation graph",
     navigateToSchema,
     navigateToHandler,
     true // supports progress
@@ -127,8 +124,7 @@ export function registerNavigationTools() {
 
   ToolRegistry.registerDeviceAware(
     "getNavigationGraph",
-    "Get the current navigation graph for debugging. " +
-    "Shows known screens, transitions, and which tool calls triggered each navigation.",
+    "Get navigation graph for debugging",
     getNavigationGraphSchema,
     getNavigationGraphHandler
   );
@@ -172,13 +168,7 @@ export function registerNavigationTools() {
 
   ToolRegistry.registerDeviceAware(
     "explore",
-    "Perpetually explore until all navigation destinations have been reached by " +
-    "automatically exploring the app and intelligently selecting and interacting with navigation elements. " +
-    "Builds a comprehensive navigation graph by prioritizing likely navigation elements (buttons, tabs, menus), " +
-    "avoiding redundant interactions, and efficiently covering unexplored screens. " +
-    "Supports breadth-first, depth-first, and weighted exploration strategies. " +
-    "Automatically detects and handles common blockers like permission dialogs and login screens. " +
-    "Default: 50 interactions, weighted strategy, 5-minute timeout.",
+    "Automatically explore app to build navigation graph",
     exploreSchema,
     exploreHandler,
     true // supports progress

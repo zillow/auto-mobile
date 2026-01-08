@@ -284,9 +284,6 @@ export class TapOnElement extends BaseVisualChange {
           const tapPoint = this.elementUtils.getElementCenter(element);
           let action = options.action;
           const longPressDuration = this.getLongPressDuration(options, this.device.platform);
-          const dragTarget = action === "longPressDrag"
-            ? this.resolveDragTarget(options, viewHierarchy)
-            : null;
 
           if (action === "focus") {
             // Check if element is already focused
@@ -327,12 +324,11 @@ export class TapOnElement extends BaseVisualChange {
                   tapPoint.y,
                   longPressDuration,
                   element,
-                  dragTarget,
                   signal
                 );
                 break;
               case "ios":
-                await this.executeiOSTap(action, tapPoint.x, tapPoint.y, longPressDuration, dragTarget);
+                await this.executeiOSTap(action, tapPoint.x, tapPoint.y, longPressDuration);
                 break;
               default:
                 throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
@@ -365,7 +361,6 @@ export class TapOnElement extends BaseVisualChange {
               action: options.action,
               duration: options.duration,
               container: options.container,
-              dragTo: options.dragTo,
               await: options.await,
               platform: this.device.platform
             }
@@ -387,7 +382,7 @@ export class TapOnElement extends BaseVisualChange {
         }
       }
 
-      if (options.action === "longPress" || options.action === "longPressDrag") {
+      if (options.action === "longPress") {
         const metadata = this.detectLongPressMetadata(previousObserveResult, result.observation);
         return {
           ...result,
@@ -464,7 +459,7 @@ export class TapOnElement extends BaseVisualChange {
    * @param y - Y coordinate
    * @param durationMs - Long press duration in milliseconds
    * @param element - Target element
-   * @param dragTarget - Optional drag target
+   * @param signal - Abort signal
    */
   private async executeAndroidTap(
     action: string,
@@ -472,18 +467,12 @@ export class TapOnElement extends BaseVisualChange {
     y: number,
     durationMs: number,
     element: Element,
-    dragTarget?: { x: number; y: number } | null,
     signal?: AbortSignal
   ): Promise<void> {
     if (action === "tap") {
       await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
     } else if (action === "longPress") {
       await this.executeAndroidLongPress(x, y, durationMs, element?.["resource-id"], signal);
-    } else if (action === "longPressDrag") {
-      if (!dragTarget) {
-        throw new ActionableError("longPressDrag requires a dragTo target");
-      }
-      await this.executeAndroidLongPressDrag(x, y, dragTarget.x, dragTarget.y, durationMs, signal);
     } else if (action === "doubleTap") {
       await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
       await new Promise(resolve => setTimeout(resolve, 200));
@@ -497,26 +486,18 @@ export class TapOnElement extends BaseVisualChange {
    * @param x - X coordinate
    * @param y - Y coordinate
    * @param durationMs - Long press duration in milliseconds
-   * @param dragTarget - Optional drag target
    */
   private async executeiOSTap(
     action: string,
     x: number,
     y: number,
-    durationMs: number,
-    dragTarget?: { x: number; y: number } | null
+    durationMs: number
   ): Promise<void> {
     if (action === "tap") {
       await this.axe.tap(x, y);
     } else if (action === "longPress") {
       // iOS long press is implemented as a tap with longer duration
       await this.axe.tap(x, y, durationMs);
-    } else if (action === "longPressDrag") {
-      if (!dragTarget) {
-        throw new ActionableError("longPressDrag requires a dragTo target");
-      }
-      await this.axe.tap(x, y, durationMs);
-      await this.axe.swipe(x, y, dragTarget.x, dragTarget.y);
     } else if (action === "doubleTap") {
       // iOS double tap - perform two quick taps
       await this.axe.tap(x, y);
@@ -532,47 +513,6 @@ export class TapOnElement extends BaseVisualChange {
     return platform === "android" ? 500 : 1000;
   }
 
-  private resolveDragTarget(
-    options: TapOnElementOptions,
-    viewHierarchy: ViewHierarchyResult
-  ): { x: number; y: number } {
-    const dragTo = options.dragTo;
-    if (!dragTo) {
-      throw new ActionableError("longPressDrag requires a dragTo target");
-    }
-
-    if (typeof dragTo.x === "number" && typeof dragTo.y === "number") {
-      return { x: dragTo.x, y: dragTo.y };
-    }
-
-    if (dragTo.text) {
-      const targetElement = this.elementUtils.findElementByText(
-        viewHierarchy,
-        dragTo.text,
-        options.container,
-        true,
-        false
-      );
-      if (!targetElement) {
-        throw new ActionableError(`Drag target not found with provided text '${dragTo.text}'`);
-      }
-      return this.elementUtils.getElementCenter(targetElement);
-    }
-
-    if (dragTo.elementId) {
-      const targetElement = this.elementUtils.findElementByResourceId(
-        viewHierarchy,
-        dragTo.elementId,
-        options.container
-      );
-      if (!targetElement) {
-        throw new ActionableError(`Drag target not found with provided elementId '${dragTo.elementId}'`);
-      }
-      return this.elementUtils.getElementCenter(targetElement);
-    }
-
-    throw new ActionableError("Drag target must include coordinates, text, or elementId");
-  }
 
   private async executeAndroidLongPress(
     x: number,
@@ -602,22 +542,6 @@ export class TapOnElement extends BaseVisualChange {
     }
   }
 
-  private async executeAndroidLongPressDrag(
-    startX: number,
-    startY: number,
-    endX: number,
-    endY: number,
-    durationMs: number,
-    signal?: AbortSignal
-  ): Promise<void> {
-    throwIfAborted(signal);
-    try {
-      await this.adb.executeCommand(`shell input touchscreen swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`, undefined, undefined, undefined, signal);
-    } catch (error) {
-      logger.warn(`[TapOnElement] touch input swipe failed, falling back to input swipe: ${error}`);
-      await this.adb.executeCommand(`shell input swipe ${startX} ${startY} ${endX} ${endY} ${durationMs}`, undefined, undefined, undefined, signal);
-    }
-  }
 
   private detectLongPressMetadata(
     previousObservation: ObserveResult | null,

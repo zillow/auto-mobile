@@ -26,18 +26,17 @@ type TestExecutionMetadata = z.infer<typeof testMetadataSchema>;
 
 // Execute plan tool schema
 const executePlanSchema = z.object({
-  planContent: z.string().describe("YAML plan content to execute directly"),
-  startStep: z.number().default(0).describe("Step index to start execution from (0-based). If not provided or negative, starts from step 0. Will error if beyond range."),
-  platform: z.enum(["android", "ios"]).describe("Target platform"),
-  // Framework parameters for device management (optional)
-  sessionUuid: z.string().optional().describe("Session UUID for parallel test execution"),
-  deviceId: z.string().optional().describe("Specific device ID to use"),
+  planContent: z.string().describe("YAML plan content"),
+  startStep: z.number().default(0).describe("Start step index (0-based, default: 0)"),
+  platform: z.enum(["android", "ios"]).describe("Platform"),
+  sessionUuid: z.string().optional().describe("Session UUID for parallel execution"),
+  deviceId: z.string().optional().describe("Device ID"),
   device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION),
-  devices: z.array(z.string()).optional().describe("Device labels to allocate for multi-device plans (e.g., [\"A\", \"B\"]). Use only when controlling multiple devices."),
-  abortStrategy: z.enum(["immediate", "finish-current-step"]).default("immediate").describe("Strategy for aborting when a device fails in multi-device plans. 'immediate': abort all devices immediately (default). 'finish-current-step': let other devices finish their current step before aborting."),
-  testMetadata: testMetadataSchema.optional().describe("Optional test metadata for execution timing history"),
-  cleanupAppId: z.string().optional().describe("App package ID to terminate after plan execution"),
-  cleanupClearAppData: z.boolean().optional().describe("Clear app data during cleanup (Android only)")
+  devices: z.array(z.string()).optional().describe("Device labels for multi-device plans"),
+  abortStrategy: z.enum(["immediate", "finish-current-step"]).default("immediate").describe("Abort strategy: immediate (default) or finish-current-step"),
+  testMetadata: testMetadataSchema.optional().describe("Test metadata for timing history"),
+  cleanupAppId: z.string().optional().describe("App ID to terminate after execution"),
+  cleanupClearAppData: z.boolean().optional().describe("Clear app data on cleanup")
 });
 
 const testExecutionRepository = new TestExecutionRepository();

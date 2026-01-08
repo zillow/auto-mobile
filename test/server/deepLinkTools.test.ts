@@ -67,7 +67,7 @@ describe("Deep Link Tools Registration", function() {
 
       const tool = ToolRegistry.getTool("getDeepLinks");
       expect(tool).toBeDefined();
-      expect(tool!.description).toContain("Query available deep links");
+      expect(tool!.description).toContain("Query deep links");
       expect(tool!.supportsProgress).toBe(false);
 
       // Test schema validation

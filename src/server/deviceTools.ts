@@ -8,29 +8,29 @@ import { syncInstalledAppResources } from "./appResources";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 });
 
 export const listDevicesSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 });
 
 export const startDeviceSchema = z.object({
   device: z.object({
-    name: z.string().describe("The device name to start"),
-    platform: z.enum(["android", "ios"]).describe("Target platform"),
-    deviceId: z.string().optional().describe("The device ID"),
-    isRunning: z.boolean().optional().describe("Whether device is running"),
-    source: z.string().optional().describe("Device source (local/remote)")
+    name: z.string().describe("Device name"),
+    platform: z.enum(["android", "ios"]).describe("Platform"),
+    deviceId: z.string().optional().describe("Device ID"),
+    isRunning: z.boolean().optional().describe("Running status"),
+    source: z.string().optional().describe("Source (local/remote)")
   }).describe("Device to start"),
-  timeoutMs: z.number().optional().describe("Maximum time to wait for device readiness in milliseconds")
+  timeoutMs: z.number().optional().describe("Readiness timeout ms")
 });
 
 export const killDeviceSchema = z.object({
   device: z.object({
-    name: z.string().describe("The device image name to kill"),
-    deviceId: z.string().describe("The device unique ID"),
-    platform: z.enum(["android", "ios"]).describe("Target platform")
+    name: z.string().describe("Device image name"),
+    deviceId: z.string().describe("Device ID"),
+    platform: z.enum(["android", "ios"]).describe("Platform")
   })
 });
 
@@ -194,21 +194,21 @@ export function registerDeviceTools() {
   // Register with the tool registry
   ToolRegistry.register(
     "listDevices",
-    "List all connected devices (both physical and virtual devices)",
+    "List connected devices",
     listDevicesSchema,
     listBootedDevicesHandler
   );
 
   ToolRegistry.register(
     "listDeviceImages",
-    "List all available device images for the specified platform",
+    "List device images",
     listDeviceImagesSchema,
     listDeviceImagesHandler
   );
 
   ToolRegistry.register(
     "startDevice",
-    "Start a device with the specified device image",
+    "Start device",
     startDeviceSchema,
     startDeviceHandler,
     true // Supports progress notifications
@@ -216,7 +216,7 @@ export function registerDeviceTools() {
 
   ToolRegistry.register(
     "killDevice",
-    "Kill a running device",
+    "Kill device",
     killDeviceSchema,
     killDeviceHandler
   );

@@ -37,8 +37,8 @@ describe("Plan execution lock", () => {
       await client.request({
         method: "tools/call",
         params: {
-          name: "listFeatureFlags",
-          arguments: {},
+          name: "listDevices",
+          arguments: { platform: "android" },
         },
       }, z.any());
       expect.fail("Expected tool call to be rejected");
@@ -64,8 +64,8 @@ describe("Plan execution lock", () => {
       const result = await client.request({
         method: "tools/call",
         params: {
-          name: "listFeatureFlags",
-          arguments: {},
+          name: "listDevices",
+          arguments: { platform: "android" },
         },
       }, z.any());
 

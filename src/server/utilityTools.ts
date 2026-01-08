@@ -11,47 +11,47 @@ import { addDeviceTargetingToSchema, addSessionUuidToSchema } from "./toolSchema
 
 // Schema definitions
 export const enableDemoModeSchema = addDeviceTargetingToSchema(z.object({
-  time: z.string().optional().describe("Time to display in statusbar in HHMM format (e.g., 1000 for 10:00)"),
-  batteryLevel: z.number().min(0).max(100).optional().describe("Battery level percentage (0-100)"),
-  batteryPlugged: z.boolean().optional().describe("Whether the device appears to be charging"),
-  wifiLevel: z.number().min(0).max(4).optional().describe("WiFi signal strength (0-4)"),
-  mobileDataType: z.enum(["4g", "5g", "lte", "3g", "edge", "none"]).optional().describe("Mobile data type to display"),
-  mobileSignalLevel: z.number().min(0).max(4).optional().describe("Mobile signal strength (0-4)"),
-  hideNotifications: z.boolean().optional().describe("Whether to hide notification icons"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  time: z.string().optional().describe("Time in HHMM (e.g., 1000)"),
+  batteryLevel: z.number().min(0).max(100).optional().describe("Battery % (0-100)"),
+  batteryPlugged: z.boolean().optional().describe("Charging status"),
+  wifiLevel: z.number().min(0).max(4).optional().describe("WiFi strength (0-4)"),
+  mobileDataType: z.enum(["4g", "5g", "lte", "3g", "edge", "none"]).optional().describe("Data type"),
+  mobileSignalLevel: z.number().min(0).max(4).optional().describe("Signal strength (0-4)"),
+  hideNotifications: z.boolean().optional().describe("Hide notifications"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const disableDemoModeSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
-  deviceId: z.string().describe("The device ID to set as active"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  deviceId: z.string().describe("Device ID"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const setLocaleSchema = addDeviceTargetingToSchema(z.object({
-  languageTag: z.string().min(1).describe("Locale language tag (e.g., \"ar-SA\", \"ja-JP\")"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  languageTag: z.string().min(1).describe("Locale tag (e.g., ar-SA, ja-JP)"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const setTimeZoneSchema = addDeviceTargetingToSchema(z.object({
-  zoneId: z.string().min(1).describe("Time zone ID (e.g., \"America/Los_Angeles\")"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  zoneId: z.string().min(1).describe("Zone ID (e.g., America/Los_Angeles)"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const setTextDirectionSchema = addDeviceTargetingToSchema(z.object({
-  rtl: z.boolean().describe("Enable or disable RTL layout"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  rtl: z.boolean().describe("RTL layout"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const set24HourFormatSchema = addDeviceTargetingToSchema(z.object({
-  enabled: z.boolean().describe("Enable or disable 24-hour time format"),
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  enabled: z.boolean().describe("24-hour format"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const getCalendarSystemSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 // Export interfaces for type safety
@@ -216,56 +216,56 @@ export function registerUtilityTools() {
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "enableDemoMode",
-    "Enable demo mode with consistent status bar indicators for screenshots",
+    "Enable demo mode",
     enableDemoModeSchema,
     enableDemoModeHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "disableDemoMode",
-    "Disable demo mode and return to normal status bar behavior",
+    "Disable demo mode",
     disableDemoModeSchema,
     disableDemoModeHandler
   );
 
   ToolRegistry.register(
     "setActiveDevice",
-    "Set the active device ID for subsequent operations",
+    "Set active device",
     setActiveDeviceSchema,
     setActiveDeviceHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "setLocale",
-    "Switch app/system locale (e.g., \"ar-SA\", \"ja-JP\")",
+    "Switch locale",
     setLocaleSchema,
     setLocaleHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "setTimeZone",
-    "Change the device time zone",
+    "Change time zone",
     setTimeZoneSchema,
     setTimeZoneHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "setTextDirection",
-    "Enable or disable RTL layout direction",
+    "Set RTL layout direction",
     setTextDirectionSchema,
     setTextDirectionHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "set24HourFormat",
-    "Toggle the device 24-hour time format",
+    "Set 24-hour time format",
     set24HourFormatSchema,
     set24HourFormatHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "getCalendarSystem",
-    "Read the current device calendar system",
+    "Get calendar system",
     getCalendarSystemSchema,
     getCalendarSystemHandler
   );

@@ -14,27 +14,27 @@ import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
 export const observeSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const listAppsSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const identifyInteractionsSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Target platform"),
+  platform: z.enum(["android", "ios"]).describe("Platform"),
   filter: z.object({
     types: z.array(z.enum(["navigation", "input", "action", "scroll", "toggle"]))
       .optional()
-      .describe("Interaction types to include"),
-    minConfidence: z.number().min(0).max(1).optional().describe("Minimum confidence threshold"),
-    limit: z.number().int().positive().optional().describe("Limit total number of interactions returned")
-  }).optional().describe("Filtering options"),
+      .describe("Interaction types"),
+    minConfidence: z.number().min(0).max(1).optional().describe("Min confidence (0-1)"),
+    limit: z.number().int().positive().optional().describe("Max results")
+  }).optional().describe("Filter options"),
   includeContext: z.object({
-    navigationGraph: z.boolean().optional().describe("Include predicted destinations from navigation graph"),
-    elementDetails: z.boolean().optional().describe("Include full element info"),
-    suggestedParams: z.boolean().optional().describe("Include ready-to-use tool params")
-  }).optional().describe("Additional context to include")
+    navigationGraph: z.boolean().optional().describe("Include nav graph predictions"),
+    elementDetails: z.boolean().optional().describe("Include element details"),
+    suggestedParams: z.boolean().optional().describe("Include tool params")
+  }).optional().describe("Context options")
 }));
 
 // Register tools (this will be called when this file is imported)
@@ -120,21 +120,21 @@ export function registerObserveTools() {
   // Register with the tool registry using the new device-aware method
   ToolRegistry.registerDeviceAware(
     "observe",
-    "Get the view hierarchy of what is displayed on screen",
+    "Get screen view hierarchy",
     observeSchema,
     observeHandler,
   );
 
   ToolRegistry.registerDeviceAware(
     "listApps",
-    "List all apps installed on the device. For Android, returns user apps grouped by profile and system apps under a separate key with profile coverage. For iOS, returns package names only.",
+    "List installed apps",
     listAppsSchema,
     listAppsHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "identifyInteractions",
-    "Analyze the most recent observation and suggest likely interactions with ready-to-use tool calls.",
+    "Suggest likely interactions",
     identifyInteractionsSchema,
     identifyInteractionsHandler
   );

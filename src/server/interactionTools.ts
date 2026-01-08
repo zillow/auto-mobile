@@ -64,14 +64,8 @@ export interface TapOnArgs {
   };
   text?: string;
   id?: string;
-  action: "tap" | "doubleTap" | "longPress" | "longPressDrag" | "focus";
+  action: "tap" | "doubleTap" | "longPress" | "focus";
   duration?: number;
-  dragTo?: {
-    x?: number;
-    y?: number;
-    text?: string;
-    elementId?: string;
-  };
   await?: {
     element: {
       id?: string;
@@ -152,14 +146,14 @@ export interface RotateArgs {
 
 // Schema definitions for tool arguments
 export const shakeSchema = addDeviceTargetingToSchema(z.object({
-  duration: z.number().optional().describe("Duration of the shake in milliseconds (default: 1000)"),
-  intensity: z.number().optional().describe("Intensity of the shake acceleration (default: 100)"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  duration: z.number().optional().describe("Shake duration in ms (default: 1000)"),
+  intensity: z.number().optional().describe("Shake acceleration intensity (default: 100)"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 const tapOnContainerSchema = z.object({
-  elementId: z.string().optional().describe("Container element resource ID to restrict search within"),
-  text: z.string().optional().describe("Container element text to restrict search within")
+  elementId: z.string().optional().describe("Container resource ID"),
+  text: z.string().optional().describe("Container text")
 }).superRefine((value, ctx) => {
   if (!value.elementId && !value.text) {
     ctx.addIssue({
@@ -171,48 +165,42 @@ const tapOnContainerSchema = z.object({
 
 export const tapOnSchema = addDeviceTargetingToSchema(z.object({
   container: tapOnContainerSchema.optional().describe(
-    "Container element to scope the search. Provide elementId or text to locate it."
+    "Container to scope search (elementId or text)"
   ),
-  action: z.enum(["tap", "doubleTap", "longPress", "longPressDrag", "focus"]).describe("Action to perform on the element"),
-  text: z.string().optional().describe("Text to tap on. Takes precedence over id if both are provided."),
-  id: z.string().optional().describe("Element ID to tap on. Ignored when text is provided."),
-  duration: z.number().optional().describe("Long press duration in milliseconds"),
-  dragTo: z.object({
-    x: z.number().optional().describe("Drag target X coordinate"),
-    y: z.number().optional().describe("Drag target Y coordinate"),
-    text: z.string().optional().describe("Text of the drag target element"),
-    elementId: z.string().optional().describe("Element ID of the drag target element"),
-  }).optional().describe("Drag target for long press drag action"),
+  action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
+  text: z.string().optional().describe("Text to tap (overrides id)"),
+  id: z.string().optional().describe("Element ID to tap"),
+  duration: z.number().optional().describe("Long press duration (ms)"),
   await: z.object({
     element: z.object({
-      id: z.string().optional().describe("Wait for element with this resource ID"),
-      text: z.string().optional().describe("Wait for element with this text"),
-    }).describe("Element to wait for after tap"),
-    timeout: z.number().optional().describe("Max wait time in ms (default: 5000)"),
-  }).optional().describe("Wait for an element to appear after tap"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+      id: z.string().optional().describe("Element ID to wait for"),
+      text: z.string().optional().describe("Element text to wait for"),
+    }).describe("Element to wait for"),
+    timeout: z.number().optional().describe("Wait timeout ms (default: 5000)"),
+  }).optional().describe("Wait for element after tap"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const dragAndDropSchema = addDeviceTargetingToSchema(z.object({
   source: z.object({
-    text: z.string().optional().describe("Text of the source element to drag"),
-    elementId: z.string().optional().describe("Element ID of the source element to drag")
-  }).describe("Source element to drag from"),
+    text: z.string().optional().describe("Source text"),
+    elementId: z.string().optional().describe("Source ID")
+  }).describe("Source element"),
   target: z.object({
-    text: z.string().optional().describe("Text of the target element to drop onto"),
-    elementId: z.string().optional().describe("Element ID of the target element to drop onto")
-  }).describe("Target element to drop onto"),
-  duration: z.number().optional().describe("Duration of the drag in milliseconds (default: 500)"),
-  holdTime: z.number().optional().describe("Hold time before dragging in milliseconds (default: 200)"),
-  dropDelay: z.number().optional().describe("Delay after dropping in milliseconds (default: 100)"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+    text: z.string().optional().describe("Target text"),
+    elementId: z.string().optional().describe("Target ID")
+  }).describe("Target element"),
+  duration: z.number().optional().describe("Drag duration ms (default: 500)"),
+  holdTime: z.number().optional().describe("Hold time ms (default: 200)"),
+  dropDelay: z.number().optional().describe("Drop delay ms (default: 100)"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
-  includeSystemInsets: z.boolean().optional().describe("Include status/navigation bars in swipes (default false)"),
+  includeSystemInsets: z.boolean().optional().describe("Include system bars (default false)"),
   container: z.object({
-    elementId: z.string().optional().describe("Resource ID of the container element (finds nearest scrollable parent if element is not scrollable)"),
-    text: z.string().optional().describe("Text within the container (finds nearest scrollable parent of element containing this text)")
+    elementId: z.string().optional().describe("Container resource ID"),
+    text: z.string().optional().describe("Container text")
   })
     .refine(
       value => [value.elementId, value.text].filter(Boolean).length === 1,
@@ -220,114 +208,102 @@ export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
     )
     .optional()
     .describe(
-      "Container element to swipe within. Provide an object with exactly one of elementId or text. " +
-      "REQUIRED for scrolling lists (RecyclerView/ScrollView/ListView). Omit only for intentional full-screen swipes."
+      "Container to swipe within (elementId or text). REQUIRED for lists. Omit for full-screen swipes."
     ),
-  autoTarget: z.boolean().optional().describe("Auto-target a scrollable container when container is omitted (default true). Set to false only if you intend to swipe the entire screen after autoTarget selected a list unexpectedly."),
+  autoTarget: z.boolean().optional().describe("Auto-target scrollable container (default true)"),
   direction: z.enum(["up", "down", "left", "right"]).describe(
-    `Direction YOUR FINGER moves on the screen.
-
-ASCII guide (finger vs content):
-  "up"    = finger up, content moves DOWN, reveals content FROM ABOVE
-  "down"  = finger down, content moves UP, reveals content FROM BELOW
-  "left"  = finger left, content moves RIGHT, reveals content FROM RIGHT
-  "right" = finger right, content moves LEFT, reveals content FROM LEFT
-
-To see more content BELOW: use direction "up".
-To see more content ABOVE: use direction "down".`
+    `Finger movement direction. up=finger up/reveals above, down=finger down/reveals below, left/right=finger left/right`
   ),
   gestureType: z.enum(["swipeFingerTowardsDirection", "scrollTowardsDirection"]).optional().describe(
-    `Semantic intent: how to interpret the direction parameter.
-"swipeFingerTowardsDirection" = finger moves in direction (default)
-"scrollTowardsDirection" = content scrolls in direction (finger moves opposite)`
+    `swipeFingerTowardsDirection=finger moves in direction (default), scrollTowardsDirection=content scrolls in direction`
   ),
   lookFor: z.object({
     elementId: z.string().optional().describe("ID of the element to look for"),
     text: z.string().optional().describe("Text to look for"),
   }).optional().describe("Swipe until we find a match"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const pinchOnSchema = addDeviceTargetingToSchema(z.object({
-  direction: z.enum(["in", "out"]).describe("Pinch direction (in = zoom out, out = zoom in)"),
-  distanceStart: z.number().optional().describe("Starting distance between fingers in pixels"),
-  distanceEnd: z.number().optional().describe("Ending distance between fingers in pixels"),
-  scale: z.number().optional().describe("Scale multiplier applied to distanceStart to compute distanceEnd"),
-  duration: z.number().optional().describe("Gesture duration in milliseconds (default: 300)"),
-  rotationDegrees: z.number().optional().describe("Rotate fingers by degrees during pinch (positive = clockwise)"),
-  includeSystemInsets: z.boolean().optional().describe("Include status/navigation bars in bounds calculation (default false)"),
+  direction: z.enum(["in", "out"]).describe("Pinch direction (in=zoom out, out=zoom in)"),
+  distanceStart: z.number().optional().describe("Start distance px"),
+  distanceEnd: z.number().optional().describe("End distance px"),
+  scale: z.number().optional().describe("Scale multiplier"),
+  duration: z.number().optional().describe("Duration ms (default: 300)"),
+  rotationDegrees: z.number().optional().describe("Rotation degrees (+ = clockwise)"),
+  includeSystemInsets: z.boolean().optional().describe("Include system bars (default false)"),
   container: z.object({
-    elementId: z.string().optional().describe("Resource ID of the container element to center within"),
-    text: z.string().optional().describe("Text within the container element to center within")
-  }).optional().describe("Container element to pinch within; omit for auto-target or full-screen pinch"),
-  autoTarget: z.boolean().optional().describe("Auto-target a large, tappable surface when container is omitted (default true)"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+    elementId: z.string().optional().describe("Container ID"),
+    text: z.string().optional().describe("Container text")
+  }).optional().describe("Container to pinch within"),
+  autoTarget: z.boolean().optional().describe("Auto-target surface (default true)"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const clearTextSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const selectAllTextSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const pressButtonSchema = addDeviceTargetingToSchema(z.object({
   button: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
-    .describe("The button to press"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+    .describe("Button to press"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const openSystemTraySchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const pressKeySchema = addDeviceTargetingToSchema(z.object({
   key: z.enum(["home", "back", "menu", "power", "volume_up", "volume_down", "recent"])
-    .describe("The key to press"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+    .describe("Key to press"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const stopAppSchema = addDeviceTargetingToSchema(z.object({
-  appId: z.string().describe("App package ID to stop"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  appId: z.string().describe("App package ID"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const clearStateSchema = addDeviceTargetingToSchema(z.object({
-  appId: z.string().describe("App package ID to clear state for"),
-  clearKeychain: z.boolean().optional().describe("Also clear iOS keychain (iOS only)"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  appId: z.string().describe("App package ID"),
+  clearKeychain: z.boolean().optional().describe("Clear iOS keychain"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const inputTextSchema = addDeviceTargetingToSchema(z.object({
-  text: z.string().describe("Text to input to the device"),
+  text: z.string().describe("Text to input"),
   imeAction: z.enum(["done", "next", "search", "send", "go", "previous"]).optional()
-    .describe("Optional IME action to perform after text input"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+    .describe("IME action after input"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const openLinkSchema = addDeviceTargetingToSchema(z.object({
-  url: z.string().describe("URL to open in the default browser"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  url: z.string().describe("URL to open"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const imeActionSchema = addDeviceTargetingToSchema(z.object({
-  action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action to perform"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  action: z.enum(["done", "next", "search", "send", "go", "previous"]).describe("IME action"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const recentAppsSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const homeScreenSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 export const rotateSchema = addDeviceTargetingToSchema(z.object({
-  orientation: z.enum(["portrait", "landscape"]).describe("The orientation to set"),
-  platform: z.enum(["android", "ios"]).describe("Platform of the device")
+  orientation: z.enum(["portrait", "landscape"]).describe("Orientation"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
 const SYSTEM_TRAY_PACKAGE = "com.android.systemui";
@@ -474,7 +450,6 @@ export function registerInteractionTools() {
       elementId: args.id,
       action: args.action,
       duration: args.duration,
-      dragTo: args.dragTo,
       await: args.await,
       strictAwait: serverConfig.isStrictAwaitEnabled(),
     }, progress);
@@ -829,7 +804,7 @@ export function registerInteractionTools() {
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "clearText",
-    "Clear text from the currently focused input field",
+    "Clear text from focused input",
     clearTextSchema,
     clearTextHandler,
     true // Supports progress notifications
@@ -837,7 +812,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "selectAllText",
-    "Select all text in the currently focused input field using long press + tap on 'Select All'",
+    "Select all text in focused input",
     selectAllTextSchema,
     selectAllTextHandler,
     true // Supports progress notifications
@@ -845,7 +820,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "pressButton",
-    "Press a hardware button on the device",
+    "Press hardware button",
     pressButtonSchema,
     pressButtonHandler,
     true // Supports progress notifications
@@ -853,7 +828,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "openSystemTray",
-    "Open the system notification tray by swiping down from the status bar",
+    "Open system notification tray",
     openSystemTraySchema,
     openSystemTrayHandler,
     true // Supports progress notifications
@@ -862,7 +837,7 @@ export function registerInteractionTools() {
   // Phase 1: Core Command Renames
   ToolRegistry.registerDeviceAware(
     "pressKey",
-    "Press a hardware key on the device (Maestro equivalent of pressButton)",
+    "Press hardware key",
     pressKeySchema,
     pressKeyHandler,
     true // Supports progress notifications
@@ -870,7 +845,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "inputText",
-    "Input text to the device",
+    "Input text",
     inputTextSchema,
     inputTextHandler,
     false // Does not support progress notifications
@@ -878,7 +853,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "openLink",
-    "Open a URL in the default browser",
+    "Open URL in browser",
     openLinkSchema,
     openLinkHandler,
     false // Does not support progress notifications
@@ -886,7 +861,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "tapOn",
-    "Tap UI elements by text or resource ID, optionally scoped to a container",
+    "Tap UI elements by text or ID",
     tapOnSchema,
     tapOnHandler,
     true // Supports progress notifications
@@ -894,7 +869,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "dragAndDrop",
-    "Drag an element and drop it onto another element",
+    "Drag and drop element",
     dragAndDropSchema,
     dragAndDropHandler,
     true // Supports progress notifications
@@ -902,7 +877,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "swipeOn",
-    "Unified swipe/scroll tool - swipe on screen or elements, with optional scroll-until-visible. IMPORTANT: use container when scrolling lists; omit only for full-screen swipes.",
+    "Swipe/scroll on screen or elements",
     swipeOnSchema,
     swipeOnHandler,
     true // Supports progress notifications
@@ -910,7 +885,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "pinchOn",
-    "Pinch to zoom in/out on screen or elements using a multi-touch gesture (requires accessibility service)",
+    "Pinch to zoom",
     pinchOnSchema,
     pinchOnHandler,
     true // Supports progress notifications
@@ -918,7 +893,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "shake",
-    "Shake the device",
+    "Shake device",
     shakeSchema,
     shakeHandler,
     true // Supports progress notifications
@@ -926,7 +901,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "imeAction",
-    "Perform an IME action (e.g., done, next, search)",
+    "Perform IME action",
     imeActionSchema,
     imeActionHandler,
     true // Supports progress notifications
@@ -934,7 +909,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "recentApps",
-    "Open the recent apps list",
+    "Open recent apps",
     recentAppsSchema,
     recentAppsHandler,
     true // Supports progress notifications
@@ -942,7 +917,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "homeScreen",
-    "Return to the home screen by pressing the home button",
+    "Go to home screen",
     homeScreenSchema,
     homeScreenHandler,
     true // Supports progress notifications
@@ -951,7 +926,7 @@ export function registerInteractionTools() {
   // Register the new rotate tool
   ToolRegistry.registerDeviceAware(
     "rotate",
-    "Rotate the device to a specific orientation",
+    "Rotate device orientation",
     rotateSchema,
     rotateHandler,
     true // Supports progress notifications

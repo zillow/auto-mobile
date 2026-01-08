@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const DEVICE_LABEL_DESCRIPTION =
-  "Optional device label for multi-device control only (use letters like \"A\", \"B\", \"C\").";
+  "Device label for multi-device plans (e.g., \"A\", \"B\")";
 
 /**
  * Helper to add sessionUuid field to tool schemas
@@ -12,7 +12,7 @@ export const DEVICE_LABEL_DESCRIPTION =
  */
 export function addSessionUuidToSchema<T extends z.ZodObject<any>>(schema: T): z.ZodObject<any> {
   return schema.extend({
-    sessionUuid: z.string().optional().describe("Session UUID for session-based device targeting (optional)"),
+    sessionUuid: z.string().optional().describe("Session UUID for device targeting"),
   }) as z.ZodObject<any>;
 }
 

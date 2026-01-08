@@ -11,17 +11,17 @@ import { logger } from "../utils/logger";
 
 // Schema definitions
 export const packageNameSchema = addDeviceTargetingToSchema(z.object({
-  appId: z.string().describe("App package ID of the app"),
+  appId: z.string().describe("App package ID"),
 }));
 
 export const launchAppSchema = addDeviceTargetingToSchema(z.object({
-  appId: z.string().describe("App package ID of the app"),
-  clearAppData: z.boolean().optional().describe("Whether to clear app data before launching, default false"),
-  coldBoot: z.boolean().optional().describe("Whether to cold boot the app, default false"),
+  appId: z.string().describe("App package ID"),
+  clearAppData: z.boolean().optional().describe("Clear app data before launch (default false)"),
+  coldBoot: z.boolean().optional().describe("Cold boot app (default false)"),
 }));
 
 export const installAppSchema = addDeviceTargetingToSchema(z.object({
-  apkPath: z.string().describe("Path to the APK file to install"),
+  apkPath: z.string().describe("APK file path"),
 }));
 
 // Export interfaces for type safety
@@ -123,21 +123,21 @@ export function registerAppTools(
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "launchApp",
-    "Launch an app by package name. For Android, automatically detects and targets the appropriate user profile (personal or work). Returns userId indicating which profile was used (0=personal, 10+=work profile).",
+    "Launch app by package name",
     launchAppSchema,
     launchAppHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "terminateApp",
-    "Terminate an app by package name. For Android, automatically detects and targets the appropriate user profile. Returns userId indicating which profile was targeted.",
+    "Terminate app by package name",
     packageNameSchema,
     terminateAppHandler
   );
 
   ToolRegistry.registerDeviceAware(
     "installApp",
-    "Install an APK file on the device. For Android, automatically installs to the appropriate user profile (work profile if exists, otherwise personal). Returns userId indicating where the app was installed.",
+    "Install APK file",
     installAppSchema,
     installAppHandler
   );
