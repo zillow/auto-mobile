@@ -24,6 +24,42 @@ The agent will generate test code that you can review and commit.
 
 See [JUnitRunner documentation](../design-docs/plat/android/junitrunner.md) for details on writing tests manually.
 
+## Test Recording & YAML Plans
+
+Record user interactions and generate executable YAML test plans using the IDE plugin:
+
+1. **Start Recording** - Click "Start Recording" in the IDE plugin tool window
+2. **Interact with App** - Tap, swipe, and input text normally
+3. **Stop Recording** - Generate a YAML plan from your interactions
+4. **Execute Plan** - Run the plan via IDE plugin, code (`executePlan` tool), or CLI
+
+### YAML Plan Format
+
+```yaml
+steps:
+  - tool: launchApp
+    params:
+      appId: com.example.app
+
+  - tool: tapOn
+    params:
+      text: "Login"
+
+  - tool: inputText
+    params:
+      text: "user@example.com"
+```
+
+Plans support assertions, conditional steps, and wait conditions for robust test automation.
+
+### Learn More
+
+See the [Test Recording guide](../design-docs/plat/android/ide-plugin/test-recording.md) for:
+- Complete recording workflow
+- YAML plan structure and advanced features
+- Execution methods (IDE, code, CI)
+- Best practices and troubleshooting
+
 ## Running Tests
 
 ### Local Execution
