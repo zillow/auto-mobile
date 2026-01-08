@@ -6,6 +6,7 @@ import { logger } from "../logger";
 import { PlanNormalizer } from "./PlanNormalizer";
 import { migratePlan } from "./PlanMigrator";
 import { getMcpServerVersion } from "../mcpVersion";
+import { PlanValidator } from "./PlanValidator";
 
 /**
  * Interface for plan serialization/deserialization
@@ -259,6 +260,7 @@ export class YamlPlanSerializer implements PlanSerializer {
       const plan: Plan = {
         name: planName,
         description: migratedPlan.description || `Plan with ${normalizedSteps.length} steps`,
+        devices: migratedPlan.devices,
         steps: normalizedSteps,
         mcpVersion: migratedPlan.mcpVersion,
         metadata: migratedPlan.metadata || {
@@ -266,6 +268,11 @@ export class YamlPlanSerializer implements PlanSerializer {
           version: "1.0.0"
         }
       };
+
+      // Validate plan structure
+      logger.info("Validating plan structure");
+      PlanValidator.validate(plan);
+      PlanValidator.validateMultiDeviceRequirements(plan);
 
       return plan;
     } catch (error) {

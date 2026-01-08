@@ -33,6 +33,7 @@ const executePlanSchema = z.object({
   deviceId: z.string().optional().describe("Specific device ID to use"),
   device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION),
   devices: z.array(z.string()).optional().describe("Device labels to allocate for multi-device plans (e.g., [\"A\", \"B\"]). Use only when controlling multiple devices."),
+  abortStrategy: z.enum(["immediate", "finish-current-step"]).default("immediate").describe("Strategy for aborting when a device fails in multi-device plans. 'immediate': abort all devices immediately (default). 'finish-current-step': let other devices finish their current step before aborting."),
   testMetadata: testMetadataSchema.optional().describe("Optional test metadata for execution timing history"),
   cleanupAppId: z.string().optional().describe("App package ID to terminate after plan execution"),
   cleanupClearAppData: z.boolean().optional().describe("Clear app data during cleanup (Android only)")
@@ -56,6 +57,7 @@ const executePlanTool = async (device: BootedDevice, params: {
   deviceId?: string;
   device?: string;
   devices?: string[];
+  abortStrategy?: "immediate" | "finish-current-step";
   testMetadata?: TestExecutionMetadata;
   cleanupAppId?: string;
   cleanupClearAppData?: boolean;
@@ -126,7 +128,7 @@ const executePlanTool = async (device: BootedDevice, params: {
 
     // Execute the plan with device context
     logger.info(`=== Starting plan execution on device ${device.deviceId} ===`);
-    const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal);
+    const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal, params.abortStrategy);
     logger.info(`Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
 
     await recordTestExecution(result.success ? "passed" : "failed", Date.now() - startTime);
