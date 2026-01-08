@@ -33,17 +33,23 @@ docker-compose up auto-mobile-dev
 
 ## Pre-built Images
 
-Published images are available on Docker Hub:
+Published images are available on Docker Hub: [kaeawc/auto-mobile](https://hub.docker.com/r/kaeawc/auto-mobile)
 
 ```bash
 # Pull latest version
 docker pull kaeawc/auto-mobile:latest
 
 # Pull specific version
-docker pull kaeawc/auto-mobile:0.0.6
+docker pull kaeawc/auto-mobile:0.0.7
+
+# Pull major.minor version (recommended for stability)
+docker pull kaeawc/auto-mobile:0.0
+
+# Pull specific commit
+docker pull kaeawc/auto-mobile:main-abc1234
 ```
 
-For setup and publishing details, see [Docker Hub Setup Guide](docs/docker-hub-setup.md).
+**For maintainers**: See [Docker Hub Setup Guide](docs/docker-hub-setup.md) for publishing credentials and workflow configuration.
 
 ## What's Included
 
