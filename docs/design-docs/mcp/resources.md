@@ -14,8 +14,7 @@ MCP Resources provide read-only access to:
 
 ### Navigation Graph
 
-**URI**: `
-automobile:navigation-graph`
+**URI**: `automobile:navigation/graph`
 
 Returns the current navigation graph showing:
 
@@ -58,8 +57,7 @@ AI agents can request resources via MCP:
 {
   "method": "resources/read",
   "params": {
-    "uri": "
-automobile:navigation-graph"
+    "uri": "automobile:navigation/graph"
   }
 }
 ```
