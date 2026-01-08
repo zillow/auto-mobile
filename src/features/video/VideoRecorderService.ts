@@ -8,6 +8,8 @@ import type {
   VideoRecordingConfigInput,
   VideoRecordingMetadata,
   VideoQualityPreset,
+  BootedDevice,
+  VideoResolution,
 } from "../../models";
 import { logger, type Logger } from "../../utils/logger";
 
@@ -17,6 +19,8 @@ export interface VideoCaptureConfig extends VideoRecordingConfig {
   outputPath: string;
   fileName: string;
   startedAt: string;
+  device?: BootedDevice;
+  maxDurationSeconds?: number;
 }
 
 export interface RecordingHandle {
@@ -44,6 +48,8 @@ export interface VideoCaptureBackend {
 export interface StartVideoRecordingOptions {
   outputName?: string;
   config?: VideoRecordingConfigInput | null;
+  device?: BootedDevice;
+  maxDurationSeconds?: number;
 }
 
 export interface ActiveVideoRecording {
@@ -92,16 +98,17 @@ export function parseVideoRecordingConfig(
     input && typeof input === "object" ? input : {};
 
   const qualityPreset = parseQualityPreset(safeInput.qualityPreset);
-  const targetBitrateKbps = parsePositiveNumber(
-    safeInput.targetBitrateKbps,
-    DEFAULT_VIDEO_RECORDING_CONFIG.targetBitrateKbps,
-    true
-  );
   const maxThroughputMbps = parsePositiveNumber(
     safeInput.maxThroughputMbps,
     DEFAULT_VIDEO_RECORDING_CONFIG.maxThroughputMbps,
     true
   );
+  const requestedBitrateKbps = parsePositiveNumber(
+    safeInput.targetBitrateKbps,
+    DEFAULT_VIDEO_RECORDING_CONFIG.targetBitrateKbps,
+    true
+  );
+  const targetBitrateKbps = capBitrateKbps(requestedBitrateKbps, maxThroughputMbps);
   const fps = parsePositiveNumber(
     safeInput.fps,
     DEFAULT_VIDEO_RECORDING_CONFIG.fps,
@@ -113,6 +120,7 @@ export function parseVideoRecordingConfig(
     true
   );
   const format = parseFormat(safeInput.format);
+  const resolution = parseResolution(safeInput.resolution);
 
   return {
     qualityPreset,
@@ -121,6 +129,7 @@ export function parseVideoRecordingConfig(
     fps,
     maxArchiveSizeMb,
     format,
+    resolution,
   };
 }
 
@@ -161,6 +170,8 @@ export class VideoRecorderService {
       outputPath,
       fileName,
       startedAt,
+      device: options.device,
+      maxDurationSeconds: options.maxDurationSeconds,
       ...config,
     });
 
@@ -455,6 +466,32 @@ function parseFormat(
   }
 
   return DEFAULT_VIDEO_RECORDING_CONFIG.format;
+}
+
+function parseResolution(
+  value: VideoRecordingConfigInput["resolution"]
+): VideoResolution | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const width = parsePositiveNumber(value.width, 0, false);
+  const height = parsePositiveNumber(value.height, 0, false);
+
+  if (width <= 0 || height <= 0) {
+    return undefined;
+  }
+
+  return { width, height };
+}
+
+function capBitrateKbps(targetBitrateKbps: number, maxThroughputMbps: number): number {
+  const maxBitrateKbps = Math.max(0, Math.floor(maxThroughputMbps * 1000));
+  if (!maxBitrateKbps) {
+    return targetBitrateKbps;
+  }
+
+  return Math.min(targetBitrateKbps, maxBitrateKbps);
 }
 
 function parsePositiveNumber(

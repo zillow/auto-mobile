@@ -12,6 +12,7 @@ import { registerUtilityTools } from "../server/utilityTools";
 import { registerDeviceTools } from "../server/deviceTools";
 import { registerPlanTools } from "../server/planTools";
 import { registerDoctorTools } from "../server/doctorTools";
+import { registerVideoRecordingTools } from "../server/videoRecordingTools";
 
 // Initialize tool registry for CLI mode
 export function initializeCliTools(): void {
@@ -24,6 +25,7 @@ export function initializeCliTools(): void {
   registerDeviceTools();
   registerPlanTools();
   registerDoctorTools();
+  registerVideoRecordingTools();
 }
 
 // Parse CLI arguments into tool name, session UUID, and parameters

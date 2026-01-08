@@ -1,6 +1,7 @@
 import type {
   AccessibilityAuditConfig,
 } from "../models/AccessibilityAudit";
+import type { VideoRecordingConfigInput } from "../models/VideoRecording";
 
 export type PlanExecutionLockScope = "session" | "global";
 
@@ -17,6 +18,7 @@ class ServerConfig {
   private _strictAwaitEnabled: boolean = false;
   private _predictiveUiEnabled: boolean = false;
   private _planExecutionLockScope: PlanExecutionLockScope = "session";
+  private _videoRecordingDefaults: VideoRecordingConfigInput = {};
 
   private constructor() {}
 
@@ -85,6 +87,14 @@ class ServerConfig {
 
   getPlanExecutionLockScope(): PlanExecutionLockScope {
     return this._planExecutionLockScope;
+  }
+
+  setVideoRecordingDefaults(defaults: VideoRecordingConfigInput): void {
+    this._videoRecordingDefaults = { ...defaults };
+  }
+
+  getVideoRecordingDefaults(): VideoRecordingConfigInput {
+    return { ...this._videoRecordingDefaults };
   }
 }
 

@@ -78,6 +78,18 @@ export interface DaemonOptions {
   strictAwait?: boolean;
   /** Plan execution lock scope (session or global) */
   planExecutionLockScope?: "session" | "global";
+  /** Default video quality preset */
+  videoQualityPreset?: string;
+  /** Default video target bitrate in Kbps */
+  videoTargetBitrateKbps?: number;
+  /** Default video max throughput in Mbps */
+  videoMaxThroughputMbps?: number;
+  /** Default video FPS */
+  videoFps?: number;
+  /** Default video format */
+  videoFormat?: string;
+  /** Default video archive size limit in MB */
+  videoMaxArchiveSizeMb?: number;
 }
 
 /**

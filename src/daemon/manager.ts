@@ -85,6 +85,24 @@ export class DaemonManager {
     if (options.planExecutionLockScope) {
       args.push("--plan-execution-lock-scope", options.planExecutionLockScope);
     }
+    if (options.videoQualityPreset) {
+      args.push("--video-quality", options.videoQualityPreset);
+    }
+    if (options.videoTargetBitrateKbps !== undefined) {
+      args.push("--video-target-bitrate-kbps", options.videoTargetBitrateKbps.toString());
+    }
+    if (options.videoMaxThroughputMbps !== undefined) {
+      args.push("--video-max-throughput-mbps", options.videoMaxThroughputMbps.toString());
+    }
+    if (options.videoFps !== undefined) {
+      args.push("--video-fps", options.videoFps.toString());
+    }
+    if (options.videoFormat) {
+      args.push("--video-format", options.videoFormat);
+    }
+    if (options.videoMaxArchiveSizeMb !== undefined) {
+      args.push("--video-archive-size-mb", options.videoMaxArchiveSizeMb.toString());
+    }
 
     // Create secure temp directory with random suffix to prevent symlink attacks
     const tempDir = mkdtempSync(join(tmpdir(), "auto-mobile-daemon-"));
@@ -325,6 +343,24 @@ export async function runDaemonCommand(
               options.planExecutionLockScope = scope;
             }
             i++;
+          } else if (args[i] === "--video-quality" || args[i] === "--video-quality-preset") {
+            options.videoQualityPreset = args[i + 1];
+            i++;
+          } else if (args[i] === "--video-target-bitrate-kbps") {
+            options.videoTargetBitrateKbps = parseInt(args[i + 1], 10);
+            i++;
+          } else if (args[i] === "--video-max-throughput-mbps") {
+            options.videoMaxThroughputMbps = Number(args[i + 1]);
+            i++;
+          } else if (args[i] === "--video-fps") {
+            options.videoFps = parseInt(args[i + 1], 10);
+            i++;
+          } else if (args[i] === "--video-format") {
+            options.videoFormat = args[i + 1];
+            i++;
+          } else if (args[i] === "--video-archive-size-mb") {
+            options.videoMaxArchiveSizeMb = Number(args[i + 1]);
+            i++;
           }
         }
 
@@ -372,6 +408,24 @@ export async function runDaemonCommand(
             if (scope === "global" || scope === "session") {
               options.planExecutionLockScope = scope;
             }
+            i++;
+          } else if (args[i] === "--video-quality" || args[i] === "--video-quality-preset") {
+            options.videoQualityPreset = args[i + 1];
+            i++;
+          } else if (args[i] === "--video-target-bitrate-kbps") {
+            options.videoTargetBitrateKbps = parseInt(args[i + 1], 10);
+            i++;
+          } else if (args[i] === "--video-max-throughput-mbps") {
+            options.videoMaxThroughputMbps = Number(args[i + 1]);
+            i++;
+          } else if (args[i] === "--video-fps") {
+            options.videoFps = parseInt(args[i + 1], 10);
+            i++;
+          } else if (args[i] === "--video-format") {
+            options.videoFormat = args[i + 1];
+            i++;
+          } else if (args[i] === "--video-archive-size-mb") {
+            options.videoMaxArchiveSizeMb = Number(args[i + 1]);
             i++;
           }
         }

@@ -31,6 +31,7 @@ import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
 import { registerTestTimingTools } from "./testTimingTools";
 import { registerPerformanceTools } from "./performanceTools";
+import { registerVideoRecordingTools } from "./videoRecordingTools";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 
 // Import resource registration functions
@@ -41,6 +42,7 @@ import { registerAppResources } from "./appResources";
 import { registerNavigationResources } from "./navigationResources";
 import { registerTestTimingResources } from "./testTimingResources";
 import { registerPerformanceResources } from "./performanceResources";
+import { registerVideoRecordingResources } from "./videoRecordingResources";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 
 export interface McpServerOptions {
@@ -98,6 +100,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDoctorTools();
   registerFeatureFlagTools();
   registerPerformanceTools();
+  registerVideoRecordingTools();
 
   // Register all resources
   registerObservationResources();
@@ -107,6 +110,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerNavigationResources();
   registerTestTimingResources();
   registerPerformanceResources();
+  registerVideoRecordingResources();
 
   registerDebugTools();
 

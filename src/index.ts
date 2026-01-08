@@ -14,6 +14,7 @@ import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
 import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefinitions";
 import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig";
+import type { VideoRecordingConfigInput } from "./models";
 
 // Detect port from git branch name for worktree isolation
 // e.g., work/164-feature-name -> port 9164
@@ -77,6 +78,7 @@ function parseArgs(): {
   a11yUseBaseline: boolean;
   predictiveUi: boolean;
   planExecutionLockScope: PlanExecutionLockScope;
+  videoRecordingDefaults: VideoRecordingConfigInput;
   daemonMode: boolean;
   daemonCommand?: string;
   daemonArgs: string[];
@@ -128,6 +130,86 @@ function parseArgs(): {
   let a11yUseBaseline = false;
   const predictiveUi = args.includes("--predictive") || args.includes("--predictive-ui");
   let planExecutionLockScope: PlanExecutionLockScope = "session";
+  const videoRecordingDefaults: VideoRecordingConfigInput = {};
+
+  const parsePositiveNumber = (
+    value: string | undefined,
+    label: string,
+    allowFloat: boolean
+  ): number | undefined => {
+    if (!value) {
+      return undefined;
+    }
+    const parsed = allowFloat ? Number(value) : parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      logger.warn(`Invalid ${label}: ${value}`);
+      return undefined;
+    }
+    return allowFloat ? parsed : Math.round(parsed);
+  };
+
+  const allowedQualityPresets = new Set(["low", "medium", "high"]);
+  const allowedFormats = new Set(["mp4"]);
+
+  const applyQualityPreset = (value: string | undefined, source: string) => {
+    if (!value) {
+      return;
+    }
+    if (!allowedQualityPresets.has(value)) {
+      logger.warn(`Invalid video quality preset (${source}): ${value}`);
+      return;
+    }
+    videoRecordingDefaults.qualityPreset = value;
+  };
+
+  const applyFormat = (value: string | undefined, source: string) => {
+    if (!value) {
+      return;
+    }
+    if (!allowedFormats.has(value)) {
+      logger.warn(`Invalid video format (${source}): ${value}`);
+      return;
+    }
+    videoRecordingDefaults.format = value;
+  };
+
+  applyQualityPreset(
+    process.env.AUTO_MOBILE_VIDEO_QUALITY_PRESET ??
+      process.env.AUTOMOBILE_VIDEO_QUALITY_PRESET,
+    "env"
+  );
+  const envTargetBitrate = process.env.AUTO_MOBILE_VIDEO_TARGET_BITRATE_KBPS ??
+    process.env.AUTOMOBILE_VIDEO_TARGET_BITRATE_KBPS;
+  const envMaxThroughput = process.env.AUTO_MOBILE_VIDEO_MAX_THROUGHPUT_MBPS ??
+    process.env.AUTOMOBILE_VIDEO_MAX_THROUGHPUT_MBPS;
+  const envFps = process.env.AUTO_MOBILE_VIDEO_FPS ??
+    process.env.AUTOMOBILE_VIDEO_FPS;
+  const envArchiveMb = process.env.AUTO_MOBILE_VIDEO_MAX_ARCHIVE_MB ??
+    process.env.AUTOMOBILE_VIDEO_MAX_ARCHIVE_MB;
+  const envFormat = process.env.AUTO_MOBILE_VIDEO_FORMAT ??
+    process.env.AUTOMOBILE_VIDEO_FORMAT;
+
+  const parsedTargetBitrate = parsePositiveNumber(envTargetBitrate, "video target bitrate", false);
+  if (parsedTargetBitrate !== undefined) {
+    videoRecordingDefaults.targetBitrateKbps = parsedTargetBitrate;
+  }
+
+  const parsedMaxThroughput = parsePositiveNumber(envMaxThroughput, "video max throughput", true);
+  if (parsedMaxThroughput !== undefined) {
+    videoRecordingDefaults.maxThroughputMbps = parsedMaxThroughput;
+  }
+
+  const parsedFps = parsePositiveNumber(envFps, "video fps", false);
+  if (parsedFps !== undefined) {
+    videoRecordingDefaults.fps = parsedFps;
+  }
+
+  const parsedArchive = parsePositiveNumber(envArchiveMb, "video max archive size", true);
+  if (parsedArchive !== undefined) {
+    videoRecordingDefaults.maxArchiveSizeMb = parsedArchive;
+  }
+
+  applyFormat(envFormat, "env");
 
   // Extract CLI-specific arguments (everything after --cli)
   const cliIndex = args.indexOf("--cli");
@@ -189,6 +271,38 @@ function parseArgs(): {
         logger.warn(`Invalid plan execution lock scope: ${scope}. Using default: ${planExecutionLockScope}`);
       }
       i++;
+    } else if (arg === "--video-quality" || arg === "--video-quality-preset") {
+      const qualityPreset = args[i + 1];
+      applyQualityPreset(qualityPreset, "cli");
+      i++;
+    } else if (arg === "--video-target-bitrate-kbps") {
+      const parsed = parsePositiveNumber(args[i + 1], "video target bitrate", false);
+      if (parsed !== undefined) {
+        videoRecordingDefaults.targetBitrateKbps = parsed;
+      }
+      i++;
+    } else if (arg === "--video-max-throughput-mbps") {
+      const parsed = parsePositiveNumber(args[i + 1], "video max throughput", true);
+      if (parsed !== undefined) {
+        videoRecordingDefaults.maxThroughputMbps = parsed;
+      }
+      i++;
+    } else if (arg === "--video-fps") {
+      const parsed = parsePositiveNumber(args[i + 1], "video fps", false);
+      if (parsed !== undefined) {
+        videoRecordingDefaults.fps = parsed;
+      }
+      i++;
+    } else if (arg === "--video-format") {
+      const format = args[i + 1];
+      applyFormat(format, "cli");
+      i++;
+    } else if (arg === "--video-archive-size-mb") {
+      const parsed = parsePositiveNumber(args[i + 1], "video max archive size", true);
+      if (parsed !== undefined) {
+        videoRecordingDefaults.maxArchiveSizeMb = parsed;
+      }
+      i++;
     }
   }
 
@@ -209,6 +323,7 @@ function parseArgs(): {
     a11yUseBaseline,
     predictiveUi,
     planExecutionLockScope,
+    videoRecordingDefaults,
     daemonMode,
     daemonCommand,
     daemonArgs,
@@ -602,12 +717,14 @@ async function main() {
       a11yUseBaseline,
       predictiveUi,
       planExecutionLockScope,
+      videoRecordingDefaults,
       daemonMode,
       daemonCommand,
       daemonArgs,
     } = parseArgs();
 
     serverConfig.setPlanExecutionLockScope(planExecutionLockScope);
+    serverConfig.setVideoRecordingDefaults(videoRecordingDefaults);
 
     const featureFlagService = FeatureFlagService.getInstance();
     await featureFlagService.initialize();
