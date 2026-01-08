@@ -4,6 +4,10 @@ description: |
   Both devices perform setup in parallel, then wait at a barrier before processing
   payments one at a time to avoid race conditions.
 
+devices:
+  - A
+  - B
+
 steps:
   # Parallel setup on both devices
   - tool: launchApp

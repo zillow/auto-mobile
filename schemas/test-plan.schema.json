@@ -16,6 +16,16 @@
       "type": "string",
       "description": "Human-readable description of what this test plan does"
     },
+    "devices": {
+      "type": "array",
+      "description": "List of device labels for multi-device test execution. Required when using device parameters or criticalSection.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
     "steps": {
       "type": "array",
       "description": "Ordered list of tool execution steps",
@@ -116,6 +126,11 @@
         "params": {
           "description": "Tool-specific parameters (can also be specified as top-level properties)"
         },
+        "device": {
+          "type": "string",
+          "description": "Device label indicating which device this step runs on (required in multi-device plans for non-device-agnostic tools)",
+          "minLength": 1
+        },
         "label": {
           "type": "string",
           "description": "Human-readable description of what this step does"
@@ -169,6 +184,38 @@
           "description": "Text to check for presence/absence"
         }
       }
+    },
+    "criticalSectionParams": {
+      "type": "object",
+      "required": ["lock", "steps", "deviceCount"],
+      "additionalProperties": false,
+      "properties": {
+        "lock": {
+          "type": "string",
+          "description": "Global lock identifier for synchronization across devices",
+          "minLength": 1
+        },
+        "steps": {
+          "type": "array",
+          "description": "Steps to execute serially within the critical section",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/planStep"
+          }
+        },
+        "deviceCount": {
+          "type": "integer",
+          "description": "Expected number of devices that must reach the barrier before execution proceeds",
+          "minimum": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Barrier timeout in milliseconds (default: 30000ms)",
+          "minimum": 0,
+          "default": 30000
+        }
+      },
+      "description": "Parameters for criticalSection tool that provides barrier synchronization and mutex-based serial execution across multiple devices"
     }
   }
 }

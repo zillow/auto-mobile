@@ -2,6 +2,8 @@ import { expect, describe, test } from "bun:test";
 import { PlanValidator } from "../../src/utils/plan/PlanValidator";
 import { Plan } from "../../src/models/Plan";
 import { ActionableError } from "../../src/models";
+import { YamlPlanSerializer } from "../../src/utils/plan/PlanSerializer";
+import fs from "fs/promises";
 
 describe("PlanValidator", () => {
   describe("validate", () => {
@@ -279,6 +281,51 @@ describe("PlanValidator", () => {
       expect(() =>
         PlanValidator.validateMultiDeviceRequirements(plan)
       ).not.toThrow();
+    });
+  });
+
+  describe("YAML anchors and merge keys", () => {
+    test("should correctly parse and validate YAML with anchors and merge keys", async () => {
+      const yamlContent = await fs.readFile(
+        "test/resources/test-plans/yaml-anchors-test.yaml",
+        "utf-8"
+      );
+
+      const serializer = new YamlPlanSerializer();
+      const plan = serializer.importPlanFromYaml(yamlContent);
+
+      // Verify the plan was parsed correctly
+      expect(plan.name).toBe("YAML Anchors and Merge Keys Test Plan");
+      expect(plan.devices).toEqual(["A", "B"]);
+      expect(plan.steps.length).toBe(5);
+
+      // Verify anchor merge worked - first launchApp should have merged params
+      expect(plan.steps[0].tool).toBe("launchApp");
+      expect(plan.steps[0].params?.appId).toBe("com.example.app");
+      expect(plan.steps[0].params?.coldBoot).toBe(false);
+      expect(plan.steps[0].params?.device).toBe("A");
+
+      // Verify anchor merge with override - second launchApp should override coldBoot
+      expect(plan.steps[1].tool).toBe("launchApp");
+      expect(plan.steps[1].params?.appId).toBe("com.example.app");
+      expect(plan.steps[1].params?.coldBoot).toBe(true);
+      expect(plan.steps[1].params?.device).toBe("B");
+
+      // Verify observe steps merged anchor params
+      expect(plan.steps[2].tool).toBe("observe");
+      expect(plan.steps[2].params?.includeScreenshot).toBe(true);
+      expect(plan.steps[2].params?.includeHierarchy).toBe(true);
+      expect(plan.steps[2].params?.device).toBe("A");
+
+      // Verify criticalSection (device-agnostic tool)
+      expect(plan.steps[3].tool).toBe("criticalSection");
+      expect(plan.steps[3].params?.lock).toBe("sync-point");
+      expect(plan.steps[3].params?.deviceCount).toBe(2);
+      expect(plan.steps[3].params?.device).toBeUndefined();
+
+      // Verify plan passes all validation
+      expect(() => PlanValidator.validate(plan)).not.toThrow();
+      expect(() => PlanValidator.validateMultiDeviceRequirements(plan)).not.toThrow();
     });
   });
 });

@@ -23,6 +23,9 @@ export class PlanValidator {
       throw new ActionableError("Plan must have a steps array");
     }
 
+    // Validate multi-device requirements
+    this.validateMultiDeviceRequirements(plan);
+
     // Validate devices field if present
     if (plan.devices !== undefined) {
       this.validateDevicesField(plan);

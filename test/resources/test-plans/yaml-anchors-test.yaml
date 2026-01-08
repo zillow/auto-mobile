@@ -1,0 +1,55 @@
+name: YAML Anchors and Merge Keys Test Plan
+description: Verifies that YAML anchors, aliases, and merge keys work with schema validation
+
+devices:
+  - A
+  - B
+
+steps:
+  # First step defines anchor for common launch params
+  - tool: launchApp
+    params: &common-launch-params
+      appId: com.example.app
+      coldBoot: false
+      device: A
+    label: Launch app on device A with common params
+
+  # Use anchor reference with merge and override
+  - tool: launchApp
+    params:
+      <<: *common-launch-params
+      device: B
+      coldBoot: true
+    label: Launch app on device B with cold boot override
+
+  # Define observe anchor in first observe step
+  - tool: observe
+    params: &observe-base
+      includeScreenshot: true
+      includeHierarchy: true
+      device: A
+    label: Observe device A with common settings
+
+  # Critical section without device parameter (device-agnostic tool)
+  - tool: criticalSection
+    params:
+      lock: sync-point
+      deviceCount: 2
+      steps:
+        - tool: tapOn
+          params:
+            device: A
+            text: Sync
+    label: Critical section for synchronization
+
+  # Reuse observe anchor with merge and override
+  - tool: observe
+    params:
+      <<: *observe-base
+      device: B
+    label: Observe device B with common settings
+
+metadata:
+  createdAt: "2026-01-08T00:00:00Z"
+  version: "1.0.0"
+  description: Test plan demonstrating YAML anchor and merge key compatibility
