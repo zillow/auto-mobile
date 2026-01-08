@@ -532,3 +532,46 @@ jobs:
       - name: "Deploy to GitHub Pages"
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # =============================================================================
+  # MCP Context Thresholds
+  # =============================================================================
+
+  benchmark-context-thresholds:
+    name: "Benchmark MCP Context Thresholds"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Run Context Threshold Benchmark"
+        id: benchmark
+        run: |
+          # Create reports directory
+          mkdir -p reports
+
+          # Run benchmark and capture exit code
+          bun run benchmark-context --output reports/context-benchmark.json || echo "FAILED=true" >> $GITHUB_ENV
+
+          # Always preserve the report file even if benchmark failed
+          exit 0
+
+      - name: "Upload Benchmark Report"
+        uses: actions/upload-artifact@v4.4.0
+        if: always()
+        with:
+          name: context-benchmark-report
+          path: reports/context-benchmark.json
+          retention-days: 90
+
+      - name: "Check Benchmark Result"
+        if: always()
+        run: |
+          if [ "$FAILED" = "true" ]; then
+            echo "::error::MCP context threshold benchmark failed - one or more thresholds were exceeded"
+            cat reports/context-benchmark.json
+            exit 1
+          fi
+          echo "::notice::MCP context threshold benchmark passed - all thresholds satisfied"
