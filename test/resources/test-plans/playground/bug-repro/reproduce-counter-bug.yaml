@@ -1,0 +1,67 @@
+---
+name: reproduce-counter-bug
+description: Reproduce the intentional counter bug in the Bug Repro Demo screen
+steps:
+  - tool: launchApp
+    appId: dev.jasonpearson.automobile.playground
+    clearAppData: true
+    label: Launch Playground app with clean state
+
+  - tool: observe
+    label: Wait for home screen to be stable
+
+  - tool: tapOn
+    selector:
+      testTag: demo_index_action
+    label: Navigate to Demo Index
+
+  - tool: observe
+    label: Wait for Demo Index to load
+
+  - tool: tapOn
+    selector:
+      testTag: demo_bug_repro_action
+    label: Navigate to Bug Repro Demo screen
+
+  - tool: observe
+    label: Wait for Bug Repro screen to load
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: bug_repro_content
+
+  - tool: tapOn
+    selector:
+      testTag: bug_repro_toggle
+    label: Enable the bug via toggle
+
+  - tool: observe
+    label: Wait for toggle state to update
+
+  - tool: tapOn
+    selector:
+      testTag: bug_repro_add
+    label: Tap Add Item to trigger the bug
+
+  - tool: observe
+    label: Observe bug manifestation - displayed count should not update
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: bug_repro_status
+
+  - tool: tapOn
+    selector:
+      testTag: bug_repro_add
+    label: Tap Add Item again to confirm bug persists
+
+  - tool: observe
+    label: Verify bug continues to manifest
+
+  - tool: tapOn
+    selector:
+      testTag: bug_repro_reset
+    label: Reset counters
+
+  - tool: observe
+    label: Wait for reset to complete

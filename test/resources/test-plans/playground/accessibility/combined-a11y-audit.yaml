@@ -1,0 +1,53 @@
+---
+name: combined-a11y-audit
+description: Run combined accessibility audit covering both contrast and tap targets
+steps:
+  - tool: launchApp
+    appId: dev.jasonpearson.automobile.playground
+    clearAppData: true
+    label: Launch Playground app with clean state
+
+  - tool: observe
+    label: Wait for home screen to be stable
+
+  - tool: tapOn
+    selector:
+      testTag: demo_index_action
+    label: Navigate to Demo Index
+
+  - tool: observe
+    label: Wait for Demo Index to load
+
+  - tool: tapOn
+    selector:
+      testTag: demo_a11y_contrast_action
+    label: Navigate to Contrast Demo screen
+
+  - tool: observe
+    label: Wait for Contrast Demo screen to load
+
+  - tool: auditAccessibility
+    auditType: contrast
+    wcagLevel: AA
+    label: Audit contrast on Contrast Demo screen
+
+  - tool: tapOn
+    selector:
+      testTag: contrast_back
+    label: Navigate back to Demo Index
+
+  - tool: observe
+    label: Wait for Demo Index to reload
+
+  - tool: tapOn
+    selector:
+      testTag: demo_a11y_tap_targets_action
+    label: Navigate to Tap Targets Demo screen
+
+  - tool: observe
+    label: Wait for Tap Targets Demo screen to load
+
+  - tool: auditAccessibility
+    auditType: tapTargets
+    minimumSize: 48
+    label: Audit tap targets on Tap Targets Demo screen

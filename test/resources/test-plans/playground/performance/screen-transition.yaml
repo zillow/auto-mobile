@@ -1,0 +1,67 @@
+---
+name: screen-transition
+description: Measure screen transition performance from list to detail
+steps:
+  - tool: launchApp
+    appId: dev.jasonpearson.automobile.playground
+    clearAppData: true
+    label: Launch Playground app with clean state
+
+  - tool: observe
+    label: Wait for home screen to be stable
+
+  - tool: tapOn
+    selector:
+      testTag: demo_index_action
+    label: Navigate to Demo Index
+
+  - tool: observe
+    label: Wait for Demo Index to load
+
+  - tool: tapOn
+    selector:
+      testTag: demo_perf_list_action
+    label: Navigate to Performance List
+
+  - tool: observe
+    label: Wait for Performance List to load
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: performance_item_1_action
+
+  - tool: tapOn
+    selector:
+      testTag: performance_item_1_action
+    label: Tap to navigate to detail screen
+
+  - tool: observe
+    label: Measure transition performance to detail screen
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: performance_detail_content
+
+  - tool: tapOn
+    selector:
+      testTag: performance_detail_back
+    label: Navigate back to list
+
+  - tool: observe
+    label: Measure back transition performance
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: performance_list
+
+  - tool: tapOn
+    selector:
+      testTag: performance_item_5_action
+    label: Navigate to different detail screen
+
+  - tool: observe
+    label: Measure second transition
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: performance_detail_content

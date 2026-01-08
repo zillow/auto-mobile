@@ -1,0 +1,23 @@
+---
+name: navigate-demo-index
+description: Navigate to the Demo Index screen from Playground home
+steps:
+  - tool: launchApp
+    appId: dev.jasonpearson.automobile.playground
+    clearAppData: true
+    label: Launch Playground app with clean state
+
+  - tool: observe
+    label: Wait for home screen to be stable
+
+  - tool: tapOn
+    selector:
+      testTag: demo_index_action
+    label: Tap to navigate to Demo Index
+
+  - tool: observe
+    label: Verify Demo Index screen is displayed
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: demo_index_description

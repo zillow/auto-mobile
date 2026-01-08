@@ -1,0 +1,35 @@
+---
+name: startup-cold-boot
+description: Measure cold boot startup performance to Startup Demo screen
+steps:
+  - tool: terminateApp
+    appId: dev.jasonpearson.automobile.playground
+    label: Ensure app is terminated for cold start
+
+  - tool: launchApp
+    appId: dev.jasonpearson.automobile.playground
+    clearAppData: false
+    label: Launch app from cold start
+
+  - tool: observe
+    label: Wait for app startup to stabilize
+
+  - tool: tapOn
+    selector:
+      testTag: demo_index_action
+    label: Navigate to Demo Index
+
+  - tool: observe
+    label: Wait for navigation to complete
+
+  - tool: tapOn
+    selector:
+      testTag: demo_startup_action
+    label: Navigate to Startup Demo screen
+
+  - tool: observe
+    label: Wait for Startup Demo screen to be stable
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: startup_ready_card

@@ -1,0 +1,55 @@
+---
+name: complete-ux-flow
+description: Complete the full UX exploration flow from start to summary
+steps:
+  - tool: launchApp
+    appId: dev.jasonpearson.automobile.playground
+    clearAppData: true
+    label: Launch Playground app with clean state
+
+  - tool: observe
+    label: Wait for home screen to be stable
+
+  - tool: tapOn
+    selector:
+      testTag: demo_index_action
+    label: Navigate to Demo Index
+
+  - tool: observe
+    label: Wait for Demo Index to load
+
+  - tool: tapOn
+    selector:
+      testTag: demo_ux_flow_action
+    label: Tap to open UX Flow Start screen
+
+  - tool: observe
+    label: Verify UX Flow Start screen is displayed
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: ux_flow_start_content
+
+  - tool: tapOn
+    selector:
+      testTag: ux_flow_start_next
+    label: Continue to Details screen
+
+  - tool: observe
+    label: Verify UX Flow Details screen is displayed
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: ux_flow_details_content
+
+  - tool: tapOn
+    selector:
+      testTag: ux_flow_details_next
+    label: Continue to Summary screen
+
+  - tool: observe
+    label: Verify UX Flow Summary screen is displayed
+    expectations:
+      - type: elementVisible
+        selector:
+          testTag: ux_flow_summary_content
