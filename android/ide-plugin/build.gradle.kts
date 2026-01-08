@@ -18,10 +18,6 @@ repositories {
 kotlin { jvmToolchain(17) }
 
 dependencies {
-  implementation(compose.desktop.currentOs)
-  implementation("org.jetbrains.jewel:jewel-foundation:0.33.0-253.29795")
-  implementation("org.jetbrains.jewel:jewel-ui:0.33.0-253.29795")
-  implementation("org.jetbrains.jewel:jewel-int-ui-standalone:0.33.0-253.29795")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
   testImplementation("junit:junit:4.13.2")
@@ -30,6 +26,7 @@ dependencies {
   intellijPlatform {
     intellijIdea("2025.3")
     bundledPlugin("com.intellij.java")
+    composeUI()
     pluginVerifier()
   }
 }

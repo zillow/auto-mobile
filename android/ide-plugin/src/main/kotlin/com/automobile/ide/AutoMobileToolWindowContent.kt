@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,11 +37,7 @@ import com.automobile.ide.graph.NavigationGraphLegend
 import com.automobile.ide.graph.NavigationGraphSummary
 import com.automobile.ide.graph.NavigationGraphView
 import com.automobile.ide.graph.RecentTransition
-import com.intellij.ide.ui.LafManagerListener
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
-import com.intellij.ui.ExperimentalUI
-import com.intellij.ui.JBColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -54,13 +49,10 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.jewel.foundation.theme.JewelTheme
-import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
-import org.jetbrains.jewel.ui.icon.LocalNewUiChecker
-import org.jetbrains.jewel.ui.icon.NewUiChecker
 import java.time.Instant
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -83,7 +75,6 @@ fun AutoMobileToolWindowContent(project: Project) {
   var lastCurrentScreen by remember { mutableStateOf<String?>(null) }
   val recentTransitions = remember { mutableStateListOf<RecentTransition>() }
   val graphJson = remember { Json { ignoreUnknownKeys = true } }
-  val isDarkTheme = rememberIdeDarkMode()
 
   data class PerformanceRangeOption(
       val label: String,
@@ -338,23 +329,21 @@ fun AutoMobileToolWindowContent(project: Project) {
     }
   }
 
-  IntUiTheme(isDarkTheme, false) {
-    CompositionLocalProvider(LocalNewUiChecker provides IdeNewUiChecker) {
-      Column(
-          modifier =
-              Modifier
-                  .fillMaxSize()
-                  .background(JewelTheme.globalColors.panelBackground)
-                  .padding(16.dp),
-          verticalArrangement = Arrangement.spacedBy(12.dp),
-      ) {
-        Text("AutoMobile")
-        Text("Status: $statusText")
-        Text("Transport: ${client.transportName}")
-        Text("Endpoint: ${client.connectionDescription}")
-        if (lastError != null) {
-          Text("Error: ${lastError ?: ""}")
-        }
+  Column(
+      modifier =
+          Modifier
+              .fillMaxSize()
+              .background(JewelTheme.globalColors.panelBackground)
+              .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    Text("AutoMobile")
+    Text("Status: $statusText")
+    Text("Transport: ${client.transportName}")
+    Text("Endpoint: ${client.connectionDescription}")
+    if (lastError != null) {
+      Text("Error: ${lastError ?: ""}")
+    }
 
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
           Text("Worktrees / MCP servers")
@@ -567,14 +556,12 @@ fun AutoMobileToolWindowContent(project: Project) {
           )
           NavigationGraphLegend(modifier = Modifier.fillMaxWidth())
         }
-        NavigationGraphView(
-            summary = graphSummary,
-            recentTransitions = recentTransitions.toList(),
-            errorMessage = graphError,
-            modifier = Modifier.fillMaxWidth().weight(1f),
-        )
-      }
-    }
+    NavigationGraphView(
+        summary = graphSummary,
+        recentTransitions = recentTransitions.toList(),
+        errorMessage = graphError,
+        modifier = Modifier.fillMaxWidth().weight(1f),
+    )
   }
 }
 
@@ -582,24 +569,6 @@ private const val NAV_GRAPH_RESOURCE_URI = "automobile:navigation/graph"
 private const val GRAPH_POLL_INTERVAL_MS = 1000L
 private const val MAX_RECENT_TRANSITIONS = 10
 private val GRAPH_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-
-private object IdeNewUiChecker : NewUiChecker {
-  override fun isNewUi(): Boolean = ExperimentalUI.isNewUI()
-}
-
-private fun isIdeDarkTheme(): Boolean = !JBColor.isBright()
-
-@Composable
-private fun rememberIdeDarkMode(): Boolean {
-  var isDarkTheme by remember { mutableStateOf(isIdeDarkTheme()) }
-  DisposableEffect(Unit) {
-    val connection = ApplicationManager.getApplication().messageBus.connect()
-    val listener = LafManagerListener { isDarkTheme = isIdeDarkTheme() }
-    connection.subscribe(LafManagerListener.TOPIC, listener)
-    onDispose { connection.disconnect() }
-  }
-  return isDarkTheme
-}
 
 private fun updateTransitionHistory(
     previousScreen: String?,
