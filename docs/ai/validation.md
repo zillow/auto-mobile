@@ -19,4 +19,14 @@ bun run test -- --grep "Name of the test suite or test case"
 
 # Reinstall MCP server
 bun install
+
+# Auto-fix shell script formatting with shfmt (Google style: 2-space indent)
+# Only formats touched/staged files by default
+bash scripts/shellcheck/apply_shfmt.sh
+
+# Format all shell scripts in the project
+ONLY_TOUCHED_FILES=false bash scripts/shellcheck/apply_shfmt.sh
+
+# Auto-install shfmt if missing during apply
+INSTALL_SHFMT_WHEN_MISSING=true bash scripts/shellcheck/apply_shfmt.sh
 ```
