@@ -8,6 +8,7 @@ import { Platform } from "../models";
 import { TestExecutionRepository, TestExecutionStatus } from "../db/testExecutionRepository";
 import { DEVICE_LABEL_DESCRIPTION } from "./toolSchemaHelpers";
 import { registerDeviceLabelMap } from "./deviceLabelMapping";
+import { PlanSchemaValidator } from "../utils/plan/PlanSchemaValidator";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -106,6 +107,25 @@ const executePlanTool = async (device: BootedDevice, params: {
       yamlContent = Buffer.from(base64Content, "base64").toString("utf-8");
       logger.info(`Base64 content decoded (${yamlContent.length} bytes)`);
     }
+
+    // Validate YAML schema before parsing
+    logger.info("=== Validating plan YAML schema ===");
+    const validator = new PlanSchemaValidator();
+    await validator.loadSchema();
+    const validationResult = validator.validateYaml(yamlContent);
+
+    if (!validationResult.valid) {
+      const errorMessages = validationResult.errors?.map(err =>
+        `${err.field}: ${err.message}${err.line !== undefined ? ` (line ${err.line})` : ""}`
+      ).join("\n") || "Unknown validation error";
+
+      throw new ActionableError(
+        `Plan YAML validation failed:\n${errorMessages}\n\n` +
+        "The plan does not conform to the AutoMobile test plan schema. " +
+        "Check the schema at schemas/test-plan.schema.json for details."
+      );
+    }
+    logger.info("Plan YAML schema validation passed");
 
     // Parse the plan
     logger.info("=== Parsing plan from YAML ===");

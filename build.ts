@@ -49,6 +49,17 @@ if (existsSync(migrationsSource)) {
   console.warn(`Database migrations not found at ${migrationsSource}`);
 }
 
+// Copy schemas for runtime validation (PlanSchemaValidator reads from disk)
+const schemasSource = join(import.meta.dir, "schemas");
+const schemasDest = join(import.meta.dir, "dist", "schemas");
+if (existsSync(schemasSource)) {
+  mkdirSync(schemasDest, { recursive: true });
+  cpSync(schemasSource, schemasDest, { recursive: true });
+  console.log("✓ Copied validation schemas");
+} else {
+  console.warn(`Validation schemas not found at ${schemasSource}`);
+}
+
 // Build iOS assets using the same bun executable that's running this script
 console.log("Building iOS assets...");
 const proc = spawnSync(Bun.which("bun") || process.execPath, ["scripts/build-ios-assets.js"], {

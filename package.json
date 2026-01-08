@@ -18,6 +18,7 @@
     "dev:streamable:port": "bun --watch src/index.ts --transport streamable --port",
     "estimate-context": "bun scripts/estimate-context-usage.ts",
     "benchmark-context": "bun scripts/benchmark-context-thresholds.ts",
+    "validate:yaml": "bun scripts/validate-yaml.ts",
     "prepublishOnly": "cp README.md README.md.backup && bun scripts/npm/transform-readme.js",
     "postpublish": "mv README.md.backup README.md || true"
   },
@@ -37,7 +38,8 @@
     "ui-testing"
   ],
   "files": [
-    "dist"
+    "dist",
+    "schemas"
   ],
   "main": "dist/src/index.js",
   "bin": {
@@ -98,6 +100,8 @@
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
     "@typescript-eslint/utils": "^8.46.2",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "esbuild": "^0.25.9",
     "eslint": "^9.38.0",
     "eslint-plugin": "^1.0.1",

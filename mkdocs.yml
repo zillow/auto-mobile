@@ -90,6 +90,8 @@ nav:
           - 'Contrast': using/a11y/contrast.md
           - 'Tap Targets': using/a11y/tap-targets.md
       - 'UI Tests': using/ui-tests.md
+      - 'Validation':
+          - 'YAML Test Plans': validation/yaml-test-plans.md
   - 'Design Docs':
       - 'Overview': design-docs/index.md
       - 'MCP':

@@ -30,6 +30,18 @@ jobs:
       - name: "Validate IDE Plugin"
         run: scripts/ide-plugin/validate.sh
 
+  validate-yaml:
+    name: "Validate YAML Test Plans"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Validate YAML Test Plans"
+        run: bun run validate:yaml
+
   validate-xml:
     name: "Validate XML"
     runs-on: ubuntu-latest
