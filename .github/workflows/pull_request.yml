@@ -18,11 +18,13 @@ jobs:
   # Change Detection
   # =============================================================================
   # Detect if only documentation files were changed to skip long-running jobs
+  # Detect if only SHA256 checksum was changed to skip long-running jobs
   detect-changes:
-    name: "Detect Documentation-Only Changes"
+    name: "Detect Documentation-Only or SHA256-Only Changes"
     runs-on: ubuntu-latest
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
+      sha256_only: ${{ steps.check-sha256.outputs.sha256_only }}
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -38,6 +40,46 @@ jobs:
               - 'mkdocs.yml'
               - '.lychee.toml'
 
+      - name: "Check for SHA256-only changes"
+        id: check-sha256
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.issue.number;
+
+            // Get PR details
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            // Check if title matches the automated SHA256 update pattern
+            const titleMatches = pr.title === 'chore: update accessibility service APK SHA256';
+
+            // Get list of changed files
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            // Check if only src/constants/release.ts was changed
+            const onlyReleaseFileChanged = files.length === 1 &&
+                                          files[0].filename === 'src/constants/release.ts';
+
+            // Skip only if BOTH conditions are met
+            const sha256Only = titleMatches && onlyReleaseFileChanged;
+
+            console.log('PR Title:', pr.title);
+            console.log('Title matches:', titleMatches);
+            console.log('Files changed:', files.map(f => f.filename).join(', '));
+            console.log('Only release.ts changed:', onlyReleaseFileChanged);
+            console.log('Result - SHA256 only:', sha256Only);
+
+            core.setOutput('sha256_only', sha256Only.toString());
+            return sha256Only;
+
   # =============================================================================
   # Fast Validation Jobs (Always Run)
   # =============================================================================
@@ -45,6 +87,8 @@ jobs:
   ide-plugin-validation:
     name: "IDE Plugin Validation"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -73,6 +117,8 @@ jobs:
   validate-xml:
     name: "Validate XML"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -87,6 +133,8 @@ jobs:
   ktfmt:
     name: "ktfmt"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -99,6 +147,8 @@ jobs:
   validate-shell-scripts:
     name: "Validate Shell Scripts"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -111,6 +161,8 @@ jobs:
   validate-mkdocs-nav:
     name: "Validate MkDocs Navigation"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -123,6 +175,8 @@ jobs:
   validate-documentation-links:
     name: "Validate Documentation Links"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -150,7 +204,7 @@ jobs:
     name: "CodeQL Analysis - Node.js/TypeScript"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     timeout-minutes: 360
     permissions:
       actions: read
@@ -183,6 +237,8 @@ jobs:
   bun-audit:
     name: "Bun Security Audit"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -209,7 +265,7 @@ jobs:
     name: "Node TypeScript Build and Test"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -230,7 +286,7 @@ jobs:
     name: "Run JUnit Runner Unit Tests"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -255,7 +311,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [detect-changes, build-android-accessibility-service]
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -294,7 +350,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [detect-changes, build-android-accessibility-service]
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -332,7 +388,7 @@ jobs:
     name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -351,7 +407,7 @@ jobs:
     name: "Build JUnitRunner Library"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -378,7 +434,7 @@ jobs:
     name: "Build Accessibility Service"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -403,7 +459,7 @@ jobs:
     name: "Build Playground App"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -456,6 +512,8 @@ jobs:
   hadolint:
     name: "Lint Dockerfile"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -471,7 +529,7 @@ jobs:
     name: "Build Docker Image"
     runs-on: ubuntu-latest
     needs: [hadolint, detect-docker-changes, detect-changes]
-    if: needs.detect-docker-changes.outputs.docker-changed == 'true' && needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-docker-changes.outputs.docker-changed == 'true' && needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -594,7 +652,7 @@ jobs:
     name: "Test Docker Compose"
     runs-on: ubuntu-latest
     needs: [hadolint, detect-docker-changes, detect-changes]
-    if: needs.detect-docker-changes.outputs.docker-changed == 'true' && needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-docker-changes.outputs.docker-changed == 'true' && needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -620,7 +678,7 @@ jobs:
     name: "Benchmark MCP Context Thresholds"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true'
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
