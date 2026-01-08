@@ -14,6 +14,34 @@ permissions:
   packages: write
 
 jobs:
+  # =============================================================================
+  # Change Detection
+  # =============================================================================
+  # Detect if only documentation files were changed to skip long-running jobs
+  detect-changes:
+    name: "Detect Documentation-Only Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Check for documentation-only changes"
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docs_only:
+              - '**/*.md'
+              - 'docs/**'
+              - 'mkdocs.yml'
+              - '.lychee.toml'
+
+  # =============================================================================
+  # Fast Validation Jobs (Always Run)
+  # =============================================================================
+
   ide-plugin-validation:
     name: "IDE Plugin Validation"
     runs-on: ubuntu-latest
@@ -114,9 +142,15 @@ jobs:
         run: |
           scripts/lychee/validate_lychee.sh
 
+  # =============================================================================
+  # Security Analysis (Skip for docs-only changes)
+  # =============================================================================
+
   codeql-node:
     name: "CodeQL Analysis - Node.js/TypeScript"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     timeout-minutes: 360
     permissions:
       actions: read
@@ -167,9 +201,15 @@ jobs:
           name: bun-audit-results
           path: bun-audit-results.json
 
+  # =============================================================================
+  # Node TypeScript Build and Test (Skip for docs-only changes)
+  # =============================================================================
+
   mcp-build-and-test:
     name: "Node TypeScript Build and Test"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -182,9 +222,15 @@ jobs:
       - name: "Run Tests"
         run: bun run test
 
+  # =============================================================================
+  # Android Build and Test Jobs (Skip for docs-only changes)
+  # =============================================================================
+
   junit-runner-unit-tests:
     name: "Run JUnit Runner Unit Tests"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -208,7 +254,8 @@ jobs:
     name: "Run JUnit Runner Emulator Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: build-android-accessibility-service
+    needs: [detect-changes, build-android-accessibility-service]
+    if: needs.detect-changes.outputs.docs_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -246,7 +293,8 @@ jobs:
     name: "Run Playground Automobile Emulator Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: build-android-accessibility-service
+    needs: [detect-changes, build-android-accessibility-service]
+    if: needs.detect-changes.outputs.docs_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -283,6 +331,8 @@ jobs:
   android-accessibility-service-unit-tests:
     name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -300,6 +350,8 @@ jobs:
   build-junit-runner-library:
     name: "Build JUnitRunner Library"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -325,6 +377,8 @@ jobs:
   build-android-accessibility-service:
     name: "Build Accessibility Service"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -348,6 +402,8 @@ jobs:
   build-playground-app:
     name: "Build Playground App"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     defaults:
       run:
         working-directory: android
@@ -414,8 +470,8 @@ jobs:
   docker-build:
     name: "Build Docker Image"
     runs-on: ubuntu-latest
-    needs: [hadolint, detect-docker-changes]
-    if: needs.detect-docker-changes.outputs.docker-changed == 'true'
+    needs: [hadolint, detect-docker-changes, detect-changes]
+    if: needs.detect-docker-changes.outputs.docker-changed == 'true' && needs.detect-changes.outputs.docs_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -537,8 +593,8 @@ jobs:
   docker-compose-test:
     name: "Test Docker Compose"
     runs-on: ubuntu-latest
-    needs: [hadolint, detect-docker-changes]
-    if: needs.detect-docker-changes.outputs.docker-changed == 'true'
+    needs: [hadolint, detect-docker-changes, detect-changes]
+    if: needs.detect-docker-changes.outputs.docker-changed == 'true' && needs.detect-changes.outputs.docs_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -563,6 +619,8 @@ jobs:
   benchmark-context-thresholds:
     name: "Benchmark MCP Context Thresholds"
     runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
