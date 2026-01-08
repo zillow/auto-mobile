@@ -81,6 +81,7 @@ nav:
       - 'UX Exploration': using/ux-exploration.md
       - 'Reproducing Bugs': using/reproducting-bugs.md
       - 'UI Auditing Prereqs': using/ui-auditing-prereqs.md
+      - 'Device State Snapshots': features/snapshots.md
       - 'Performance Analysis':
           - 'Startup': using/perf-analysis/startup.md
           - 'Screen Transition': using/perf-analysis/screen-transition.md
