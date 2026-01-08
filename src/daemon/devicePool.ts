@@ -177,6 +177,141 @@ export class DevicePool {
   }
 
   /**
+   * Assign multiple devices to sessions upfront with a shared timeout
+   *
+   * This is used for multi-device plans where we want to allocate all devices
+   * before execution begins, ensuring we fail fast if not enough devices are available.
+   *
+   * @param sessionIds Array of session IDs to assign devices to
+   * @param timeoutMs Total timeout in milliseconds for allocating ALL devices (default: 5 minutes)
+   * @returns Map of sessionId -> deviceId for all assigned devices
+   * @throws ActionableError if unable to allocate all devices within timeout
+   */
+  async assignMultipleDevices(
+    sessionIds: string[],
+    timeoutMs: number = 300000
+  ): Promise<Map<string, string>> {
+    const startTime = this.timer.now();
+    const assignments = new Map<string, string>();
+    const requiredCount = sessionIds.length;
+
+    logger.info(
+      `[DevicePool] Starting upfront allocation of ${requiredCount} devices ` +
+      `(timeout: ${timeoutMs / 1000}s)`
+    );
+
+    // Validate we have enough devices
+    await this.ensurePoolRefreshed();
+    const stats = this.getStats();
+
+    if (stats.total < requiredCount) {
+      throw new ActionableError(
+        `Not enough devices in pool: need ${requiredCount}, have ${stats.total}.\n` +
+        `Device pool status:\n` +
+        `  Total devices: ${stats.total}\n` +
+        `  Idle: ${stats.idle}\n` +
+        `  Assigned: ${stats.assigned}\n` +
+        `  Error: ${stats.error}\n\n` +
+        `Suggestions:\n` +
+        `  - Start ${requiredCount - stats.total} more emulator(s) or connect more devices\n` +
+        `  - Reduce the number of devices required in the test plan\n` +
+        `  - Verify ADB is working: adb devices`
+      );
+    }
+
+    // Try to assign devices with shared timeout
+    let attemptCount = 0;
+    const assigned = new Set<string>();
+
+    while (assigned.size < requiredCount) {
+      attemptCount++;
+      const elapsed = this.timer.now() - startTime;
+
+      // Check timeout
+      if (elapsed > timeoutMs) {
+        // Release any devices we've assigned so far
+        for (const deviceId of assignments.values()) {
+          await this.releaseDevice(deviceId);
+        }
+        const currentStats = this.getStats();
+        throw new ActionableError(
+          `Timed out allocating devices after ${Math.round(elapsed / 1000)}s (${attemptCount} attempts).\n` +
+          `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
+          `Device pool status:\n` +
+          `  Total devices: ${currentStats.total}\n` +
+          `  Idle: ${currentStats.idle}\n` +
+          `  Assigned: ${currentStats.assigned}\n` +
+          `  Error: ${currentStats.error}\n\n` +
+          `Suggestions:\n` +
+          `  - Reduce parallel test count to match available devices\n` +
+          `  - Start additional emulators or connect more physical devices\n` +
+          `  - Increase device allocation timeout\n` +
+          `  - Check if tests are properly releasing devices after completion`
+        );
+      }
+
+      // Try to assign next session
+      const sessionIndex = assigned.size;
+      const sessionId = sessionIds[sessionIndex];
+
+      const result = await this.tryAssignDevice(sessionId);
+
+      if (result.success) {
+        assigned.add(sessionId);
+        assignments.set(sessionId, result.deviceId!);
+        logger.info(
+          `[DevicePool] Allocated device ${result.deviceId} to session ${sessionId} ` +
+          `(${assigned.size}/${requiredCount})`
+        );
+      } else if (!result.shouldWait) {
+        // No devices at all - this shouldn't happen as we checked earlier
+        // but handle it gracefully
+        const currentStats = this.getStats();
+        throw new ActionableError(
+          `Failed to allocate devices: no devices available.\n` +
+          `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
+          `Device pool status:\n` +
+          `  Total devices: ${currentStats.total}\n` +
+          `  Idle: ${currentStats.idle}\n` +
+          `  Assigned: ${currentStats.assigned}\n` +
+          `  Error: ${currentStats.error}\n\n` +
+          `Suggestions:\n` +
+          `  - Start an emulator or connect a physical device\n` +
+          `  - Check device pool status: auto-mobile --daemon available-devices\n` +
+          `  - Verify ADB is working: adb devices`
+        );
+      } else {
+        // Devices busy - wait and retry
+        if (attemptCount === 1) {
+          logger.info(
+            `[DevicePool] Waiting for ${requiredCount - assigned.size} more device(s) ` +
+            `(${result.totalDevices} total, all currently busy)...`
+          );
+        }
+        await this.timer.sleep(this.DEVICE_WAIT_INTERVAL_MS);
+      }
+    }
+
+    const totalElapsed = this.timer.now() - startTime;
+    logger.info(
+      `[DevicePool] Successfully allocated ${requiredCount} devices ` +
+      `in ${totalElapsed}ms (${attemptCount} attempts)`
+    );
+
+    return assignments;
+  }
+
+  /**
+   * Ensure device pool has been refreshed at least once
+   */
+  private async ensurePoolRefreshed(): Promise<void> {
+    if (this.devices.size === 0) {
+      logger.info("[DevicePool] Pool is empty, attempting auto-refresh...");
+      await this.refreshDevices();
+    }
+  }
+
+  /**
    * Assign a device to a session
    *
    * Called when a new session is created or when a session needs to pick a device.

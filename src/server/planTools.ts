@@ -7,8 +7,9 @@ import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
 import { TestExecutionRepository, TestExecutionStatus } from "../db/testExecutionRepository";
 import { DEVICE_LABEL_DESCRIPTION } from "./toolSchemaHelpers";
-import { registerDeviceLabelMap } from "./deviceLabelMapping";
+import { registerDeviceLabelMap, buildDeviceLabelMap } from "./deviceLabelMapping";
 import { PlanSchemaValidator } from "../utils/plan/PlanSchemaValidator";
+import { DaemonState } from "../daemon/daemonState";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -33,6 +34,7 @@ const executePlanSchema = z.object({
   deviceId: z.string().optional().describe("Device ID"),
   device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION),
   devices: z.array(z.string()).optional().describe("Device labels for multi-device plans"),
+  deviceAllocationTimeoutMs: z.number().default(300000).describe("Timeout in milliseconds for allocating all devices (default: 300000 = 5 minutes)"),
   abortStrategy: z.enum(["immediate", "finish-current-step"]).default("immediate").describe("Abort strategy: immediate (default) or finish-current-step"),
   testMetadata: testMetadataSchema.optional().describe("Test metadata for timing history"),
   cleanupAppId: z.string().optional().describe("App ID to terminate after execution"),
@@ -57,6 +59,7 @@ const executePlanTool = async (device: BootedDevice, params: {
   deviceId?: string;
   device?: string;
   devices?: string[];
+  deviceAllocationTimeoutMs: number;
   abortStrategy?: "immediate" | "finish-current-step";
   testMetadata?: TestExecutionMetadata;
   cleanupAppId?: string;
@@ -131,6 +134,9 @@ const executePlanTool = async (device: BootedDevice, params: {
     const plan = importPlanFromYaml(yamlContent);
     logger.info(`Plan parsed successfully: '${plan.name}' with ${plan.steps.length} steps`);
 
+    // Device allocation for multi-device plans
+    let deviceMapping: Record<string, string> | undefined;
+
     if (params.devices && params.devices.length > 0) {
       if (!params.sessionUuid) {
         throw new ActionableError("Device labels require a sessionUuid to be provided.");
@@ -140,6 +146,64 @@ const executePlanTool = async (device: BootedDevice, params: {
           `Device label '${params.device}' was not declared in devices list: ${params.devices.join(", ")}`
         );
       }
+
+      // Upfront device allocation for fail-fast behavior
+      logger.info("=== Allocating devices upfront ===");
+
+      if (!DaemonState.getInstance().isInitialized()) {
+        throw new ActionableError("Multi-device plans require an active daemon session.");
+      }
+
+      const devicePool = DaemonState.getInstance().getDevicePool();
+      const sessionManager = DaemonState.getInstance().getSessionManager();
+
+      // Build device label map to get session UUIDs
+      const labelToSessionMap = buildDeviceLabelMap(params.devices, params.sessionUuid, params.device);
+      const sessionIds = Object.values(labelToSessionMap);
+
+      logger.info(
+        `Requesting allocation of ${sessionIds.length} devices for labels: ${Object.keys(labelToSessionMap).join(", ")} ` +
+        `(timeout: ${params.deviceAllocationTimeoutMs / 1000}s)`
+      );
+
+      // Allocate all devices upfront with shared timeout
+      const sessionToDeviceMap = await devicePool.assignMultipleDevices(
+        sessionIds,
+        params.deviceAllocationTimeoutMs
+      );
+
+      // Verify sessions were created in SessionManager for each allocated device
+      for (const sessionUuid of sessionToDeviceMap.keys()) {
+        // Device was already assigned in assignMultipleDevices via tryAssignDevice
+        // which calls sessionManager.createSession, so we just need to verify
+        const session = sessionManager.getSession(sessionUuid);
+        if (!session) {
+          throw new ActionableError(
+            `Internal error: Session ${sessionUuid} not found after device allocation`
+          );
+        }
+      }
+
+      // Build the device mapping for the result (label -> deviceId)
+      deviceMapping = {};
+      for (const [label, sessionUuid] of Object.entries(labelToSessionMap)) {
+        const deviceId = sessionToDeviceMap.get(sessionUuid);
+        if (!deviceId) {
+          throw new ActionableError(
+            `Internal error: No device allocated for session ${sessionUuid} (label: ${label})`
+          );
+        }
+        deviceMapping[label] = deviceId;
+      }
+
+      // Log the allocation result
+      logger.info("=== Device allocation complete ===");
+      for (const [label, deviceId] of Object.entries(deviceMapping)) {
+        const sessionUuid = labelToSessionMap[label];
+        logger.info(`  ${label} → ${deviceId} (session: ${sessionUuid})`);
+      }
+
+      // Register the device label map (sessions are already created, this just caches the mapping)
       await registerDeviceLabelMap(params.sessionUuid, params.devices, params.device);
     } else if (params.device) {
       throw new ActionableError("Device label requires a devices list to be provided.");
@@ -158,7 +222,8 @@ const executePlanTool = async (device: BootedDevice, params: {
       totalSteps: result.totalSteps,
       failedStep: result.failedStep,
       error: result.failedStep ? result.failedStep.error : undefined,
-      platform: device.platform
+      platform: device.platform,
+      deviceMapping
     };
 
     logger.info("=== Returning from executePlanTool ===");

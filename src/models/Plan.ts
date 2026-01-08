@@ -31,6 +31,7 @@ export interface PlanExecutionResult {
     error: string;
     device?: string; // Device label for multi-device plans
   };
+  deviceMapping?: Record<string, string>; // Maps device labels to device IDs (e.g., {"A": "emulator-5554", "B": "emulator-5556"})
   perDeviceResults?: Map<string, DeviceExecutionResult>; // For multi-device plans
 }
 
