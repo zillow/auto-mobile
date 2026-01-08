@@ -524,4 +524,261 @@ describe("AccessibilityServiceManager", function() {
       expect(secondResult.success).toBe(true);
     });
   });
+
+  describe("enableViaSettings", function() {
+    test("should enable service when no services are currently enabled (null)", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: "null",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${serviceComponent}"`, {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted("shell settings get secure enabled_accessibility_services")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${serviceComponent}"`)).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 1")).toBe(true);
+    });
+
+    test("should enable service when no services are currently enabled (empty string)", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${serviceComponent}"`, {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${serviceComponent}"`)).toBe(true);
+    });
+
+    test("should append service to existing services list", async function() {
+      const existingServices = "com.example.other/com.example.other.Service";
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const expectedServices = `${existingServices}:${serviceComponent}`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: existingServices,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${expectedServices}"`, {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${expectedServices}"`)).toBe(true);
+    });
+
+    test("should not re-enable service if already enabled", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: serviceComponent,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      // Should still enable accessibility globally but not modify the services list
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 1")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services`)).toBe(false);
+    });
+
+    test("should preserve other services when enabling in middle of list", async function() {
+      const existingServices = "com.example.first/com.example.First:com.example.second/com.example.Second";
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const expectedServices = `${existingServices}:${serviceComponent}`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: existingServices,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${expectedServices}"`, {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${expectedServices}"`)).toBe(true);
+    });
+  });
+
+  describe("disableViaSettings", function() {
+    test("should handle null services gracefully", async function() {
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: "null",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      // Should not execute any put commands
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure")).toBe(false);
+    });
+
+    test("should handle empty string gracefully", async function() {
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      // Should not execute any put commands
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure")).toBe(false);
+    });
+
+    test("should remove service when it's the only enabled service", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: serviceComponent,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse('shell settings put secure enabled_accessibility_services ""', {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 0", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted('shell settings put secure enabled_accessibility_services ""')).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 0")).toBe(true);
+    });
+
+    test("should remove service from start of list and preserve others", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const otherService = "com.example.other/com.example.other.Service";
+      const currentServices = `${serviceComponent}:${otherService}`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: currentServices,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${otherService}"`, {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${otherService}"`)).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 0")).toBe(false);
+    });
+
+    test("should remove service from middle of list and preserve others", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const firstService = "com.example.first/com.example.First";
+      const lastService = "com.example.last/com.example.Last";
+      const currentServices = `${firstService}:${serviceComponent}:${lastService}`;
+      const expectedServices = `${firstService}:${lastService}`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: currentServices,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${expectedServices}"`, {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${expectedServices}"`)).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 0")).toBe(false);
+    });
+
+    test("should remove service from end of list and preserve others", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const otherService = "com.example.other/com.example.other.Service";
+      const currentServices = `${otherService}:${serviceComponent}`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: currentServices,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${otherService}"`, {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${otherService}"`)).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 0")).toBe(false);
+    });
+
+    test("should handle case when service is not in the list", async function() {
+      const otherService = "com.example.other/com.example.other.Service";
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: otherService,
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      // Should not execute any put commands since service was not enabled
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure enabled_accessibility_services")).toBe(false);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled")).toBe(false);
+    });
+
+    test("should disable accessibility globally when removing last service", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: serviceComponent,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse('shell settings put secure enabled_accessibility_services ""', {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 0", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 0")).toBe(true);
+    });
+  });
 });

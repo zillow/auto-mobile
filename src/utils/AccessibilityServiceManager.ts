@@ -471,55 +471,102 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   }
 
   /**
+   * Enable Accessibility Service via adb settings commands
+   */
+  async enableViaSettings(): Promise<void> {
+    try {
+      logger.info("Enabling Accessibility Service via settings commands");
+
+      // Get current enabled services
+      const result = await this.adb.executeCommand("shell settings get secure enabled_accessibility_services");
+      let currentServices = result.stdout.trim();
+
+      // Handle null or empty values
+      if (currentServices === "null" || currentServices === "") {
+        currentServices = "";
+      }
+
+      // Build the service component name
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      // Check if service is already in the list
+      if (currentServices.includes(serviceComponent)) {
+        logger.info("Accessibility Service is already enabled");
+      } else {
+        // Append service to list (colon-separated)
+        const updatedServices = currentServices
+          ? `${currentServices}:${serviceComponent}`
+          : serviceComponent;
+
+        // Set updated list
+        await this.adb.executeCommand(`shell settings put secure enabled_accessibility_services "${updatedServices}"`);
+        logger.info("Added AutoMobile service to enabled_accessibility_services");
+      }
+
+      // Enable accessibility globally
+      await this.adb.executeCommand("shell settings put secure accessibility_enabled 1");
+      logger.info("Accessibility Service enabled successfully via settings");
+
+      // Clear cache after enabling
+      this.clearAvailabilityCache();
+    } catch (error) {
+      throw new Error(`Failed to enable Accessibility Service via settings: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Disable Accessibility Service via adb settings commands
+   */
+  async disableViaSettings(): Promise<void> {
+    try {
+      logger.info("Disabling Accessibility Service via settings commands");
+
+      // Get current enabled services
+      const result = await this.adb.executeCommand("shell settings get secure enabled_accessibility_services");
+      const currentServices = result.stdout.trim();
+
+      // Handle null or empty values
+      if (currentServices === "null" || currentServices === "") {
+        logger.info("No accessibility services enabled");
+        return;
+      }
+
+      // Parse service list
+      const serviceList = currentServices.split(":");
+
+      // Remove AutoMobile service from list
+      const filteredServices = serviceList.filter(service => !service.includes(AndroidAccessibilityServiceManager.PACKAGE));
+
+      // Check if service was in the list
+      if (filteredServices.length === serviceList.length) {
+        logger.info("Accessibility Service was not enabled");
+      } else {
+        // Set updated list
+        const updatedServices = filteredServices.join(":");
+        await this.adb.executeCommand(`shell settings put secure enabled_accessibility_services "${updatedServices}"`);
+        logger.info("Removed AutoMobile service from enabled_accessibility_services");
+
+        // Conditionally disable accessibility if no other services remain
+        if (filteredServices.length === 0 || (filteredServices.length === 1 && filteredServices[0] === "")) {
+          await this.adb.executeCommand("shell settings put secure accessibility_enabled 0");
+          logger.info("Disabled accessibility globally (no other services remain)");
+        }
+      }
+
+      logger.info("Accessibility Service disabled successfully via settings");
+
+      // Clear cache after disabling
+      this.clearAvailabilityCache();
+    } catch (error) {
+      throw new Error(`Failed to disable Accessibility Service via settings: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
    * Enable Accessibility Service
    */
   async enable(): Promise<void> {
-    try {
-      logger.info("Enabling Accessibility Service input method");
-
-      // Use dynamic imports to avoid circular dependency
-      const { TerminateApp } = await import("../features/action/TerminateApp");
-      const { LaunchApp } = await import("../features/action/LaunchApp");
-      const { TapOnElement } = await import("../features/action/TapOnElement");
-      const { PressButton } = await import("../features/action/PressButton");
-
-      await new TerminateApp(this.device).execute(AndroidAccessibilityServiceManager.PACKAGE);
-
-      await new LaunchApp(this.device).execute(
-        AndroidAccessibilityServiceManager.PACKAGE,
-        false,
-        false,
-        AndroidAccessibilityServiceManager.ACTIVITY
-      );
-
-      await new TapOnElement(this.device).execute({
-        text: "Open Accessibility Settings",
-        action: "tap"
-      });
-
-      await new TapOnElement(this.device).execute({
-        text: "AutoMobile A11Y Service",
-        action: "tap"
-      });
-
-      await new TapOnElement(this.device).execute({
-        text: "Use AutoMobile A11Y Service",
-        action: "tap"
-      });
-
-      await new TapOnElement(this.device).execute({
-        elementId: "android:id/accessibility_permission_enable_allow_button",
-        action: "tap"
-      });
-
-      await new PressButton(this.device).execute("back");
-      await new PressButton(this.device).execute("back");
-      await new PressButton(this.device).execute("back");
-
-      logger.info("Accessibility Service enabled successfully");
-    } catch (error) {
-      throw new Error(`Failed to enable Accessibility Service: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    return this.enableViaSettings();
   }
 
   /**
