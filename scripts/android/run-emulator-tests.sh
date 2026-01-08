@@ -336,11 +336,11 @@ for i in $(seq 1 $MAX_RETRIES); do
   echo "$RESULT"
 
   # Check if we have at least 1 available device (device pool is initialized)
-  if echo "$RESULT" | grep -q '"availableDevices":[^0]'; then
+  if echo "$RESULT" | grep -q '"availableDevices": [1-9]'; then
     print_success "Daemon is ready and devices are available"
     DAEMON_READY=true
     break
-  elif echo "$RESULT" | grep -q '"availableDevices":0'; then
+  elif echo "$RESULT" | grep -q '"availableDevices": 0'; then
     echo "Device pool not yet initialized (0 devices), waiting ${RETRY_DELAY}s..."
     sleep $RETRY_DELAY
   else

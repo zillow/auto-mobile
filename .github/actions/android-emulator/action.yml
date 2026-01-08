@@ -41,6 +41,9 @@ runs:
         distribution: "zulu"
         java-version: "21"
 
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
     - name: Verify Java version
       shell: ${{ inputs.shell }}
       run: |
@@ -62,6 +65,10 @@ runs:
           ~/.android/avd/*
           ~/.android/adb*
         key: avd-${{ runner.os }}-${{ inputs.api_level }}-${{ inputs.arch }}-${{ inputs.target }}
+        restore-keys: |
+          avd-${{ runner.os }}-${{ inputs.api_level }}-${{ inputs.arch }}-
+          avd-${{ runner.os }}-${{ inputs.api_level }}-
+          avd-${{ runner.os }}-
 
     - name: Create AVD and generate snapshot for caching
       if: steps.avd-cache.outputs.cache-hit != 'true'
@@ -94,5 +101,5 @@ runs:
         script: ../scripts/android/run-emulator-tests.sh "${{ inputs.accessibility-apk-path }}" "${{ inputs.script }}"
         working-directory: ${{ inputs.working-directory }}
         force-avd-creation: false
-        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: false
