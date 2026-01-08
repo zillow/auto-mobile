@@ -234,6 +234,12 @@ export class ObserveScreen {
           logger.debug(`Found focused element: ${focusedElement.text || focusedElement["resource-id"] || "no text/id"}`);
         }
         await this.detectIntentChooser(result);
+        if (viewHierarchy.notificationPermissionDetected !== undefined) {
+          result.notificationPermissionDetected = viewHierarchy.notificationPermissionDetected;
+          if (viewHierarchy.notificationPermissionDetected) {
+            logger.info("[ObserveScreen] Notification permission dialog detected in view hierarchy");
+          }
+        }
       }
 
       logger.debug(`View hierarchy retrieval took ${Date.now() - viewHierarchyStart}ms`);
@@ -358,6 +364,10 @@ export class ObserveScreen {
         // Fallback: if activeWindow still not populated, use the Window class
         if (!result.activeWindow) {
           await this.collectActiveWindow(result);
+        }
+
+        if (result.notificationPermissionDetected && result.activeWindow) {
+          result.activeWindow.type = "notification_permission_dialog";
         }
 
         perf.end();

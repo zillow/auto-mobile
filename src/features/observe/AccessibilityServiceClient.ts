@@ -72,6 +72,8 @@ export interface AccessibilityHierarchy {
   hierarchy: AccessibilityNode;
   windows?: AccessibilityWindowHierarchy[];
   intentChooserDetected?: boolean;
+  notificationPermissionDetected?: boolean;
+  error?: string;
 }
 
 /**
@@ -791,7 +793,13 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
         // Notify hierarchy navigation detector for view hierarchy-based navigation detection
         if (this.hierarchyNavigationDetector) {
+          if (!message.data.hierarchy) {
+            logger.warn("[ACCESSIBILITY_SERVICE] Skipping navigation detection: hierarchy missing in update");
+          } else if (message.data.error) {
+            logger.warn(`[ACCESSIBILITY_SERVICE] Skipping navigation detection due to hierarchy error: ${message.data.error}`);
+          } else {
           this.hierarchyNavigationDetector.onHierarchyUpdate(message.data);
+          }
         }
       }
 
@@ -1259,13 +1267,47 @@ export class AccessibilityServiceClient implements AccessibilityService {
     try {
       logger.info("[ACCESSIBILITY_SERVICE] Converting accessibility service format to ViewHierarchyResult format");
 
+      let hierarchyToConvert: AccessibilityNode | undefined = accessibilityHierarchy.hierarchy;
+      let resolvedPackageName = accessibilityHierarchy.packageName;
+      let fallbackWindowId: number | undefined;
+
+      if (!hierarchyToConvert && accessibilityHierarchy.windows?.length) {
+        const windowsWithHierarchy = accessibilityHierarchy.windows.filter(window => window.hierarchy);
+        const fallbackWindow =
+          windowsWithHierarchy.find(window => window.isFocused) ?? windowsWithHierarchy[0];
+
+        if (fallbackWindow?.hierarchy) {
+          hierarchyToConvert = fallbackWindow.hierarchy;
+          fallbackWindowId = fallbackWindow.windowId;
+          if (!resolvedPackageName && fallbackWindow.packageName) {
+            resolvedPackageName = fallbackWindow.packageName;
+          }
+          logger.warn(
+            `[ACCESSIBILITY_SERVICE] Missing main hierarchy, using window ${fallbackWindow.windowId} for conversion`
+          );
+        }
+      }
+
+      if (!hierarchyToConvert) {
+        const errorMessage = accessibilityHierarchy.error || "Accessibility hierarchy missing from accessibility service";
+        return {
+          hierarchy: {
+            error: errorMessage
+          },
+          packageName: resolvedPackageName,
+          intentChooserDetected: accessibilityHierarchy.intentChooserDetected,
+          notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected
+        } as ViewHierarchyResult;
+      }
+
       // Convert the accessibility node format to match the existing XML-based format
-      const convertedHierarchy = this.convertAccessibilityNode(accessibilityHierarchy.hierarchy);
+      const convertedHierarchy = this.convertAccessibilityNode(hierarchyToConvert);
 
       const result: ViewHierarchyResult = {
         hierarchy: convertedHierarchy,
-        packageName: accessibilityHierarchy.packageName,
-        intentChooserDetected: accessibilityHierarchy.intentChooserDetected
+        packageName: resolvedPackageName,
+        intentChooserDetected: accessibilityHierarchy.intentChooserDetected,
+        notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected
       };
 
       // Convert windows if present (for multi-window support - popups, toolbars, etc.)
@@ -1283,7 +1325,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       const duration = Date.now() - startTime;
-      logger.info(`[ACCESSIBILITY_SERVICE] Format conversion completed in ${duration}ms`);
+      logger.info(
+        `[ACCESSIBILITY_SERVICE] Format conversion completed in ${duration}ms` +
+        `${fallbackWindowId !== undefined ? ` (fallback window ${fallbackWindowId})` : ""}`
+      );
 
       return result;
     } catch (error) {

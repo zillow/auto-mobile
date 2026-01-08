@@ -12,6 +12,8 @@ export interface ViewHierarchyResult {
   packageName?: string;
   /** Whether an intent chooser dialog was detected (from accessibility service) */
   intentChooserDetected?: boolean;
+  /** Whether a notification permission dialog was detected (from accessibility service) */
+  notificationPermissionDetected?: boolean;
   /** All visible windows (including popups, toolbars, etc.) */
   windows?: WindowHierarchy[];
 }

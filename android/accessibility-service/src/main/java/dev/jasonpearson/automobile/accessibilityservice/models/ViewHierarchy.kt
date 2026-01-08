@@ -14,6 +14,7 @@ data class ViewHierarchy(
     val windowInfo: WindowInfo? = null,
     val windows: List<WindowHierarchy>? = null, // All visible windows (including popups, toolbars)
     val intentChooserDetected: Boolean? = null,
+    val notificationPermissionDetected: Boolean? = null,
     val error: String? = null, // For error cases like locked screen
 )
 

@@ -99,6 +99,8 @@ export interface ObserveResult {
 
   /** Whether a system intent chooser dialog was detected */
   intentChooserDetected?: boolean;
+  /** Whether a notification permission dialog was detected */
+  notificationPermissionDetected?: boolean;
 
   /**
    * Device wakefulness state (Android only)

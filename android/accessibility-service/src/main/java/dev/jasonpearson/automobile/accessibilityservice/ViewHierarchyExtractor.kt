@@ -77,11 +77,16 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
           }
       val intentChooserDetected =
           filteredElement?.let { detectIntentChooserIndicators(it) } ?: false
+      val notificationPermissionDetected =
+          filteredElement?.let {
+            detectNotificationPermissionDialog(it, rootNode.packageName?.toString())
+          }
 
       ViewHierarchy(
           packageName = rootNode.packageName?.toString(),
           hierarchy = filteredElement,
           intentChooserDetected = intentChooserDetected,
+          notificationPermissionDetected = notificationPermissionDetected,
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error extracting view hierarchy", e)
@@ -116,6 +121,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     var mainHierarchy: UIElementInfo? = null
     var mainPackageName: String? = null
     var intentChooserDetected = false
+    var notificationPermissionDetected: Boolean? = null
     var activeWindowLayer = 0
     var activeWindowKey: Int? = null
     val windowLayers = mutableMapOf<Int, Int>()
@@ -154,6 +160,10 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         if (window.isActive) {
           mainHierarchy = optimizedElement
           mainPackageName = packageName
+          if (notificationPermissionDetected == null && optimizedElement != null) {
+            notificationPermissionDetected =
+                detectNotificationPermissionDialog(optimizedElement, packageName)
+          }
           // Skip adding to windows list - it's already in main hierarchy
           continue
         }
@@ -196,6 +206,10 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       mainPackageName = activeWindowRoot.packageName?.toString()
       if (!intentChooserDetected && mainHierarchy != null) {
         intentChooserDetected = detectIntentChooserIndicators(mainHierarchy!!)
+      }
+      if (notificationPermissionDetected == null && mainHierarchy != null) {
+        notificationPermissionDetected =
+            detectNotificationPermissionDialog(mainHierarchy!!, mainPackageName)
       }
     }
 
@@ -244,6 +258,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         hierarchy = mainHierarchy,
         windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null,
         intentChooserDetected = intentChooserDetected,
+        notificationPermissionDetected = notificationPermissionDetected,
     )
   }
 
@@ -337,6 +352,55 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
 
   internal fun detectIntentChooserIndicatorsForTest(element: UIElementInfo): Boolean {
     return detectIntentChooserIndicators(element)
+  }
+
+  /** Detect notification permission dialog indicators in an optimized hierarchy. */
+  private fun detectNotificationPermissionDialog(
+      element: UIElementInfo,
+      packageName: String?,
+  ): Boolean {
+    if (packageName.isNullOrBlank() || !packageName.contains("permissioncontroller", true)) {
+      return false
+    }
+
+    var hasNotificationText = false
+    var hasPermissionButtons = false
+
+    fun visit(node: UIElementInfo) {
+      val text = (node.text ?: node.contentDesc ?: "").lowercase()
+      if (text.contains("notification")) {
+        hasNotificationText = true
+      }
+
+      val resourceId = node.resourceId?.lowercase() ?: ""
+      if (
+          resourceId.contains("permission_allow_button") ||
+              resourceId.contains("permission_deny_button")
+      ) {
+        hasPermissionButtons = true
+      }
+
+      if (hasNotificationText && hasPermissionButtons) {
+        return
+      }
+
+      for (child in extractChildrenFromNode(node.node)) {
+        visit(child)
+        if (hasNotificationText && hasPermissionButtons) {
+          return
+        }
+      }
+    }
+
+    visit(element)
+    return hasNotificationText && hasPermissionButtons
+  }
+
+  internal fun detectNotificationPermissionDialogForTest(
+      element: UIElementInfo,
+      packageName: String?,
+  ): Boolean {
+    return detectNotificationPermissionDialog(element, packageName)
   }
 
   /**

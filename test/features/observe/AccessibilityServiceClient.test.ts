@@ -235,6 +235,7 @@ describe("AccessibilityServiceClient", function() {
         updatedAt: 1750934583218,
         packageName: "com.google.android.deskclock",
         intentChooserDetected: true,
+        notificationPermissionDetected: true,
         hierarchy: {
           "text": "6:43 AM",
           "content-desc": "6:43 AM",
@@ -272,6 +273,7 @@ describe("AccessibilityServiceClient", function() {
       expect(result.hierarchy.clickable).toBeUndefined();
       expect(result.hierarchy.enabled).toBe("true");
       expect(result.intentChooserDetected).toBe(true);
+      expect(result.notificationPermissionDetected).toBe(true);
 
       // Check child node conversion
       expect(typeof result.hierarchy.node).toBe("object");
@@ -314,7 +316,35 @@ describe("AccessibilityServiceClient", function() {
 
       expect(result).toBeDefined();
       expect(result.hierarchy).toBeDefined();
-      expect(result.hierarchy.error).toContain("Failed to convert accessibility service hierarchy format");
+      expect(result.hierarchy.error).toContain("Accessibility hierarchy missing from accessibility service");
+    });
+
+    test("should fall back to window hierarchy when main hierarchy is missing", function() {
+      const fallbackHierarchy = {
+        updatedAt: 1750934583218,
+        packageName: "",
+        hierarchy: null as any,
+        windows: [
+          {
+            windowId: 10,
+            windowType: "application",
+            windowLayer: 0,
+            packageName: "com.android.permissioncontroller",
+            isActive: false,
+            isFocused: true,
+            hierarchy: {
+              text: "Allow Example to send notifications?",
+              "resource-id": "com.android.permissioncontroller:id/permission_allow_button"
+            }
+          }
+        ]
+      };
+
+      const result = accessibilityServiceClient.convertToViewHierarchyResult(fallbackHierarchy);
+
+      expect(result.hierarchy).toBeDefined();
+      expect(result.hierarchy.text).toBe("Allow Example to send notifications?");
+      expect(result.packageName).toBe("com.android.permissioncontroller");
     });
   });
 

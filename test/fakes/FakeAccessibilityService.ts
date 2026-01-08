@@ -281,7 +281,8 @@ export class FakeAccessibilityService implements AccessibilityService {
       },
       packageName: accessibilityHierarchy.packageName,
       updatedAt: accessibilityHierarchy.updatedAt,
-      intentChooserDetected: accessibilityHierarchy.intentChooserDetected
+      intentChooserDetected: accessibilityHierarchy.intentChooserDetected,
+      notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected
     };
   }
 

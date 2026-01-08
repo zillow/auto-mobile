@@ -171,6 +171,40 @@ class ViewHierarchyExtractorTest {
   }
 
   @Test
+  fun `detectNotificationPermissionDialog returns true when notification dialog markers present`() {
+    val title = UIElementInfo(text = "Allow Example to send notifications?")
+    val allowButton =
+        UIElementInfo(resourceId = "com.android.permissioncontroller:id/permission_allow_button")
+    val childrenJson =
+        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), listOf(title, allowButton))
+    val root = UIElementInfo(className = "android.widget.LinearLayout", node = childrenJson)
+
+    assertTrue(
+        extractor.detectNotificationPermissionDialogForTest(
+            root,
+            "com.android.permissioncontroller",
+        ),
+    )
+  }
+
+  @Test
+  fun `detectNotificationPermissionDialog returns false for non-permission controller package`() {
+    val title = UIElementInfo(text = "Allow Example to send notifications?")
+    val allowButton =
+        UIElementInfo(resourceId = "com.android.permissioncontroller:id/permission_allow_button")
+    val childrenJson =
+        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), listOf(title, allowButton))
+    val root = UIElementInfo(className = "android.widget.LinearLayout", node = childrenJson)
+
+    assertFalse(
+        extractor.detectNotificationPermissionDialogForTest(
+            root,
+            "com.example.app",
+        ),
+    )
+  }
+
+  @Test
   fun `meetsFilterCriteria excludes UIElementInfo with no values`() = runTest {
     val plainElement = UIElementInfo()
 
