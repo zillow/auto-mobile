@@ -31,6 +31,7 @@ import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
 import { registerTestTimingTools } from "./testTimingTools";
 import { registerPerformanceTools } from "./performanceTools";
+import { registerCriticalSectionTools } from "./criticalSectionTools";
 import { registerVideoRecordingTools } from "./videoRecordingTools";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 
@@ -100,6 +101,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDoctorTools();
   registerFeatureFlagTools();
   registerPerformanceTools();
+  registerCriticalSectionTools();
   registerVideoRecordingTools();
 
   // Register all resources

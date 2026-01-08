@@ -333,7 +333,7 @@ describe("AccessibilityServiceClient", function() {
             isActive: false,
             isFocused: true,
             hierarchy: {
-              text: "Allow Example to send notifications?",
+              "text": "Allow Example to send notifications?",
               "resource-id": "com.android.permissioncontroller:id/permission_allow_button"
             }
           }

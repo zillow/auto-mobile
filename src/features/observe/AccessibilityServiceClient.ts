@@ -798,7 +798,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
           } else if (message.data.error) {
             logger.warn(`[ACCESSIBILITY_SERVICE] Skipping navigation detection due to hierarchy error: ${message.data.error}`);
           } else {
-          this.hierarchyNavigationDetector.onHierarchyUpdate(message.data);
+            this.hierarchyNavigationDetector.onHierarchyUpdate(message.data);
           }
         }
       }

@@ -64,8 +64,8 @@ describe("SelectionStateDetector", () => {
     );
 
     const element: Element = {
-      bounds: { left: 0, top: 0, right: 50, bottom: 50 },
-      text: "Tab1",
+      "bounds": { left: 0, top: 0, right: 50, bottom: 50 },
+      "text": "Tab1",
       "resource-id": "tab1"
     };
 
