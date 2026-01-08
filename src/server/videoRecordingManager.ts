@@ -1,12 +1,15 @@
 import { ActionableError, BootedDevice, VideoRecordingConfigInput, VideoRecordingMetadata } from "../models";
 import {
   PlatformVideoCaptureBackend,
+  FfmpegVideoCaptureBackend,
   VideoRecorderService,
   type ActiveVideoRecording,
+  type VideoCaptureBackend,
 } from "../features/video";
 import { serverConfig } from "../utils/ServerConfig";
 import { logger } from "../utils/logger";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
+import { spawn } from "node:child_process";
 
 export interface StartVideoRecordingRequest {
   device: BootedDevice;
@@ -26,26 +29,45 @@ const activeRecordingIds = new Set<string>();
 const autoStopTimers = new Map<string, { timer: Timer; handle: NodeJS.Timeout }>();
 let latestActiveRecordingId: string | null = null;
 
-function createDefaultRecorderService(): VideoRecorderService {
-  return new VideoRecorderService({
-    backend: new PlatformVideoCaptureBackend(),
+async function checkFfmpegAvailable(): Promise<boolean> {
+  return new Promise(resolve => {
+    const process = spawn("ffmpeg", ["-version"], { stdio: "ignore" });
+    process.once("error", () => resolve(false));
+    process.once("exit", code => resolve(code === 0));
   });
 }
 
-function getVideoRecordingDependencies(): VideoRecordingManagerDependencies {
+async function selectBackend(): Promise<VideoCaptureBackend> {
+  const ffmpegAvailable = await checkFfmpegAvailable();
+
+  if (ffmpegAvailable) {
+    logger.debug("[VideoRecording] FFmpeg available, using FfmpegVideoCaptureBackend");
+    return new FfmpegVideoCaptureBackend();
+  }
+
+  logger.debug("[VideoRecording] FFmpeg not available, using PlatformVideoCaptureBackend");
+  return new PlatformVideoCaptureBackend();
+}
+
+async function createRecorderService(): Promise<VideoRecorderService> {
+  const backend = await selectBackend();
+  return new VideoRecorderService({ backend });
+}
+
+async function getVideoRecordingDependencies(): Promise<VideoRecordingManagerDependencies> {
   if (!moduleDependencies) {
     moduleDependencies = {
-      videoRecorderService: createDefaultRecorderService(),
+      videoRecorderService: await createRecorderService(),
       timer: defaultTimer,
     };
   }
   return moduleDependencies;
 }
 
-export function setVideoRecordingManagerDependencies(
+export async function setVideoRecordingManagerDependencies(
   deps: Partial<VideoRecordingManagerDependencies>
-): void {
-  const current = getVideoRecordingDependencies();
+): Promise<void> {
+  const current = await getVideoRecordingDependencies();
   moduleDependencies = {
     videoRecorderService: deps.videoRecorderService ?? current.videoRecorderService,
     timer: deps.timer ?? current.timer,
@@ -97,12 +119,12 @@ function resolveActiveRecordingId(recordingId?: string): string {
   throw new ActionableError("No active video recording found. Provide recordingId.");
 }
 
-function scheduleAutoStop(recordingId: string, maxDurationSeconds: number): void {
+async function scheduleAutoStop(recordingId: string, maxDurationSeconds: number): Promise<void> {
   if (!Number.isFinite(maxDurationSeconds) || maxDurationSeconds <= 0) {
     return;
   }
 
-  const { timer } = getVideoRecordingDependencies();
+  const { timer } = await getVideoRecordingDependencies();
   const timeoutMs = Math.max(1, Math.round(maxDurationSeconds * 1000));
   const handle = timer.setTimeout(() => {
     void stopVideoRecording(recordingId).catch(error => {
@@ -121,14 +143,14 @@ function clearAutoStop(recordingId: string): void {
   }
 }
 
-export function getVideoRecorderService(): VideoRecorderService {
-  return getVideoRecordingDependencies().videoRecorderService;
+export async function getVideoRecorderService(): Promise<VideoRecorderService> {
+  return (await getVideoRecordingDependencies()).videoRecorderService;
 }
 
 export async function startVideoRecording(
   request: StartVideoRecordingRequest
 ): Promise<ActiveVideoRecording> {
-  const { videoRecorderService } = getVideoRecordingDependencies();
+  const { videoRecorderService } = await getVideoRecordingDependencies();
   const defaults = serverConfig.getVideoRecordingDefaults();
   const overrides = request.configOverrides ?? {};
   const configInput = mergeConfigInput(defaults, overrides);
@@ -144,7 +166,7 @@ export async function startVideoRecording(
   latestActiveRecordingId = active.recordingId;
 
   if (request.maxDurationSeconds) {
-    scheduleAutoStop(active.recordingId, request.maxDurationSeconds);
+    await scheduleAutoStop(active.recordingId, request.maxDurationSeconds);
   }
 
   return active;
@@ -153,7 +175,7 @@ export async function startVideoRecording(
 export async function stopVideoRecording(
   recordingId?: string
 ): Promise<VideoRecordingMetadata> {
-  const { videoRecorderService } = getVideoRecordingDependencies();
+  const { videoRecorderService } = await getVideoRecordingDependencies();
   const resolvedId = resolveActiveRecordingId(recordingId);
 
   clearAutoStop(resolvedId);
@@ -169,14 +191,14 @@ export async function stopVideoRecording(
 }
 
 export async function listVideoRecordings(): Promise<VideoRecordingMetadata[]> {
-  return getVideoRecordingDependencies().videoRecorderService.listRecordings();
+  return (await getVideoRecordingDependencies()).videoRecorderService.listRecordings();
 }
 
 export async function getVideoRecordingMetadata(
   recordingId: string,
   options?: { touch?: boolean }
 ): Promise<VideoRecordingMetadata | null> {
-  return getVideoRecordingDependencies().videoRecorderService.getRecordingMetadata(recordingId, options);
+  return (await getVideoRecordingDependencies()).videoRecorderService.getRecordingMetadata(recordingId, options);
 }
 
 export async function getLatestVideoRecordingMetadata(): Promise<VideoRecordingMetadata | null> {
@@ -185,5 +207,5 @@ export async function getLatestVideoRecordingMetadata(): Promise<VideoRecordingM
 }
 
 export async function deleteVideoRecording(recordingId: string): Promise<boolean> {
-  return getVideoRecordingDependencies().videoRecorderService.deleteRecording(recordingId);
+  return (await getVideoRecordingDependencies()).videoRecorderService.deleteRecording(recordingId);
 }

@@ -32,7 +32,7 @@ describe("videoRecordingManager", () => {
       now: () => new Date(fakeTimer.now()),
     });
 
-    setVideoRecordingManagerDependencies({
+    await setVideoRecordingManagerDependencies({
       videoRecorderService: service,
       timer: fakeTimer,
     });
