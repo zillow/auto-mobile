@@ -78,6 +78,22 @@ If you have a private npm registry for proxying public npm:
 - Android: [Android setup](plat/android.md)
 - iOS: unsupported at the moment, but the [design doc](../design-docs/plat/ios/index.md) outlines plans.
 
+## Decision guide (Android)
+
+If your goal is interactive AI-driven automation, the MCP server plus an agent is enough. The rest are optional based on
+what you want to do:
+
+- **IntelliJ IDE Plugin** - Toggle feature flags, record tests, visualize the navigation graph, and inspect app
+  performance while coding.
+- **JUnitRunner** - Test framework dependency (not the SDK library) to run AutoMobile tests from JUnit/Gradle or CI with
+  device pooling, timing ordering, and optional AI self-healing (requires model provider keys).
+- **Android SDK library** - Add app-side instrumentation like recomposition tracking.
+
+For Android UI automation, you must enable the [Accessibility Service](../design-docs/plat/android/accessibility-service.md)
+on test devices so AutoMobile can access the view hierarchy.
+
+For a comparison table and scenarios, see the [Android decision guide](plat/android.md#decision-guide).
+
 ### AI Agent & Model Providers
 
 Any MCP-compatible client can use AutoMobile. Configuration guides for specific clients:
@@ -96,4 +112,3 @@ For model provider supported features like JUnitRunner AI self-healing tests you
 - **AWS Bedrock** - [Setup Guide](https://docs.aws.amazon.com/bedrock/latest/userguide/setting-up.html)
 
 Set API keys via environment variables or system properties. See [JUnitRunner](../design-docs/plat/android/junitrunner.md#model-providers) for configuration details.
-

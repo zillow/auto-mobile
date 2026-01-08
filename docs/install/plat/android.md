@@ -49,11 +49,36 @@ Quick example:
 }
 ```
 
-## Optional Components
+## Decision guide
 
-1. Install the [IntelliJ IDE Plugin](../../design-docs/plat/android/ide-plugin/overview.md) to gain the ability to toggle feature flags, record tests, visualize the real-time navigation graph, and inspect app performance.
-2. Add the [JUnitRunner](../../design-docs/plat/android/junitrunner.md) test dependency to all Android application and library modules you want to run AutoMobile tests from.
-3. Add the [Android SDK](../../design-docs/plat/android/auto-mobile-sdk.md) Android library to add recomposition tracking.
+AutoMobile always needs the MCP server (configured in the overview). Everything below is optional and only needed for
+specific workflows.
+
+### Component summary
+
+- **Accessibility Service** - Required on test devices for AutoMobile to access the view hierarchy and UI signals.
+- **IntelliJ IDE Plugin** - Attach to a running MCP server to toggle feature flags, record tests, visualize the
+  real-time navigation graph, and inspect app performance.
+- **JUnitRunner** - Test framework dependency (not the SDK library) to run AutoMobile tests from JUnit/Gradle or CI.
+  Enables device pooling and timing-based ordering, and can use AI self-healing when model provider keys are configured.
+- **Android SDK library** - Add to app modules when you want app-side instrumentation like recomposition tracking.
+
+### Comparison table
+
+| Goal | Use these components |
+| --- | --- |
+| Drive the app from an AI agent (Claude, Cursor, etc.) | MCP server + agent |
+| Record tests or view the navigation graph inside Android Studio | MCP server + [IntelliJ IDE Plugin](../../design-docs/plat/android/ide-plugin/overview.md) |
+| Run AutoMobile tests in Gradle/CI | MCP server + [JUnitRunner](../../design-docs/plat/android/junitrunner.md) |
+| Collect recomposition tracking data | MCP server + [Android SDK library](../../design-docs/plat/android/auto-mobile-sdk.md) |
+| Access the real-time view hierarchy | Enable the [Accessibility Service](../../design-docs/plat/android/accessibility-service.md) |
+
+### Scenarios
+
+- **Exploratory automation** - MCP server + agent only, plus the Accessibility Service on devices. Add the IDE plugin if
+  you want the navigation graph while you explore.
+- **CI or local JUnit execution** - Add JUnitRunner (plus model provider keys if you want AI self-healing).
+- **App instrumentation focus** - Add the Android SDK library for recomposition tracking.
 
 ## Troubleshooting
 
