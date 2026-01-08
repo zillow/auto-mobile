@@ -47,6 +47,13 @@ export interface AccessibilityVersionCheckResult {
   reinstallError?: string;
 }
 
+export interface ToggleCapabilities {
+  supportsSettingsToggle: boolean;
+  deviceType: "emulator" | "physical";
+  apiLevel: number | null;
+  reason?: string;
+}
+
 type InstalledApkSha256Result = {
   sha256: string | null;
   source: "device" | "host" | "none";
@@ -69,6 +76,9 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   private cachedInstallation: { isInstalled: boolean; timestamp: number } | null = null;
   private cachedEnabled: { isEnabled: boolean; timestamp: number } | null = null;
   private static readonly STATUS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+  // Cache for toggle capabilities (settings permissions don't change during session)
+  private cachedToggleCapabilities: ToggleCapabilities | null = null;
 
   private attemptedAutomatedSetup: boolean = false;
   private static instances: Map<string, AndroidAccessibilityServiceManager> = new Map();
@@ -112,6 +122,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     this.cachedAvailability = null;
     this.cachedInstallation = null;
     this.cachedEnabled = null;
+    this.cachedToggleCapabilities = null;
     logger.info("[ACCESSIBILITY_SERVICE] Cleared all availability caches");
   }
 
@@ -474,6 +485,14 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
    * Enable Accessibility Service via adb settings commands
    */
   async enableViaSettings(): Promise<void> {
+    // Check if settings toggle is supported
+    const capabilities = await this.getToggleCapabilities();
+    if (!capabilities.supportsSettingsToggle) {
+      const errorMsg = `Settings-based accessibility toggle is not supported on this device. ${capabilities.reason || ""}`;
+      logger.error("[ACCESSIBILITY_SERVICE] " + errorMsg, { capabilities });
+      throw new Error(errorMsg);
+    }
+
     try {
       logger.info("Enabling Accessibility Service via settings commands");
 
@@ -518,6 +537,14 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
    * Disable Accessibility Service via adb settings commands
    */
   async disableViaSettings(): Promise<void> {
+    // Check if settings toggle is supported
+    const capabilities = await this.getToggleCapabilities();
+    if (!capabilities.supportsSettingsToggle) {
+      const errorMsg = `Settings-based accessibility toggle is not supported on this device. ${capabilities.reason || ""}`;
+      logger.error("[ACCESSIBILITY_SERVICE] " + errorMsg, { capabilities });
+      throw new Error(errorMsg);
+    }
+
     try {
       logger.info("Disabling Accessibility Service via settings commands");
 
@@ -667,6 +694,121 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         await this.cleanupApk(apkPath);
       }
     }
+  }
+
+  /**
+   * Detect if device is an emulator or physical device
+   * Returns [isEmulator, hadError] tuple to track detection success
+   */
+  private async isEmulator(): Promise<[boolean, boolean]> {
+    try {
+      const result = await this.adb.executeCommand("shell getprop ro.kernel.qemu", undefined, undefined, true);
+      const qemuProp = result.stdout.trim();
+      // ro.kernel.qemu is "1" on emulators, empty or "0" on physical devices
+      if (qemuProp === "1") {
+        return [true, false];
+      }
+
+      // Fallback: check ro.product.model for common emulator strings
+      const modelResult = await this.adb.executeCommand("shell getprop ro.product.model", undefined, undefined, true);
+      const model = modelResult.stdout.trim().toLowerCase();
+      return [model.includes("emulator") || model.includes("sdk"), false];
+    } catch (error) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Error detecting device type", { error });
+      // Default to physical device on error (more conservative), but mark as errored
+      return [false, true];
+    }
+  }
+
+  /**
+   * Get device API level
+   * Returns [apiLevel, hadError] tuple to track detection success
+   */
+  private async getApiLevel(): Promise<[number | null, boolean]> {
+    try {
+      const result = await this.adb.executeCommand("shell getprop ro.build.version.sdk", undefined, undefined, true);
+      const apiLevel = parseInt(result.stdout.trim(), 10);
+      return [isNaN(apiLevel) ? null : apiLevel, false];
+    } catch (error) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Error getting API level", { error });
+      return [null, true];
+    }
+  }
+
+  /**
+   * Check if the device supports programmatic accessibility toggle via settings commands
+   * @returns Promise<boolean> - True if settings-based toggle is supported
+   */
+  async canUseSettingsToggle(): Promise<boolean> {
+    const capabilities = await this.getToggleCapabilities();
+    return capabilities.supportsSettingsToggle;
+  }
+
+  /**
+   * Get detailed capabilities for accessibility service toggling
+   * @returns Promise<ToggleCapabilities> - Capability information including device type and reason if unavailable
+   */
+  async getToggleCapabilities(): Promise<ToggleCapabilities> {
+    // Return cached result if available
+    if (this.cachedToggleCapabilities) {
+      logger.info("[ACCESSIBILITY_SERVICE] Using cached toggle capabilities");
+      return this.cachedToggleCapabilities;
+    }
+
+    logger.info("[ACCESSIBILITY_SERVICE] Detecting toggle capabilities");
+
+    const [isEmulator, emulatorDetectionError] = await this.isEmulator();
+    const [apiLevel, apiLevelDetectionError] = await this.getApiLevel();
+    const deviceType = isEmulator ? "emulator" : "physical";
+
+    let supportsSettingsToggle = false;
+    let reason: string | undefined;
+
+    // If we had detection errors, don't make definitive claims about support
+    const hadDetectionError = emulatorDetectionError || apiLevelDetectionError;
+
+    if (hadDetectionError) {
+      supportsSettingsToggle = false;
+      reason = "Unable to detect device capabilities due to transient error. Retry may succeed.";
+      logger.warn("[ACCESSIBILITY_SERVICE] Detection error - not caching result", {
+        emulatorDetectionError,
+        apiLevelDetectionError
+      });
+    } else if (isEmulator) {
+      // Emulators generally support settings-based toggle
+      supportsSettingsToggle = true;
+      logger.info("[ACCESSIBILITY_SERVICE] Emulator detected - settings toggle supported");
+    } else {
+      // Physical devices may require special permissions
+      supportsSettingsToggle = false;
+      reason = "Physical devices may require root, device owner status, or special shell permissions for programmatic accessibility toggle";
+      logger.info("[ACCESSIBILITY_SERVICE] Physical device detected - settings toggle may not be supported", { reason });
+    }
+
+    // Additional API level checks could be added here if needed
+    if (!hadDetectionError && apiLevel !== null && apiLevel < 16) {
+      supportsSettingsToggle = false;
+      reason = `API level ${apiLevel} is too old (requires API 16+)`;
+      logger.warn("[ACCESSIBILITY_SERVICE] API level too old for settings toggle", { apiLevel });
+    }
+
+    const capabilities: ToggleCapabilities = {
+      supportsSettingsToggle,
+      deviceType,
+      apiLevel,
+      reason
+    };
+
+    // Only cache if we successfully detected capabilities without errors
+    // This prevents transient errors from creating sticky false negatives
+    if (!hadDetectionError) {
+      this.cachedToggleCapabilities = capabilities;
+      logger.info("[ACCESSIBILITY_SERVICE] Toggle capabilities detected and cached", capabilities);
+    } else {
+      logger.info("[ACCESSIBILITY_SERVICE] Toggle capabilities detected but not cached due to detection errors", capabilities);
+    }
+
+    return capabilities;
   }
 
   private async getInstalledApkSha256WithDetails(): Promise<InstalledApkSha256Result> {

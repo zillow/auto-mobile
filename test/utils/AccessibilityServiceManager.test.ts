@@ -529,6 +529,15 @@ describe("AccessibilityServiceManager", function() {
     test("should enable service when no services are currently enabled (null)", async function() {
       const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: "null",
         stderr: ""
@@ -552,6 +561,15 @@ describe("AccessibilityServiceManager", function() {
     test("should enable service when no services are currently enabled (empty string)", async function() {
       const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: "",
         stderr: ""
@@ -575,6 +593,15 @@ describe("AccessibilityServiceManager", function() {
       const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
       const expectedServices = `${existingServices}:${serviceComponent}`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: existingServices,
         stderr: ""
@@ -596,6 +623,15 @@ describe("AccessibilityServiceManager", function() {
     test("should not re-enable service if already enabled", async function() {
       const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: serviceComponent,
         stderr: ""
@@ -617,6 +653,15 @@ describe("AccessibilityServiceManager", function() {
       const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
       const expectedServices = `${existingServices}:${serviceComponent}`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: existingServices,
         stderr: ""
@@ -636,8 +681,328 @@ describe("AccessibilityServiceManager", function() {
     });
   });
 
+  describe("getToggleCapabilities", function() {
+    test("should detect emulator and support settings toggle", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+
+      const capabilities = await accessibilityServiceClient.getToggleCapabilities();
+
+      expect(capabilities.supportsSettingsToggle).toBe(true);
+      expect(capabilities.deviceType).toBe("emulator");
+      expect(capabilities.apiLevel).toBe(29);
+      expect(capabilities.reason).toBeUndefined();
+    });
+
+    test("should not cache capabilities when detection errors occur", async function() {
+      let callCount = 0;
+      const fakeExecAsync = async (command: string) => {
+        callCount++;
+        // First call fails, second call succeeds
+        if (callCount <= 2) {
+          throw new Error("ADB transient error");
+        }
+
+        const prefix = "adb -s test-device ";
+        const strippedCommand = command.startsWith(prefix) ? command.slice(prefix.length) : command;
+
+        if (strippedCommand.includes("ro.kernel.qemu")) {
+          return { stdout: "1", stderr: "" };
+        }
+        if (strippedCommand.includes("ro.build.version.sdk")) {
+          return { stdout: "29", stderr: "" };
+        }
+        return { stdout: "", stderr: "" };
+      };
+
+      const testAdb = new AdbClient(testDevice, fakeExecAsync);
+      AndroidAccessibilityServiceManager.resetInstances();
+      const manager = AndroidAccessibilityServiceManager.getInstance(testDevice, testAdb);
+
+      // First call - should fail with error and NOT cache
+      const capabilities1 = await manager.getToggleCapabilities();
+      expect(capabilities1.supportsSettingsToggle).toBe(false);
+      expect(capabilities1.reason).toContain("transient error");
+
+      // Second call - should retry and succeed
+      const capabilities2 = await manager.getToggleCapabilities();
+      expect(capabilities2.supportsSettingsToggle).toBe(true);
+      expect(capabilities2.deviceType).toBe("emulator");
+      expect(capabilities2.apiLevel).toBe(29);
+    });
+
+    test("should detect physical device and not support settings toggle", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.product.model", {
+        stdout: "Pixel 6",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "33",
+        stderr: ""
+      });
+
+      const capabilities = await accessibilityServiceClient.getToggleCapabilities();
+
+      expect(capabilities.supportsSettingsToggle).toBe(false);
+      expect(capabilities.deviceType).toBe("physical");
+      expect(capabilities.apiLevel).toBe(33);
+      expect(capabilities.reason).toContain("Physical devices may require");
+    });
+
+    test("should fallback to model detection when qemu prop is unavailable", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.product.model", {
+        stdout: "sdk_gphone64_arm64",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "35",
+        stderr: ""
+      });
+
+      const capabilities = await accessibilityServiceClient.getToggleCapabilities();
+
+      expect(capabilities.supportsSettingsToggle).toBe(true);
+      expect(capabilities.deviceType).toBe("emulator");
+      expect(capabilities.apiLevel).toBe(35);
+    });
+
+    test("should reject devices with API level below 16", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "15",
+        stderr: ""
+      });
+
+      const capabilities = await accessibilityServiceClient.getToggleCapabilities();
+
+      expect(capabilities.supportsSettingsToggle).toBe(false);
+      expect(capabilities.deviceType).toBe("emulator");
+      expect(capabilities.apiLevel).toBe(15);
+      expect(capabilities.reason).toContain("API level 15 is too old");
+    });
+
+    test("should handle API level parsing errors gracefully", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "invalid",
+        stderr: ""
+      });
+
+      const capabilities = await accessibilityServiceClient.getToggleCapabilities();
+
+      expect(capabilities.supportsSettingsToggle).toBe(true);
+      expect(capabilities.deviceType).toBe("emulator");
+      expect(capabilities.apiLevel).toBe(null);
+    });
+
+    test("should cache capabilities result", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+
+      // First call
+      const capabilities1 = await accessibilityServiceClient.getToggleCapabilities();
+      const commandCount1 = fakeAdb.getExecutedCommands().length;
+
+      // Second call should use cache
+      const capabilities2 = await accessibilityServiceClient.getToggleCapabilities();
+      const commandCount2 = fakeAdb.getExecutedCommands().length;
+
+      expect(capabilities1).toEqual(capabilities2);
+      expect(commandCount2).toBe(commandCount1); // No new commands executed
+    });
+
+    test("should clear cache when clearAvailabilityCache is called", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+
+      // First call
+      await accessibilityServiceClient.getToggleCapabilities();
+      const commandCount1 = fakeAdb.getExecutedCommands().length;
+
+      // Clear cache
+      accessibilityServiceClient.clearAvailabilityCache();
+
+      // Second call should execute commands again
+      await accessibilityServiceClient.getToggleCapabilities();
+      const commandCount2 = fakeAdb.getExecutedCommands().length;
+
+      expect(commandCount2).toBeGreaterThan(commandCount1);
+    });
+  });
+
+  describe("canUseSettingsToggle", function() {
+    test("should return true for emulator", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+
+      const canUse = await accessibilityServiceClient.canUseSettingsToggle();
+      expect(canUse).toBe(true);
+    });
+
+    test("should return false for physical device", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.product.model", {
+        stdout: "Pixel 6",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "33",
+        stderr: ""
+      });
+
+      const canUse = await accessibilityServiceClient.canUseSettingsToggle();
+      expect(canUse).toBe(false);
+    });
+  });
+
+  describe("enableViaSettings with capability check", function() {
+    test("should throw error when settings toggle is not supported", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.product.model", {
+        stdout: "Pixel 6",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "33",
+        stderr: ""
+      });
+
+      await expect(accessibilityServiceClient.enableViaSettings()).rejects.toThrow("Settings-based accessibility toggle is not supported");
+    });
+
+    test("should succeed when settings toggle is supported", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: "null",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${serviceComponent}"`, {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 1")).toBe(true);
+    });
+  });
+
+  describe("disableViaSettings with capability check", function() {
+    test("should throw error when settings toggle is not supported", async function() {
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.product.model", {
+        stdout: "Pixel 6",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "33",
+        stderr: ""
+      });
+
+      await expect(accessibilityServiceClient.disableViaSettings()).rejects.toThrow("Settings-based accessibility toggle is not supported");
+    });
+
+    test("should succeed when settings toggle is supported", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: serviceComponent,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse('shell settings put secure enabled_accessibility_services ""', {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 0", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.disableViaSettings();
+
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure accessibility_enabled 0")).toBe(true);
+    });
+  });
+
   describe("disableViaSettings", function() {
     test("should handle null services gracefully", async function() {
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: "null",
         stderr: ""
@@ -650,6 +1015,15 @@ describe("AccessibilityServiceManager", function() {
     });
 
     test("should handle empty string gracefully", async function() {
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: "",
         stderr: ""
@@ -664,6 +1038,15 @@ describe("AccessibilityServiceManager", function() {
     test("should remove service when it's the only enabled service", async function() {
       const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: serviceComponent,
         stderr: ""
@@ -688,6 +1071,15 @@ describe("AccessibilityServiceManager", function() {
       const otherService = "com.example.other/com.example.other.Service";
       const currentServices = `${serviceComponent}:${otherService}`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: currentServices,
         stderr: ""
@@ -710,6 +1102,15 @@ describe("AccessibilityServiceManager", function() {
       const currentServices = `${firstService}:${serviceComponent}:${lastService}`;
       const expectedServices = `${firstService}:${lastService}`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: currentServices,
         stderr: ""
@@ -730,6 +1131,15 @@ describe("AccessibilityServiceManager", function() {
       const otherService = "com.example.other/com.example.other.Service";
       const currentServices = `${otherService}:${serviceComponent}`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: currentServices,
         stderr: ""
@@ -748,6 +1158,15 @@ describe("AccessibilityServiceManager", function() {
     test("should handle case when service is not in the list", async function() {
       const otherService = "com.example.other/com.example.other.Service";
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: otherService,
         stderr: ""
@@ -763,6 +1182,15 @@ describe("AccessibilityServiceManager", function() {
     test("should disable accessibility globally when removing last service", async function() {
       const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
 
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
         stdout: serviceComponent,
         stderr: ""
