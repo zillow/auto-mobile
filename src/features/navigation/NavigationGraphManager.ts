@@ -1,7 +1,8 @@
 import { logger } from "../../utils/logger";
 import { BackStackInfo } from "../../models";
 import { NavigationRepository } from "../../db/navigationRepository";
-import type { NavigationEdge as DBNavigationEdge, NavigationNode as DBNavigationNode } from "../../db/types";
+import { TestCoverageRepository } from "../../db/testCoverageRepository";
+import type { NavigationEdge as DBNavigationEdge, NavigationNode as DBNavigationNode, TestCoverageSession } from "../../db/types";
 import {
   NavigationGraph,
   NavigationEvent,
@@ -66,12 +67,16 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
   private static instance: NavigationGraphManager | null = null;
 
   private repository: NavigationRepository;
+  private testCoverageRepository: TestCoverageRepository;
   private currentAppId: string | null = null;
   private currentScreen: string | null = null;
   private graphUpdateListener?: () => void;
 
   // Tool call history kept in memory for correlation (transient data)
   private toolCallHistory: ToolCallInteraction[] = [];
+
+  // Test coverage tracking
+  private activeTestSession: TestCoverageSession | null = null;
 
   private readonly HISTORY_PAGE_DEFAULT = 50;
   private readonly HISTORY_PAGE_MAX = 200;
@@ -83,6 +88,7 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
 
   private constructor() {
     this.repository = new NavigationRepository();
+    this.testCoverageRepository = new TestCoverageRepository();
   }
 
   /**
@@ -100,6 +106,44 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
    */
   public static resetInstance(): void {
     NavigationGraphManager.instance = null;
+  }
+
+  /**
+   * Start a test coverage session.
+   * This enables tracking which nodes and edges are visited during tests.
+   */
+  public async startTestSession(sessionUuid: string): Promise<void> {
+    if (!this.currentAppId) {
+      logger.warn(`[TEST_COVERAGE] Cannot start test session - no current app set`);
+      return;
+    }
+
+    this.activeTestSession = await this.testCoverageRepository.getOrCreateSession(
+      sessionUuid,
+      this.currentAppId
+    );
+
+    logger.info(`[TEST_COVERAGE] Started test session: ${sessionUuid} for app: ${this.currentAppId}`);
+  }
+
+  /**
+   * End the current test coverage session.
+   */
+  public async endTestSession(): Promise<void> {
+    if (!this.activeTestSession) {
+      return;
+    }
+
+    await this.testCoverageRepository.endSession(this.activeTestSession.session_uuid);
+    logger.info(`[TEST_COVERAGE] Ended test session: ${this.activeTestSession.session_uuid}`);
+    this.activeTestSession = null;
+  }
+
+  /**
+   * Get the active test coverage session (if any).
+   */
+  public getActiveTestSession(): TestCoverageSession | null {
+    return this.activeTestSession;
   }
 
   /**
@@ -175,6 +219,15 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
       timestamp
     );
 
+    // Record node visit for test coverage if session is active
+    if (this.activeTestSession) {
+      await this.testCoverageRepository.recordNodeVisit(
+        this.activeTestSession.id,
+        node.id,
+        timestamp
+      );
+    }
+
     // Get modal stack from the most recent tool call (if any)
     const recentToolCall = this.findCorrelatedToolCall(timestamp);
     const currentModalStack = recentToolCall?.uiState?.modalStack;
@@ -204,6 +257,15 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
         toolArgs,
         timestamp
       );
+
+      // Record edge traversal for test coverage if session is active
+      if (this.activeTestSession) {
+        await this.testCoverageRepository.recordEdgeTraversal(
+          this.activeTestSession.id,
+          edge.id,
+          timestamp
+        );
+      }
 
       // Store UI elements if present in interaction
       if (interaction?.uiState?.selectedElements) {
@@ -266,11 +328,20 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
     const timestamp = event.timestamp;
 
     // Get or create node and update visit count
-    await this.repository.getOrCreateNode(
+    const node = await this.repository.getOrCreateNode(
       this.currentAppId,
       screenName,
       timestamp
     );
+
+    // Record node visit for test coverage if session is active
+    if (this.activeTestSession) {
+      await this.testCoverageRepository.recordNodeVisit(
+        this.activeTestSession.id,
+        node.id,
+        timestamp
+      );
+    }
 
     // Get modal stack from the most recent tool call (if any)
     const recentToolCall = this.findCorrelatedToolCall(timestamp);
@@ -295,6 +366,15 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
         toolArgs,
         timestamp
       );
+
+      // Record edge traversal for test coverage if session is active
+      if (this.activeTestSession) {
+        await this.testCoverageRepository.recordEdgeTraversal(
+          this.activeTestSession.id,
+          edge.id,
+          timestamp
+        );
+      }
 
       // Store UI elements if present in interaction
       if (interaction?.uiState?.selectedElements) {

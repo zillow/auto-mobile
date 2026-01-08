@@ -54,4 +54,6 @@ local.properties
 
 /roadmap
 
-/keystore
+# Exclude private keystores, but include the shared debug keystore
+/keystore/*
+!/keystore/debug.keystore

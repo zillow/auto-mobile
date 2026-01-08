@@ -1,5 +1,6 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
+import { testCoverageAnalyzer } from "../features/navigation/TestCoverageAnalyzer";
 import {
   NavigationGraphSummary,
   NavigationGraphSummaryProvider,
@@ -17,6 +18,7 @@ export const NAVIGATION_RESOURCE_URIS = {
   HISTORY_WITH_CURSOR: "automobile:navigation/history?cursor={cursor}",
   HISTORY_WITH_LIMIT: "automobile:navigation/history?limit={limit}",
   HISTORY_WITH_CURSOR_AND_LIMIT: "automobile:navigation/history?cursor={cursor}&limit={limit}",
+  TEST_COVERAGE: "automobile:navigation/test-coverage",
 } as const;
 
 export type NavigationGraphResourceContent = NavigationGraphSummary;
@@ -285,5 +287,44 @@ export function registerNavigationResources(options: {
     }
   );
 
-  logger.info("[NavigationResources] Registered navigation graph resources");
+  ResourceRegistry.register(
+    NAVIGATION_RESOURCE_URIS.TEST_COVERAGE,
+    "Navigation Test Coverage Report",
+    "Comprehensive test coverage analysis for the navigation graph, including coverage metrics, critical gaps, and recommendations.",
+    "application/json",
+    async () => {
+      try {
+        const navManager = NavigationGraphManager.getInstance();
+        const appId = navManager.getCurrentAppId();
+
+        if (!appId) {
+          return {
+            uri: NAVIGATION_RESOURCE_URIS.TEST_COVERAGE,
+            mimeType: "application/json",
+            text: JSON.stringify({
+              error: "No current app set. Launch or observe an app first to enable test coverage tracking."
+            }, null, 2)
+          };
+        }
+
+        const report = await testCoverageAnalyzer.generateReport(appId);
+        return {
+          uri: NAVIGATION_RESOURCE_URIS.TEST_COVERAGE,
+          mimeType: "application/json",
+          text: JSON.stringify(report, null, 2)
+        };
+      } catch (error) {
+        logger.error(`[NavigationResources] Failed to generate test coverage report: ${error}`);
+        return {
+          uri: NAVIGATION_RESOURCE_URIS.TEST_COVERAGE,
+          mimeType: "application/json",
+          text: JSON.stringify({
+            error: `Failed to generate test coverage report: ${error}`
+          }, null, 2)
+        };
+      }
+    }
+  );
+
+  logger.info("[NavigationResources] Registered navigation graph resources including test coverage");
 }

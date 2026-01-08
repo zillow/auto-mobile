@@ -1,6 +1,7 @@
 import { SessionManager } from "../daemon/sessionManager";
 import { DevicePool } from "../daemon/devicePool";
 import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { ActionableError, BootedDevice } from "../models";
 import { logger } from "../utils/logger";
 
@@ -41,6 +42,14 @@ export async function createToolExecutionContext(
 
   if (!existingSession) {
     await ensureAccessibilityServiceReady(session.assignedDevice, sessionUuid);
+
+    // Start test coverage session for navigation graph tracking
+    // This enables automatic tracking of screens and transitions during test execution
+    const navManager = NavigationGraphManager.getInstance();
+    if (navManager.getCurrentAppId()) {
+      await navManager.startTestSession(sessionUuid);
+      logger.info(`[ToolExecutionContext] Started test coverage tracking for session ${sessionUuid}`);
+    }
   }
 
   return {

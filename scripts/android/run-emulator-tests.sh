@@ -257,15 +257,49 @@ else
   echo ""
 
   echo "Installing accessibility service APK..."
+
+  # Try to install with -r (replace) first
+  # This should work now that we have a shared debug keystore
   echo "Running: adb install -r '$APK_PATH'"
   echo ""
 
-  if adb install -r "$APK_PATH"; then
-    print_success "APK installed successfully"
+  set +e
+  install_output=$(adb install -r "$APK_PATH" 2>&1)
+  install_exit=$?
+  set -e
+
+  echo "$install_output"
+
+  if [ $install_exit -eq 0 ]; then
+    print_success "APK installed successfully (replaced existing)"
   else
-    APK_INSTALL_EXIT=$?
-    print_error "APK installation failed with exit code $APK_INSTALL_EXIT"
-    exit "$APK_INSTALL_EXIT"
+    # Check if failure was due to signature mismatch
+    if echo "$install_output" | grep -q "INSTALL_FAILED_UPDATE_INCOMPATIBLE"; then
+      print_warning "Signature mismatch detected - uninstalling old version and retrying"
+      echo ""
+
+      PACKAGE_NAME="dev.jasonpearson.automobile.accessibilityservice"
+      echo "Uninstalling existing package..."
+      if adb uninstall "$PACKAGE_NAME"; then
+        print_success "Old package uninstalled"
+      else
+        print_warning "Uninstall failed, but proceeding with fresh install"
+      fi
+      echo ""
+
+      echo "Running: adb install '$APK_PATH'"
+      if adb install "$APK_PATH"; then
+        print_success "APK installed successfully (clean install)"
+      else
+        APK_INSTALL_EXIT=$?
+        print_error "APK installation failed with exit code $APK_INSTALL_EXIT"
+        exit "$APK_INSTALL_EXIT"
+      fi
+    else
+      # Other failure - fail immediately
+      print_error "APK installation failed with exit code $install_exit"
+      exit "$install_exit"
+    fi
   fi
 fi
 

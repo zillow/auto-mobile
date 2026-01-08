@@ -291,6 +291,38 @@ export interface TestExecutionsTable {
   created_at: Generated<string>;
 }
 
+// Test coverage tables
+export interface TestCoverageSessionsTable {
+  id: Generated<number>;
+  session_uuid: string;
+  app_id: string;
+  start_time: number;
+  end_time: number | null;
+  total_nodes_visited: number;
+  total_edges_traversed: number;
+  created_at: Generated<string>;
+}
+
+export interface TestNodeCoverageTable {
+  id: Generated<number>;
+  session_id: number;
+  node_id: number;
+  visit_count: number;
+  first_visit_time: number;
+  last_visit_time: number;
+  created_at: Generated<string>;
+}
+
+export interface TestEdgeCoverageTable {
+  id: Generated<number>;
+  session_id: number;
+  edge_id: number;
+  traversal_count: number;
+  first_traversal_time: number;
+  last_traversal_time: number;
+  created_at: Generated<string>;
+}
+
 // Feature flags table
 export interface FeatureFlagsTable {
   key: string;
@@ -323,6 +355,9 @@ export interface Database {
   recomposition_metrics: RecompositionMetricsTable;
   test_executions: TestExecutionsTable;
   feature_flags: FeatureFlagsTable;
+  test_coverage_sessions: TestCoverageSessionsTable;
+  test_node_coverage: TestNodeCoverageTable;
+  test_edge_coverage: TestEdgeCoverageTable;
 }
 
 // Convenience types for each table
@@ -402,3 +437,13 @@ export type FeatureFlagUpdate = Updateable<FeatureFlagsTable>;
 export type TestExecution = Selectable<TestExecutionsTable>;
 export type NewTestExecution = Insertable<TestExecutionsTable>;
 export type TestExecutionUpdate = Updateable<TestExecutionsTable>;
+
+export type TestCoverageSession = Selectable<TestCoverageSessionsTable>;
+export type NewTestCoverageSession = Insertable<TestCoverageSessionsTable>;
+export type TestCoverageSessionUpdate = Updateable<TestCoverageSessionsTable>;
+
+export type TestNodeCoverage = Selectable<TestNodeCoverageTable>;
+export type NewTestNodeCoverage = Insertable<TestNodeCoverageTable>;
+
+export type TestEdgeCoverage = Selectable<TestEdgeCoverageTable>;
+export type NewTestEdgeCoverage = Insertable<TestEdgeCoverageTable>;
