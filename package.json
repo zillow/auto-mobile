@@ -17,6 +17,7 @@
     "dev:streamable": "bun --watch src/index.ts --transport streamable",
     "dev:streamable:port": "bun --watch src/index.ts --transport streamable --port",
     "estimate-context": "bun scripts/estimate-context-usage.ts",
+    "benchmark-context": "bun scripts/benchmark-context-thresholds.ts",
     "prepublishOnly": "cp README.md README.md.backup && bun scripts/npm/transform-readme.js",
     "postpublish": "mv README.md.backup README.md || true"
   },

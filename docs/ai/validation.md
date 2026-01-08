@@ -17,6 +17,12 @@ bun run test
 # Run specific tests
 bun run test -- --grep "Name of the test suite or test case"
 
+# Estimate MCP context usage
+bun run estimate-context
+
+# Benchmark MCP context thresholds
+bun run benchmark-context
+
 # Reinstall MCP server
 bun install
 

@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "generatedAt": "2026-01-08",
+    "description": "MCP context usage thresholds based on baseline measurement with 10% buffer",
+    "baseline": {
+      "tools": 13211,
+      "resources": 381,
+      "resourceTemplates": 468,
+      "total": 14060
+    },
+    "buffer": "10%"
+  },
+  "thresholds": {
+    "tools": 14532,
+    "resources": 419,
+    "resourceTemplates": 515,
+    "total": 15466
+  }
+}
