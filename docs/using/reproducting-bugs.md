@@ -15,10 +15,47 @@ When you receive a bug report, ask your AI agent:
 
 The agent will:
 1. Navigate to screen (if specified), otherwise it will attempt to find the behavior in the app
-2. Take a snapshot of device state using the [takeDeviceSnapshot]() MCP tool call.
-2. Reproduce any steps or context provided to approximate the state.
+2. Take a snapshot of device state using the [captureDeviceSnapshot](../features/snapshots.md#capturedevicesnapshot) MCP tool call.
+3. Reproduce any steps or context provided to approximate the state.
 
 Once a bug is reproduced, you can create an [automated test](ui-tests.md).
+
+## Next Steps
+
+After reproducing a bug, use these MCP tools to complete the workflow:
+
+### Generate Bug Report
+
+Use the [bugReport](../design-docs/mcp/actions.md#testing--debugging) tool to create a comprehensive bug report:
+
+```javascript
+await bugReport({
+  description: "Login button not responding after network error"
+});
+```
+
+This captures:
+- Current screen state and view hierarchy
+- Recent logcat entries
+- Screenshot
+- Device and app information
+
+### Automate Reproduction Steps
+
+Convert your bug reproduction steps into an automated test using [executePlan](../design-docs/mcp/actions.md#testing--debugging):
+
+```javascript
+await executePlan({
+  planContent: `
+- launchApp: { packageName: "com.example.app" }
+- tapOn: { contentDescription: "Login" }
+- inputText: { text: "user@example.com" }
+- tapOn: { text: "Submit" }
+  `
+});
+```
+
+This ensures the bug can be reliably reproduced and becomes a regression test once fixed.
 
 ## Debugging Workflow
 
