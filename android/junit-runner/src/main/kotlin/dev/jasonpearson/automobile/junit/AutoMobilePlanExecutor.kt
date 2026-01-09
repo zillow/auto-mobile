@@ -98,22 +98,33 @@ internal object AutoMobilePlanExecutor {
   private fun loadAndProcessPlan(planPath: String, parameters: Map<String, Any>): String {
     val planContent = File(planPath).readText()
 
-    if (parameters.isEmpty()) {
-      return planContent
-    }
-
     // Perform parameter substitution using template syntax ${parameter_name}
     var processedContent = planContent
+    if (parameters.isNotEmpty()) {
+      parameters.forEach { (key, value) ->
+        val placeholder = "\${$key}"
+        val stringValue =
+            when (value) {
+              is String -> value
+              is Enum<*> -> value.name
+              else -> value.toString()
+            }
+        processedContent = processedContent.replace(placeholder, stringValue)
+      }
+    }
 
-    parameters.forEach { (key, value) ->
-      val placeholder = "\${$key}"
-      val stringValue =
-          when (value) {
-            is String -> value
-            is Enum<*> -> value.name
-            else -> value.toString()
-          }
-      processedContent = processedContent.replace(placeholder, stringValue)
+    // Validate YAML schema after parameter substitution
+    val validationResult = PlanSchemaValidator.validateYaml(processedContent)
+    if (!validationResult.valid) {
+      val errorMessages = validationResult.errors.joinToString("\n") { err ->
+        val location = if (err.line != null) " (line ${err.line})" else ""
+        "${err.field}: ${err.message}$location"
+      }
+      throw IllegalArgumentException(
+          "Plan YAML validation failed:\n$errorMessages\n\n" +
+              "The plan does not conform to the AutoMobile test plan schema. " +
+              "Check schemas/test-plan.schema.json for details."
+      )
     }
 
     return processedContent

@@ -14,14 +14,41 @@ All test plan YAML files are validated against a JSON schema that defines:
 ## Validation Levels
 
 ### 1. Parse Validation
-All YAML files must be syntactically valid and parseable by the YAML parser.
+All YAML files must be syntactically valid and parseable by the YAML parser. Parse errors include line and column numbers to help locate issues.
+
+**YAML Features Supported:**
+- ✅ YAML anchors (`&anchor-name`)
+- ✅ Anchor references (`*anchor-name`)
+- ✅ Merge keys (`<<: *anchor`)
+- ✅ Multi-document YAML (though plans should use single documents)
 
 ### 2. Schema Validation
 Test plans must conform to the AutoMobile test plan schema:
 - `schemas/test-plan.schema.json` - JSON Schema Draft 7 format
 
-### 3. Runtime Validation (executePlan)
-When executing plans via the `executePlan` MCP tool, plans are validated before execution to provide early error feedback.
+The schema validates:
+- Required fields (`name`, `steps`)
+- Field types (strings, arrays, objects, etc.)
+- Array constraints (minItems, uniqueItems)
+- String constraints (minLength, pattern)
+- Nested structures (expectations, metadata, critical sections)
+
+**Note:** Tool-specific parameters (e.g., `appId` for `launchApp`, `selector` for `tapOn`) are validated at runtime by individual tool handlers, not by the schema.
+
+### 3. Execution-Time Validation
+
+Validation happens automatically in two places:
+
+**MCP Server (`executePlan` tool):**
+- Validates YAML before parsing
+- Runs in TypeScript using AJV (Another JSON Schema Validator)
+- Reports errors with line/column numbers when possible
+
+**Kotlin JUnit Runner (`AutoMobilePlanExecutor`):**
+- Validates YAML after parameter substitution but before sending to daemon
+- Runs in Kotlin using networknt json-schema-validator
+- Reports errors with line/column numbers when possible
+- Ensures test plans fail fast in Android tests with clear error messages
 
 ## Running Validation Locally
 
@@ -162,6 +189,61 @@ steps:
 
 Both formats are valid. The `PlanNormalizer` converts top-level properties into the `params` object at runtime.
 
+### YAML Anchors and Merge Keys
+
+Test plans support YAML anchors and merge keys to reduce repetition and make plans more maintainable:
+
+**Example: Reusing common parameters**
+```yaml
+name: anchor-example
+steps:
+  # Define anchor for common launch params
+  - tool: launchApp
+    params: &launch-params
+      appId: com.example.app
+      coldBoot: false
+      clearAppData: false
+    label: First launch
+
+  # Reuse anchor with merge and override
+  - tool: launchApp
+    params:
+      <<: *launch-params  # Merge all properties from anchor
+      coldBoot: true       # Override specific property
+    label: Second launch with cold boot
+
+  # Use same params again
+  - tool: launchApp
+    params: *launch-params
+    label: Third launch (same as first)
+```
+
+**Example: Multi-device plans with anchors**
+```yaml
+name: multi-device-anchor-example
+devices:
+  - A
+  - B
+steps:
+  - tool: observe
+    params: &observe-common
+      includeScreenshot: true
+      includeHierarchy: true
+      device: A
+
+  - tool: tapOn
+    params:
+      device: A
+      text: Sync
+
+  - tool: observe
+    params:
+      <<: *observe-common
+      device: B  # Override device while keeping other params
+```
+
+The validation system fully supports YAML anchors and merge keys - they are resolved during YAML parsing before schema validation occurs.
+
 ### Legacy Field Support
 
 The schema allows legacy fields for backwards compatibility:
@@ -228,14 +310,40 @@ if (!result.valid) {
 const fileResult = await validator.validateFile('path/to/plan.yaml');
 ```
 
+### In Kotlin/Java (JUnit Runner)
+
+```kotlin
+import dev.jasonpearson.automobile.junit.PlanSchemaValidator
+
+// Validate YAML content
+val result = PlanSchemaValidator.validateYaml(yamlContent)
+if (!result.valid) {
+    result.errors.forEach { err ->
+        val location = err.line?.let { " (line $it)" } ?: ""
+        println("${err.field}: ${err.message}$location")
+    }
+}
+```
+
+Validation is automatic in `AutoMobilePlanExecutor.loadAndProcessPlan()`. If validation fails, you'll get an `IllegalArgumentException`:
+
+```
+java.lang.IllegalArgumentException: Plan YAML validation failed:
+steps[0].tool: Missing required property 'tool' (line 5)
+steps[2]: Unknown property 'invalidField'. This might be a legacy field - check the migration guide.
+
+The plan does not conform to the AutoMobile test plan schema.
+Check schemas/test-plan.schema.json for details.
+```
+
 ### In executePlan Tool
 
 Validation is automatic when using the `executePlan` MCP tool. If a plan fails validation, you'll receive an `ActionableError` with details:
 
 ```
 Plan YAML validation failed:
-steps[0].tool: Must be one of: observe, tapOn, swipeOn, ...
-steps[2]: Missing required property 'tool'
+steps[0].tool: Must be one of: observe, tapOn, swipeOn, ... (line 5)
+steps[2]: Missing required property 'tool' (line 12)
 
 The plan does not conform to the AutoMobile test plan schema.
 Check the schema at schemas/test-plan.schema.json for details.
@@ -281,11 +389,12 @@ This is a syntax error in your YAML. Common causes:
 
 Planned improvements for YAML validation:
 
-1. **JUnit Runner Integration** - Validate test plans in Kotlin/Java tests (separate issue)
-2. **Tool Parameter Validation** - Validate tool-specific parameters against Zod schemas
-3. **Schema Documentation** - Auto-generate schema docs from JSON schema
-4. **Custom Rules** - Add custom validation rules (e.g., required labels, naming conventions)
-5. **Pre-commit Hook** - Automatically validate changed YAML files before commit
+1. **Tool Parameter Validation** - Validate tool-specific parameters against Zod schemas at the schema level (currently validated at runtime)
+2. **Schema Documentation** - Auto-generate schema docs from JSON schema with examples
+3. **Custom Rules** - Add custom validation rules (e.g., required labels, naming conventions, accessibility requirements)
+4. **Pre-commit Hook** - Automatically validate changed YAML files before commit
+5. **Better Error Recovery** - Suggest fixes for common validation errors
+6. **Performance Profiling** - Validate that plans don't contain known performance anti-patterns
 
 ## Related Documentation
 

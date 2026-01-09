@@ -23,8 +23,9 @@ dependencies {
   implementation(libs.junit.jupiter.api)
   implementation(libs.junit.jupiter.engine)
 
-  // YAML processing
+  // YAML processing and schema validation
   implementation(libs.snakeyaml)
+  implementation(libs.json.schema.validator)
 
   // Kotlin ecosystem (coroutines, datetime, serialization)
   implementation(libs.bundles.kotlinx.ecosystem)
