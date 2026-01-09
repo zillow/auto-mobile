@@ -10,8 +10,10 @@ import { BunSqliteDialect } from "./bunSqliteDialect";
 
 // Database file location (defaults to ~/.auto-mobile/auto-mobile.db)
 const DEFAULT_DB_DIR = path.join(os.homedir(), ".auto-mobile");
-const ENV_DB_PATH = process.env.AUTO_MOBILE_DB_PATH ?? process.env.AUTOMOBILE_DB_PATH;
-const ENV_DB_DIR = process.env.AUTO_MOBILE_DB_DIR ?? process.env.AUTOMOBILE_DB_DIR;
+// @deprecated AUTO_MOBILE_DB_PATH - use AUTOMOBILE_DB_PATH instead
+// @deprecated AUTO_MOBILE_DB_DIR - use AUTOMOBILE_DB_DIR instead
+const ENV_DB_PATH = process.env.AUTOMOBILE_DB_PATH ?? process.env.AUTO_MOBILE_DB_PATH;
+const ENV_DB_DIR = process.env.AUTOMOBILE_DB_DIR ?? process.env.AUTO_MOBILE_DB_DIR;
 const DB_PATH = ENV_DB_PATH
   ? path.resolve(ENV_DB_PATH)
   : path.join(ENV_DB_DIR ? path.resolve(ENV_DB_DIR) : DEFAULT_DB_DIR, "auto-mobile.db");

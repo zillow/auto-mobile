@@ -73,7 +73,7 @@ simultaneously without port conflicts:
 **Override options:**
 ```shell
 # Environment variable (highest priority)
-AUTO_MOBILE_PORT=8080 bun run dev
+AUTOMOBILE_PORT=8080 bun run dev
 
 # Command line flag
 bun run dev:port 8080

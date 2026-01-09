@@ -10,8 +10,8 @@ IntelliJ/Android Studio plugin scaffold for AutoMobile.
 ## MCP transport selection
 The plugin selects the MCP transport in this order:
 1. Discovered MCP dev server over HTTP (health-checked on localhost).
-2. `AUTO_MOBILE_MCP_HTTP_URL` (or `-Dautomobile.mcp.httpUrl`) for Streamable HTTP.
-3. `AUTO_MOBILE_MCP_STDIO_COMMAND` (or `-Dautomobile.mcp.stdioCommand`) for stdio.
+2. `AUTOMOBILE_MCP_HTTP_URL` (or `-Dautomobile.mcp.httpUrl`) for Streamable HTTP.
+3. `AUTOMOBILE_MCP_STDIO_COMMAND` (or `-Dautomobile.mcp.stdioCommand`) for stdio.
 4. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`.
 
 The tool window lists git worktrees and any matching MCP dev servers. Use the dropdown to pick which worktree/server

@@ -12,7 +12,7 @@ Migrations run on server startup and are managed with Kysely's `Migrator` + `Fil
 
 The migration directory is resolved in this order:
 
-1. `AUTO_MOBILE_MIGRATIONS_DIR` or `AUTOMOBILE_MIGRATIONS_DIR` (absolute or relative path).
+1. `AUTOMOBILE_MIGRATIONS_DIR` environment variable (absolute or relative path).
 2. Module-relative defaults (first match):
    - `dist/src/db/migrations` when running the bundled server.
    - `src/db/migrations` when running from source.

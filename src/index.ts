@@ -22,7 +22,8 @@ function detectPortFromBranch(): number {
   const basePort = 9000;
 
   // Check environment variable first (explicit override)
-  const envPort = process.env.AUTO_MOBILE_PORT;
+  // @deprecated AUTO_MOBILE_PORT - use AUTOMOBILE_PORT instead
+  const envPort = process.env.AUTOMOBILE_PORT ?? process.env.AUTO_MOBILE_PORT;
   if (envPort) {
     const port = parseInt(envPort, 10);
     if (!isNaN(port) && port > 0 && port < 65536) {
@@ -173,21 +174,22 @@ function parseArgs(): {
     videoRecordingDefaults.format = value;
   };
 
+  // @deprecated AUTO_MOBILE_VIDEO_* - use AUTOMOBILE_VIDEO_* instead
   applyQualityPreset(
-    process.env.AUTO_MOBILE_VIDEO_QUALITY_PRESET ??
-      process.env.AUTOMOBILE_VIDEO_QUALITY_PRESET,
+    process.env.AUTOMOBILE_VIDEO_QUALITY_PRESET ??
+      process.env.AUTO_MOBILE_VIDEO_QUALITY_PRESET,
     "env"
   );
-  const envTargetBitrate = process.env.AUTO_MOBILE_VIDEO_TARGET_BITRATE_KBPS ??
-    process.env.AUTOMOBILE_VIDEO_TARGET_BITRATE_KBPS;
-  const envMaxThroughput = process.env.AUTO_MOBILE_VIDEO_MAX_THROUGHPUT_MBPS ??
-    process.env.AUTOMOBILE_VIDEO_MAX_THROUGHPUT_MBPS;
-  const envFps = process.env.AUTO_MOBILE_VIDEO_FPS ??
-    process.env.AUTOMOBILE_VIDEO_FPS;
-  const envArchiveMb = process.env.AUTO_MOBILE_VIDEO_MAX_ARCHIVE_MB ??
-    process.env.AUTOMOBILE_VIDEO_MAX_ARCHIVE_MB;
-  const envFormat = process.env.AUTO_MOBILE_VIDEO_FORMAT ??
-    process.env.AUTOMOBILE_VIDEO_FORMAT;
+  const envTargetBitrate = process.env.AUTOMOBILE_VIDEO_TARGET_BITRATE_KBPS ??
+    process.env.AUTO_MOBILE_VIDEO_TARGET_BITRATE_KBPS;
+  const envMaxThroughput = process.env.AUTOMOBILE_VIDEO_MAX_THROUGHPUT_MBPS ??
+    process.env.AUTO_MOBILE_VIDEO_MAX_THROUGHPUT_MBPS;
+  const envFps = process.env.AUTOMOBILE_VIDEO_FPS ??
+    process.env.AUTO_MOBILE_VIDEO_FPS;
+  const envArchiveMb = process.env.AUTOMOBILE_VIDEO_MAX_ARCHIVE_MB ??
+    process.env.AUTO_MOBILE_VIDEO_MAX_ARCHIVE_MB;
+  const envFormat = process.env.AUTOMOBILE_VIDEO_FORMAT ??
+    process.env.AUTO_MOBILE_VIDEO_FORMAT;
 
   const parsedTargetBitrate = parsePositiveNumber(envTargetBitrate, "video target bitrate", false);
   if (parsedTargetBitrate !== undefined) {

@@ -571,9 +571,11 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
             "isCi" to JsonPrimitive(resolveCiMode()),
         )
 
+    // @deprecated AUTO_MOBILE_APP_VERSION - use AUTOMOBILE_APP_VERSION instead
     val appVersion =
         firstNonBlank(
             SystemPropertyCache.get("automobile.app.version", ""),
+            System.getenv("AUTOMOBILE_APP_VERSION"),
             System.getenv("AUTO_MOBILE_APP_VERSION"),
             System.getenv("APP_VERSION"),
         )
@@ -581,9 +583,11 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       metadata["appVersion"] = JsonPrimitive(appVersion)
     }
 
+    // @deprecated AUTO_MOBILE_GIT_COMMIT - use AUTOMOBILE_GIT_COMMIT instead
     val gitCommit =
         firstNonBlank(
             SystemPropertyCache.get("automobile.git.commit", ""),
+            System.getenv("AUTOMOBILE_GIT_COMMIT"),
             System.getenv("AUTO_MOBILE_GIT_COMMIT"),
             System.getenv("GITHUB_SHA"),
             System.getenv("GIT_COMMIT"),
@@ -619,11 +623,13 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     return JsonObject(metadata)
   }
 
+  // @deprecated AUTO_MOBILE_TARGET_SDK - use AUTOMOBILE_TARGET_SDK instead
   private fun resolveTargetSdk(): Int? {
     val candidate =
         firstNonBlank(
             SystemPropertyCache.get("automobile.android.targetSdk", ""),
             SystemPropertyCache.get("automobile.targetSdk", ""),
+            System.getenv("AUTOMOBILE_TARGET_SDK"),
             System.getenv("AUTO_MOBILE_TARGET_SDK"),
             System.getenv("ANDROID_TARGET_SDK"),
         )

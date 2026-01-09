@@ -5,7 +5,8 @@ import { fileURLToPath } from "url";
 import { logger } from "../utils/logger";
 
 function resolveMigrationFolder(): string {
-  const envPath = process.env.AUTO_MOBILE_MIGRATIONS_DIR ?? process.env.AUTOMOBILE_MIGRATIONS_DIR;
+  // @deprecated AUTO_MOBILE_MIGRATIONS_DIR - use AUTOMOBILE_MIGRATIONS_DIR instead
+  const envPath = process.env.AUTOMOBILE_MIGRATIONS_DIR ?? process.env.AUTO_MOBILE_MIGRATIONS_DIR;
   if (envPath) {
     return path.resolve(envPath);
   }

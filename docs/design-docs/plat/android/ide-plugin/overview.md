@@ -8,8 +8,8 @@ local daemon socket when needed.
 The plugin resolves a transport when the user clicks "Attach to MCP":
 
 1. MCP dev server discovered via HTTP health checks on localhost.
-2. `AUTO_MOBILE_MCP_HTTP_URL` / `-Dautomobile.mcp.httpUrl` (streamable HTTP).
-3. `AUTO_MOBILE_MCP_STDIO_COMMAND` / `-Dautomobile.mcp.stdioCommand` (stdio).
+2. `AUTOMOBILE_MCP_HTTP_URL` / `-Dautomobile.mcp.httpUrl` (streamable HTTP).
+3. `AUTOMOBILE_MCP_STDIO_COMMAND` / `-Dautomobile.mcp.stdioCommand` (stdio).
 4. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`.
 
 ## MCP dev server discovery

@@ -21,8 +21,8 @@ supported Apple tooling.
 The companion app selects an MCP transport in this order:
 
 1. Discovered MCP dev server over HTTP (health check on localhost).
-2. `AUTO_MOBILE_MCP_HTTP_URL` or `automobile.mcp.httpUrl`.
-3. `AUTO_MOBILE_MCP_STDIO_COMMAND` or `automobile.mcp.stdioCommand`.
+2. `AUTOMOBILE_MCP_HTTP_URL` or `automobile.mcp.httpUrl`.
+3. `AUTOMOBILE_MCP_STDIO_COMMAND` or `automobile.mcp.stdioCommand`.
 4. Unix socket fallback at `/tmp/auto-mobile-daemon-<uid>.sock`.
 
 ## MCP dev server discovery
