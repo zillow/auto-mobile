@@ -374,6 +374,7 @@ jobs:
 
       - name: "Create PR for SHA256 update"
         if: steps.check.outputs.needed == 'true'
+        id: create-pr
         uses: peter-evans/create-pull-request@v6
         with:
           # Use a PAT with workflow scope so the PR triggers CI runs.
@@ -415,6 +416,13 @@ jobs:
             automated
             android
             release engineering
+
+      - name: "Enable auto-merge on PR"
+        if: steps.check.outputs.needed == 'true' && steps.create-pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_MOBILE_PR_TOKEN }}
+        run: |
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash
 
   build-playground-app:
     name: "Build Playground App"
