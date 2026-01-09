@@ -103,6 +103,8 @@ class WebSocketServer(
         ((requestId: String?, action: String, text: String?) -> Unit)? =
         null,
     private val onSetRecompositionTracking: ((enabled: Boolean) -> Unit)? = null,
+    private val onGetCurrentFocus: ((requestId: String?) -> Unit)? = null,
+    private val onGetTraversalOrder: ((requestId: String?) -> Unit)? = null,
 ) {
   companion object {
     private const val TAG = "WebSocketServer"
@@ -435,6 +437,14 @@ class WebSocketServer(
           } else {
             Log.w(TAG, "set_recomposition_tracking missing enabled flag")
           }
+        }
+        "get_current_focus" -> {
+          Log.d(TAG, "Received get_current_focus request (requestId: ${request.requestId})")
+          onGetCurrentFocus?.invoke(request.requestId)
+        }
+        "get_traversal_order" -> {
+          Log.d(TAG, "Received get_traversal_order request (requestId: ${request.requestId})")
+          onGetTraversalOrder?.invoke(request.requestId)
         }
         else -> {
           Log.d(TAG, "Unknown message type: ${request.type}")

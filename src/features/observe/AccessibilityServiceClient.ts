@@ -2,7 +2,7 @@ import WebSocket from "ws";
 import { randomBytes } from "crypto";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { BootedDevice, RecompositionNodeInfo, ViewHierarchyResult } from "../../models";
+import { BootedDevice, RecompositionNodeInfo, ViewHierarchyResult, CurrentFocusResult, TraversalOrderResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -10,6 +10,7 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { NavigationGraphManager, NavigationEvent } from "../navigation/NavigationGraphManager";
 import { HierarchyNavigationDetector } from "../navigation/HierarchyNavigationDetector";
 import { throwIfAborted } from "../../utils/toolUtils";
+import { ElementParser } from "../utility/ElementParser";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -529,6 +530,14 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private pendingClipboardResolve: ((result: A11yClipboardResult) => void) | null = null;
   private pendingClipboardRequestId: string | null = null;
 
+  // Current focus handling
+  private pendingCurrentFocusResolve: ((result: CurrentFocusResult) => void) | null = null;
+  private pendingCurrentFocusRequestId: string | null = null;
+
+  // Traversal order handling
+  private pendingTraversalOrderResolve: ((result: TraversalOrderResult) => void) | null = null;
+  private pendingTraversalOrderRequestId: string | null = null;
+
   // WebSocket factory for testing
   private webSocketFactory: (url: string) => WebSocket;
 
@@ -1020,6 +1029,66 @@ export class AccessibilityServiceClient implements AccessibilityService {
         });
       }
 
+      // Handle current focus result
+      if (message.type === "current_focus_result" && this.pendingCurrentFocusResolve) {
+        const focusMessage = message as any;
+        const perfTiming = focusMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Current focus result (requestId: ${focusMessage.requestId}, totalTimeMs: ${focusMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingCurrentFocusResolve;
+        this.pendingCurrentFocusResolve = null;
+        this.pendingCurrentFocusRequestId = null;
+
+        // Convert accessibility node to Element if present
+        const focusedElement = focusMessage.focusedElement
+          ? this.convertAccessibilityNodeToElement(focusMessage.focusedElement)
+          : null;
+
+        resolve({
+          focusedElement,
+          totalTimeMs: focusMessage.totalTimeMs,
+          requestId: focusMessage.requestId,
+          error: focusMessage.error
+        });
+      }
+
+      // Handle traversal order result
+      if (message.type === "traversal_order_result" && this.pendingTraversalOrderResolve) {
+        const traversalMessage = message as any;
+        const perfTiming = traversalMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        const result = traversalMessage.result;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Traversal order result (requestId: ${traversalMessage.requestId}, totalCount: ${result?.totalCount}, totalTimeMs: ${traversalMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingTraversalOrderResolve;
+        this.pendingTraversalOrderResolve = null;
+        this.pendingTraversalOrderRequestId = null;
+
+        if (result && result.elements) {
+          // Convert accessibility nodes to Elements
+          const elements = result.elements.map((node: any) =>
+            this.convertAccessibilityNodeToElement(node)
+          );
+
+          resolve({
+            elements,
+            focusedIndex: result.focusedIndex,
+            totalCount: result.totalCount,
+            totalTimeMs: traversalMessage.totalTimeMs,
+            requestId: traversalMessage.requestId,
+            error: traversalMessage.error
+          });
+        } else {
+          resolve({
+            elements: [],
+            focusedIndex: null,
+            totalCount: 0,
+            totalTimeMs: traversalMessage.totalTimeMs,
+            requestId: traversalMessage.requestId,
+            error: traversalMessage.error || "No result data"
+          });
+        }
+      }
+
       // Handle navigation event
       if (message.type === "navigation_event") {
         const navMessage = message as any;
@@ -1401,6 +1470,25 @@ export class AccessibilityServiceClient implements AccessibilityService {
      * @param node - The accessibility service node
      * @returns Converted node in XML-like format
      */
+  /**
+   * Convert AccessibilityNode to Element type
+   * @param node - Accessibility node from WebSocket message
+   * @returns Converted Element or null if conversion fails
+   */
+  private convertAccessibilityNodeToElement(node: AccessibilityNode): Element | null {
+    try {
+      // First convert to intermediate format
+      const converted = this.convertAccessibilityNode(node);
+
+      // Then parse to Element using ElementParser
+      const elementParser = new ElementParser();
+      return elementParser.parseNodeBounds(converted);
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to convert node to Element: ${error}`);
+      return null;
+    }
+  }
+
   private convertAccessibilityNode(node: AccessibilityNode | AccessibilityNode[]): any {
     // Handle array of nodes
     if (Array.isArray(node)) {
@@ -2720,5 +2808,167 @@ export class AccessibilityServiceClient implements AccessibilityService {
     logger.warn(`[ACCESSIBILITY_SERVICE] setAccessibilityFocus(${resourceId}) called but not yet implemented (stub)`);
     // TODO: Implement accessibility focus setting
     // This should send a command to the Android accessibility service to set focus on the element
+  }
+
+  /**
+   * Get the current accessibility focus element (TalkBack cursor position)
+   * @param timeoutMs - Maximum time to wait for result in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<CurrentFocusResult> - The current focus result
+   */
+  async requestCurrentFocus(
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<CurrentFocusResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for current focus");
+        return {
+          focusedElement: null,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send current focus request
+      const requestId = `current_focus_${Date.now()}_${generateSecureId()}`;
+      this.pendingCurrentFocusRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the result
+      const focusPromise = new Promise<CurrentFocusResult>(resolve => {
+        this.pendingCurrentFocusResolve = resolve;
+
+        // Set up timeout
+        this.timer.setTimeout(() => {
+          if (this.pendingCurrentFocusResolve === resolve) {
+            this.pendingCurrentFocusResolve = null;
+            this.pendingCurrentFocusRequestId = null;
+            resolve({
+              focusedElement: null,
+              totalTimeMs: Date.now() - startTime,
+              error: `Current focus timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({ type: "get_current_focus", requestId });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent current focus request (requestId: ${requestId})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForCurrentFocus", () => focusPromise);
+
+      const duration = Date.now() - startTime;
+      if (result.error) {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Current focus failed after ${duration}ms: ${result.error}`);
+      } else {
+        logger.info(`[ACCESSIBILITY_SERVICE] Current focus received in ${duration}ms`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Current focus request failed after ${duration}ms: ${error}`);
+      return {
+        focusedElement: null,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Get the traversal order of accessibility-focusable elements
+   * @param timeoutMs - Maximum time to wait for result in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<TraversalOrderResult> - The traversal order result
+   */
+  async requestTraversalOrder(
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<TraversalOrderResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for traversal order");
+        return {
+          elements: [],
+          focusedIndex: null,
+          totalCount: 0,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send traversal order request
+      const requestId = `traversal_order_${Date.now()}_${generateSecureId()}`;
+      this.pendingTraversalOrderRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the result
+      const traversalPromise = new Promise<TraversalOrderResult>(resolve => {
+        this.pendingTraversalOrderResolve = resolve;
+
+        // Set up timeout
+        this.timer.setTimeout(() => {
+          if (this.pendingTraversalOrderResolve === resolve) {
+            this.pendingTraversalOrderResolve = null;
+            this.pendingTraversalOrderRequestId = null;
+            resolve({
+              elements: [],
+              focusedIndex: null,
+              totalCount: 0,
+              totalTimeMs: Date.now() - startTime,
+              error: `Traversal order timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({ type: "get_traversal_order", requestId });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent traversal order request (requestId: ${requestId})`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForTraversalOrder", () => traversalPromise);
+
+      const duration = Date.now() - startTime;
+      if (result.error) {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Traversal order failed after ${duration}ms: ${result.error}`);
+      } else {
+        logger.info(`[ACCESSIBILITY_SERVICE] Traversal order received in ${duration}ms (${result.totalCount} elements)`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Traversal order request failed after ${duration}ms: ${error}`);
+      return {
+        elements: [],
+        focusedIndex: null,
+        totalCount: 0,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
   }
 }

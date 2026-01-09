@@ -7,6 +7,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
 import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
+import dev.jasonpearson.automobile.accessibilityservice.models.TraversalOrderResult
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import dev.jasonpearson.automobile.accessibilityservice.models.WindowHierarchy
@@ -1303,5 +1304,312 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         ?: element.text?.takeIf { it.isNotBlank() }
         ?: element.className?.takeIf { it.isNotBlank() }
         ?: "unlabeled view"
+  }
+
+  /**
+   * Extract information about a single focused element.
+   * Used for getCurrentFocus command.
+   */
+  fun extractFocusedElementInfo(focusedNode: AccessibilityNodeInfo): UIElementInfo? {
+    return try {
+      val bounds = Rect()
+      focusedNode.getBoundsInScreen(bounds)
+      val elementBounds = ElementBounds(bounds)
+
+      // Extract basic info about the focused element
+      val extrasMap = extractExtras(focusedNode)
+      val testTag = extractTestTag(extrasMap)
+
+      var stateDescription: String? = null
+      if (Build.VERSION.SDK_INT >= 30) {
+        stateDescription = focusedNode.stateDescription?.toString()
+      }
+      val hintText: String? = focusedNode.hintText?.toString()
+      val errorMessage: String? = focusedNode.error?.toString()
+      var tooltipText: String? = null
+      var paneTitle: String? = null
+      if (Build.VERSION.SDK_INT >= 28) {
+        tooltipText = focusedNode.tooltipText?.toString()
+        paneTitle = focusedNode.paneTitle?.toString()
+      }
+
+      UIElementInfo(
+          className = focusedNode.className?.toString(),
+          resourceId = focusedNode.viewIdResourceName,
+          text = focusedNode.text?.toString(),
+          contentDesc = focusedNode.contentDescription?.toString(),
+          clickable = focusedNode.isClickable.toString(),
+          longClickable = focusedNode.isLongClickable.toString(),
+          enabled = focusedNode.isEnabled.toString(),
+          focusable = focusedNode.isFocusable.toString(),
+          focused = focusedNode.isFocused.toString(),
+          accessibilityFocused = focusedNode.isAccessibilityFocused.toString(),
+          checkable = focusedNode.isCheckable.toString(),
+          checked = focusedNode.isChecked.toString(),
+          scrollable = focusedNode.isScrollable.toString(),
+          password = focusedNode.isPassword.toString(),
+          selected = focusedNode.isSelected.toString(),
+          bounds = elementBounds,
+          testTag = testTag,
+          stateDescription = stateDescription,
+          hintText = hintText,
+          errorMessage = errorMessage,
+          tooltipText = tooltipText,
+          paneTitle = paneTitle,
+      )
+    } catch (e: Exception) {
+      Log.e(TAG, "Error extracting focused element info", e)
+      null
+    }
+  }
+
+  /**
+   * Extract traversal order from the active window.
+   * Returns an ordered list of accessibility-focusable elements in TalkBack traversal order.
+   */
+  fun extractTraversalOrderFromActiveWindow(
+      rootNode: AccessibilityNodeInfo?,
+      screenDimensions: ScreenDimensions? = null,
+  ): TraversalOrderResult {
+    if (rootNode == null) {
+      Log.w(TAG, "Root node is null for traversal order extraction")
+      return TraversalOrderResult(elements = emptyList(), focusedIndex = null)
+    }
+
+    // Find accessibility-focused node
+    val accessibilityFocusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+
+    // Collect focusable elements in traversal order
+    val focusableElements = mutableListOf<UIElementInfo>()
+    var focusedIndex: Int? = null
+
+    collectFocusableElements(
+        rootNode,
+        0,
+        screenDimensions,
+        accessibilityFocusedNode,
+        focusableElements,
+    )
+
+    // Find the focused element index
+    if (accessibilityFocusedNode != null) {
+      focusedIndex = findFocusedElementIndex(focusableElements, accessibilityFocusedNode)
+    }
+
+    return TraversalOrderResult(
+        elements = focusableElements,
+        focusedIndex = focusedIndex,
+    )
+  }
+
+  /**
+   * Extract traversal order from all windows.
+   * Returns an ordered list of accessibility-focusable elements across all windows.
+   */
+  fun extractTraversalOrderFromAllWindows(
+      windows: List<AccessibilityWindowInfo>,
+      activeWindowRoot: AccessibilityNodeInfo?,
+      screenDimensions: ScreenDimensions? = null,
+  ): TraversalOrderResult {
+    if (windows.isEmpty() && activeWindowRoot == null) {
+      Log.w(TAG, "No windows available for traversal order extraction")
+      return TraversalOrderResult(elements = emptyList(), focusedIndex = null)
+    }
+
+    // Find accessibility-focused node across all windows
+    var accessibilityFocusedNode: AccessibilityNodeInfo? = null
+    for (window in windows) {
+      val rootNode = window.root ?: continue
+      val focusedInWindow = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+      if (focusedInWindow != null) {
+        accessibilityFocusedNode = focusedInWindow
+        break
+      }
+    }
+    // Fallback to activeWindowRoot
+    if (accessibilityFocusedNode == null && activeWindowRoot != null) {
+      accessibilityFocusedNode =
+          activeWindowRoot.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+    }
+
+    val focusableElements = mutableListOf<UIElementInfo>()
+    var focusedIndex: Int? = null
+
+    // Collect from each window, sorted by layer
+    val sortedWindows = windows.sortedBy { it.layer }
+    for (window in sortedWindows) {
+      val rootNode = window.root ?: continue
+      collectFocusableElements(
+          rootNode,
+          0,
+          screenDimensions,
+          accessibilityFocusedNode,
+          focusableElements,
+      )
+    }
+
+    // Find the focused element index
+    if (accessibilityFocusedNode != null) {
+      focusedIndex = findFocusedElementIndex(focusableElements, accessibilityFocusedNode)
+    }
+
+    return TraversalOrderResult(
+        elements = focusableElements,
+        focusedIndex = focusedIndex,
+    )
+  }
+
+  /**
+   * Collect accessibility-focusable elements in depth-first traversal order.
+   * This matches TalkBack's default traversal behavior.
+   */
+  private fun collectFocusableElements(
+      node: AccessibilityNodeInfo,
+      depth: Int,
+      screenDimensions: ScreenDimensions?,
+      accessibilityFocusedNode: AccessibilityNodeInfo?,
+      result: MutableList<UIElementInfo>,
+  ) {
+    if (depth > MAX_DEPTH) {
+      return
+    }
+
+    try {
+      val bounds = Rect()
+      node.getBoundsInScreen(bounds)
+      val elementBounds = ElementBounds(bounds)
+
+      // Filter zero-area and offscreen nodes
+      if (elementBounds.hasZeroArea()) {
+        return
+      }
+
+      if (screenDimensions != null && screenDimensions.isValid()) {
+        if (elementBounds.isCompletelyOffscreen(screenDimensions.width, screenDimensions.height)) {
+          return
+        }
+      }
+
+      // Check if this node is accessibility-focusable
+      // A node is focusable if it supports ACTION_ACCESSIBILITY_FOCUS or ACTION_CLEAR_ACCESSIBILITY_FOCUS
+      // The currently focused node typically has ACTION_CLEAR_ACCESSIBILITY_FOCUS instead
+      val isFocusable = node.actionList?.any {
+        it.id == AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS ||
+        it.id == AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS
+      } ?: false
+
+      // Also include nodes that are currently accessibility focused
+      val isCurrentlyFocused = node.isAccessibilityFocused
+
+      if (isFocusable || isCurrentlyFocused) {
+        // Extract element info for focusable elements
+        val elementInfo = extractSimpleElementInfo(node, accessibilityFocusedNode)
+        if (elementInfo != null) {
+          result.add(elementInfo)
+        }
+      }
+
+      // Recursively collect from children (depth-first traversal)
+      val childCount = min(node.childCount, MAX_CHILDREN)
+      for (i in 0 until childCount) {
+        val child = node.getChild(i)
+        if (child != null) {
+          collectFocusableElements(
+              child,
+              depth + 1,
+              screenDimensions,
+              accessibilityFocusedNode,
+              result,
+          )
+          child.recycle()
+        }
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Error collecting focusable element at depth $depth", e)
+    }
+  }
+
+  /**
+   * Extract simplified element info for traversal order.
+   * Only includes essential fields to reduce payload size.
+   */
+  private fun extractSimpleElementInfo(
+      node: AccessibilityNodeInfo,
+      accessibilityFocusedNode: AccessibilityNodeInfo?,
+  ): UIElementInfo? {
+    return try {
+      val bounds = Rect()
+      node.getBoundsInScreen(bounds)
+      val elementBounds = ElementBounds(bounds)
+
+      val extrasMap = extractExtras(node)
+      val testTag = extractTestTag(extrasMap)
+
+      // Check if this node is the focused one
+      val isAccessibilityFocusedBool = accessibilityFocusedNode != null &&
+          isSameNode(node, accessibilityFocusedNode)
+
+      UIElementInfo(
+          className = node.className?.toString(),
+          resourceId = node.viewIdResourceName,
+          text = node.text?.toString(),
+          contentDesc = node.contentDescription?.toString(),
+          clickable = node.isClickable.toString(),
+          enabled = node.isEnabled.toString(),
+          focusable = node.isFocusable.toString(),
+          accessibilityFocused = isAccessibilityFocusedBool.toString(),
+          bounds = elementBounds,
+          testTag = testTag,
+      )
+    } catch (e: Exception) {
+      Log.w(TAG, "Error extracting simple element info", e)
+      null
+    }
+  }
+
+  /**
+   * Check if two AccessibilityNodeInfo objects refer to the same node.
+   * Compares bounds, resource ID, and text.
+   */
+  private fun isSameNode(
+      node1: AccessibilityNodeInfo,
+      node2: AccessibilityNodeInfo,
+  ): Boolean {
+    try {
+      val bounds1 = Rect()
+      val bounds2 = Rect()
+      node1.getBoundsInScreen(bounds1)
+      node2.getBoundsInScreen(bounds2)
+
+      return bounds1 == bounds2 &&
+          node1.viewIdResourceName == node2.viewIdResourceName &&
+          node1.text?.toString() == node2.text?.toString()
+    } catch (e: Exception) {
+      return false
+    }
+  }
+
+  /**
+   * Find the index of the focused element in the focusable elements list.
+   */
+  private fun findFocusedElementIndex(
+      focusableElements: List<UIElementInfo>,
+      accessibilityFocusedNode: AccessibilityNodeInfo,
+  ): Int? {
+    val focusedBounds = Rect()
+    accessibilityFocusedNode.getBoundsInScreen(focusedBounds)
+    val focusedResourceId = accessibilityFocusedNode.viewIdResourceName
+    val focusedText = accessibilityFocusedNode.text?.toString()
+
+    return focusableElements.indexOfFirst { element ->
+      val bounds = element.bounds
+      bounds != null &&
+          bounds.left == focusedBounds.left &&
+          bounds.top == focusedBounds.top &&
+          bounds.right == focusedBounds.right &&
+          bounds.bottom == focusedBounds.bottom &&
+          element.resourceId == focusedResourceId &&
+          element.text == focusedText
+    }.takeIf { it >= 0 }
   }
 }
