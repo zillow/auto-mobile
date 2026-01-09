@@ -99,6 +99,9 @@ class WebSocketServer(
     private val onRequestAction:
         ((requestId: String?, action: String, resourceId: String?) -> Unit)? =
         null,
+    private val onRequestClipboard:
+        ((requestId: String?, action: String, text: String?) -> Unit)? =
+        null,
     private val onSetRecompositionTracking: ((enabled: Boolean) -> Unit)? = null,
 ) {
   companion object {
@@ -413,6 +416,15 @@ class WebSocketServer(
             onRequestAction?.invoke(request.requestId, action, request.resourceId)
           } else {
             Log.w(TAG, "Action request missing required action")
+          }
+        }
+        "request_clipboard" -> {
+          Log.d(TAG, "Received clipboard request (requestId: ${request.requestId})")
+          val action = request.action
+          if (action != null) {
+            onRequestClipboard?.invoke(request.requestId, action, request.text)
+          } else {
+            Log.w(TAG, "Clipboard request missing required action")
           }
         }
         "set_recomposition_tracking" -> {

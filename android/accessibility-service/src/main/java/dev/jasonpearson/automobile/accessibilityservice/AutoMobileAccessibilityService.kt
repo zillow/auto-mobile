@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -68,6 +70,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private lateinit var webSocketServer: WebSocketServer
   private lateinit var hierarchyDebouncer: HierarchyDebouncer
   private val navigationEventAccumulator = NavigationEventAccumulator()
+  private val clipboardManager by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
 
   // Job for collecting hierarchy flow results
   private var hierarchyFlowJob: Job? = null
@@ -251,8 +254,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               }
               .launchIn(serviceScope)
 
-      // Start WebSocket server with hierarchy, screenshot, swipe, text input, and IME action
-      // callbacks
+      // Start WebSocket server with hierarchy, screenshot, swipe, text input, IME action,
+      // and clipboard callbacks
       webSocketServer =
           WebSocketServer(
               port = 8765,
@@ -293,6 +296,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onRequestSelectAll = { requestId -> performSelectAll(requestId) },
               onRequestAction = { requestId, action, resourceId ->
                 performNodeAction(requestId, action, resourceId)
+              },
+              onRequestClipboard = { requestId, action, text ->
+                performClipboard(requestId, action, text)
               },
               onSetRecompositionTracking = { enabled -> setRecompositionTrackingEnabled(enabled) },
           )
@@ -1456,6 +1462,132 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
+  /**
+   * Perform clipboard operations using ClipboardManager and AccessibilityService.
+   * Supports copy, paste, clear, and get operations.
+   */
+  private fun performClipboard(requestId: String?, action: String, text: String?) {
+    val startTime = System.currentTimeMillis()
+    Log.d(TAG, "performClipboard: action='$action'")
+    perfProvider.serial("performClipboard")
+
+    try {
+      perfProvider.startOperation("executeClipboardAction")
+
+      val (success, resultText, error) = when (action) {
+        "copy" -> {
+          if (text == null || text.isEmpty()) {
+            Triple(false, null, "Text is required for copy action")
+          } else {
+            try {
+              val clip = ClipData.newPlainText("AutoMobile", text)
+              clipboardManager.setPrimaryClip(clip)
+              Log.d(TAG, "Clipboard copy successful (${text.length} chars)")
+              Triple(true, null, null)
+            } catch (e: Exception) {
+              Log.e(TAG, "Clipboard copy failed", e)
+              Triple(false, null, "Copy failed: ${e.message}")
+            }
+          }
+        }
+        "get" -> {
+          try {
+            val clip = clipboardManager.primaryClip
+            val clipText = clip?.getItemAt(0)?.text?.toString()
+            if (clipText != null) {
+              Log.d(TAG, "Clipboard get successful (${clipText.length} chars)")
+              Triple(true, clipText, null)
+            } else {
+              Log.d(TAG, "Clipboard is empty")
+              Triple(true, "", null)
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "Clipboard get failed", e)
+            Triple(false, null, "Get failed: ${e.message}")
+          }
+        }
+        "clear" -> {
+          try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+              clipboardManager.clearPrimaryClip()
+              Log.d(TAG, "Clipboard cleared using clearPrimaryClip()")
+            } else {
+              // Fallback for API < 28: set empty clip
+              val emptyClip = ClipData.newPlainText("", "")
+              clipboardManager.setPrimaryClip(emptyClip)
+              Log.d(TAG, "Clipboard cleared using empty clip (API < 28)")
+            }
+            Triple(true, null, null)
+          } catch (e: Exception) {
+            Log.e(TAG, "Clipboard clear failed", e)
+            Triple(false, null, "Clear failed: ${e.message}")
+          }
+        }
+        "paste" -> {
+          try {
+            perfProvider.startOperation("findFocusedNode")
+            val focusedNode = findFocusedEditableNode(rootInActiveWindow)
+            perfProvider.endOperation("findFocusedNode")
+
+            if (focusedNode == null) {
+              Log.w(TAG, "No focused editable node found for paste")
+              Triple(false, null, "No focused input field found. Focus a text field before pasting.")
+            } else {
+              perfProvider.startOperation("performPaste")
+              val pasteSuccess = focusedNode.performAction(
+                android.view.accessibility.AccessibilityNodeInfo.ACTION_PASTE
+              )
+              focusedNode.recycle()
+              perfProvider.endOperation("performPaste")
+
+              if (pasteSuccess) {
+                Log.d(TAG, "Clipboard paste successful")
+                Triple(true, null, null)
+              } else {
+                Log.w(TAG, "Paste action returned false")
+                Triple(false, null, "Paste action failed")
+              }
+            }
+          } catch (e: Exception) {
+            Log.e(TAG, "Clipboard paste failed", e)
+            Triple(false, null, "Paste failed: ${e.message}")
+          }
+        }
+        else -> {
+          Log.w(TAG, "Unknown clipboard action: $action")
+          Triple(false, null, "Unknown action: $action")
+        }
+      }
+
+      perfProvider.endOperation("executeClipboardAction")
+      perfProvider.end()
+
+      Log.d(TAG, "Clipboard action completed: action=$action, success=$success")
+
+      val totalTime = System.currentTimeMillis() - startTime
+      Log.d(TAG, "Clipboard total time: ${totalTime}ms")
+
+      // Broadcast clipboard result
+      kotlinx.coroutines.runBlocking {
+        broadcastClipboardResult(requestId, action, success, resultText, error, totalTime)
+      }
+    } catch (e: Exception) {
+      perfProvider.end()
+      val errorTime = System.currentTimeMillis()
+      Log.e(TAG, "Error performing clipboard operation", e)
+      kotlinx.coroutines.runBlocking {
+        broadcastClipboardResult(
+          requestId,
+          action,
+          false,
+          null,
+          e.message,
+          errorTime - startTime
+        )
+      }
+    }
+  }
+
   /** Find the next focusable node after the given node in document order. */
   private fun findNextFocusableNode(
       root: android.view.accessibility.AccessibilityNodeInfo?,
@@ -1769,6 +1901,52 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.d(TAG, "Broadcasted action result to ${webSocketServer.getConnectionCount()} clients")
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting action result", e)
+    }
+  }
+
+  /** Broadcast clipboard result to WebSocket clients */
+  private suspend fun broadcastClipboardResult(
+      requestId: String?,
+      action: String,
+      success: Boolean,
+      text: String?,
+      error: String?,
+      totalTimeMs: Long,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping clipboard result broadcast")
+      return
+    }
+
+    try {
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"clipboard_result","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","action":"$action"""")
+          append(""","success":$success""")
+          append(""","totalTimeMs":$totalTimeMs""")
+          if (text != null) {
+            // Escape text for JSON
+            val escapedText = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+            append(""","text":"$escapedText"""")
+          }
+          if (error != null) {
+            // Escape error message for JSON
+            val escapedError = error.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+            append(""","error":"$escapedError"""")
+          }
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted clipboard result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting clipboard result", e)
     }
   }
 
