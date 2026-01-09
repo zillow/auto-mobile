@@ -740,6 +740,17 @@ export class SwipeOn extends BaseVisualChange {
       : `element with id "${options.lookFor!.elementId}"`;
     logger.info(`[SwipeOn] Looking for ${target} with maxTime=${maxTime}ms`);
 
+    // Check if accessibility service (TalkBack) is enabled
+    const isTalkBackEnabled = await perf.track("checkTalkBack", async () => {
+      if (this.device.platform !== "android") {
+        return false;
+      }
+      return await this.accessibilityDetector.isAccessibilityEnabled(
+        this.device.deviceId,
+        this.adb
+      );
+    });
+
     // First check if element is already visible
     foundElement = await perf.track("initialSearch", () =>
       this.findElementInHierarchy(options.lookFor!, lastObservation.viewHierarchy!, options.container)
@@ -747,6 +758,12 @@ export class SwipeOn extends BaseVisualChange {
 
     if (foundElement) {
       logger.info(`[SwipeOn] Element already visible, no scrolling needed`);
+
+      // Set accessibility focus on found element if requested
+      if (isTalkBackEnabled && options.focusTarget) {
+        await this.setAccessibilityFocusOnElement(foundElement, perf);
+      }
+
       perf.end();
       return {
         success: true,
@@ -762,6 +779,19 @@ export class SwipeOn extends BaseVisualChange {
         duration: 0,
         observation: lastObservation
       };
+    }
+
+    // Clear accessibility focus before scrolling (only when focusTarget is requested)
+    if (isTalkBackEnabled && options.focusTarget) {
+      try {
+        await perf.track("clearAccessibilityFocus", async () => {
+          await this.accessibilityService.clearAccessibilityFocus();
+          logger.info("[SwipeOn] Cleared accessibility focus before scrolling (focusTarget requested)");
+        });
+      } catch (error) {
+        logger.warn(`[SwipeOn] Failed to clear accessibility focus: ${error}`);
+        // Continue anyway - this is not a critical failure
+      }
     }
 
     // Scroll until element is found
@@ -856,6 +886,11 @@ export class SwipeOn extends BaseVisualChange {
       throw new ActionableError(
         `${target} not found after scrolling for ${elapsed}ms (${scrollIteration} iterations, timeout=${maxTime}ms).`
       );
+    }
+
+    // Set accessibility focus on found element if requested
+    if (isTalkBackEnabled && options.focusTarget) {
+      await this.setAccessibilityFocusOnElement(foundElement, perf);
     }
 
     perf.end();
@@ -1040,6 +1075,34 @@ export class SwipeOn extends BaseVisualChange {
 
     // Simple fingerprint based on hierarchy structure
     return JSON.stringify(viewHierarchy.hierarchy).slice(0, 1000);
+  }
+
+  /**
+   * Set accessibility focus on an element (TalkBack cursor).
+   * This is a helper method that attempts to set focus using the element's resource ID.
+   *
+   * @param element - Element to set accessibility focus on
+   * @param perf - Performance tracker
+   */
+  private async setAccessibilityFocusOnElement(
+    element: Element,
+    perf: PerformanceTracker
+  ): Promise<void> {
+    try {
+      await perf.track("setAccessibilityFocus", async () => {
+        const resourceId = element["resource-id"];
+        if (!resourceId) {
+          logger.warn("[SwipeOn] Cannot set accessibility focus: element has no resource-id");
+          return;
+        }
+
+        await this.accessibilityService.setAccessibilityFocus(resourceId);
+        logger.info(`[SwipeOn] Set accessibility focus on element: ${resourceId}`);
+      });
+    } catch (error) {
+      logger.warn(`[SwipeOn] Failed to set accessibility focus: ${error}`);
+      // Continue anyway - this is not a critical failure
+    }
   }
 
   /**

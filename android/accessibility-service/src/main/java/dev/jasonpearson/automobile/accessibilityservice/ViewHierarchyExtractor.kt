@@ -64,8 +64,19 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     }
 
     return try {
+      // Find accessibility-focused node before extracting hierarchy
+      val accessibilityFocusedNode =
+          rootNode.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+
       val rootElement =
-          extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+          extractNodeInfo(
+              rootNode,
+              0,
+              textFilter,
+              screenDimensions,
+              dedupeTextContentDesc,
+              accessibilityFocusedNode,
+          )
       val optimizedElement = rootElement?.let { optimizeHierarchy(it) }
       val filteredElement =
           optimizedElement?.let {
@@ -82,11 +93,15 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             detectNotificationPermissionDialog(it, rootNode.packageName?.toString())
           }
 
+      // Find the accessibility-focused element in the filtered hierarchy
+      val accessibilityFocusedElement = filteredElement?.let { findAccessibilityFocusedElement(it) }
+
       ViewHierarchy(
           packageName = rootNode.packageName?.toString(),
           hierarchy = filteredElement,
           intentChooserDetected = intentChooserDetected,
           notificationPermissionDetected = notificationPermissionDetected,
+          accessibilityFocusedElement = accessibilityFocusedElement,
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error extracting view hierarchy", e)
@@ -115,6 +130,22 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     if (windows.isEmpty() && activeWindowRoot == null) {
       Log.w(TAG, "No windows available for extraction")
       return ViewHierarchy(error = "No windows available")
+    }
+
+    // Find accessibility-focused node across all windows
+    var accessibilityFocusedNode: AccessibilityNodeInfo? = null
+    for (window in windows) {
+      val rootNode = window.root ?: continue
+      val focusedInWindow = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+      if (focusedInWindow != null) {
+        accessibilityFocusedNode = focusedInWindow
+        break
+      }
+    }
+    // Fallback to activeWindowRoot if not found in windows list
+    if (accessibilityFocusedNode == null && activeWindowRoot != null) {
+      accessibilityFocusedNode =
+          activeWindowRoot.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
     }
 
     val windowHierarchies = mutableListOf<WindowHierarchy>()
@@ -149,7 +180,14 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             }
 
         val element =
-            extractNodeInfo(rootNode, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+            extractNodeInfo(
+                rootNode,
+                0,
+                textFilter,
+                screenDimensions,
+                dedupeTextContentDesc,
+                accessibilityFocusedNode,
+            )
         val optimizedElement = element?.let { optimizeHierarchy(it) }
         val packageName = rootNode.packageName?.toString()
         if (!intentChooserDetected && optimizedElement != null) {
@@ -201,7 +239,14 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     // Fallback to activeWindowRoot if no active window found in window list
     if (mainHierarchy == null && activeWindowRoot != null) {
       val element =
-          extractNodeInfo(activeWindowRoot, 0, textFilter, screenDimensions, dedupeTextContentDesc)
+          extractNodeInfo(
+              activeWindowRoot,
+              0,
+              textFilter,
+              screenDimensions,
+              dedupeTextContentDesc,
+              accessibilityFocusedNode,
+          )
       mainHierarchy = element?.let { optimizeHierarchy(it) }
       mainPackageName = activeWindowRoot.packageName?.toString()
       if (!intentChooserDetected && mainHierarchy != null) {
@@ -253,12 +298,16 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         "Extracted ${windowHierarchies.size} additional window hierarchies (after filtering)",
     )
 
+    // Find the accessibility-focused element in the filtered hierarchy
+    val accessibilityFocusedElement = mainHierarchy?.let { findAccessibilityFocusedElement(it) }
+
     return ViewHierarchy(
         packageName = mainPackageName,
         hierarchy = mainHierarchy,
         windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null,
         intentChooserDetected = intentChooserDetected,
         notificationPermissionDetected = notificationPermissionDetected,
+        accessibilityFocusedElement = accessibilityFocusedElement,
     )
   }
 
@@ -459,6 +508,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
    * @param textFilter Optional text filter
    * @param screenDimensions Optional screen dimensions for offscreen filtering
    * @param dedupeTextContentDesc When true, omit content-desc when it equals text
+   * @param accessibilityFocusedNode The node that has accessibility focus (TalkBack cursor)
    */
   private fun extractNodeInfo(
       node: AccessibilityNodeInfo,
@@ -466,6 +516,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       textFilter: String? = null,
       screenDimensions: ScreenDimensions? = null,
       dedupeTextContentDesc: Boolean = true,
+      accessibilityFocusedNode: AccessibilityNodeInfo? = null,
   ): UIElementInfo? {
     if (depth > MAX_DEPTH) {
       return null
@@ -495,7 +546,14 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         val child = node.getChild(i)
         if (child != null) {
           val childInfo =
-              extractNodeInfo(child, depth + 1, textFilter, screenDimensions, dedupeTextContentDesc)
+              extractNodeInfo(
+                  child,
+                  depth + 1,
+                  textFilter,
+                  screenDimensions,
+                  dedupeTextContentDesc,
+                  accessibilityFocusedNode,
+              )
           if (childInfo != null) {
             children.add(childInfo)
           }
@@ -659,6 +717,10 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             null
           }
 
+      // Check if this node has accessibility focus
+      val hasAccessibilityFocus =
+          accessibilityFocusedNode != null && node == accessibilityFocusedNode
+
       val elementInfo =
           UIElementInfo(
               text = text,
@@ -672,6 +734,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               enabled = if (!node.isEnabled) "false" else null, // Only include if disabled
               focusable = if (node.isFocusable) "true" else null,
               focused = if (node.isFocused) "true" else null,
+              accessibilityFocused = if (hasAccessibilityFocus) "true" else null,
               scrollable = if (node.isScrollable) "true" else null,
               password = if (node.isPassword) "true" else null,
               checkable = if (node.isCheckable) "true" else null,
@@ -704,6 +767,28 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       Log.e(TAG, "Error extracting node info at depth $depth", e)
       null
     }
+  }
+
+  /**
+   * Find the accessibility-focused element in the hierarchy.
+   * Recursively searches for the element with accessibilityFocused == "true".
+   */
+  private fun findAccessibilityFocusedElement(element: UIElementInfo): UIElementInfo? {
+    // Check if this element has accessibility focus
+    if (element.isAccessibilityFocused) {
+      return element
+    }
+
+    // Recursively check children
+    val children = extractChildrenFromNode(element.node)
+    for (child in children) {
+      val focusedInChild = findAccessibilityFocusedElement(child)
+      if (focusedInChild != null) {
+        return focusedInChild
+      }
+    }
+
+    return null
   }
 
   /** Extract children from node JsonElement */

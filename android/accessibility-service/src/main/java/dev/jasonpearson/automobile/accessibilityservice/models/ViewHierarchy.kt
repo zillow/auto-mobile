@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.accessibilityservice.models
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -15,6 +16,8 @@ data class ViewHierarchy(
     val windows: List<WindowHierarchy>? = null, // All visible windows (including popups, toolbars)
     val intentChooserDetected: Boolean? = null,
     val notificationPermissionDetected: Boolean? = null,
+    @SerialName("accessibility-focused-element")
+    val accessibilityFocusedElement: UIElementInfo? = null, // Element with TalkBack cursor
     val error: String? = null, // For error cases like locked screen
 )
 

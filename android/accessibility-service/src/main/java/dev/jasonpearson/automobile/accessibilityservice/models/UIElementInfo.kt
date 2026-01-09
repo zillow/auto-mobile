@@ -24,6 +24,7 @@ data class UIElementInfo(
     val enabled: String? = null,
     val focusable: String? = null,
     val focused: String? = null,
+    @SerialName("accessibility-focused") val accessibilityFocused: String? = null,
     val scrollable: String? = null,
     val password: String? = null,
     val checkable: String? = null,
@@ -69,6 +70,9 @@ data class UIElementInfo(
 
   val isFocused: Boolean
     get() = focused == "true"
+
+  val isAccessibilityFocused: Boolean
+    get() = accessibilityFocused == "true"
 
   val isScrollable: Boolean
     get() = scrollable == "true"

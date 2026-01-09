@@ -1184,6 +1184,77 @@ export class ViewHierarchy {
   }
 
   /**
+   * Find the accessibility-focused element (TalkBack cursor position) in the view hierarchy.
+   * First checks the top-level accessibility-focused-element field, then traverses if needed.
+   */
+  findAccessibilityFocusedElement(viewHierarchy: any): Element | null {
+    if (!viewHierarchy) {
+      return null;
+    }
+
+    // First check if accessibility-focused-element is provided at the top level (from Kotlin)
+    if (viewHierarchy["accessibility-focused-element"]) {
+      const element = this.parseNodeBounds(viewHierarchy["accessibility-focused-element"]);
+      if (element) {
+        element["accessibility-focused"] = true;
+        return element;
+      }
+    }
+
+    // Fallback: traverse the hierarchy to find the accessibility-focused element
+    let accessibilityFocusedElement: Element | null = null;
+
+    const traverseNode = (node: any): void => {
+      if (accessibilityFocusedElement) {
+        return; // Already found accessibility-focused element, stop traversing
+      }
+
+      // Check if current node has accessibility focus
+      const props = node.$ || node;
+      if (props["accessibility-focused"] === "true" || props["accessibility-focused"] === true) {
+        // Parse the node into an Element
+        const element = this.parseNodeBounds(node);
+        if (element) {
+          // Ensure accessibility-focused property is a boolean
+          element["accessibility-focused"] = true;
+          accessibilityFocusedElement = element;
+          return;
+        }
+      }
+
+      // Continue traversing children
+      if (node.node) {
+        const children = Array.isArray(node.node) ? node.node : [node.node];
+        for (const child of children) {
+          traverseNode(child);
+          if (accessibilityFocusedElement) {
+            break; // Stop if we found the accessibility-focused element
+          }
+        }
+      }
+    };
+
+    // Search in main hierarchy first
+    if (viewHierarchy.hierarchy) {
+      traverseNode(viewHierarchy.hierarchy);
+    }
+
+    // Also search in all windows (for popups, toolbars, etc.)
+    if (!accessibilityFocusedElement && viewHierarchy.windows) {
+      for (const window of viewHierarchy.windows) {
+        if (window.hierarchy) {
+          traverseNode(window.hierarchy);
+          if (accessibilityFocusedElement) {
+            break;
+          }
+        }
+      }
+    }
+
+    return accessibilityFocusedElement;
+  }
+
+  /**
    * Calculate the center coordinates of an element
    * @param element - The element to calculate center for
    * @returns The center coordinates

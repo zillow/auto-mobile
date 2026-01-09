@@ -235,6 +235,13 @@ export class ObserveScreen {
           result.focusedElement = focusedElement;
           logger.debug(`Found focused element: ${focusedElement.text || focusedElement["resource-id"] || "no text/id"}`);
         }
+
+        const accessibilityFocusedElement = this.viewHierarchy.findAccessibilityFocusedElement(viewHierarchy);
+        if (accessibilityFocusedElement) {
+          result.accessibilityFocusedElement = accessibilityFocusedElement;
+          logger.debug(`Found accessibility-focused element: ${accessibilityFocusedElement.text || accessibilityFocusedElement["resource-id"] || accessibilityFocusedElement["content-desc"] || "no text/id/desc"}`);
+        }
+
         await this.detectIntentChooser(result);
         if (viewHierarchy.notificationPermissionDetected !== undefined) {
           result.notificationPermissionDetected = viewHierarchy.notificationPermissionDetected;

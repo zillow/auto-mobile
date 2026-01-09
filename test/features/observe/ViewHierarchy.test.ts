@@ -1268,4 +1268,131 @@ describe("Offscreen Node Filtering", function() {
     // Offscreen parent should be removed
     expect(flatNodes).not.toContain("OffscreenParent");
   });
+
+  describe("findAccessibilityFocusedElement", function() {
+    test("should find accessibility-focused element from top-level field", function() {
+      const hierarchy = {
+        "accessibility-focused-element": {
+          "text": "Focused Button",
+          "resource-id": "com.app:id/button",
+          "content-desc": "Submit",
+          "bounds": { left: 100, top: 200, right: 300, bottom: 250 }
+        },
+        "hierarchy": {
+          bounds: "[0,0][1080,2400]",
+          node: [
+            { text: "Other Button", bounds: "[0,100][500,200]" }
+          ]
+        }
+      };
+
+      const result = viewHierarchy.findAccessibilityFocusedElement(hierarchy);
+
+      expect(result).not.toBeNull();
+      expect(result?.text).toBe("Focused Button");
+      expect(result?.["resource-id"]).toBe("com.app:id/button");
+      expect(result?.["content-desc"]).toBe("Submit");
+      expect(result?.["accessibility-focused"]).toBe(true);
+    });
+
+    test("should find accessibility-focused element by traversing hierarchy", function() {
+      const hierarchy = {
+        hierarchy: {
+          bounds: "[0,0][1080,2400]",
+          node: [
+            { text: "Button 1", bounds: "[0,100][500,200]" },
+            {
+              text: "Container",
+              bounds: "[0,300][500,600]",
+              node: [
+                { "text": "Button 2", "accessibility-focused": "true", "bounds": "[10,310][490,350]" },
+                { text: "Button 3", bounds: "[10,360][490,400]" }
+              ]
+            }
+          ]
+        }
+      };
+
+      const result = viewHierarchy.findAccessibilityFocusedElement(hierarchy);
+
+      expect(result).not.toBeNull();
+      expect(result?.text).toBe("Button 2");
+      expect(result?.["accessibility-focused"]).toBe(true);
+    });
+
+    test("should return null when no accessibility-focused element exists", function() {
+      const hierarchy = {
+        hierarchy: {
+          bounds: "[0,0][1080,2400]",
+          node: [
+            { text: "Button 1", bounds: "[0,100][500,200]" },
+            { text: "Button 2", bounds: "[0,300][500,400]" }
+          ]
+        }
+      };
+
+      const result = viewHierarchy.findAccessibilityFocusedElement(hierarchy);
+
+      expect(result).toBeNull();
+    });
+
+    test("should return null when hierarchy is null", function() {
+      const result = viewHierarchy.findAccessibilityFocusedElement(null);
+
+      expect(result).toBeNull();
+    });
+
+    test("should prioritize top-level field over hierarchy traversal", function() {
+      const hierarchy = {
+        "accessibility-focused-element": {
+          text: "Top-level Focused",
+          bounds: { left: 100, top: 200, right: 300, bottom: 250 }
+        },
+        "hierarchy": {
+          bounds: "[0,0][1080,2400]",
+          node: [
+            { "text": "Hierarchy Focused", "accessibility-focused": "true", "bounds": "[0,100][500,200]" }
+          ]
+        }
+      };
+
+      const result = viewHierarchy.findAccessibilityFocusedElement(hierarchy);
+
+      expect(result).not.toBeNull();
+      expect(result?.text).toBe("Top-level Focused");
+      expect(result?.["accessibility-focused"]).toBe(true);
+    });
+
+    test("should search in all windows for accessibility-focused element", function() {
+      const hierarchy = {
+        hierarchy: {
+          bounds: "[0,0][1080,2400]",
+          node: [
+            { text: "Main Window Button", bounds: "[0,100][500,200]" }
+          ]
+        },
+        windows: [
+          {
+            windowId: 1,
+            windowType: "application",
+            windowLayer: 1,
+            isActive: false,
+            isFocused: false,
+            hierarchy: {
+              bounds: "[0,0][500,300]",
+              node: [
+                { "text": "Popup Button", "accessibility-focused": "true", "bounds": "[10,10][490,50]" }
+              ]
+            }
+          }
+        ]
+      };
+
+      const result = viewHierarchy.findAccessibilityFocusedElement(hierarchy);
+
+      expect(result).not.toBeNull();
+      expect(result?.text).toBe("Popup Button");
+      expect(result?.["accessibility-focused"]).toBe(true);
+    });
+  });
 });

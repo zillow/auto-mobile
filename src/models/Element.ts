@@ -16,6 +16,7 @@ export interface Element {
   enabled?: boolean;
   focusable?: boolean;
   focused?: boolean;
+  "accessibility-focused"?: boolean;
   scrollable?: boolean;
   orientation?: string;
   selected?: boolean;

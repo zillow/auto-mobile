@@ -14,6 +14,8 @@ export interface ViewHierarchyResult {
   intentChooserDetected?: boolean;
   /** Whether a notification permission dialog was detected (from accessibility service) */
   notificationPermissionDetected?: boolean;
+  /** Element with TalkBack/accessibility cursor (Android only) */
+  "accessibility-focused-element"?: ViewHierarchyNode;
   /** All visible windows (including popups, toolbars, etc.) */
   windows?: WindowHierarchy[];
 }

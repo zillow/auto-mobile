@@ -97,6 +97,12 @@ export interface ObserveResult {
    */
   focusedElement?: Element;
 
+  /**
+   * The element with accessibility focus (TalkBack/VoiceOver cursor)
+   * Contains the element that currently has the screen reader cursor
+   */
+  accessibilityFocusedElement?: Element;
+
   /** Whether a system intent chooser dialog was detected */
   intentChooserDetected?: boolean;
   /** Whether a notification permission dialog was detected */

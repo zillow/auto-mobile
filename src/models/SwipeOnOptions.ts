@@ -36,6 +36,13 @@ export interface SwipeOnOptions {
     maxTime?: number; // Max time to search (default 15000ms) - internal only
   };
 
+  /**
+   * Whether to set accessibility focus on the target element after finding it
+   * (only applies when using lookFor and TalkBack/VoiceOver is enabled)
+   * Default: false
+   */
+  focusTarget?: boolean;
+
   // Gesture options
   speed?: "slow" | "normal" | "fast"; // Speed preset
   duration?: number; // Manual duration override (ms) - internal only
