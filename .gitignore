@@ -32,3 +32,10 @@ docs/contributing/index.md
 # IntelliJ Platform Gradle plugin artifacts
 android/ide-plugin/.intellijPlatform/
 .lycheecache
+
+# Gradle test reports (in case they're generated at root)
+/classes/
+/css/
+/index.html
+/js/
+/packages/
