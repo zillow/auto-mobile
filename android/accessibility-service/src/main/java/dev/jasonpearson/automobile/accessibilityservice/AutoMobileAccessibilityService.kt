@@ -265,6 +265,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onRequestSwipe = { requestId, x1, y1, x2, y2, duration ->
                 performSwipe(requestId, x1, y1, x2, y2, duration)
               },
+              onRequestTwoFingerSwipe = { requestId, x1, y1, x2, y2, duration, offset ->
+                performTwoFingerSwipe(requestId, x1, y1, x2, y2, duration, offset)
+              },
               onRequestPinch = {
                   requestId,
                   centerX,
@@ -774,6 +777,118 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
+  /**
+   * Perform a two-finger swipe gesture for TalkBack mode scrolling.
+   * This allows scrolling content without moving the TalkBack focus cursor.
+   *
+   * @param requestId Optional request ID for response correlation
+   * @param x1 Starting X coordinate
+   * @param y1 Starting Y coordinate
+   * @param x2 Ending X coordinate
+   * @param y2 Ending Y coordinate
+   * @param duration Duration of the swipe in milliseconds
+   * @param offset Horizontal offset between the two fingers (default 100px)
+   */
+  private fun performTwoFingerSwipe(
+      requestId: String?,
+      x1: Int,
+      y1: Int,
+      x2: Int,
+      y2: Int,
+      duration: Long,
+      offset: Int = 100
+  ) {
+    val startTime = System.currentTimeMillis()
+    Log.d(TAG, "performTwoFingerSwipe: ($x1, $y1) -> ($x2, $y2) duration=${duration}ms, offset=${offset}px")
+    perfProvider.serial("performTwoFingerSwipe")
+
+    try {
+      // Create two parallel paths for the two fingers
+      perfProvider.startOperation("buildPaths")
+      val path1 =
+          Path().apply {
+            moveTo(x1.toFloat(), y1.toFloat())
+            lineTo(x2.toFloat(), y2.toFloat())
+          }
+
+      val path2 =
+          Path().apply {
+            moveTo((x1 + offset).toFloat(), y1.toFloat())
+            lineTo((x2 + offset).toFloat(), y2.toFloat())
+          }
+
+      // Build the gesture description with two strokes
+      val gesture =
+          GestureDescription.Builder()
+              .addStroke(GestureDescription.StrokeDescription(path1, 0, duration))
+              .addStroke(GestureDescription.StrokeDescription(path2, 0, duration))
+              .build()
+      perfProvider.endOperation("buildPaths")
+
+      val gestureBuiltTime = System.currentTimeMillis()
+      Log.d(TAG, "Two-finger gesture built in ${gestureBuiltTime - startTime}ms")
+
+      perfProvider.startOperation("dispatchGesture")
+      // Dispatch the gesture
+      val dispatched =
+          dispatchGesture(
+              gesture,
+              object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                  perfProvider.endOperation("dispatchGesture")
+                  perfProvider.end() // end performTwoFingerSwipe block
+                  val completedTime = System.currentTimeMillis()
+                  val totalTime = completedTime - startTime
+                  val gestureTime = completedTime - gestureBuiltTime
+                  Log.d(TAG, "Two-finger swipe completed: gesture=${gestureTime}ms, total=${totalTime}ms")
+
+                  // Broadcast success result
+                  serviceScope.launch {
+                    broadcastSwipeResult(requestId, true, null, totalTime, gestureTime)
+                  }
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                  perfProvider.endOperation("dispatchGesture")
+                  perfProvider.end() // end performTwoFingerSwipe block
+                  val cancelledTime = System.currentTimeMillis()
+                  val totalTime = cancelledTime - startTime
+                  Log.w(TAG, "Two-finger swipe cancelled after ${totalTime}ms")
+
+                  // Broadcast cancelled result
+                  serviceScope.launch {
+                    broadcastSwipeResult(requestId, false, "Gesture was cancelled", totalTime, null)
+                  }
+                }
+              },
+              null,
+          )
+
+      if (!dispatched) {
+        perfProvider.endOperation("dispatchGesture")
+        perfProvider.end() // end performTwoFingerSwipe block
+        val failTime = System.currentTimeMillis()
+        Log.e(TAG, "Failed to dispatch two-finger swipe gesture")
+        serviceScope.launch {
+          broadcastSwipeResult(
+              requestId,
+              false,
+              "Failed to dispatch gesture",
+              failTime - startTime,
+              null,
+          )
+        }
+      }
+    } catch (e: Exception) {
+      perfProvider.end() // end performTwoFingerSwipe block
+      val errorTime = System.currentTimeMillis()
+      Log.e(TAG, "Error performing two-finger swipe", e)
+      serviceScope.launch {
+        broadcastSwipeResult(requestId, false, e.message, errorTime - startTime, null)
+      }
+    }
+  }
+
   /** Perform a pinch gesture using AccessibilityService's dispatchGesture API. */
   private fun performPinch(
       requestId: String?,
@@ -1276,6 +1391,24 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                   android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS
               )
             }
+            "clear_focus" -> {
+              // ACTION_CLEAR_ACCESSIBILITY_FOCUS to clear TalkBack cursor
+              targetNode.performAction(
+                  android.view.accessibility.AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS
+              )
+            }
+            "scroll_forward" -> {
+              // ACTION_SCROLL_FORWARD for scrolling down/right in TalkBack mode
+              targetNode.performAction(
+                  android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+              )
+            }
+            "scroll_backward" -> {
+              // ACTION_SCROLL_BACKWARD for scrolling up/left in TalkBack mode
+              targetNode.performAction(
+                  android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+              )
+            }
             else -> {
               Log.w(TAG, "Unknown action: $action")
               false
@@ -1288,8 +1421,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
       Log.d(TAG, "Action completed: success=$success")
 
-      // Wait for UI to settle after click/long_click, then extract fresh hierarchy
-      if (success && action in listOf("click", "long_click")) {
+      // Wait for UI to settle after click/long_click/scroll, then extract fresh hierarchy
+      if (success && action in listOf("click", "long_click", "scroll_forward", "scroll_backward")) {
         val freshHierarchy =
             hierarchyDebouncer.extractAfterQuiescence(
                 quiescenceMs = 50L,

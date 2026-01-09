@@ -23,6 +23,8 @@ import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder"
 import { SwipeResult } from "../../models/SwipeResult";
 import { ObserveScreen } from "../observe/ObserveScreen";
 import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
+import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
+import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
 
 export interface GestureExecutor {
   swipe(
@@ -50,6 +52,7 @@ export interface SwipeOnDependencies {
   executeGesture?: GestureExecutor;
   observeScreen?: ObserveScreenLike;
   elementUtils?: ElementUtils;
+  accessibilityDetector?: AccessibilityDetector;
 }
 
 type SwipeOnResolvedOptions = SwipeOnOptions & { direction: SwipeDirection };
@@ -67,6 +70,7 @@ export class SwipeOn extends BaseVisualChange {
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
   private webdriver: WebDriverAgent;
+  private accessibilityDetector: AccessibilityDetector;
   private static readonly MAX_ATTEMPTS = 5;
 
   constructor(
@@ -81,6 +85,7 @@ export class SwipeOn extends BaseVisualChange {
     this.elementUtils = dependencies.elementUtils ?? new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.webdriver = webdriver || new WebDriverAgent(device);
+    this.accessibilityDetector = dependencies.accessibilityDetector || defaultAccessibilityDetector;
     if (dependencies.observeScreen) {
       this.observeScreen = dependencies.observeScreen as unknown as ObserveScreen;
     }
@@ -105,6 +110,134 @@ export class SwipeOn extends BaseVisualChange {
       y2: 0,
       duration: 0
     };
+  }
+
+  /**
+   * Execute swipe with TalkBack detection and branching logic.
+   * Routes to appropriate swipe method based on TalkBack state.
+   */
+  private async executeSwipeGesture(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    direction: SwipeDirection,
+    containerElement: Element | null,
+    gestureOptions?: GestureOptions,
+    perf?: PerformanceTracker
+  ): Promise<SwipeResult> {
+    // Only check TalkBack for Android platform
+    if (this.device.platform !== "android") {
+      return this.executeGesture.swipe(x1, y1, x2, y2, gestureOptions, perf);
+    }
+
+    // Check if TalkBack is enabled
+    const isTalkBackEnabled = await this.accessibilityDetector.isAccessibilityEnabled(
+      this.device.id,
+      this.adb!
+    );
+
+    if (isTalkBackEnabled) {
+      logger.info("[SwipeOn] TalkBack enabled, using accessibility-aware swipe");
+      return this.executeAndroidSwipeWithAccessibility(
+        x1, y1, x2, y2,
+        direction,
+        containerElement,
+        gestureOptions,
+        perf
+      );
+    } else {
+      // Standard mode: Use coordinate-based swipes
+      logger.debug("[SwipeOn] TalkBack disabled, using standard swipe");
+      return this.executeGesture.swipe(x1, y1, x2, y2, gestureOptions, perf);
+    }
+  }
+
+  /**
+   * Execute swipe using accessibility actions (TalkBack mode).
+   * Tries ACTION_SCROLL first if container is known, falls back to two-finger swipe.
+   */
+  private async executeAndroidSwipeWithAccessibility(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    direction: SwipeDirection,
+    containerElement: Element | null,
+    gestureOptions?: GestureOptions,
+    perf?: PerformanceTracker
+  ): Promise<SwipeResult> {
+    // Try accessibility scroll actions if container is known and has resource-id
+    if (containerElement && containerElement["resource-id"]) {
+      try {
+        // Clear accessibility focus before scrolling to ensure scroll affects content
+        logger.debug("[SwipeOn] Clearing accessibility focus before scroll");
+        await this.accessibilityService.requestAction("clear_focus", containerElement["resource-id"]);
+      } catch (error) {
+        logger.warn(`[SwipeOn] Failed to clear accessibility focus: ${error}`);
+        // Continue anyway
+      }
+
+      // Map swipe direction to scroll action
+      const scrollAction = (direction === "up" || direction === "left")
+        ? "scroll_backward"
+        : "scroll_forward";
+
+      logger.info(`[SwipeOn] Attempting ACTION_SCROLL (${scrollAction}) on container: ${containerElement["resource-id"]}`);
+
+      try {
+        const result = await this.accessibilityService.requestAction(
+          scrollAction,
+          containerElement["resource-id"]
+        );
+
+        if (result.success) {
+          logger.info("[SwipeOn] ACTION_SCROLL succeeded");
+          return {
+            success: true,
+            x1,
+            y1,
+            x2,
+            y2,
+            duration: gestureOptions?.duration || 300
+          };
+        } else {
+          logger.warn(`[SwipeOn] ACTION_SCROLL failed: ${result.error}, falling back to two-finger swipe`);
+        }
+      } catch (error) {
+        logger.warn(`[SwipeOn] ACTION_SCROLL error: ${error}, falling back to two-finger swipe`);
+      }
+    } else {
+      logger.debug("[SwipeOn] No container with resource-id, skipping ACTION_SCROLL");
+    }
+
+    // Fallback to two-finger swipe
+    logger.info("[SwipeOn] Using two-finger swipe gesture for TalkBack");
+    const duration = gestureOptions?.duration || 300;
+    const offset = 100; // Fixed offset as per design doc
+
+    const a11yResult = await this.accessibilityService.requestTwoFingerSwipe(
+      x1, y1, x2, y2,
+      duration,
+      offset,
+      5000,
+      perf || new NoOpPerformanceTracker()
+    );
+
+    if (a11yResult.success) {
+      return {
+        success: true,
+        x1,
+        y1,
+        x2,
+        y2,
+        duration
+      };
+    } else {
+      throw new ActionableError(
+        `Two-finger swipe failed: ${a11yResult.error || "Unknown error"}`
+      );
+    }
   }
 
   private async getScrollableContext(): Promise<{
@@ -445,11 +578,13 @@ export class SwipeOn extends BaseVisualChange {
         };
 
         const swipeResult = await perf.track("executeScreenSwipe", () =>
-          this.executeGesture.swipe(
+          this.executeSwipeGesture(
             Math.floor(startX),
             Math.floor(startY),
             Math.floor(endX),
             Math.floor(endY),
+            options.direction,
+            null, // No container for screen swipe
             gestureOptions,
             perf
           )
@@ -508,11 +643,13 @@ export class SwipeOn extends BaseVisualChange {
         };
 
         const swipeResult = await perf.track("executeElementSwipe", () =>
-          this.executeGesture.swipe(
+          this.executeSwipeGesture(
             Math.floor(startX),
             Math.floor(startY),
             Math.floor(endX),
             Math.floor(endY),
+            options.direction,
+            element, // Use the container element
             gestureOptions,
             perf
           )
@@ -648,11 +785,13 @@ export class SwipeOn extends BaseVisualChange {
       // Execute swipe with observedInteraction
       const swipeResult = await this.observedInteraction(
         async () => {
-          return await this.executeGesture.swipe(
+          return await this.executeSwipeGesture(
             Math.floor(startX),
             Math.floor(startY),
             Math.floor(endX),
             Math.floor(endY),
+            options.direction,
+            containerElement, // Use the container element
             gestureOptions,
             perf
           );

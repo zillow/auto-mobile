@@ -32,6 +32,7 @@ data class WebSocketRequest(
     val x2: Int? = null,
     val y2: Int? = null,
     val duration: Long? = null,
+    val offset: Int? = null, // Two-finger swipe offset
     val holdTime: Long? = null,
     // Pinch parameters
     val centerX: Int? = null,
@@ -64,6 +65,9 @@ class WebSocketServer(
     private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
     private val onRequestSwipe:
         ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? =
+        null,
+    private val onRequestTwoFingerSwipe:
+        ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, offset: Int) -> Unit)? =
         null,
     private val onRequestDrag:
         ((
@@ -328,6 +332,20 @@ class WebSocketServer(
             onRequestSwipe?.invoke(request.requestId, x1, y1, x2, y2, duration)
           } else {
             Log.w(TAG, "Swipe request missing required coordinates")
+          }
+        }
+        "request_two_finger_swipe" -> {
+          Log.d(TAG, "Received two-finger swipe request (requestId: ${request.requestId})")
+          val x1 = request.x1
+          val y1 = request.y1
+          val x2 = request.x2
+          val y2 = request.y2
+          val duration = request.duration ?: 300L
+          val offset = request.offset ?: 100
+          if (x1 != null && y1 != null && x2 != null && y2 != null) {
+            onRequestTwoFingerSwipe?.invoke(request.requestId, x1, y1, x2, y2, duration, offset)
+          } else {
+            Log.w(TAG, "Two-finger swipe request missing required coordinates")
           }
         }
         "request_drag" -> {

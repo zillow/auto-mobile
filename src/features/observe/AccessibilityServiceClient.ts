@@ -1893,6 +1893,107 @@ export class AccessibilityServiceClient implements AccessibilityService {
   }
 
   /**
+   * Request a two-finger swipe gesture from the accessibility service for TalkBack mode.
+   * This allows scrolling content without moving the TalkBack focus cursor.
+   *
+   * @param x1 - Starting X coordinate
+   * @param y1 - Starting Y coordinate
+   * @param x2 - Ending X coordinate
+   * @param y2 - Ending Y coordinate
+   * @param duration - Duration of the swipe in milliseconds (default 300ms)
+   * @param offset - Horizontal offset between the two fingers (default 100px)
+   * @param timeoutMs - Timeout for the request in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11ySwipeResult> - The swipe result with timing information
+   */
+  async requestTwoFingerSwipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    duration: number = 300,
+    offset: number = 100,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11ySwipeResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for two-finger swipe");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send two-finger swipe request
+      const requestId = `two_finger_swipe_${Date.now()}_${generateSecureId()}`;
+      this.pendingSwipeRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the swipe result
+      const swipePromise = new Promise<A11ySwipeResult>(resolve => {
+        this.pendingSwipeResolve = resolve;
+
+        // Set up timeout
+        this.timer.setTimeout(() => {
+          if (this.pendingSwipeResolve === resolve) {
+            this.pendingSwipeResolve = null;
+            this.pendingSwipeRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Two-finger swipe timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_two_finger_swipe",
+          requestId,
+          x1: Math.round(x1),
+          y1: Math.round(y1),
+          x2: Math.round(x2),
+          y2: Math.round(y2),
+          duration,
+          offset
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent two-finger swipe request (requestId: ${requestId}, ${x1},${y1} -> ${x2},${y2}, duration: ${duration}ms, offset: ${offset}px)`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForSwipe", () => swipePromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Two-finger swipe completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, gestureTime=${result.gestureTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Two-finger swipe failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Two-finger swipe request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
    * Request a drag gesture from the accessibility service using dispatchGesture API.
    * @param x1 - Starting X coordinate
    * @param y1 - Starting Y coordinate
