@@ -6,6 +6,7 @@ export * from "./BiometricAuthResult";
 export * from "./AppStatusResult";
 export * from "./ClearAppDataResult";
 export * from "./ClearTextResult";
+export * from "./ClipboardResult";
 export * from "./DeepLinkResult";
 export * from "./DemoModeResult";
 export * from "./DisplayedTimeMetric";

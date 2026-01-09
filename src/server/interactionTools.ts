@@ -14,6 +14,7 @@ import { RecentApps } from "../features/action/RecentApps";
 import { HomeScreen } from "../features/action/HomeScreen";
 import { Rotate } from "../features/action/Rotate";
 import { OpenURL } from "../features/action/OpenURL";
+import { Clipboard } from "../features/action/Clipboard";
 import { ActionableError, BootedDevice, ViewHierarchyResult } from "../models";
 import { serverConfig } from "../utils/ServerConfig";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
@@ -141,6 +142,12 @@ export interface RecentAppsArgs {
 
 export interface RotateArgs {
   orientation: "portrait" | "landscape";
+  platform: Platform;
+}
+
+export interface ClipboardArgs {
+  action: "copy" | "paste" | "clear" | "get";
+  text?: string;
   platform: Platform;
 }
 
@@ -303,6 +310,12 @@ export const homeScreenSchema = addDeviceTargetingToSchema(z.object({
 
 export const rotateSchema = addDeviceTargetingToSchema(z.object({
   orientation: z.enum(["portrait", "landscape"]).describe("Orientation"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
+}));
+
+export const clipboardSchema = addDeviceTargetingToSchema(z.object({
+  action: z.enum(["copy", "paste", "clear", "get"]).describe("Clipboard action: copy=set clipboard, paste=paste into focused field, clear=clear clipboard, get=get clipboard content"),
+  text: z.string().optional().describe("Text to copy (required for 'copy' action)"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
@@ -801,6 +814,44 @@ export function registerInteractionTools() {
     }
   };
 
+  // Clipboard handler
+  const clipboardHandler = async (device: BootedDevice, args: ClipboardArgs) => {
+    try {
+      const clipboard = new Clipboard(device);
+      const result = await clipboard.execute(args.action, args.text);
+
+      // Build descriptive message based on action
+      let message = "";
+      switch (args.action) {
+        case "copy":
+          message = `Copied text to clipboard`;
+          break;
+        case "paste":
+          message = `Pasted clipboard content into focused field`;
+          break;
+        case "clear":
+          message = `Cleared clipboard`;
+          break;
+        case "get":
+          message = result.text
+            ? `Retrieved clipboard content: "${result.text.substring(0, 50)}${result.text.length > 50 ? "..." : ""}"`
+            : `Retrieved empty clipboard`;
+          break;
+      }
+
+      if (result.method) {
+        message += ` (via ${result.method})`;
+      }
+
+      return createJSONToolResponse({
+        message,
+        ...result
+      });
+    } catch (error) {
+      throw new ActionableError(`Failed to execute clipboard ${args.action}: ${error}`);
+    }
+  };
+
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
     "clearText",
@@ -930,5 +981,14 @@ export function registerInteractionTools() {
     rotateSchema,
     rotateHandler,
     true // Supports progress notifications
+  );
+
+  // Register the clipboard tool
+  ToolRegistry.registerDeviceAware(
+    "clipboard",
+    "Clipboard operations (copy/paste/clear/get)",
+    clipboardSchema,
+    clipboardHandler,
+    false // Does not support progress notifications
   );
 }
