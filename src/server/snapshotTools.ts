@@ -12,7 +12,10 @@ export const captureDeviceSnapshotSchema = addDeviceTargetingToSchema(z.object({
   snapshotName: z.string().optional().describe("Name for the snapshot (auto-generated if not provided)"),
   includeAppData: z.boolean().optional().default(true).describe("Include app data directories in snapshot"),
   includeSettings: z.boolean().optional().default(true).describe("Include system settings in snapshot"),
-  useVmSnapshot: z.boolean().optional().default(true).describe("Use emulator VM snapshot if available (faster, emulator only)")
+  useVmSnapshot: z.boolean().optional().default(true).describe("Use emulator VM snapshot if available (faster, emulator only)"),
+  strictBackupMode: z.boolean().optional().default(false).describe("If true, fail entire snapshot if app data backup fails or times out"),
+  backupTimeout: z.number().optional().default(30000).describe("Timeout in milliseconds for adb backup user confirmation (default: 30000ms)"),
+  userApps: z.enum(["current", "all"]).optional().default("current").describe("Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)")
 }));
 
 export const restoreDeviceSnapshotSchema = addDeviceTargetingToSchema(z.object({
@@ -34,6 +37,9 @@ export interface CaptureSnapshotArgs {
   includeAppData?: boolean;
   includeSettings?: boolean;
   useVmSnapshot?: boolean;
+  strictBackupMode?: boolean;
+  backupTimeout?: number;
+  userApps?: "current" | "all";
 }
 
 export interface RestoreSnapshotArgs {

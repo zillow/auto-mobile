@@ -19,6 +19,15 @@ export interface SnapshotManifest {
     secure?: Record<string, string>;
     system?: Record<string, string>;
   };
+  appDataBackup?: {
+    backupFile?: string; // Path to .ab backup file
+    backedUpPackages?: string[]; // Packages that were successfully backed up
+    skippedPackages?: string[]; // Packages that were skipped (backup not allowed)
+    failedPackages?: string[]; // Packages that failed to backup
+    totalPackages?: number; // Total number of packages attempted
+    backupTimedOut?: boolean; // Whether backup timed out waiting for user confirmation
+    backupMethod?: "adb_backup" | "root_pull" | "none"; // Method used for backup
+  };
 }
 
 export interface SnapshotListItem {
@@ -236,5 +245,12 @@ export class SnapshotStorage {
    */
   getSettingsPath(snapshotName: string): string {
     return path.join(this.getSnapshotPath(snapshotName), "settings.json");
+  }
+
+  /**
+   * Get backup file path within a snapshot (.ab file for adb backup)
+   */
+  getBackupFilePath(snapshotName: string): string {
+    return path.join(this.getAppDataPath(snapshotName), "backup.ab");
   }
 }

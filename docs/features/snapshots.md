@@ -23,6 +23,9 @@ Capture the current device state as a snapshot.
 - `includeAppData` (optional, default: true): Include app data directories in snapshot
 - `includeSettings` (optional, default: true): Include system settings (global/secure/system)
 - `useVmSnapshot` (optional, default: true): Use emulator VM snapshot if available (faster for emulators)
+- `strictBackupMode` (optional, default: false): If true, fail entire snapshot if app data backup fails or times out
+- `backupTimeout` (optional, default: 30000): Timeout in milliseconds for adb backup user confirmation
+- `userApps` (optional, default: "current"): Which apps to backup - "current" (foreground app only) or "all" (all user-installed apps)
 - `sessionUuid` (optional): Session UUID for multi-device targeting
 - `device` (optional): Device label for multi-device control
 
@@ -184,11 +187,20 @@ await deleteSnapshot({
 - Package list (`pm list packages`)
 - System settings (global/secure/system via `settings list`)
 - Foreground app state
-- App data paths (requires root for full backup)
+- App data via `adb backup`:
+  - Only user-installed apps (system apps excluded)
+  - Only apps that allow backup (`android:allowBackup="true"`)
+  - Defaults to current foreground app only (`userApps: "current"`)
+  - Can backup all user apps with `userApps: "all"`
+  - Requires user confirmation on device (30s timeout by default)
+  - Apps with `android:allowBackup="false"` are automatically skipped
 
 **What Gets Restored:**
-- Clears all app data via `pm clear`
+- Clears app data for all packages via `pm clear`
 - Restores system settings via `settings put`
+- Restores app data via `adb restore` (if backup was successful)
+  - Requires user confirmation on device (30s timeout by default)
+  - Only restores apps that were successfully backed up
 - Relaunches foreground app
 
 ## Storage Location
@@ -198,10 +210,11 @@ Snapshots are stored in `~/.automobile/snapshots/` with the following structure:
 ```
 ~/.automobile/snapshots/
 ├── Pixel_5_2026-01-08_12-30-45/
-│   ├── manifest.json          # Snapshot metadata
+│   ├── manifest.json          # Snapshot metadata (includes backup status)
 │   ├── settings.json          # Device settings (ADB snapshots only)
 │   └── app_data/              # App data directory (ADB snapshots only)
-│       └── packages.txt       # List of installed packages
+│       ├── packages.txt       # List of installed packages
+│       └── backup.ab          # ADB backup file (if backup succeeded)
 └── another-snapshot/
     └── ...
 ```
@@ -272,12 +285,76 @@ const v1 = await loadManifest("v1.0-baseline");
 const v2 = await loadManifest("v1.1-baseline");
 ```
 
+## App Data Backup Details
+
+### How It Works
+
+The ADB snapshot feature uses Android's native `adb backup` and `adb restore` commands to capture and restore app data:
+
+1. **Filtering**: Only user-installed apps are backed up (system apps are excluded)
+2. **Backup Eligibility**: Apps must have `android:allowBackup="true"` in their manifest
+3. **Scope**: By default, only the current foreground app is backed up (`userApps: "current"`)
+4. **User Confirmation**: The device will prompt the user to confirm the backup/restore operation
+5. **Timeout**: If the user doesn't confirm within 30 seconds (configurable), the backup continues without app data
+
+### Backup Metadata
+
+The snapshot manifest includes detailed backup information:
+
+```json
+{
+  "appDataBackup": {
+    "backupFile": "backup.ab",
+    "backupMethod": "adb_backup",
+    "totalPackages": 150,
+    "backedUpPackages": ["com.example.app"],
+    "skippedPackages": ["com.example.nobackup"],
+    "failedPackages": [],
+    "backupTimedOut": false
+  }
+}
+```
+
+### Backup Modes
+
+**Current App Only (default)**:
+```javascript
+await captureDeviceSnapshot({
+  userApps: "current",  // Only backup foreground app
+  includeAppData: true
+});
+```
+
+**All User Apps**:
+```javascript
+await captureDeviceSnapshot({
+  userApps: "all",  // Backup all user-installed apps
+  includeAppData: true
+});
+```
+
+**Strict Mode** (fail if backup times out):
+```javascript
+await captureDeviceSnapshot({
+  strictBackupMode: true,  // Fail entire snapshot if backup fails
+  backupTimeout: 60000     // Wait 60 seconds for user confirmation
+});
+```
+
+### Limitations
+
+- **User Confirmation Required**: Cannot automate without user interaction
+- **allowBackup Flag**: Apps with `android:allowBackup="false"` cannot be backed up
+- **APKs Not Included**: Only app data is backed up, not the APK files themselves
+- **Timeout**: If user doesn't confirm, snapshot continues without app data (unless strictBackupMode is enabled)
+
 ## Limitations
 
 - **Android Only**: Currently only supports Android devices
-- **App Data Backup**: Full app data backup requires root access or manual ADB backup confirmation
+- **App Data Backup**: Requires user confirmation on device for each backup/restore operation
 - **VM Snapshots**: Only available for emulators, not physical devices
 - **Storage Space**: Snapshots can be large (especially VM snapshots), manage storage accordingly
+- **Backup Scope**: By default, only current app is backed up (set `userApps: "all"` for all apps)
 
 ## Performance
 

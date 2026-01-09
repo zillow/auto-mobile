@@ -5,6 +5,7 @@ import { SnapshotStorage, SnapshotManifest } from "../../utils/snapshotStorage";
 import { logger } from "../../utils/logger";
 import { promises as fs } from "fs";
 import * as path from "path";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface RestoreSnapshotArgs {
   snapshotName: string;
@@ -25,8 +26,9 @@ export class RestoreSnapshot {
   private adb: AdbClient;
   private emulator: AndroidEmulatorClient;
   private storage: SnapshotStorage;
+  private timer: Timer;
 
-  constructor(device: BootedDevice, adb?: AdbClient, emulator?: AndroidEmulatorClient) {
+  constructor(device: BootedDevice, adb?: AdbClient, emulator?: AndroidEmulatorClient, timer: Timer = defaultTimer) {
     if (device.platform !== "android") {
       throw new ActionableError("Snapshot restore is currently only supported for Android devices");
     }
@@ -35,6 +37,7 @@ export class RestoreSnapshot {
     this.adb = adb || new AdbClient(device);
     this.emulator = emulator || new AndroidEmulatorClient();
     this.storage = new SnapshotStorage();
+    this.timer = timer;
   }
 
   /**
@@ -101,7 +104,7 @@ export class RestoreSnapshot {
       logger.info(`VM snapshot restored successfully`);
 
       // Wait a moment for emulator to stabilize after snapshot load
-      await this.sleep(2000);
+      await this.timer.sleep(2000);
 
       logger.info("VM snapshot restoration complete");
     } catch (error) {
@@ -223,25 +226,94 @@ export class RestoreSnapshot {
   ): Promise<void> {
     logger.info("Restoring app data");
 
-    const appDataPath = this.storage.getAppDataPath(snapshotName);
-    const packageListPath = path.join(appDataPath, "packages.txt");
+    // Check if backup metadata exists
+    if (!manifest.appDataBackup) {
+      logger.warn("No app data backup metadata found in manifest");
+      return;
+    }
+
+    const { backupFile, backupMethod, backedUpPackages } = manifest.appDataBackup;
+
+    // If no backup was performed, skip restore
+    if (backupMethod === "none" || !backupFile || !backedUpPackages || backedUpPackages.length === 0) {
+      logger.info(`No app data backup available (method: ${backupMethod || "none"})`);
+      return;
+    }
+
+    // Get backup file path
+    const backupFilePath = path.join(this.storage.getAppDataPath(snapshotName), backupFile);
 
     try {
-      // Check if package list exists
-      await fs.access(packageListPath);
+      // Check if backup file exists
+      await fs.access(backupFilePath);
 
-      const packageListContent = await fs.readFile(packageListPath, "utf-8");
-      const packages = packageListContent.split("\n").filter(p => p.trim());
+      const stats = await fs.stat(backupFilePath);
+      if (stats.size === 0) {
+        logger.warn("Backup file is empty, skipping restore");
+        return;
+      }
 
-      logger.info(`Package list contains ${packages.length} packages`);
+      logger.info(`Found backup file: ${backupFilePath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+      logger.info(`Restoring ${backedUpPackages.length} apps using adb restore`);
+      logger.info("Please confirm the restore on your device if prompted");
 
-      // Note: Actual app data restoration would require:
-      // 1. Root access to push data to /data/data/
-      // 2. Or adb restore for backed up data
-      // For now, we've cleared the app data - apps will start fresh
-      logger.info("App data restoration requires root access or adb restore confirmation");
+      // Perform adb restore
+      const restoreResult = await this.performAdbRestore(backupFilePath);
+
+      if (restoreResult.success) {
+        logger.info(`Successfully restored app data for ${backedUpPackages.length} apps`);
+      } else if (restoreResult.timedOut) {
+        logger.warn("App data restore timed out - user may not have confirmed on device");
+      } else {
+        logger.warn("App data restore may have failed - check device");
+      }
     } catch (error) {
       logger.warn(`Could not restore app data: ${error}`);
+    }
+  }
+
+  /**
+   * Perform adb restore with timeout
+   */
+  private async performAdbRestore(
+    backupFilePath: string,
+    timeoutMs: number = 30000
+  ): Promise<{ success: boolean; timedOut: boolean }> {
+    try {
+      // Execute restore with timeout using timer
+      let timeoutHandle: NodeJS.Timeout | null = null;
+      let timedOut = false;
+
+      const result = await Promise.race([
+        this.adb.executeCommand(`restore "${backupFilePath}"`),
+        new Promise<{ stdout: string; stderr: string; timedOut: true }>(resolve => {
+          timeoutHandle = this.timer.setTimeout(() => {
+            timedOut = true;
+            resolve({ stdout: "", stderr: "Restore timed out", timedOut: true });
+          }, timeoutMs);
+        })
+      ]);
+
+      // Clear timeout if command completed first
+      if (timeoutHandle && !timedOut) {
+        this.timer.clearTimeout(timeoutHandle);
+      }
+
+      if ("timedOut" in result && result.timedOut) {
+        logger.warn(`Restore timed out after ${timeoutMs}ms - user may not have confirmed on device`);
+        return { success: false, timedOut: true };
+      }
+
+      // Check if restore was successful
+      // adb restore doesn't provide clear success/failure output, so we assume success
+      return { success: true, timedOut: false };
+    } catch (error) {
+      // Clear timeout to avoid keeping process alive
+      if (timeoutHandle) {
+        this.timer.clearTimeout(timeoutHandle);
+      }
+      logger.error(`Restore failed: ${error}`);
+      return { success: false, timedOut: false };
     }
   }
 
@@ -260,12 +332,5 @@ export class RestoreSnapshot {
     } catch (error) {
       logger.warn(`Failed to restore foreground app: ${error}`);
     }
-  }
-
-  /**
-   * Sleep utility
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

@@ -9,8 +9,8 @@ describe("SnapshotStorage", () => {
   let testBasePath: string;
 
   beforeEach(async () => {
-    // Create a temporary directory for tests
-    testBasePath = path.join(os.tmpdir(), `snapshot-test-${Date.now()}`);
+    // Create a secure temporary directory for tests
+    testBasePath = await fs.mkdtemp(path.join(os.tmpdir(), "snapshot-test-"));
     storage = new SnapshotStorage(testBasePath);
     await storage.ensureSnapshotsDirectory();
   });
@@ -216,6 +216,13 @@ describe("SnapshotStorage", () => {
     it("should return correct settings path", () => {
       const settingsPath = storage.getSettingsPath("test-snapshot");
       expect(settingsPath).toBe(path.join(testBasePath, "test-snapshot", "settings.json"));
+    });
+  });
+
+  describe("getBackupFilePath", () => {
+    it("should return correct backup file path", () => {
+      const backupFilePath = storage.getBackupFilePath("test-snapshot");
+      expect(backupFilePath).toBe(path.join(testBasePath, "test-snapshot", "app_data", "backup.ab"));
     });
   });
 });
