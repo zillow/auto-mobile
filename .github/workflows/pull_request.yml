@@ -25,6 +25,7 @@ jobs:
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       sha256_only: ${{ steps.check-sha256.outputs.sha256_only }}
+      ide_plugin_changed: ${{ steps.filter-ide-plugin.outputs.ide_plugin }}
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -109,27 +110,81 @@ jobs:
             core.setOutput('sha256_only', sha256Only.toString());
             return sha256Only;
 
+      - name: "Check for IDE Plugin changes"
+        id: filter-ide-plugin
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ide_plugin:
+              - 'android/ide-plugin/**'
+
   # =============================================================================
   # Fast Validation Jobs (Always Run)
   # =============================================================================
 
-  ide-plugin-validation:
-    name: "IDE Plugin Validation"
+  build-ide-plugin:
+    name: "Build IDE Plugin"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.ide_plugin_changed == 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    defaults:
+      run:
+        working-directory: android/ide-plugin
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
-      - name: "Install JDK"
-        uses: actions/setup-java@v4
+      - uses: ./.github/actions/gradle-task-run
         with:
-          distribution: 'zulu'
-          java-version: '21'
+          gradle-tasks: "build -x test"
+          gradle-project-directory: "android/ide-plugin"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: "Validate IDE Plugin"
-        run: scripts/ide-plugin/validate.sh
+      - name: "Build Plugin ZIP"
+        shell: bash
+        working-directory: android/ide-plugin
+        run: |
+          ./gradlew buildPlugin --stacktrace --continue
+
+      - name: "Verify Plugin"
+        shell: bash
+        working-directory: android/ide-plugin
+        run: |
+          ./gradlew verifyPlugin --stacktrace --continue
+
+      - name: "Upload IDE Plugin ZIP"
+        uses: actions/upload-artifact@v4.4.0
+        if: success()
+        with:
+          name: ide-plugin-zip
+          path: android/ide-plugin/build/distributions/*.zip
+
+  ide-plugin-unit-tests:
+    name: "Run IDE Plugin Unit Tests"
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-ide-plugin]
+    if: needs.detect-changes.outputs.ide_plugin_changed == 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    defaults:
+      run:
+        working-directory: android/ide-plugin
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: "test"
+          gradle-project-directory: "android/ide-plugin"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Upload Test Results"
+        if: failure()
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: ide-plugin-test-results
+          path: android/ide-plugin/build/reports/tests/test/
 
   validate-yaml:
     name: "Validate YAML Test Plans"
