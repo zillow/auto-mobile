@@ -18,7 +18,7 @@ class SimpleIntegrationTest {
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
 
     assertNotNull(annotation)
-    assertEquals("test-plans/launch-clock.yaml", annotation.plan)
+    assertEquals("test-plans/launch-clock-app.yaml", annotation.plan)
     assertEquals("", annotation.prompt)
     assertEquals(0, annotation.maxRetries)
     assertTrue(annotation.aiAssistance)
@@ -32,7 +32,7 @@ class SimpleIntegrationTest {
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
 
     assertNotNull(annotation)
-    assertEquals("test-plans/launch-clock.yaml", annotation.plan)
+    assertEquals("test-plans/launch-clock-app.yaml", annotation.plan)
     assertFalse(annotation.aiAssistance)
   }
 
@@ -42,7 +42,7 @@ class SimpleIntegrationTest {
     val annotation = method.getAnnotation(AutoMobileTest::class.java)
 
     assertNotNull(annotation)
-    assertEquals("test-plans/launch-clock.yaml", annotation.plan)
+    assertEquals("test-plans/launch-clock-app.yaml", annotation.plan)
     assertEquals("emulator-5554", annotation.device)
   }
 
@@ -62,13 +62,13 @@ class SimpleIntegrationTest {
 /** Test target class for SimpleIntegrationTest */
 class SimpleTestTargetClass {
 
-  @Test @AutoMobileTest(plan = "test-plans/launch-clock.yaml") fun testWithAutoMobileAnnotation() {}
+  @Test @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml") fun testWithAutoMobileAnnotation() {}
 
   @Test
-  @AutoMobileTest(plan = "test-plans/launch-clock.yaml", aiAssistance = false)
+  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml", aiAssistance = false)
   fun testWithPlanParameter() {}
 
   @Test
-  @AutoMobileTest(plan = "test-plans/launch-clock.yaml", device = "emulator-5554")
+  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml", device = "emulator-5554")
   fun testWithSpecificDevice() {}
 }
