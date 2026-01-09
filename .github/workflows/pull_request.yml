@@ -864,3 +864,139 @@ jobs:
                 body: body
               });
             }
+
+  # =============================================================================
+  # MCP Tool Call Throughput
+  # =============================================================================
+
+  benchmark-tool-throughput:
+    name: "Benchmark MCP Tool Throughput"
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Run Tool Throughput Benchmark"
+        id: benchmark
+        run: |
+          # Create reports directory
+          mkdir -p reports
+
+          # Run benchmark and capture exit code
+          bun run benchmark-tools --output reports/tool-benchmark.json || echo "FAILED=true" >> $GITHUB_ENV
+
+          # Always preserve the report file even if benchmark failed
+          exit 0
+
+      - name: "Upload Benchmark Report"
+        uses: actions/upload-artifact@v4.4.0
+        if: always()
+        with:
+          name: tool-benchmark-report
+          path: reports/tool-benchmark.json
+          retention-days: 90
+
+      - name: "Check Benchmark Result"
+        if: always()
+        run: |
+          if [ "$FAILED" = "true" ]; then
+            echo "::error::MCP tool throughput benchmark failed - performance regressions detected"
+            cat reports/tool-benchmark.json
+            exit 1
+          fi
+          echo "::notice::MCP tool throughput benchmark passed - no regressions"
+
+      - name: "Comment on PR with Results"
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'reports/tool-benchmark.json';
+
+            if (!fs.existsSync(reportPath)) {
+              console.log('No benchmark report found');
+              return;
+            }
+
+            const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+            // Build summary table
+            let body = '## MCP Tool Call Throughput Benchmark\n\n';
+            body += `**Sample Size:** ${report.sampleSize} iterations per tool\n`;
+            body += `**Total Duration:** ${(report.totalDuration / 1000).toFixed(2)}s\n`;
+            body += `**Average Throughput:** ${report.summary.averageThroughput.toFixed(2)} ops/second\n\n`;
+
+            // Group results by category
+            const categories = [
+              { name: 'Fast Operations', expectedLatency: '<100ms', tools: ['listDevices', 'getForegroundApp', 'pressButton'] },
+              { name: 'Medium Operations', expectedLatency: '100ms-1s', tools: ['observe', 'tapOn', 'inputText', 'swipe'] },
+              { name: 'Slow Operations', expectedLatency: '1s+', tools: ['launchApp', 'installApp'] }
+            ];
+
+            for (const category of categories) {
+              const categoryResults = report.results.filter(r => category.tools.includes(r.toolName));
+              if (categoryResults.length === 0) continue;
+
+              body += `### ${category.name} (${category.expectedLatency})\n\n`;
+              body += '| Tool | P50 | P95 | P99 | Mean | Success | Status |\n';
+              body += '|------|-----|-----|-----|------|---------|--------|\n';
+
+              for (const result of categoryResults) {
+                const status = result.overallPassed === false ? '❌' : '✅';
+                body += `| ${result.toolName} | ${result.p50.toFixed(1)}ms | ${result.p95.toFixed(1)}ms | ${result.p99.toFixed(1)}ms | ${result.mean.toFixed(1)}ms | ${result.successRate.toFixed(0)}% | ${status} |\n`;
+
+                // Add regression details if failed
+                if (result.thresholdChecks && result.overallPassed === false) {
+                  for (const check of result.thresholdChecks.filter(c => !c.passed)) {
+                    body += `| └─ ${check.metric.toUpperCase()} regression | ${check.actual.toFixed(2)}ms | | | ${check.threshold.toFixed(2)}ms | +${check.regression.toFixed(1)}% | |\n`;
+                  }
+                }
+              }
+              body += '\n';
+            }
+
+            // Add violations section if any
+            if (report.violations.length > 0) {
+              body += '### ⚠️ Performance Regressions\n\n';
+              for (const violation of report.violations) {
+                body += `- ${violation}\n`;
+              }
+              body += '\n';
+            }
+
+            body += `**Summary:** ${report.summary.passedTools}/${report.summary.totalTools} tools passed\n`;
+            body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\n\n`;
+            body += `_Generated at ${report.timestamp}_`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('MCP Tool Call Throughput Benchmark')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
