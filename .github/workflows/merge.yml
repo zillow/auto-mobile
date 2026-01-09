@@ -428,6 +428,22 @@ jobs:
     name: "Publish to Docker Hub"
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs:
+      - ide-plugin-validation
+      - validate-xml
+      - ktfmt
+      - validate-shell-scripts
+      - validate-mkdocs-nav
+      - validate-documentation-links
+      - mcp-build-and-test
+      - junit-runner-unit-tests
+      - junit-runner-emulator-tests
+      - playground-automobile-emulator-tests
+      - android-accessibility-service-unit-tests
+      - build-junit-runner-library
+      - build-android-accessibility-service
+      - build-playground-app
+      - benchmark-context-thresholds
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
