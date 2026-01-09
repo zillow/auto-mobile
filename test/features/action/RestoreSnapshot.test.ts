@@ -55,6 +55,517 @@ describe("RestoreSnapshot", () => {
     fakeTimer.reset();
   });
 
+  describe("VM snapshot restore", () => {
+    it("should restore VM snapshot for emulator", async () => {
+      const snapshotName = "test-vm-restore";
+
+      // Create VM snapshot manifest
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: true,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup VM snapshot load command
+      fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "OK");
+
+      const result = await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: true
+      });
+
+      expect(result.snapshotType).toBe("vm");
+      expect(result.restoredAt).toBeDefined();
+      expect(fakeAdb.wasCommandExecuted(`emu avd snapshot load ${snapshotName}`)).toBe(true);
+      expect(fakeTimer.wasSleepCalled(2000)).toBe(true); // Stabilization sleep
+    });
+
+    it("should throw error when VM snapshot load fails with KO", async () => {
+      const snapshotName = "test-vm-fail";
+
+      // Create VM snapshot manifest
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: true,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup VM snapshot load command to fail
+      fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "", "KO: snapshot load failed");
+
+      await expect(restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: true
+      })).rejects.toThrow("Failed to restore VM snapshot");
+    });
+
+    it("should use ADB restore for VM snapshot when useVmSnapshot is false", async () => {
+      const snapshotName = "test-vm-as-adb";
+
+      // Create VM snapshot manifest
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: false,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      const result = await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Should use ADB restore even for VM snapshot when flag is false
+      expect(result.snapshotType).toBe("vm");
+      expect(fakeAdb.wasCommandExecuted("emu avd snapshot load")).toBe(false);
+    });
+
+    it("should not use VM restore for physical device", async () => {
+      const snapshotName = "test-physical-vm";
+
+      // Create physical device
+      const physicalDevice: BootedDevice = {
+        deviceId: "ABC123DEF",
+        name: "Pixel_5_Physical",
+        platform: "android",
+        isEmulator: false
+      };
+
+      const restorePhysical = new RestoreSnapshot(physicalDevice, fakeAdb as any, undefined, fakeTimer);
+      (restorePhysical as any).storage = storage;
+
+      // Create VM snapshot manifest (but can't restore on physical device)
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: false,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      const result = await restorePhysical.execute({
+        snapshotName,
+        useVmSnapshot: true
+      });
+
+      // Should use ADB restore for physical device
+      expect(result.snapshotType).toBe("vm");
+      expect(fakeAdb.wasCommandExecuted("emu avd snapshot load")).toBe(false);
+    });
+  });
+
+  describe("settings restore", () => {
+    it("should restore all settings types", async () => {
+      const snapshotName = "test-restore-settings";
+
+      // Create manifest with settings
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: false,
+        includeSettings: true,
+        settings: {
+          global: { airplane_mode_on: "1", wifi_on: "0" },
+          secure: { android_id: "xyz789", mock_location: "0" },
+          system: { screen_brightness: "200", font_scale: "1.2" }
+        }
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup settings restore commands
+      fakeAdb.setCommandResult("shell settings put global airplane_mode_on '1'", "");
+      fakeAdb.setCommandResult("shell settings put global wifi_on '0'", "");
+      fakeAdb.setCommandResult("shell settings put secure android_id 'xyz789'", "");
+      fakeAdb.setCommandResult("shell settings put secure mock_location '0'", "");
+      fakeAdb.setCommandResult("shell settings put system screen_brightness '200'", "");
+      fakeAdb.setCommandResult("shell settings put system font_scale '1.2'", "");
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Verify all settings were restored
+      expect(fakeAdb.wasCommandExecuted("shell settings put global airplane_mode_on '1'")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put global wifi_on '0'")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure android_id 'xyz789'")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put secure mock_location '0'")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put system screen_brightness '200'")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell settings put system font_scale '1.2'")).toBe(true);
+    });
+
+    it("should handle settings with special characters", async () => {
+      const snapshotName = "test-settings-special";
+
+      // Create manifest with settings containing special characters
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: false,
+        includeSettings: true,
+        settings: {
+          global: { test_key: "value with spaces and 'quotes'" },
+          secure: {},
+          system: {}
+        }
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup settings restore command with escaped value
+      fakeAdb.setCommandResult("shell settings put global test_key 'value with spaces and '\\''quotes'\\'''", "");
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Verify special characters were escaped properly
+      expect(fakeAdb.wasCommandExecuted("shell settings put global test_key")).toBe(true);
+    });
+
+    it("should skip empty settings sections", async () => {
+      const snapshotName = "test-empty-settings";
+
+      // Create manifest with empty settings
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: false,
+        includeSettings: true,
+        settings: {
+          global: {},
+          secure: {},
+          system: {}
+        }
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Verify no settings commands were called
+      expect(fakeAdb.wasCommandExecuted("shell settings put")).toBe(false);
+    });
+
+    it("should skip settings restore when includeSettings is false", async () => {
+      const snapshotName = "test-no-settings-restore";
+
+      // Create manifest without settings
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: false,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Verify no settings commands were called
+      expect(fakeAdb.wasCommandExecuted("shell settings put")).toBe(false);
+    });
+  });
+
+  describe("error scenarios", () => {
+    it("should throw error when snapshot does not exist", async () => {
+      await expect(restoreSnapshot.execute({
+        snapshotName: "non-existent-snapshot",
+        useVmSnapshot: false
+      })).rejects.toThrow("Snapshot 'non-existent-snapshot' not found");
+    });
+
+    it("should throw error for platform mismatch", async () => {
+      const snapshotName = "test-platform-mismatch";
+
+      // Create manifest for different platform
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: "ios-device",
+        deviceName: "iPhone_14",
+        platform: "ios",
+        snapshotType: "adb",
+        includeAppData: false,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      await expect(restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      })).rejects.toThrow("Snapshot platform 'ios' does not match device platform 'android'");
+    });
+
+    it("should throw error for non-Android platform", () => {
+      const iosDevice: BootedDevice = {
+        deviceId: "ios-device",
+        name: "iPhone_14",
+        platform: "ios",
+        isEmulator: true
+      };
+
+      expect(() => new RestoreSnapshot(iosDevice, fakeAdb as any, undefined, fakeTimer))
+        .toThrow("Snapshot restore is currently only supported for Android devices");
+    });
+
+    it("should handle app clear failures gracefully", async () => {
+      const snapshotName = "test-clear-fail";
+
+      // Create manifest with packages
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: true,
+        includeSettings: false,
+        packages: ["com.example.app1", "com.example.app2"]
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup clear commands - one succeeds, one fails
+      fakeAdb.setCommandResult("shell pm clear com.example.app1", "Success");
+      fakeAdb.setCommandResult("shell pm clear com.example.app2", "Failed");
+
+      // Should not throw, just log warnings
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      expect(fakeAdb.wasCommandExecuted("shell pm clear com.example.app1")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell pm clear com.example.app2")).toBe(true);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should not clear app data when includeAppData is false", async () => {
+      const snapshotName = "test-no-clear";
+
+      // Create manifest without app data
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: false,
+        includeSettings: false,
+        packages: ["com.example.app"]
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Verify pm clear was not called
+      expect(fakeAdb.wasCommandExecuted("shell pm clear")).toBe(false);
+    });
+
+    it("should not clear app data when packages list is empty", async () => {
+      const snapshotName = "test-empty-packages";
+
+      // Create manifest with empty packages
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: true,
+        includeSettings: false,
+        packages: []
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Verify pm clear was not called
+      expect(fakeAdb.wasCommandExecuted("shell pm clear")).toBe(false);
+    });
+
+    it("should skip foreground app restore when not in manifest", async () => {
+      const snapshotName = "test-no-foreground";
+
+      // Create manifest without foreground app
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: false,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      // Verify app launch was not called
+      expect(fakeAdb.wasCommandExecuted("shell am start")).toBe(false);
+    });
+
+    it("should handle missing backup file gracefully", async () => {
+      const snapshotName = "test-missing-backup";
+
+      // Create manifest with backup metadata but no actual file
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: true,
+        includeSettings: false,
+        packages: ["com.example.app"],
+        appDataBackup: {
+          backupFile: "backup.ab",
+          backupMethod: "adb_backup",
+          totalPackages: 1,
+          backedUpPackages: ["com.example.app"],
+          skippedPackages: [],
+          failedPackages: []
+        }
+      };
+
+      // Save manifest but don't create backup file
+      await storage.saveManifest(manifest);
+
+      // Should not throw, just skip restore
+      const result = await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      expect(result.snapshotType).toBe("adb");
+      expect(fakeAdb.wasCommandExecuted("restore")).toBe(false);
+    });
+
+    it("should skip restore for empty backup file", async () => {
+      const snapshotName = "test-empty-backup";
+
+      // Create manifest with backup
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "adb",
+        includeAppData: true,
+        includeSettings: false,
+        packages: ["com.example.app"],
+        appDataBackup: {
+          backupFile: "backup.ab",
+          backupMethod: "adb_backup",
+          totalPackages: 1,
+          backedUpPackages: ["com.example.app"],
+          skippedPackages: [],
+          failedPackages: []
+        }
+      };
+
+      // Create empty backup file
+      const appDataPath = storage.getAppDataPath(snapshotName);
+      await fs.mkdir(appDataPath, { recursive: true });
+      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      await fs.writeFile(backupFilePath, "", "utf-8"); // Empty file
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      const result = await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: false
+      });
+
+      expect(result.snapshotType).toBe("adb");
+      expect(fakeAdb.wasCommandExecuted("restore")).toBe(false);
+    });
+  });
+
   describe("app data restore with timeout", () => {
     it("should restore successfully when user confirms within timeout", async () => {
       const snapshotName = "test-snapshot";
