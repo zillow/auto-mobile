@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../fixtures/mcpTestFixture";
 import { FakePlanExecutionLock } from "../fakes/FakePlanExecutionLock";
 import {
@@ -7,6 +7,8 @@ import {
 } from "../../src/server/PlanExecutionLock";
 import { ExecutionTracker } from "../../src/server/executionTracker";
 import type { PlanExecutionLockScope } from "../../src/utils/ServerConfig";
+import { FakeDeviceUtils } from "../fakes/FakeDeviceUtils";
+import { resetDeviceToolsDependencies, setDeviceToolsDependencies } from "../../src/server/deviceTools";
 
 class FakePlanExecutionLockScopeProvider implements PlanExecutionLockScopeProvider {
   constructor(private scope: PlanExecutionLockScope) {}
@@ -21,6 +23,24 @@ class FakePlanExecutionLockScopeProvider implements PlanExecutionLockScopeProvid
 }
 
 describe("Plan execution lock", () => {
+  let fakeDeviceUtils: FakeDeviceUtils;
+
+  beforeEach(() => {
+    // Set up FakeDeviceUtils to avoid real ADB commands
+    fakeDeviceUtils = new FakeDeviceUtils();
+    // Configure with empty device list since we're testing plan lock, not device functionality
+    fakeDeviceUtils.setBootedDevices("android", []);
+
+    setDeviceToolsDependencies({
+      deviceManagerFactory: () => fakeDeviceUtils
+    });
+  });
+
+  afterEach(() => {
+    // Reset dependencies to avoid test pollution
+    resetDeviceToolsDependencies();
+  });
+
   test("rejects MCP tool calls when a plan is executing", async () => {
     const fixture = new McpTestFixture({
       planExecutionLock: new FakePlanExecutionLock({
