@@ -43,7 +43,7 @@ export class BaseVisualChange {
   observeScreen: ObserveScreen;
   window: Window;
   private predictionAnalyzer: PredictionAnalyzer;
-  private timer: Timer;
+  protected timer: Timer;
 
   /**
    * Create an BaseVisualChange instance

@@ -3,16 +3,22 @@ import { Explore } from "../../../src/features/navigation/Explore";
 import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { BootedDevice, Element, ObserveResult } from "../../../src/models";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("Explore", () => {
   let explore: Explore;
   let device: BootedDevice;
   let mockAdb: any;
   let mockObserveScreen: any;
+  let fakeTimer: FakeTimer;
 
   beforeEach(() => {
     // Reset singleton
     NavigationGraphManager.resetInstance();
+
+    // Create fake timer
+    fakeTimer = new FakeTimer();
+    fakeTimer.setManualMode();
 
     // Create fake device
     device = {
@@ -587,6 +593,277 @@ describe("Explore", () => {
 
       expect(key1).toBe(key2);
       expect(key1).not.toBe(key3);
+    });
+  });
+
+  describe("graph-based navigation (validate mode)", () => {
+    test("should initialize graph traversal state in validate mode", async () => {
+      const navManager = NavigationGraphManager.getInstance();
+
+      // Pre-populate the graph with some nodes and edges
+      navManager.recordNavigationEvent({
+        destination: "Screen1",
+        source: "TEST",
+        arguments: {},
+        metadata: {},
+        timestamp: Date.now(),
+        sequenceNumber: 1,
+        applicationId: "com.test.app"
+      });
+
+      await navManager.recordToolCall(
+        "tapOn",
+        { text: "Button1" },
+        {
+          selectedElements: [{ text: "Button1", resourceId: "btn1", contentDesc: "" }]
+        }
+      );
+
+      navManager.recordNavigationEvent({
+        destination: "Screen2",
+        source: "TEST",
+        arguments: {},
+        metadata: {},
+        timestamp: Date.now(),
+        sequenceNumber: 2,
+        applicationId: "com.test.app"
+      });
+
+      explore = new Explore(device, mockAdb);
+      (explore as any).observeScreen = mockObserveScreen;
+
+      // Initialize traversal
+      await (explore as any).initializeGraphTraversal();
+
+      const state = (explore as any).graphTraversalState;
+      expect(state).toBeDefined();
+      expect(state.totalNodesInGraph).toBeGreaterThan(0);
+      expect(state.totalEdgesInGraph).toBeGreaterThan(0);
+      expect(state.visitedNodes.size).toBe(0);
+      expect(state.traversedEdges.size).toBe(0);
+    });
+
+    test("should select next edge to traverse", async () => {
+      explore = new Explore(device, mockAdb);
+      await (explore as any).initializeGraphTraversal();
+
+      const state = (explore as any).graphTraversalState;
+
+      // If there are any pending edges, selectNextEdgeToTraverse should return one
+      if (state.pendingEdges.length > 0) {
+        const firstEdge = state.pendingEdges[0];
+        const edge = (explore as any).selectNextEdgeToTraverse(firstEdge.from);
+        expect(edge).toBeDefined();
+        expect(edge).toBe(firstEdge);
+      }
+
+      // If there are no edges from current screen, it should look for any pending edge
+      const edge = (explore as any).selectNextEdgeToTraverse("NonExistentScreen");
+      if (state.pendingEdges.length > 0) {
+        expect(edge).toBeDefined();
+      } else {
+        expect(edge).toBeNull();
+      }
+    });
+
+    test("should mark nodes as visited", async () => {
+      explore = new Explore(device, mockAdb);
+      await (explore as any).initializeGraphTraversal();
+
+      const state = (explore as any).graphTraversalState;
+      expect(state.visitedNodes.size).toBe(0);
+
+      (explore as any).markNodeVisited("Screen1");
+      expect(state.visitedNodes.size).toBe(1);
+      expect(state.visitedNodes.has("Screen1")).toBe(true);
+
+      (explore as any).markNodeVisited("Screen2");
+      expect(state.visitedNodes.size).toBe(2);
+    });
+
+    test("should mark edges as traversed with validation results", async () => {
+      explore = new Explore(device, mockAdb, null, fakeTimer);
+      await (explore as any).initializeGraphTraversal();
+
+      const state = (explore as any).graphTraversalState;
+      expect(state.traversedEdges.size).toBe(0);
+
+      // Create a mock edge with interaction
+      const mockEdge = {
+        from: "Screen1",
+        to: "Screen2",
+        timestamp: Date.now(),
+        edgeType: "tool" as const,
+        interaction: {
+          toolName: "tapOn",
+          args: { text: "Submit Button" },
+          timestamp: Date.now()
+        }
+      };
+
+      (explore as any).markEdgeTraversed(mockEdge, "Screen2", true, undefined, 0.95);
+
+      expect(state.traversedEdges.size).toBe(1);
+
+      // Get the actual edge key generated
+      const edgeKey = (explore as any).getEdgeKey(mockEdge);
+      expect(state.traversedEdges.has(edgeKey)).toBe(true);
+
+      const validation = state.edgeValidationResults.get(edgeKey);
+      expect(validation).toBeDefined();
+      expect(validation?.success).toBe(true);
+      expect(validation?.expectedTo).toBe("Screen2");
+      expect(validation?.actualTo).toBe("Screen2");
+      expect(validation?.matchConfidence).toBe(0.95);
+    });
+
+    test("should record failed edge validation", async () => {
+      explore = new Explore(device, mockAdb, null, fakeTimer);
+      await (explore as any).initializeGraphTraversal();
+
+      const state = (explore as any).graphTraversalState;
+
+      // Create a mock edge with interaction
+      const mockEdge = {
+        from: "Screen1",
+        to: "Screen2",
+        timestamp: Date.now(),
+        edgeType: "tool" as const,
+        interaction: {
+          toolName: "tapOn",
+          args: { text: "Navigate Button" },
+          timestamp: Date.now()
+        }
+      };
+
+      (explore as any).markEdgeTraversed(
+        mockEdge,
+        "Screen3",
+        false,
+        "Navigation diverged",
+        0.8
+      );
+
+      const edgeKey = (explore as any).getEdgeKey(mockEdge);
+      const validation = state.edgeValidationResults.get(edgeKey);
+      expect(validation?.success).toBe(false);
+      expect(validation?.expectedTo).toBe("Screen2");
+      expect(validation?.actualTo).toBe("Screen3");
+      expect(validation?.error).toBe("Navigation diverged");
+    });
+
+    test("should generate edge keys correctly", async () => {
+      explore = new Explore(device, mockAdb, null, fakeTimer);
+
+      // Create edges with same interaction
+      const edge1 = {
+        from: "Screen1",
+        to: "Screen2",
+        timestamp: 1000,
+        edgeType: "tool" as const,
+        interaction: {
+          toolName: "tapOn",
+          args: { text: "Button A" },
+          timestamp: 1000
+        }
+      };
+
+      const edge2 = {
+        from: "Screen1",
+        to: "Screen2",
+        timestamp: 2000, // Different timestamp
+        edgeType: "tool" as const,
+        interaction: {
+          toolName: "tapOn",
+          args: { text: "Button A" }, // Same interaction
+          timestamp: 2000
+        }
+      };
+
+      const edge3 = {
+        from: "Screen1",
+        to: "Screen2",
+        timestamp: 1000,
+        edgeType: "tool" as const,
+        interaction: {
+          toolName: "tapOn",
+          args: { text: "Button B" }, // Different interaction
+          timestamp: 1000
+        }
+      };
+
+      const edge4 = {
+        from: "Screen2",
+        to: "Screen1",
+        timestamp: 1000,
+        edgeType: "tool" as const,
+        interaction: {
+          toolName: "tapOn",
+          args: { text: "Button A" },
+          timestamp: 1000
+        }
+      };
+
+      const key1 = (explore as any).getEdgeKey(edge1);
+      const key2 = (explore as any).getEdgeKey(edge2);
+      const key3 = (explore as any).getEdgeKey(edge3);
+      const key4 = (explore as any).getEdgeKey(edge4);
+
+      // Same interaction = same key (deterministic)
+      expect(key1).toBe(key2);
+      // Different interaction = different key
+      expect(key1).not.toBe(key3);
+      // Different screens = different key
+      expect(key1).not.toBe(key4);
+
+      // Verify format: from->hash->to
+      expect(key1).toMatch(/^Screen1->[a-f0-9]{8}->Screen2$/);
+    });
+
+    test("should include graph traversal metrics in result", async () => {
+      const navManager = NavigationGraphManager.getInstance();
+
+      // Create a simple graph
+      navManager.recordNavigationEvent({
+        destination: "Screen1",
+        source: "TEST",
+        arguments: {},
+        metadata: {},
+        timestamp: Date.now(),
+        sequenceNumber: 1,
+        applicationId: "com.test.app"
+      });
+
+      explore = new Explore(device, mockAdb, null, fakeTimer);
+      (explore as any).observeScreen = mockObserveScreen;
+
+      await (explore as any).initializeGraphTraversal();
+
+      // Mark some edges as traversed
+      const mockEdge = {
+        from: "Screen1",
+        to: "Screen2",
+        timestamp: fakeTimer.now(),
+        edgeType: "tool" as const,
+        interaction: {
+          toolName: "tapOn",
+          args: { text: "Test Button" },
+          timestamp: fakeTimer.now()
+        }
+      };
+      (explore as any).markEdgeTraversed(mockEdge, "Screen2", true);
+      (explore as any).markNodeVisited("Screen1");
+      (explore as any).markNodeVisited("Screen2");
+
+      const initialGraph = await navManager.exportGraph();
+      const result = await (explore as any).generateReport(initialGraph, Date.now(), false);
+
+      expect(result.graphTraversal).toBeDefined();
+      expect(result.graphTraversal?.nodesVisited).toBe(2);
+      expect(result.graphTraversal?.edgesTraversed).toBe(1);
+      expect(result.graphTraversal?.edgeValidationResults).toBeDefined();
+      expect(result.graphTraversal?.edgeValidationResults.length).toBeGreaterThan(0);
+      expect(result.graphTraversal?.coveragePercentage).toBeGreaterThanOrEqual(0);
     });
   });
 });

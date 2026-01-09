@@ -11,6 +11,8 @@ import { SwipeOnElement } from "../action/SwipeOnElement";
 import { ElementParser } from "../utility/ElementParser";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
+import { createHash } from "crypto";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 /**
  * Exploration strategies for explore
@@ -85,6 +87,14 @@ export interface ExploreResult {
   observation?: ObserveResult;
   durationMs: number;
   stopReason?: string;
+  graphTraversal?: {
+    nodesVisited: number;
+    totalNodes: number;
+    edgesTraversed: number;
+    totalEdges: number;
+    edgeValidationResults: EdgeValidationResult[];
+    coveragePercentage: number;
+  };
 }
 
 export interface PlannedInteraction {
@@ -135,6 +145,32 @@ interface TrackedElement {
 }
 
 /**
+ * Edge validation result for tracking success/failure of known transitions
+ */
+export interface EdgeValidationResult {
+  edgeKey: string;
+  fromScreen: string;
+  expectedTo: string;
+  actualTo: string | null;
+  success: boolean;
+  timestamp: number;
+  error?: string;
+  matchConfidence?: number;
+}
+
+/**
+ * Graph traversal state for validate mode
+ */
+export interface GraphTraversalState {
+  visitedNodes: Set<string>;
+  traversedEdges: Set<string>;
+  pendingEdges: NavigationEdge[];
+  edgeValidationResults: Map<string, EdgeValidationResult>;
+  totalNodesInGraph: number;
+  totalEdgesInGraph: number;
+}
+
+/**
  * Explore implements intelligent app navigation exploration.
  * Perpetually explores until all navigation destinations have been reached by
  * automatically discovering navigation paths, prioritizing likely navigation elements,
@@ -154,6 +190,9 @@ export class Explore extends BaseVisualChange {
   private previousScreen: string | null = null;
   private targetPackageName: string | null = null;
   private consecutiveOutOfAppCount: number = 0;
+  private graphTraversalState: GraphTraversalState | null = null;
+  private currentTargetEdge: NavigationEdge | null = null;
+  private currentElementConfidence: number = 0;
 
   // Constants for safety limits
   private static readonly MAX_CONSECUTIVE_BACKS = 5;
@@ -167,9 +206,10 @@ export class Explore extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null
+    axe: AxeClient | null = null,
+    timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe);
+    super(device, adb, axe, timer);
     this.navigationManager = NavigationGraphManager.getInstance();
     this.exploredElements = new Map();
     this.elementParser = new ElementParser();
@@ -219,6 +259,14 @@ export class Explore extends BaseVisualChange {
       // Capture initial graph state
       const initialGraph = await this.navigationManager.exportGraph();
       const initialNodeCount = initialGraph.nodes.length;
+
+      // Initialize graph traversal for validate mode
+      if (mode === "validate") {
+        await this.initializeGraphTraversal();
+        logger.info(
+          `[Explore] Validate mode: traversing ${this.graphTraversalState?.totalEdgesInGraph ?? 0} known edges`
+        );
+      }
 
       // Main exploration loop
       while (this.shouldContinue(maxInteractions, timeoutMs, startTime)) {
@@ -306,6 +354,22 @@ export class Explore extends BaseVisualChange {
         if (interactionSuccess) {
           this.interactionCount++;
           this.consecutiveNoChangeCount = 0;
+
+          // Validate navigation in validate mode
+          if (mode === "validate" && this.currentTargetEdge) {
+            const preNavigationScreen = currentScreen ?? "unknown";
+            const validationSuccess = await this.validateNavigation(
+              this.currentTargetEdge,
+              preNavigationScreen,
+              this.currentElementConfidence
+            );
+
+            if (!validationSuccess) {
+              // Navigation validation failed - stop exploration
+              logger.error("[Explore] Stopping exploration due to navigation validation failure");
+              break;
+            }
+          }
         } else {
           this.consecutiveNoChangeCount++;
         }
@@ -339,13 +403,27 @@ export class Explore extends BaseVisualChange {
 
         // Report progress
         if (progress) {
-          const currentGraph = await this.navigationManager.exportGraph();
-          const currentNodeCount = currentGraph.nodes.length;
-          await progress(
-            this.interactionCount,
-            maxInteractions,
-            `Explored ${currentNodeCount - initialNodeCount} new screens (${this.interactionCount}/${maxInteractions} interactions)`
-          );
+          if (mode === "validate" && this.graphTraversalState) {
+            // Report graph traversal progress
+            const edgesTraversed = this.graphTraversalState.traversedEdges.size;
+            const totalEdges = this.graphTraversalState.totalEdgesInGraph;
+            const coveragePercent =
+              totalEdges > 0 ? Math.round((edgesTraversed / totalEdges) * 100) : 0;
+            await progress(
+              this.interactionCount,
+              maxInteractions,
+              `Validating graph: ${edgesTraversed}/${totalEdges} edges traversed (${coveragePercent}%) - ${this.interactionCount}/${maxInteractions} interactions`
+            );
+          } else {
+            // Report discovery progress
+            const currentGraph = await this.navigationManager.exportGraph();
+            const currentNodeCount = currentGraph.nodes.length;
+            await progress(
+              this.interactionCount,
+              maxInteractions,
+              `Explored ${currentNodeCount - initialNodeCount} new screens (${this.interactionCount}/${maxInteractions} interactions)`
+            );
+          }
         }
 
         // Periodic reset if configured
@@ -565,6 +643,60 @@ export class Explore extends BaseVisualChange {
       if (allCandidates.length === 0) {
         return null;
       }
+
+      // In validate mode, use graph-based navigation
+      if (mode === "validate" && this.graphTraversalState) {
+        const currentScreen = this.navigationManager.getCurrentScreen() ?? "unknown";
+
+        // Mark current node as visited
+        if (currentScreen !== "unknown") {
+          this.markNodeVisited(currentScreen);
+        }
+
+        // Select next edge to traverse
+        const targetEdge = this.selectNextEdgeToTraverse(currentScreen);
+        if (!targetEdge) {
+          logger.info("[Explore] No more edges to traverse in validate mode");
+          this.stopReason = "All edges in navigation graph have been traversed";
+          return null;
+        }
+
+        // Find element that matches the target edge
+        const match = this.findElementMatchingEdge(allCandidates, targetEdge);
+        if (!match) {
+          const errorMsg =
+            `Validate mode: Cannot find element matching edge ${targetEdge.from}->${targetEdge.to}. ` +
+            `App may have diverged from known graph.`;
+          logger.error(`[Explore] ${errorMsg}`);
+          this.stopReason = errorMsg;
+
+          // Mark edge as failed
+          this.markEdgeTraversed(
+            targetEdge,
+            null,
+            false,
+            "Element not found on screen"
+          );
+
+          return null;
+        }
+
+        logger.info(
+          `[Explore] Validate mode: targeting edge ${targetEdge.from}->${targetEdge.to} ` +
+            `(confidence: ${(match.confidence * 100).toFixed(0)}%)`
+        );
+
+        // Store target edge and confidence for post-interaction validation
+        this.currentTargetEdge = targetEdge;
+        this.currentElementConfidence = match.confidence;
+
+        return match.element;
+      }
+
+      // Discovery and hybrid modes: use traditional element selection
+      // Clear validate mode state
+      this.currentTargetEdge = null;
+      this.currentElementConfidence = 0;
 
       // Filter out exhausted elements
       const unexhaustedElements = this.filterUnexhaustedElements(allCandidates);
@@ -1448,6 +1580,239 @@ export class Explore extends BaseVisualChange {
   }
 
   /**
+   * Validate that navigation matched expected edge in validate mode
+   */
+  private async validateNavigation(
+    expectedEdge: NavigationEdge,
+    preNavigationScreen: string,
+    elementConfidence: number
+  ): Promise<boolean> {
+    // Wait a bit for navigation to complete
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const actualScreen = this.navigationManager.getCurrentScreen() ?? "unknown";
+    const success = actualScreen === expectedEdge.to;
+
+    // Mark edge as traversed with result
+    this.markEdgeTraversed(
+      expectedEdge,
+      actualScreen,
+      success,
+      success ? undefined : `Expected ${expectedEdge.to}, got ${actualScreen}`,
+      elementConfidence
+    );
+
+    if (!success) {
+      const errorMsg =
+        `Validate mode: Navigation validation failed for edge ${expectedEdge.from}->${expectedEdge.to}. ` +
+        `Expected to reach "${expectedEdge.to}", but reached "${actualScreen}". ` +
+        `App has diverged from known graph.`;
+      logger.error(`[Explore] ${errorMsg}`);
+      this.stopReason = errorMsg;
+    }
+
+    return success;
+  }
+
+  /**
+   * Find element on screen that matches a target edge
+   */
+  private findElementMatchingEdge(
+    elements: Element[],
+    edge: NavigationEdge
+  ): { element: Element; confidence: number } | null {
+    const uiState = edge.uiState || edge.interaction?.uiState;
+    if (!uiState) {
+      logger.warn(`[Explore] Edge ${edge.from}->${edge.to} has no UI state, cannot match`);
+      return null;
+    }
+
+    let bestMatch: { element: Element; confidence: number } | null = null;
+    let bestScore = 0;
+
+    for (const element of elements) {
+      // Try to match against selected elements in the edge's UI state
+      if (uiState.selectedElements && uiState.selectedElements.length > 0) {
+        for (const selected of uiState.selectedElements) {
+          const score = this.scoreSelectedElementMatch(element, selected);
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = { element, confidence: score };
+          }
+        }
+      }
+
+      // Try to match against scroll position if present
+      if (uiState.scrollPosition) {
+        const score = this.scoreScrollPositionMatch(element, uiState.scrollPosition);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = { element, confidence: score };
+        }
+      }
+    }
+
+    // Require minimum confidence threshold
+    const MIN_CONFIDENCE = 0.6;
+    if (bestMatch && bestMatch.confidence >= MIN_CONFIDENCE) {
+      logger.debug(
+        `[Explore] Matched element for edge ${edge.from}->${edge.to} with confidence ${bestMatch.confidence.toFixed(2)}`
+      );
+      return bestMatch;
+    }
+
+    logger.warn(
+      `[Explore] No confident match for edge ${edge.from}->${edge.to} ` +
+        `(best score: ${bestScore.toFixed(2)}, threshold: ${MIN_CONFIDENCE})`
+    );
+    return null;
+  }
+
+  /**
+   * Initialize graph traversal state for validate mode
+   */
+  private async initializeGraphTraversal(): Promise<void> {
+    const graph = await this.navigationManager.exportGraph();
+    const allEdges: NavigationEdge[] = [];
+
+    // Collect all edges from the graph
+    for (const edge of graph.edges) {
+      allEdges.push(edge);
+    }
+
+    this.graphTraversalState = {
+      visitedNodes: new Set<string>(),
+      traversedEdges: new Set<string>(),
+      pendingEdges: [...allEdges],
+      edgeValidationResults: new Map<string, EdgeValidationResult>(),
+      totalNodesInGraph: graph.nodes.length,
+      totalEdgesInGraph: allEdges.length
+    };
+
+    logger.info(
+      `[Explore] Initialized graph traversal: ${graph.nodes.length} nodes, ${allEdges.length} edges`
+    );
+  }
+
+  /**
+   * Generate edge key for tracking
+   * Uses hash of the action/interaction to ensure uniqueness for multiple edges between same screens
+   * Format: {from}->{action_hash}->{to}
+   */
+  private getEdgeKey(edge: NavigationEdge): string {
+    const actionHash = this.hashEdgeAction(edge);
+    return `${edge.from}->${actionHash}->${edge.to}`;
+  }
+
+  /**
+   * Create a deterministic hash of the edge's action/interaction
+   * This ensures the same interaction always produces the same hash
+   */
+  private hashEdgeAction(edge: NavigationEdge): string {
+    // For edges without interactions (back button, unknown), use edge type
+    if (!edge.interaction) {
+      return createHash("sha256")
+        .update(`${edge.edgeType}`)
+        .digest("hex")
+        .substring(0, 8);
+    }
+
+    // Create a stable representation of the interaction, excluding timestamps
+    const stableData = {
+      toolName: edge.interaction.toolName,
+      // Sort args keys for stability, exclude any timestamp-like fields
+      args: Object.keys(edge.interaction.args)
+        .filter(k => !k.toLowerCase().includes("timestamp"))
+        .sort()
+        .reduce((acc, key) => {
+          acc[key] = edge.interaction!.args[key];
+          return acc;
+        }, {} as Record<string, any>),
+      // Include edge type for additional uniqueness
+      edgeType: edge.edgeType
+    };
+
+    return createHash("sha256")
+      .update(JSON.stringify(stableData))
+      .digest("hex")
+      .substring(0, 8); // Use first 8 chars for readability
+  }
+
+  /**
+   * Mark current node as visited
+   */
+  private markNodeVisited(screenName: string): void {
+    if (!this.graphTraversalState) {
+      return;
+    }
+    this.graphTraversalState.visitedNodes.add(screenName);
+  }
+
+  /**
+   * Mark edge as traversed with validation result
+   */
+  private markEdgeTraversed(
+    edge: NavigationEdge,
+    actualTo: string | null,
+    success: boolean,
+    error?: string,
+    matchConfidence?: number
+  ): void {
+    if (!this.graphTraversalState) {
+      return;
+    }
+
+    const edgeKey = this.getEdgeKey(edge);
+    this.graphTraversalState.traversedEdges.add(edgeKey);
+
+    const validationResult: EdgeValidationResult = {
+      edgeKey,
+      fromScreen: edge.from,
+      expectedTo: edge.to,
+      actualTo,
+      success,
+      timestamp: this.timer.now(),
+      error,
+      matchConfidence
+    };
+
+    this.graphTraversalState.edgeValidationResults.set(edgeKey, validationResult);
+
+    // Remove from pending edges
+    this.graphTraversalState.pendingEdges = this.graphTraversalState.pendingEdges.filter(
+      e => this.getEdgeKey(e) !== edgeKey
+    );
+
+    logger.info(
+      `[Explore] Edge ${edgeKey} validation: ${success ? "SUCCESS" : "FAILED"}` +
+        (actualTo && actualTo !== edge.to ? ` (went to ${actualTo})` : "")
+    );
+  }
+
+  /**
+   * Select next edge to traverse in validate mode
+   * Only selects edges from the current screen to avoid false divergence
+   */
+  private selectNextEdgeToTraverse(currentScreen: string): NavigationEdge | null {
+    if (!this.graphTraversalState) {
+      return null;
+    }
+
+    // Only select untraversed edges from current screen
+    // Do not attempt to navigate to other screens, as this causes false divergence
+    const untraversedFromCurrent = this.graphTraversalState.pendingEdges.filter(
+      edge => edge.from === currentScreen
+    );
+
+    if (untraversedFromCurrent.length > 0) {
+      return untraversedFromCurrent[0];
+    }
+
+    // No edges from current screen - exploration is complete or stuck
+    return null;
+  }
+
+  /**
    * Generate final report
    */
   private async generateReport(
@@ -1465,6 +1830,26 @@ export class Explore extends BaseVisualChange {
     const coveragePercentage =
       totalScreens > 0 ? (exploredScreens / totalScreens) * 100 : 0;
 
+    // Build graph traversal metrics if in validate mode
+    let graphTraversal: ExploreResult["graphTraversal"];
+    if (this.graphTraversalState) {
+      const traversalCoverage =
+        this.graphTraversalState.totalEdgesInGraph > 0
+          ? (this.graphTraversalState.traversedEdges.size /
+              this.graphTraversalState.totalEdgesInGraph) *
+            100
+          : 0;
+
+      graphTraversal = {
+        nodesVisited: this.graphTraversalState.visitedNodes.size,
+        totalNodes: this.graphTraversalState.totalNodesInGraph,
+        edgesTraversed: this.graphTraversalState.traversedEdges.size,
+        totalEdges: this.graphTraversalState.totalEdgesInGraph,
+        edgeValidationResults: Array.from(this.graphTraversalState.edgeValidationResults.values()),
+        coveragePercentage: Math.round(traversalCoverage * 100) / 100
+      };
+    }
+
     return {
       success: true,
       cancelled,
@@ -1480,7 +1865,8 @@ export class Explore extends BaseVisualChange {
       },
       elementSelections: this.elementSelections,
       durationMs: Date.now() - startTime,
-      stopReason: this.stopReason || "Exploration completed successfully"
+      stopReason: this.stopReason || "Exploration completed successfully",
+      graphTraversal
     };
   }
 }
