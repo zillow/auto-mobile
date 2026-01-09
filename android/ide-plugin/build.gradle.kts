@@ -1,9 +1,9 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 
 plugins {
-  kotlin("jvm") version "2.2.20"
-  kotlin("plugin.serialization") version "2.2.20"
-  kotlin("plugin.compose") version "2.2.20"
+  kotlin("jvm")
+  alias(libs.plugins.kotlin.serialization)
+  kotlin("plugin.compose")
   id("org.jetbrains.intellij.platform") version "2.10.5"
   id("org.jetbrains.compose") version "1.8.0"
 }
@@ -12,18 +12,32 @@ repositories {
   google()
   mavenCentral()
   maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-  intellijPlatform { defaultRepositories() }
+  intellijPlatform {
+    defaultRepositories()
+  }
 }
 
-kotlin { jvmToolchain(17) }
+java {
+  toolchain {
+    languageVersion.set(JavaLanguageVersion.of(libs.versions.build.java.target.get()))
+  }
+}
 
 dependencies {
-  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-  implementation("com.networknt:json-schema-validator:1.5.3")
-  implementation("org.yaml:snakeyaml:2.3")
+  // Shared validation module
+  implementation(project(":test-plan-validation"))
+
+  // Kotlin ecosystem
+  implementation(libs.kotlinx.coroutines)
+  implementation(libs.kotlinx.serialization)
+
+  // YAML and JSON schema validation (transitive from test-plan-validation)
+  implementation(libs.snakeyaml)
+  implementation(libs.json.schema.validator)
+
+  // Test dependencies
   testImplementation("junit:junit:4.13.2")
-  testImplementation("org.jetbrains.kotlin:kotlin-test")
+  testImplementation(libs.kotlin.test)
 
   intellijPlatform {
     intellijIdea("2025.3")

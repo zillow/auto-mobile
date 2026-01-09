@@ -1,5 +1,5 @@
 dependencyResolutionManagement {
-  @Suppress("UnstableApiUsage") repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  @Suppress("UnstableApiUsage") repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
   // Use Maven Central as the default repository (where Gradle will download dependencies) in all
   // subprojects.
   @Suppress("UnstableApiUsage")
@@ -35,6 +35,10 @@ include(":accessibility-service")
 include(":auto-mobile-sdk")
 
 include(":junit-runner")
+
+include(":test-plan-validation")
+
+include(":ide-plugin")
 
 include(":playground:analytics")
 

@@ -18,12 +18,15 @@ java {
 version = "0.0.7-SNAPSHOT"
 
 dependencies {
+  // Shared validation module
+  implementation(project(":test-plan-validation"))
+
   // JUnit dependencies
   implementation(libs.junit)
   implementation(libs.junit.jupiter.api)
   implementation(libs.junit.jupiter.engine)
 
-  // YAML processing and schema validation
+  // YAML processing and schema validation (transitive from test-plan-validation)
   implementation(libs.snakeyaml)
   implementation(libs.json.schema.validator)
 
