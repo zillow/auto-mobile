@@ -20,12 +20,15 @@ kotlin { jvmToolchain(17) }
 dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+  implementation("com.networknt:json-schema-validator:1.5.3")
+  implementation("org.yaml:snakeyaml:2.3")
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.jetbrains.kotlin:kotlin-test")
 
   intellijPlatform {
     intellijIdea("2025.3")
     bundledPlugin("com.intellij.java")
+    bundledPlugin("org.jetbrains.plugins.yaml")
     composeUI()
     pluginVerifier()
   }

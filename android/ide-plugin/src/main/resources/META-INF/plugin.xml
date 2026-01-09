@@ -10,10 +10,23 @@
   <depends>com.intellij.modules.platform</depends>
   <depends>com.intellij.modules.java</depends>
   <depends>com.intellij.modules.compose</depends>
+  <depends>org.jetbrains.plugins.yaml</depends>
 
   <extensions defaultExtensionNs="com.intellij">
     <toolWindow id="AutoMobile" anchor="right" icon="/icons/toolWindow.svg" factoryClass="com.automobile.ide.AutoMobileToolWindowFactory" />
     <applicationConfigurable id="automobile.settings" displayName="AutoMobile" instance="com.automobile.ide.settings.AutoMobileSettingsConfigurable" />
     <applicationConfigurable id="automobile.featureFlags" parentId="automobile.settings" displayName="Feature Flags" instance="com.automobile.ide.settings.FeatureFlagsConfigurable" />
+    <applicationService serviceImplementation="com.automobile.ide.settings.AutoMobileSettings" />
+    <projectService serviceImplementation="com.automobile.ide.yaml.TestPlanValidationService" />
+
+    <!-- YAML test plan validation -->
+    <externalAnnotator language="yaml" implementationClass="com.automobile.ide.yaml.TestPlanExternalAnnotator" />
+    <localInspection language="yaml"
+                     displayName="AutoMobile Test Plan Validation"
+                     groupPath="AutoMobile"
+                     groupName="Test Plans"
+                     enabledByDefault="true"
+                     level="ERROR"
+                     implementationClass="com.automobile.ide.yaml.TestPlanInspection" />
   </extensions>
 </idea-plugin>
