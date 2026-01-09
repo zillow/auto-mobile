@@ -19,6 +19,9 @@
     "estimate-context": "bun scripts/estimate-context-usage.ts",
     "benchmark-context": "bun scripts/benchmark-context-thresholds.ts",
     "validate:yaml": "bun scripts/validate-yaml.ts",
+    "dead-code:ts": "bash scripts/detect-dead-code-ts.sh",
+    "dead-code:ts:prune": "npx ts-prune",
+    "dead-code:ts:knip": "npx knip",
     "prepublishOnly": "cp README.md README.md.backup && bun scripts/npm/transform-readme.js",
     "postpublish": "mv README.md.backup README.md || true"
   },
@@ -107,9 +110,11 @@
     "eslint-plugin": "^1.0.1",
     "eslint-plugin-import": "^2.31.0",
     "eslint-plugin-notice": "^1.0.0",
+    "knip": "^5.80.2",
     "proxyquire": "^2.1.3",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "ts-prune": "^0.10.3",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

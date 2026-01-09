@@ -146,6 +146,7 @@ nav:
   - 'Contributing':
       - 'How': contributing/index.md
       - 'Local Development': contributing/local-development.md
+      - 'Dead Code Detection': contributing/dead-code-detection.md
       - 'Docker Hub Publishing': docker-hub-setup.md
       - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md

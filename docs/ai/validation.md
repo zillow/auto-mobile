@@ -26,6 +26,9 @@ bun run benchmark-context
 # Reinstall MCP server
 bun install
 
+# Validate shell scripts with shellcheck
+bash scripts/shellcheck/validate_shell_scripts.sh
+
 # Auto-fix shell script formatting with shfmt (Google style: 2-space indent)
 # Only formats touched/staged files by default
 bash scripts/shellcheck/apply_shfmt.sh

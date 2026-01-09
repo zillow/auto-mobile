@@ -1,0 +1,27 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "src/index.ts",
+    "src/**/*.test.ts",
+    "scripts/**/*.ts",
+    "build.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "build.ts"
+  ],
+  "ignore": [
+    "dist/**",
+    "node_modules/**",
+    "android/**",
+    "**/*.d.ts"
+  ],
+  "ignoreDependencies": [],
+  "ignoreBinaries": [],
+  "ignoreExportsUsedInFile": true,
+  "includeEntryExports": false,
+  "typescript": {
+    "config": "tsconfig.json"
+  }
+}

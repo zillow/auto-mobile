@@ -1,0 +1,214 @@
+name: "Dead Code Detection"
+
+on:
+  schedule:
+    # Run weekly on Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      threshold:
+        description: 'Maximum allowed dead code issues (default: 10)'
+        required: false
+        default: '10'
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  detect-dead-code:
+    name: "Detect TypeScript Dead Code"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Install jq"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Run Dead Code Detection"
+        id: detect
+        run: |
+          # Create reports directory
+          mkdir -p reports
+
+          # Set threshold from workflow input or default to 10
+          THRESHOLD=${{ github.event.inputs.threshold || '10' }}
+
+          # Run detection script and capture exit code
+          bun run dead-code:ts --output-dir=reports --threshold=$THRESHOLD || echo "FAILED=true" >> $GITHUB_ENV
+
+          # Always preserve the report files even if detection failed
+          exit 0
+
+      - name: "Upload Dead Code Report (JSON)"
+        uses: actions/upload-artifact@v4.4.0
+        if: always()
+        with:
+          name: dead-code-report-json
+          path: reports/dead-code-report.json
+          retention-days: 90
+
+      - name: "Upload Dead Code Report (Markdown)"
+        uses: actions/upload-artifact@v4.4.0
+        if: always()
+        with:
+          name: dead-code-report-markdown
+          path: reports/dead-code-report.md
+          retention-days: 90
+
+      - name: "Check Detection Result"
+        if: always()
+        run: |
+          if [ "$FAILED" = "true" ]; then
+            echo "::error::Dead code detection failed - threshold exceeded"
+            cat reports/dead-code-report.json
+            exit 1
+          fi
+          echo "::notice::Dead code detection passed - below threshold"
+
+      - name: "Create or Update Issue"
+        if: always() && env.FAILED == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'reports/dead-code-report.md';
+
+            if (!fs.existsSync(reportPath)) {
+              console.log('No dead code report found');
+              return;
+            }
+
+            const reportContent = fs.readFileSync(reportPath, 'utf8');
+            const jsonReportPath = 'reports/dead-code-report.json';
+            const jsonReport = JSON.parse(fs.readFileSync(jsonReportPath, 'utf8'));
+
+            // Build issue body with summary and link to full report
+            let body = '## Dead Code Detection Report\n\n';
+            body += '> ⚠️ **Dead code threshold exceeded** - This automated report identifies unused TypeScript code in the repository.\n\n';
+            body += `**Timestamp:** ${jsonReport.timestamp}\n\n`;
+            body += `**Total Issues:** ${jsonReport.totalIssues}\n\n`;
+
+            body += '### Summary\n\n';
+            body += '| Category | Count |\n';
+            body += '|----------|-------|\n';
+            body += `| Unused Exports | ${jsonReport.summary.unusedExports} |\n`;
+            body += `| Unused Files | ${jsonReport.summary.unusedFiles} |\n`;
+            body += `| Unused Dependencies | ${jsonReport.summary.unusedDependencies} |\n`;
+            body += `| Other | ${jsonReport.summary.other} |\n\n`;
+
+            body += '### Action Items\n\n';
+            body += '1. Review the [full report artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})\n';
+            body += '2. Determine which items are false positives (e.g., public API exports)\n';
+            body += '3. Remove genuinely unused code\n';
+            body += '4. Update knip.json configuration if needed to ignore valid exports\n\n';
+
+            body += '### Tool Breakdown\n\n';
+            body += `- **ts-prune:** ${jsonReport.byTool.tsPrune} issues\n`;
+            body += `- **knip:** ${jsonReport.byTool.knip} issues\n\n`;
+
+            if (jsonReport.summary.unusedExports > 0 && jsonReport.issues.length > 0) {
+              body += '### Sample Issues (first 10)\n\n';
+              const unusedExports = jsonReport.issues.filter(i => i.type === 'unused export').slice(0, 10);
+              if (unusedExports.length > 0) {
+                body += '**Unused Exports:**\n';
+                for (const issue of unusedExports) {
+                  body += `- \`${issue.location}\` - ${issue.name}\n`;
+                }
+                body += '\n';
+              }
+            }
+
+            body += '### How to Fix\n\n';
+            body += '```bash\n';
+            body += '# Run locally to see full report\n';
+            body += 'bun run dead-code:ts\n\n';
+            body += '# Run individual tools\n';
+            body += 'bun run dead-code:ts:prune\n';
+            body += 'bun run dead-code:ts:knip\n';
+            body += '```\n\n';
+
+            body += '### Documentation\n\n';
+            body += 'See [docs/contributing/dead-code-detection.md](https://github.com/${{ github.repository }}/blob/main/docs/contributing/dead-code-detection.md) for details on:\n';
+            body += '- Interpreting results\n';
+            body += '- Configuring knip\n';
+            body += '- Handling false positives\n\n';
+
+            body += '_This issue was automatically created by the [Dead Code Detection workflow](https://github.com/${{ github.repository }}/blob/main/.github/workflows/dead-code-detection.yml)_';
+
+            // Search for existing dead code issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dead-code,automated',
+            });
+
+            const existingIssue = issues.find(issue =>
+              issue.title === 'Dead Code Detection: Threshold Exceeded'
+            );
+
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: body
+              });
+              console.log(`Updated existing issue #${existingIssue.number}`);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'Dead Code Detection: Threshold Exceeded',
+                body: body,
+                labels: ['dead-code', 'automated', 'maintenance']
+              });
+              console.log(`Created new issue #${newIssue.data.number}`);
+            }
+
+      - name: "Close Issue if Passed"
+        if: always() && env.FAILED != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Search for existing dead code issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dead-code,automated',
+            });
+
+            const existingIssue = issues.find(issue =>
+              issue.title === 'Dead Code Detection: Threshold Exceeded'
+            );
+
+            if (existingIssue) {
+              // Close the issue with a comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: '✅ Dead code has been cleaned up! The latest detection run found no issues above the threshold. Closing this issue.'
+              });
+
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                state: 'closed'
+              });
+
+              console.log(`Closed issue #${existingIssue.number}`);
+            } else {
+              console.log('No open dead code issue found - nothing to close');
+            }
