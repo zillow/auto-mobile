@@ -12,6 +12,7 @@ import { isDebugModeEnabled } from "../debug";
 import { ExecutePlanStepDebugInfo } from "../../models/ExecutePlanResult";
 import { throwIfAborted } from "../toolUtils";
 import { PlanPartitioner, TrackedStep } from "./PlanPartitioner";
+import { DaemonState } from "../../daemon/daemonState";
 
 /**
  * Interface for plan execution
@@ -180,8 +181,14 @@ export class DefaultPlanExecutor implements PlanExecutor {
               enhancedParams.platform = platform;
             }
 
-            // Inject deviceId if provided and not already set - this ensures the tool uses the correct device
-            if (deviceId && !enhancedParams.deviceId && !enhancedParams.device) {
+            // Inject deviceId if provided and not already set - BUT only if session-based routing won't work
+            // We suppress deviceId injection when BOTH conditions are met:
+            // 1. sessionUuid is present (for session-based routing)
+            // 2. daemon is initialized (so session routing will actually work in ToolRegistry)
+            // If daemon is not initialized, we still inject deviceId to preserve device targeting,
+            // preventing fallback to auto-selection which may target the wrong device.
+            const shouldSuppressDeviceId = sessionUuid && DaemonState.getInstance().isInitialized();
+            if (deviceId && !shouldSuppressDeviceId && !enhancedParams.deviceId && !enhancedParams.device) {
               enhancedParams.deviceId = deviceId;
               logger.info(`[PlanExecutor] Injecting deviceId ${deviceId} into ${step.tool}`);
             }
@@ -589,7 +596,9 @@ export class DefaultPlanExecutor implements PlanExecutor {
             if (platform && !enhancedParams.platform) {
               enhancedParams.platform = platform;
             }
-            if (deviceId && !enhancedParams.deviceId && !enhancedParams.device) {
+            // Only inject deviceId if session-based routing won't work (see detailed comment in executeSequential)
+            const shouldSuppressDeviceId = sessionUuid && DaemonState.getInstance().isInitialized();
+            if (deviceId && !shouldSuppressDeviceId && !enhancedParams.deviceId && !enhancedParams.device) {
               enhancedParams.deviceId = deviceId;
             }
             if (sessionUuid && !enhancedParams.sessionUuid) {
