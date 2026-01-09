@@ -64,6 +64,7 @@ runs:
         path: |
           ~/.android/avd/*
           ~/.android/adb*
+          ~/.android/sdk/system-images/*
         key: avd-${{ runner.os }}-${{ inputs.api_level }}-${{ inputs.arch }}-${{ inputs.target }}
         restore-keys: |
           avd-${{ runner.os }}-${{ inputs.api_level }}-${{ inputs.arch }}-
