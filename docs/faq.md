@@ -34,6 +34,20 @@ Physical devices do need USB debugging enabled for AutoMobile to function with t
 
 Once enabled, the USB debugging authorization is remembered for your computer, so you only need to do this once per device.
 
+### How is the Accessibility Service enabled?
+
+AutoMobile **automatically enables** the accessibility service using ADB settings commands. This is fast, reliable, and requires no manual interaction.
+
+The process:
+- Works automatically on emulators and properly configured devices
+- Completes in milliseconds
+- Preserves other enabled accessibility services
+- Detects device capabilities and provides clear error messages if unsupported
+
+On standard physical devices without root or device owner status, settings-based toggling may not be supported due to Android security restrictions. AutoMobile will detect this and provide guidance.
+
+See the [Accessibility Service documentation](design-docs/plat/android/accessibility-service.md) for technical details.
+
 ### Can I use multiple devices simultaneously?
 
 AutoMobile supports multiple connected devices, but if you're using it as an MCP with an agent it's going to automatically

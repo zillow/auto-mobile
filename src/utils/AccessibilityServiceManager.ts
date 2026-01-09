@@ -529,7 +529,19 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       // Clear cache after enabling
       this.clearAvailabilityCache();
     } catch (error) {
-      throw new Error(`Failed to enable Accessibility Service via settings: ${error instanceof Error ? error.message : String(error)}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorLower = errorMsg.toLowerCase();
+
+      // Categorize error types for clearer feedback
+      if (errorLower.includes("permission denied") || errorLower.includes("not permitted")) {
+        throw new Error(`Permission denied while enabling Accessibility Service. The device may require root access, device owner status, or special shell permissions. Original error: ${errorMsg}`);
+      } else if (errorLower.includes("device not found") || errorLower.includes("no devices") || errorLower.includes("offline")) {
+        throw new Error(`Device connection lost while enabling Accessibility Service. Ensure the device is connected and adb is responsive. Original error: ${errorMsg}`);
+      } else if (errorLower.includes("timeout") || errorLower.includes("timed out")) {
+        throw new Error(`Timeout while enabling Accessibility Service. The device may be unresponsive. Original error: ${errorMsg}`);
+      } else {
+        throw new Error(`Failed to enable Accessibility Service via settings. This may indicate an ADB communication issue or device state problem. Original error: ${errorMsg}`);
+      }
     }
   }
 
@@ -585,7 +597,19 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       // Clear cache after disabling
       this.clearAvailabilityCache();
     } catch (error) {
-      throw new Error(`Failed to disable Accessibility Service via settings: ${error instanceof Error ? error.message : String(error)}`);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorLower = errorMsg.toLowerCase();
+
+      // Categorize error types for clearer feedback
+      if (errorLower.includes("permission denied") || errorLower.includes("not permitted")) {
+        throw new Error(`Permission denied while disabling Accessibility Service. The device may require root access, device owner status, or special shell permissions. Original error: ${errorMsg}`);
+      } else if (errorLower.includes("device not found") || errorLower.includes("no devices") || errorLower.includes("offline")) {
+        throw new Error(`Device connection lost while disabling Accessibility Service. Ensure the device is connected and adb is responsive. Original error: ${errorMsg}`);
+      } else if (errorLower.includes("timeout") || errorLower.includes("timed out")) {
+        throw new Error(`Timeout while disabling Accessibility Service. The device may be unresponsive. Original error: ${errorMsg}`);
+      } else {
+        throw new Error(`Failed to disable Accessibility Service via settings. This may indicate an ADB communication issue or device state problem. Original error: ${errorMsg}`);
+      }
     }
   }
 
@@ -683,10 +707,29 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       };
 
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const errorLower = errorMsg.toLowerCase();
+
+      // Provide categorized error messages for better debugging
+      let message = "Failed to setup Accessibility Service";
+      if (errorLower.includes("permission denied") || errorLower.includes("not permitted")) {
+        message = "Failed to setup Accessibility Service due to permission error";
+      } else if (errorLower.includes("device not found") || errorLower.includes("no devices") || errorLower.includes("offline")) {
+        message = "Failed to setup Accessibility Service due to device connection issue";
+      } else if (errorLower.includes("timeout") || errorLower.includes("timed out")) {
+        message = "Failed to setup Accessibility Service due to timeout";
+      } else if (errorLower.includes("download") || errorLower.includes("network") || errorLower.includes("unreachable")) {
+        message = "Failed to setup Accessibility Service due to network/download error";
+      } else if (errorLower.includes("not supported")) {
+        message = "Failed to setup Accessibility Service - settings toggle not supported on this device";
+      } else if (errorLower.includes("installation failed") || errorLower.includes("install")) {
+        message = "Failed to setup Accessibility Service due to APK installation error";
+      }
+
       return {
         success: false,
-        message: "Failed to setup Accessibility Service",
-        error: error instanceof Error ? error.message : String(error)
+        message,
+        error: errorMsg
       };
     } finally {
       // Clean up APK file if it was downloaded
