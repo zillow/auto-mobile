@@ -1,6 +1,7 @@
 name: "On Merge"
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -427,7 +428,7 @@ jobs:
   publish-docker-hub:
     name: "Publish to Docker Hub"
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs:
       - ide-plugin-validation
       - validate-xml
@@ -505,7 +506,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
 
       - name: "Update Docker Hub description"
         uses: peter-evans/dockerhub-description@v4
