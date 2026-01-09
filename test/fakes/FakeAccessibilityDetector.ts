@@ -37,6 +37,20 @@ export class FakeAccessibilityDetector implements AccessibilityDetector {
   }
 
   /**
+   * Alias for getDetectionCallCount for test compatibility
+   */
+  getCheckCount(): number {
+    return this.detectionCallCount;
+  }
+
+  /**
+   * Helper method to set TalkBack enabled/disabled state for default device
+   */
+  setTalkBackEnabled(enabled: boolean): void {
+    this.setDefaultResult(enabled, enabled ? "talkback" : "unknown");
+  }
+
+  /**
    * Get the list of devices that had their cache invalidated
    */
   getInvalidatedDevices(): string[] {

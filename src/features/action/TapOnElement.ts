@@ -20,6 +20,8 @@ import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { SelectionStateTracker, SelectionCaptureState, TakeScreenshotCapturer } from "../navigation/SelectionStateTracker";
+import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
+import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
 
 /**
  * Command to tap on UI element containing specified text
@@ -30,6 +32,7 @@ export class TapOnElement extends BaseVisualChange {
   private accessibilityService: AccessibilityServiceClient;
   private visionConfig: VisionFallbackConfig;
   private selectionStateTracker: SelectionStateTracker;
+  private accessibilityDetector: AccessibilityDetector;
   private static readonly MAX_ATTEMPTS = 5;
   private static readonly AWAIT_POLL_INTERVAL_MS = 100;
 
@@ -39,7 +42,8 @@ export class TapOnElement extends BaseVisualChange {
     axe: AxeClient | null = null,
     webdriver: WebDriverAgent | null = null,
     visionConfig?: VisionFallbackConfig,
-    selectionStateTracker?: SelectionStateTracker
+    selectionStateTracker?: SelectionStateTracker,
+    accessibilityDetector?: AccessibilityDetector
   ) {
     super(device, adb, axe);
     this.elementUtils = new ElementUtils();
@@ -49,6 +53,7 @@ export class TapOnElement extends BaseVisualChange {
     this.selectionStateTracker = selectionStateTracker ?? new SelectionStateTracker({
       screenshotCapturer: new TakeScreenshotCapturer(device, this.adb)
     });
+    this.accessibilityDetector = accessibilityDetector || defaultAccessibilityDetector;
   }
 
   /**
@@ -324,7 +329,8 @@ export class TapOnElement extends BaseVisualChange {
                   tapPoint.y,
                   longPressDuration,
                   element,
-                  signal
+                  signal,
+                  options
                 );
                 break;
               case "ios":
@@ -460,8 +466,36 @@ export class TapOnElement extends BaseVisualChange {
    * @param durationMs - Long press duration in milliseconds
    * @param element - Target element
    * @param signal - Abort signal
+   * @param options - Tap options (for focusFirst parameter)
    */
   private async executeAndroidTap(
+    action: string,
+    x: number,
+    y: number,
+    durationMs: number,
+    element: Element,
+    signal?: AbortSignal,
+    options?: TapOnElementOptions
+  ): Promise<void> {
+    // Check if TalkBack is enabled
+    const isTalkBackEnabled = await this.accessibilityDetector.isAccessibilityEnabled(
+      this.device.id,
+      this.adb
+    );
+
+    if (isTalkBackEnabled) {
+      // TalkBack mode: Use AccessibilityService ACTION_CLICK
+      await this.executeAndroidTapWithAccessibility(action, element, durationMs, options, signal);
+    } else {
+      // Standard mode: Use coordinate-based taps
+      await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
+    }
+  }
+
+  /**
+   * Execute tap using coordinate-based input commands (standard mode)
+   */
+  private async executeAndroidTapWithCoordinates(
     action: string,
     x: number,
     y: number,
@@ -477,6 +511,61 @@ export class TapOnElement extends BaseVisualChange {
       await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
       await new Promise(resolve => setTimeout(resolve, 200));
       await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
+    }
+  }
+
+  /**
+   * Execute tap using AccessibilityService actions (TalkBack mode)
+   */
+  private async executeAndroidTapWithAccessibility(
+    action: string,
+    element: Element,
+    durationMs: number,
+    options?: TapOnElementOptions,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const resourceId = element?.["resource-id"];
+    if (!resourceId) {
+      throw new ActionableError("Cannot perform accessibility action: element has no resource-id");
+    }
+
+    // Determine if we should set accessibility focus first
+    // Default to true for TalkBack mode (mimics user behavior)
+    const shouldFocusFirst = options?.focusFirst ?? true;
+
+    if (shouldFocusFirst && action !== "longPress") {
+      // Set accessibility focus before action (except for long press which handles focus internally)
+      try {
+        await this.accessibilityService.requestAction("focus", resourceId);
+        // Brief delay for TalkBack announcement
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        logger.warn(`[TapOnElement] Failed to set accessibility focus: ${error}`);
+        // Continue with action anyway
+      }
+    }
+
+    if (action === "tap") {
+      const result = await this.accessibilityService.requestAction("click", resourceId);
+      if (!result.success) {
+        throw new ActionableError(`Failed to perform accessibility click: ${result.error}`);
+      }
+    } else if (action === "longPress") {
+      const result = await this.accessibilityService.requestAction("long_click", resourceId);
+      if (!result.success) {
+        throw new ActionableError(`Failed to perform accessibility long click: ${result.error}`);
+      }
+    } else if (action === "doubleTap") {
+      // Double tap: Two ACTION_CLICK calls with delay
+      const result1 = await this.accessibilityService.requestAction("click", resourceId);
+      if (!result1.success) {
+        throw new ActionableError(`Failed to perform first accessibility click: ${result1.error}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const result2 = await this.accessibilityService.requestAction("click", resourceId);
+      if (!result2.success) {
+        throw new ActionableError(`Failed to perform second accessibility click: ${result2.error}`);
+      }
     }
   }
 
