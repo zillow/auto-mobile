@@ -6,7 +6,9 @@ export type FeatureFlagKey =
   | "mem-perf-audit"
   | "strict-await"
   | "accessibility-audit"
-  | "predictive-ui";
+  | "predictive-ui"
+  | "force-accessibility-mode"
+  | "accessibility-auto-detect";
 
 export type FeatureFlagConfig = Record<string, unknown>;
 
@@ -72,5 +74,17 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     label: "Predictive UI",
     description: "Enable predictive UI state generation during observe.",
     defaultValue: false,
+  },
+  {
+    key: "force-accessibility-mode",
+    label: "Force accessibility mode",
+    description: "Force-enable accessibility mode for testing (overrides auto-detection).",
+    defaultValue: false,
+  },
+  {
+    key: "accessibility-auto-detect",
+    label: "Accessibility auto-detect",
+    description: "Automatically detect and adapt to TalkBack/VoiceOver when enabled.",
+    defaultValue: true,
   },
 ];

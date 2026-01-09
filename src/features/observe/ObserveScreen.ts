@@ -25,6 +25,8 @@ import { WcagAudit } from "../accessibility/WcagAudit";
 import { Element } from "../../models/Element";
 import { RecompositionTracker } from "../performance/RecompositionTracker";
 import { PredictiveUIState } from "./PredictiveUIState";
+import { accessibilityDetector } from "../../utils/AccessibilityDetector";
+import { FeatureFlagService } from "../featureFlags/FeatureFlagService";
 
 /**
  * Interface for cached observe result
@@ -802,6 +804,60 @@ export class ObserveScreen {
   }
 
   /**
+   * Detect accessibility state (TalkBack/VoiceOver) and attach to result
+   * @param result - ObserveResult to attach accessibility state to
+   * @param perf - Performance tracker
+   * @param signal - Abort signal
+   */
+  private async detectAccessibilityState(
+    result: ObserveResult,
+    perf: PerformanceTracker,
+    signal?: AbortSignal
+  ): Promise<void> {
+    // Only run on Android for now (iOS VoiceOver detection is Phase 2)
+    if (this.device.platform !== "android") {
+      logger.debug("[AccessibilityDetector] Skipping detection, only Android is supported");
+      return;
+    }
+
+    try {
+      await perf.track("accessibilityDetection", async () => {
+        throwIfAborted(signal);
+
+        // Get feature flag service instance
+        const featureFlags = FeatureFlagService.getInstance();
+
+        // Detect accessibility state
+        const enabled = await accessibilityDetector.isAccessibilityEnabled(
+          this.device.deviceId,
+          this.adb,
+          featureFlags
+        );
+
+        const service = await accessibilityDetector.detectMethod(
+          this.device.deviceId,
+          this.adb,
+          featureFlags
+        );
+
+        // Attach to result
+        result.accessibilityState = {
+          enabled,
+          service,
+        };
+
+        logger.debug(
+          `[AccessibilityDetector] Accessibility state: enabled=${enabled}, service=${service}`
+        );
+      });
+    } catch (error) {
+      logger.error(`[AccessibilityDetector] Failed to detect accessibility state: ${error}`);
+      // Don't fail the entire observation if detection fails
+      // Result will simply not include accessibilityState field
+    }
+  }
+
+  /**
    * Get the latest screenshot path from cache
    */
   private async getLatestScreenshotPath(): Promise<string | undefined> {
@@ -874,6 +930,9 @@ export class ObserveScreen {
 
       // Run accessibility audit if enabled
       await this.runAccessibilityAudit(result, perf);
+
+      // Detect accessibility state (TalkBack/VoiceOver)
+      await this.detectAccessibilityState(result, perf, signal);
 
       if (serverConfig.isPredictiveUiEnabled()) {
         try {

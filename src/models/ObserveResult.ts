@@ -177,4 +177,15 @@ export interface ObserveResult {
    * Predictive UI state derived from navigation graph (when enabled)
    */
   predictions?: Predictions;
+
+  /**
+   * Accessibility state for the device
+   * Indicates if accessibility services (TalkBack/VoiceOver) are enabled
+   */
+  accessibilityState?: {
+    /** Whether any accessibility service is enabled */
+    enabled: boolean;
+    /** The detected accessibility service type */
+    service: "talkback" | "unknown";
+  };
 }
