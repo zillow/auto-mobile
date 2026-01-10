@@ -6,7 +6,7 @@ Add this test Gradle dependency to all Android apps and libraries in your codeba
 modules that cover the UI you want to test.
 
 ```gradle
-testImplementation("dev.jasonpearson.automobile.junitrunner:x.y.z")
+testImplementation("dev.jasonpearson.auto-mobile:auto-mobile-junit-runner:x.y.z")
 ```
 
 Note that this artifact hasn't been published to Maven Central just yet and is forthcoming.

@@ -17,7 +17,7 @@ Android library SDK for tracking navigation events across various navigation fra
 
 ```kotlin
 dependencies {
-    implementation("dev.jasonpearson.automobile:auto-mobile-sdk:0.0.1-SNAPSHOT")
+    implementation("dev.jasonpearson.auto-mobile:auto-mobile-sdk:0.0.1-SNAPSHOT")
 }
 ```
 
@@ -25,7 +25,7 @@ dependencies {
 
 ```groovy
 dependencies {
-    implementation 'dev.jasonpearson.automobile:auto-mobile-sdk:0.0.1-SNAPSHOT'
+    implementation 'dev.jasonpearson.auto-mobile:auto-mobile-sdk:0.0.1-SNAPSHOT'
 }
 ```
 

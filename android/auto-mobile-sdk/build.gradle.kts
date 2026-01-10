@@ -82,7 +82,7 @@ mavenPublishing {
   publishToMavenCentral()
   signAllPublications()
 
-  coordinates("dev.jasonpearson.automobile", "auto-mobile-sdk", project.version.toString())
+  coordinates("dev.jasonpearson.auto-mobile", "auto-mobile-sdk", project.version.toString())
 
   pom {
     name.set("AutoMobile SDK")

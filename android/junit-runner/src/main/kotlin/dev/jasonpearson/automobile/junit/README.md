@@ -245,7 +245,7 @@ Add to your `build.gradle`:
 
 ```gradle
 dependencies {
-    testImplementation 'com.automobile:junit-runner:1.0.0'
+    testImplementation 'dev.jasonpearson.auto-mobile:auto-mobile-junit-runner:1.0.0'
 }
 ```
 
