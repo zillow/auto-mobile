@@ -382,6 +382,7 @@ jobs:
           node-version: "18.20.5"
 
       - name: "Trust heapdump"
+        continue-on-error: true
         run: bun pm trust heapdump
 
       - name: "Trust memwatch-next"

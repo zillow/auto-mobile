@@ -141,8 +141,8 @@ WORKDIR /workspace
 # Copy package files first for better caching
 COPY package.json bun.lock ./
 
-# Install dependencies with Bun
-RUN bun install --frozen-lockfile
+# Install dependencies with Bun (skip dev deps for image build)
+RUN bun install --frozen-lockfile --production
 
 # Copy the rest of the application
 COPY . .
