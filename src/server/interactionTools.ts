@@ -427,27 +427,6 @@ const isSystemTrayOpen = (viewHierarchy?: ViewHierarchyResult): boolean => {
     }
   }
 
-  if (!viewHierarchy.windows || viewHierarchy.windows.length === 0) {
-    return false;
-  }
-
-  for (const window of viewHierarchy.windows) {
-    if (!window.hierarchy) {
-      continue;
-    }
-
-    const windowHierarchy: any = window.hierarchy;
-    const windowRoots = windowHierarchy.node
-      ? (Array.isArray(windowHierarchy.node) ? windowHierarchy.node : [windowHierarchy.node])
-      : [windowHierarchy];
-
-    for (const rootNode of windowRoots) {
-      if (traverseForSystemTray(rootNode)) {
-        return true;
-      }
-    }
-  }
-
   return false;
 };
 

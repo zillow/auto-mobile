@@ -10,7 +10,6 @@ import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 import dev.jasonpearson.automobile.accessibilityservice.models.TraversalOrderResult
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
-import dev.jasonpearson.automobile.accessibilityservice.models.WindowHierarchy
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.serialization.builtins.ListSerializer
@@ -94,12 +93,19 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             detectNotificationPermissionDialog(it, rootNode.packageName?.toString())
           }
 
-      // Find the accessibility-focused element in the filtered hierarchy
-      val accessibilityFocusedElement = filteredElement?.let { findAccessibilityFocusedElement(it) }
+      val unifiedHierarchy =
+          filteredElement?.let {
+            val nodeElement = encodeChildrenToNodeElement(listOf(it))
+            nodeElement?.let { root -> UIElementInfo(node = root) }
+          }
+
+      // Find the accessibility-focused element in the unified hierarchy
+      val accessibilityFocusedElement =
+          unifiedHierarchy?.let { findAccessibilityFocusedElement(it) }
 
       ViewHierarchy(
           packageName = rootNode.packageName?.toString(),
-          hierarchy = filteredElement,
+          hierarchy = unifiedHierarchy,
           intentChooserDetected = intentChooserDetected,
           notificationPermissionDetected = notificationPermissionDetected,
           accessibilityFocusedElement = accessibilityFocusedElement,
@@ -112,8 +118,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
 
   /**
    * Extracts view hierarchy from all visible windows. This captures popups, toolbars, and other
-   * floating windows that aren't in the main window. Filters out irrelevant windows (system UI,
-   * input methods, selection handles) to reduce payload size.
+   * floating windows that aren't in the main window.
    *
    * @param windows List of all accessibility windows (from AccessibilityService.windows)
    * @param activeWindowRoot Root node of the active window (for backward compatibility)
@@ -149,21 +154,19 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
           activeWindowRoot.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
     }
 
-    val windowHierarchies = mutableListOf<WindowHierarchy>()
+    val windowEntries = mutableListOf<WindowEntry>()
     var mainHierarchy: UIElementInfo? = null
     var mainPackageName: String? = null
     var intentChooserDetected = false
     var notificationPermissionDetected: Boolean? = null
     var activeWindowLayer = 0
     var activeWindowKey: Int? = null
-    val windowLayers = mutableMapOf<Int, Int>()
 
     // Extract from each window
     for (window in windows) {
       try {
         val rootNode = window.root ?: continue
         val windowLayer = window.layer
-        windowLayers[window.id] = windowLayer
         if (window.isActive) {
           activeWindowLayer = windowLayer
           activeWindowKey = window.id
@@ -195,7 +198,6 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
           intentChooserDetected = detectIntentChooserIndicators(optimizedElement)
         }
 
-        // The active window becomes the main hierarchy (backward compatibility)
         if (window.isActive) {
           mainHierarchy = optimizedElement
           mainPackageName = packageName
@@ -203,35 +205,21 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
             notificationPermissionDetected =
                 detectNotificationPermissionDialog(optimizedElement, packageName)
           }
-          // Skip adding to windows list - it's already in main hierarchy
-          continue
         }
 
-        // Filter out irrelevant windows to reduce payload size
-        if (shouldSkipWindow(windowType, optimizedElement)) {
-          Log.d(TAG, "Skipping window ${window.id} (type=$windowType): filtered out")
-          continue
+        if (optimizedElement != null) {
+          windowEntries.add(
+              WindowEntry(
+                  windowId = window.id,
+                  windowType = windowType,
+                  windowLayer = windowLayer,
+                  packageName = packageName,
+                  isActive = window.isActive,
+                  isFocused = window.isFocused,
+                  hierarchy = optimizedElement,
+              )
+          )
         }
-
-        // Get window layer for z-ordering
-        val layer =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-              window.displayId
-            } else {
-              window.id
-            }
-
-        windowHierarchies.add(
-            WindowHierarchy(
-                windowId = window.id,
-                windowType = windowType,
-                windowLayer = layer,
-                packageName = packageName,
-                isActive = window.isActive,
-                isFocused = window.isFocused,
-                hierarchy = optimizedElement,
-            )
-        )
       } catch (e: Exception) {
         Log.e(TAG, "Error extracting hierarchy from window ${window.id}", e)
       }
@@ -257,104 +245,62 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         notificationPermissionDetected =
             detectNotificationPermissionDialog(mainHierarchy!!, mainPackageName)
       }
-    }
-
-    if (OCCLUSION_FILTER_ENABLED) {
-      val resolvedWindowKey = activeWindowKey ?: DEFAULT_WINDOW_KEY
-      val occlusionInfo =
-          buildOcclusionInfo(
-              mainHierarchy,
-              resolvedWindowKey,
-              activeWindowLayer,
-              windowHierarchies,
-              windowLayers,
-          )
-      mainHierarchy =
-          mainHierarchy?.let {
-            filterOccludedHierarchy(it, occlusionInfo, resolvedWindowKey, path = "", isRoot = true)
-          }
-      if (windowHierarchies.isNotEmpty()) {
-        val filteredWindows =
-            windowHierarchies.map { windowHierarchy ->
-              val windowKey = windowHierarchy.windowId
-              val hierarchy =
-                  windowHierarchy.hierarchy?.let {
-                    filterOccludedHierarchy(
-                        it,
-                        occlusionInfo,
-                        windowKey,
-                        path = "",
-                        isRoot = true,
-                    )
-                  }
-              windowHierarchy.copy(hierarchy = hierarchy)
-            }
-        windowHierarchies.clear()
-        windowHierarchies.addAll(filteredWindows)
+      if (mainHierarchy != null) {
+        val fallbackWindowId = activeWindowKey ?: DEFAULT_WINDOW_KEY
+        windowEntries.add(
+            WindowEntry(
+                windowId = fallbackWindowId,
+                windowType = "application",
+                windowLayer = activeWindowLayer,
+                packageName = mainPackageName,
+                isActive = true,
+                isFocused = true,
+                hierarchy = mainHierarchy!!,
+            )
+        )
       }
     }
 
-    Log.d(
-        TAG,
-        "Extracted ${windowHierarchies.size} additional window hierarchies (after filtering)",
-    )
+    if (OCCLUSION_FILTER_ENABLED && windowEntries.isNotEmpty()) {
+      val occlusionInfo = buildOcclusionInfo(windowEntries)
+      val filteredEntries =
+          windowEntries.mapNotNull { windowEntry ->
+            val hierarchy =
+                filterOccludedHierarchy(
+                    windowEntry.hierarchy,
+                    occlusionInfo,
+                    windowEntry.windowId,
+                    path = "",
+                    isRoot = false,
+                )
+            hierarchy?.let { windowEntry.copy(hierarchy = it) }
+          }
+      windowEntries.clear()
+      windowEntries.addAll(filteredEntries)
+      mainHierarchy = windowEntries.firstOrNull { it.isActive }?.hierarchy ?: mainHierarchy
+    }
 
-    // Find the accessibility-focused element in the filtered hierarchy
-    val accessibilityFocusedElement = mainHierarchy?.let { findAccessibilityFocusedElement(it) }
+    if (windowEntries.isEmpty()) {
+      Log.w(TAG, "No visible windows available after filtering")
+      return ViewHierarchy(error = "No visible windows available")
+    }
+
+    val sortedWindowRoots =
+        windowEntries.sortedWith(compareBy<WindowEntry> { it.windowLayer }.thenBy { it.windowId })
+            .map { it.hierarchy }
+    val windowRootsElement = encodeChildrenToNodeElement(sortedWindowRoots)
+    val unifiedHierarchy = windowRootsElement?.let { UIElementInfo(node = it) }
+
+    val accessibilityFocusedElement =
+        unifiedHierarchy?.let { findAccessibilityFocusedElement(it) }
 
     return ViewHierarchy(
         packageName = mainPackageName,
-        hierarchy = mainHierarchy,
-        windows = if (windowHierarchies.isNotEmpty()) windowHierarchies else null,
+        hierarchy = unifiedHierarchy,
         intentChooserDetected = intentChooserDetected,
         notificationPermissionDetected = notificationPermissionDetected,
         accessibilityFocusedElement = accessibilityFocusedElement,
     )
-  }
-
-  /**
-   * Determines if a window should be skipped based on filtering heuristics. We skip windows that
-   * don't add useful information for UI automation:
-   * - System windows (status bar, navigation bar)
-   * - Input method windows (keyboard)
-   * - Tiny windows without actionable content (selection handles)
-   * - Windows without any clickable elements with text/content-desc
-   */
-  private fun shouldSkipWindow(windowType: String, hierarchy: UIElementInfo?): Boolean {
-    // Skip system windows (status bar, nav bar, etc.)
-    if (windowType == "system") return true
-
-    // Skip input method windows (keyboard)
-    if (windowType == "input_method") return true
-
-    // Skip accessibility overlays and magnification overlays
-    if (windowType == "accessibility_overlay" || windowType == "magnification_overlay") return true
-
-    // Skip split screen divider
-    if (windowType == "split_screen_divider") return true
-
-    // If no hierarchy, skip
-    if (hierarchy == null) return true
-
-    // Check if window has any actionable content worth keeping
-    if (!hasActionableContent(hierarchy)) {
-      // Check window size - tiny windows without content are likely selection handles
-      val bounds = hierarchy.bounds
-      if (bounds != null) {
-        val width = bounds.right - bounds.left
-        val height = bounds.bottom - bounds.top
-        val area = width * height
-        // Skip tiny windows (less than 100x100 = 10,000 px²)
-        if (area < 10000) {
-          Log.d(TAG, "Skipping tiny window with area $area px² and no actionable content")
-          return true
-        }
-      }
-      // No actionable content regardless of size
-      return true
-    }
-
-    return false
   }
 
   /** Detect intent chooser indicators in an optimized hierarchy. */
@@ -454,53 +400,6 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   }
 
   /**
-   * Checks if a hierarchy contains actionable content worth including. Actionable content =
-   * clickable elements with text or content-desc.
-   */
-  private fun hasActionableContent(element: UIElementInfo): Boolean {
-    // Check if this element is actionable
-    if (element.isClickable || element.isLongClickable) {
-      // Has meaningful identifier?
-      if (
-          !element.text.isNullOrBlank() ||
-              !element.contentDesc.isNullOrBlank() ||
-              !element.resourceId.isNullOrBlank()
-      ) {
-        return true
-      }
-    }
-
-    // Check children recursively via node property
-    val nodeElement = element.node ?: return false
-    return hasActionableContentInNode(nodeElement)
-  }
-
-  /** Recursively checks if a node JsonElement contains actionable content. */
-  private fun hasActionableContentInNode(nodeElement: JsonElement): Boolean {
-    return when {
-      nodeElement is JsonObject -> {
-        try {
-          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
-          hasActionableContent(child)
-        } catch (e: Exception) {
-          false
-        }
-      }
-      nodeElement is JsonArray -> {
-        nodeElement.jsonArray.any { childJson ->
-          try {
-            val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
-            hasActionableContent(child)
-          } catch (e: Exception) {
-            false
-          }
-        }
-      }
-      else -> false
-    }
-  }
-
-  /**
    * Recursively extracts node information with depth limiting, offscreen filtering, and zero-area
    * filtering.
    *
@@ -538,6 +437,11 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         if (elementBounds.isCompletelyOffscreen(screenDimensions.width, screenDimensions.height)) {
           return null
         }
+      }
+
+      // Filter nodes not actually visible to the user
+      if (!node.isVisibleToUser) {
+        return null
       }
 
       val children = mutableListOf<UIElementInfo>()
@@ -1000,6 +904,16 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     }
   }
 
+  private data class WindowEntry(
+      val windowId: Int,
+      val windowType: String,
+      val windowLayer: Int,
+      val packageName: String?,
+      val isActive: Boolean,
+      val isFocused: Boolean,
+      val hierarchy: UIElementInfo,
+  )
+
   private data class OrderCounter(var value: Int = 0)
 
   private data class NodeKey(val windowKey: Int, val path: String)
@@ -1017,38 +931,34 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   private data class OcclusionInfo(val coverage: Double, val occludedBy: String?)
 
   private fun applyOcclusionFilteringSingleWindow(element: UIElementInfo): UIElementInfo? {
-    val occlusionInfo = buildOcclusionInfo(element, DEFAULT_WINDOW_KEY, 0, emptyList(), emptyMap())
+    val windowEntry =
+        WindowEntry(
+            windowId = DEFAULT_WINDOW_KEY,
+            windowType = "application",
+            windowLayer = 0,
+            packageName = null,
+            isActive = true,
+            isFocused = true,
+            hierarchy = element,
+        )
+    val occlusionInfo = buildOcclusionInfo(listOf(windowEntry))
     return filterOccludedHierarchy(
         element,
         occlusionInfo,
         DEFAULT_WINDOW_KEY,
         path = "",
-        isRoot = true,
+        isRoot = false,
     )
   }
 
   private fun buildOcclusionInfo(
-      mainHierarchy: UIElementInfo?,
-      activeWindowKey: Int,
-      activeWindowLayer: Int,
-      windowHierarchies: List<WindowHierarchy>,
-      windowLayers: Map<Int, Int>,
+      windowEntries: List<WindowEntry>,
   ): Map<NodeKey, OcclusionInfo> {
     val nodes = mutableListOf<OcclusionNode>()
-    if (mainHierarchy != null) {
-      collectOcclusionNodes(
-          mainHierarchy,
-          activeWindowKey,
-          activeWindowLayer,
-          path = "",
-          orderCounter = OrderCounter(),
-          nodes = nodes,
-      )
-    }
-    for (windowHierarchy in windowHierarchies) {
-      val hierarchy = windowHierarchy.hierarchy ?: continue
-      val windowKey = windowHierarchy.windowId
-      val windowLayer = windowLayers[windowKey] ?: windowHierarchy.windowLayer
+    for (windowEntry in windowEntries) {
+      val hierarchy = windowEntry.hierarchy
+      val windowKey = windowEntry.windowId
+      val windowLayer = windowEntry.windowLayer
       collectOcclusionNodes(
           hierarchy,
           windowKey,

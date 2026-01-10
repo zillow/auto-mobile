@@ -657,35 +657,39 @@ export class TapOnElement extends BaseVisualChange {
     previousHierarchy?: ViewHierarchyResult,
     currentHierarchy?: ViewHierarchyResult
   ): boolean {
-    if (!currentHierarchy?.windows || currentHierarchy.windows.length === 0) {
+    if (!currentHierarchy) {
       return false;
     }
-    const previousWindowTypes = new Set(
-      (previousHierarchy?.windows || []).map(window => window.windowType.toLowerCase())
-    );
+    const previousRoots = this.getRootSignatures(previousHierarchy);
+    const currentRoots = this.elementUtils.extractRootNodes(currentHierarchy);
 
-    return currentHierarchy.windows.some(window => {
-      const windowType = window.windowType.toLowerCase();
-      const isMenu = windowType.includes("menu") || windowType.includes("popup");
-      return isMenu && !previousWindowTypes.has(windowType);
-    });
+    for (const root of currentRoots) {
+      const signature = this.getRootSignature(root);
+      if (previousRoots.has(signature)) {
+        continue;
+      }
+      if (this.containsMenuIndicators(root)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private detectNewWindow(
     previousHierarchy?: ViewHierarchyResult,
     currentHierarchy?: ViewHierarchyResult
   ): boolean {
-    const previousWindows = previousHierarchy?.windows || [];
-    const currentWindows = currentHierarchy?.windows || [];
-    if (currentWindows.length === 0) {
+    if (!currentHierarchy) {
       return false;
     }
-    const previousSignatures = new Set(
-      previousWindows.map(window => `${window.windowId}:${window.windowType}:${window.windowLayer}`)
-    );
-    return currentWindows.some(window =>
-      !previousSignatures.has(`${window.windowId}:${window.windowType}:${window.windowLayer}`)
-    );
+    const previousRoots = this.getRootSignatures(previousHierarchy);
+    const currentRoots = this.elementUtils.extractRootNodes(currentHierarchy);
+    if (currentRoots.length === 0) {
+      return false;
+    }
+
+    return currentRoots.some(root => !previousRoots.has(this.getRootSignature(root)));
   }
 
   private detectSelectionStarted(currentHierarchy?: ViewHierarchyResult): boolean {
@@ -726,6 +730,47 @@ export class TapOnElement extends BaseVisualChange {
     }
 
     return selectionFound;
+  }
+
+  private getRootSignatures(viewHierarchy?: ViewHierarchyResult): Set<string> {
+    if (!viewHierarchy) {
+      return new Set();
+    }
+    const roots = this.elementUtils.extractRootNodes(viewHierarchy);
+    return new Set(roots.map(root => this.getRootSignature(root)));
+  }
+
+  private getRootSignature(root: any): string {
+    const props = this.elementUtils.extractNodeProperties(root);
+    const resourceId = props["resource-id"] ?? props.resourceId ?? "";
+    const className = props.class ?? props.className ?? "";
+    const bounds = props.bounds ?? "";
+    const text = props.text ?? props["content-desc"] ?? "";
+    return `${resourceId}|${className}|${bounds}|${text}`;
+  }
+
+  private containsMenuIndicators(root: any): boolean {
+    let found = false;
+    this.elementUtils.traverseNode(root, (node: any) => {
+      if (found) {
+        return;
+      }
+      const props = this.elementUtils.extractNodeProperties(node);
+      const resourceId = (props["resource-id"] ?? props.resourceId ?? "").toLowerCase();
+      const className = (props.class ?? props.className ?? "").toLowerCase();
+      const text = (props.text ?? props["content-desc"] ?? "").toLowerCase();
+      if (
+        resourceId.includes("menu") ||
+        resourceId.includes("popup") ||
+        className.includes("menu") ||
+        className.includes("popup") ||
+        text.includes("menu") ||
+        text.includes("popup")
+      ) {
+        found = true;
+      }
+    });
+    return found;
   }
 
   private async waitForAwaitElement(

@@ -152,34 +152,22 @@ describe("ScreenFingerprint", () => {
       expect(result.elementCount).toBe(0);
     });
 
-    test("should include windows in fingerprint", () => {
-      const hierarchyWithWindows: AccessibilityHierarchy = {
-        updatedAt: 1234567890,
-        packageName: "com.test.app",
-        hierarchy: {
-          "resource-id": "com.app:id/main",
-        },
-        windows: [
-          {
-            windowId: 1,
-            windowType: "TYPE_APPLICATION",
-            windowLayer: 0,
-            isActive: true,
-            isFocused: true,
-            hierarchy: {
-              "text": "Window Content",
-              "resource-id": "com.app:id/window_content",
-            },
-          },
+    test("should include additional root nodes in fingerprint", () => {
+      const hierarchyWithOverlay = createHierarchy({
+        node: [
+          { "resource-id": "com.app:id/main" },
+          { "text": "Window Content", "resource-id": "com.app:id/window_content" },
         ],
-      };
-
-      const hierarchyWithoutWindows = createHierarchy({
-        "resource-id": "com.app:id/main",
       });
 
-      const result1 = ScreenFingerprint.compute(hierarchyWithWindows);
-      const result2 = ScreenFingerprint.compute(hierarchyWithoutWindows);
+      const hierarchyWithoutOverlay = createHierarchy({
+        node: [
+          { "resource-id": "com.app:id/main" },
+        ],
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchyWithOverlay);
+      const result2 = ScreenFingerprint.compute(hierarchyWithoutOverlay);
 
       expect(result1.hash).not.toBe(result2.hash);
     });

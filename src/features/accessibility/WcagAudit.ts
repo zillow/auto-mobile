@@ -382,10 +382,22 @@ export class WcagAudit {
   private generateScreenId(packageName: string, hierarchy: ViewHierarchyNode): string {
     // Use package name + root activity/fragment identifier
     // This is a simplified approach - could be enhanced with more specific identifiers
-    const rootClass = hierarchy.class || "unknown";
-    const rootId = hierarchy["resource-id"] || "";
+    const rootNode = this.resolveRootNode(hierarchy);
+    const rootClass = rootNode.class || "unknown";
+    const rootId = rootNode["resource-id"] || "";
 
     return `${packageName}:${rootClass}:${rootId}`;
+  }
+
+  private resolveRootNode(hierarchy: ViewHierarchyNode): ViewHierarchyNode {
+    const node = (hierarchy as any).node;
+    if (Array.isArray(node) && node.length > 0) {
+      return node[node.length - 1] as ViewHierarchyNode;
+    }
+    if (node && typeof node === "object") {
+      return node as ViewHierarchyNode;
+    }
+    return hierarchy;
   }
 
   /**

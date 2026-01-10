@@ -1363,29 +1363,20 @@ describe("Offscreen Node Filtering", function() {
       expect(result?.["accessibility-focused"]).toBe(true);
     });
 
-    test("should search in all windows for accessibility-focused element", function() {
+    test("should search across top-level root nodes for accessibility-focused element", function() {
       const hierarchy = {
         hierarchy: {
           bounds: "[0,0][1080,2400]",
           node: [
-            { text: "Main Window Button", bounds: "[0,100][500,200]" }
-          ]
-        },
-        windows: [
-          {
-            windowId: 1,
-            windowType: "application",
-            windowLayer: 1,
-            isActive: false,
-            isFocused: false,
-            hierarchy: {
+            { text: "Main Window Button", bounds: "[0,100][500,200]" },
+            {
               bounds: "[0,0][500,300]",
               node: [
                 { "text": "Popup Button", "accessibility-focused": "true", "bounds": "[10,10][490,50]" }
               ]
             }
-          }
-        ]
+          ]
+        }
       };
 
       const result = viewHierarchy.findAccessibilityFocusedElement(hierarchy);

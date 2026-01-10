@@ -319,33 +319,6 @@ describe("AccessibilityServiceClient", function() {
       expect(result.hierarchy.error).toContain("Accessibility hierarchy missing from accessibility service");
     });
 
-    test("should fall back to window hierarchy when main hierarchy is missing", function() {
-      const fallbackHierarchy = {
-        updatedAt: 1750934583218,
-        packageName: "",
-        hierarchy: null as any,
-        windows: [
-          {
-            windowId: 10,
-            windowType: "application",
-            windowLayer: 0,
-            packageName: "com.android.permissioncontroller",
-            isActive: false,
-            isFocused: true,
-            hierarchy: {
-              "text": "Allow Example to send notifications?",
-              "resource-id": "com.android.permissioncontroller:id/permission_allow_button"
-            }
-          }
-        ]
-      };
-
-      const result = accessibilityServiceClient.convertToViewHierarchyResult(fallbackHierarchy);
-
-      expect(result.hierarchy).toBeDefined();
-      expect(result.hierarchy.text).toBe("Allow Example to send notifications?");
-      expect(result.packageName).toBe("com.android.permissioncontroller");
-    });
   });
 
   describe("getAccessibilityHierarchy", function() {

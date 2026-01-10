@@ -20,15 +20,6 @@ export interface AccessibilityHierarchy {
   updatedAt: number;
   packageName: string;
   hierarchy: AccessibilityNode;
-  windows?: Array<{
-    windowId: number;
-    windowType: string;
-    windowLayer: number;
-    packageName?: string;
-    isActive: boolean;
-    isFocused: boolean;
-    hierarchy?: AccessibilityNode;
-  }>;
 }
 
 /**
@@ -115,22 +106,6 @@ export class ScreenFingerprint {
       null,
       false
     );
-
-    // Also traverse windows if present
-    if (hierarchy.windows) {
-      for (const window of hierarchy.windows) {
-        if (window.hierarchy) {
-          this.traverseHierarchy(
-            window.hierarchy,
-            elements,
-            scrollableContainerChildren,
-            opts,
-            null,
-            false
-          );
-        }
-      }
-    }
 
     // Filter duplicates from scrollable containers if enabled
     let filteredElements = elements;

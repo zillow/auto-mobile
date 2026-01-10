@@ -1168,18 +1168,6 @@ export class ViewHierarchy {
       traverseNode(viewHierarchy.hierarchy);
     }
 
-    // Also search in all windows (for popups, toolbars, etc.)
-    if (!focusedElement && viewHierarchy.windows) {
-      for (const window of viewHierarchy.windows) {
-        if (window.hierarchy) {
-          traverseNode(window.hierarchy);
-          if (focusedElement) {
-            break;
-          }
-        }
-      }
-    }
-
     return focusedElement;
   }
 
@@ -1237,18 +1225,6 @@ export class ViewHierarchy {
     // Search in main hierarchy first
     if (viewHierarchy.hierarchy) {
       traverseNode(viewHierarchy.hierarchy);
-    }
-
-    // Also search in all windows (for popups, toolbars, etc.)
-    if (!accessibilityFocusedElement && viewHierarchy.windows) {
-      for (const window of viewHierarchy.windows) {
-        if (window.hierarchy) {
-          traverseNode(window.hierarchy);
-          if (accessibilityFocusedElement) {
-            break;
-          }
-        }
-      }
     }
 
     return accessibilityFocusedElement;
