@@ -1,6 +1,7 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { logger } from "../utils/logger";
+import { stringifyToolResponse } from "../utils/toolUtils";
 import * as fs from "fs/promises";
 import * as path from "path";
 
@@ -63,7 +64,7 @@ async function getLatestObservation(): Promise<ResourceContent> {
     return {
       uri: RESOURCE_URIS.LATEST_OBSERVATION,
       mimeType: "application/json",
-      text: JSON.stringify(cachedResult, null, 2)
+      text: stringifyToolResponse(cachedResult)
     };
   } catch (error) {
     logger.error(`[ObservationResources] Failed to get latest observation: ${error}`);

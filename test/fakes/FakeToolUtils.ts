@@ -3,6 +3,7 @@
  * Allows configuration and verification of tool response creation
  */
 import { ToolUtils } from "../../src/utils/interfaces/ToolUtils";
+import { stringifyToolResponse } from "../../src/utils/toolUtils";
 
 export class FakeToolUtils implements ToolUtils {
   private jsonResponses: any[] = [];
@@ -24,7 +25,7 @@ export class FakeToolUtils implements ToolUtils {
       content: [
         {
           type: "text",
-          text: JSON.stringify(content, null, 2)
+          text: stringifyToolResponse(content)
         }
       ]
     };

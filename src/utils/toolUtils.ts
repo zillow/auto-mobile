@@ -3,6 +3,17 @@
  */
 import { OPERATION_CANCELLED_MESSAGE } from "./constants";
 
+const stripAccessibilityExtras = (key: string, value: unknown): unknown => {
+  if (key === "extras") {
+    return undefined;
+  }
+  return value;
+};
+
+export const stringifyToolResponse = (content: unknown): string => {
+  return JSON.stringify(content, stripAccessibilityExtras, 2);
+};
+
 /**
  * Interface for tool response formatter
  */
@@ -41,7 +52,7 @@ export class DefaultToolResponseFormatter implements ToolResponseFormatter {
       content: [
         {
           type: "text",
-          text: JSON.stringify(content, null, 2)
+          text: stringifyToolResponse(content)
         }
       ]
     };
