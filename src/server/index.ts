@@ -81,6 +81,8 @@ function formatToolParamError(toolName: string, error: unknown): string {
 }
 
 export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
+  // Plan execution lock with per-session scope to prevent interference during executePlan
+  // Each test thread gets its own sessionUuid, enabling parallel execution on different devices
   const planExecutionLock = options.planExecutionLock ?? createDefaultPlanExecutionLock();
   void FeatureFlagService.getInstance()
     .initialize()
@@ -188,6 +190,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
         : undefined;
     const sessionUuid = typeof rawSessionUuid === "string" ? rawSessionUuid : undefined;
 
+    // Check if tool call should be blocked due to active executePlan in this session
     const decision = planExecutionLock.evaluate({
       toolName: name,
       sessionId,

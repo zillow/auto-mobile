@@ -11,6 +11,7 @@ import {
   SessionContext,
 } from "./types";
 import { SOCKET_PATH } from "./constants";
+import { DaemonState } from "./daemonState";
 
 /**
  * Unix Socket Server that proxies requests to the HTTP MCP server
@@ -197,6 +198,50 @@ export class UnixSocketServer {
       }
       case "ide/ping": {
         return { ok: true, timestamp: Date.now() };
+      }
+      case "daemon/refreshDevices": {
+        // Direct device pool refresh without going through MCP
+        const state = DaemonState.getInstance();
+        if (!state.isInitialized()) {
+          return {
+            success: false,
+            error: "Daemon not initialized",
+            addedDevices: 0,
+            totalDevices: 0,
+          };
+        }
+        const pool = state.getDevicePool();
+        const addedCount = await pool.refreshDevices();
+        const stats = pool.getStats();
+        return {
+          success: true,
+          addedDevices: addedCount,
+          totalDevices: stats.total,
+          availableDevices: stats.idle,
+          stats: stats,
+        };
+      }
+      case "daemon/availableDevices": {
+        // Direct device pool query without going through MCP
+        const state = DaemonState.getInstance();
+        if (!state.isInitialized()) {
+          return {
+            success: false,
+            error: "Daemon not initialized",
+            availableDevices: 0,
+            totalDevices: 0,
+          };
+        }
+        const pool = state.getDevicePool();
+        const stats = pool.getStats();
+        return {
+          success: true,
+          availableDevices: stats.idle,
+          totalDevices: stats.total,
+          assignedDevices: stats.assigned,
+          errorDevices: stats.error,
+          stats: stats,
+        };
       }
       default:
         throw new Error(`Unsupported daemon method: ${request.method}`);

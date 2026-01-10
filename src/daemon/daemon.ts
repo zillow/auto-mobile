@@ -57,6 +57,10 @@ export class Daemon {
    * Start the daemon
    */
   async start(): Promise<void> {
+    // Enable stdout logging in daemon mode so logs appear in daemon.log file
+    // (daemon's stdout/stderr are redirected to /tmp/auto-mobile-daemon-XXXXXX/daemon.log)
+    logger.enableStdoutLogging();
+
     logger.info("Starting AutoMobile daemon...");
 
     this.initializeDatabase();
@@ -67,7 +71,13 @@ export class Daemon {
     // Start HTTP MCP server
     await this.startHttpServer();
 
-    // Start Unix socket server
+    // Initialize device pool BEFORE starting socket server
+    // This ensures clients connecting via socket will see initialized device pool
+    // Wait up to 10 seconds - emulators should already be running
+    logger.info("Initializing device pool...");
+    await this.initializeDevicePoolWithTimeout(10000);
+
+    // Start Unix socket server AFTER device pool is ready
     logger.info(`Daemon host: "${this.host}", port: ${this.port}`);
     logger.info(`MCP_STREAMABLE_PATH: "${MCP_STREAMABLE_PATH}"`);
     const mcpEndpoint = `http://${this.host}:${this.port}${MCP_STREAMABLE_PATH}`;
@@ -77,14 +87,12 @@ export class Daemon {
     await this.socketServer.start();
     logger.info("Unix socket server started");
 
-    // Initialize device pool with discovered devices (async in background)
-    // Don't await to avoid blocking daemon startup
-    this.initializeDevicePool().catch(error => {
-      logger.error(`Failed to initialize device pool in background: ${error}`);
-    });
-
     // Write PID file
     await this.writePidFile();
+
+    // Verify DaemonState is initialized
+    const isInitialized = DaemonState.getInstance().isInitialized();
+    logger.info(`DaemonState initialized: ${isInitialized}, device count: ${this.devicePool.getTotalDeviceCount()}`);
 
     // Setup shutdown handlers
     this.setupShutdownHandlers();
@@ -516,6 +524,34 @@ export class Daemon {
       }
     } catch (error) {
       logger.error(`Recovery attempt failed: ${error}`);
+    }
+  }
+
+  /**
+   * Initialize device pool with timeout
+   * Waits for device discovery with configurable timeout
+   */
+  private async initializeDevicePoolWithTimeout(timeoutMs: number): Promise<void> {
+    const timeoutPromise = new Promise<void>(resolve => {
+      setTimeout(() => {
+        logger.warn(`Device pool initialization timed out after ${timeoutMs}ms`);
+        resolve();
+      }, timeoutMs);
+    });
+
+    const initPromise = this.initializeDevicePool();
+
+    // Race between initialization and timeout
+    await Promise.race([initPromise, timeoutPromise]);
+
+    // Log final device pool status
+    const deviceCount = this.devicePool.getTotalDeviceCount();
+    if (deviceCount === 0) {
+      logger.warn("Device pool is empty after initialization.");
+      logger.warn("Tests will fail until devices are available.");
+      logger.warn("Start an emulator or connect a physical device, then restart the daemon.");
+    } else {
+      logger.info(`Device pool ready with ${deviceCount} device(s)`);
     }
   }
 

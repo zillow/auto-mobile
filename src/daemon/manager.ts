@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import { readFile, unlink } from "node:fs/promises";
 import { existsSync, openSync, closeSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,16 +32,78 @@ import { DaemonState } from "./daemonState";
  */
 export class DaemonManager {
   /**
+   * Find all running auto-mobile daemon processes (including those from other worktrees)
+   */
+  findAllDaemonProcesses(): number[] {
+    try {
+      // Use ps to find all auto-mobile daemon processes for current user
+      const psOutput = execSync(
+        `ps aux | grep -E "bun.*auto-mobile.*--daemon-mode|bun.*dist/src/index.js --daemon-mode" | grep -v grep`,
+        { encoding: "utf-8" }
+      );
+
+      const pids: number[] = [];
+      const lines = psOutput.trim().split("\n").filter(line => line.trim());
+
+      for (const line of lines) {
+        // Parse PID from ps output (second column)
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          const pid = parseInt(parts[1], 10);
+          if (!isNaN(pid) && pid !== process.pid) {
+            pids.push(pid);
+          }
+        }
+      }
+
+      return pids;
+    } catch (error) {
+      // No matching processes found or command failed
+      return [];
+    }
+  }
+
+  /**
    * Start the daemon in background (detached process)
    */
   async start(options: DaemonOptions = {}): Promise<void> {
-    // Check if daemon is already running
+    // Check for any running daemon processes from ANY worktree
+    const otherDaemons = this.findAllDaemonProcesses();
+    if (otherDaemons.length > 0) {
+      console.log(
+        `\nWARNING: Found ${otherDaemons.length} other auto-mobile daemon process(es) running:`
+      );
+      for (const pid of otherDaemons) {
+        console.log(`  - PID ${pid}`);
+      }
+      console.log(
+        `\nThese may be from other worktrees and can cause device pool conflicts.`
+      );
+      console.log(`Stopping all other daemons before starting new one...`);
+
+      for (const pid of otherDaemons) {
+        try {
+          process.kill(pid, "SIGTERM");
+          console.log(`  Stopped PID ${pid}`);
+        } catch (error) {
+          console.log(`  Failed to stop PID ${pid}: ${error}`);
+        }
+      }
+
+      // Wait for processes to terminate
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Enforce single daemon policy: stop any existing daemon before starting
+    // This ensures only one daemon runs on the host system (per user)
     const status = await this.status();
     if (status.running) {
       console.log(
-        `Daemon already running (PID ${status.pid}, port ${status.port})`
+        `Found existing daemon (PID ${status.pid}, port ${status.port}), stopping it...`
       );
-      return;
+      await this.stop();
+      // Wait briefly for cleanup
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     // Clean up stale socket and PID files from previous sessions
@@ -383,6 +445,20 @@ export async function runDaemonCommand(
           console.log(
             `  Started: ${status.startedAt ? new Date(status.startedAt).toISOString() : "unknown"}`
           );
+
+          // Check for other daemon processes (exclude current daemon)
+          const otherDaemons = manager.findAllDaemonProcesses().filter(pid => pid !== status.pid);
+          if (otherDaemons.length > 0) {
+            console.log(
+              `\n⚠️  WARNING: Found ${otherDaemons.length} other daemon process(es) from other worktrees:`
+            );
+            for (const pid of otherDaemons) {
+              console.log(`  - PID ${pid}`);
+            }
+            console.log(
+              `\nThese can cause device pool conflicts. Run 'auto-mobile --daemon restart' to stop them.`
+            );
+          }
         } else {
           console.log("Daemon is not running");
         }

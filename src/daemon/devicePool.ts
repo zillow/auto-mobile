@@ -35,6 +35,8 @@ export interface PooledDevice {
  * Works with SessionManager to maintain bidirectional mappings.
  */
 export class DevicePool {
+  private static instanceCounter = 0;
+  private readonly instanceId: number;
   private devices: Map<string, PooledDevice> = new Map();
   private sessionManager: SessionManager;
   private assignmentMutex = new Mutex();
@@ -48,6 +50,8 @@ export class DevicePool {
   private readonly DEVICE_WAIT_INTERVAL_MS = 1000; // Check every 1 second
 
   constructor(sessionManager: SessionManager, timer: Timer = defaultTimer) {
+    this.instanceId = ++DevicePool.instanceCounter;
+    logger.info(`[DEVICE-POOL-DEBUG] Creating DevicePool instance #${this.instanceId}`);
     this.sessionManager = sessionManager;
     this.timer = timer;
   }
@@ -327,6 +331,9 @@ export class DevicePool {
    * This enables parallel test execution with limited devices.
    */
   async assignDeviceToSession(sessionId: string): Promise<string> {
+    logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: assignDeviceToSession called for session ${sessionId}`);
+    logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Current devices.size: ${this.devices.size}`);
+    logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Device IDs: ${Array.from(this.devices.keys()).join(", ")}`);
     const startTime = this.timer.now();
     let attemptCount = 0;
 
@@ -406,21 +413,35 @@ export class DevicePool {
     totalDevices: number;
   }> {
     return await this.assignmentMutex.runExclusive(async () => {
-      // Find first idle device
-      let device = Array.from(this.devices.values()).find(d => d.status === "idle");
+      logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: devices.size = ${this.devices.size}`);
+      logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: device IDs = ${Array.from(this.devices.keys()).join(", ")}`);
+
+      // Find idle devices and select least recently used for better distribution
+      const idleDevices = Array.from(this.devices.values()).filter(d => d.status === "idle");
+      let device: PooledDevice | undefined;
+      if (idleDevices.length > 0) {
+        // Sort by lastUsedAt (ascending) to get least recently used device
+        // This provides better load distribution across devices
+        idleDevices.sort((a, b) => a.lastUsedAt - b.lastUsedAt);
+        device = idleDevices[0];
+      }
+      logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: found idle device = ${device?.id || "none"}`);
 
       // If no devices available and pool is empty, try to refresh
       // This handles race conditions during daemon startup
       if (!device && this.devices.size === 0) {
         logger.info("Device pool is empty, attempting auto-refresh...");
         const addedCount = await this.refreshDevices();
+        logger.info(`[DEVICE-POOL-DEBUG] Auto-refresh added ${addedCount} devices`);
         if (addedCount > 0) {
           // Try again after refresh
           device = Array.from(this.devices.values()).find(d => d.status === "idle");
+          logger.info(`[DEVICE-POOL-DEBUG] After refresh, found idle device = ${device?.id || "none"}`);
         }
       }
 
       const totalDevices = this.devices.size;
+      logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: totalDevices = ${totalDevices}`);
 
       if (!device) {
         // No idle device - check if devices exist but are busy

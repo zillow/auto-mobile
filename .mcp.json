@@ -1,4 +1,9 @@
 {
   "mcpServers": {
+    "auto-mobile": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@kaeawc/auto-mobile", "--debug-perf", "--debug"]
+    }
   }
 }

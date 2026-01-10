@@ -1,5 +1,6 @@
 import { SessionManager } from "./sessionManager";
 import { DevicePool } from "./devicePool";
+import { logger } from "../utils/logger";
 
 /**
  * Singleton for accessing daemon state
@@ -48,8 +49,12 @@ export class DaemonState {
    */
   getDevicePool(): DevicePool {
     if (!this.devicePool) {
+      logger.error("[DAEMON-STATE-DEBUG] getDevicePool called but devicePool is null!");
       throw new Error("DaemonState not initialized");
     }
+    const stats = this.devicePool.getStats();
+    const poolInstanceId = (this.devicePool as any).instanceId;
+    logger.info(`[DAEMON-STATE-DEBUG] getDevicePool returning pool instance #${poolInstanceId} with ${stats.total} devices`);
     return this.devicePool;
   }
 

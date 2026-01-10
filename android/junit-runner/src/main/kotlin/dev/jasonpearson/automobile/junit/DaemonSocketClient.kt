@@ -23,10 +23,17 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 internal object DaemonSocketClientManager {
+  // Use ThreadLocal to give each thread its own socket connection
+  // This enables true parallel execution since socket server queues requests per connection
+  private val threadLocalClient = ThreadLocal<DaemonSocketClient>()
   private val clientLock = Any()
-  private var client: DaemonSocketClient? = null
+  @Volatile
+  private var daemonEnsured = false
 
   fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse {
     val socketClient = getOrCreateClient()
@@ -34,17 +41,31 @@ internal object DaemonSocketClientManager {
   }
 
   private fun getOrCreateClient(): DaemonSocketClient {
+    // Each thread gets its own connection for parallel execution
+    val existing = threadLocalClient.get()
+    if (existing != null && existing.isConnected()) {
+      return existing
+    }
+
+    val socketPath = DaemonSocketPaths.socketPath()
+
+    // Ensure daemon is running (restart if socket disappeared after crash/exit)
     synchronized(clientLock) {
-      val existing = client
-      if (existing != null && existing.isConnected()) {
-        return existing
+      // Reset daemonEnsured if socket doesn't exist (daemon crashed/exited)
+      if (!File(socketPath).exists()) {
+        daemonEnsured = false
       }
 
-      ensureDaemonRunning()
-      val newClient = DaemonSocketClient(DaemonSocketPaths.socketPath())
-      client = newClient
-      return newClient
+      if (!daemonEnsured) {
+        ensureDaemonRunning()
+        daemonEnsured = true
+      }
     }
+
+    // Create new client for this thread
+    val newClient = DaemonSocketClient(socketPath)
+    threadLocalClient.set(newClient)
+    return newClient
   }
 
   private fun ensureDaemonRunning() {
@@ -82,6 +103,97 @@ internal object DaemonSocketClientManager {
           "Daemon failed to start within ${DaemonSocketPaths.daemonStartTimeoutMs()}ms"
       )
     }
+
+    // NOTE: Device pool initialization check removed to allow parallel test execution.
+    // The daemon initializes its device pool at startup, and tests will wait for
+    // devices as needed when they call executePlan.
+  }
+
+  /**
+   * Wait for daemon device pool to have at least one device
+   * This is a blocking health check that prevents tests from running
+   * until devices are available.
+   */
+  private fun waitForDevicePoolReady(timeoutMs: Long) {
+    val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
+    if (debugMode) {
+      println("Waiting for daemon device pool to initialize...")
+    }
+
+    val startTime = System.currentTimeMillis()
+    var lastDeviceCount = -1
+    var nextRefreshTime = startTime + 2000 // First refresh after 2 seconds
+
+    while (System.currentTimeMillis() - startTime < timeoutMs) {
+      try {
+        val socketClient = DaemonSocketClient(DaemonSocketPaths.socketPath())
+
+        // Trigger device refresh every 2 seconds if pool is still empty
+        val now = System.currentTimeMillis()
+        if (now >= nextRefreshTime && lastDeviceCount == 0) {
+          if (debugMode) {
+            println("Triggering device pool refresh...")
+          }
+          try {
+            val refreshResponse = socketClient.callDaemonMethod(
+                "daemon/refreshDevices",
+                5000
+            )
+            if (debugMode && refreshResponse.success) {
+              val addedDevices = refreshResponse.result
+                  ?.jsonObject?.get("addedDevices")
+                  ?.jsonPrimitive?.intOrNull ?: 0
+              println("Device pool refresh complete: added $addedDevices devices")
+            }
+          } catch (e: Exception) {
+            if (debugMode) {
+              println("Device refresh error: ${e.message}")
+            }
+          }
+          nextRefreshTime = now + 2000 // Schedule next refresh in 2 seconds
+        }
+
+        val response = socketClient.callDaemonMethod(
+            "daemon/availableDevices",
+            5000
+        )
+        socketClient.close()
+
+        if (response.success) {
+          val totalDevices = response.result
+              ?.jsonObject?.get("totalDevices")
+              ?.jsonPrimitive?.intOrNull ?: 0
+
+          if (totalDevices > 0) {
+            if (debugMode) {
+              println("Device pool ready with $totalDevices device(s)")
+            }
+            return
+          }
+
+          // Log only if device count changed
+          if (totalDevices != lastDeviceCount) {
+            if (debugMode) {
+              println("Device pool still empty, waiting...")
+            }
+            lastDeviceCount = totalDevices
+          }
+        }
+      } catch (e: Exception) {
+        // Ignore errors during health check, will retry
+        if (debugMode) {
+          println("Device pool check error: ${e.message}")
+        }
+      }
+
+      Thread.sleep(500)
+    }
+
+    // Device pool is still empty after timeout - throw error
+    throw DaemonUnavailableException(
+        "Daemon device pool is empty after ${timeoutMs}ms. " +
+        "Start an emulator or connect a physical device before running tests."
+    )
   }
 
   private fun resolveDaemonEnvironmentOverrides(): Map<String, String> {
@@ -113,7 +225,7 @@ internal object DaemonSocketClientManager {
 }
 
 internal object DaemonSocketPaths {
-  private const val DEFAULT_DAEMON_STARTUP_TIMEOUT_MS = 30000L
+  private const val DEFAULT_DAEMON_STARTUP_TIMEOUT_MS = 10000L
   private var localAutoMobileExistsCache: Boolean? = null
   private val localAutoMobilePath: String
     get() = File("../../dist/src/index.js").absolutePath
@@ -187,6 +299,9 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
   private val writeLock = Any()
   @Volatile private var closed = false
 
+  // Unique session UUID for this client/thread to enable per-thread plan execution locking
+  private val sessionUuid: String = UUID.randomUUID().toString()
+
   private val channel: SocketChannel = connect()
   private val reader: BufferedReader
   private val writer: BufferedWriter
@@ -218,6 +333,33 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
             type = "mcp_request",
             method = "tools/call",
             params = buildJsonParams(toolName, arguments),
+        )
+
+    val responseFuture = CompletableFuture<DaemonResponse>()
+    pending[requestId] = responseFuture
+
+    sendRequest(request)
+
+    return try {
+      responseFuture.get(timeoutMs, TimeUnit.MILLISECONDS)
+    } catch (e: TimeoutException) {
+      pending.remove(requestId)
+      throw DaemonUnavailableException("Daemon request timeout after ${timeoutMs}ms")
+    }
+  }
+
+  fun callDaemonMethod(method: String, timeoutMs: Long): DaemonResponse {
+    if (!isConnected()) {
+      throw DaemonUnavailableException("Daemon socket connection is not available")
+    }
+
+    val requestId = UUID.randomUUID().toString()
+    val request =
+        DaemonRequest(
+            id = requestId,
+            type = "daemon_request",
+            method = method,
+            params = JsonObject(emptyMap()),
         )
 
     val responseFuture = CompletableFuture<DaemonResponse>()
@@ -294,7 +436,11 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
   }
 
   private fun buildJsonParams(toolName: String, arguments: JsonObject): JsonObject {
-    return JsonObject(mapOf("name" to JsonPrimitive(toolName), "arguments" to arguments))
+    // Include sessionUuid in tool arguments to enable per-thread plan execution locking
+    val argumentsWithSession = JsonObject(arguments.toMutableMap().apply {
+      put("sessionUuid", JsonPrimitive(sessionUuid))
+    })
+    return JsonObject(mapOf("name" to JsonPrimitive(toolName), "arguments" to argumentsWithSession))
   }
 
   private fun failPendingRequests(message: String) {
