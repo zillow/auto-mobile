@@ -27,19 +27,11 @@ export class ElementFinder {
     return this.findContainerNode(viewHierarchy, container) !== null;
   }
 
-  private findContainerNode(
-    viewHierarchy: ViewHierarchyResult,
-    container: { elementId?: string; text?: string }
+  private findContainerNodeInRoots(
+    rootNodes: ViewHierarchyNode[],
+    container: { elementId?: string; text?: string },
+    matchesContainerText: ((input?: string) => boolean) | null
   ): ViewHierarchyNode | null {
-    if (!viewHierarchy || !container) {
-      return null;
-    }
-
-    const matchesContainerText = container.text
-      ? this.textMatcher.createTextMatcher(container.text, true, false)
-      : null;
-    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
-
     for (const rootNode of rootNodes) {
       let containerNode: ViewHierarchyNode | null = null;
       this.parser.traverseNode(rootNode, (node: ViewHierarchyNode) => {
@@ -78,44 +70,59 @@ export class ElementFinder {
     return null;
   }
 
-  /**
-   * Find an element in the view hierarchy that matches the specified text
-   * @param viewHierarchy - The view hierarchy to search
-   * @param text - The text to search for
-   * @param container - Container element selector to restrict the search within its child nodes
-   * @param fuzzyMatch - Whether to use fuzzy matching (partial text match)
-   * @param caseSensitive - Whether to use case-sensitive matching
-   * @returns The found element or null
-   */
-  findElementByText(
+  private findContainerNode(
     viewHierarchy: ViewHierarchyResult,
-    text: string,
-    container: { elementId?: string; text?: string } | null = null,
-    fuzzyMatch: boolean = true,
-    caseSensitive: boolean = false
-  ): Element | null {
-    if (!viewHierarchy || !text) {
+    container: { elementId?: string; text?: string }
+  ): ViewHierarchyNode | null {
+    if (!viewHierarchy || !container) {
       return null;
     }
 
-    // Create matcher function once instead of repeatedly in the loop
-    const matchesText = this.textMatcher.createTextMatcher(text, fuzzyMatch, caseSensitive);
+    const matchesContainerText = container.text
+      ? this.textMatcher.createTextMatcher(container.text, true, false)
+      : null;
     const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const containerInMain = this.findContainerNodeInRoots(
+      rootNodes,
+      container,
+      matchesContainerText
+    );
+    if (containerInMain) {
+      return containerInMain;
+    }
+
+    const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
+    for (const windowRoots of windowRootGroups) {
+      const containerInWindow = this.findContainerNodeInRoots(
+        windowRoots,
+        container,
+        matchesContainerText
+      );
+      if (containerInWindow) {
+        return containerInWindow;
+      }
+    }
+
+    return null;
+  }
+
+  private sortElementsByArea(elements: Element[]): void {
+    elements.sort((a, b) => {
+      const aArea = (a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top);
+      const bArea = (b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top);
+      return aArea - bArea;
+    });
+  }
+
+  private findElementByTextInRoots(
+    rootNodes: ViewHierarchyNode[],
+    text: string,
+    matchesText: (input?: string) => boolean
+  ): Element | null {
     const matches: Element[] = [];
     const exactMatches: Element[] = [];
 
-    const containerNode = container
-      ? this.findContainerNode(viewHierarchy, container)
-      : null;
-
-    if (container && !containerNode) {
-      // Container not found, return null
-      return null;
-    }
-
-    // Search only within the container node's subtree
-    const searchNodes = containerNode ? [containerNode] : rootNodes;
-    for (const searchNode of searchNodes) {
+    for (const searchNode of rootNodes) {
       this.parser.traverseNode(searchNode, (node: any) => {
         const nodeProperties = this.parser.extractNodeProperties(node);
         logger.info(`[Element] node: ${nodeProperties["text"]} ${nodeProperties["content-desc"]} ${nodeProperties["class"]}`);
@@ -185,21 +192,144 @@ export class ElementFinder {
     }
 
     if (exactMatches.length > 0) {
-      exactMatches.sort((a, b) => {
-        const aArea = (a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top);
-        const bArea = (b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top);
-        return aArea - bArea;
-      });
+      this.sortElementsByArea(exactMatches);
       return exactMatches[0];
     }
 
     if (matches.length > 0) {
-      matches.sort((a, b) => {
-        const aArea = (a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top);
-        const bArea = (b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top);
-        return aArea - bArea;
-      });
+      this.sortElementsByArea(matches);
       return matches[0];
+    }
+
+    return null;
+  }
+
+  private findElementByResourceIdInRoots(
+    rootNodes: ViewHierarchyNode[],
+    resourceId: string,
+    partialMatch: boolean
+  ): Element | null {
+    const matches: Element[] = [];
+
+    for (const searchNode of rootNodes) {
+      this.parser.traverseNode(searchNode, (node: any) => {
+        const nodeProperties = this.parser.extractNodeProperties(node);
+        if (nodeProperties["resource-id"] && typeof nodeProperties["resource-id"] === "string") {
+          const nodeResourceId = nodeProperties["resource-id"];
+          if (
+            nodeResourceId === resourceId ||
+            (partialMatch && nodeResourceId.toLowerCase().includes(resourceId.toLowerCase()))
+          ) {
+            const parsedNode = this.parser.parseNodeBounds(node);
+            if (parsedNode) {
+              matches.push(parsedNode);
+            }
+          }
+        }
+      });
+    }
+
+    if (matches.length > 0) {
+      this.sortElementsByArea(matches);
+      return matches[0];
+    }
+
+    return null;
+  }
+
+  private findScrollableContainerInRoots(rootNodes: ViewHierarchyNode[]): Element | null {
+    for (const rootNode of rootNodes) {
+      let foundScrollable: Element | null = null;
+      this.parser.traverseNode(rootNode, (node: any) => {
+        if (foundScrollable) {return;} // Already found one
+        const nodeProperties = this.parser.extractNodeProperties(node);
+        if (nodeProperties.scrollable === "true" || nodeProperties.scrollable === true) {
+          const parsedNode = this.parser.parseNodeBounds(node);
+          if (parsedNode) {
+            foundScrollable = parsedNode;
+          }
+        }
+      });
+      if (foundScrollable) {
+        return foundScrollable;
+      }
+    }
+
+    return null;
+  }
+
+  private findFocusedTextInputInRoots(rootNodes: ViewHierarchyNode[], inputClasses: string[]): Element | null {
+    for (const rootNode of rootNodes) {
+      let foundElement: Element | null = null;
+      this.parser.traverseNode(rootNode, (node: any) => {
+        if (foundElement) {return;} // Already found one
+
+        const nodeProperties = this.parser.extractNodeProperties(node);
+        // Check for both 'class' and 'className' property names
+        const nodeClass = nodeProperties.class || nodeProperties.className;
+        if ((nodeProperties.focused === "true" || nodeProperties.focused === true) &&
+          nodeClass &&
+          inputClasses.some(cls => nodeClass.includes(cls))) {
+          const parsedNode = this.parser.parseNodeBounds(node);
+          if (parsedNode) {
+            foundElement = parsedNode;
+          }
+        }
+      });
+
+      if (foundElement) {return foundElement;}
+    }
+
+    return null;
+  }
+
+  /**
+   * Find an element in the view hierarchy that matches the specified text
+   * @param viewHierarchy - The view hierarchy to search
+   * @param text - The text to search for
+   * @param container - Container element selector to restrict the search within its child nodes
+   * @param fuzzyMatch - Whether to use fuzzy matching (partial text match)
+   * @param caseSensitive - Whether to use case-sensitive matching
+   * @returns The found element or null
+   */
+  findElementByText(
+    viewHierarchy: ViewHierarchyResult,
+    text: string,
+    container: { elementId?: string; text?: string } | null = null,
+    fuzzyMatch: boolean = true,
+    caseSensitive: boolean = false
+  ): Element | null {
+    if (!viewHierarchy || !text) {
+      return null;
+    }
+
+    // Create matcher function once instead of repeatedly in the loop
+    const matchesText = this.textMatcher.createTextMatcher(text, fuzzyMatch, caseSensitive);
+    const containerNode = container
+      ? this.findContainerNode(viewHierarchy, container)
+      : null;
+
+    if (container && !containerNode) {
+      // Container not found, return null
+      return null;
+    }
+
+    if (containerNode) {
+      return this.findElementByTextInRoots([containerNode], text, matchesText);
+    }
+
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const mainMatch = this.findElementByTextInRoots(rootNodes, text, matchesText);
+    if (mainMatch) {
+      return mainMatch;
+    }
+
+    const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
+    for (const windowRoots of windowRootGroups) {
+      const windowMatch = this.findElementByTextInRoots(windowRoots, text, matchesText);
+      if (windowMatch) {
+        return windowMatch;
+      }
     }
 
     return null;
@@ -223,9 +353,6 @@ export class ElementFinder {
       return null;
     }
 
-    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
-    const matches: Element[] = [];
-
     const containerNode = container
       ? this.findContainerNode(viewHierarchy, container)
       : null;
@@ -235,30 +362,22 @@ export class ElementFinder {
       return null;
     }
 
-    const searchNodes = containerNode ? [containerNode] : rootNodes;
-
-    for (const searchNode of searchNodes) {
-      this.parser.traverseNode(searchNode, (node: any) => {
-        const nodeProperties = this.parser.extractNodeProperties(node);
-        if (nodeProperties["resource-id"] && typeof nodeProperties["resource-id"] === "string") {
-          const nodeResourceId = nodeProperties["resource-id"];
-          if (nodeResourceId === resourceId || (partialMatch && nodeResourceId.toLowerCase().includes(resourceId.toLowerCase()))) {
-            const parsedNode = this.parser.parseNodeBounds(node);
-            if (parsedNode) {
-              matches.push(parsedNode);
-            }
-          }
-        }
-      });
+    if (containerNode) {
+      return this.findElementByResourceIdInRoots([containerNode], resourceId, partialMatch);
     }
 
-    if (matches.length > 0) {
-      matches.sort((a, b) => {
-        const aArea = (a.bounds.right - a.bounds.left) * (a.bounds.bottom - a.bounds.top);
-        const bArea = (b.bounds.right - b.bounds.left) * (b.bounds.bottom - b.bounds.top);
-        return aArea - bArea;
-      });
-      return matches[0];
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const mainMatch = this.findElementByResourceIdInRoots(rootNodes, resourceId, partialMatch);
+    if (mainMatch) {
+      return mainMatch;
+    }
+
+    const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
+    for (const windowRoots of windowRootGroups) {
+      const windowMatch = this.findElementByResourceIdInRoots(windowRoots, resourceId, partialMatch);
+      if (windowMatch) {
+        return windowMatch;
+      }
     }
 
     return null;
@@ -275,7 +394,10 @@ export class ElementFinder {
       return null;
     }
 
-    const flattenedElements = this.parser.flattenViewHierarchy(viewHierarchy);
+    const flattenedElements = this.parser.flattenViewHierarchy(viewHierarchy, {
+      includeWindows: true,
+      windowOrder: "topmost-first"
+    });
 
     if (index >= flattenedElements.length) {
       return null;
@@ -298,7 +420,10 @@ export class ElementFinder {
       return [];
     }
 
-    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const rootNodes = [
+      ...this.parser.extractRootNodes(viewHierarchy),
+      ...this.parser.extractWindowRootNodes(viewHierarchy, "topmost-first")
+    ];
     const scrollables: Element[] = [];
 
     // Process each root node
@@ -328,22 +453,16 @@ export class ElementFinder {
     }
 
     const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const mainScrollable = this.findScrollableContainerInRoots(rootNodes);
+    if (mainScrollable) {
+      return mainScrollable;
+    }
 
-    // Process each root node
-    for (const rootNode of rootNodes) {
-      let foundScrollable: Element | null = null;
-      this.parser.traverseNode(rootNode, (node: any) => {
-        if (foundScrollable) {return;} // Already found one
-        const nodeProperties = this.parser.extractNodeProperties(node);
-        if (nodeProperties.scrollable === "true" || nodeProperties.scrollable === true) {
-          const parsedNode = this.parser.parseNodeBounds(node);
-          if (parsedNode) {
-            foundScrollable = parsedNode;
-          }
-        }
-      });
-      if (foundScrollable) {
-        return foundScrollable;
+    const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
+    for (const windowRoots of windowRootGroups) {
+      const windowScrollable = this.findScrollableContainerInRoots(windowRoots);
+      if (windowScrollable) {
+        return windowScrollable;
       }
     }
 
@@ -360,7 +479,10 @@ export class ElementFinder {
       return [];
     }
 
-    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const rootNodes = [
+      ...this.parser.extractRootNodes(viewHierarchy),
+      ...this.parser.extractWindowRootNodes(viewHierarchy, "topmost-first")
+    ];
     const clickables: Element[] = [];
 
     // Process each root node
@@ -390,7 +512,10 @@ export class ElementFinder {
       return [];
     }
 
-    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const rootNodes = [
+      ...this.parser.extractRootNodes(viewHierarchy),
+      ...this.parser.extractWindowRootNodes(viewHierarchy, "topmost-first")
+    ];
     const childElements: Element[] = [];
     const parentBounds = parentElement.bounds;
 
@@ -501,7 +626,6 @@ export class ElementFinder {
    * @returns The focused text input element or null if not found
    */
   findFocusedTextInput(viewHierarchy: any): any {
-    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
     const inputClasses = [
       "android.widget.EditText",
       "android.widget.AutoCompleteTextView",
@@ -509,25 +633,18 @@ export class ElementFinder {
       "androidx.appcompat.widget.AppCompatEditText"
     ];
 
-    for (const rootNode of rootNodes) {
-      let foundElement: any = null;
-      this.parser.traverseNode(rootNode, (node: any) => {
-        if (foundElement) {return;} // Already found one
+    const rootNodes = this.parser.extractRootNodes(viewHierarchy);
+    const mainMatch = this.findFocusedTextInputInRoots(rootNodes, inputClasses);
+    if (mainMatch) {
+      return mainMatch;
+    }
 
-        const nodeProperties = this.parser.extractNodeProperties(node);
-        // Check for both 'class' and 'className' property names
-        const nodeClass = nodeProperties.class || nodeProperties.className;
-        if ((nodeProperties.focused === "true" || nodeProperties.focused === true) &&
-          nodeClass &&
-          inputClasses.some(cls => nodeClass.includes(cls))) {
-          const parsedNode = this.parser.parseNodeBounds(node);
-          if (parsedNode) {
-            foundElement = parsedNode;
-          }
-        }
-      });
-
-      if (foundElement) {return foundElement;}
+    const windowRootGroups = this.parser.extractWindowRootGroups(viewHierarchy, "topmost-first");
+    for (const windowRoots of windowRootGroups) {
+      const windowMatch = this.findFocusedTextInputInRoots(windowRoots, inputClasses);
+      if (windowMatch) {
+        return windowMatch;
+      }
     }
 
     return null;

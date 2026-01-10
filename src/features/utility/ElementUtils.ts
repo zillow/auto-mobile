@@ -91,7 +91,10 @@ export class ElementUtils {
   }
 
   flattenViewHierarchy(viewHierarchy: ViewHierarchyResult): Array<{ element: Element; index: number; text?: string }> {
-    return this.parser.flattenViewHierarchy(viewHierarchy);
+    return this.parser.flattenViewHierarchy(viewHierarchy, {
+      includeWindows: true,
+      windowOrder: "topmost-first"
+    });
   }
 
   // ===== ElementFinder methods =====

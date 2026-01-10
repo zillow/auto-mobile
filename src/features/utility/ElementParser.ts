@@ -1,6 +1,8 @@
 import { Element } from "../../models/Element";
 import { ElementBounds, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
 
+type WindowSearchOrder = "topmost-first" | "bottommost-first";
+
 /**
  * Handles parsing of view hierarchy structures
  */
@@ -75,20 +77,100 @@ export class ElementParser {
    * @returns Array of root nodes
    */
   extractRootNodes(viewHierarchy: ViewHierarchyResult): ViewHierarchyNode[] {
-    if (!viewHierarchy) {return [];}
-
-    let rootNodes: ViewHierarchyNode[] = [];
-
-    if (viewHierarchy.hierarchy && viewHierarchy.hierarchy.node) {
-      // Standard hierarchy from UI Automator
-      if (Array.isArray(viewHierarchy.hierarchy.node)) {
-        rootNodes = viewHierarchy.hierarchy.node;
-      } else {
-        rootNodes = [viewHierarchy.hierarchy.node];
-      }
+    if (!viewHierarchy?.hierarchy) {
+      return [];
     }
 
-    return rootNodes;
+    const hierarchy: any = viewHierarchy.hierarchy;
+    if (hierarchy && typeof hierarchy === "object" && "error" in hierarchy && hierarchy.error) {
+      return [];
+    }
+
+    return this.extractHierarchyRoots(hierarchy);
+  }
+
+  /**
+   * Extract root nodes from each window hierarchy, ordered by window layer.
+   * @param viewHierarchy - The view hierarchy to extract from
+   * @param order - Window search order (topmost-first by default)
+   * @returns Array of root node arrays for each window
+   */
+  extractWindowRootGroups(
+    viewHierarchy: ViewHierarchyResult,
+    order: WindowSearchOrder = "topmost-first"
+  ): ViewHierarchyNode[][] {
+    if (!viewHierarchy?.windows || viewHierarchy.windows.length === 0) {
+      return [];
+    }
+
+    const windowsWithHierarchy = viewHierarchy.windows.filter(window => window.hierarchy);
+    if (windowsWithHierarchy.length === 0) {
+      return [];
+    }
+
+    const sortedWindows = this.sortWindows(windowsWithHierarchy, order);
+    return sortedWindows.map(window => this.extractHierarchyRoots(window.hierarchy as ViewHierarchyNode));
+  }
+
+  /**
+   * Extract root nodes from all window hierarchies, ordered by window layer.
+   * @param viewHierarchy - The view hierarchy to extract from
+   * @param order - Window search order (topmost-first by default)
+   * @returns Array of root nodes across all windows
+   */
+  extractWindowRootNodes(
+    viewHierarchy: ViewHierarchyResult,
+    order: WindowSearchOrder = "topmost-first"
+  ): ViewHierarchyNode[] {
+    const groups = this.extractWindowRootGroups(viewHierarchy, order);
+    return groups.reduce(
+      (acc, group) => acc.concat(group),
+      [] as ViewHierarchyNode[]
+    );
+  }
+
+  private extractHierarchyRoots(hierarchy: any): ViewHierarchyNode[] {
+    if (!hierarchy) {
+      return [];
+    }
+
+    if (hierarchy.node) {
+      return Array.isArray(hierarchy.node) ? hierarchy.node : [hierarchy.node];
+    }
+
+    if (hierarchy.hierarchy) {
+      return [hierarchy.hierarchy];
+    }
+
+    return [hierarchy];
+  }
+
+  private sortWindows<T extends { windowLayer: number }>(windows: T[], order: WindowSearchOrder): T[] {
+    const direction = order === "topmost-first" ? -1 : 1;
+    return windows
+      .map((window, index) => ({ window, index }))
+      .sort((a, b) => {
+        const layerDelta = this.normalizeWindowLayer(a.window.windowLayer) -
+          this.normalizeWindowLayer(b.window.windowLayer);
+        if (layerDelta !== 0) {
+          return layerDelta * direction;
+        }
+        return a.index - b.index;
+      })
+      .map(entry => entry.window);
+  }
+
+  private normalizeWindowLayer(value: unknown): number {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+    return 0;
   }
 
   /**
@@ -121,13 +203,21 @@ export class ElementParser {
    * @param viewHierarchy - The view hierarchy to flatten
    * @returns Array of elements with their indices and depth in hierarchy
    */
-  flattenViewHierarchy(viewHierarchy: ViewHierarchyResult): Array<{ element: Element; index: number; depth: number; text?: string }> {
+  flattenViewHierarchy(
+    viewHierarchy: ViewHierarchyResult,
+    options: { includeWindows?: boolean; windowOrder?: WindowSearchOrder } = {}
+  ): Array<{ element: Element; index: number; depth: number; text?: string }> {
     if (!viewHierarchy) {
       return [];
     }
 
     const flattenedElements: Array<{ element: Element; index: number; depth: number; text?: string }> = [];
-    const rootNodes = this.extractRootNodes(viewHierarchy);
+    const rootNodes = options.includeWindows
+      ? [
+        ...this.extractRootNodes(viewHierarchy),
+        ...this.extractWindowRootNodes(viewHierarchy, options.windowOrder ?? "topmost-first")
+      ]
+      : this.extractRootNodes(viewHierarchy);
     let currentIndex = 0;
 
     // Process each root node

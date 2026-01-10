@@ -601,5 +601,220 @@ describe("ElementUtils", () => {
       );
       expect(result).not.toBeNull();
     });
+
+    test("should fall back to the topmost window when main hierarchy has no match", () => {
+      const hierarchyWithWindows = {
+        hierarchy: {
+          node: {
+            $: {
+              bounds: "[0,0][100,100]",
+              class: "android.widget.FrameLayout"
+            },
+            node: [
+              {
+                $: {
+                  bounds: "[10,10][50,50]",
+                  class: "android.widget.TextView",
+                  text: "Main"
+                }
+              }
+            ]
+          }
+        },
+        windows: [
+          {
+            windowId: 1,
+            windowType: "popup",
+            windowLayer: 5,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              $: {
+                bounds: "[0,0][50,50]",
+                class: "android.widget.TextView",
+                text: "Cancel"
+              }
+            }
+          },
+          {
+            windowId: 2,
+            windowType: "input_method",
+            windowLayer: 10,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              $: {
+                bounds: "[0,0][80,80]",
+                class: "android.widget.TextView",
+                text: "Cancel"
+              }
+            }
+          }
+        ]
+      };
+
+      const mockObserveResult = createObserveResult(hierarchyWithWindows);
+      const result = elementUtils.findElementByText(
+        mockObserveResult.viewHierarchy,
+        "Cancel",
+        null,
+        true,
+        false
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.bounds).toEqual({ left: 0, top: 0, right: 80, bottom: 80 });
+    });
+
+    test("should prefer main hierarchy matches over window matches", () => {
+      const hierarchyWithMainAndWindowMatch = {
+        hierarchy: {
+          node: {
+            $: {
+              bounds: "[0,0][300,300]",
+              class: "android.widget.FrameLayout"
+            },
+            node: [
+              {
+                $: {
+                  bounds: "[20,20][200,200]",
+                  class: "android.widget.TextView",
+                  text: "Cancel"
+                }
+              }
+            ]
+          }
+        },
+        windows: [
+          {
+            windowId: 3,
+            windowType: "input_method",
+            windowLayer: 15,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              $: {
+                bounds: "[0,0][50,50]",
+                class: "android.widget.TextView",
+                text: "Cancel"
+              }
+            }
+          }
+        ]
+      };
+
+      const mockObserveResult = createObserveResult(hierarchyWithMainAndWindowMatch);
+      const result = elementUtils.findElementByText(
+        mockObserveResult.viewHierarchy,
+        "Cancel",
+        null,
+        true,
+        false
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.bounds).toEqual({ left: 20, top: 20, right: 200, bottom: 200 });
+    });
+  });
+
+  describe("findElementByResourceId", () => {
+    test("should fall back to the topmost window when main hierarchy has no match", () => {
+      const hierarchyWithWindows = {
+        hierarchy: {
+          node: {
+            $: {
+              bounds: "[0,0][100,100]",
+              class: "android.widget.FrameLayout"
+            }
+          }
+        },
+        windows: [
+          {
+            windowId: 10,
+            windowType: "popup",
+            windowLayer: 3,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              $: {
+                bounds: "[0,0][40,40]",
+                class: "android.widget.Button",
+                "resource-id": "com.example:id/cancel_button"
+              }
+            }
+          },
+          {
+            windowId: 11,
+            windowType: "input_method",
+            windowLayer: 8,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              $: {
+                bounds: "[0,0][90,90]",
+                class: "android.widget.Button",
+                "resource-id": "com.example:id/cancel_button"
+              }
+            }
+          }
+        ]
+      };
+
+      const mockObserveResult = createObserveResult(hierarchyWithWindows);
+      const result = elementUtils.findElementByResourceId(
+        mockObserveResult.viewHierarchy,
+        "com.example:id/cancel_button"
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.bounds).toEqual({ left: 0, top: 0, right: 90, bottom: 90 });
+    });
+
+    test("should prefer main hierarchy matches over window matches", () => {
+      const hierarchyWithMainAndWindowMatch = {
+        hierarchy: {
+          node: {
+            $: {
+              bounds: "[0,0][300,300]",
+              class: "android.widget.FrameLayout"
+            },
+            node: [
+              {
+                $: {
+                  bounds: "[30,30][220,220]",
+                  class: "android.widget.Button",
+                  "resource-id": "com.example:id/cancel_button"
+                }
+              }
+            ]
+          }
+        },
+        windows: [
+          {
+            windowId: 12,
+            windowType: "popup",
+            windowLayer: 12,
+            isActive: true,
+            isFocused: true,
+            hierarchy: {
+              $: {
+                bounds: "[0,0][60,60]",
+                class: "android.widget.Button",
+                "resource-id": "com.example:id/cancel_button"
+              }
+            }
+          }
+        ]
+      };
+
+      const mockObserveResult = createObserveResult(hierarchyWithMainAndWindowMatch);
+      const result = elementUtils.findElementByResourceId(
+        mockObserveResult.viewHierarchy,
+        "com.example:id/cancel_button"
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.bounds).toEqual({ left: 30, top: 30, right: 220, bottom: 220 });
+    });
   });
 });
