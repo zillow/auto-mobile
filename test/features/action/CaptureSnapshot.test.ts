@@ -142,6 +142,84 @@ describe("CaptureSnapshot", () => {
       })).rejects.toThrow("Failed to capture VM snapshot");
     });
 
+    it("should throw error when VM snapshot fails with KO in stdout", async () => {
+      const snapshotName = "test-vm-fail-stdout";
+
+      // Setup getForegroundApp
+      (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
+
+      // Setup VM snapshot command to fail (KO in stdout)
+      fakeAdb.setCommandResult(`emu avd snapshot save ${snapshotName}`, "KO: snapshot failed");
+
+      await expect(captureSnapshot.execute({
+        snapshotName,
+        includeAppData: true,
+        includeSettings: false,
+        useVmSnapshot: true
+      })).rejects.toThrow("Failed to capture VM snapshot");
+    });
+
+    it("should throw error when VM snapshot returns no OK response", async () => {
+      const snapshotName = "test-vm-empty-response";
+
+      // Setup getForegroundApp
+      (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
+
+      // Setup VM snapshot command with empty output
+      fakeAdb.setCommandResult(`emu avd snapshot save ${snapshotName}`, "", "");
+
+      await expect(captureSnapshot.execute({
+        snapshotName,
+        includeAppData: true,
+        includeSettings: false,
+        useVmSnapshot: true
+      })).rejects.toThrow("no response from emulator");
+    });
+
+    it("should surface offline errors when VM snapshot command fails", async () => {
+      const snapshotName = "test-vm-offline";
+
+      // Setup getForegroundApp
+      (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
+
+      // Setup VM snapshot command to throw offline error
+      fakeAdb.setCommandError(
+        `emu avd snapshot save ${snapshotName}`,
+        new Error("device offline")
+      );
+
+      await expect(captureSnapshot.execute({
+        snapshotName,
+        includeAppData: true,
+        includeSettings: false,
+        useVmSnapshot: true
+      })).rejects.toThrow("offline");
+    });
+
+    it("should pass VM snapshot timeout to adb command", async () => {
+      const snapshotName = "test-vm-timeout";
+      const vmSnapshotTimeoutMs = 12000;
+
+      // Setup getForegroundApp
+      (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
+
+      // Setup VM snapshot command
+      fakeAdb.setCommandResult(`emu avd snapshot save ${snapshotName}`, "OK");
+
+      await captureSnapshot.execute({
+        snapshotName,
+        includeAppData: true,
+        includeSettings: false,
+        useVmSnapshot: true,
+        vmSnapshotTimeoutMs
+      });
+
+      const call = fakeAdb.getCommandCalls().find(
+        entry => entry.command === `emu avd snapshot save ${snapshotName}`
+      );
+      expect(call?.timeoutMs).toBe(vmSnapshotTimeoutMs);
+    });
+
     it("should use ADB snapshot for non-emulator device even with useVmSnapshot=true", async () => {
       const snapshotName = "test-physical-device";
 

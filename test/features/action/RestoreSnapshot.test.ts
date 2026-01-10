@@ -115,6 +115,124 @@ describe("RestoreSnapshot", () => {
       })).rejects.toThrow("Failed to restore VM snapshot");
     });
 
+    it("should throw error when VM snapshot load fails with KO in stdout", async () => {
+      const snapshotName = "test-vm-fail-stdout";
+
+      // Create VM snapshot manifest
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: true,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup VM snapshot load command to fail (KO in stdout)
+      fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "KO: snapshot load failed");
+
+      await expect(restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: true
+      })).rejects.toThrow("Failed to restore VM snapshot");
+    });
+
+    it("should throw error when VM snapshot load returns no OK response", async () => {
+      const snapshotName = "test-vm-empty-response";
+
+      // Create VM snapshot manifest
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: true,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup VM snapshot load command with empty output
+      fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "", "");
+
+      await expect(restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: true
+      })).rejects.toThrow("no response from emulator");
+    });
+
+    it("should surface offline errors when VM snapshot command fails", async () => {
+      const snapshotName = "test-vm-offline";
+
+      // Create VM snapshot manifest
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: true,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup VM snapshot load command to throw offline error
+      fakeAdb.setCommandError(
+        `emu avd snapshot load ${snapshotName}`,
+        new Error("device offline")
+      );
+
+      await expect(restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: true
+      })).rejects.toThrow("offline");
+    });
+
+    it("should pass VM snapshot timeout to adb command", async () => {
+      const snapshotName = "test-vm-timeout";
+      const vmSnapshotTimeoutMs = 15000;
+
+      // Create VM snapshot manifest
+      const manifest: SnapshotManifest = {
+        snapshotName,
+        timestamp: new Date().toISOString(),
+        deviceId: device.deviceId,
+        deviceName: device.name,
+        platform: "android",
+        snapshotType: "vm",
+        includeAppData: true,
+        includeSettings: false
+      };
+
+      // Save manifest
+      await storage.saveManifest(manifest);
+
+      // Setup VM snapshot load command
+      fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "OK");
+
+      await restoreSnapshot.execute({
+        snapshotName,
+        useVmSnapshot: true,
+        vmSnapshotTimeoutMs
+      });
+
+      const call = fakeAdb.getCommandCalls().find(
+        entry => entry.command === `emu avd snapshot load ${snapshotName}`
+      );
+      expect(call?.timeoutMs).toBe(vmSnapshotTimeoutMs);
+    });
+
     it("should use ADB restore for VM snapshot when useVmSnapshot is false", async () => {
       const snapshotName = "test-vm-as-adb";
 

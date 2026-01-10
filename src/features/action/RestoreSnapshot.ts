@@ -1,6 +1,11 @@
 import { BootedDevice, ActionableError } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
+import {
+  buildVmSnapshotCommand,
+  evaluateVmSnapshotResult,
+  formatVmSnapshotExecutionError
+} from "../../utils/android-cmdline-tools/vmSnapshot";
 import { SnapshotStorage, SnapshotManifest } from "../../utils/snapshotStorage";
 import { logger } from "../../utils/logger";
 import { promises as fs } from "fs";
@@ -10,6 +15,7 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
 export interface RestoreSnapshotArgs {
   snapshotName: string;
   useVmSnapshot?: boolean;
+  vmSnapshotTimeoutMs?: number; // Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)
 }
 
 export interface RestoreSnapshotResult {
@@ -44,7 +50,7 @@ export class RestoreSnapshot {
    * Execute snapshot restoration
    */
   async execute(args: RestoreSnapshotArgs): Promise<RestoreSnapshotResult> {
-    const { snapshotName, useVmSnapshot = true } = args;
+    const { snapshotName, useVmSnapshot = true, vmSnapshotTimeoutMs = 30000 } = args;
 
     // Check if snapshot exists
     if (!(await this.storage.snapshotExists(snapshotName))) {
@@ -68,7 +74,7 @@ export class RestoreSnapshot {
     const shouldUseVmSnapshot = useVmSnapshot && manifest.snapshotType === "vm" && isEmulator;
 
     if (shouldUseVmSnapshot) {
-      await this.restoreVmSnapshot(snapshotName, manifest);
+      await this.restoreVmSnapshot(snapshotName, manifest, vmSnapshotTimeoutMs);
     } else {
       await this.restoreAdbSnapshot(snapshotName, manifest);
     }
@@ -86,19 +92,26 @@ export class RestoreSnapshot {
    */
   private async restoreVmSnapshot(
     snapshotName: string,
-    manifest: SnapshotManifest
+    manifest: SnapshotManifest,
+    vmSnapshotTimeoutMs: number
   ): Promise<void> {
     logger.info(`Restoring VM snapshot for emulator ${this.device.deviceId}`);
 
     try {
       // Load VM snapshot using ADB emu command
-      const loadCommand = `emu avd snapshot load ${snapshotName}`;
+      const loadCommand = buildVmSnapshotCommand("load", snapshotName);
       logger.info(`Executing: adb -s ${this.device.deviceId} ${loadCommand}`);
 
-      const result = await this.adb.executeCommand(loadCommand);
+      let result;
+      try {
+        result = await this.adb.executeCommand(loadCommand, vmSnapshotTimeoutMs);
+      } catch (error) {
+        throw new Error(formatVmSnapshotExecutionError("load", snapshotName, error));
+      }
 
-      if (result.stderr && result.stderr.includes("KO")) {
-        throw new Error(`VM snapshot restoration failed: ${result.stderr}`);
+      const evaluation = evaluateVmSnapshotResult("load", snapshotName, result);
+      if (!evaluation.ok) {
+        throw new Error(evaluation.errorMessage);
       }
 
       logger.info(`VM snapshot restored successfully`);
@@ -108,8 +121,9 @@ export class RestoreSnapshot {
 
       logger.info("VM snapshot restoration complete");
     } catch (error) {
-      logger.error(`Failed to restore VM snapshot: ${error}`);
-      throw new ActionableError(`Failed to restore VM snapshot: ${error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to restore VM snapshot: ${message}`);
+      throw new ActionableError(`Failed to restore VM snapshot: ${message}`);
     }
   }
 

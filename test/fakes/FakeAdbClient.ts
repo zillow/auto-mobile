@@ -3,20 +3,32 @@
  * Captures commands executed without actually running ADB
  */
 export class FakeAdbClient {
-  private commands: string[] = [];
+  private commandCalls: Array<{
+    command: string;
+    timeoutMs?: number;
+    maxBuffer?: number;
+    noRetry?: boolean;
+    signal?: AbortSignal;
+  }> = [];
   private commandResults: Map<string, { stdout: string; stderr: string }> = new Map();
+  private commandErrors: Map<string, Error> = new Map();
 
   /**
    * Record a command execution
    */
   async executeCommand(
     command: string,
-    _options?: any,
-    _timeout?: number,
-    _encoding?: string,
-    _signal?: AbortSignal
+    timeoutMs?: number,
+    maxBuffer?: number,
+    noRetry?: boolean,
+    signal?: AbortSignal
   ): Promise<{ stdout: string; stderr: string }> {
-    this.commands.push(command);
+    this.commandCalls.push({ command, timeoutMs, maxBuffer, noRetry, signal });
+
+    const error = this.commandErrors.get(command);
+    if (error) {
+      throw error;
+    }
 
     // Return configured result or default success
     const result = this.commandResults.get(command) || { stdout: "", stderr: "" };
@@ -31,32 +43,66 @@ export class FakeAdbClient {
   }
 
   /**
+   * Configure a command to throw an error
+   */
+  setCommandError(command: string, error: Error): void {
+    this.commandErrors.set(command, error);
+  }
+
+  /**
+   * Get all recorded command calls
+   */
+  getCommandCalls(): Array<{
+    command: string;
+    timeoutMs?: number;
+    maxBuffer?: number;
+    noRetry?: boolean;
+    signal?: AbortSignal;
+  }> {
+    return [...this.commandCalls];
+  }
+
+  /**
+   * Get the last command call details
+   */
+  getLastCommandCall(): {
+    command: string;
+    timeoutMs?: number;
+    maxBuffer?: number;
+    noRetry?: boolean;
+    signal?: AbortSignal;
+  } | undefined {
+    return this.commandCalls[this.commandCalls.length - 1];
+  }
+
+  /**
    * Get the last command executed
    */
   getLastCommand(): string {
-    return this.commands[this.commands.length - 1] || "";
+    return this.commandCalls[this.commandCalls.length - 1]?.command || "";
   }
 
   /**
    * Get all commands executed
    */
   getAllCommands(): string[] {
-    return [...this.commands];
+    return this.commandCalls.map(call => call.command);
   }
 
   /**
    * Clear recorded commands
    */
   clearCommands(): void {
-    this.commands = [];
+    this.commandCalls = [];
   }
 
   /**
    * Reset fake state
    */
   reset(): void {
-    this.commands = [];
+    this.commandCalls = [];
     this.commandResults.clear();
+    this.commandErrors.clear();
   }
 
   /**
@@ -64,9 +110,9 @@ export class FakeAdbClient {
    */
   wasCommandExecuted(commandPattern: string | RegExp): boolean {
     if (typeof commandPattern === "string") {
-      return this.commands.some(cmd => cmd.includes(commandPattern));
+      return this.commandCalls.some(call => call.command.includes(commandPattern));
     }
-    return this.commands.some(cmd => commandPattern.test(cmd));
+    return this.commandCalls.some(call => commandPattern.test(call.command));
   }
 
   /**
@@ -74,8 +120,8 @@ export class FakeAdbClient {
    */
   getCommandCount(commandPattern: string | RegExp): number {
     if (typeof commandPattern === "string") {
-      return this.commands.filter(cmd => cmd.includes(commandPattern)).length;
+      return this.commandCalls.filter(call => call.command.includes(commandPattern)).length;
     }
-    return this.commands.filter(cmd => commandPattern.test(cmd)).length;
+    return this.commandCalls.filter(call => commandPattern.test(call.command)).length;
   }
 }

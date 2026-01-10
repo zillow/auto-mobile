@@ -1,6 +1,11 @@
 import { BootedDevice, ActionableError } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
+import {
+  buildVmSnapshotCommand,
+  evaluateVmSnapshotResult,
+  formatVmSnapshotExecutionError
+} from "../../utils/android-cmdline-tools/vmSnapshot";
 import { SnapshotStorage, SnapshotManifest } from "../../utils/snapshotStorage";
 import { logger } from "../../utils/logger";
 import { promises as fs } from "fs";
@@ -15,6 +20,7 @@ export interface CaptureSnapshotArgs {
   strictBackupMode?: boolean; // If true, fail entire snapshot if app data backup fails
   backupTimeout?: number; // Timeout in milliseconds for adb backup (default: 30000ms)
   userApps?: "current" | "all"; // Which apps to backup: "current" (foreground app only) or "all" (all user apps)
+  vmSnapshotTimeoutMs?: number; // Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)
 }
 
 export interface CaptureSnapshotResult {
@@ -58,7 +64,8 @@ export class CaptureSnapshot {
       useVmSnapshot = true,
       strictBackupMode = false,
       backupTimeout = 30000,
-      userApps = "current"
+      userApps = "current",
+      vmSnapshotTimeoutMs = 30000
     } = args;
 
     // Generate snapshot name if not provided
@@ -78,7 +85,7 @@ export class CaptureSnapshot {
     let manifest: SnapshotManifest;
 
     if (shouldUseVmSnapshot) {
-      manifest = await this.captureVmSnapshot(snapshotName, includeSettings);
+      manifest = await this.captureVmSnapshot(snapshotName, includeSettings, vmSnapshotTimeoutMs);
     } else {
       manifest = await this.captureAdbSnapshot(snapshotName, includeAppData, includeSettings, strictBackupMode, backupTimeout, userApps);
     }
@@ -101,19 +108,26 @@ export class CaptureSnapshot {
    */
   private async captureVmSnapshot(
     snapshotName: string,
-    includeSettings: boolean
+    includeSettings: boolean,
+    vmSnapshotTimeoutMs: number
   ): Promise<SnapshotManifest> {
     logger.info(`Using VM snapshot for emulator ${this.device.deviceId}`);
 
     try {
       // Save VM snapshot using ADB emu command
-      const saveCommand = `emu avd snapshot save ${snapshotName}`;
+      const saveCommand = buildVmSnapshotCommand("save", snapshotName);
       logger.info(`Executing: adb -s ${this.device.deviceId} ${saveCommand}`);
 
-      const result = await this.adb.executeCommand(saveCommand);
+      let result;
+      try {
+        result = await this.adb.executeCommand(saveCommand, vmSnapshotTimeoutMs);
+      } catch (error) {
+        throw new Error(formatVmSnapshotExecutionError("save", snapshotName, error));
+      }
 
-      if (result.stderr && result.stderr.includes("KO")) {
-        throw new Error(`VM snapshot failed: ${result.stderr}`);
+      const evaluation = evaluateVmSnapshotResult("save", snapshotName, result);
+      if (!evaluation.ok) {
+        throw new Error(evaluation.errorMessage);
       }
 
       logger.info(`VM snapshot saved successfully`);
@@ -143,8 +157,9 @@ export class CaptureSnapshot {
 
       return manifest;
     } catch (error) {
-      logger.error(`Failed to capture VM snapshot: ${error}`);
-      throw new ActionableError(`Failed to capture VM snapshot: ${error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to capture VM snapshot: ${message}`);
+      throw new ActionableError(`Failed to capture VM snapshot: ${message}`);
     }
   }
 

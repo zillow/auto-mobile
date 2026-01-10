@@ -23,6 +23,7 @@ Capture the current device state as a snapshot.
 - `includeAppData` (optional, default: true): Include app data directories in snapshot
 - `includeSettings` (optional, default: true): Include system settings (global/secure/system)
 - `useVmSnapshot` (optional, default: true): Use emulator VM snapshot if available (faster for emulators)
+- `vmSnapshotTimeoutMs` (optional, default: 30000): Timeout in milliseconds for emulator VM snapshot commands
 - `strictBackupMode` (optional, default: false): If true, fail entire snapshot if app data backup fails or times out
 - `backupTimeout` (optional, default: 30000): Timeout in milliseconds for adb backup user confirmation
 - `userApps` (optional, default: "current"): Which apps to backup - "current" (foreground app only) or "all" (all user-installed apps)
@@ -66,6 +67,7 @@ Restore device to a previously captured snapshot state.
 **Parameters:**
 - `snapshotName` (required): Name of the snapshot to restore
 - `useVmSnapshot` (optional, default: true): Use emulator VM snapshot if available
+- `vmSnapshotTimeoutMs` (optional, default: 30000): Timeout in milliseconds for emulator VM snapshot commands
 - `sessionUuid` (optional): Session UUID for multi-device targeting
 - `device` (optional): Device label for multi-device control
 
@@ -168,7 +170,9 @@ await deleteSnapshot({
 
 **Technical Details:**
 - Uses `adb emu avd snapshot save/load` commands
-- Snapshots stored in emulator's AVD directory
+- Emulator replies with `OK` or `KO: <reason>` (missing `OK` is treated as failure)
+- Commands time out after 30000ms by default (configurable via `vmSnapshotTimeoutMs`)
+- Snapshots stored in emulator's AVD directory (typically `~/.android/avd/<avd>.avd/snapshots/`)
 - Metadata stored in `~/.automobile/snapshots/` for management
 
 ### ADB Snapshots (All Devices)
@@ -218,6 +222,8 @@ Snapshots are stored in `~/.automobile/snapshots/` with the following structure:
 └── another-snapshot/
     └── ...
 ```
+
+VM snapshots themselves are stored in the emulator AVD directory and persist across emulator restarts. Deleting a snapshot via `deleteSnapshot` removes AutoMobile metadata but does not delete the emulator's VM snapshot.
 
 ## Use Cases
 
@@ -377,6 +383,8 @@ await captureDeviceSnapshot({
 
 - Verify device is connected and responsive
 - For VM snapshots, ensure emulator console is accessible
+- If VM snapshot commands time out, increase `vmSnapshotTimeoutMs` or restart the emulator
+- If the emulator reports an unknown command, update the emulator to a version that supports snapshots
 - Check available disk space in `~/.automobile/snapshots/`
 
 ### Snapshot Restore Fails
@@ -384,6 +392,7 @@ await captureDeviceSnapshot({
 - Verify snapshot exists using `listSnapshots`
 - Check platform compatibility (snapshot vs device)
 - For VM snapshots, ensure emulator is running
+- If the emulator reports device offline, reconnect or restart the emulator
 
 ### Snapshot Too Large
 

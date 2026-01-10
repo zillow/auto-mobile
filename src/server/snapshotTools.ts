@@ -15,12 +15,14 @@ export const captureDeviceSnapshotSchema = addDeviceTargetingToSchema(z.object({
   useVmSnapshot: z.boolean().optional().default(true).describe("Use emulator VM snapshot if available (faster, emulator only)"),
   strictBackupMode: z.boolean().optional().default(false).describe("If true, fail entire snapshot if app data backup fails or times out"),
   backupTimeout: z.number().optional().default(30000).describe("Timeout in milliseconds for adb backup user confirmation (default: 30000ms)"),
-  userApps: z.enum(["current", "all"]).optional().default("current").describe("Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)")
+  userApps: z.enum(["current", "all"]).optional().default("current").describe("Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)"),
+  vmSnapshotTimeoutMs: z.number().optional().default(30000).describe("Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)")
 }));
 
 export const restoreDeviceSnapshotSchema = addDeviceTargetingToSchema(z.object({
   snapshotName: z.string().describe("Name of the snapshot to restore"),
-  useVmSnapshot: z.boolean().optional().default(true).describe("Use emulator VM snapshot if available (faster, emulator only)")
+  useVmSnapshot: z.boolean().optional().default(true).describe("Use emulator VM snapshot if available (faster, emulator only)"),
+  vmSnapshotTimeoutMs: z.number().optional().default(30000).describe("Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)")
 }));
 
 export const listSnapshotsSchema = addDeviceTargetingToSchema(z.object({
@@ -40,11 +42,13 @@ export interface CaptureSnapshotArgs {
   strictBackupMode?: boolean;
   backupTimeout?: number;
   userApps?: "current" | "all";
+  vmSnapshotTimeoutMs?: number;
 }
 
 export interface RestoreSnapshotArgs {
   snapshotName: string;
   useVmSnapshot?: boolean;
+  vmSnapshotTimeoutMs?: number;
 }
 
 export interface ListSnapshotsArgs {
