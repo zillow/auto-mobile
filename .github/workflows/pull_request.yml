@@ -860,72 +860,6 @@ jobs:
           fi
           echo "::notice::MCP context threshold benchmark passed - all thresholds satisfied"
 
-      - name: "Comment on PR with Results"
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const reportPath = 'reports/context-benchmark.json';
-
-            if (!fs.existsSync(reportPath)) {
-              console.log('No benchmark report found');
-              return;
-            }
-
-            const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-
-            const formatRow = (label, result) => {
-              const status = result.passed ? '✅' : '❌';
-              return `| ${label} | ${result.actual.toLocaleString()} | ${result.threshold.toLocaleString()} | ${result.usage}% | ${status} |`;
-            };
-
-            let body = '## MCP Context Threshold Benchmark\n\n';
-            body += '| Category | Actual | Threshold | Usage | Status |\n';
-            body += '|----------|--------|-----------|-------|--------|\n';
-            body += formatRow('Tools', report.results.tools) + '\n';
-            body += formatRow('Resources', report.results.resources) + '\n';
-            body += formatRow('Resource Templates', report.results.resourceTemplates) + '\n';
-            body += formatRow('**Total**', report.results.total) + '\n';
-
-            if (report.violations.length > 0) {
-              body += '\n### ⚠️ Threshold Violations\n\n';
-              for (const violation of report.violations) {
-                body += `- ${violation}\n`;
-              }
-            }
-
-            body += `\n**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}`;
-            body += `\n\n_Generated at ${report.timestamp}_`;
-
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('MCP Context Threshold Benchmark')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body
-              });
-            }
-
   # =============================================================================
   # MCP Tool Call Throughput
   # =============================================================================
@@ -970,97 +904,6 @@ jobs:
             exit 1
           fi
           echo "::notice::MCP tool throughput benchmark passed - no regressions"
-
-      - name: "Comment on PR with Results"
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const reportPath = 'reports/tool-benchmark.json';
-
-            if (!fs.existsSync(reportPath)) {
-              console.log('No benchmark report found');
-              return;
-            }
-
-            const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-
-            // Build summary table
-            let body = '## MCP Tool Call Throughput Benchmark\n\n';
-            body += `**Sample Size:** ${report.sampleSize} iterations per tool\n`;
-            body += `**Total Duration:** ${(report.totalDuration / 1000).toFixed(2)}s\n`;
-            body += `**Average Throughput:** ${report.summary.averageThroughput.toFixed(2)} ops/second\n\n`;
-
-            // Group results by category
-            const categories = [
-              { name: 'Fast Operations', expectedLatency: '<100ms', tools: ['listDevices', 'getForegroundApp', 'pressButton'] },
-              { name: 'Medium Operations', expectedLatency: '100ms-1s', tools: ['observe', 'tapOn', 'inputText', 'swipe'] },
-              { name: 'Slow Operations', expectedLatency: '1s+', tools: ['launchApp', 'installApp'] }
-            ];
-
-            for (const category of categories) {
-              const categoryResults = report.results.filter(r => category.tools.includes(r.toolName));
-              if (categoryResults.length === 0) continue;
-
-              body += `### ${category.name} (${category.expectedLatency})\n\n`;
-              body += '| Tool | P50 | P95 | P99 | Mean | Success | Status |\n';
-              body += '|------|-----|-----|-----|------|---------|--------|\n';
-
-              for (const result of categoryResults) {
-                const status = result.overallPassed === false ? '❌' : '✅';
-                body += `| ${result.toolName} | ${result.p50.toFixed(1)}ms | ${result.p95.toFixed(1)}ms | ${result.p99.toFixed(1)}ms | ${result.mean.toFixed(1)}ms | ${result.successRate.toFixed(0)}% | ${status} |\n`;
-
-                // Add regression details if failed
-                if (result.thresholdChecks && result.overallPassed === false) {
-                  for (const check of result.thresholdChecks.filter(c => !c.passed)) {
-                    body += `| └─ ${check.metric.toUpperCase()} regression | ${check.actual.toFixed(2)}ms | | | ${check.threshold.toFixed(2)}ms | +${check.regression.toFixed(1)}% | |\n`;
-                  }
-                }
-              }
-              body += '\n';
-            }
-
-            // Add violations section if any
-            if (report.violations.length > 0) {
-              body += '### ⚠️ Performance Regressions\n\n';
-              for (const violation of report.violations) {
-                body += `- ${violation}\n`;
-              }
-              body += '\n';
-            }
-
-            body += `**Summary:** ${report.summary.passedTools}/${report.summary.totalTools} tools passed\n`;
-            body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\n\n`;
-            body += `_Generated at ${report.timestamp}_`;
-
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(comment =>
-              comment.user.type === 'Bot' &&
-              comment.body.includes('MCP Tool Call Throughput Benchmark')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body
-              });
-            }
 
   # =============================================================================
   # MCP Startup Benchmark
@@ -1107,84 +950,283 @@ jobs:
           fi
           echo "::notice::MCP startup benchmark passed - no regressions"
 
-      - name: "Comment on PR with Results"
-        if: always()
+  # =============================================================================
+  # Consolidated MCP Benchmark Comment
+  # =============================================================================
+
+  post-benchmark-results:
+    name: "Post Consolidated Benchmark Results"
+    runs-on: ubuntu-latest
+    needs: [benchmark-context-thresholds, benchmark-tool-throughput, benchmark-startup]
+    if: always()
+    steps:
+      - name: "Download Context Benchmark Report"
+        uses: actions/download-artifact@v4
+        with:
+          name: context-benchmark-report
+          path: reports
+        continue-on-error: true
+
+      - name: "Download Tool Benchmark Report"
+        uses: actions/download-artifact@v4
+        with:
+          name: tool-benchmark-report
+          path: reports
+        continue-on-error: true
+
+      - name: "Download Startup Benchmark Report"
+        uses: actions/download-artifact@v4
+        with:
+          name: startup-benchmark-report
+          path: reports
+        continue-on-error: true
+
+      - name: "Post Consolidated Comment"
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const reportPath = 'reports/startup-benchmark.json';
 
-            if (!fs.existsSync(reportPath)) {
-              console.log('No benchmark report found');
+            const contextPath = 'reports/context-benchmark.json';
+            const toolPath = 'reports/tool-benchmark.json';
+            const startupPath = 'reports/startup-benchmark.json';
+
+            const readReport = (reportPath, label) => {
+              if (!fs.existsSync(reportPath)) {
+                return { label, report: null };
+              }
+              try {
+                const raw = fs.readFileSync(reportPath, 'utf8');
+                return { label, report: JSON.parse(raw) };
+              } catch (error) {
+                console.log(`Failed to read ${label} report: ${error.message}`);
+                return { label, report: null };
+              }
+            };
+
+            const contextReport = readReport(contextPath, 'Context Thresholds');
+            const toolReport = readReport(toolPath, 'Tool Call Throughput');
+            const startupReport = readReport(startupPath, 'Startup Performance');
+
+            if (!contextReport.report && !toolReport.report && !startupReport.report) {
+              console.log('No benchmark reports found. Skipping PR comment.');
               return;
             }
 
-            const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+            let body = '## MCP Benchmarks\n\n';
 
-            const formatMs = value => `${value.toFixed(1)}ms`;
-            const formatBytes = value => `${(value / (1024 * 1024)).toFixed(1)}MB`;
+            const statuses = [];
+            let hasFailures = false;
+            let hasMissing = false;
 
-            let body = '## MCP Startup Benchmark\n\n';
-
-            if (report.results.mcpServer) {
-              body += '### MCP Server (stdio)\n\n';
-              body += '| Mode | Ready | First Tool Call | Heap Used |\n';
-              body += '|------|-------|-----------------|-----------|\n';
-              for (const run of report.results.mcpServer.runs || []) {
-                const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
-                body += `| ${run.mode} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToFirstToolCallMs)} | ${heap} |\n`;
+            const trackStatus = (label, report) => {
+              if (!report) {
+                statuses.push(`${label}: ⚠️ missing`);
+                hasMissing = true;
+                return;
               }
-              body += '\n';
+              const passed = report.passed !== false;
+              const icon = passed ? '✅' : '❌';
+              statuses.push(`${label}: ${icon}`);
+              if (!passed) {
+                hasFailures = true;
+              }
+            };
 
-              const discovery = report.results.mcpServer.deviceDiscovery;
-              if (discovery) {
-                if (discovery.skipped) {
-                  body += `Device discovery: skipped (${discovery.reason || 'no reason provided'})\n\n`;
-                } else if (discovery.scenarios?.length) {
-                  body += 'Device discovery scenarios:\n';
-                  for (const scenario of discovery.scenarios) {
-                    body += `- ${scenario.name}: ${formatMs(scenario.durationMs)} (${scenario.deviceCount} device(s))\n`;
+            trackStatus('Context Thresholds', contextReport.report);
+            trackStatus('Tool Call Throughput', toolReport.report);
+            trackStatus('Startup', startupReport.report);
+
+            let overallStatus = '⚠️ PARTIAL';
+            if (!hasFailures && !hasMissing) {
+              overallStatus = '✅ PASSED';
+            } else if (hasFailures) {
+              overallStatus = '❌ FAILED';
+            }
+
+            body += `**Overall Status:** ${overallStatus}\n`;
+            body += `**Status by Benchmark:** ${statuses.join(' | ')}\n\n`;
+
+            if (contextReport.report) {
+              const report = contextReport.report;
+              const formatRow = (label, result) => {
+                if (!result) {
+                  return `| ${label} | n/a | n/a | n/a | ⚠️ |`;
+                }
+                const status = result.passed ? '✅' : '❌';
+                const actual = typeof result.actual === 'number' ? result.actual.toLocaleString() : 'n/a';
+                const threshold = typeof result.threshold === 'number' ? result.threshold.toLocaleString() : 'n/a';
+                const usage = typeof result.usage === 'number' ? `${result.usage}%` : 'n/a';
+                return `| ${label} | ${actual} | ${threshold} | ${usage} | ${status} |`;
+              };
+
+              body += '### Context Thresholds\n\n';
+              body += '| Category | Actual | Threshold | Usage | Status |\n';
+              body += '|----------|--------|-----------|-------|--------|\n';
+              body += formatRow('Tools', report.results?.tools) + '\n';
+              body += formatRow('Resources', report.results?.resources) + '\n';
+              body += formatRow('Resource Templates', report.results?.resourceTemplates) + '\n';
+              body += formatRow('**Total**', report.results?.total) + '\n';
+
+              if (Array.isArray(report.violations) && report.violations.length > 0) {
+                body += '\n### ⚠️ Threshold Violations\n\n';
+                for (const violation of report.violations) {
+                  body += `- ${violation}\n`;
+                }
+              }
+
+              body += `\n**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}`;
+              if (report.timestamp) {
+                body += `\n\n_Generated at ${report.timestamp}_`;
+              }
+              body += '\n\n';
+            }
+
+            if (toolReport.report) {
+              const report = toolReport.report;
+              const summary = report.summary ?? {};
+              const sampleSize = report.sampleSize ?? 'n/a';
+              const totalDuration = typeof report.totalDuration === 'number'
+                ? `${(report.totalDuration / 1000).toFixed(2)}s`
+                : 'n/a';
+              const averageThroughput = typeof summary.averageThroughput === 'number'
+                ? `${summary.averageThroughput.toFixed(2)} ops/second`
+                : 'n/a';
+
+              body += '### Tool Call Throughput\n\n';
+              body += `**Sample Size:** ${sampleSize} iterations per tool\n`;
+              body += `**Total Duration:** ${totalDuration}\n`;
+              body += `**Average Throughput:** ${averageThroughput}\n\n`;
+
+              const categories = [
+                { name: 'Fast Operations', expectedLatency: '<100ms', tools: ['listDevices', 'getForegroundApp', 'pressButton'] },
+                { name: 'Medium Operations', expectedLatency: '100ms-1s', tools: ['observe', 'tapOn', 'inputText', 'swipe'] },
+                { name: 'Slow Operations', expectedLatency: '1s+', tools: ['launchApp', 'installApp'] }
+              ];
+
+              const results = Array.isArray(report.results) ? report.results : [];
+              let renderedAnyCategory = false;
+
+              for (const category of categories) {
+                const categoryResults = results.filter(r => category.tools.includes(r.toolName));
+                if (categoryResults.length === 0) continue;
+                renderedAnyCategory = true;
+
+                body += `#### ${category.name} (${category.expectedLatency})\n\n`;
+                body += '| Tool | P50 | P95 | P99 | Mean | Success | Status |\n';
+                body += '|------|-----|-----|-----|------|---------|--------|\n';
+
+                for (const result of categoryResults) {
+                  const status = result.overallPassed === false ? '❌' : '✅';
+                  const p50 = typeof result.p50 === 'number' ? `${result.p50.toFixed(1)}ms` : 'n/a';
+                  const p95 = typeof result.p95 === 'number' ? `${result.p95.toFixed(1)}ms` : 'n/a';
+                  const p99 = typeof result.p99 === 'number' ? `${result.p99.toFixed(1)}ms` : 'n/a';
+                  const mean = typeof result.mean === 'number' ? `${result.mean.toFixed(1)}ms` : 'n/a';
+                  const success = typeof result.successRate === 'number' ? `${result.successRate.toFixed(0)}%` : 'n/a';
+                  body += `| ${result.toolName} | ${p50} | ${p95} | ${p99} | ${mean} | ${success} | ${status} |\n`;
+
+                  if (Array.isArray(result.thresholdChecks) && result.overallPassed === false) {
+                    for (const check of result.thresholdChecks.filter(c => !c.passed)) {
+                      const metric = check.metric ? check.metric.toUpperCase() : 'METRIC';
+                      const actual = typeof check.actual === 'number' ? `${check.actual.toFixed(2)}ms` : 'n/a';
+                      const threshold = typeof check.threshold === 'number' ? `${check.threshold.toFixed(2)}ms` : 'n/a';
+                      const regression = typeof check.regression === 'number' ? `+${check.regression.toFixed(1)}%` : 'n/a';
+                      body += `| └─ ${metric} regression | ${actual} | | | ${threshold} | ${regression} | |\n`;
+                    }
+                  }
+                }
+                body += '\n';
+              }
+
+              if (!renderedAnyCategory) {
+                body += '_No tool results found._\n\n';
+              }
+
+              if (Array.isArray(report.violations) && report.violations.length > 0) {
+                body += '#### ⚠️ Performance Regressions\n\n';
+                for (const violation of report.violations) {
+                  body += `- ${violation}\n`;
+                }
+                body += '\n';
+              }
+
+              const passedTools = typeof summary.passedTools === 'number' ? summary.passedTools : 'n/a';
+              const totalTools = typeof summary.totalTools === 'number' ? summary.totalTools : 'n/a';
+              body += `**Summary:** ${passedTools}/${totalTools} tools passed\n`;
+              body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\n\n`;
+              if (report.timestamp) {
+                body += `_Generated at ${report.timestamp}_\n\n`;
+              }
+            }
+
+            if (startupReport.report) {
+              const report = startupReport.report;
+              const formatMs = value => (typeof value === 'number' ? `${value.toFixed(1)}ms` : 'n/a');
+              const formatBytes = value => (typeof value === 'number' ? `${(value / (1024 * 1024)).toFixed(1)}MB` : 'n/a');
+
+              body += '### Startup Performance\n\n';
+
+              if (report.results?.mcpServer) {
+                body += '#### MCP Server (stdio)\n\n';
+                body += '| Mode | Ready | First Tool Call | Heap Used |\n';
+                body += '|------|-------|-----------------|-----------|\n';
+                for (const run of report.results.mcpServer.runs || []) {
+                  const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
+                  body += `| ${run.mode} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToFirstToolCallMs)} | ${heap} |\n`;
+                }
+                body += '\n';
+
+                const discovery = report.results.mcpServer.deviceDiscovery;
+                if (discovery) {
+                  if (discovery.skipped) {
+                    body += `Device discovery: skipped (${discovery.reason || 'no reason provided'})\n\n`;
+                  } else if (discovery.scenarios?.length) {
+                    body += 'Device discovery scenarios:\n';
+                    for (const scenario of discovery.scenarios) {
+                      body += `- ${scenario.name}: ${formatMs(scenario.durationMs)} (${scenario.deviceCount} device(s))\n`;
+                    }
+                    body += '\n';
+                  }
+                }
+              }
+
+              if (report.results?.daemon) {
+                body += '#### Daemon\n\n';
+                body += '| Mode | Spawn | Ready | Responsive | Heap Used |\n';
+                body += '|------|-------|-------|------------|-----------|\n';
+                for (const run of report.results.daemon.runs || []) {
+                  const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
+                  body += `| ${run.mode} | ${formatMs(run.spawnMs)} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToResponsiveMs)} | ${heap} |\n`;
+                }
+                body += '\n';
+              }
+
+              if (report.comparisons?.regressions?.length) {
+                const failures = report.comparisons.regressions.filter(r => !r.passed);
+                if (failures.length > 0) {
+                  body += '#### ⚠️ Regressions\n\n';
+                  for (const regression of failures) {
+                    body += `- ${regression.metric}: ${regression.actual.toFixed(2)} > ${regression.threshold.toFixed(2)} (+${regression.regression.toFixed(1)}%)\n`;
                   }
                   body += '\n';
                 }
               }
-            }
 
-            if (report.results.daemon) {
-              body += '### Daemon\n\n';
-              body += '| Mode | Spawn | Ready | Responsive | Heap Used |\n';
-              body += '|------|-------|-------|------------|-----------|\n';
-              for (const run of report.results.daemon.runs || []) {
-                const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
-                body += `| ${run.mode} | ${formatMs(run.spawnMs)} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToResponsiveMs)} | ${heap} |\n`;
-              }
-              body += '\n';
-            }
-
-            if (report.comparisons?.regressions?.length) {
-              const failures = report.comparisons.regressions.filter(r => !r.passed);
-              if (failures.length > 0) {
-                body += '### ⚠️ Regressions\n\n';
-                for (const regression of failures) {
-                  body += `- ${regression.metric}: ${regression.actual.toFixed(2)} > ${regression.threshold.toFixed(2)} (+${regression.regression.toFixed(1)}%)\n`;
+              if (report.skips?.length) {
+                body += '#### Skipped Checks\n\n';
+                for (const skip of report.skips) {
+                  body += `- ${skip}\n`;
                 }
                 body += '\n';
               }
-            }
 
-            if (report.skips?.length) {
-              body += '### Skipped Checks\n\n';
-              for (const skip of report.skips) {
-                body += `- ${skip}\n`;
+              body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\n`;
+              if (report.timestamp) {
+                body += `\n_Generated at ${report.timestamp}_`;
               }
-              body += '\n';
+              body += '\n\n';
             }
 
-            body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\n`;
-            body += `\n_Generated at ${report.timestamp}_`;
-
-            // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -1193,7 +1235,7 @@ jobs:
 
             const botComment = comments.find(comment =>
               comment.user.type === 'Bot' &&
-              comment.body.includes('MCP Startup Benchmark')
+              comment.body.includes('## MCP Benchmarks')
             );
 
             if (botComment) {
