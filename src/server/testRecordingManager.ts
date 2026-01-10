@@ -138,12 +138,12 @@ const buildRecordedMetadata = (event: InteractionEvent): Record<string, any> => 
   const element = event.element;
   const recordedElement = element
     ? {
-        resourceId: element["resource-id"],
-        text: element.text,
-        contentDescription: element["content-desc"],
-        className: element["class"],
-        bounds: element.bounds,
-      }
+      resourceId: element["resource-id"],
+      text: element.text,
+      contentDescription: element["content-desc"],
+      className: element["class"],
+      bounds: element.bounds,
+    }
     : undefined;
 
   return {

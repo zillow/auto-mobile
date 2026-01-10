@@ -8,6 +8,7 @@ import { AndroidAccessibilityServiceManager } from "./AccessibilityServiceManage
 import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorClient";
 import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
+import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 
 /**
  * Interface for device session management
@@ -72,6 +73,10 @@ export interface DeviceSessionManager {
 }
 
 export interface DeviceReadyOptions {
+  skipAccessibilityDownload?: boolean;
+  /**
+   * @deprecated Use skipAccessibilityDownload instead.
+   */
   skipAccessibilitySetup?: boolean;
 }
 
@@ -318,13 +323,60 @@ export class DeviceSessionManager implements DeviceSessionManager {
       );
     }
 
-    if (options?.skipAccessibilitySetup) {
-      logger.info(`[DeviceSessionManager] Skipping accessibility service setup for ${deviceId}`);
-      return;
-    }
-
     try {
-      await AndroidAccessibilityServiceManager.getInstance(device).setup();
+      const skipAccessibilityDownload = options?.skipAccessibilityDownload ?? options?.skipAccessibilitySetup;
+      if (options?.skipAccessibilitySetup !== undefined) {
+        logger.warn("[DeviceSessionManager] skipAccessibilitySetup is deprecated; use skipAccessibilityDownload instead.");
+      }
+
+      const accessibilityClient = AccessibilityServiceClient.getInstance(device);
+      if (accessibilityClient.isConnected()) {
+        logger.info(`[DeviceSessionManager] Accessibility service websocket connected for ${deviceId}, skipping accessibility checks`);
+        return;
+      }
+
+      const manager = AndroidAccessibilityServiceManager.getInstance(device);
+      const [isInstalled, isEnabled] = await Promise.all([
+        manager.isInstalled(),
+        manager.isEnabled()
+      ]);
+
+      if (isInstalled && isEnabled) {
+        logger.info(`[DeviceSessionManager] Accessibility service already enabled for ${deviceId}`);
+        if (skipAccessibilityDownload) {
+          return;
+        }
+        logger.info(`[DeviceSessionManager] Accessibility service enabled for ${deviceId}, verifying version compatibility`);
+      }
+
+      if (!isInstalled && skipAccessibilityDownload) {
+        logger.info(`[DeviceSessionManager] Accessibility service not installed for ${deviceId}, skipping download/install`);
+        return;
+      }
+
+      if (isInstalled && !isEnabled) {
+        logger.info(`[DeviceSessionManager] Accessibility service installed but not enabled for ${deviceId}, enabling now`);
+        try {
+          await manager.enable();
+          if (skipAccessibilityDownload) {
+            return;
+          }
+          logger.info(`[DeviceSessionManager] Accessibility service enabled for ${deviceId}, verifying version compatibility`);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logger.warn(`[DeviceSessionManager] Failed to enable accessibility service: ${errorMessage}`);
+          if (skipAccessibilityDownload) {
+            return;
+          }
+        }
+      }
+
+      if (skipAccessibilityDownload) {
+        logger.info(`[DeviceSessionManager] Skipping accessibility service download/install for ${deviceId}`);
+        return;
+      }
+
+      await manager.setup();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`[DeviceSessionManager] Failed to setup accessibility service: ${errorMessage}`);

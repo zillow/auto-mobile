@@ -161,7 +161,7 @@ class ToolRegistryClass {
       const device = await this.deviceSessionManager.ensureDeviceReady(
         platform,
         providedDeviceId,
-        { skipAccessibilitySetup: name === "observe" }
+        { skipAccessibilityDownload: name === "observe" }
       );
       logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
 
