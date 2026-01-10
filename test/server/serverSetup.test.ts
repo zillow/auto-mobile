@@ -1,12 +1,15 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createMcpServer } from "../../src/server/index";
 import { ToolRegistry } from "../../src/server/toolRegistry";
 
 describe("MCP Server Setup", () => {
+  let server: ReturnType<typeof createMcpServer>;
+
+  beforeAll(() => {
+    server = createMcpServer();
+  });
 
   test("should create an MCP server instance over stdio", () => {
-    const server = createMcpServer();
-
     // Test that the server exists and has the expected structure
     expect(server).toBeDefined();
     expect(server).toHaveProperty("server");
@@ -18,8 +21,6 @@ describe("MCP Server Setup", () => {
   });
 
   test("should have correct server metadata", () => {
-    const server = createMcpServer();
-
     // Test that server was created successfully
     expect(server).toBeDefined();
     expect(server.server).toBeDefined();

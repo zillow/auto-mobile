@@ -1,7 +1,9 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { SwipeOn } from "../../../src/features/action/SwipeOn";
 import { ObserveResult } from "../../../src/models";
+import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
+import { FakeAccessibilityDetector } from "../../fakes/FakeAccessibilityDetector";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeGestureExecutor } from "../../fakes/FakeGestureExecutor";
 import { FakeWindow } from "../../fakes/FakeWindow";
@@ -12,6 +14,8 @@ describe("SwipeOn autoTarget", () => {
   let fakeGesture: FakeGestureExecutor;
   let fakeAwaitIdle: FakeAwaitIdle;
   let fakeWindow: FakeWindow;
+  let fakeAccessibilityDetector: FakeAccessibilityDetector;
+  let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
 
   const createObserveResult = (viewHierarchy: any): ObserveResult => ({
     timestamp: Date.now(),
@@ -41,7 +45,8 @@ describe("SwipeOn autoTarget", () => {
   const createSwipeOn = () => {
     const swipeOn = new SwipeOn(device, null, null, null, {
       executeGesture: fakeGesture,
-      observeScreen: fakeObserveScreen
+      observeScreen: fakeObserveScreen,
+      accessibilityDetector: fakeAccessibilityDetector
     });
     (swipeOn as any).awaitIdle = fakeAwaitIdle;
     (swipeOn as any).window = fakeWindow;
@@ -49,11 +54,18 @@ describe("SwipeOn autoTarget", () => {
   };
 
   beforeEach(() => {
+    fakeAccessibilityDetector = new FakeAccessibilityDetector();
+    fakeAccessibilityDetector.setTalkBackEnabled(false);
+    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue({} as AccessibilityServiceClient);
     fakeObserveScreen = new FakeObserveScreen();
     fakeGesture = new FakeGestureExecutor();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeWindow = new FakeWindow();
     fakeWindow.setCachedActiveWindow(null);
+  });
+
+  afterEach(() => {
+    getInstanceSpy?.mockRestore();
   });
 
   test("auto-targets the largest non-fullscreen scrollable when multiple exist", async () => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import os from "node:os";
 import path from "node:path";
 import fs from "fs-extra";
@@ -20,11 +20,15 @@ describe("videoRecordingManager", () => {
   let archiveRoot: string;
   let testDevice: BootedDevice;
 
+  beforeAll(async () => {
+    archiveRoot = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-video-"));
+  });
+
   beforeEach(async () => {
     fakeTimer = new FakeTimer();
     fakeTimer.setManualMode();
     fakeBackend = new FakeVideoCaptureBackend();
-    archiveRoot = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-video-"));
+    await fs.emptyDir(archiveRoot);
 
     const service = new VideoRecorderService({
       backend: fakeBackend,
@@ -46,6 +50,9 @@ describe("videoRecordingManager", () => {
 
   afterEach(async () => {
     resetVideoRecordingManagerDependencies();
+  });
+
+  afterAll(async () => {
     await fs.remove(archiveRoot);
   });
 

@@ -1,18 +1,19 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
   ListResourceTemplatesRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
+import { z } from "zod";
 
 describe("MCP Templates List", () => {
   let fixture: McpTestFixture;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     fixture = new McpTestFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
@@ -23,7 +24,6 @@ describe("MCP Templates List", () => {
     const { client } = fixture.getContext();
 
     // Send resources/templates/list request
-    const { z } = await import("zod");
     const listResourceTemplatesResponseSchema = z.object({
       resourceTemplates: z.array(z.object({
         uriTemplate: z.string(),
@@ -77,7 +77,6 @@ describe("MCP Templates List", () => {
     );
 
     // Send resources/templates/list request
-    const { z } = await import("zod");
     const listResourceTemplatesResponseSchema = z.object({
       resourceTemplates: z.array(z.object({
         uriTemplate: z.string(),

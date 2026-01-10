@@ -1,8 +1,9 @@
-import { expect, describe, test, beforeEach, afterEach } from "bun:test";
+import { expect, describe, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { Explore } from "../../../src/features/navigation/Explore";
 import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { BootedDevice, Element, ObserveResult } from "../../../src/models";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
+import { FakeNavigationGraphManager } from "../../fakes/FakeNavigationGraphManager";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("Explore", () => {
@@ -10,15 +11,16 @@ describe("Explore", () => {
   let device: BootedDevice;
   let mockAdb: any;
   let mockObserveScreen: any;
+  let fakeGraph: FakeNavigationGraphManager;
   let fakeTimer: FakeTimer;
+  let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
 
   beforeEach(() => {
-    // Reset singleton
-    NavigationGraphManager.resetInstance();
-
-    // Create fake timer
+    fakeGraph = new FakeNavigationGraphManager();
     fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
+    getInstanceSpy = spyOn(NavigationGraphManager, "getInstance").mockReturnValue(
+      fakeGraph as unknown as NavigationGraphManager
+    );
 
     // Create fake device
     device = {
@@ -76,7 +78,7 @@ describe("Explore", () => {
   });
 
   afterEach(() => {
-    NavigationGraphManager.resetInstance();
+    getInstanceSpy?.mockRestore();
   });
 
   function createMockViewHierarchyNode(overrides: any = {}): any {

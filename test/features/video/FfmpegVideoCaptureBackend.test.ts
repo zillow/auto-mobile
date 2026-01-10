@@ -7,9 +7,21 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
   let backend: FfmpegVideoCaptureBackend;
   let mockDevice: BootedDevice;
   let mockConfig: VideoCaptureConfig;
+  let listEncodersCalls: number;
+  let checkVersionCalls: number;
 
   beforeEach(function() {
     backend = new FfmpegVideoCaptureBackend();
+    listEncodersCalls = 0;
+    checkVersionCalls = 0;
+
+    (backend as any).listEncoders = async () => {
+      listEncodersCalls += 1;
+      return ["h264_nvenc", "h264_vaapi", "h264_videotoolbox"];
+    };
+    (backend as any).checkFfmpegVersion = async () => {
+      checkVersionCalls += 1;
+    };
 
     mockDevice = {
       platform: "android",
@@ -43,6 +55,7 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
       expect(hwAccel.encoder).toBeDefined();
       expect(typeof hwAccel.available).toBe("boolean");
       expect(hwAccel.description).toBeDefined();
+      expect(listEncodersCalls).toBe(1);
     });
 
     test("should cache hardware acceleration detection", async function() {
@@ -50,6 +63,7 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
       const hwAccel2 = await (backend as any).detectHardwareAccel();
 
       expect(hwAccel1).toEqual(hwAccel2);
+      expect(listEncodersCalls).toBe(1);
     });
   });
 
@@ -145,22 +159,17 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
 
   describe("FFmpeg Availability", function() {
     test("should check FFmpeg version", async function() {
-      try {
-        await (backend as any).checkFfmpegVersion();
-      } catch (error) {
-        expect(error).toBeDefined();
-      }
+      await (backend as any).checkFfmpegVersion();
+      expect(checkVersionCalls).toBe(1);
     });
   });
 
   describe("Encoder Listing", function() {
     test("should list available encoders", async function() {
-      try {
-        const encoders = await (backend as any).listEncoders();
-        expect(Array.isArray(encoders)).toBe(true);
-      } catch (error) {
-        expect(error).toBeDefined();
-      }
+      const encoders = await (backend as any).listEncoders();
+      expect(Array.isArray(encoders)).toBe(true);
+      expect(encoders.length).toBeGreaterThan(0);
+      expect(listEncodersCalls).toBe(1);
     });
   });
 });

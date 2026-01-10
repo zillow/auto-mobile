@@ -1,13 +1,46 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { CriticalSectionCoordinator } from "../../src/server/CriticalSectionCoordinator";
+import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("CriticalSectionCoordinator", () => {
   let coordinator: CriticalSectionCoordinator;
+  let fakeTimer: FakeTimer;
+  let originalSetTimeout: typeof global.setTimeout;
+  let originalClearTimeout: typeof global.clearTimeout;
+  let originalDateNow: typeof Date.now;
 
   beforeEach(() => {
+    fakeTimer = new FakeTimer();
+    fakeTimer.setManualMode();
+
+    originalSetTimeout = global.setTimeout;
+    originalClearTimeout = global.clearTimeout;
+    originalDateNow = Date.now;
+
+    global.setTimeout = ((callback: (...args: any[]) => void, ms?: number, ...args: any[]) => {
+      return fakeTimer.setTimeout(() => callback(...args), ms ?? 0);
+    }) as typeof global.setTimeout;
+    global.clearTimeout = ((handle: NodeJS.Timeout) => {
+      fakeTimer.clearTimeout(handle);
+    }) as typeof global.clearTimeout;
+    Date.now = () => fakeTimer.now();
+
     coordinator = CriticalSectionCoordinator.getInstance();
     coordinator.reset();
   });
+
+  afterEach(() => {
+    Date.now = originalDateNow;
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+    fakeTimer.reset();
+  });
+
+  const wait = async (ms: number): Promise<void> => {
+    const promise = new Promise<void>(resolve => setTimeout(resolve, ms));
+    fakeTimer.advanceTime(ms);
+    await promise;
+  };
 
   test("allows single device to immediately enter critical section", async () => {
     coordinator.registerExpectedDevices("lock-1", 1);
@@ -32,7 +65,7 @@ describe("CriticalSectionCoordinator", () => {
     const promises = ["device-1", "device-2", "device-3"].map(
       async (deviceId, index) => {
         // Stagger arrivals slightly
-        await new Promise(resolve => setTimeout(resolve, index * 10));
+        await wait(index * 10);
         arrivals.push({ deviceId, arrivedAt: Date.now() });
 
         const release = await coordinator.enterCriticalSection(
@@ -41,8 +74,6 @@ describe("CriticalSectionCoordinator", () => {
         );
         releases.push({ deviceId, releasedAt: Date.now() });
 
-        // Simulate work inside critical section
-        await new Promise(resolve => setTimeout(resolve, 5));
         release();
       }
     );
@@ -73,7 +104,7 @@ describe("CriticalSectionCoordinator", () => {
       const release = await coordinator.enterCriticalSection(lockName, deviceId);
 
       executionLog.push({ deviceId, event: "start", time: Date.now() });
-      await new Promise(resolve => setTimeout(resolve, 20));
+      await wait(20);
       executionLog.push({ deviceId, event: "end", time: Date.now() });
 
       release();
@@ -116,7 +147,9 @@ describe("CriticalSectionCoordinator", () => {
       100
     );
 
-    await expect(Promise.all([promise1, promise2])).rejects.toThrow(
+    const allPromises = Promise.all([promise1, promise2]);
+    fakeTimer.advanceTime(100);
+    await expect(allPromises).rejects.toThrow(
       /Timeout waiting for critical section/
     );
   });
@@ -190,7 +223,7 @@ describe("CriticalSectionCoordinator", () => {
     const deviceWork = async (lockName: string, deviceId: string) => {
       const release = await coordinator.enterCriticalSection(lockName, deviceId);
       executionLog.push(`${lockName}:${deviceId}:start`);
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await wait(10);
       executionLog.push(`${lockName}:${deviceId}:end`);
       release();
     };
@@ -225,6 +258,7 @@ describe("CriticalSectionCoordinator", () => {
     coordinator.forceCleanup(lockName);
 
     // The waiting device should timeout since barrier was cleared
+    fakeTimer.advanceTime(200);
     await expect(promise).rejects.toThrow(/Timeout waiting for critical section/);
 
     // After force cleanup, lock state is gone

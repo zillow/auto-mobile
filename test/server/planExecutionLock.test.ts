@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../fixtures/mcpTestFixture";
 import { FakePlanExecutionLock } from "../fakes/FakePlanExecutionLock";
 import {
@@ -9,6 +9,7 @@ import { ExecutionTracker } from "../../src/server/executionTracker";
 import type { PlanExecutionLockScope } from "../../src/utils/ServerConfig";
 import { FakeDeviceUtils } from "../fakes/FakeDeviceUtils";
 import { resetDeviceToolsDependencies, setDeviceToolsDependencies } from "../../src/server/deviceTools";
+import { z } from "zod";
 
 class FakePlanExecutionLockScopeProvider implements PlanExecutionLockScopeProvider {
   constructor(private scope: PlanExecutionLockScope) {}
@@ -23,9 +24,11 @@ class FakePlanExecutionLockScopeProvider implements PlanExecutionLockScopeProvid
 }
 
 describe("Plan execution lock", () => {
+  let fixture: McpTestFixture;
   let fakeDeviceUtils: FakeDeviceUtils;
+  let fakePlanExecutionLock: FakePlanExecutionLock;
 
-  beforeEach(() => {
+  beforeAll(async () => {
     // Set up FakeDeviceUtils to avoid real ADB commands
     fakeDeviceUtils = new FakeDeviceUtils();
     // Configure with empty device list since we're testing plan lock, not device functionality
@@ -34,26 +37,35 @@ describe("Plan execution lock", () => {
     setDeviceToolsDependencies({
       deviceManagerFactory: () => fakeDeviceUtils
     });
+
+    fakePlanExecutionLock = new FakePlanExecutionLock({
+      blocked: false,
+      scope: "session",
+    });
+
+    fixture = new McpTestFixture({
+      planExecutionLock: fakePlanExecutionLock,
+    });
+    await fixture.setup();
   });
 
-  afterEach(() => {
+  afterAll(async () => {
     // Reset dependencies to avoid test pollution
+    if (fixture) {
+      await fixture.teardown();
+    }
     resetDeviceToolsDependencies();
   });
 
   test("rejects MCP tool calls when a plan is executing", async () => {
-    const fixture = new McpTestFixture({
-      planExecutionLock: new FakePlanExecutionLock({
-        blocked: true,
-        scope: "session",
-        reason: "plan execution in progress",
-      }),
+    fakePlanExecutionLock.setDecision({
+      blocked: true,
+      scope: "session",
+      reason: "plan execution in progress",
     });
-    await fixture.setup();
 
     try {
       const { client } = fixture.getContext();
-      const { z } = await import("zod");
       await client.request({
         method: "tools/call",
         params: {
@@ -64,35 +76,25 @@ describe("Plan execution lock", () => {
       expect.fail("Expected tool call to be rejected");
     } catch (error: any) {
       expect(error.message).toContain("plan execution in progress");
-    } finally {
-      await fixture.teardown();
     }
   });
 
   test("allows MCP tool calls when no plan is executing", async () => {
-    const fixture = new McpTestFixture({
-      planExecutionLock: new FakePlanExecutionLock({
-        blocked: false,
-        scope: "session",
-      }),
+    fakePlanExecutionLock.setDecision({
+      blocked: false,
+      scope: "session",
     });
-    await fixture.setup();
 
-    try {
-      const { client } = fixture.getContext();
-      const { z } = await import("zod");
-      const result = await client.request({
-        method: "tools/call",
-        params: {
-          name: "listDevices",
-          arguments: { platform: "android" },
-        },
-      }, z.any());
+    const { client } = fixture.getContext();
+    const result = await client.request({
+      method: "tools/call",
+      params: {
+        name: "listDevices",
+        arguments: { platform: "android" },
+      },
+    }, z.any());
 
-      expect(result).toHaveProperty("content");
-    } finally {
-      await fixture.teardown();
-    }
+    expect(result).toHaveProperty("content");
   });
 
   test("scopes blocking to session or global", () => {

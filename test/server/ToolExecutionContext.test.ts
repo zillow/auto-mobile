@@ -8,6 +8,7 @@ describe("ToolExecutionContext", () => {
   let sessionManager: SessionManager;
   let devicePool: DevicePool;
   let originalGetInstance: typeof AndroidAccessibilityServiceManager.getInstance;
+  const sessionOptions = { keepScreenAwake: false };
 
   beforeEach(async () => {
     sessionManager = new SessionManager();
@@ -30,7 +31,7 @@ describe("ToolExecutionContext", () => {
         }
       } as any);
 
-    const context = await createToolExecutionContext("session-1", sessionManager, devicePool);
+    const context = await createToolExecutionContext("session-1", sessionManager, devicePool, sessionOptions);
 
     expect(context.deviceId).toBe("device-1");
     expect(setupCalls).toBe(1);
@@ -47,7 +48,7 @@ describe("ToolExecutionContext", () => {
       } as any);
 
     await sessionManager.createSession("session-1", "device-1");
-    const context = await createToolExecutionContext("session-1", sessionManager, devicePool);
+    const context = await createToolExecutionContext("session-1", sessionManager, devicePool, sessionOptions);
 
     expect(context.deviceId).toBe("device-1");
     expect(setupCalls).toBe(0);

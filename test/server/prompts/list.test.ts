@@ -1,15 +1,16 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
+import { z } from "zod";
 
 describe("MCP Prompts List", () => {
   let fixture: McpTestFixture;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     fixture = new McpTestFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
@@ -20,7 +21,6 @@ describe("MCP Prompts List", () => {
     const { client } = fixture.getContext();
 
     // Send prompts/list request
-    const { z } = await import("zod");
     const listPromptsResponseSchema = z.object({
       prompts: z.array(z.object({
         name: z.string(),
@@ -80,7 +80,6 @@ describe("MCP Prompts List", () => {
     );
 
     // Send prompts/list request
-    const { z } = await import("zod");
     const listPromptsResponseSchema = z.object({
       prompts: z.array(z.object({
         name: z.string(),

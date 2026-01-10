@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { ObserveResult } from "../../../src/models/ObserveResult";
@@ -11,10 +11,8 @@ describe("ObserveScreen", function() {
     let fakeAdb: FakeAdbExecutor;
     let mockDevice: BootedDevice;
 
-    beforeEach(function() {
-      // Clear cache before each test to prevent interference between tests
+    beforeAll(function() {
       ObserveScreen.clearCache();
-
       mockDevice = {
         deviceId: "test-device",
         name: "Test Device",
@@ -113,7 +111,7 @@ describe("ObserveScreen", function() {
     let viewHierarchy: any;
     let mockDevice: BootedDevice;
 
-    beforeEach(function() {
+    beforeAll(function() {
       mockDevice = {
         deviceId: "test-device",
         name: "Test Device",

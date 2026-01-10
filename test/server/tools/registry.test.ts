@@ -1,12 +1,13 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { createMcpServer } from "../../../src/server/index";
 import { ToolRegistry } from "../../../src/server/toolRegistry";
 
 describe("MCP Tools Registry", () => {
+  beforeAll(() => {
+    createMcpServer();
+  });
 
   test("should expose all required MCP tools through the registry", () => {
-    createMcpServer();
-
     // Test that the server exposes MCP tools correctly
     const toolDefinitions = ToolRegistry.getToolDefinitions();
     expect(Array.isArray(toolDefinitions)).toBe(true);
@@ -32,7 +33,6 @@ describe("MCP Tools Registry", () => {
   test("should maintain singleton registry across server instances", () => {
     // This tests the MCP initialization pattern
     createMcpServer();
-    createMcpServer();
 
     const tools1 = ToolRegistry.getToolDefinitions();
     const tools2 = ToolRegistry.getToolDefinitions();
@@ -46,8 +46,6 @@ describe("MCP Tools Registry", () => {
   });
 
   test("should provide tools that can be executed (handler functions exist)", () => {
-    createMcpServer();
-
     const allTools = ToolRegistry.getAllTools();
 
     // Each registered tool should have an executable handler
@@ -62,7 +60,6 @@ describe("MCP Tools Registry", () => {
   });
 
   test("should register all tool categories", () => {
-    createMcpServer();
     const toolDefinitions = ToolRegistry.getToolDefinitions();
     const toolNames = toolDefinitions.map(tool => tool.name);
 

@@ -1,32 +1,31 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createMcpServer } from "../../src/server/index";
 import { McpTestFixture } from "../fixtures/mcpTestFixture";
+import { z } from "zod";
 
 describe("MCP Ping", () => {
   let fixture: McpTestFixture;
+  let server: ReturnType<typeof createMcpServer>;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     fixture = new McpTestFixture();
     await fixture.setup();
+    server = createMcpServer();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
   });
 
   test("should handle MCP ping request", async () => {
-    const server = createMcpServer();
-
     // Test that server is created successfully
     expect(typeof server).toBe("object");
     expect(typeof server.server).toBe("object");
   });
 
   test("should have ping handler registered", async () => {
-    const server = createMcpServer();
-
     // Test that server is created successfully
     expect(typeof server).toBe("object");
     expect(typeof server.server).toBe("object");
@@ -36,8 +35,6 @@ describe("MCP Ping", () => {
   });
 
   test("should include ping in server capabilities", async () => {
-    const server = createMcpServer();
-
     // Test that server was created without errors
     expect(typeof server).toBe("object");
     expect(typeof server.server).toBe("object");
@@ -56,7 +53,6 @@ describe("MCP Ping", () => {
     const { client } = fixture.getContext();
 
     // Send ping request using the client
-    const { z } = await import("zod");
     const result = await client.request({
       method: "ping",
       params: {}

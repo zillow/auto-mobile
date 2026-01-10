@@ -1,27 +1,26 @@
-import { expect, describe, test, beforeEach, afterEach, beforeAll } from "bun:test";
+import { expect, describe, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { NavigateTo } from "../../../src/features/navigation/NavigateTo";
 import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { BootedDevice } from "../../../src/models";
 import { z } from "zod";
-import { runMigrations } from "../../helpers/database";
+import { FakeNavigationGraphManager } from "../../fakes/FakeNavigationGraphManager";
 
 describe("NavigateTo", () => {
   let navigateTo: NavigateTo;
   let device: BootedDevice;
   let toolCallLog: Array<{ toolName: string; args: Record<string, any> }>;
+  let fakeGraph: FakeNavigationGraphManager;
+  let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
 
   // Map of text -> screen to simulate navigation when tools are called
   let navigationMap: Map<string, string>;
 
-  beforeAll(async () => {
-    // Run database migrations once before all tests
-    await runMigrations();
-  });
-
   beforeEach(async () => {
-    // Reset singleton
-    NavigationGraphManager.resetInstance();
+    fakeGraph = new FakeNavigationGraphManager();
+    getInstanceSpy = spyOn(NavigationGraphManager, "getInstance").mockReturnValue(
+      fakeGraph as unknown as NavigationGraphManager
+    );
     ToolRegistry.clearTools();
 
     // Create fake device
@@ -71,7 +70,7 @@ describe("NavigateTo", () => {
   });
 
   afterEach(() => {
-    NavigationGraphManager.resetInstance();
+    getInstanceSpy?.mockRestore();
     ToolRegistry.clearTools();
   });
 

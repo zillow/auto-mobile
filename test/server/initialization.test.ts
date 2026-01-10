@@ -1,16 +1,17 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../fixtures/mcpTestFixture";
 import { getMcpServerVersion } from "../../src/utils/mcpVersion";
+import { z } from "zod";
 
 describe("MCP Server Initialization", () => {
   let fixture: McpTestFixture;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     fixture = new McpTestFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
@@ -20,7 +21,6 @@ describe("MCP Server Initialization", () => {
     const { client } = fixture.getContext();
 
     // Send initialize request
-    const { z } = await import("zod");
     const initializeResponseSchema = z.object({
       capabilities: z.object({
         resources: z.object({}),

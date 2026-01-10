@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import { ResourceRegistry } from "../../../src/server/resourceRegistry";
 import { FakeDeviceUtils } from "../../fakes/FakeDeviceUtils";
 import { setDeviceManager, BootedDevicesResourceContent } from "../../../src/server/bootedDeviceResources";
 import { BootedDevice } from "../../../src/models";
+import { z } from "zod";
 
 describe("MCP Booted Device Resources", () => {
   let fixture: McpTestFixture;
@@ -38,16 +39,18 @@ describe("MCP Booted Device Resources", () => {
     source: "local"
   };
 
-  beforeEach(async () => {
-    // Set up fake device utils before each test
-    fakeDeviceUtils = new FakeDeviceUtils();
-    setDeviceManager(fakeDeviceUtils);
-
+  beforeAll(async () => {
     fixture = new McpTestFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  beforeEach(() => {
+    // Set up fake device utils before each test
+    fakeDeviceUtils = new FakeDeviceUtils();
+    setDeviceManager(fakeDeviceUtils);
+  });
+
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
@@ -59,7 +62,6 @@ describe("MCP Booted Device Resources", () => {
     test("should include booted devices resource in list", async function() {
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const listResourcesResponseSchema = z.object({
         resources: z.array(z.object({
           uri: z.string(),
@@ -86,7 +88,6 @@ describe("MCP Booted Device Resources", () => {
     test("should include booted devices template in resource templates list", async function() {
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const listResourceTemplatesResponseSchema = z.object({
         resourceTemplates: z.array(z.object({
           uriTemplate: z.string(),
@@ -119,7 +120,6 @@ describe("MCP Booted Device Resources", () => {
 
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),
@@ -158,7 +158,6 @@ describe("MCP Booted Device Resources", () => {
       // No devices set up - fakeDeviceUtils returns empty by default
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),
@@ -189,7 +188,6 @@ describe("MCP Booted Device Resources", () => {
 
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),
@@ -231,7 +229,6 @@ describe("MCP Booted Device Resources", () => {
 
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),
@@ -272,7 +269,6 @@ describe("MCP Booted Device Resources", () => {
 
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),
@@ -302,7 +298,6 @@ describe("MCP Booted Device Resources", () => {
     test("should return error for invalid platform", async function() {
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),
@@ -334,7 +329,6 @@ describe("MCP Booted Device Resources", () => {
 
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),
@@ -363,7 +357,6 @@ describe("MCP Booted Device Resources", () => {
 
       const { client } = fixture.getContext();
 
-      const { z } = await import("zod");
       const readResourceResponseSchema = z.object({
         contents: z.array(z.object({
           uri: z.string(),

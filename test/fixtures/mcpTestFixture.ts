@@ -1,6 +1,6 @@
-import { createMcpServer } from "../../src/server/index";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { createMcpServer } from "../../src/server/index";
 
 export interface McpTestContext {
   server: ReturnType<typeof createMcpServer>;
@@ -20,6 +20,7 @@ export class McpTestFixture {
   ) {}
 
   async setup(): Promise<void> {
+    const { createMcpServer } = await import("../../src/server/index");
     this.server = createMcpServer(this.serverOptions);
     [this.serverTransport, this.clientTransport] = InMemoryTransport.createLinkedPair();
 

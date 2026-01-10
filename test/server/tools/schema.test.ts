@@ -1,16 +1,16 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { createMcpServer } from "../../../src/server/index";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { resetDeviceToolsDependencies, setDeviceToolsDependencies } from "../../../src/server/deviceTools";
 import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { DeviceInfo } from "../../../src/models";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import { FakeDeviceUtils } from "../../fakes/FakeDeviceUtils";
+import { z } from "zod";
 
 describe("MCP Tools Schema", () => {
   let fixture: McpTestFixture;
   let fakeDeviceUtils: FakeDeviceUtils;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     fakeDeviceUtils = new FakeDeviceUtils();
     const androidDevices: DeviceInfo[] = [
       { name: "Pixel_6_API_34", platform: "android", isRunning: false, source: "local" }
@@ -24,7 +24,7 @@ describe("MCP Tools Schema", () => {
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
@@ -32,8 +32,6 @@ describe("MCP Tools Schema", () => {
   });
 
   test("should validate tool schema definitions conform to MCP standards", () => {
-    createMcpServer();
-
     const toolDefinitions = ToolRegistry.getToolDefinitions();
 
     // Each tool should conform to MCP protocol requirements
@@ -65,7 +63,6 @@ describe("MCP Tools Schema", () => {
 
     const { client } = fixture.getContext();
 
-    const { z } = await import("zod");
     const toolResponseSchema = z.object({
       content: z.array(z.object({
         type: z.string(),
@@ -90,7 +87,6 @@ describe("MCP Tools Schema", () => {
 
     const { client } = fixture.getContext();
 
-    const { z } = await import("zod");
     const toolResponseSchema = z.object({
       content: z.array(z.object({
         type: z.string(),
@@ -116,7 +112,6 @@ describe("MCP Tools Schema", () => {
     const { client } = fixture.getContext();
 
     try {
-      const { z } = await import("zod");
       const result = await client.request({
         method: "tools/call",
         params: {
@@ -147,7 +142,6 @@ describe("MCP Tools Schema", () => {
 
     // Test tapOn with string instead of number
     try {
-      const { z } = await import("zod");
       await client.request({
         method: "tools/call",
         params: {
@@ -168,7 +162,6 @@ describe("MCP Tools Schema", () => {
     const { client } = fixture.getContext();
 
     try {
-      const { z } = await import("zod");
       await client.request({
         method: "tools/call",
         params: {

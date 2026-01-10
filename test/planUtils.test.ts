@@ -1,4 +1,4 @@
-import { expect, describe, test, beforeEach, afterEach } from "bun:test";
+import { expect, describe, test, beforeAll, beforeEach, afterAll } from "bun:test";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -6,14 +6,22 @@ import { exportPlanFromLogs, importPlanFromYaml, executePlan } from "../src/util
 import { Plan } from "../src/models/Plan";
 
 describe("Plan Utils", () => {
-  let tempDir: string;
+  let tempRoot: string;
+  let testDir: string;
+  let testCounter = 0;
 
-  beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "plan-test-"));
+  beforeAll(async () => {
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "plan-test-"));
   });
 
-  afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+  beforeEach(async () => {
+    testCounter += 1;
+    testDir = path.join(tempRoot, `case-${testCounter}`);
+    await fs.mkdir(testDir, { recursive: true });
+  });
+
+  afterAll(async () => {
+    await fs.rm(tempRoot, { recursive: true, force: true });
   });
 
   describe("exportPlanFromLogs", () => {
@@ -47,13 +55,13 @@ describe("Plan Utils", () => {
       ];
 
       // Write log entries to files
-      const logFile = path.join(tempDir, "test.json");
+      const logFile = path.join(testDir, "test.json");
       const logContent = logEntries.map(entry => JSON.stringify(entry)).join("\n");
       await fs.writeFile(logFile, logContent);
 
       // Export plan
-      const outputPath = path.join(tempDir, "test-plan.yaml");
-      const result = await exportPlanFromLogs(tempDir, "Test Plan", outputPath);
+      const outputPath = path.join(testDir, "test-plan.yaml");
+      const result = await exportPlanFromLogs(testDir, "Test Plan", outputPath);
 
       expect(result.success).toBe(true);
       expect(result.stepCount).toBe(3); // launchApp, tapOnText, last observe
@@ -79,12 +87,12 @@ describe("Plan Utils", () => {
         }
       ];
 
-      const logFile = path.join(tempDir, "test.json");
+      const logFile = path.join(testDir, "test.json");
       const logContent = logEntries.map(entry => JSON.stringify(entry)).join("\n");
       await fs.writeFile(logFile, logContent);
 
-      const outputPath = path.join(tempDir, "test-plan.yaml");
-      const result = await exportPlanFromLogs(tempDir, "Test Plan", outputPath);
+      const outputPath = path.join(testDir, "test-plan.yaml");
+      const result = await exportPlanFromLogs(testDir, "Test Plan", outputPath);
 
       expect(result.success).toBe(true);
       expect(result.stepCount).toBe(1); // Only launchApp
@@ -114,12 +122,12 @@ describe("Plan Utils", () => {
         }
       ];
 
-      const logFile = path.join(tempDir, "test.json");
+      const logFile = path.join(testDir, "test.json");
       const logContent = logEntries.map(entry => JSON.stringify(entry)).join("\n");
       await fs.writeFile(logFile, logContent);
 
-      const outputPath = path.join(tempDir, "test-plan.yaml");
-      const result = await exportPlanFromLogs(tempDir, "Test Plan", outputPath);
+      const outputPath = path.join(testDir, "test-plan.yaml");
+      const result = await exportPlanFromLogs(testDir, "Test Plan", outputPath);
 
       expect(result.success).toBe(true);
       expect(result.stepCount).toBe(2); // tapOnText + last observe
@@ -132,8 +140,8 @@ describe("Plan Utils", () => {
     });
 
     test("should handle empty log directory", async () => {
-      const outputPath = path.join(tempDir, "test-plan.yaml");
-      const result = await exportPlanFromLogs(tempDir, "Test Plan", outputPath);
+      const outputPath = path.join(testDir, "test-plan.yaml");
+      const result = await exportPlanFromLogs(testDir, "Test Plan", outputPath);
 
       expect(result.success).toBe(false);
       expect(result.error).toContain("No log files found");
@@ -149,12 +157,12 @@ describe("Plan Utils", () => {
         }
       ];
 
-      const logFile = path.join(tempDir, "test.json");
+      const logFile = path.join(testDir, "test.json");
       const logContent = logEntries.map(entry => JSON.stringify(entry)).join("\n");
       await fs.writeFile(logFile, logContent);
 
-      const outputPath = path.join(tempDir, "plan.yaml");
-      const result = await exportPlanFromLogs(tempDir, "Test Plan", outputPath);
+      const outputPath = path.join(testDir, "plan.yaml");
+      const result = await exportPlanFromLogs(testDir, "Test Plan", outputPath);
 
       expect(result.success).toBe(true);
       expect(result.planPath).toBe(outputPath);

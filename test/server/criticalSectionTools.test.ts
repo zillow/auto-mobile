@@ -1,18 +1,21 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { ToolRegistry } from "../../src/server/toolRegistry";
 import { registerCriticalSectionTools } from "../../src/server/criticalSectionTools";
 import { CriticalSectionCoordinator } from "../../src/server/CriticalSectionCoordinator";
 import type { BootedDevice } from "../../src/models";
+import { z } from "zod";
 
 describe("criticalSection tool", () => {
-  beforeEach(() => {
-    // Reset coordinator before each test
-    CriticalSectionCoordinator.getInstance().reset();
-
+  beforeAll(() => {
     // Register the tool if not already registered
     if (!ToolRegistry.getTool("criticalSection")) {
       registerCriticalSectionTools();
     }
+  });
+
+  beforeEach(() => {
+    // Reset coordinator before each test
+    CriticalSectionCoordinator.getInstance().reset();
   });
 
   test("tool is registered with correct schema", () => {
@@ -132,7 +135,7 @@ describe("criticalSection tool", () => {
     ToolRegistry.register(
       "mockStep",
       "Mock step for testing",
-      require("zod").z.object({ message: require("zod").z.string() }),
+      z.object({ message: z.string() }),
       async (params: { message: string }) => {
         executionLog.push(params.message);
         return { success: true };
@@ -184,7 +187,7 @@ describe("criticalSection tool", () => {
     ToolRegistry.register(
       "mockSuccess",
       "Mock success step",
-      require("zod").z.object({ message: require("zod").z.string() }),
+      z.object({ message: z.string() }),
       async (params: { message: string }) => {
         executionLog.push(params.message);
         return { success: true };
@@ -194,7 +197,7 @@ describe("criticalSection tool", () => {
     ToolRegistry.register(
       "mockFailure",
       "Mock failure step",
-      require("zod").z.object({}),
+      z.object({}),
       async () => {
         executionLog.push("failure");
         throw new Error("Simulated failure");

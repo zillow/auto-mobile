@@ -1,18 +1,17 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import {
-  ListResourcesRequestSchema
-} from "@modelcontextprotocol/sdk/types.js";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
+import { ResourceRegistry } from "../../../src/server/resourceRegistry";
+import { z } from "zod";
 
 describe("MCP Resources List", () => {
   let fixture: McpTestFixture;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     fixture = new McpTestFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
@@ -23,7 +22,6 @@ describe("MCP Resources List", () => {
     const { client } = fixture.getContext();
 
     // Send resources/list request
-    const { z } = await import("zod");
     const listResourcesResponseSchema = z.object({
       resources: z.array(z.object({
         uri: z.string(),
@@ -59,30 +57,28 @@ describe("MCP Resources List", () => {
 
   test("given a resource is registered, endpoint should return a list with that resource", async function() {
 
-    // For this test, we need to mock or implement a resource registration
-    // Since the current server doesn't have resource registration functionality,
-    // we'll mock the server's response handler to return a test resource
+    const { client } = fixture.getContext();
 
-    const { server, client } = fixture.getContext();
-
-    // Override the resources list handler to return a test resource
     const testResource = {
-      uri: "file:///test/resource.txt",
+      uri: "automobile:test/resource",
       name: "Test Resource",
       description: "A test resource for validation",
       mimeType: "text/plain"
     };
 
-    // Mock the handler to return our test resource on the existing server
-    server.server.setRequestHandler(
-      ListResourcesRequestSchema,
+    ResourceRegistry.register(
+      testResource.uri,
+      testResource.name,
+      testResource.description,
+      testResource.mimeType,
       async () => ({
-        resources: [testResource]
+        uri: testResource.uri,
+        mimeType: testResource.mimeType,
+        text: "ok"
       })
     );
 
     // Send resources/list request
-    const { z } = await import("zod");
     const listResourcesResponseSchema = z.object({
       resources: z.array(z.object({
         uri: z.string(),
@@ -97,17 +93,19 @@ describe("MCP Resources List", () => {
       params: {}
     }, listResourcesResponseSchema);
 
-    // Verify resources list contains the test resource
-    expect(typeof result).toBe("object");
-    expect(result).toHaveProperty("resources");
-    expect(Array.isArray(result.resources)).toBe(true);
-    expect(result.resources).toHaveLength(1);
+    try {
+      // Verify resources list contains the test resource
+      expect(typeof result).toBe("object");
+      expect(result).toHaveProperty("resources");
+      expect(Array.isArray(result.resources)).toBe(true);
 
-    // Verify the resource has required properties
-    const resource = result.resources[0];
-    expect(resource).toHaveProperty("uri", testResource.uri);
-    expect(resource).toHaveProperty("name", testResource.name);
-    expect(resource).toHaveProperty("description", testResource.description);
-    expect(resource).toHaveProperty("mimeType", testResource.mimeType);
+      const resource = result.resources.find((r: any) => r.uri === testResource.uri);
+      expect(resource).toBeDefined();
+      expect(resource).toHaveProperty("name", testResource.name);
+      expect(resource).toHaveProperty("description", testResource.description);
+      expect(resource).toHaveProperty("mimeType", testResource.mimeType);
+    } finally {
+      ResourceRegistry.unregister(testResource.uri);
+    }
   });
 });

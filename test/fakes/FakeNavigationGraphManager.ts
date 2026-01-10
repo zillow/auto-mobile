@@ -164,6 +164,8 @@ export class FakeNavigationGraphManager implements NavigationGraph, NavigationGr
   recordNavigationEvent(event: NavigationEvent): void {
     this.trackCall("recordNavigationEvent", [event]);
 
+    const previousScreen = this.currentScreen;
+
     // Update current screen
     this.currentScreen = event.destination;
 
@@ -180,6 +182,25 @@ export class FakeNavigationGraphManager implements NavigationGraph, NavigationGr
       const node = this.nodes.get(event.destination)!;
       node.lastSeenAt = event.timestamp;
       node.visitCount++;
+    }
+
+    if (previousScreen && previousScreen !== event.destination && this.toolCallHistory.length > 0) {
+      const lastInteraction = this.toolCallHistory[this.toolCallHistory.length - 1];
+      const edge: NavigationEdge = {
+        from: previousScreen,
+        to: event.destination,
+        timestamp: event.timestamp,
+        edgeType: "tool",
+        interaction: lastInteraction,
+        uiState: lastInteraction.uiState
+      };
+      this.edges.push(edge);
+      this.edgeSummaries.push({
+        id: this.nextEdgeId++,
+        from: edge.from,
+        to: edge.to,
+        toolName: edge.interaction?.toolName ?? null
+      });
     }
 
     this.emitGraphUpdated();
@@ -230,18 +251,32 @@ export class FakeNavigationGraphManager implements NavigationGraph, NavigationGr
       };
     }
 
-    // Look for direct edge
-    const directEdge = this.edges.find(
-      e => e.from === this.currentScreen && e.to === targetScreen
-    );
+    const startScreen = this.currentScreen;
+    const queue: Array<{ screen: string; path: NavigationEdge[] }> = [
+      { screen: startScreen, path: [] }
+    ];
+    const visited = new Set<string>([startScreen]);
 
-    if (directEdge) {
-      return {
-        found: true,
-        path: [directEdge],
-        startScreen: this.currentScreen,
-        targetScreen
-      };
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const outgoing = this.edges.filter(edge => edge.from === current.screen);
+
+      for (const edge of outgoing) {
+        if (visited.has(edge.to)) {
+          continue;
+        }
+        const nextPath = [...current.path, edge];
+        if (edge.to === targetScreen) {
+          return {
+            found: true,
+            path: nextPath,
+            startScreen,
+            targetScreen
+          };
+        }
+        visited.add(edge.to);
+        queue.push({ screen: edge.to, path: nextPath });
+      }
     }
 
     return {

@@ -1,13 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { z } from "zod";
 
 describe("MCP Resources Read", () => {
   let fixture: McpTestFixture;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     // Clear both in-memory and disk caches from previous tests
     ObserveScreen.clearCache();
 
@@ -25,7 +26,7 @@ describe("MCP Resources Read", () => {
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
@@ -35,7 +36,6 @@ describe("MCP Resources Read", () => {
     const { client } = fixture.getContext();
 
     // Send resources/read request
-    const { z } = await import("zod");
     const readResourceResponseSchema = z.object({
       contents: z.array(z.object({
         uri: z.string(),
@@ -74,7 +74,6 @@ describe("MCP Resources Read", () => {
     const { client } = fixture.getContext();
 
     // Send resources/read request
-    const { z } = await import("zod");
     const readResourceResponseSchema = z.object({
       contents: z.array(z.object({
         uri: z.string(),
@@ -120,7 +119,6 @@ describe("MCP Resources Read", () => {
     const { client } = fixture.getContext();
 
     // Send resources/read request for non-existent resource
-    const { z } = await import("zod");
     const readResourceResponseSchema = z.object({
       contents: z.array(z.object({
         uri: z.string(),

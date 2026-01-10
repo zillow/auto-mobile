@@ -1,47 +1,8 @@
-import { expect, describe, test, beforeEach, afterEach, beforeAll } from "bun:test";
+import { expect, describe, test, beforeEach, afterEach } from "bun:test";
 import { registerDeepLinkTools } from "../../src/server/deepLinkTools";
 import { ToolRegistry } from "../../src/server/toolRegistry";
-import { MultiPlatformDeviceManager } from "../../src/utils/deviceUtils";
-import { FakeTimer } from "../fakes/FakeTimer";
-
-// Helper function to check if AVDs are available
-async function checkAvdAvailability(): Promise<boolean> {
-  try {
-    // Add timeout to prevent hanging in CI when Android SDK is not available
-    const fakeTimer = new FakeTimer();
-    fakeTimer.setManualMode();
-
-    const timeoutPromise = new Promise<boolean>(resolve => {
-      fakeTimer.setTimeout(() => resolve(false), 2000); // 2 second timeout
-    });
-
-    const checkPromise = (async () => {
-      const deviceUtils = new MultiPlatformDeviceManager();
-      const avds = await deviceUtils.listDeviceImages("android");
-      return avds.length > 0;
-    })().catch(() => false);
-
-    const racePromise = Promise.race([checkPromise, timeoutPromise]);
-    await Promise.resolve();
-    fakeTimer.advanceTime(2000);
-    return await racePromise;
-  } catch (error) {
-    // If we can't list AVDs (e.g., Android SDK not available), return false
-    return false;
-  }
-}
 
 describe("Deep Link Tools Registration", function() {
-  let avdsAvailable: boolean;
-
-  beforeAll(async function() {
-    // Check if AVDs are available once before all tests
-    avdsAvailable = await checkAvdAvailability();
-    if (!avdsAvailable) {
-      console.log("Skipping device-dependent tests: No AVDs available or Android SDK not found");
-    }
-  });
-
   beforeEach(() => {
     // Clear the tool registry before each test
     (ToolRegistry as any).tools.clear();

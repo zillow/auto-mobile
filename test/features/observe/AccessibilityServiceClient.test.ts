@@ -7,7 +7,8 @@ import { BootedDevice } from "../../../src/models";
 import {
   FakeWebSocket,
   createInstantFailureWebSocketFactory,
-  createSuccessWebSocketFactory
+  createSuccessWebSocketFactory,
+  WebSocketState
 } from "../../fakes/FakeWebSocket";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
@@ -85,6 +86,29 @@ describe("AccessibilityServiceClient", function() {
     };
   };
 
+  const waitForSocketOpen = async (socket: FakeWebSocket | null): Promise<void> => {
+    if (!socket) {
+      return;
+    }
+    if (socket.readyState === WebSocketState.OPEN) {
+      return;
+    }
+    await new Promise<void>(resolve => {
+      socket.once("open", () => resolve());
+    });
+  };
+
+  const waitForSocket = async (getSocket: () => FakeWebSocket | null): Promise<FakeWebSocket | null> => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const socket = getSocket();
+      if (socket) {
+        return socket;
+      }
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    return getSocket();
+  };
+
   describe("getLatestHierarchy", function() {
     test("should return hierarchy data when WebSocket receives fresh data", async function() {
       const mockHierarchyData = {
@@ -114,9 +138,9 @@ describe("AccessibilityServiceClient", function() {
 
       try {
         const resultPromise = testClient.getLatestHierarchy(true, 2000);
-        await new Promise(resolve => setTimeout(resolve, 10));
-        const socket = getSocket();
+        const socket = await waitForSocket(getSocket);
         expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
         socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
           timestamp: Date.now(),
@@ -157,9 +181,9 @@ describe("AccessibilityServiceClient", function() {
       try {
         // First call to populate cache
         const firstResultPromise = testClient.getLatestHierarchy(true, 2000);
-        await new Promise(resolve => setTimeout(resolve, 10));
-        const socket = getSocket();
+        const socket = await waitForSocket(getSocket);
         expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
         socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
           timestamp: Date.now(),

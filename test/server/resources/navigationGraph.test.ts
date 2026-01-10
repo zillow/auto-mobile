@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import {
   NAVIGATION_RESOURCE_URIS,
@@ -7,30 +7,35 @@ import {
   setNavigationGraphProvider
 } from "../../../src/server/navigationResources";
 import { FakeNavigationGraphManager } from "../../fakes/FakeNavigationGraphManager";
+import { z } from "zod";
 
 describe("MCP Navigation Graph Resource", () => {
   let fixture: McpTestFixture;
   let fakeGraph: FakeNavigationGraphManager;
 
-  beforeEach(async () => {
-    fakeGraph = new FakeNavigationGraphManager();
-    setNavigationGraphProvider(fakeGraph);
-
+  beforeAll(async () => {
     fixture = new McpTestFixture();
     await fixture.setup();
   });
 
-  afterEach(async () => {
+  beforeEach(() => {
+    fakeGraph = new FakeNavigationGraphManager();
+    setNavigationGraphProvider(fakeGraph);
+  });
+
+  afterEach(() => {
+    setNavigationGraphProvider(null);
+  });
+
+  afterAll(async () => {
     if (fixture) {
       await fixture.teardown();
     }
-    setNavigationGraphProvider(null);
   });
 
   test("should include navigation graph resource in list", async () => {
     const { client } = fixture.getContext();
 
-    const { z } = await import("zod");
     const listResourcesResponseSchema = z.object({
       resources: z.array(z.object({
         uri: z.string(),
@@ -82,7 +87,6 @@ describe("MCP Navigation Graph Resource", () => {
     });
 
     const { client } = fixture.getContext();
-    const { z } = await import("zod");
     const readResourceResponseSchema = z.object({
       contents: z.array(z.object({
         uri: z.string(),
@@ -115,7 +119,6 @@ describe("MCP Navigation Graph Resource", () => {
   test("should include navigation node templates in list", async () => {
     const { client } = fixture.getContext();
 
-    const { z } = await import("zod");
     const listResourceTemplatesResponseSchema = z.object({
       resourceTemplates: z.array(z.object({
         uriTemplate: z.string(),
@@ -169,7 +172,6 @@ describe("MCP Navigation Graph Resource", () => {
     });
 
     const { client } = fixture.getContext();
-    const { z } = await import("zod");
     const readResourceResponseSchema = z.object({
       contents: z.array(z.object({
         uri: z.string(),
@@ -224,7 +226,6 @@ describe("MCP Navigation Graph Resource", () => {
     });
 
     const { client } = fixture.getContext();
-    const { z } = await import("zod");
     const readResourceResponseSchema = z.object({
       contents: z.array(z.object({
         uri: z.string(),
