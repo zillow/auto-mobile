@@ -74,6 +74,10 @@ AutoMobile manages accessibility service versions automatically:
 - Validates downloaded APKs via SHA256 checksum
 - Supports local APK overrides for development
 
+When device setup uses `skipAccessibilityDownload`, AutoMobile still validates the installed service checksum.
+If the version is incompatible, it surfaces a warning/error advising you to rerun without
+`skipAccessibilityDownload` to upgrade or install the matching APK manually.
+
 ## Environment Variables
 
 - `AUTOMOBILE_ACCESSIBILITY_APK_PATH`: Override APK source with local file path

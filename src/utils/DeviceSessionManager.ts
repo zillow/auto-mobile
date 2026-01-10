@@ -336,6 +336,16 @@ export class DeviceSessionManager implements DeviceSessionManager {
       }
 
       const manager = AndroidAccessibilityServiceManager.getInstance(device);
+      const verifyCompatibilityWhenSkipping = async (): Promise<void> => {
+        const isCompatible = await manager.isVersionCompatible();
+        if (isCompatible) {
+          logger.info(`[DeviceSessionManager] Accessibility service version compatible for ${deviceId}`);
+          return;
+        }
+        const errorMessage = "Accessibility service version mismatch detected. Run without skipAccessibilityDownload to install a compatible version.";
+        logger.warn(`[DeviceSessionManager] ${errorMessage} Device: ${deviceId}`);
+        throw new ActionableError(errorMessage);
+      };
       const [isInstalled, isEnabled] = await Promise.all([
         manager.isInstalled(),
         manager.isEnabled()
@@ -344,6 +354,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
       if (isInstalled && isEnabled) {
         logger.info(`[DeviceSessionManager] Accessibility service already enabled for ${deviceId}`);
         if (skipAccessibilityDownload) {
+          await verifyCompatibilityWhenSkipping();
           return;
         }
         logger.info(`[DeviceSessionManager] Accessibility service enabled for ${deviceId}, verifying version compatibility`);
@@ -359,6 +370,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
         try {
           await manager.enable();
           if (skipAccessibilityDownload) {
+            await verifyCompatibilityWhenSkipping();
             return;
           }
           logger.info(`[DeviceSessionManager] Accessibility service enabled for ${deviceId}, verifying version compatibility`);
