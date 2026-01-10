@@ -78,6 +78,24 @@ If you have a private npm registry for proxying public npm:
 - Android: [Android setup](plat/android.md)
 - iOS: unsupported at the moment, but the [design doc](../design-docs/plat/ios/index.md) outlines plans.
 
+## Android first run
+
+Use this short path once the MCP server is running, a device is connected, the Accessibility Service is enabled, and your
+app is installed on the device.
+
+1. **Verify device connectivity**
+   Claude Code prompt: "Use AutoMobile to list connected Android devices and confirm one is ready."
+2. **List installed apps**
+   Claude Code prompt: "List installed apps and show package names so I can pick the target package."
+3. **Launch the target app**
+   Claude Code prompt: "Launch package `com.example.app` and confirm it is in the foreground."
+4. **Run a short exploration**
+   Claude Code prompt: "Explore this app for about 10 interactions, avoid destructive actions, and stay in the main flow."
+5. **Capture a concrete result**
+   Claude Code prompt: "Summarize the screens discovered and the actions that navigate between them (a mini navigation graph)."
+
+You should end with a device ID, a package name, and a short navigation summary you can save or share.
+
 ## Decision guide (Android)
 
 If your goal is interactive AI-driven automation, the MCP server plus an agent is enough. The rest are optional based on

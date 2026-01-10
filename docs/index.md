@@ -8,6 +8,7 @@ Android is the primary supported platform today; iOS support is on the roadmap.
 **How do I get started?**
 
 - [Installation](install/overview.md) - Install AutoMobile in your environment or IDE
+- [Android first run](install/overview.md#android-first-run) - Verify a device, launch your app, and capture a concrete exploration result
 
 ### What can I use this to do?
 

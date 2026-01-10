@@ -2,6 +2,11 @@
 
 Use AutoMobile with AI agents to interactively explore and understand your app's user experience.
 
+## First run (Android)
+
+If this is your first time using AutoMobile, start with the [Android first run](../install/overview.md#android-first-run)
+quickstart. It verifies device connectivity, launches your app, runs a short exploration, and produces a concrete
+navigation summary.
 
 AutoMobile's exploration capabilities allow AI agents to:
 
