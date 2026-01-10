@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Path
+import android.graphics.Rect
 import android.os.Build
 import android.util.Base64
 import android.util.DisplayMetrics
@@ -20,6 +21,9 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.RecompositionSnapshot
+import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
+import dev.jasonpearson.automobile.accessibilityservice.models.InteractionElement
+import dev.jasonpearson.automobile.accessibilityservice.models.InteractionEvent
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
@@ -73,6 +77,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private lateinit var hierarchyDebouncer: HierarchyDebouncer
   private val navigationEventAccumulator = NavigationEventAccumulator()
   private val clipboardManager by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
+  private var lastWindowClassName: String? = null
 
   // Job for collecting hierarchy flow results
   private var hierarchyFlowJob: Job? = null
@@ -386,6 +391,21 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       // Log accessibility events for debugging (reduced verbosity)
       Log.v(TAG, "Accessibility event: ${event.eventType}, package: ${event.packageName}")
 
+      if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        lastWindowClassName = event.className?.toString()
+      }
+
+      when (event.eventType) {
+        AccessibilityEvent.TYPE_VIEW_CLICKED ->
+            recordInteractionEvent(event, "tap")
+        AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ->
+            recordInteractionEvent(event, "longPress")
+        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED ->
+            recordInteractionEvent(event, "inputText")
+        AccessibilityEvent.TYPE_VIEW_SCROLLED ->
+            recordInteractionEvent(event, "swipe")
+      }
+
       // Delegate to the smart debouncer for content/window changes
       // The debouncer uses structural hash comparison to detect animation vs real changes
       if (
@@ -404,6 +424,85 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
   override fun onInterrupt() {
     Log.w(TAG, "Accessibility service interrupted")
+  }
+
+  private fun recordInteractionEvent(event: AccessibilityEvent, type: String) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      return
+    }
+
+    val source = event.source
+    val bounds =
+        source?.let {
+          val rect = Rect()
+          it.getBoundsInScreen(rect)
+          ElementBounds(rect)
+        }
+    val element =
+        source?.let {
+          InteractionElement(
+              text = it.text?.toString(),
+              contentDescription = it.contentDescription?.toString(),
+              resourceId = it.viewIdResourceName,
+              className = it.className?.toString(),
+              bounds = bounds,
+          )
+        }
+    source?.recycle()
+
+    val textValue =
+        if (type == "inputText") {
+          val textList = event.text
+          if (textList.isNullOrEmpty()) null
+          else textList.joinToString(separator = "") { it.toString() }
+        } else {
+          null
+        }
+
+    val scrollDeltaX =
+        if (type == "swipe" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          event.scrollDeltaX
+        } else {
+          null
+        }
+    val scrollDeltaY =
+        if (type == "swipe" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          event.scrollDeltaY
+        } else {
+          null
+        }
+
+    val interaction =
+        InteractionEvent(
+            type = type,
+            timestamp = System.currentTimeMillis(),
+            packageName = event.packageName?.toString(),
+            screenClassName = lastWindowClassName,
+            element = element,
+            text = textValue,
+            scrollDeltaX = scrollDeltaX,
+            scrollDeltaY = scrollDeltaY,
+        )
+
+    serviceScope.launch {
+      try {
+        broadcastInteractionEvent(interaction)
+      } catch (e: Exception) {
+        Log.e(TAG, "Error broadcasting interaction event", e)
+      }
+    }
+  }
+
+  private suspend fun broadcastInteractionEvent(interaction: InteractionEvent) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping interaction event broadcast")
+      return
+    }
+
+    val eventJson = jsonCompact.encodeToString(interaction)
+    webSocketServer.broadcast(
+        """{"type":"interaction_event","timestamp":${interaction.timestamp},"event":$eventJson}"""
+    )
   }
 
   /** Get current screen dimensions for offscreen filtering. */

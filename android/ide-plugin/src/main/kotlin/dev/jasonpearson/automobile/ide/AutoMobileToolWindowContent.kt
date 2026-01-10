@@ -37,7 +37,12 @@ import dev.jasonpearson.automobile.ide.graph.NavigationGraphLegend
 import dev.jasonpearson.automobile.ide.graph.NavigationGraphSummary
 import dev.jasonpearson.automobile.ide.graph.NavigationGraphView
 import dev.jasonpearson.automobile.ide.graph.RecentTransition
+import dev.jasonpearson.automobile.ide.settings.AutoMobileSettings
+import dev.jasonpearson.automobile.ide.yaml.TestPlanDetector
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.LocalFileSystem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -53,7 +58,13 @@ import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.nio.file.StandardOpenOption
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -103,6 +114,18 @@ fun AutoMobileToolWindowContent(project: Project) {
   var autoPollEnabled by remember { mutableStateOf(true) }
   val performancePageSize = 25
   val pollIntervalMs = 5000L
+
+  val settings = AutoMobileSettings.getInstance()
+  val planNameState = rememberTextFieldState()
+  var recordingStatus by remember { mutableStateOf("Idle") }
+  var recordingError by remember { mutableStateOf<String?>(null) }
+  var isRecording by remember { mutableStateOf(false) }
+  var recordingId by remember { mutableStateOf<String?>(null) }
+  var lastPlanPath by remember { mutableStateOf<String?>(null) }
+  var lastPlanName by remember { mutableStateOf<String?>(null) }
+  var lastPlanContent by remember { mutableStateOf<String?>(null) }
+  var executeStatus by remember { mutableStateOf<String?>(null) }
+  var executeError by remember { mutableStateOf<String?>(null) }
 
   DisposableEffect(client) { onDispose { client.close() } }
 
@@ -185,6 +208,96 @@ fun AutoMobileToolWindowContent(project: Project) {
         compareByDescending<PerformanceAuditHistoryEntry> { it.timestamp }
             .thenByDescending { it.id }
     )
+  }
+
+  fun resolvePlanOutputDirectory(): Path {
+    val configured = settings.testPlanOutputDirectory.trim()
+    val fallback = if (configured.isNotEmpty()) configured else DEFAULT_TEST_PLAN_OUTPUT_DIR
+    val rawPath = Paths.get(fallback)
+    val projectBase = project.basePath
+    return if (rawPath.isAbsolute || projectBase.isNullOrBlank()) {
+      rawPath
+    } else {
+      Paths.get(projectBase).resolve(rawPath)
+    }
+  }
+
+  fun sanitizePlanFileName(name: String): String {
+    val normalized =
+        name.trim()
+            .lowercase()
+            .replace(Regex("[^a-z0-9-_]+"), "-")
+            .trim('-', '_')
+    return if (normalized.isBlank()) "recorded-plan" else normalized
+  }
+
+  fun buildPlanOutputPath(planName: String): Path {
+    val outputDir = resolvePlanOutputDirectory()
+    val baseName = sanitizePlanFileName(planName)
+    var candidate = outputDir.resolve("$baseName.yaml")
+    if (Files.exists(candidate)) {
+      val suffix = LocalDateTime.now().format(PLAN_FILE_TIMESTAMP_FORMATTER)
+      candidate = outputDir.resolve("${baseName}-$suffix.yaml")
+    }
+    return candidate
+  }
+
+  suspend fun persistPlan(planContent: String, planName: String): Path {
+    val outputPath = buildPlanOutputPath(planName)
+    withContext(Dispatchers.IO) {
+      val parent = outputPath.parent
+      if (parent != null) {
+        Files.createDirectories(parent)
+      }
+      Files.writeString(
+          outputPath,
+          planContent,
+          StandardCharsets.UTF_8,
+          StandardOpenOption.CREATE,
+          StandardOpenOption.TRUNCATE_EXISTING,
+      )
+    }
+    return outputPath
+  }
+
+  fun openPlanInEditor(path: Path) {
+    val file = LocalFileSystem.getInstance().refreshAndFindFileByPath(path.toString())
+    if (file != null) {
+      FileEditorManager.getInstance(project).openFile(file, true)
+    }
+  }
+
+  suspend fun resolvePlanContentForExecution(): Pair<String, String?>? {
+    val editor = FileEditorManager.getInstance(project).selectedTextEditor
+    if (editor != null) {
+      val document = editor.document
+      val content = document.text
+      val virtualFile = FileDocumentManager.getInstance().getFile(document)
+      val extension = virtualFile?.extension?.lowercase()
+      if ((extension == "yaml" || extension == "yml") &&
+          TestPlanDetector.hasMinimumTestPlanStructure(content)
+      ) {
+        return content to virtualFile?.path
+      }
+    }
+
+    val storedPath = lastPlanPath
+    if (!storedPath.isNullOrBlank()) {
+      val fromDisk = withContext(Dispatchers.IO) {
+        val path = Paths.get(storedPath)
+        if (Files.exists(path)) {
+          Files.readString(path, StandardCharsets.UTF_8) to storedPath
+        } else {
+          null
+        }
+      }
+      if (fromDisk != null) {
+        return fromDisk
+      }
+    }
+
+    val cachedContent = lastPlanContent
+    return cachedContent?.let { it to lastPlanName }
   }
 
   suspend fun refreshDiscovery(): McpDiscoverySnapshot {
@@ -515,6 +628,154 @@ fun AutoMobileToolWindowContent(project: Project) {
           }
         }
 
+        Spacer(modifier = Modifier.height(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text("Test Recording")
+          Text("Status: $recordingStatus")
+          if (recordingError != null) {
+            Text("Error: ${recordingError ?: ""}")
+          }
+
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DefaultButton(
+                onClick = {
+                  scope.launch {
+                    if (!isConnected) {
+                      recordingError = "Connect to MCP before recording."
+                      return@launch
+                    }
+                    recordingError = null
+                    recordingStatus = "Starting..."
+                    try {
+                      val result =
+                          withContext(Dispatchers.IO) { client.startTestRecording() }
+                      recordingId = result.recordingId
+                      isRecording = true
+                      val deviceLabel = result.deviceId ?: "device"
+                      recordingStatus = "Recording on $deviceLabel"
+                    } catch (e: Exception) {
+                      recordingStatus = "Idle"
+                      recordingError = e.message
+                    }
+                  }
+                },
+                enabled = isConnected && !isRecording,
+            ) {
+              Text("Start Recording")
+            }
+            OutlinedButton(
+                onClick = {
+                  scope.launch {
+                    if (!isConnected) {
+                      recordingError = "Connect to MCP before stopping."
+                      return@launch
+                    }
+                    recordingError = null
+                    recordingStatus = "Stopping..."
+                    val requestedName = planNameState.text.toString().trim().ifBlank { null }
+                    try {
+                      val result =
+                          withContext(Dispatchers.IO) {
+                            client.stopTestRecording(recordingId, requestedName)
+                          }
+                      lastPlanName = result.planName
+                      lastPlanContent = result.planContent
+                      recordingId = null
+                      isRecording = false
+                      val planPath =
+                          try {
+                            persistPlan(result.planContent, result.planName)
+                          } catch (e: Exception) {
+                            recordingError = "Plan saved in memory but failed to write to disk: ${e.message}"
+                            null
+                          }
+                      if (planPath != null) {
+                        lastPlanPath = planPath.toString()
+                        recordingStatus = "Saved ${result.stepCount} steps"
+                        openPlanInEditor(planPath)
+                      } else {
+                        recordingStatus = "Recording stopped (save failed)"
+                      }
+                    } catch (e: Exception) {
+                      recordingStatus = "Stop failed"
+                      recordingError = e.message
+                    }
+                  }
+                },
+                enabled = isConnected && isRecording,
+            ) {
+              Text("Stop Recording")
+            }
+          }
+
+          LabeledTextField(
+              label = "Plan name (optional)",
+              state = planNameState,
+              modifier = Modifier.width(300.dp),
+          )
+
+          Text("Output: ${resolvePlanOutputDirectory()}")
+          if (lastPlanPath != null) {
+            Text("Latest plan: ${lastPlanPath ?: ""}")
+          }
+
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DefaultButton(
+                onClick = {
+                  scope.launch {
+                    if (!isConnected) {
+                      executeError = "Connect to MCP before executing."
+                      return@launch
+                    }
+                    executeError = null
+                    executeStatus = "Executing..."
+                    try {
+                      val planSource = resolvePlanContentForExecution()
+                      if (planSource == null) {
+                        executeStatus = "Idle"
+                        executeError = "No YAML plan found in the editor or last recording."
+                        return@launch
+                      }
+                      val (planContent, _) = planSource
+                      val result =
+                          withContext(Dispatchers.IO) {
+                            client.executePlan(planContent, platform = "android")
+                          }
+                      executeStatus =
+                          if (result.success) {
+                            "Success (${result.executedSteps}/${result.totalSteps})"
+                          } else {
+                            "Failed (${result.executedSteps}/${result.totalSteps})"
+                          }
+                      if (!result.success) {
+                        val failed = result.failedStep
+                        executeError =
+                            result.error
+                                ?: failed?.let {
+                                  "Step ${it.stepIndex} (${it.tool}) failed: ${it.error}"
+                                }
+                                ?: "Plan execution failed."
+                      }
+                    } catch (e: Exception) {
+                      executeStatus = "Failed"
+                      executeError = e.message
+                    }
+                  }
+                },
+                enabled = isConnected,
+            ) {
+              Text("Execute Plan")
+            }
+          }
+
+          if (executeStatus != null) {
+            Text("Execute: ${executeStatus ?: ""}")
+          }
+          if (executeError != null) {
+            Text("Execute error: ${executeError ?: ""}")
+          }
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
         TestTimingPanel(
             project = project,
@@ -569,6 +830,8 @@ private const val NAV_GRAPH_RESOURCE_URI = "automobile:navigation/graph"
 private const val GRAPH_POLL_INTERVAL_MS = 1000L
 private const val MAX_RECENT_TRANSITIONS = 10
 private val GRAPH_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+private const val DEFAULT_TEST_PLAN_OUTPUT_DIR = "test/resources/test-plans"
+private val PLAN_FILE_TIMESTAMP_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
 
 private fun updateTransitionHistory(
     previousScreen: String?,

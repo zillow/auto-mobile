@@ -12,6 +12,7 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 )
 class AutoMobileSettings : PersistentStateComponent<AutoMobileSettings> {
     var enableYamlLinting: Boolean = true
+    var testPlanOutputDirectory: String = "test/resources/test-plans"
 
     override fun getState(): AutoMobileSettings = this
 

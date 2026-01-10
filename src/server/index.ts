@@ -35,6 +35,7 @@ import { registerCriticalSectionTools } from "./criticalSectionTools";
 import { registerVideoRecordingTools } from "./videoRecordingTools";
 import { registerSnapshotTools } from "./snapshotTools";
 import { registerBiometricTools } from "./biometricTools";
+import { registerTestRecordingTools } from "./testRecordingTools";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 
 // Import resource registration functions
@@ -111,6 +112,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerVideoRecordingTools();
   registerSnapshotTools();
   registerBiometricTools();
+  registerTestRecordingTools();
   registerDebugTools();
   startupBenchmark.endPhase("toolRegistration");
 

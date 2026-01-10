@@ -118,6 +118,54 @@ class McpHttpClient(
     return decodeToolResponse(json, response, TestTimingSummary.serializer())
   }
 
+  override fun startTestRecording(platform: String): TestRecordingStartResult {
+    val response = callTool(
+      "startTestRecording",
+      buildJsonObject { put("platform", JsonPrimitive(platform)) },
+    )
+    return decodeToolResponse(json, response, TestRecordingStartResult.serializer())
+  }
+
+  override fun stopTestRecording(
+      recordingId: String?,
+      planName: String?,
+  ): TestRecordingStopResult {
+    val response = callTool(
+      "stopTestRecording",
+      buildJsonObject {
+        if (recordingId != null) {
+          put("recordingId", JsonPrimitive(recordingId))
+        }
+        if (!planName.isNullOrBlank()) {
+          put("planName", JsonPrimitive(planName))
+        }
+      },
+    )
+    return decodeToolResponse(json, response, TestRecordingStopResult.serializer())
+  }
+
+  override fun executePlan(
+      planContent: String,
+      platform: String,
+      startStep: Int?,
+      sessionUuid: String?,
+  ): ExecutePlanResult {
+    val response = callTool(
+      "executePlan",
+      buildJsonObject {
+        put("planContent", JsonPrimitive(planContent))
+        put("platform", JsonPrimitive(platform))
+        if (startStep != null) {
+          put("startStep", JsonPrimitive(startStep))
+        }
+        if (!sessionUuid.isNullOrBlank()) {
+          put("sessionUuid", JsonPrimitive(sessionUuid))
+        }
+      },
+    )
+    return decodeToolResponse(json, response, ExecutePlanResult.serializer())
+  }
+
   private fun callTool(name: String, arguments: JsonObject): JsonElement {
     ensureInitialized()
     val response =

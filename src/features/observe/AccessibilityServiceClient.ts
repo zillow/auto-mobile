@@ -2,7 +2,7 @@ import WebSocket from "ws";
 import { randomBytes } from "crypto";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { BootedDevice, RecompositionNodeInfo, ViewHierarchyResult, CurrentFocusResult, TraversalOrderResult } from "../../models";
+import { BootedDevice, RecompositionNodeInfo, ViewHierarchyResult, CurrentFocusResult, TraversalOrderResult, Element } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -73,6 +73,7 @@ interface WebSocketMessage {
   data?: AccessibilityHierarchy;
   format?: string;
   error?: string;
+  event?: InteractionEvent;
 }
 
 /**
@@ -180,6 +181,17 @@ export interface A11yClipboardResult {
   totalTimeMs: number;
   error?: string;
   perfTiming?: AndroidPerfTiming[];
+}
+
+export interface InteractionEvent {
+  type: "tap" | "longPress" | "swipe" | "inputText";
+  timestamp: number;
+  packageName?: string;
+  screenClassName?: string;
+  element?: Partial<Element>;
+  text?: string;
+  scrollDeltaX?: number;
+  scrollDeltaY?: number;
 }
 
 /**
@@ -430,6 +442,11 @@ export interface AccessibilityService {
   ): Promise<ScreenshotResult>;
 
   /**
+   * Ensure the WebSocket connection is established for streaming events.
+   */
+  ensureConnected(perf?: PerformanceTracker): Promise<boolean>;
+
+  /**
    * Check if WebSocket is currently connected to the accessibility service
    * @returns true if WebSocket connection is open, false otherwise
    */
@@ -515,6 +532,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Clipboard handling
   private pendingClipboardResolve: ((result: A11yClipboardResult) => void) | null = null;
   private pendingClipboardRequestId: string | null = null;
+
+  private interactionListeners: Set<(event: InteractionEvent) => void> = new Set();
 
   // Current focus handling
   private pendingCurrentFocusResolve: ((result: CurrentFocusResult) => void) | null = null;
@@ -623,6 +642,29 @@ export class AccessibilityServiceClient implements AccessibilityService {
    */
   public isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  public async ensureConnected(
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<boolean> {
+    return this.connectWebSocket(perf);
+  }
+
+  public onInteraction(listener: (event: InteractionEvent) => void): () => void {
+    this.interactionListeners.add(listener);
+    return () => {
+      this.interactionListeners.delete(listener);
+    };
+  }
+
+  private notifyInteractionListeners(event: InteractionEvent): void {
+    for (const listener of this.interactionListeners) {
+      try {
+        listener(event);
+      } catch (error) {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Interaction listener error: ${error}`);
+      }
+    }
   }
 
   /**
@@ -1086,6 +1128,14 @@ export class AccessibilityServiceClient implements AccessibilityService {
             `(source: ${event.source}, app: ${event.applicationId || "unknown"}, timestamp: ${event.timestamp})`
           );
           await NavigationGraphManager.getInstance().recordNavigationEvent(event);
+        }
+      }
+
+      if (message.type === "interaction_event") {
+        const interactionMessage = message as any;
+        const interaction = interactionMessage.event as InteractionEvent | undefined;
+        if (interaction) {
+          this.notifyInteractionListeners(interaction);
         }
       }
     } catch (error) {

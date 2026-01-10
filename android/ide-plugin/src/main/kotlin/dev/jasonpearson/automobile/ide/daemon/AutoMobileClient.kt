@@ -32,6 +32,14 @@ interface AutoMobileClient {
       offset: Int? = null,
   ): PerformanceAuditHistoryResult
   fun getTestTimings(query: TestTimingQuery = TestTimingQuery()): TestTimingSummary
+  fun startTestRecording(platform: String = "android"): TestRecordingStartResult
+  fun stopTestRecording(recordingId: String? = null, planName: String? = null): TestRecordingStopResult
+  fun executePlan(
+      planContent: String,
+      platform: String = "android",
+      startStep: Int? = null,
+      sessionUuid: String? = null,
+  ): ExecutePlanResult
   fun close() {}
 }
 

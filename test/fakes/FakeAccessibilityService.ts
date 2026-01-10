@@ -414,6 +414,11 @@ export class FakeAccessibilityService implements AccessibilityService {
     return this.isConnectedState;
   }
 
+  async ensureConnected(): Promise<boolean> {
+    this.isConnectedState = true;
+    return this.isConnectedState;
+  }
+
   hasCachedHierarchy(): boolean {
     return this.hasCachedHierarchyState;
   }
