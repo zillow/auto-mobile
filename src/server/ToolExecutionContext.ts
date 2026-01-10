@@ -1,9 +1,11 @@
 import { SessionManager } from "../daemon/sessionManager";
+import type { Session } from "../daemon/sessionManager";
 import { DevicePool } from "../daemon/devicePool";
 import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { ActionableError, BootedDevice } from "../models";
 import { logger } from "../utils/logger";
+import { KeepScreenAwakeManager, KEEP_SCREEN_AWAKE_STATE_KEY, KeepScreenAwakeState } from "../utils/KeepScreenAwakeManager";
 
 /**
  * Tool Execution Context
@@ -21,6 +23,10 @@ export interface ToolExecutionContext {
   devicePool?: DevicePool;
 }
 
+export interface SessionOptions {
+  keepScreenAwake?: boolean;
+}
+
 /**
  * Create tool execution context from session UUID
  *
@@ -29,7 +35,8 @@ export interface ToolExecutionContext {
 export async function createToolExecutionContext(
   sessionUuid: string | undefined,
   sessionManager: SessionManager,
-  devicePool: DevicePool
+  devicePool: DevicePool,
+  sessionOptions: SessionOptions = {}
 ): Promise<ToolExecutionContext> {
   if (!sessionUuid) {
     return {};
@@ -39,6 +46,8 @@ export async function createToolExecutionContext(
 
   // Get or create session
   const session = await sessionManager.getOrCreateSession(sessionUuid, devicePool);
+
+  await ensureKeepScreenAwake(session, sessionManager, sessionOptions);
 
   if (!existingSession) {
     await ensureAccessibilityServiceReady(session.assignedDevice, sessionUuid);
@@ -74,6 +83,39 @@ async function ensureAccessibilityServiceReady(deviceId: string, sessionId: stri
       `Failed to setup accessibility service for session ${sessionId}: ${setupResult.error || setupResult.message}`
     );
   }
+}
+
+async function ensureKeepScreenAwake(
+  session: Session,
+  sessionManager: SessionManager,
+  sessionOptions: SessionOptions
+): Promise<void> {
+  const existingState = session.cacheData.customData?.[KEEP_SCREEN_AWAKE_STATE_KEY] as KeepScreenAwakeState | undefined;
+  if (existingState) {
+    return;
+  }
+
+  const keepScreenAwake = sessionOptions.keepScreenAwake !== false;
+  const device: BootedDevice = {
+    name: session.assignedDevice,
+    platform: "android",
+    deviceId: session.assignedDevice
+  };
+  const manager = new KeepScreenAwakeManager(device);
+
+  let state: KeepScreenAwakeState;
+  try {
+    state = await manager.apply(keepScreenAwake);
+  } catch (error) {
+    logger.warn(`[ToolExecutionContext] Failed to apply keep-awake for ${device.deviceId}: ${error}`);
+    state = { applied: false, skipReason: "failed" };
+  }
+
+  const customData = {
+    ...(session.cacheData.customData ?? {}),
+    [KEEP_SCREEN_AWAKE_STATE_KEY]: state
+  };
+  sessionManager.updateSessionCache(session.sessionId, { customData });
 }
 
 /**

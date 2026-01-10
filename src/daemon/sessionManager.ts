@@ -1,5 +1,7 @@
 import { defaultTimer, Timer } from "../utils/SystemTimer";
 import { logger } from "../utils/logger";
+import { BootedDevice } from "../models";
+import { KeepScreenAwakeManager, KEEP_SCREEN_AWAKE_STATE_KEY, KeepScreenAwakeState } from "../utils/KeepScreenAwakeManager";
 
 /**
  * Session Cache Data
@@ -184,6 +186,8 @@ export class SessionManager {
       return null;
     }
 
+    await this.restoreKeepScreenAwake(session);
+
     const deviceId = session.assignedDevice;
     this.removeSession(sessionId);
     logger.info(`Released session ${sessionId}, freeing device ${deviceId}`);
@@ -313,6 +317,21 @@ export class SessionManager {
     }
     this.sessions.delete(sessionId);
     this.sessionDeviceMap.delete(sessionId);
+  }
+
+  private async restoreKeepScreenAwake(session: Session): Promise<void> {
+    const state = session.cacheData.customData?.[KEEP_SCREEN_AWAKE_STATE_KEY] as KeepScreenAwakeState | undefined;
+    if (!state || !state.applied) {
+      return;
+    }
+
+    const device: BootedDevice = {
+      name: session.assignedDevice,
+      platform: "android",
+      deviceId: session.assignedDevice
+    };
+    const manager = new KeepScreenAwakeManager(device);
+    await manager.restore(state);
   }
 
   /**

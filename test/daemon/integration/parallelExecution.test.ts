@@ -92,7 +92,7 @@ describe("Parallel Execution Across Multiple Devices", function() {
   });
 
   describe("Session Lifecycle with Device Reuse", function() {
-    test("should reuse device after session release", async function() {
+    test("should select least recently used device after session release", async function() {
       const session1Id = "session-uuid-1";
       const session2Id = "session-uuid-2";
 
@@ -102,10 +102,27 @@ describe("Parallel Execution Across Multiple Devices", function() {
       // Release first session
       await devicePool.releaseDevice(device1);
 
-      // Assign device to second session - should get the same device
+      const deviceIds = ["device-1", "device-2", "device-3"];
+      const expectedDevice = deviceIds.find(id => id !== device1) ?? deviceIds[0];
+      const remainingDevice = deviceIds.find(id => id !== device1 && id !== expectedDevice);
+      const releasedDevice = devicePool.getDevice(device1);
+      const expectedPoolDevice = devicePool.getDevice(expectedDevice);
+      const remainingPoolDevice = remainingDevice ? devicePool.getDevice(remainingDevice) : null;
+
+      if (releasedDevice) {
+        releasedDevice.lastUsedAt = 3000;
+      }
+      if (expectedPoolDevice) {
+        expectedPoolDevice.lastUsedAt = 1000;
+      }
+      if (remainingPoolDevice) {
+        remainingPoolDevice.lastUsedAt = 2000;
+      }
+
+      // Assign device to second session - should get least recently used device
       const device2 = await devicePool.assignDeviceToSession(session2Id);
 
-      expect(device1).toBe(device2);
+      expect(device2).toBe(expectedDevice);
     });
 
     test("should handle rapid session creation and release cycles", async function() {

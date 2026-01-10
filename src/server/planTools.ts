@@ -31,6 +31,7 @@ const executePlanSchema = z.object({
   startStep: z.number().default(0).describe("Start step index (0-based, default: 0)"),
   platform: z.enum(["android", "ios"]).describe("Platform"),
   sessionUuid: z.string().optional().describe("Session UUID for parallel execution"),
+  keepScreenAwake: z.boolean().optional().describe("Keep physical Android devices awake during the session (default: true)"),
   deviceId: z.string().optional().describe("Device ID"),
   device: z.string().optional().describe(DEVICE_LABEL_DESCRIPTION),
   devices: z.array(z.string()).optional().describe("Device labels for multi-device plans"),
@@ -56,6 +57,7 @@ const executePlanTool = async (device: BootedDevice, params: {
   startStep: number;
   platform: Platform;
   sessionUuid?: string;
+  keepScreenAwake?: boolean;
   deviceId?: string;
   device?: string;
   devices?: string[];
@@ -204,7 +206,12 @@ const executePlanTool = async (device: BootedDevice, params: {
       }
 
       // Register the device label map (sessions are already created, this just caches the mapping)
-      await registerDeviceLabelMap(params.sessionUuid, params.devices, params.device);
+      await registerDeviceLabelMap(
+        params.sessionUuid,
+        params.devices,
+        params.device,
+        { keepScreenAwake: params.keepScreenAwake }
+      );
     } else if (params.device) {
       throw new ActionableError("Device label requires a devices list to be provided.");
     }

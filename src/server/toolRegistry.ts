@@ -99,6 +99,7 @@ class ToolRegistryClass {
       const deviceLabel = typeof args.device === "string" ? args.device : undefined;
       const declaredDeviceLabels = Array.isArray(args.devices) ? args.devices : undefined;
       let sessionUuid = baseSessionUuid;
+      const keepScreenAwake = typeof args.keepScreenAwake === "boolean" ? args.keepScreenAwake : undefined;
 
       if (deviceLabel) {
         if (!DaemonState.getInstance().isInitialized()) {
@@ -143,7 +144,7 @@ class ToolRegistryClass {
         logger.info(`[ToolRegistry] Entering session-based device assignment for ${sessionUuid}`);
         const sessionManager = DaemonState.getInstance().getSessionManager();
         const devicePool = DaemonState.getInstance().getDevicePool();
-        const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool);
+        const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool, { keepScreenAwake });
         if (context.deviceId && !providedDeviceId) {
           providedDeviceId = context.deviceId;
           logger.info(`[ToolRegistry] Resolved device from session: ${providedDeviceId}`);
@@ -244,7 +245,7 @@ class ToolRegistryClass {
         if (sessionUuid && DaemonState.getInstance().isInitialized()) {
           const sessionManager = DaemonState.getInstance().getSessionManager();
           const devicePool = DaemonState.getInstance().getDevicePool();
-          const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool);
+          const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool, { keepScreenAwake });
 
           // Cache observation data for certain tools to reduce API calls
           if (name === "observe" && response?.viewHierarchy) {
