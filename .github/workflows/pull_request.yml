@@ -138,6 +138,7 @@ jobs:
         with:
           gradle-tasks: "build -x test"
           gradle-project-directory: "android/ide-plugin"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -176,6 +177,7 @@ jobs:
         with:
           gradle-tasks: "test"
           gradle-project-directory: "android/ide-plugin"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -385,6 +387,7 @@ jobs:
         with:
           gradle-tasks: ":junit-runner:test"
           gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -414,6 +417,7 @@ jobs:
           script: "./gradlew :junit-runner:test --stacktrace --info"
           working-directory: './android/'
           accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
 
       - name: "Upload Test Results"
         if: always()
@@ -453,6 +457,7 @@ jobs:
           script: "./gradlew :playground:app:test --stacktrace --info"
           working-directory: './android/'
           accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
 
       - name: "Upload Test Results"
         if: always()
@@ -484,6 +489,7 @@ jobs:
         with:
           gradle-tasks: ":accessibility-service:testDebugUnitTest"
           gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -505,6 +511,7 @@ jobs:
         with:
           gradle-tasks: ":junitRunner:assemble"
           gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -530,6 +537,7 @@ jobs:
         with:
           gradle-tasks: ":accessibility-service:assembleDebug"
           gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -557,6 +565,7 @@ jobs:
         with:
           gradle-tasks: ":playground:app:assembleDebug"
           gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 

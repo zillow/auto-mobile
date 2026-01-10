@@ -51,9 +51,14 @@ export class KeepScreenAwakeManager {
 
     await this.wakeDevice();
 
-    const svcWasEnabled = await this.readSvcStayonEnabled();
+    const svcState = await this.readSvcStayonState();
     if (await this.tryEnableSvcStayon()) {
-      return { applied: true, method: "svc", svcWasEnabled };
+      return {
+        applied: true,
+        method: "svc",
+        svcWasEnabled: svcState.enabled,
+        originalStayOnWhilePluggedIn: svcState.value
+      };
     }
 
     const settingsResult = await this.applySettingsFallback();
@@ -77,6 +82,29 @@ export class KeepScreenAwakeManager {
     }
 
     if (state.method === "svc") {
+      if (state.originalStayOnWhilePluggedIn !== undefined) {
+        const originalEnabled = this.parseStayOnWhilePluggedIn(state.originalStayOnWhilePluggedIn);
+        const restored = await this.restoreSetting(
+          "global",
+          "stay_on_while_plugged_in",
+          state.originalStayOnWhilePluggedIn
+        );
+        if (restored) {
+          return;
+        }
+        if (originalEnabled !== false) {
+          if (originalEnabled === undefined) {
+            logger.warn(`[KeepScreenAwake] Skipping svc stayon restore on ${this.device.deviceId}: prior state unknown`);
+          }
+          return;
+        }
+        try {
+          await this.adb.executeCommand("shell svc power stayon false");
+        } catch (error) {
+          logger.warn(`[KeepScreenAwake] Failed to disable svc stayon on ${this.device.deviceId}: ${error}`);
+        }
+        return;
+      }
       if (state.svcWasEnabled === undefined) {
         logger.warn(`[KeepScreenAwake] Skipping svc stayon restore on ${this.device.deviceId}: prior state unknown`);
         return;
@@ -202,9 +230,15 @@ export class KeepScreenAwakeManager {
     };
   }
 
-  private async readSvcStayonEnabled(): Promise<boolean | undefined> {
+  private async readSvcStayonState(): Promise<{
+    value: string | null | undefined;
+    enabled: boolean | undefined;
+  }> {
     const value = await this.readSetting("global", "stay_on_while_plugged_in");
-    return this.parseStayOnWhilePluggedIn(value);
+    return {
+      value,
+      enabled: this.parseStayOnWhilePluggedIn(value)
+    };
   }
 
   private parseStayOnWhilePluggedIn(value?: string | null): boolean | undefined {
@@ -249,10 +283,10 @@ export class KeepScreenAwakeManager {
     scope: "global" | "system",
     key: string,
     originalValue?: string | null
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (originalValue === undefined) {
       logger.warn(`[KeepScreenAwake] Missing original ${scope} ${key} for ${this.device.deviceId}; skipping restore`);
-      return;
+      return false;
     }
 
     const command = originalValue === null
@@ -261,8 +295,10 @@ export class KeepScreenAwakeManager {
 
     try {
       await this.adb.executeCommand(command);
+      return true;
     } catch (error) {
       logger.warn(`[KeepScreenAwake] Failed to restore ${scope} ${key} on ${this.device.deviceId}: ${error}`);
+      return false;
     }
   }
 }

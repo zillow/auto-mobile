@@ -31,6 +31,10 @@ inputs:
     description: "Optional path to accessibility service APK to install before running the script"
     default: ""
     required: "false"
+  gradle-home-directory:
+    description: "The directory to use for Gradle User Home"
+    default: ""
+    required: "false"
 
 runs:
   using: "composite"
@@ -40,6 +44,17 @@ runs:
       with:
         distribution: "zulu"
         java-version: "21"
+
+    - name: Set Gradle User Home
+      shell: ${{ inputs.shell }}
+      run: |
+        gradle_home="${{ inputs.gradle-home-directory }}"
+        if [ -z "$gradle_home" ]; then
+          gradle_home="$HOME/.gradle"
+        fi
+        gradle_home="${gradle_home/#\~/$HOME}"
+        echo "GRADLE_USER_HOME=$gradle_home" >> $GITHUB_ENV
+        echo "Using GRADLE_USER_HOME=$gradle_home"
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4

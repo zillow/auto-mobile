@@ -75,6 +75,17 @@ runs:
       if: ${{ inputs.malloc-replacement == 'tcmalloc' }}
       uses: kaeawc/setup-tcmalloc@v0.0.1
 
+    - name: "Set Gradle User Home"
+      shell: ${{ inputs.shell }}
+      run: |
+        gradle_home="${{ inputs.gradle-home-directory }}"
+        if [ -z "$gradle_home" ]; then
+          gradle_home="$HOME/.gradle"
+        fi
+        gradle_home="${gradle_home/#\~/$HOME}"
+        echo "GRADLE_USER_HOME=$gradle_home" >> $GITHUB_ENV
+        echo "Using GRADLE_USER_HOME=$gradle_home"
+
     - name: "Sanitize artifact name"
       id: sanitize-name
       shell: ${{ inputs.shell }}
