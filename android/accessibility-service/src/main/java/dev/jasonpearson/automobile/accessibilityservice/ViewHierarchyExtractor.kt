@@ -77,7 +77,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               dedupeTextContentDesc,
               accessibilityFocusedNode,
           )
-      val optimizedElement = rootElement?.let { optimizeHierarchy(it) }
+      val optimizedElement = rootElement?.let { wrapOptimizedElements(optimizeHierarchy(it)) }
       val filteredElement =
           optimizedElement?.let {
             if (OCCLUSION_FILTER_ENABLED) {
@@ -192,7 +192,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
                 dedupeTextContentDesc,
                 accessibilityFocusedNode,
             )
-        val optimizedElement = element?.let { optimizeHierarchy(it) }
+        val optimizedElement = element?.let { wrapOptimizedElements(optimizeHierarchy(it)) }
         val packageName = rootNode.packageName?.toString()
         if (!intentChooserDetected && optimizedElement != null) {
           intentChooserDetected = detectIntentChooserIndicators(optimizedElement)
@@ -236,7 +236,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               dedupeTextContentDesc,
               accessibilityFocusedNode,
           )
-      mainHierarchy = element?.let { optimizeHierarchy(it) }
+      mainHierarchy = element?.let { wrapOptimizedElements(optimizeHierarchy(it)) }
       mainPackageName = activeWindowRoot.packageName?.toString()
       if (!intentChooserDetected && mainHierarchy != null) {
         intentChooserDetected = detectIntentChooserIndicators(mainHierarchy!!)
@@ -776,17 +776,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   /** Check if element meets filter criteria (matches test expectations) */
   private fun meetsFilterCriteria(element: UIElementInfo, textFilter: String? = null): Boolean {
     // String filter criteria
-    val hasStringCriteria =
-        !element.text.isNullOrBlank() ||
-            !element.resourceId.isNullOrBlank() ||
-            !element.contentDesc.isNullOrBlank() ||
-            !element.testTag.isNullOrBlank() ||
-            !element.role.isNullOrBlank() ||
-            !element.stateDescription.isNullOrBlank() ||
-            !element.errorMessage.isNullOrBlank() ||
-            !element.hintText.isNullOrBlank() ||
-            !element.tooltipText.isNullOrBlank() ||
-            !element.paneTitle.isNullOrBlank()
+    val hasStringCriteria = hasStringCriteria(element)
 
     // Boolean filter criteria
     val hasBooleanCriteria =
@@ -816,60 +806,113 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     return (hasStringCriteria || hasBooleanCriteria || hasAccessibilityFeatures) && meetsTextFilter
   }
 
+  private fun hasStringCriteria(element: UIElementInfo): Boolean {
+    return !element.text.isNullOrBlank() ||
+        !element.resourceId.isNullOrBlank() ||
+        !element.contentDesc.isNullOrBlank() ||
+        !element.testTag.isNullOrBlank() ||
+        !element.role.isNullOrBlank() ||
+        !element.stateDescription.isNullOrBlank() ||
+        !element.errorMessage.isNullOrBlank() ||
+        !element.hintText.isNullOrBlank() ||
+        !element.tooltipText.isNullOrBlank() ||
+        !element.paneTitle.isNullOrBlank()
+  }
+
+  private fun decodeOptimizedChildren(nodeElement: JsonElement): List<UIElementInfo>? {
+    return when {
+      nodeElement is JsonObject -> {
+        try {
+          listOf(json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement))
+        } catch (e: Exception) {
+          null
+        }
+      }
+      nodeElement is JsonArray -> {
+        val children = mutableListOf<UIElementInfo>()
+        for (childJson in nodeElement.jsonArray) {
+          val child =
+              try {
+                json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+              } catch (e: Exception) {
+                return null
+              }
+          children.add(child)
+        }
+        children
+      }
+      else -> null
+    }
+  }
+
+  private fun wrapOptimizedElements(elements: List<UIElementInfo>): UIElementInfo? {
+    if (elements.isEmpty()) {
+      return null
+    }
+    if (elements.size == 1) {
+      return elements[0]
+    }
+
+    val nodeElement = encodeChildrenToNodeElement(elements) ?: return null
+    return UIElementInfo(node = nodeElement)
+  }
+
   /**
    * Optimizes the hierarchy by:
-   * 1. Collapsing single-child wrapper nodes (structural nodes with only bounds)
+   * 1. Promoting children of bounds-only wrapper nodes (structural nodes with only bounds)
    * 2. Filtering out bounds-only intermediate nodes
    *
    * This significantly reduces hierarchy size for complex UIs like YouTube.
    */
-  private fun optimizeHierarchy(element: UIElementInfo): UIElementInfo? {
+  private fun optimizeHierarchy(element: UIElementInfo): List<UIElementInfo> {
     // First, recursively optimize children
     val optimizedNode = element.node?.let { optimizeNode(it) }
 
     // Check if this element is a bounds-only wrapper (has no useful properties)
     val isBoundsOnlyWrapper = !meetsFilterCriteria(element)
 
-    // If it's a bounds-only wrapper with exactly one optimized child, collapse to that child
-    if (isBoundsOnlyWrapper && optimizedNode != null) {
-      val singleChild = extractSingleChild(optimizedNode)
-      if (singleChild != null) {
-        return singleChild
+    if (isBoundsOnlyWrapper) {
+      if (optimizedNode == null) {
+        return emptyList()
       }
+
+      val optimizedChildren = decodeOptimizedChildren(optimizedNode)
+      if (optimizedChildren == null) {
+        return listOf(element.copy(node = optimizedNode))
+      }
+      if (optimizedChildren.isEmpty()) {
+        return emptyList()
+      }
+      return optimizedChildren
     }
 
-    // If it's a bounds-only wrapper with no children (leaf), filter it out
-    if (isBoundsOnlyWrapper && optimizedNode == null) {
-      return null
-    }
-
-    // Return element with optimized children
-    return element.copy(node = optimizedNode)
+    return listOf(element.copy(node = optimizedNode))
   }
 
   /** Recursively optimize node children (handles both single element and array). */
   private fun optimizeNode(nodeElement: JsonElement): JsonElement? {
+    fun optimizeChild(childJson: JsonElement): List<JsonElement> {
+      return try {
+        val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+        val optimizedChildren = optimizeHierarchy(child)
+        optimizedChildren.map { json.encodeToJsonElement(UIElementInfo.serializer(), it) }
+      } catch (e: Exception) {
+        listOf(childJson)
+      }
+    }
+
     return when {
       nodeElement is JsonObject -> {
-        try {
-          val child = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
-          val optimized = optimizeHierarchy(child)
-          optimized?.let { json.encodeToJsonElement(UIElementInfo.serializer(), it) }
-        } catch (e: Exception) {
-          nodeElement
+        val optimizedChildren = optimizeChild(nodeElement)
+        when {
+          optimizedChildren.isEmpty() -> null
+          optimizedChildren.size == 1 -> optimizedChildren[0]
+          else -> JsonArray(optimizedChildren)
         }
       }
       nodeElement is JsonArray -> {
         val optimizedChildren =
-            nodeElement.jsonArray.mapNotNull { childJson ->
-              try {
-                val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
-                val optimized = optimizeHierarchy(child)
-                optimized?.let { json.encodeToJsonElement(UIElementInfo.serializer(), it) }
-              } catch (e: Exception) {
-                childJson
-              }
-            }
+            nodeElement.jsonArray.flatMap { childJson -> optimizeChild(childJson) }
         when {
           optimizedChildren.isEmpty() -> null
           optimizedChildren.size == 1 -> optimizedChildren[0]
@@ -877,30 +920,6 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         }
       }
       else -> nodeElement
-    }
-  }
-
-  /**
-   * Extract single child from a node JsonElement. Returns the child if there's exactly one, null
-   * otherwise.
-   */
-  private fun extractSingleChild(nodeElement: JsonElement): UIElementInfo? {
-    return when {
-      nodeElement is JsonObject -> {
-        try {
-          json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
-        } catch (e: Exception) {
-          null
-        }
-      }
-      nodeElement is JsonArray && nodeElement.jsonArray.size == 1 -> {
-        try {
-          json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement.jsonArray[0])
-        } catch (e: Exception) {
-          null
-        }
-      }
-      else -> null
     }
   }
 
