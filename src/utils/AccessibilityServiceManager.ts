@@ -500,7 +500,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       const result = await this.adb.executeCommand("shell settings get secure enabled_accessibility_services");
       let currentServices = result.stdout.trim();
 
-      // Handle null or empty values
+      // Issue #384: preserve existing enabled services; settings may return "null" or empty.
       if (currentServices === "null" || currentServices === "") {
         currentServices = "";
       }
@@ -512,7 +512,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       if (currentServices.includes(serviceComponent)) {
         logger.info("Accessibility Service is already enabled");
       } else {
-        // Append service to list (colon-separated)
+        // Issue #384: append to the colon-separated list instead of overwriting other services.
         const updatedServices = currentServices
           ? `${currentServices}:${serviceComponent}`
           : serviceComponent;
@@ -571,6 +571,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       }
 
       // Parse service list
+      // Issue #384: remove only the AutoMobile entry and preserve all other enabled services.
       const serviceList = currentServices.split(":");
 
       // Remove AutoMobile service from list
@@ -586,6 +587,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         logger.info("Removed AutoMobile service from enabled_accessibility_services");
 
         // Conditionally disable accessibility if no other services remain
+        // Edge case: a trailing separator can yield [""]; treat it as no remaining services.
         if (filteredServices.length === 0 || (filteredServices.length === 1 && filteredServices[0] === "")) {
           await this.adb.executeCommand("shell settings put secure accessibility_enabled 0");
           logger.info("Disabled accessibility globally (no other services remain)");
