@@ -47,6 +47,7 @@ import { registerTestTimingResources } from "./testTimingResources";
 import { registerPerformanceResources } from "./performanceResources";
 import { registerVideoRecordingResources } from "./videoRecordingResources";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
+import { startupBenchmark } from "../utils/startupBenchmark";
 
 export interface McpServerOptions {
   debug?: boolean;
@@ -92,6 +93,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   // Get configuration and device session managers
 
   // Register all tool categories
+  startupBenchmark.startPhase("toolRegistration");
   registerObserveTools();
   registerInteractionTools();
   registerAppTools();
@@ -109,8 +111,11 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerVideoRecordingTools();
   registerSnapshotTools();
   registerBiometricTools();
+  registerDebugTools();
+  startupBenchmark.endPhase("toolRegistration");
 
   // Register all resources
+  startupBenchmark.startPhase("resourceRegistration");
   registerObservationResources();
   registerBootedDeviceResources();
   registerDeviceImageResources();
@@ -119,10 +124,10 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerTestTimingResources();
   registerPerformanceResources();
   registerVideoRecordingResources();
-
-  registerDebugTools();
+  startupBenchmark.endPhase("resourceRegistration");
 
   // Create a new MCP server
+  startupBenchmark.startPhase("sdkInitialization");
   const server = new McpServer({
     name: "AutoMobile",
     version: getMcpServerVersion()
@@ -133,8 +138,10 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
       prompts: {}
     }
   });
+  startupBenchmark.endPhase("sdkInitialization");
 
   // Register all tools with the server
+  startupBenchmark.startPhase("serverHandlerRegistration");
   ToolRegistry.registerWithServer(server);
 
   // Register all resources with the server
@@ -242,6 +249,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
       executionTracker.endExecution(execution.id);
     }
   });
+  startupBenchmark.endPhase("serverHandlerRegistration");
 
   return server;
 };

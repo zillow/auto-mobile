@@ -31,13 +31,21 @@ export const DAEMON_PORT_RANGE_END = 3010;
  * Unix socket path for daemon communication
  * Per-user socket to avoid permission issues
  */
-export const SOCKET_PATH = `/tmp/auto-mobile-daemon-${uid}.sock`;
+const socketPathOverride =
+  process.env.AUTOMOBILE_DAEMON_SOCKET_PATH ??
+  process.env.AUTO_MOBILE_DAEMON_SOCKET_PATH;
+export const SOCKET_PATH =
+  socketPathOverride ?? `/tmp/auto-mobile-daemon-${uid}.sock`;
 
 /**
  * PID lock file path
  * Contains daemon process information
  */
-export const PID_FILE_PATH = `/tmp/auto-mobile-daemon-${uid}.pid`;
+const pidFilePathOverride =
+  process.env.AUTOMOBILE_DAEMON_PID_FILE_PATH ??
+  process.env.AUTO_MOBILE_DAEMON_PID_FILE_PATH;
+export const PID_FILE_PATH =
+  pidFilePathOverride ?? `/tmp/auto-mobile-daemon-${uid}.pid`;
 
 /**
  * Connection timeout in milliseconds

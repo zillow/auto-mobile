@@ -74,6 +74,32 @@ Thresholds are defined in `scripts/context-thresholds.json`:
 
 Current thresholds represent baseline + 10% buffer to allow for incremental growth while preventing significant regressions.
 
+## Startup Benchmark
+
+Measure MCP server and daemon startup time (cold/warm) with optional baseline comparison:
+
+```bash
+bun run benchmark-startup --compare benchmark/startup-baseline.json --output reports/startup-benchmark.json
+```
+
+**Options:**
+```bash
+# Only run cold or warm measurements
+bun run benchmark-startup --cold
+bun run benchmark-startup --warm
+
+# Skip daemon or server benchmarks
+bun run benchmark-startup --server-only
+bun run benchmark-startup --daemon-only
+
+# Change regression threshold multiplier
+bun run benchmark-startup --threshold 1.3
+```
+
+**Notes:**
+- Device discovery scenarios run only when `adb` is available and at least one device is connected.
+- The benchmark will run `adb kill-server` when measuring cold ADB startup impact.
+
 ## Other Scripts
 
 ### Build Scripts
@@ -102,6 +128,7 @@ Run `scripts/<category>/validate_*.sh` for validation or `scripts/<category>/app
 The following scripts are invoked by GitHub Actions workflows:
 
 - `benchmark-context-thresholds.ts` - Runs in `.github/workflows/context-thresholds.yml`
+- `benchmark-startup.sh` - Runs in `.github/workflows/pull_request.yml`
 - `validate_*.sh` - Various validation workflows in `.github/workflows/pull_request.yml`
 
 See workflow files for integration details.

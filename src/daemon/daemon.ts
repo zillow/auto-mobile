@@ -21,6 +21,7 @@ import { existsSync } from "node:fs";
 import { PID_FILE_PATH, DAEMON_VERSION } from "./constants";
 import { executionTracker } from "../server/executionTracker";
 import { closeDatabase, getDatabase } from "../db";
+import { startupBenchmark } from "../utils/startupBenchmark";
 
 /**
  * Main daemon process
@@ -69,13 +70,17 @@ export class Daemon {
     this.port = await this.findAvailablePort(this.port);
 
     // Start HTTP MCP server
+    startupBenchmark.startPhase("httpServerStart");
     await this.startHttpServer();
+    startupBenchmark.endPhase("httpServerStart");
 
     // Initialize device pool BEFORE starting socket server
     // This ensures clients connecting via socket will see initialized device pool
     // Wait up to 10 seconds - emulators should already be running
     logger.info("Initializing device pool...");
+    startupBenchmark.startPhase("deviceDiscovery");
     await this.initializeDevicePoolWithTimeout(10000);
+    startupBenchmark.endPhase("deviceDiscovery");
 
     // Start Unix socket server AFTER device pool is ready
     logger.info(`Daemon host: "${this.host}", port: ${this.port}`);
@@ -84,7 +89,9 @@ export class Daemon {
     logger.info(`Creating UnixSocketServer with endpoint: "${mcpEndpoint}"`);
     this.socketServer = new UnixSocketServer(SOCKET_PATH, mcpEndpoint);
     logger.info("Starting Unix socket server...");
+    startupBenchmark.startPhase("socketServerStart");
     await this.socketServer.start();
+    startupBenchmark.endPhase("socketServerStart");
     logger.info("Unix socket server started");
 
     // Write PID file
@@ -100,6 +107,13 @@ export class Daemon {
     // Start health check timer (every 30 seconds)
     this.startHealthCheckTimer();
     this.startHeartbeatMonitor();
+
+    startupBenchmark.emit("daemon", {
+      host: this.host,
+      port: this.port,
+      socketPath: SOCKET_PATH,
+      deviceCount: this.devicePool.getTotalDeviceCount(),
+    });
 
     logger.info(
       `Daemon started: PID ${process.pid}, socket ${SOCKET_PATH}, HTTP port ${this.port}`

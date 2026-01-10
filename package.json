@@ -19,6 +19,7 @@
     "estimate-context": "bun scripts/estimate-context-usage.ts",
     "benchmark-context": "bun scripts/benchmark-context-thresholds.ts",
     "benchmark-tools": "bun scripts/benchmark-mcp-tools.ts",
+    "benchmark-startup": "bash scripts/benchmark-startup.sh",
     "validate:yaml": "bun scripts/validate-yaml.ts",
     "dead-code:ts": "bash scripts/detect-dead-code-ts.sh",
     "dead-code:ts:prune": "npx ts-prune",

@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "thresholdMultiplier": 1.3,
+  "metrics": {
+    "mcpServer.cold.timeToReadyMs": 500,
+    "mcpServer.warm.timeToReadyMs": 200,
+    "mcpServer.cold.timeToFirstToolCallMs": 1000,
+    "mcpServer.warm.timeToFirstToolCallMs": 500,
+    "mcpServer.cold.memory.heapUsedBytes": 104857600,
+    "daemon.cold.timeToReadyMs": 2000,
+    "daemon.warm.timeToReadyMs": 1000,
+    "daemon.cold.timeToResponsiveMs": 2500,
+    "daemon.warm.timeToResponsiveMs": 1500,
+    "daemon.cold.memory.heapUsedBytes": 157286400
+  },
+  "metadata": {
+    "generatedAt": "2025-01-01T00:00:00.000Z",
+    "description": "Initial startup performance baselines (targets + buffer)"
+  }
+}

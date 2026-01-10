@@ -15,6 +15,9 @@ import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
 import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefinitions";
 import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig";
 import type { VideoRecordingConfigInput } from "./models";
+import { startupBenchmark } from "./utils/startupBenchmark";
+
+startupBenchmark.mark("processEntry");
 
 // Detect port from git branch name for worktree isolation
 // e.g., work/164-feature-name -> port 9164
@@ -532,9 +535,16 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
   });
 
   // Start HTTP server
+  startupBenchmark.startPhase("serverListening");
   server.listen(transport.port!, transport.host!, () => {
     logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/streamable`);
     logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/streamable`);
+    startupBenchmark.endPhase("serverListening");
+    startupBenchmark.emit("mcp-server", {
+      transport: "streamable",
+      host: transport.host,
+      port: transport.port
+    });
   });
 
   // Handle server shutdown
@@ -646,9 +656,16 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
   });
 
   // Start HTTP server
+  startupBenchmark.startPhase("serverListening");
   server.listen(transport.port!, transport.host!, () => {
     logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/sse`);
     logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/sse`);
+    startupBenchmark.endPhase("serverListening");
+    startupBenchmark.emit("mcp-server", {
+      transport: "sse",
+      host: transport.host,
+      port: transport.port
+    });
   });
 
   // Handle server shutdown
@@ -810,9 +827,12 @@ async function main() {
       }
       try {
         logger.info("Connecting MCP server to stdio transport");
+        startupBenchmark.startPhase("serverListening");
         await server.connect(stdioTransport);
+        startupBenchmark.endPhase("serverListening");
         logger.info("MCP server connected to stdio transport");
         logger.info("AutoMobile MCP server running on stdio");
+        startupBenchmark.emit("mcp-server", { transport: "stdio" });
       } catch (error) {
         logger.error("MCP server connect failed:", error);
         throw error;

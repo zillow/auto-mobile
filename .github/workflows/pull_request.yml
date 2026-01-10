@@ -1009,3 +1009,153 @@ jobs:
                 body: body
               });
             }
+
+  # =============================================================================
+  # MCP Startup Benchmark
+  # =============================================================================
+
+  benchmark-startup:
+    name: "Benchmark MCP Startup"
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Run Startup Benchmark"
+        id: benchmark
+        run: |
+          # Create reports directory
+          mkdir -p reports
+
+          # Run benchmark and capture exit code
+          bun run benchmark-startup --compare benchmark/startup-baseline.json --output reports/startup-benchmark.json || echo "FAILED=true" >> $GITHUB_ENV
+
+          # Always preserve the report file even if benchmark failed
+          exit 0
+
+      - name: "Upload Benchmark Report"
+        uses: actions/upload-artifact@v4.4.0
+        if: always()
+        with:
+          name: startup-benchmark-report
+          path: reports/startup-benchmark.json
+          retention-days: 90
+
+      - name: "Check Benchmark Result"
+        if: always()
+        run: |
+          if [ "$FAILED" = "true" ]; then
+            echo "::error::MCP startup benchmark failed - regressions detected"
+            cat reports/startup-benchmark.json
+            exit 1
+          fi
+          echo "::notice::MCP startup benchmark passed - no regressions"
+
+      - name: "Comment on PR with Results"
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'reports/startup-benchmark.json';
+
+            if (!fs.existsSync(reportPath)) {
+              console.log('No benchmark report found');
+              return;
+            }
+
+            const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+            const formatMs = value => `${value.toFixed(1)}ms`;
+            const formatBytes = value => `${(value / (1024 * 1024)).toFixed(1)}MB`;
+
+            let body = '## MCP Startup Benchmark\\n\\n';
+
+            if (report.results.mcpServer) {
+              body += '### MCP Server (stdio)\\n\\n';
+              body += '| Mode | Ready | First Tool Call | Heap Used |\\n';
+              body += '|------|-------|-----------------|-----------|\\n';
+              for (const run of report.results.mcpServer.runs || []) {
+                const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
+                body += `| ${run.mode} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToFirstToolCallMs)} | ${heap} |\\n`;
+              }
+              body += '\\n';
+
+              const discovery = report.results.mcpServer.deviceDiscovery;
+              if (discovery) {
+                if (discovery.skipped) {
+                  body += `Device discovery: skipped (${discovery.reason || 'no reason provided'})\\n\\n`;
+                } else if (discovery.scenarios?.length) {
+                  body += 'Device discovery scenarios:\\n';
+                  for (const scenario of discovery.scenarios) {
+                    body += `- ${scenario.name}: ${formatMs(scenario.durationMs)} (${scenario.deviceCount} device(s))\\n`;
+                  }
+                  body += '\\n';
+                }
+              }
+            }
+
+            if (report.results.daemon) {
+              body += '### Daemon\\n\\n';
+              body += '| Mode | Spawn | Ready | Responsive | Heap Used |\\n';
+              body += '|------|-------|-------|------------|-----------|\\n';
+              for (const run of report.results.daemon.runs || []) {
+                const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
+                body += `| ${run.mode} | ${formatMs(run.spawnMs)} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToResponsiveMs)} | ${heap} |\\n`;
+              }
+              body += '\\n';
+            }
+
+            if (report.comparisons?.regressions?.length) {
+              const failures = report.comparisons.regressions.filter(r => !r.passed);
+              if (failures.length > 0) {
+                body += '### ⚠️ Regressions\\n\\n';
+                for (const regression of failures) {
+                  body += `- ${regression.metric}: ${regression.actual.toFixed(2)} > ${regression.threshold.toFixed(2)} (+${regression.regression.toFixed(1)}%)\\n`;
+                }
+                body += '\\n';
+              }
+            }
+
+            if (report.skips?.length) {
+              body += '### Skipped Checks\\n\\n';
+              for (const skip of report.skips) {
+                body += `- ${skip}\\n`;
+              }
+              body += '\\n';
+            }
+
+            body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\\n`;
+            body += `\\n_Generated at ${report.timestamp}_`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('MCP Startup Benchmark')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
