@@ -80,6 +80,28 @@ When using prompt-based testing:
 - `automobile.junit.timing.ordering`: Test order strategy based on historical duration (`auto`, `none`, `duration-asc`, `duration-desc`; default: `auto`)
 - `automobile.junit.timing.fetch.timeout.ms`: Timing query timeout in milliseconds (default: 5000)
   - Timing fetch is automatically disabled when CI is detected (`automobile.ci.mode=true` or `CI=true`).
+- `automobile.junit.plan.cache.enabled`: Enable plan path/content caching (default: true)
+- `automobile.junit.plan.cache.max.entries`: Max cached plan entries before evicting least recently used (default: 100)
+
+### Memory Monitoring and Diagnostics
+
+JUnitRunner can track heap usage between test executions and trigger JVM diagnostics when memory
+growth exceeds a threshold or when tests fail. This uses JDK CLI tools (for example `jstat`,
+`jcmd`, and `jmap`) so it works without LeakCanary.
+
+Diagnostics and heap dumps are written to `heap-dump/` by default. Override the output directory
+with `automobile.junit.memory.heapdump.dir`.
+
+#### Memory Properties
+
+- `automobile.junit.memory.monitor.enabled`: Enable per-test memory tracking (default: false)
+- `automobile.junit.memory.monitor.sample.interval`: Sample every N tests (default: 1)
+- `automobile.junit.memory.monitor.log`: Log per-test heap deltas (default: true)
+- `automobile.junit.memory.max.growth.mb`: Threshold for heap growth deltas (default: 30)
+- `automobile.junit.memory.diagnostics.enabled`: Capture JDK diagnostics on failure/threshold (default: true)
+- `automobile.junit.memory.dump.on.failure`: Write heap dump when a test fails (default: true)
+- `automobile.junit.memory.dump.on.threshold`: Write heap dump when heap delta exceeds threshold (default: true)
+- `automobile.junit.memory.heapdump.dir`: Output directory for diagnostics/heap dumps (default: `heap-dump`)
 
 ### Historical Test Timing
 

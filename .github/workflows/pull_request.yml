@@ -390,6 +390,13 @@ jobs:
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: "Upload Heap Dumps"
+        if: failure()
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: junit-runner-heap-dumps
+          path: heap-dump
+          if-no-files-found: ignore
 
   # Test isolation issue resolved in #107 and #109
   # Re-enabled in #110
@@ -418,6 +425,13 @@ jobs:
           working-directory: './android/'
           accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
           gradle-home-directory: "~/.gradle/${{ github.job }}"
+      - name: "Upload Heap Dumps"
+        if: failure()
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: junit-runner-heap-dumps
+          path: heap-dump
+          if-no-files-found: ignore
 
       - name: "Upload Test Results"
         if: always()

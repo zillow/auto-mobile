@@ -13,6 +13,7 @@ npm-debug.log*
 /.gitlab-ci-local
 *.tgz
 *.hprof
+/heap-dump/
 
 # Places to locally write while thinking or planning
 /scratch
