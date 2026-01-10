@@ -11,6 +11,7 @@ import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetricsCollector";
 import { serverConfig } from "../../utils/ServerConfig";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export type ForegroundCheckMode = "parallel" | "single";
 
@@ -23,13 +24,15 @@ export class LaunchApp extends BaseVisualChange {
    * @param adb - Optional AdbClient instance for testing
    * @param axe - Optional AxeClient instance for testing
    * @param simctl - Optional SimCtlClient instance for testing
+   * @param timer - Optional Timer instance for testing
    */
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
     axe: AxeClient | null = null,
-    simctl: SimCtlClient | null = null) {
-    super(device, adb, axe);
+    simctl: SimCtlClient | null = null,
+    timer: Timer = defaultTimer) {
+    super(device, adb, axe, timer);
     this.device = device;
     this.simctl = simctl || new SimCtlClient(this.device);
   }
@@ -294,7 +297,7 @@ export class LaunchApp extends BaseVisualChange {
 
     // Check app status (installation and running)
     const installedApps = await perf.track("checkInstalled", async () => {
-      return (new ListInstalledApps(this.device)).execute();
+      return (new ListInstalledApps(this.device, this.adb)).execute();
     });
     logger.info(`[LaunchApp] Found ${installedApps.length} installed app(s)`);
     logger.info(`[LaunchApp] Looking for package: ${packageName}`);
@@ -323,6 +326,7 @@ export class LaunchApp extends BaseVisualChange {
     });
 
     let didTerminateOrClear = false;
+    let alreadyForeground = false;
 
     if (isRunning) {
       if (clearAppData) {
@@ -344,32 +348,12 @@ export class LaunchApp extends BaseVisualChange {
           return this.adb.getForegroundApp();
         });
 
-        const isForeground = foregroundApp &&
-                             foregroundApp.packageName === packageName &&
-                             foregroundApp.userId === targetUserId;
+        alreadyForeground = foregroundApp &&
+                            foregroundApp.packageName === packageName &&
+                            foregroundApp.userId === targetUserId;
 
-        if (isForeground) {
+        if (alreadyForeground) {
           logger.info(`[LaunchApp] App ${packageName} is already in foreground in user ${targetUserId}`);
-          perf.end();
-          const result: LaunchAppResult = {
-            success: true,
-            packageName,
-            activityName,
-            userId: targetUserId,
-            error: "App is already in foreground"
-          };
-          // Add perfTiming if enabled
-          const timings = perf.getTimings();
-          if (perf.isEnabled() && timings) {
-            result.observation = {
-              updatedAt: new Date().toISOString(),
-              screenSize: { width: 0, height: 0 },
-              systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
-              userId: targetUserId,
-              perfTiming: timings
-            };
-          }
-          return result;
         }
       }
     } else {
@@ -381,6 +365,30 @@ export class LaunchApp extends BaseVisualChange {
       }
     }
 
+    if (alreadyForeground) {
+      const result = await this.observedInteraction(
+        async () => {
+          perf.end();
+          return {
+            success: true,
+            packageName,
+            activityName,
+            userId: targetUserId
+          };
+        },
+        {
+          changeExpected: false,
+          perf,
+          packageName,
+          skipPreviousObserve: didTerminateOrClear,
+          skipUiStability: skipUiStability ?? false
+        }
+      );
+      result.error = "App is already in foreground";
+      result.success = true;
+      return result;
+    }
+
     logger.info(`[LaunchApp] Proceeding with app launch`);
 
     const captureDisplayedMetrics = serverConfig.isUiPerfModeEnabled();
@@ -388,6 +396,9 @@ export class LaunchApp extends BaseVisualChange {
       ? new DisplayedTimeMetricsCollector(this.device, this.adb)
       : null;
     let displayedMetricsStartMs: number | null = null;
+
+    const foregroundWaitTimeoutMs = 5000;
+    const foregroundPollIntervalMs = 200;
 
     const launchResult = await this.observedInteraction(
       async () => {
@@ -397,13 +408,23 @@ export class LaunchApp extends BaseVisualChange {
             () => this.adb.getDeviceTimestampMs()
           );
         }
-        return this.performLaunch(packageName, activityName, targetUserId, perf);
+        const launchOutcome = await this.performLaunch(packageName, activityName, targetUserId, perf);
+        await this.waitForAppForeground(
+          packageName,
+          targetUserId,
+          foregroundCheckMode,
+          foregroundWaitTimeoutMs,
+          foregroundPollIntervalMs,
+          perf
+        );
+        return launchOutcome;
       },
       {
         changeExpected: false,
         perf,
         skipPreviousObserve: didTerminateOrClear,
-        skipUiStability: skipUiStability ?? false
+        skipUiStability: skipUiStability ?? false,
+        packageName
       }
     );
 
@@ -427,6 +448,47 @@ export class LaunchApp extends BaseVisualChange {
   }
 
   /**
+   * Wait for the target app to enter the foreground.
+   */
+  private async waitForAppForeground(
+    packageName: string,
+    userId: number,
+    mode: ForegroundCheckMode,
+    timeoutMs: number,
+    pollIntervalMs: number,
+    perf?: PerformanceTracker
+  ): Promise<boolean> {
+    const waitForForeground = async (): Promise<boolean> => {
+      const startTime = this.timer.now();
+
+      logger.info(`[LaunchApp] Waiting for ${packageName} to reach foreground (timeout: ${timeoutMs}ms)`);
+
+      while (true) {
+        const isForeground = await this.checkAppForeground(packageName, mode, perf, userId);
+        if (isForeground) {
+          logger.info(`[LaunchApp] App ${packageName} reached foreground after ${this.timer.now() - startTime}ms`);
+          return true;
+        }
+
+        if (this.timer.now() - startTime >= timeoutMs) {
+          break;
+        }
+
+        await this.timer.sleep(pollIntervalMs);
+      }
+
+      logger.warn(`[LaunchApp] Timed out waiting for ${packageName} to reach foreground after ${timeoutMs}ms`);
+      return false;
+    };
+
+    if (perf) {
+      return perf.track("waitForForeground", waitForForeground);
+    }
+
+    return waitForForeground();
+  }
+
+  /**
    * Check if app is in foreground
    * @param packageName - Package name to check
    * @param mode - Check strategy: 'single' (default) or 'parallel'
@@ -435,9 +497,24 @@ export class LaunchApp extends BaseVisualChange {
   private async checkAppForeground(
     packageName: string,
     mode: ForegroundCheckMode = "single",
-    perf?: PerformanceTracker
+    perf?: PerformanceTracker,
+    userId?: number
   ): Promise<boolean> {
     logger.info(`[LaunchApp] Checking if app is in foreground (mode: ${mode})`);
+
+    const foregroundApp = perf
+      ? await perf.track("foregroundApp", () => this.adb.getForegroundApp())
+      : await this.adb.getForegroundApp();
+
+    if (foregroundApp) {
+      const matchesPackage = foregroundApp.packageName === packageName;
+      const matchesUser = userId === undefined || foregroundApp.userId === userId;
+      const isForeground = matchesPackage && matchesUser;
+      logger.info(`[LaunchApp] Foreground app match (adb): ${isForeground}`);
+      if (isForeground) {
+        return true;
+      }
+    }
 
     switch (mode) {
       case "parallel":

@@ -52,8 +52,7 @@ export function registerAppTools(
         args.coldBoot ?? false,
         undefined, // activityName
         "single", // foregroundCheckMode
-        undefined, // userId
-        true // skipUiStability - skip the 12+ second stability polling
+        undefined // userId
       );
 
       return createJSONToolResponse({
