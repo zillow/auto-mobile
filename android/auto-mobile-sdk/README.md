@@ -9,6 +9,7 @@ Android library SDK for tracking navigation events across various navigation fra
 - Circuit navigation support
 - Manual tracking for custom navigation solutions
 - Simple listener-based API
+- Debug-only notification posting for automated test scenarios
 - Maven Central publishing ready
 
 ## Installation
@@ -108,6 +109,27 @@ Navigation3Adapter.trackManually(
 // Stop tracking
 Navigation3Adapter.stop()
 ```
+
+### Notifications (debug-only)
+
+Post rich notifications as the app-under-test from debug builds:
+
+```kotlin
+AutoMobileSDK.initialize(applicationContext)
+
+AutoMobileNotifications.post(
+    title = "Welcome",
+    body = "This is a test notification",
+    style = NotificationStyle.BIG_TEXT,
+    imagePath = "/sdcard/Download/automobile/sample.png",
+    actions = listOf(NotificationAction(label = "Open", actionId = "open_action"))
+)
+```
+
+Notes:
+- The AutoMobile MCP server uses a debug-only broadcast receiver to trigger notifications.
+- Release builds do not include the receiver; SDK integration is required for app-under-test notifications.
+- The MCP tool uploads host images to `/sdcard/Download/automobile/` before posting big-picture notifications.
 
 ## API Reference
 

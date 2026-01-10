@@ -56,6 +56,7 @@ object AutoMobileSDK {
   fun initialize(context: Context) {
     this.context = context.applicationContext
     RecompositionTracker.initialize(this.context!!)
+    AutoMobileNotifications.initialize(this.context!!)
   }
 
   /**

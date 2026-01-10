@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <receiver
+      android:name="dev.jasonpearson.automobile.sdk.notifications.AutoMobileNotificationReceiver"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="dev.jasonpearson.automobile.sdk.NOTIFICATION_POST" />
+      </intent-filter>
+    </receiver>
+
+    <receiver
+      android:name="dev.jasonpearson.automobile.sdk.notifications.AutoMobileNotificationActionReceiver"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="dev.jasonpearson.automobile.sdk.NOTIFICATION_ACTION" />
+      </intent-filter>
+    </receiver>
+  </application>
+</manifest>

@@ -162,6 +162,7 @@ The schema validates the following tool names:
 - `pressButton`
 - `auditAccessibility`
 - `openLink`
+- `postNotification`
 - `criticalSection`
 
 ### Parameter Formats

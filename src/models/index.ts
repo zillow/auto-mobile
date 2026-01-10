@@ -38,6 +38,7 @@ export * from "./ObserveResult";
 export * from "./Recomposition";
 export * from "./GetCalendarSystemResult";
 export * from "./OpenURLResult";
+export * from "./PostNotificationResult";
 export * from "./PinchResult";
 export * from "./PinchOnOptions";
 export * from "./PinchOnResult";
