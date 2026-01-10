@@ -103,9 +103,12 @@ export function registerAppTools(
     try {
       const installApp = new InstallApp(device);
       const result = await installApp.execute(args.apkPath, undefined, signal);
+      const message = result.warning
+        ? `Installed app from ${args.apkPath}. Warning: ${result.warning}`
+        : `Installed app from ${args.apkPath}`;
 
       return createJSONToolResponse({
-        message: `Installed app from ${args.apkPath}`,
+        message,
         ...result
       });
     } catch (error) {
