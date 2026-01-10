@@ -1125,64 +1125,64 @@ jobs:
             const formatMs = value => `${value.toFixed(1)}ms`;
             const formatBytes = value => `${(value / (1024 * 1024)).toFixed(1)}MB`;
 
-            let body = '## MCP Startup Benchmark\\n\\n';
+            let body = '## MCP Startup Benchmark\n\n';
 
             if (report.results.mcpServer) {
-              body += '### MCP Server (stdio)\\n\\n';
-              body += '| Mode | Ready | First Tool Call | Heap Used |\\n';
-              body += '|------|-------|-----------------|-----------|\\n';
+              body += '### MCP Server (stdio)\n\n';
+              body += '| Mode | Ready | First Tool Call | Heap Used |\n';
+              body += '|------|-------|-----------------|-----------|\n';
               for (const run of report.results.mcpServer.runs || []) {
                 const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
-                body += `| ${run.mode} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToFirstToolCallMs)} | ${heap} |\\n`;
+                body += `| ${run.mode} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToFirstToolCallMs)} | ${heap} |\n`;
               }
-              body += '\\n';
+              body += '\n';
 
               const discovery = report.results.mcpServer.deviceDiscovery;
               if (discovery) {
                 if (discovery.skipped) {
-                  body += `Device discovery: skipped (${discovery.reason || 'no reason provided'})\\n\\n`;
+                  body += `Device discovery: skipped (${discovery.reason || 'no reason provided'})\n\n`;
                 } else if (discovery.scenarios?.length) {
-                  body += 'Device discovery scenarios:\\n';
+                  body += 'Device discovery scenarios:\n';
                   for (const scenario of discovery.scenarios) {
-                    body += `- ${scenario.name}: ${formatMs(scenario.durationMs)} (${scenario.deviceCount} device(s))\\n`;
+                    body += `- ${scenario.name}: ${formatMs(scenario.durationMs)} (${scenario.deviceCount} device(s))\n`;
                   }
-                  body += '\\n';
+                  body += '\n';
                 }
               }
             }
 
             if (report.results.daemon) {
-              body += '### Daemon\\n\\n';
-              body += '| Mode | Spawn | Ready | Responsive | Heap Used |\\n';
-              body += '|------|-------|-------|------------|-----------|\\n';
+              body += '### Daemon\n\n';
+              body += '| Mode | Spawn | Ready | Responsive | Heap Used |\n';
+              body += '|------|-------|-------|------------|-----------|\n';
               for (const run of report.results.daemon.runs || []) {
                 const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
-                body += `| ${run.mode} | ${formatMs(run.spawnMs)} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToResponsiveMs)} | ${heap} |\\n`;
+                body += `| ${run.mode} | ${formatMs(run.spawnMs)} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToResponsiveMs)} | ${heap} |\n`;
               }
-              body += '\\n';
+              body += '\n';
             }
 
             if (report.comparisons?.regressions?.length) {
               const failures = report.comparisons.regressions.filter(r => !r.passed);
               if (failures.length > 0) {
-                body += '### ⚠️ Regressions\\n\\n';
+                body += '### ⚠️ Regressions\n\n';
                 for (const regression of failures) {
-                  body += `- ${regression.metric}: ${regression.actual.toFixed(2)} > ${regression.threshold.toFixed(2)} (+${regression.regression.toFixed(1)}%)\\n`;
+                  body += `- ${regression.metric}: ${regression.actual.toFixed(2)} > ${regression.threshold.toFixed(2)} (+${regression.regression.toFixed(1)}%)\n`;
                 }
-                body += '\\n';
+                body += '\n';
               }
             }
 
             if (report.skips?.length) {
-              body += '### Skipped Checks\\n\\n';
+              body += '### Skipped Checks\n\n';
               for (const skip of report.skips) {
-                body += `- ${skip}\\n`;
+                body += `- ${skip}\n`;
               }
-              body += '\\n';
+              body += '\n';
             }
 
-            body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\\n`;
-            body += `\\n_Generated at ${report.timestamp}_`;
+            body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\n`;
+            body += `\n_Generated at ${report.timestamp}_`;
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
