@@ -1,0 +1,2542 @@
+[
+  {
+    "name": "biometricAuth",
+    "description": "Simulate biometric authentication (fingerprint) on Android emulators. Trigger match/fail/cancel actions for testing biometric prompts.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "match",
+            "fail",
+            "cancel"
+          ],
+          "description": "Biometric action: 'match' triggers successful authentication, 'fail' simulates non-matching biometric, 'cancel' cancels the prompt"
+        },
+        "modality": {
+          "type": "string",
+          "enum": [
+            "any",
+            "fingerprint",
+            "face"
+          ],
+          "description": "Biometric modality (default: 'any'). Currently only 'fingerprint' is reliably supported on Android emulators. 'face' is not consistently supported."
+        },
+        "fingerprintId": {
+          "type": "number",
+          "description": "Fingerprint ID to simulate (default: 1 for 'match', 2 for 'fail'). Use enrolled ID (typically 1) for match, non-enrolled ID (typically 2) for fail."
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bugReport",
+    "description": "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, and optionally a screenshot. The report can be saved to a file for sharing with AutoMobile developers.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Target platform"
+        },
+        "appId": {
+          "type": "string",
+          "description": "App package ID to filter logcat for specific app"
+        },
+        "includeScreenshot": {
+          "type": "boolean",
+          "description": "Whether to include screenshot (default: true)"
+        },
+        "includeRawHierarchy": {
+          "type": "boolean",
+          "description": "Whether to include raw view hierarchy XML (default: true)"
+        },
+        "includeLogcat": {
+          "type": "boolean",
+          "description": "Whether to include logcat entries (default: true)"
+        },
+        "logcatLines": {
+          "type": "number",
+          "description": "Number of recent logcat lines to include (default: 100)"
+        },
+        "saveToFile": {
+          "type": "boolean",
+          "description": "Whether to save full report to a file (default: false)"
+        },
+        "saveDir": {
+          "type": "string",
+          "description": "Directory to save report to"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "captureDeviceSnapshot",
+    "description": "Capture current device state as a snapshot for later restoration. Supports both VM snapshots (emulators) and ADB-based capture (all devices).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "snapshotName": {
+          "type": "string",
+          "description": "Name for the snapshot (auto-generated if not provided)"
+        },
+        "includeAppData": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include app data directories in snapshot"
+        },
+        "includeSettings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include system settings in snapshot"
+        },
+        "useVmSnapshot": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use emulator VM snapshot if available (faster, emulator only)"
+        },
+        "strictBackupMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, fail entire snapshot if app data backup fails or times out"
+        },
+        "backupTimeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Timeout in milliseconds for adb backup user confirmation (default: 30000ms)"
+        },
+        "userApps": {
+          "type": "string",
+          "enum": [
+            "current",
+            "all"
+          ],
+          "default": "current",
+          "description": "Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "clearText",
+    "description": "Clear text from focused input",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "clipboard",
+    "description": "Clipboard operations (copy/paste/clear/get)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "copy",
+            "paste",
+            "clear",
+            "get"
+          ],
+          "description": "Clipboard action: copy=set clipboard, paste=paste into focused field, clear=clear clipboard, get=get clipboard content"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text to copy (required for 'copy' action)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "criticalSection",
+    "description": "Coordinate multiple devices at a synchronization barrier and execute steps serially. All devices must reach the critical section before any can proceed. Steps execute one device at a time in the order they acquire the lock.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "lock": {
+          "type": "string",
+          "description": "Global lock identifier. All devices using the same lock name will wait for each other at this barrier."
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tool": {
+                "type": "string",
+                "description": "Tool name to execute"
+              },
+              "params": {
+                "type": "object",
+                "additionalProperties": {},
+                "description": "Tool-specific parameters"
+              },
+              "label": {
+                "type": "string",
+                "description": "Optional human-readable label"
+              }
+            },
+            "required": [
+              "tool",
+              "params"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "description": "Steps to execute serially within the critical section. Each step should target a specific device using the 'device' parameter."
+        },
+        "deviceCount": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Number of devices expected to reach this critical section. All devices must arrive before any can proceed."
+        },
+        "timeout": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Timeout in milliseconds for waiting at the barrier (default: 30000ms)"
+        }
+      },
+      "required": [
+        "lock",
+        "steps",
+        "deviceCount"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "daemon_available_devices",
+    "description": "Query number of available devices in daemon pool",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "daemon_refresh_devices",
+    "description": "Refresh device pool by discovering connected devices",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "daemon_release_session",
+    "description": "Release a session and free its device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "Session UUID to release"
+        }
+      },
+      "required": [
+        "sessionId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "daemon_session_info",
+    "description": "Get information about an existing session",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "description": "Session UUID"
+        }
+      },
+      "required": [
+        "sessionId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "debugSearch",
+    "description": "Debug element search operations. Shows all matching elements, which one would be selected, and near-misses that almost matched. Use this to understand why an element isn't being found or why the wrong element is being selected.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Target platform"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text to search for in elements"
+        },
+        "resourceId": {
+          "type": "string",
+          "description": "Resource ID to search for"
+        },
+        "container": {
+          "type": "object",
+          "properties": {
+            "elementId": {
+              "type": "string",
+              "description": "Container element resource ID to restrict search within"
+            },
+            "text": {
+              "type": "string",
+              "description": "Container element text to restrict search within"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Container element to scope the search - specify elementId or text to locate it"
+        },
+        "fuzzyMatch": {
+          "type": "boolean",
+          "description": "Whether to use fuzzy matching (default: true)"
+        },
+        "caseSensitive": {
+          "type": "boolean",
+          "description": "Whether to use case-sensitive matching (default: false)"
+        },
+        "includeNearMisses": {
+          "type": "boolean",
+          "description": "Include elements that almost matched (default: true)"
+        },
+        "maxNearMisses": {
+          "type": "number",
+          "description": "Maximum number of near-misses to include (default: 10)"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deleteSnapshot",
+    "description": "Delete a snapshot permanently",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "snapshotName": {
+          "type": "string",
+          "description": "Name of the snapshot to delete"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "snapshotName"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deleteVideoRecording",
+    "description": "Delete an archived video recording by ID.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "recordingId": {
+          "type": "string",
+          "description": "Recording ID to delete"
+        }
+      },
+      "required": [
+        "recordingId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "disableDemoMode",
+    "description": "Disable demo mode",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "doctor",
+    "description": "Run diagnostic checks to verify AutoMobile setup and environment configuration",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "android": {
+          "type": "boolean",
+          "description": "Run Android-specific checks only"
+        },
+        "ios": {
+          "type": "boolean",
+          "description": "Run iOS-specific checks only"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "dragAndDrop",
+    "description": "Drag and drop element",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Source text"
+            },
+            "elementId": {
+              "type": "string",
+              "description": "Source ID"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Source element"
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Target text"
+            },
+            "elementId": {
+              "type": "string",
+              "description": "Target ID"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Target element"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Drag duration ms (default: 500)"
+        },
+        "holdTime": {
+          "type": "number",
+          "description": "Hold time ms (default: 200)"
+        },
+        "dropDelay": {
+          "type": "number",
+          "description": "Drop delay ms (default: 100)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "enableDemoMode",
+    "description": "Enable demo mode",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "type": "string",
+          "description": "Time in HHMM (e.g., 1000)"
+        },
+        "batteryLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Battery % (0-100)"
+        },
+        "batteryPlugged": {
+          "type": "boolean",
+          "description": "Charging status"
+        },
+        "wifiLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "WiFi strength (0-4)"
+        },
+        "mobileDataType": {
+          "type": "string",
+          "enum": [
+            "4g",
+            "5g",
+            "lte",
+            "3g",
+            "edge",
+            "none"
+          ],
+          "description": "Data type"
+        },
+        "mobileSignalLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "Signal strength (0-4)"
+        },
+        "hideNotifications": {
+          "type": "boolean",
+          "description": "Hide notifications"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "executePlan",
+    "description": "Execute a series of tool calls from a YAML plan content. Stops execution if any step fails (success: false). Optionally can resume execution from a specific step index.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "planContent": {
+          "type": "string",
+          "description": "YAML plan content"
+        },
+        "startStep": {
+          "type": "number",
+          "default": 0,
+          "description": "Start step index (0-based, default: 0)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for parallel execution"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Device ID"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Device labels for multi-device plans"
+        },
+        "deviceAllocationTimeoutMs": {
+          "type": "number",
+          "default": 300000,
+          "description": "Timeout in milliseconds for allocating all devices (default: 300000 = 5 minutes)"
+        },
+        "abortStrategy": {
+          "type": "string",
+          "enum": [
+            "immediate",
+            "finish-current-step"
+          ],
+          "default": "immediate",
+          "description": "Abort strategy: immediate (default) or finish-current-step"
+        },
+        "testMetadata": {
+          "type": "object",
+          "properties": {
+            "testClass": {
+              "type": "string"
+            },
+            "testMethod": {
+              "type": "string"
+            },
+            "appVersion": {
+              "type": "string"
+            },
+            "gitCommit": {
+              "type": "string"
+            },
+            "targetSdk": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "jdkVersion": {
+              "type": "string"
+            },
+            "jvmTarget": {
+              "type": "string"
+            },
+            "gradleVersion": {
+              "type": "string"
+            },
+            "isCi": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "testClass",
+            "testMethod"
+          ],
+          "additionalProperties": false,
+          "description": "Test metadata for timing history"
+        },
+        "cleanupAppId": {
+          "type": "string",
+          "description": "App ID to terminate after execution"
+        },
+        "cleanupClearAppData": {
+          "type": "boolean",
+          "description": "Clear app data on cleanup"
+        }
+      },
+      "required": [
+        "planContent",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "explore",
+    "description": "Automatically explore app to build navigation graph",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "maxInteractions": {
+          "type": "number",
+          "description": "Max interactions (default: 50)"
+        },
+        "timeoutMs": {
+          "type": "number",
+          "description": "Timeout ms (default: 300000)"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "breadth-first",
+            "depth-first",
+            "weighted"
+          ],
+          "description": "Strategy (default: weighted)"
+        },
+        "resetToHome": {
+          "type": "boolean",
+          "description": "Reset to home periodically (default: false)"
+        },
+        "resetInterval": {
+          "type": "number",
+          "description": "Reset interval (default: 15)"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "discover",
+            "validate",
+            "hybrid"
+          ],
+          "description": "Mode (default: hybrid)"
+        },
+        "packageName": {
+          "type": "string",
+          "description": "Package to limit exploration"
+        },
+        "dryRun": {
+          "type": "boolean",
+          "description": "Dry run (no interactions)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "default": "android"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "getCalendarSystem",
+    "description": "Get calendar system",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "getDeepLinks",
+    "description": "Query deep links for app",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "appId": {
+          "type": "string",
+          "description": "App package ID"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "appId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "getNavigationGraph",
+    "description": "Get navigation graph for debugging",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "default": "android"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "getTestTimings",
+    "description": "Retrieve aggregated historical test execution timing statistics for optimization.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "lookbackDays": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Number of days of history to include."
+        },
+        "limit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 5000,
+          "description": "Maximum number of tests to return."
+        },
+        "minSamples": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum sample size to include a test."
+        },
+        "orderBy": {
+          "type": "string",
+          "enum": [
+            "lastRun",
+            "averageDuration",
+            "sampleSize"
+          ],
+          "description": "Sort key for results."
+        },
+        "orderDirection": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "description": "Sort direction for results."
+        },
+        "testClass": {
+          "type": "string",
+          "description": "Filter by test class name."
+        },
+        "testMethod": {
+          "type": "string",
+          "description": "Filter by test method name."
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Filter by device ID."
+        },
+        "deviceName": {
+          "type": "string",
+          "description": "Filter by device name."
+        },
+        "devicePlatform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Filter by device platform."
+        },
+        "deviceType": {
+          "type": "string",
+          "enum": [
+            "emulator",
+            "simulator",
+            "device"
+          ],
+          "description": "Filter by device type."
+        },
+        "appVersion": {
+          "type": "string",
+          "description": "Filter by app version."
+        },
+        "gitCommit": {
+          "type": "string",
+          "description": "Filter by git commit SHA."
+        },
+        "targetSdk": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Filter by target SDK."
+        },
+        "jdkVersion": {
+          "type": "string",
+          "description": "Filter by JDK version."
+        },
+        "jvmTarget": {
+          "type": "string",
+          "description": "Filter by JVM target."
+        },
+        "gradleVersion": {
+          "type": "string",
+          "description": "Filter by Gradle version."
+        },
+        "isCi": {
+          "type": "boolean",
+          "description": "Filter by CI mode."
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Filter by session UUID."
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "homeScreen",
+    "description": "Go to home screen",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "identifyInteractions",
+    "description": "Suggest likely interactions",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "filter": {
+          "type": "object",
+          "properties": {
+            "types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "navigation",
+                  "input",
+                  "action",
+                  "scroll",
+                  "toggle"
+                ]
+              },
+              "description": "Interaction types"
+            },
+            "minConfidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Min confidence (0-1)"
+            },
+            "limit": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Max results"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Filter options"
+        },
+        "includeContext": {
+          "type": "object",
+          "properties": {
+            "navigationGraph": {
+              "type": "boolean",
+              "description": "Include nav graph predictions"
+            },
+            "elementDetails": {
+              "type": "boolean",
+              "description": "Include element details"
+            },
+            "suggestedParams": {
+              "type": "boolean",
+              "description": "Include tool params"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Context options"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "imeAction",
+    "description": "Perform IME action",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "done",
+            "next",
+            "search",
+            "send",
+            "go",
+            "previous"
+          ],
+          "description": "IME action"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "inputText",
+    "description": "Input text",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Text to input"
+        },
+        "imeAction": {
+          "type": "string",
+          "enum": [
+            "done",
+            "next",
+            "search",
+            "send",
+            "go",
+            "previous"
+          ],
+          "description": "IME action after input"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "text",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "installApp",
+    "description": "Install APK file",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "apkPath": {
+          "type": "string",
+          "description": "APK file path"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "apkPath"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "killDevice",
+    "description": "Kill device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Device image name"
+            },
+            "deviceId": {
+              "type": "string",
+              "description": "Device ID"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "android",
+                "ios"
+              ],
+              "description": "Platform"
+            }
+          },
+          "required": [
+            "name",
+            "deviceId",
+            "platform"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "device"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "launchApp",
+    "description": "Launch app by package name",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "appId": {
+          "type": "string",
+          "description": "App package ID"
+        },
+        "clearAppData": {
+          "type": "boolean",
+          "description": "Clear app data before launch (default false)"
+        },
+        "coldBoot": {
+          "type": "boolean",
+          "description": "Cold boot app (default false)"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "appId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "listApps",
+    "description": "List installed apps",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "listDeviceImages",
+    "description": "List device images",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "listDevices",
+    "description": "List connected devices",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "listPerformanceAuditResults",
+    "description": "List UI performance audit results from the local database.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "startTime": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "Start timestamp (ISO string or epoch ms)"
+        },
+        "endTime": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "End timestamp (ISO string or epoch ms)"
+        },
+        "limit": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 500,
+          "description": "Max results to return"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Offset for pagination"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Optional device ID filter"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "listSnapshots",
+    "description": "List all available snapshots for a device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deviceId": {
+          "type": "string",
+          "description": "Filter snapshots by device ID"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "listVideoRecordings",
+    "description": "List archived video recordings and their metadata.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "navigateTo",
+    "description": "Navigate to screen using navigation graph",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "targetScreen": {
+          "type": "string",
+          "description": "Target screen name"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "default": "android"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "targetScreen"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "observe",
+    "description": "Get screen view hierarchy",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "openLink",
+    "description": "Open URL in browser",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL to open"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "url",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "openSystemTray",
+    "description": "Open system notification tray",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "pinchOn",
+    "description": "Pinch to zoom",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": [
+            "in",
+            "out"
+          ],
+          "description": "Pinch direction (in=zoom out, out=zoom in)"
+        },
+        "distanceStart": {
+          "type": "number",
+          "description": "Start distance px"
+        },
+        "distanceEnd": {
+          "type": "number",
+          "description": "End distance px"
+        },
+        "scale": {
+          "type": "number",
+          "description": "Scale multiplier"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Duration ms (default: 300)"
+        },
+        "rotationDegrees": {
+          "type": "number",
+          "description": "Rotation degrees (+ = clockwise)"
+        },
+        "includeSystemInsets": {
+          "type": "boolean",
+          "description": "Include system bars (default false)"
+        },
+        "container": {
+          "type": "object",
+          "properties": {
+            "elementId": {
+              "type": "string",
+              "description": "Container ID"
+            },
+            "text": {
+              "type": "string",
+              "description": "Container text"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Container to pinch within"
+        },
+        "autoTarget": {
+          "type": "boolean",
+          "description": "Auto-target surface (default true)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "direction",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "pressButton",
+    "description": "Press hardware button",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "button": {
+          "type": "string",
+          "enum": [
+            "home",
+            "back",
+            "menu",
+            "power",
+            "volume_up",
+            "volume_down",
+            "recent"
+          ],
+          "description": "Button to press"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "button",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "pressKey",
+    "description": "Press hardware key",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "enum": [
+            "home",
+            "back",
+            "menu",
+            "power",
+            "volume_up",
+            "volume_down",
+            "recent"
+          ],
+          "description": "Key to press"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "key",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "rawViewHierarchy",
+    "description": "Get raw view hierarchy data without parsing. Returns XML from uiautomator and/or JSON from accessibility service. Useful for debugging when parsed hierarchy doesn't match what's on screen.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Target platform"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "uiautomator",
+            "accessibility-service",
+            "both"
+          ],
+          "description": "Source for hierarchy extraction: 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "recentApps",
+    "description": "Open recent apps",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "restoreDeviceSnapshot",
+    "description": "Restore device to a previously captured snapshot state. Clears current state and restores apps, settings, and data.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "snapshotName": {
+          "type": "string",
+          "description": "Name of the snapshot to restore"
+        },
+        "useVmSnapshot": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use emulator VM snapshot if available (faster, emulator only)"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "snapshotName"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "rotate",
+    "description": "Rotate device orientation",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "orientation": {
+          "type": "string",
+          "enum": [
+            "portrait",
+            "landscape"
+          ],
+          "description": "Orientation"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "orientation",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "selectAllText",
+    "description": "Select all text in focused input",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "set24HourFormat",
+    "description": "Set 24-hour time format",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "24-hour format"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "enabled",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "setActiveDevice",
+    "description": "Set active device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "deviceId": {
+          "type": "string",
+          "description": "Device ID"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        }
+      },
+      "required": [
+        "deviceId",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "setLocale",
+    "description": "Switch locale",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "languageTag": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Locale tag (e.g., ar-SA, ja-JP)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "languageTag",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "setTextDirection",
+    "description": "Set RTL layout direction",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rtl": {
+          "type": "boolean",
+          "description": "RTL layout"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "rtl",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "setTimeZone",
+    "description": "Change time zone",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "zoneId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Zone ID (e.g., America/Los_Angeles)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "zoneId",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "shake",
+    "description": "Shake device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "duration": {
+          "type": "number",
+          "description": "Shake duration in ms (default: 1000)"
+        },
+        "intensity": {
+          "type": "number",
+          "description": "Shake acceleration intensity (default: 100)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "startDevice",
+    "description": "Start device",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Device name"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "android",
+                "ios"
+              ],
+              "description": "Platform"
+            },
+            "deviceId": {
+              "type": "string",
+              "description": "Device ID"
+            },
+            "isRunning": {
+              "type": "boolean",
+              "description": "Running status"
+            },
+            "source": {
+              "type": "string",
+              "description": "Source (local/remote)"
+            }
+          },
+          "required": [
+            "name",
+            "platform"
+          ],
+          "additionalProperties": false,
+          "description": "Device to start"
+        },
+        "timeoutMs": {
+          "type": "number",
+          "description": "Readiness timeout ms"
+        }
+      },
+      "required": [
+        "device"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "startVideoRecording",
+    "description": "Start a low-overhead video recording for the active device.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Target platform"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Optional device ID override"
+        },
+        "qualityPreset": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "description": "Recording quality preset"
+        },
+        "targetBitrateKbps": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Target bitrate in Kbps"
+        },
+        "maxThroughputMbps": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Max throughput in Mbps"
+        },
+        "fps": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Frames per second"
+        },
+        "resolution": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Override resolution width in pixels"
+            },
+            "height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Override resolution height in pixels"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "additionalProperties": false,
+          "description": "Override capture resolution"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "mp4"
+          ],
+          "description": "Video format"
+        },
+        "maxDurationSeconds": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Maximum recording duration in seconds"
+        },
+        "outputName": {
+          "type": "string",
+          "description": "Optional label to identify the recording"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "stopVideoRecording",
+    "description": "Stop an active video recording and archive it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "recordingId": {
+          "type": "string",
+          "description": "Recording ID to stop (defaults to latest active recording)"
+        }
+      },
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "swipeOn",
+    "description": "Swipe/scroll on screen or elements",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "includeSystemInsets": {
+          "type": "boolean",
+          "description": "Include system bars (default false)"
+        },
+        "container": {
+          "type": "object",
+          "properties": {
+            "elementId": {
+              "type": "string",
+              "description": "Container resource ID"
+            },
+            "text": {
+              "type": "string",
+              "description": "Container text"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Container to swipe within (elementId or text). REQUIRED for lists. Omit for full-screen swipes."
+        },
+        "autoTarget": {
+          "type": "boolean",
+          "description": "Auto-target scrollable container (default true)"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "up",
+            "down",
+            "left",
+            "right"
+          ],
+          "description": "Finger movement direction. up=finger up/reveals above, down=finger down/reveals below, left/right=finger left/right"
+        },
+        "gestureType": {
+          "type": "string",
+          "enum": [
+            "swipeFingerTowardsDirection",
+            "scrollTowardsDirection"
+          ],
+          "description": "swipeFingerTowardsDirection=finger moves in direction (default), scrollTowardsDirection=content scrolls in direction"
+        },
+        "lookFor": {
+          "type": "object",
+          "properties": {
+            "elementId": {
+              "type": "string",
+              "description": "ID of the element to look for"
+            },
+            "text": {
+              "type": "string",
+              "description": "Text to look for"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Swipe until we find a match"
+        },
+        "speed": {
+          "type": "string",
+          "enum": [
+            "slow",
+            "normal",
+            "fast"
+          ],
+          "description": "Scroll speed"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "direction",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "tapOn",
+    "description": "Tap UI elements by text or ID",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "container": {
+          "type": "object",
+          "properties": {
+            "elementId": {
+              "type": "string",
+              "description": "Container resource ID"
+            },
+            "text": {
+              "type": "string",
+              "description": "Container text"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Container to scope search (elementId or text)"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "tap",
+            "doubleTap",
+            "longPress",
+            "focus"
+          ],
+          "description": "Action type"
+        },
+        "text": {
+          "type": "string",
+          "description": "Text to tap (overrides id)"
+        },
+        "id": {
+          "type": "string",
+          "description": "Element ID to tap"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Long press duration (ms)"
+        },
+        "await": {
+          "type": "object",
+          "properties": {
+            "element": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Element ID to wait for"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Element text to wait for"
+                }
+              },
+              "additionalProperties": false,
+              "description": "Element to wait for"
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Wait timeout ms (default: 5000)"
+            }
+          },
+          "required": [
+            "element"
+          ],
+          "additionalProperties": false,
+          "description": "Wait for element after tap"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "terminateApp",
+    "description": "Terminate app by package name",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "appId": {
+          "type": "string",
+          "description": "App package ID"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "appId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  }
+]

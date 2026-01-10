@@ -81,6 +81,10 @@ Current thresholds represent baseline + 10% buffer to allow for incremental grow
 - `build.ts` - Compile TypeScript to JavaScript for distribution
 - `npm/transform-readme.js` - Transform README for npm package
 
+### Tool Definition Scripts
+
+- `update-tool-definitions.sh` - Regenerate and stage `schemas/tool-definitions.json` for IDE YAML completion
+
 ### Validation Scripts
 
 See individual script directories for specialized validation:

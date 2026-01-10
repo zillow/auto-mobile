@@ -96,7 +96,10 @@ object TestPlanValidator {
             return schema!!
         }
 
-        val schemaStream = javaClass.classLoader.getResourceAsStream("schemas/test-plan.schema.json")
+        val schemaStream = getResourceStream(
+            "test-plan.schema.json",
+            "schemas/test-plan.schema.json"
+        )
             ?: throw IllegalStateException(
                 "Could not find test-plan.schema.json in classpath resources. " +
                 "Ensure schemas/test-plan.schema.json is included in the plugin resources."
@@ -110,6 +113,17 @@ object TestPlanValidator {
         schema = factory.getSchema(schemaJson)
 
         return schema!!
+    }
+
+    private fun getResourceStream(vararg paths: String): java.io.InputStream? {
+        val classLoader = javaClass.classLoader
+        for (path in paths) {
+            val stream = classLoader.getResourceAsStream(path)
+            if (stream != null) {
+                return stream
+            }
+        }
+        return null
     }
 
     /**

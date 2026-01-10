@@ -21,6 +21,7 @@
 
     <!-- YAML test plan validation -->
     <externalAnnotator language="yaml" implementationClass="dev.jasonpearson.automobile.ide.yaml.TestPlanExternalAnnotator" />
+    <completion.contributor language="yaml" implementationClass="dev.jasonpearson.automobile.ide.yaml.TestPlanCompletionContributor" />
     <localInspection language="yaml"
                      displayName="AutoMobile Test Plan Validation"
                      groupPath="AutoMobile"

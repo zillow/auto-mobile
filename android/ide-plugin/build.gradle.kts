@@ -23,6 +23,12 @@ java {
   }
 }
 
+sourceSets {
+  named("main") {
+    resources.srcDir(rootProject.projectDir.parentFile.resolve("schemas"))
+  }
+}
+
 dependencies {
   // Shared validation module
   implementation(project(":test-plan-validation"))
