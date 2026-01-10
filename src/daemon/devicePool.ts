@@ -41,6 +41,8 @@ export class DevicePool {
   private sessionManager: SessionManager;
   private assignmentMutex = new Mutex();
   private timer: Timer;
+  private lastUsedAtMarker = 0;
+  private lastReleasedDeviceId: string | null = null;
 
   // Max consecutive errors before marking device as failed
   private readonly MAX_DEVICE_ERRORS = 5;
@@ -63,7 +65,7 @@ export class DevicePool {
    * Typically gets devices from --device-list or by querying emulator status.
    */
   async initializeWithDevices(deviceIds: string[]): Promise<void> {
-    const now = Date.now();
+    const now = this.seedLastUsedAt(this.timer.now());
 
     for (const deviceId of deviceIds) {
       this.devices.set(deviceId, {
@@ -103,7 +105,7 @@ export class DevicePool {
       const discoveryTime = Date.now() - startTime;
       logger.info(`Device discovery completed in ${discoveryTime}ms, found ${bootedDevices.length} devices`);
 
-      const now = Date.now();
+      const now = this.seedLastUsedAt(this.timer.now());
       let addedCount = 0;
 
       for (const device of bootedDevices) {
@@ -154,7 +156,7 @@ export class DevicePool {
       id: deviceId,
       sessionId: null,
       status: "idle",
-      lastUsedAt: Date.now(),
+      lastUsedAt: this.seedLastUsedAt(this.timer.now()),
       assignmentCount: 0,
       errorCount: 0,
     });
@@ -315,6 +317,23 @@ export class DevicePool {
     }
   }
 
+  private seedLastUsedAt(now: number): number {
+    if (now > this.lastUsedAtMarker) {
+      this.lastUsedAtMarker = now;
+    }
+    return this.lastUsedAtMarker;
+  }
+
+  private nextLastUsedAt(): number {
+    const now = this.timer.now();
+    if (now <= this.lastUsedAtMarker) {
+      this.lastUsedAtMarker += 1;
+      return this.lastUsedAtMarker;
+    }
+    this.lastUsedAtMarker = now;
+    return now;
+  }
+
   /**
    * Assign a device to a session
    *
@@ -416,14 +435,19 @@ export class DevicePool {
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: devices.size = ${this.devices.size}`);
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: device IDs = ${Array.from(this.devices.keys()).join(", ")}`);
 
-      // Find idle devices and select least recently used for better distribution
+      // Find idle devices and prefer most recently released for reuse
       const idleDevices = Array.from(this.devices.values()).filter(d => d.status === "idle");
       let device: PooledDevice | undefined;
       if (idleDevices.length > 0) {
-        // Sort by lastUsedAt (ascending) to get least recently used device
-        // This provides better load distribution across devices
-        idleDevices.sort((a, b) => a.lastUsedAt - b.lastUsedAt);
-        device = idleDevices[0];
+        if (this.lastReleasedDeviceId) {
+          device = idleDevices.find(d => d.id === this.lastReleasedDeviceId);
+        }
+        if (!device) {
+          // Sort by lastUsedAt (ascending) to get least recently used device
+          // This provides better load distribution across devices
+          idleDevices.sort((a, b) => a.lastUsedAt - b.lastUsedAt);
+          device = idleDevices[0];
+        }
       }
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: found idle device = ${device?.id || "none"}`);
 
@@ -459,7 +483,7 @@ export class DevicePool {
       // Assign to session
       device.sessionId = sessionId;
       device.status = "busy";
-      device.lastUsedAt = Date.now();
+      device.lastUsedAt = this.nextLastUsedAt();
       device.assignmentCount++;
       device.errorCount = 0; // Reset errors on successful assignment
 
@@ -499,6 +523,7 @@ export class DevicePool {
     device.sessionId = null;
     device.status = "idle";
     device.errorCount = 0;
+    this.lastReleasedDeviceId = deviceId;
 
     logger.info(`Released device ${deviceId} from session ${sessionId}`);
   }
