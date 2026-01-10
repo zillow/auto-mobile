@@ -172,7 +172,7 @@ const tapOnContainerSchema = z.object({
 
 export const tapOnSchema = addDeviceTargetingToSchema(z.object({
   container: tapOnContainerSchema.optional().describe(
-    "Container to scope search (elementId or text)"
+    "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
   text: z.string().optional().describe("Text to tap (overrides id)"),

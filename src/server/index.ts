@@ -68,7 +68,7 @@ function formatToolParamError(toolName: string, error: unknown): string {
   });
 
   const hints: string[] = [];
-  if (toolName === "swipeOn") {
+  if (toolName === "swipeOn" || toolName === "tapOn") {
     const containerIssue = error.issues.find(issue => issue.path[0] === "container");
     if (containerIssue) {
       hints.push("container must be an object like { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }");

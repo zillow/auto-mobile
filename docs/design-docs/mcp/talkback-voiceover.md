@@ -651,8 +651,12 @@ async function swipeOn(params: SwipeParams): Promise<SwipeResult> {
         ? 'SCROLL_BACKWARD'
         : 'SCROLL_FORWARD';
 
+      const selector = params.container.elementId
+        ? { resourceId: params.container.elementId }
+        : { text: params.container.text };
+
       const success = await accessibilityClient.performAction(deviceId, {
-        selector: { resourceId: params.container },
+        selector,
         action: scrollAction,
       });
 
@@ -1036,7 +1040,7 @@ await tapOn({ text: "Log in" });
 **Standard Automation**:
 ```typescript
 await swipeOn({
-  container: "item_list",
+  container: { elementId: "item_list" },
   direction: "up",
   lookFor: { text: "Item 50" },
 });
@@ -1052,7 +1056,7 @@ await tapOn({ text: "Item 50" });
 ```typescript
 // Auto-detection enables two-finger swipe or accessibility actions
 await swipeOn({
-  container: "item_list",
+  container: { elementId: "item_list" },
   direction: "up",
   lookFor: { text: "Item 50" },
   // Internal: Uses ACTION_SCROLL_FORWARD or two-finger swipe
@@ -1076,8 +1080,12 @@ async function swipeOn(params: SwipeParams) {
 
     while (!found && iterations < maxIterations) {
       // Try accessibility scroll
+      const selector = params.container.elementId
+        ? { resourceId: params.container.elementId }
+        : { text: params.container.text };
+
       const scrollSuccess = await accessibilityClient.performAction({
-        selector: { resourceId: params.container },
+        selector,
         action: params.direction === 'up' ? 'SCROLL_FORWARD' : 'SCROLL_BACKWARD',
       });
 
@@ -1826,7 +1834,7 @@ fun announceForAccessibility(text: String) {
 **Enhanced API**:
 ```typescript
 await swipeOn({
-  container: "list",
+  container: { elementId: "list" },
   direction: "up",
   lookFor: { text: "Item 50" },
   focusTarget: true,              // Set focus when found
