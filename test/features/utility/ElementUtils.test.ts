@@ -737,8 +737,8 @@ describe("ElementUtils", () => {
             isFocused: true,
             hierarchy: {
               $: {
-                bounds: "[0,0][40,40]",
-                class: "android.widget.Button",
+                "bounds": "[0,0][40,40]",
+                "class": "android.widget.Button",
                 "resource-id": "com.example:id/cancel_button"
               }
             }
@@ -751,8 +751,8 @@ describe("ElementUtils", () => {
             isFocused: true,
             hierarchy: {
               $: {
-                bounds: "[0,0][90,90]",
-                class: "android.widget.Button",
+                "bounds": "[0,0][90,90]",
+                "class": "android.widget.Button",
                 "resource-id": "com.example:id/cancel_button"
               }
             }
@@ -781,8 +781,8 @@ describe("ElementUtils", () => {
             node: [
               {
                 $: {
-                  bounds: "[30,30][220,220]",
-                  class: "android.widget.Button",
+                  "bounds": "[30,30][220,220]",
+                  "class": "android.widget.Button",
                   "resource-id": "com.example:id/cancel_button"
                 }
               }
@@ -798,8 +798,8 @@ describe("ElementUtils", () => {
             isFocused: true,
             hierarchy: {
               $: {
-                bounds: "[0,0][60,60]",
-                class: "android.widget.Button",
+                "bounds": "[0,0][60,60]",
+                "class": "android.widget.Button",
                 "resource-id": "com.example:id/cancel_button"
               }
             }

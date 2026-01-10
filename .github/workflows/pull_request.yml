@@ -364,6 +364,43 @@ jobs:
       - name: "Run Tests"
         run: bun run test
 
+  memory-leak-detection:
+    name: "Memory Leak Detection"
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    timeout-minutes: 30
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Setup Node for native addons"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18.20.5"
+
+      - name: "Trust heapdump"
+        run: bun pm trust heapdump
+
+      - name: "Trust memwatch-next"
+        continue-on-error: true
+        run: bun pm trust memwatch-next
+
+      - name: "Rebuild native dependencies"
+        run: bun install --frozen-lockfile
+
+      - name: "Run Memory Leak Detection"
+        run: bun run test:memory-leaks
+
+      - name: "Upload Heap Snapshots"
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heap-snapshots
+          path: "*.heapsnapshot"
+
   # =============================================================================
   # Android Build and Test Jobs (Skip for docs-only changes)
   # =============================================================================

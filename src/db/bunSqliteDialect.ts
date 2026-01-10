@@ -1,4 +1,4 @@
-import { Database as BunDatabase } from "bun:sqlite";
+import type { Database as BunDatabase } from "bun:sqlite";
 import {
   DatabaseConnection,
   DatabaseIntrospector,

@@ -86,6 +86,7 @@ nav:
           - 'Startup': using/perf-analysis/startup.md
           - 'Screen Transition': using/perf-analysis/screen-transition.md
           - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
+          - 'Memory Profiling': using/perf-analysis/memory-profiling.md
       - 'Accessibility':
           - 'Contrast': using/a11y/contrast.md
           - 'Tap Targets': using/a11y/tap-targets.md

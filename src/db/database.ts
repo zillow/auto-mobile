@@ -2,11 +2,31 @@ import { Kysely } from "kysely";
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
-import { Database as BunDatabase } from "bun:sqlite";
 import type { Database as DatabaseSchema } from "./types";
 import { runMigrations } from "./migrator";
 import { logger } from "../utils/logger";
 import { BunSqliteDialect } from "./bunSqliteDialect";
+
+type BunDatabaseConstructor = typeof import("bun:sqlite").Database;
+
+let bunDatabaseConstructor: BunDatabaseConstructor | null = null;
+
+function isBunRuntime(): boolean {
+  return typeof (process.versions as Record<string, string> | undefined)?.bun === "string";
+}
+
+function resolveBunDatabaseConstructor(): BunDatabaseConstructor {
+  if (!isBunRuntime()) {
+    throw new Error("bun:sqlite is only available when running under Bun.");
+  }
+
+  if (!bunDatabaseConstructor) {
+    const bunSqliteModule = require("bun:sqlite") as { Database: BunDatabaseConstructor };
+    bunDatabaseConstructor = bunSqliteModule.Database;
+  }
+
+  return bunDatabaseConstructor;
+}
 
 // Database file location (defaults to ~/.auto-mobile/auto-mobile.db)
 const DEFAULT_DB_DIR = path.join(os.homedir(), ".auto-mobile");
@@ -35,7 +55,8 @@ export function getDatabase(): Kysely<DatabaseSchema> {
     }
 
     // Use Bun's built-in SQLite
-    const sqliteDb = new BunDatabase(DB_PATH);
+    const BunDatabaseConstructor = resolveBunDatabaseConstructor();
+    const sqliteDb = new BunDatabaseConstructor(DB_PATH);
 
     // Enable WAL mode for better concurrent read performance
     sqliteDb.exec("PRAGMA journal_mode = WAL;");

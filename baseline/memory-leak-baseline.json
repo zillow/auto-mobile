@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-01-10T06:19:04.512Z",
+  "passed": true,
+  "config": {
+    "iterations": 1000,
+    "opsPerSecond": 10,
+    "operations": [
+      "observe",
+      "tapOn",
+      "swipeOn",
+      "inputText"
+    ],
+    "heapGrowthLimitMb": 50,
+    "warmupIterations": 100,
+    "gcEvery": 100
+  },
+  "results": {
+    "durationMs": 100127.662833,
+    "operationCounts": {
+      "observe": 250,
+      "tapOn": 250,
+      "swipeOn": 250,
+      "inputText": 250
+    },
+    "heapUsedStart": 24333376,
+    "heapUsedEnd": 24724544,
+    "heapGrowthBytes": 391168,
+    "heapDiffBytes": 0,
+    "effectiveGrowthBytes": 391168
+  },
+  "memwatch": {
+    "leakDetected": false,
+    "leakEventCount": 0
+  }
+}
