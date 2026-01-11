@@ -31,7 +31,6 @@ import { registerPlanTools } from "./planTools";
 import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
 import { registerTestTimingTools } from "./testTimingTools";
-import { registerPerformanceTools } from "./performanceTools";
 import { registerCriticalSectionTools } from "./criticalSectionTools";
 import { registerVideoRecordingTools } from "./videoRecordingTools";
 import { registerSnapshotTools } from "./snapshotTools";
@@ -109,7 +108,6 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerTestTimingTools();
   registerDoctorTools();
   registerFeatureFlagTools();
-  registerPerformanceTools();
   registerCriticalSectionTools();
   registerVideoRecordingTools();
   registerSnapshotTools();

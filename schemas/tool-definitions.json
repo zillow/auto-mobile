@@ -1248,46 +1248,6 @@
     }
   },
   {
-    "name": "listPerformanceAuditResults",
-    "description": "List UI performance audit results from the local database.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "startTime": {
-          "type": [
-            "string",
-            "number"
-          ],
-          "description": "Start timestamp (ISO string or epoch ms)"
-        },
-        "endTime": {
-          "type": [
-            "string",
-            "number"
-          ],
-          "description": "End timestamp (ISO string or epoch ms)"
-        },
-        "limit": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 500,
-          "description": "Max results to return"
-        },
-        "offset": {
-          "type": "integer",
-          "minimum": 0,
-          "description": "Offset for pagination"
-        },
-        "deviceId": {
-          "type": "string",
-          "description": "Optional device ID filter"
-        }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "listSnapshots",
     "description": "List all available snapshots for a device",
     "inputSchema": {

@@ -14,7 +14,6 @@ object ValidTools {
         "executePlan", "criticalSection",
         "getDeepLinks",
         "getNavigationGraph", "explore", "identifyInteractions",
-        "listPerformanceAuditResults",
         "captureDeviceSnapshot", "restoreDeviceSnapshot", "listSnapshots", "deleteSnapshot",
         "startVideoRecording", "stopVideoRecording", "listVideoRecordings", "deleteVideoRecording",
         "listDeviceImages",

@@ -65,7 +65,6 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 
 - 🚩 `listFeatureFlags` lists all available feature flags and their current states.
 - ⚙️ `setFeatureFlag` enables/disables feature flags for experimental features and performance tuning.
-- 📊 `listPerformanceAuditResults` lists UI performance audit results from the local database.
 - 🎬 `enableDemoMode` enables demo mode with consistent status bar indicators for screenshots.
 - 🎬 `disableDemoMode` disables demo mode and returns to normal status bar behavior.
 

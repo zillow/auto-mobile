@@ -34,7 +34,6 @@ import { registerPlanTools } from "../src/server/planTools";
 import { registerDoctorTools } from "../src/server/doctorTools";
 import { registerFeatureFlagTools } from "../src/server/featureFlagTools";
 import { registerTestTimingTools } from "../src/server/testTimingTools";
-import { registerPerformanceTools } from "../src/server/performanceTools";
 
 // Import resource registration functions
 import { registerObservationResources } from "../src/server/observationResources";
@@ -116,7 +115,6 @@ function registerAllTools(): void {
   registerTestTimingTools();
   registerDoctorTools();
   registerFeatureFlagTools();
-  registerPerformanceTools();
 
   // Only register debug tools if debug mode is enabled
   // For estimation purposes, we'll skip them to match typical production usage

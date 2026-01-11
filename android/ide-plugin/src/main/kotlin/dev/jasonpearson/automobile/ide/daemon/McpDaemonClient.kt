@@ -100,25 +100,9 @@ class McpDaemonClient(
       limit: Int?,
       offset: Int?,
   ): PerformanceAuditHistoryResult {
-    val response =
-        callTool(
-            "listPerformanceAuditResults",
-            buildJsonObject {
-              if (startTime != null) {
-                put("startTime", JsonPrimitive(startTime))
-              }
-              if (endTime != null) {
-                put("endTime", JsonPrimitive(endTime))
-              }
-              if (limit != null) {
-                put("limit", JsonPrimitive(limit))
-              }
-              if (offset != null) {
-                put("offset", JsonPrimitive(offset))
-              }
-            },
-    )
-    return decodeToolResponse(json, response, PerformanceAuditHistoryResult.serializer())
+    val uri = buildPerformanceResultsUri(startTime, endTime, limit, offset)
+    val contents = readResource(uri)
+    return decodePerformanceAuditResource(json, contents)
   }
 
   override fun getTestTimings(query: TestTimingQuery): TestTimingSummary {

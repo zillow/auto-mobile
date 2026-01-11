@@ -71,11 +71,7 @@ export async function buildPerformanceAuditResponse(
 
   const range = getTimestampRange(page.results.map(result => result.timestamp));
   const toolCalls = range
-    ? await toolCallRepository.listToolNamesBetween(
-      range.start,
-      range.end,
-      ["listPerformanceAuditResults"]
-    )
+    ? await toolCallRepository.listToolNamesBetween(range.start, range.end)
     : [];
 
   return {

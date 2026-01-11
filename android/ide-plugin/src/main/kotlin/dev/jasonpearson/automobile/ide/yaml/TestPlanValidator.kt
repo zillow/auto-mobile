@@ -69,8 +69,6 @@ object TestPlanValidator {
         "getDeepLinks",
         // Navigation graph
         "getNavigationGraph", "explore", "identifyInteractions",
-        // Performance
-        "listPerformanceAuditResults",
         // Snapshots
         "captureDeviceSnapshot", "restoreDeviceSnapshot", "listSnapshots", "deleteSnapshot",
         // Video recording

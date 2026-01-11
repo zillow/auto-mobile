@@ -66,9 +66,6 @@ object TestPlanToolCategories {
             "explore",
             "identifyInteractions"
         ),
-        "Performance" to setOf(
-            "listPerformanceAuditResults"
-        ),
         "Snapshots" to setOf(
             "captureDeviceSnapshot",
             "restoreDeviceSnapshot",
