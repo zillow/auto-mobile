@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
 import { existsSync } from "fs";
 import { join, resolve } from "path";
+import { ActionableError } from "../../models";
 import { logger } from "../logger";
 import {
   detectAndroidCommandLineTools,
@@ -33,6 +34,82 @@ const createDefaultDependencies = (): AvdManagerDependencies => ({
 });
 
 const SDK_ROOT_MARKERS = ["system-images", "platforms", "platform-tools", "build-tools"];
+const OLD_TOOLS_BIN_MARKER = "/tools/bin/";
+const CMDLINE_TOOLS_MARKER = "/cmdline-tools/";
+const JAXB_ERROR_MARKERS = [
+  "javax/xml/bind/annotation/XmlSchema",
+  "javax.xml.bind.annotation.XmlSchema",
+  "javax/xml/bind",
+  "javax.xml.bind"
+];
+
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
+function isOldAndroidToolsPath(pathValue: string): boolean {
+  const normalized = normalizePath(pathValue);
+  return normalized.includes(OLD_TOOLS_BIN_MARKER) && !normalized.includes(CMDLINE_TOOLS_MARKER);
+}
+
+function hasJaxbError(output: string): boolean {
+  if (!output) {
+    return false;
+  }
+
+  const normalized = normalizePath(output);
+  return JAXB_ERROR_MARKERS.some(marker => normalized.includes(marker));
+}
+
+function formatIncompatibleAvdManagerMessage(avdmanagerPath: string, reason: "jaxb" | "deprecated"): string {
+  const header = reason === "jaxb"
+    ? "Error: Android SDK tools are outdated and incompatible with Java 11+."
+    : "Error: Detected deprecated Android SDK Tools (tools/bin).";
+  const issue = reason === "jaxb"
+    ? "Issue: Detected javax.xml.bind (JAXB) errors. This usually means the deprecated \"Android SDK Tools\" package (tools/bin) is in use."
+    : "Issue: Old \"Android SDK Tools\" package (deprecated since 2017).";
+
+  return [
+    header,
+    "",
+    `Current avdmanager: ${avdmanagerPath}`,
+    issue,
+    "",
+    "Fix:",
+    "1. Download \"Android SDK Command-line Tools\" from:",
+    "   https://developer.android.com/studio#command-line-tools-only",
+    "2. Extract to: $ANDROID_SDK_ROOT/cmdline-tools/latest/",
+    "3. Ensure ANDROID_SDK_ROOT/ANDROID_HOME point to your SDK root and remove tools/bin from PATH."
+  ].join("\n");
+}
+
+function getIncompatibleAvdManagerMessage(avdmanagerPath: string, output: string): string | null {
+  if (hasJaxbError(output)) {
+    return formatIncompatibleAvdManagerMessage(avdmanagerPath, "jaxb");
+  }
+
+  if (isOldAndroidToolsPath(avdmanagerPath)) {
+    return formatIncompatibleAvdManagerMessage(avdmanagerPath, "deprecated");
+  }
+
+  return null;
+}
+
+function getCommandOutputForDetection(result: { stdout: string; stderr: string }): string {
+  return [result.stderr, result.stdout].filter(Boolean).join("\n");
+}
+
+function getCommandFailureSummary(result: { stdout: string; stderr: string }): string {
+  const stderr = result.stderr.trim();
+  if (stderr) {
+    return stderr;
+  }
+  const stdout = result.stdout.trim();
+  if (stdout) {
+    return stdout;
+  }
+  return "Unknown error";
+}
 
 function looksLikeAndroidSdkRoot(sdkRoot: string, dependencies: AvdManagerDependencies): boolean {
   if (!dependencies.existsSync(sdkRoot)) {
@@ -392,7 +469,12 @@ export async function listDeviceImages(dependencies = createDefaultDependencies(
     const result = await spawnCommand(avdmanagerPath, ["list", "avd"], { env }, dependencies);
 
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to list AVDs: ${result.stderr}`);
+      const detectionOutput = getCommandOutputForDetection(result);
+      const compatibilityMessage = getIncompatibleAvdManagerMessage(avdmanagerPath, detectionOutput);
+      if (compatibilityMessage) {
+        throw new ActionableError(compatibilityMessage);
+      }
+      throw new Error(`Failed to list AVDs: ${getCommandFailureSummary(result)}`);
     }
 
     return parseAvdList(result.stdout);
@@ -462,12 +544,21 @@ export async function createAvd(params: CreateAvdParams, dependencies = createDe
         message: `AVD ${name} created successfully`,
         avdName: name
       };
-    } else {
+    }
+
+    const detectionOutput = getCommandOutputForDetection(result);
+    const compatibilityMessage = getIncompatibleAvdManagerMessage(avdmanagerPath, detectionOutput);
+    if (compatibilityMessage) {
       return {
         success: false,
-        message: `AVD creation failed: ${result.stderr}`
+        message: compatibilityMessage
       };
     }
+
+    return {
+      success: false,
+      message: `AVD creation failed: ${getCommandFailureSummary(result)}`
+    };
   } catch (error) {
     const message = `Failed to create AVD ${params.name}: ${(error as Error).message}`;
     dependencies.logger.error(message);
@@ -494,9 +585,15 @@ export async function deleteAvd(name: string, dependencies = createDefaultDepend
     if (result.exitCode === 0) {
       dependencies.logger.info(`Successfully deleted AVD: ${name}`);
       return { success: true, message: `AVD ${name} deleted successfully` };
-    } else {
-      return { success: false, message: `AVD deletion failed: ${result.stderr}` };
     }
+
+    const detectionOutput = getCommandOutputForDetection(result);
+    const compatibilityMessage = getIncompatibleAvdManagerMessage(avdmanagerPath, detectionOutput);
+    if (compatibilityMessage) {
+      return { success: false, message: compatibilityMessage };
+    }
+
+    return { success: false, message: `AVD deletion failed: ${getCommandFailureSummary(result)}` };
   } catch (error) {
     const message = `Failed to delete AVD ${name}: ${(error as Error).message}`;
     dependencies.logger.error(message);
@@ -516,7 +613,12 @@ export async function listDevices(dependencies = createDefaultDependencies()): P
     const result = await spawnCommand(avdmanagerPath, ["list", "device"], { env }, dependencies);
 
     if (result.exitCode !== 0) {
-      throw new Error(`Failed to list devices: ${result.stderr}`);
+      const detectionOutput = getCommandOutputForDetection(result);
+      const compatibilityMessage = getIncompatibleAvdManagerMessage(avdmanagerPath, detectionOutput);
+      if (compatibilityMessage) {
+        throw new ActionableError(compatibilityMessage);
+      }
+      throw new Error(`Failed to list devices: ${getCommandFailureSummary(result)}`);
     }
 
     return parseDeviceList(result.stdout);
