@@ -11,12 +11,14 @@ NC='\033[0m' # No Color
 
 IMAGE_NAME="${IMAGE_NAME:-auto-mobile:latest}"
 CONTAINER_NAME="auto-mobile-test-$$"
+STDIO_CONTAINER_NAME="${CONTAINER_NAME}-stdio"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 
 # Cleanup function
 cleanup() {
   echo -e "${YELLOW}Cleaning up test container...${NC}"
   docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+  docker rm -f "${STDIO_CONTAINER_NAME}" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -128,9 +130,35 @@ fi
 echo -e "\n${YELLOW}Test 11: Testing MCP stdio protocol...${NC}"
 # Create a simple initialize request
 INIT_REQUEST='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
+STDIO_TIMEOUT_SECONDS=15
+STDIO_TEST_OUTPUT="$(mktemp)"
+STDIO_TEST_ERROR="$(mktemp)"
 
 # Test stdio communication (run container with -i flag, send request, check for response)
-RESPONSE=$(echo "${INIT_REQUEST}" | docker run --platform "${DOCKER_PLATFORM}" -i --rm "${IMAGE_NAME}" 2>/dev/null | head -1 || true)
+STDIO_EXIT_CODE=0
+timeout "${STDIO_TIMEOUT_SECONDS}"s bash -c \
+  'printf "%s\n" "$1" | docker run --platform "$2" -i --rm --name "$3" "$4"' \
+  _ "${INIT_REQUEST}" "${DOCKER_PLATFORM}" "${STDIO_CONTAINER_NAME}" "${IMAGE_NAME}" \
+  >"${STDIO_TEST_OUTPUT}" 2>"${STDIO_TEST_ERROR}" || STDIO_EXIT_CODE=$?
+RESPONSE=$(head -1 "${STDIO_TEST_OUTPUT}" || true)
+
+if [ "${STDIO_EXIT_CODE}" -ne 0 ]; then
+  if [ "${STDIO_EXIT_CODE}" -eq 124 ]; then
+    echo -e "${YELLOW}⚠ MCP stdio test timed out after ${STDIO_TIMEOUT_SECONDS}s${NC}"
+  else
+    echo -e "${YELLOW}⚠ MCP stdio test exited with status ${STDIO_EXIT_CODE}${NC}"
+  fi
+
+  if docker ps -a --format '{{.Names}}' | grep -q "^${STDIO_CONTAINER_NAME}$"; then
+    echo -e "${YELLOW}  Container ${STDIO_CONTAINER_NAME} is still present; recent logs:${NC}"
+    docker logs --tail 50 "${STDIO_CONTAINER_NAME}" || true
+  fi
+
+  echo -e "${YELLOW}  Stdout (first 5 lines):${NC}"
+  sed -n '1,5p' "${STDIO_TEST_OUTPUT}"
+  echo -e "${YELLOW}  Stderr (first 5 lines):${NC}"
+  sed -n '1,5p' "${STDIO_TEST_ERROR}"
+fi
 
 if echo "${RESPONSE}" | grep -q '"jsonrpc":"2.0"'; then
   echo -e "${GREEN}✓ MCP server responds to stdio protocol${NC}"
@@ -139,6 +167,8 @@ else
   echo -e "${YELLOW}⚠ MCP stdio test inconclusive (server may need initialization time)${NC}"
   echo -e "  Response: ${RESPONSE}"
 fi
+
+rm -f "${STDIO_TEST_OUTPUT}" "${STDIO_TEST_ERROR}"
 
 # Test 12: Android SDK components
 echo -e "\n${YELLOW}Test 12: Verifying Android SDK components...${NC}"
