@@ -8,7 +8,6 @@ describe("Android doctor command line tools check", () => {
     detectAndroidCommandLineTools: async () => [],
     getBestAndroidToolsLocation: () => null,
     getAndroidHomeWithSystemImages: () => null,
-    getAndroidSdkFromEnvironment: () => "/Users/test/Library/Android/sdk",
     getAndroidSdkEnvValue: () => "/Users/test/Library/Android/sdk",
     installCmdlineTools: async () => ({
       success: true,
@@ -74,7 +73,6 @@ describe("Android doctor command line tools check", () => {
   test("should warn when install is requested without ANDROID_HOME", async () => {
     const result = await checkAndroidCommandLineTools({ installCmdlineTools: true }, {
       ...baseDependencies,
-      getAndroidSdkFromEnvironment: () => null,
       getAndroidSdkEnvValue: () => undefined
     });
 
@@ -114,7 +112,6 @@ describe("Android doctor command line tools check", () => {
 
     const resultPromise = checkAndroidCommandLineTools({ installCmdlineTools: true }, {
       ...baseDependencies,
-      getAndroidSdkFromEnvironment: () => null,
       getAndroidSdkEnvValue: () => "/Users/test/Library/Android/sdk",
       installCmdlineTools: async () => {
         installCalls.push("install");
