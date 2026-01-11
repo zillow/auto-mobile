@@ -33,11 +33,6 @@ export class FakeVideoCaptureBackend implements VideoCaptureBackend {
 
   async stop(handle: RecordingHandle): Promise<RecordingResult> {
     this.stopCalls.push(handle);
-    if (this.stopResolvers.length > 0) {
-      const resolver = this.stopResolvers.shift();
-      resolver?.(handle);
-    }
-
     await fs.writeFile(handle.outputPath, this.outputPayload);
 
     const baseResult: RecordingResult = {
@@ -48,6 +43,11 @@ export class FakeVideoCaptureBackend implements VideoCaptureBackend {
       sizeBytes: this.outputPayload.length,
       codec: "h264",
     };
+
+    if (this.stopResolvers.length > 0) {
+      const resolver = this.stopResolvers.shift();
+      resolver?.(handle);
+    }
 
     if (this.stopResultOverrides) {
       const overrides = this.stopResultOverrides;

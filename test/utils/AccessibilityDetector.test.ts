@@ -94,6 +94,7 @@ describe("AccessibilityDetector - Unit Tests", () => {
 
   beforeEach(() => {
     fakeTimer = new FakeTimer();
+    fakeTimer.setManualMode();
     detector = new DefaultAccessibilityDetector(fakeTimer);
     fakeAdb = new FakeAdbExecutor();
     fakeFeatureFlags = new FakeFeatureFlagService();
