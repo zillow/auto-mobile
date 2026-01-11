@@ -48,68 +48,6 @@
     }
   },
   {
-    "name": "bugReport",
-    "description": "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, and optionally a screenshot. The report can be saved to a file for sharing with AutoMobile developers.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Target platform"
-        },
-        "appId": {
-          "type": "string",
-          "description": "App package ID to filter logcat for specific app"
-        },
-        "includeScreenshot": {
-          "type": "boolean",
-          "description": "Whether to include screenshot (default: true)"
-        },
-        "includeRawHierarchy": {
-          "type": "boolean",
-          "description": "Whether to include raw view hierarchy XML (default: true)"
-        },
-        "includeLogcat": {
-          "type": "boolean",
-          "description": "Whether to include logcat entries (default: true)"
-        },
-        "logcatLines": {
-          "type": "number",
-          "description": "Number of recent logcat lines to include (default: 100)"
-        },
-        "saveToFile": {
-          "type": "boolean",
-          "description": "Whether to save full report to a file (default: false)"
-        },
-        "saveDir": {
-          "type": "string",
-          "description": "Directory to save report to"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "captureDeviceSnapshot",
     "description": "Capture current device state as a snapshot for later restoration. Supports both VM snapshots (emulators) and ADB-based capture (all devices).",
     "inputSchema": {
@@ -367,79 +305,6 @@
       },
       "required": [
         "sessionId"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "debugSearch",
-    "description": "Debug element search operations. Shows all matching elements, which one would be selected, and near-misses that almost matched. Use this to understand why an element isn't being found or why the wrong element is being selected.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Target platform"
-        },
-        "text": {
-          "type": "string",
-          "description": "Text to search for in elements"
-        },
-        "resourceId": {
-          "type": "string",
-          "description": "Resource ID to search for"
-        },
-        "container": {
-          "type": "object",
-          "properties": {
-            "elementId": {
-              "type": "string",
-              "description": "Container element resource ID to restrict search within"
-            },
-            "text": {
-              "type": "string",
-              "description": "Container element text to restrict search within"
-            }
-          },
-          "additionalProperties": false,
-          "description": "Container element to scope the search - specify elementId or text to locate it"
-        },
-        "fuzzyMatch": {
-          "type": "boolean",
-          "description": "Whether to use fuzzy matching (default: true)"
-        },
-        "caseSensitive": {
-          "type": "boolean",
-          "description": "Whether to use case-sensitive matching (default: false)"
-        },
-        "includeNearMisses": {
-          "type": "boolean",
-          "description": "Include elements that almost matched (default: true)"
-        },
-        "maxNearMisses": {
-          "type": "number",
-          "description": "Maximum number of near-misses to include (default: 10)"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "platform"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -954,37 +819,6 @@
     }
   },
   {
-    "name": "getNavigationGraph",
-    "description": "Get navigation graph for debugging",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "default": "android"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "getTestTimings",
     "description": "Retrieve aggregated historical test execution timing statistics for optimization.",
     "inputSchema": {
@@ -1107,91 +941,6 @@
             "ios"
           ],
           "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "identifyInteractions",
-    "description": "Suggest likely interactions",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "filter": {
-          "type": "object",
-          "properties": {
-            "types": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "enum": [
-                  "navigation",
-                  "input",
-                  "action",
-                  "scroll",
-                  "toggle"
-                ]
-              },
-              "description": "Interaction types"
-            },
-            "minConfidence": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 1,
-              "description": "Min confidence (0-1)"
-            },
-            "limit": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "description": "Max results"
-            }
-          },
-          "additionalProperties": false,
-          "description": "Filter options"
-        },
-        "includeContext": {
-          "type": "object",
-          "properties": {
-            "navigationGraph": {
-              "type": "boolean",
-              "description": "Include nav graph predictions"
-            },
-            "elementDetails": {
-              "type": "boolean",
-              "description": "Include element details"
-            },
-            "suggestedParams": {
-              "type": "boolean",
-              "description": "Include tool params"
-            }
-          },
-          "additionalProperties": false,
-          "description": "Context options"
         },
         "sessionUuid": {
           "type": "string",
@@ -1896,49 +1645,6 @@
       },
       "required": [
         "key",
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "rawViewHierarchy",
-    "description": "Get raw view hierarchy data without parsing. Returns XML from uiautomator and/or JSON from accessibility service. Useful for debugging when parsed hierarchy doesn't match what's on screen.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Target platform"
-        },
-        "source": {
-          "type": "string",
-          "enum": [
-            "uiautomator",
-            "accessibility-service",
-            "both"
-          ],
-          "description": "Source for hierarchy extraction: 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
         "platform"
       ],
       "additionalProperties": false,

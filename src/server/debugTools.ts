@@ -147,20 +147,26 @@ export function registerDebugTools() {
     "rawViewHierarchy",
     "Get raw view hierarchy data without parsing. Returns XML from uiautomator and/or JSON from accessibility service. Useful for debugging when parsed hierarchy doesn't match what's on screen.",
     rawViewHierarchySchema,
-    rawViewHierarchyHandler
+    rawViewHierarchyHandler,
+    false,
+    true
   );
 
   ToolRegistry.registerDeviceAware(
     "debugSearch",
     "Debug element search operations. Shows all matching elements, which one would be selected, and near-misses that almost matched. Use this to understand why an element isn't being found or why the wrong element is being selected.",
     debugSearchSchema,
-    debugSearchHandler
+    debugSearchHandler,
+    false,
+    true
   );
 
   ToolRegistry.registerDeviceAware(
     "bugReport",
     "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, and optionally a screenshot. The report can be saved to a file for sharing with AutoMobile developers.",
     bugReportSchema,
-    bugReportHandler
+    bugReportHandler,
+    false,
+    true
   );
 }

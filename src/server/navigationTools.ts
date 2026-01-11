@@ -126,7 +126,9 @@ export function registerNavigationTools() {
     "getNavigationGraph",
     "Get navigation graph for debugging",
     getNavigationGraphSchema,
-    getNavigationGraphHandler
+    getNavigationGraphHandler,
+    false,
+    true
   );
 
   // Explore handler

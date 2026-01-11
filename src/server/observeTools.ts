@@ -136,6 +136,8 @@ export function registerObserveTools() {
     "identifyInteractions",
     "Suggest likely interactions",
     identifyInteractionsSchema,
-    identifyInteractionsHandler
+    identifyInteractionsHandler,
+    false,
+    true
   );
 }

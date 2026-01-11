@@ -15,6 +15,7 @@ import { createToolExecutionContext, updateSessionCache } from "./ToolExecutionC
 import { AppCleanupService, DefaultAppCleanupService } from "./AppCleanupService";
 import { ToolCallRepository } from "../db/toolCallRepository";
 import { getDeviceLabelMap, releaseDeviceLabelSessions } from "./deviceLabelMapping";
+import { isDebugModeEnabled } from "../utils/debug";
 
 // Progress notification interface
 export interface ProgressCallback {
@@ -40,6 +41,7 @@ export interface RegisteredTool {
   supportsProgress?: boolean;
     requiresDevice?: boolean;
     deviceAwareHandler?: DeviceAwareToolHandler;
+  debugOnly?: boolean;
 }
 
 // The registry that holds all tools
@@ -55,15 +57,28 @@ class ToolRegistryClass {
     this.toolCallRepository = new ToolCallRepository();
   }
 
+  private isToolAvailable(tool: RegisteredTool): boolean {
+    return !tool.debugOnly || isDebugModeEnabled();
+  }
+
   // Register a new tool
   register(
     name: string,
     description: string,
     schema: any,
     handler: ToolHandler,
-    supportsProgress: boolean = false
+    supportsProgress: boolean = false,
+    debugOnly: boolean = false
   ): void {
-    this.tools.set(name, { name, description, schema, handler, supportsProgress, requiresDevice: false });
+    this.tools.set(name, {
+      name,
+      description,
+      schema,
+      handler,
+      supportsProgress,
+      requiresDevice: false,
+      debugOnly
+    });
   }
 
   // Helper: Get foreground app package name
@@ -89,7 +104,8 @@ class ToolRegistryClass {
     description: string,
     schema: any,
     handler: DeviceAwareToolHandler,
-    supportsProgress: boolean = false
+    supportsProgress: boolean = false,
+    debugOnly: boolean = false
   ): void {
     // Create a wrapper that handles device ID injection
     const wrappedHandler: ToolHandler = async (args: any, progress?: ProgressCallback, signal?: AbortSignal) => {
@@ -309,18 +325,23 @@ class ToolRegistryClass {
       handler: wrappedHandler,
       supportsProgress,
       requiresDevice: true,
-      deviceAwareHandler: handler
+      deviceAwareHandler: handler,
+      debugOnly
     });
   }
 
   // Get all registered tools
   getAllTools(): RegisteredTool[] {
-    return Array.from(this.tools.values());
+    return Array.from(this.tools.values()).filter(tool => this.isToolAvailable(tool));
   }
 
   // Get a specific tool by name
   getTool(name: string): RegisteredTool | undefined {
-    return this.tools.get(name);
+    const tool = this.tools.get(name);
+    if (!tool || !this.isToolAvailable(tool)) {
+      return undefined;
+    }
+    return tool;
   }
 
   // Register all tools with an MCP server
@@ -344,7 +365,7 @@ class ToolRegistryClass {
 
   // Get tools in MCP format
   getToolDefinitions() {
-    return Array.from(this.tools.values()).map(tool => ({
+    return this.getAllTools().map(tool => ({
       name: tool.name,
       description: tool.description,
       inputSchema: zodToJsonSchema(tool.schema)
@@ -354,7 +375,7 @@ class ToolRegistryClass {
   // Get a map of all schema
   getSchemaMap(): Record<string, any> {
     const schemaMap: Record<string, any> = {};
-    this.tools.forEach(tool => {
+    this.getAllTools().forEach(tool => {
       schemaMap[tool.name] = tool.schema;
     });
     return schemaMap;
