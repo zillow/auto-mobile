@@ -1,6 +1,6 @@
 import { spawn } from "child_process";
 import { existsSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { logger } from "../logger";
 import {
   detectAndroidCommandLineTools,
@@ -32,6 +32,136 @@ const createDefaultDependencies = (): AvdManagerDependencies => ({
   installAndroidTools // This function now throws - kept for compatibility with existing code
 });
 
+const SDK_ROOT_MARKERS = ["system-images", "platforms", "platform-tools", "build-tools"];
+
+function looksLikeAndroidSdkRoot(sdkRoot: string, dependencies: AvdManagerDependencies): boolean {
+  if (!dependencies.existsSync(sdkRoot)) {
+    return false;
+  }
+
+  // For avdmanager operations, system-images is required
+  // Check if system-images exists, OR if at least 2 other markers exist (for backward compatibility)
+  const hasSystemImages = dependencies.existsSync(join(sdkRoot, "system-images"));
+  if (hasSystemImages) {
+    return true;
+  }
+
+  // Fall back to checking if at least 2 markers exist (for SDK roots without system-images yet)
+  const markerCount = SDK_ROOT_MARKERS.filter(marker =>
+    dependencies.existsSync(join(sdkRoot, marker))
+  ).length;
+
+  return markerCount >= 2;
+}
+
+function stripCmdlineToolsPath(pathValue: string): string | undefined {
+  const normalized = pathValue.replace(/\\/g, "/");
+  if (normalized.endsWith("/cmdline-tools/latest")) {
+    return normalized.replace(/\/cmdline-tools\/latest$/, "");
+  }
+  if (normalized.endsWith("/cmdline-tools")) {
+    return normalized.replace(/\/cmdline-tools$/, "");
+  }
+  return undefined;
+}
+
+function getTypicalSdkPaths(): string[] {
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+
+  switch (process.platform) {
+    case "darwin":
+      return [
+        ...(homeDir ? [join(homeDir, "Library/Android/sdk")] : []),
+        "/opt/android-sdk",
+        "/usr/local/android-sdk"
+      ];
+    case "linux":
+      return [
+        ...(homeDir ? [join(homeDir, "Android/Sdk")] : []),
+        "/opt/android-sdk",
+        "/usr/local/android-sdk"
+      ];
+    case "win32":
+      return [
+        ...(homeDir ? [join(homeDir, "AppData/Local/Android/Sdk")] : []),
+        "C:/Android/Sdk",
+        "C:/android-sdk"
+      ];
+    default:
+      return [];
+  }
+}
+
+function resolveAndroidSdkRoot(
+  location: AndroidToolsLocation,
+  dependencies: AvdManagerDependencies
+): string | undefined {
+  const candidates = new Set<string>();
+
+  const envCandidates = [
+    process.env.ANDROID_SDK_ROOT,
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_HOME
+  ].filter(Boolean) as string[];
+
+  for (const candidate of envCandidates) {
+    candidates.add(candidate);
+  }
+
+  const strippedPath = stripCmdlineToolsPath(location.path);
+  if (strippedPath) {
+    candidates.add(strippedPath);
+  }
+
+  candidates.add(location.path);
+  candidates.add(resolve(location.path, ".."));
+  candidates.add(resolve(location.path, "..", ".."));
+
+  for (const typicalPath of getTypicalSdkPaths()) {
+    candidates.add(typicalPath);
+  }
+
+  // Two-pass search: First pass prioritizes SDK roots with system-images
+  // This ensures we pick a complete SDK (with system-images) over an incomplete one
+  // (e.g., Homebrew with only platforms/platform-tools/build-tools)
+
+  // Pass 1: Only accept candidates with system-images
+  for (const candidate of candidates) {
+    if (!dependencies.existsSync(candidate)) {
+      continue;
+    }
+    const hasSystemImages = dependencies.existsSync(join(candidate, "system-images"));
+    if (hasSystemImages) {
+      return candidate;
+    }
+  }
+
+  // Pass 2: Fall back to candidates with 2+ markers (backward compatibility)
+  for (const candidate of candidates) {
+    if (looksLikeAndroidSdkRoot(candidate, dependencies)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function getAndroidSdkEnv(
+  location: AndroidToolsLocation,
+  dependencies: AvdManagerDependencies
+): NodeJS.ProcessEnv | undefined {
+  const sdkRoot = resolveAndroidSdkRoot(location, dependencies);
+  if (!sdkRoot) {
+    return undefined;
+  }
+
+  return {
+    ...process.env,
+    ANDROID_HOME: sdkRoot,
+    ANDROID_SDK_ROOT: sdkRoot
+  };
+}
+
 /**
  * Execute a command using spawn with proper error handling and logging
  */
@@ -39,6 +169,7 @@ async function spawnCommand(command: string, args: string[], options: {
   cwd?: string;
   input?: string;
   timeout?: number;
+  env?: NodeJS.ProcessEnv;
 } = {}, dependencies = createDefaultDependencies()): Promise<{
   stdout: string;
   stderr: string;
@@ -49,6 +180,7 @@ async function spawnCommand(command: string, args: string[], options: {
 
     const child = dependencies.spawn(command, args, {
       cwd: options.cwd,
+      env: options.env,
       stdio: ["pipe", "pipe", "pipe"]
     });
 
@@ -166,6 +298,7 @@ export async function acceptLicenses(dependencies = createDefaultDependencies())
   try {
     const location = await ensureToolsAvailable(dependencies);
     const sdkmanagerPath = getSdkManagerPath(location, dependencies);
+    const env = getAndroidSdkEnv(location, dependencies);
 
     dependencies.logger.info("Accepting Android SDK licenses...");
 
@@ -173,7 +306,8 @@ export async function acceptLicenses(dependencies = createDefaultDependencies())
     const licenseInput = "y\n".repeat(20);
     const result = await spawnCommand(sdkmanagerPath, ["--licenses"], {
       input: licenseInput,
-      timeout: 60000 // 60 second timeout
+      timeout: 60000, // 60 second timeout
+      env
     }, dependencies);
 
     if (result.exitCode === 0) {
@@ -196,8 +330,9 @@ export async function listSystemImages(filter?: SystemImageFilter, dependencies 
   try {
     const location = await ensureToolsAvailable(dependencies);
     const sdkmanagerPath = getSdkManagerPath(location, dependencies);
+    const env = getAndroidSdkEnv(location, dependencies);
 
-    const result = await spawnCommand(sdkmanagerPath, ["--list"], {}, dependencies);
+    const result = await spawnCommand(sdkmanagerPath, ["--list"], { env }, dependencies);
 
     if (result.exitCode !== 0) {
       throw new Error(`Failed to list system images: ${result.stderr}`);
@@ -220,6 +355,7 @@ export async function installSystemImage(packageName: string, acceptLicense = tr
   try {
     const location = await ensureToolsAvailable(dependencies);
     const sdkmanagerPath = getSdkManagerPath(location, dependencies);
+    const env = getAndroidSdkEnv(location, dependencies);
 
     dependencies.logger.info(`Installing system image: ${packageName}`);
 
@@ -227,7 +363,8 @@ export async function installSystemImage(packageName: string, acceptLicense = tr
     const input = acceptLicense ? "y\n".repeat(10) : undefined;
     const result = await spawnCommand(sdkmanagerPath, [packageName], {
       input,
-      timeout: 600000 // 10 minute timeout for downloads
+      timeout: 600000, // 10 minute timeout for downloads
+      env
     }, dependencies);
 
     if (result.exitCode === 0) {
@@ -250,8 +387,9 @@ export async function listDeviceImages(dependencies = createDefaultDependencies(
   try {
     const location = await ensureToolsAvailable(dependencies);
     const avdmanagerPath = getAvdManagerPath(location, dependencies);
+    const env = getAndroidSdkEnv(location, dependencies);
 
-    const result = await spawnCommand(avdmanagerPath, ["list", "avd"], {}, dependencies);
+    const result = await spawnCommand(avdmanagerPath, ["list", "avd"], { env }, dependencies);
 
     if (result.exitCode !== 0) {
       throw new Error(`Failed to list AVDs: ${result.stderr}`);
@@ -275,6 +413,7 @@ export async function createAvd(params: CreateAvdParams, dependencies = createDe
   try {
     const location = await ensureToolsAvailable(dependencies);
     const avdmanagerPath = getAvdManagerPath(location, dependencies);
+    const env = getAndroidSdkEnv(location, dependencies);
 
     const {
       name,
@@ -312,7 +451,8 @@ export async function createAvd(params: CreateAvdParams, dependencies = createDe
 
     const result = await spawnCommand(avdmanagerPath, args, {
       input: "\n", // Default response to any prompts
-      timeout: 300000 // 5 minute timeout
+      timeout: 300000, // 5 minute timeout
+      env
     }, dependencies);
 
     if (result.exitCode === 0) {
@@ -345,10 +485,11 @@ export async function deleteAvd(name: string, dependencies = createDefaultDepend
   try {
     const location = await ensureToolsAvailable(dependencies);
     const avdmanagerPath = getAvdManagerPath(location, dependencies);
+    const env = getAndroidSdkEnv(location, dependencies);
 
     dependencies.logger.info(`Deleting AVD: ${name}`);
 
-    const result = await spawnCommand(avdmanagerPath, ["delete", "avd", "-n", name], {}, dependencies);
+    const result = await spawnCommand(avdmanagerPath, ["delete", "avd", "-n", name], { env }, dependencies);
 
     if (result.exitCode === 0) {
       dependencies.logger.info(`Successfully deleted AVD: ${name}`);
@@ -370,8 +511,9 @@ export async function listDevices(dependencies = createDefaultDependencies()): P
   try {
     const location = await ensureToolsAvailable(dependencies);
     const avdmanagerPath = getAvdManagerPath(location, dependencies);
+    const env = getAndroidSdkEnv(location, dependencies);
 
-    const result = await spawnCommand(avdmanagerPath, ["list", "device"], {}, dependencies);
+    const result = await spawnCommand(avdmanagerPath, ["list", "device"], { env }, dependencies);
 
     if (result.exitCode !== 0) {
       throw new Error(`Failed to list devices: ${result.stderr}`);

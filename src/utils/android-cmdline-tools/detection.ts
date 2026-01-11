@@ -414,12 +414,12 @@ export function getBestAndroidToolsLocation(locations: AndroidToolsLocation[]): 
     return null;
   }
 
-  // Priority order: homebrew > android_home > android_sdk_root > typical > path > manual
+  // Priority order: android_home > android_sdk_root > typical > homebrew > path > manual
   const sourcePriority: Record<AndroidToolsSource, number> = {
-    homebrew: 1,
-    android_home: 2,
-    android_sdk_root: 3,
-    typical: 4,
+    android_home: 1,
+    android_sdk_root: 2,
+    typical: 3,
+    homebrew: 4,
     path: 5,
     manual: 6
   };

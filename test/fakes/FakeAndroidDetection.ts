@@ -217,10 +217,10 @@ export class FakeAndroidDetection implements AndroidDetection {
     }
 
     const sourcePriority: Record<AndroidToolsSource, number> = {
-      homebrew: 1,
-      android_home: 2,
-      android_sdk_root: 3,
-      typical: 4,
+      android_home: 1,
+      android_sdk_root: 2,
+      typical: 3,
+      homebrew: 4,
       path: 5,
       manual: 6
     };

@@ -202,7 +202,7 @@ describe("Android Command Line Tools - Detection", () => {
       expect(best).toBeNull();
     });
 
-    test("should prioritize homebrew over other sources", () => {
+    test("should prioritize Android SDK locations over Homebrew", () => {
       const locations = [
         {
           path: "/typical/path",
@@ -217,7 +217,7 @@ describe("Android Command Line Tools - Detection", () => {
       ];
 
       const best = getBestAndroidToolsLocation(locations);
-      expect(best?.source).toBe("homebrew");
+      expect(best?.source).toBe("typical");
     });
 
     test("should prioritize locations with more available tools when source is the same", () => {
@@ -281,7 +281,7 @@ describe("Android Command Line Tools - Detection", () => {
       ];
 
       const best = getBestAndroidToolsLocation(locations);
-      expect(best?.source).toBe("homebrew");
+      expect(best?.source).toBe("android_sdk_root");
     });
   });
 
