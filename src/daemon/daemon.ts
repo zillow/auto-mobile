@@ -23,6 +23,7 @@ import { executionTracker } from "../server/executionTracker";
 import { closeDatabase, getDatabase } from "../db";
 import { startupBenchmark } from "../utils/startupBenchmark";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./videoRecordingSocketServer";
+import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./testRecordingSocketServer";
 
 /**
  * Main daemon process
@@ -96,6 +97,7 @@ export class Daemon {
     logger.info("Unix socket server started");
 
     await startVideoRecordingSocketServer();
+    await startTestRecordingSocketServer();
 
     // Write PID file
     await this.writePidFile();
@@ -644,6 +646,7 @@ export class Daemon {
     }
 
     await stopVideoRecordingSocketServer();
+    await stopTestRecordingSocketServer();
 
     // Close all active HTTP sessions
     for (const [sessionId, streamableTransport] of this.transports) {

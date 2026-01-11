@@ -231,8 +231,12 @@ export class DeviceSessionManager implements DeviceSessionManager {
         }
     }
 
+    let selectedDevice: BootedDevice | undefined;
+    let deviceVerified = false;
+    let deviceSource: "provided" | "current" | "auto" = "auto";
+
     // If a specific device is provided, verify it exists on the correct platform
-    if (providedDeviceId && resolvedPlatform) {
+    if (providedDeviceId) {
       const providedDevice = platformDevices.find(device => device.deviceId === providedDeviceId);
       if (!providedDevice) {
         throw new ActionableError(
@@ -240,20 +244,18 @@ export class DeviceSessionManager implements DeviceSessionManager {
           `Available ${platform} devices: ${platformDevices.join(", ") || "none"}`
         );
       }
-
-      await this.verifyDevice(providedDeviceId, resolvedPlatform, options);
-      this.setCurrentDevice(providedDevice, resolvedPlatform);
-      logger.info(`[DeviceSessionManager] Using provided device: ${providedDeviceId}`);
-      return providedDevice;
+      selectedDevice = providedDevice;
+      deviceSource = "provided";
     }
 
     // If we have a current device for the requested platform, verify it's still ready
-    if (this.currentDevice && this.currentPlatform === platform) {
+    if (!selectedDevice && this.currentDevice && this.currentPlatform === platform) {
       logger.info(`[DeviceSessionManager] Found current device: ${this.currentDevice.deviceId}, verifying readiness`);
       try {
         await this.verifyDevice(this.currentDevice.deviceId, platform, options);
-        logger.info(`[DeviceSessionManager] Using current device: ${this.currentDevice.deviceId}`);
-        return this.currentDevice;
+        selectedDevice = this.currentDevice;
+        deviceVerified = true;
+        deviceSource = "current";
       } catch (error) {
         logger.warn(`Current device ${this.currentDevice} is no longer ready: ${error}`);
         this.currentDevice = undefined;
@@ -262,11 +264,20 @@ export class DeviceSessionManager implements DeviceSessionManager {
     }
 
     // No device set - find or start one for the requested platform
-    logger.info(`[DeviceSessionManager] No current device, finding or starting device for platform ${resolvedPlatform}`);
-    const device = await this.findOrStartDevice(resolvedPlatform, options);
-    this.setCurrentDevice(device, resolvedPlatform);
-    logger.info(`[DeviceSessionManager] Using device from findOrStartDevice: ${device.deviceId}`);
-    return device;
+    if (!selectedDevice) {
+      logger.info(`[DeviceSessionManager] No current device, finding or starting device for platform ${resolvedPlatform}`);
+      selectedDevice = await this.findOrStartDevice(resolvedPlatform, options);
+      deviceVerified = true;
+      deviceSource = "auto";
+    }
+
+    if (!deviceVerified) {
+      await this.verifyDevice(selectedDevice.deviceId, resolvedPlatform, options);
+    }
+
+    this.setCurrentDevice(selectedDevice, resolvedPlatform);
+    logger.info(`[DeviceSessionManager] Using ${deviceSource} device: ${selectedDevice.deviceId}`);
+    return selectedDevice;
   }
 
   /**

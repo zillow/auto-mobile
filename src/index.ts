@@ -10,6 +10,7 @@ import { runCliCommand } from "./cli";
 import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./daemon/videoRecordingSocketServer";
+import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./daemon/testRecordingSocketServer";
 import { execSync } from "node:child_process";
 import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
@@ -563,6 +564,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
     transports.clear();
 
     await stopVideoRecordingSocketServer();
+    await stopTestRecordingSocketServer();
 
     server.close(() => {
       logger.info("Streamable HTTP server shut down");
@@ -686,6 +688,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
     sessions.clear();
 
     await stopVideoRecordingSocketServer();
+    await stopTestRecordingSocketServer();
 
     server.close(() => {
       logger.info("SSE server shut down");
@@ -701,6 +704,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
 process.on("SIGINT", async () => {
   logger.info("Received SIGINT signal, shutting down");
   await stopVideoRecordingSocketServer();
+  await stopTestRecordingSocketServer();
   logger.close();
   process.exit(0);
 });
@@ -708,6 +712,7 @@ process.on("SIGINT", async () => {
 process.on("SIGTERM", async () => {
   logger.info("Received SIGTERM signal, shutting down");
   await stopVideoRecordingSocketServer();
+  await stopTestRecordingSocketServer();
   logger.close();
   process.exit(0);
 });
@@ -814,6 +819,7 @@ async function main() {
       process.exit(0);
     } else {
       await startVideoRecordingSocketServer();
+      await startTestRecordingSocketServer();
       if (transport.type === "streamable") {
         // Run as Streamable HTTP server
         logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);

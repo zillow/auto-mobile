@@ -188,12 +188,12 @@ const writeToLogFile = async (level: string, message: string, args: any[]) => {
     if (logMessage.length > 1000) {
       logMessage = logMessage.substring(0, 1000) + "... (truncated)";
     }
-    logMessage = logMessage.replace(/[\r\n\t]/g, " ");
-    logStream.write(logMessage + "\n");
+    const safeLogMessage = logMessage.replace(/[\r\n\t]/g, " ");
+    logStream.write(safeLogMessage + "\n");
 
     // Also write to STDOUT if enabled
     if (logToStdout) {
-      console.log(logMessage);
+      process.stdout.write(`${safeLogMessage}\n`);
     }
   } catch (err) {
     console.error("Failed to write log:", err);

@@ -23,6 +23,7 @@ class McpHttpClient(
 ) : AutoMobileClient {
   override val transportName: String = "MCP HTTP"
   override val connectionDescription: String = endpoint
+  private val testRecordingClient = TestRecordingSocketClient()
 
   private val httpClient = HttpClient.newBuilder().build()
   private var sessionId: String? = null
@@ -104,29 +105,15 @@ class McpHttpClient(
   }
 
   override fun startTestRecording(platform: String): TestRecordingStartResult {
-    val response = callTool(
-      "startTestRecording",
-      buildJsonObject { put("platform", JsonPrimitive(platform)) },
-    )
-    return decodeToolResponse(json, response, TestRecordingStartResult.serializer())
+    return testRecordingClient.startTestRecording(platform)
   }
 
   override fun stopTestRecording(
       recordingId: String?,
       planName: String?,
   ): TestRecordingStopResult {
-    val response = callTool(
-      "stopTestRecording",
-      buildJsonObject {
-        if (recordingId != null) {
-          put("recordingId", JsonPrimitive(recordingId))
-        }
-        if (!planName.isNullOrBlank()) {
-          put("planName", JsonPrimitive(planName))
-        }
-      },
-    )
-    return decodeToolResponse(json, response, TestRecordingStopResult.serializer())
+    val resolvedPlanName = planName?.ifBlank { null }
+    return testRecordingClient.stopTestRecording(recordingId, resolvedPlanName)
   }
 
   override fun executePlan(

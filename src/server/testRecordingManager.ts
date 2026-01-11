@@ -25,6 +25,15 @@ export interface TestRecordingStopResult {
   platform: string;
 }
 
+export interface TestRecordingStatus {
+  recordingId: string;
+  deviceId: string;
+  platform: string;
+  startedAt: string;
+  eventCount: number;
+  durationMs: number;
+}
+
 interface RecordingSession {
   recordingId: string;
   deviceId: string;
@@ -44,6 +53,23 @@ const INPUT_COALESCE_WINDOW_MS = 800;
 const SWIPE_COALESCE_WINDOW_MS = 600;
 
 let activeRecording: RecordingSession | null = null;
+
+export function getTestRecordingStatus(): TestRecordingStatus | null {
+  if (!activeRecording) {
+    return null;
+  }
+
+  const durationMs = Date.now() - activeRecording.startedAt;
+
+  return {
+    recordingId: activeRecording.recordingId,
+    deviceId: activeRecording.deviceId,
+    platform: activeRecording.platform,
+    startedAt: new Date(activeRecording.startedAt).toISOString(),
+    eventCount: activeRecording.events.length,
+    durationMs,
+  };
+}
 
 const buildElementKey = (event: InteractionEvent): string | null => {
   const element = event.element;

@@ -12,10 +12,13 @@ Test recording allows developers to:
 
 ## Recording Workflow
 
+Recording control uses the test recording Unix socket (`~/.auto-mobile/test-recording.sock`)
+so the IDE can start/stop capture without issuing MCP tool calls.
+
 ### 1. Start Recording
 
 From the IDE plugin tool window:
-1. Click "Attach to MCP" to connect to the running MCP server
+1. Ensure the AutoMobile server is running
 2. Select the target device from the dropdown
 3. Click "Start Recording" to begin capturing interactions
 
