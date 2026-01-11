@@ -63,4 +63,6 @@ export interface DoctorOptions {
   ios?: boolean;
   /** Output in JSON format */
   json?: boolean;
+  /** Install Android command line tools when requested */
+  installCmdlineTools?: boolean;
 }

@@ -174,6 +174,7 @@ async function runDoctorCommand(params: Record<string, any>): Promise<void> {
   const report = await runDoctor({
     android: params.android,
     ios: params.ios,
+    installCmdlineTools: params.installCmdlineTools,
   });
 
   if (jsonOutput) {

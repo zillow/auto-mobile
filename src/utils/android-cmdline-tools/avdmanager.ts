@@ -5,7 +5,10 @@ import { ActionableError } from "../../models";
 import { logger } from "../logger";
 import {
   detectAndroidCommandLineTools,
+  getAndroidHomeWithSystemImages,
   getBestAndroidToolsLocation,
+  getCmdlineToolsRoot,
+  isHomebrewToolsPath,
   validateRequiredTools,
   type AndroidToolsLocation
 } from "./detection";
@@ -17,6 +20,7 @@ export interface AvdManagerDependencies {
   existsSync: typeof existsSync;
   logger: typeof logger;
   detectAndroidCommandLineTools: typeof detectAndroidCommandLineTools;
+  getAndroidHomeWithSystemImages: typeof getAndroidHomeWithSystemImages;
   getBestAndroidToolsLocation: typeof getBestAndroidToolsLocation;
   validateRequiredTools: typeof validateRequiredTools;
   installAndroidTools: typeof installAndroidTools;
@@ -28,6 +32,7 @@ const createDefaultDependencies = (): AvdManagerDependencies => ({
   existsSync,
   logger,
   detectAndroidCommandLineTools,
+  getAndroidHomeWithSystemImages,
   getBestAndroidToolsLocation,
   validateRequiredTools,
   installAndroidTools // This function now throws - kept for compatibility with existing code
@@ -42,6 +47,7 @@ const JAXB_ERROR_MARKERS = [
   "javax/xml/bind",
   "javax.xml.bind"
 ];
+let hasWarnedHomebrewSystemImagesMismatch = false;
 
 function normalizePath(value: string): string {
   return value.replace(/\\/g, "/");
@@ -109,6 +115,41 @@ function getCommandFailureSummary(result: { stdout: string; stderr: string }): s
     return stdout;
   }
   return "Unknown error";
+}
+
+function maybeWarnHomebrewSystemImagesMismatch(
+  location: AndroidToolsLocation,
+  dependencies: AvdManagerDependencies
+): void {
+  if (hasWarnedHomebrewSystemImagesMismatch) {
+    return;
+  }
+
+  if (!isHomebrewToolsPath(location.path)) {
+    return;
+  }
+
+  const androidHomeInfo = dependencies.getAndroidHomeWithSystemImages();
+  if (!androidHomeInfo) {
+    return;
+  }
+
+  const toolsRoot = getCmdlineToolsRoot(location.path);
+  if (normalizePath(toolsRoot) === normalizePath(androidHomeInfo.androidHome)) {
+    return;
+  }
+
+  const warningMessage = [
+    "Warning: Homebrew Android cmdline-tools detected, but system images are in ANDROID_HOME.",
+    "avdmanager may report missing system images because Homebrew sets com.android.sdkmanager.toolsdir to its own root.",
+    `avdmanager location: ${location.path}`,
+    `ANDROID_HOME: ${androidHomeInfo.androidHome}`,
+    `System images: ${androidHomeInfo.systemImagesPath}`,
+    "Fix: install cmdline-tools into ANDROID_HOME or run `auto-mobile --cli doctor --install-cmdline-tools`."
+  ].join(" ");
+
+  dependencies.logger.warn(warningMessage);
+  hasWarnedHomebrewSystemImagesMismatch = true;
 }
 
 function looksLikeAndroidSdkRoot(sdkRoot: string, dependencies: AvdManagerDependencies): boolean {
@@ -329,6 +370,8 @@ async function ensureToolsAvailable(dependencies = createDefaultDependencies()):
     dependencies.logger.error(`Missing required tools: ${validation.missing.join(", ")} and tool installation has been removed`);
     throw new Error(`Missing required tools: ${validation.missing.join(", ")}. Tool installation functionality has been removed. Please install Android SDK manually.`);
   }
+
+  maybeWarnHomebrewSystemImagesMismatch(bestLocation, dependencies);
 
   return bestLocation;
 }

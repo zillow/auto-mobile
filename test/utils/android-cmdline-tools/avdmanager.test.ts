@@ -90,6 +90,7 @@ describe("AVDManager", function() {
       existsSync: (path: string) => true,
       logger: mockLogger,
       detectAndroidCommandLineTools: async () => [mockLocation],
+      getAndroidHomeWithSystemImages: () => null,
       getBestAndroidToolsLocation: () => mockLocation,
       validateRequiredTools: () => ({ valid: true, missing: [] }),
       installAndroidTools: async () => ({
@@ -512,6 +513,60 @@ Available Android Virtual Devices:
     });
   });
 
+  describe("Homebrew system image mismatch warning", () => {
+    test("should warn once when Homebrew tools are used and ANDROID_HOME has system-images", async () => {
+      const warnings: string[] = [];
+      const mockLogger = {
+        info: () => {},
+        warn: (message: string) => warnings.push(message),
+        error: () => {},
+        debug: () => {},
+        setLogLevel: () => {},
+        getLogLevel: () => "info",
+        enableStdoutLogging: () => {},
+        disableStdoutLogging: () => {},
+        close: () => {}
+      };
+
+      const mockDeps = createDependencies({
+        logger: mockLogger,
+        getAndroidHomeWithSystemImages: () => ({
+          androidHome: "/Users/test/Library/Android/sdk",
+          systemImagesPath: "/Users/test/Library/Android/sdk/system-images"
+        })
+      });
+
+      const homebrewLocation = {
+        path: "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest",
+        source: "homebrew" as const,
+        version: "test",
+        available_tools: ["avdmanager", "sdkmanager"]
+      };
+
+      mockDeps.getBestAndroidToolsLocation = () => homebrewLocation;
+      mockDeps.detectAndroidCommandLineTools = async () => [homebrewLocation];
+
+      const originalSpawn = mockDeps.spawn;
+      const fakeTimer = createFakeTimer();
+
+      mockDeps.spawn = (command: string, args: string[], options?: any) => {
+        const child: any = originalSpawn(command, args, options);
+        fakeTimer.setTimeout(() => {
+          child.triggerStdout(Buffer.from("Available Android Virtual Devices:\n"));
+          child.triggerClose(0);
+        }, 0);
+        return child;
+      };
+
+      await resolveWithFakeTimer(fakeTimer, avdmanager.listDeviceImages(mockDeps));
+      await resolveWithFakeTimer(fakeTimer, avdmanager.listDeviceImages(mockDeps));
+
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]).toContain("Homebrew Android cmdline-tools detected");
+      expect(warnings[0]).toContain("ANDROID_HOME");
+    });
+  });
+
   describe("listDevices", () => {
     test("should parse device list correctly", async () => {
       const mockDeps = createDependencies();
@@ -776,7 +831,7 @@ id: pixel_4
           }
         ];
 
-        mockDeps.getBestAndroidToolsLocation = async () => ({
+        mockDeps.getBestAndroidToolsLocation = () => ({
           path: "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest",
           source: "homebrew"
         });
