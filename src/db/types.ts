@@ -332,6 +332,33 @@ export interface FeatureFlagsTable {
   updated_at: string;
 }
 
+// Video recording tables
+export interface VideoRecordingsTable {
+  recording_id: string;
+  device_id: string;
+  platform: "android" | "ios";
+  status: string;
+  output_name: string | null;
+  file_name: string;
+  file_path: string;
+  format: string;
+  size_bytes: number;
+  duration_ms: number | null;
+  codec: string | null;
+  created_at: string;
+  started_at: string;
+  ended_at: string | null;
+  last_accessed_at: string;
+  config_json: string;
+}
+
+export interface VideoRecordingConfigsTable {
+  key: string;
+  config_json: string;
+  updated_at: string;
+  created_at: Generated<string>;
+}
+
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
@@ -355,6 +382,8 @@ export interface Database {
   recomposition_metrics: RecompositionMetricsTable;
   test_executions: TestExecutionsTable;
   feature_flags: FeatureFlagsTable;
+  video_recordings: VideoRecordingsTable;
+  video_recording_configs: VideoRecordingConfigsTable;
   test_coverage_sessions: TestCoverageSessionsTable;
   test_node_coverage: TestNodeCoverageTable;
   test_edge_coverage: TestEdgeCoverageTable;
@@ -434,6 +463,14 @@ export type RecompositionMetricsUpdate = Updateable<RecompositionMetricsTable>;
 export type FeatureFlag = Selectable<FeatureFlagsTable>;
 export type NewFeatureFlag = Insertable<FeatureFlagsTable>;
 export type FeatureFlagUpdate = Updateable<FeatureFlagsTable>;
+
+export type VideoRecording = Selectable<VideoRecordingsTable>;
+export type NewVideoRecording = Insertable<VideoRecordingsTable>;
+export type VideoRecordingUpdate = Updateable<VideoRecordingsTable>;
+
+export type VideoRecordingConfig = Selectable<VideoRecordingConfigsTable>;
+export type NewVideoRecordingConfig = Insertable<VideoRecordingConfigsTable>;
+export type VideoRecordingConfigUpdate = Updateable<VideoRecordingConfigsTable>;
 export type TestExecution = Selectable<TestExecutionsTable>;
 export type NewTestExecution = Insertable<TestExecutionsTable>;
 export type TestExecutionUpdate = Updateable<TestExecutionsTable>;

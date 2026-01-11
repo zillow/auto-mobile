@@ -24,7 +24,7 @@ Defaults should be conservative and low-quality:
 - `targetBitrateKbps`: 1000
 - `maxThroughputMbps`: 5
 - `fps`: 15
-- `maxArchiveSizeMb`: 2048
+- `maxArchiveSizeMb`: 100
 - `format`: `mp4` (H.264 baseline)
 
 Example config payload:
@@ -35,7 +35,7 @@ Example config payload:
   "targetBitrateKbps": 1000,
   "maxThroughputMbps": 5,
   "fps": 15,
-  "maxArchiveSizeMb": 2048,
+  "maxArchiveSizeMb": 100,
   "format": "mp4"
 }
 ```
@@ -44,18 +44,15 @@ Example config payload:
 
 ## MCP Tools
 
-- `startVideoRecording`
-  - Params: `platform`, `deviceId`/`sessionUuid`, optional overrides for `targetBitrateKbps`, `fps`, `resolution`,
-    `qualityPreset`, `format`, `maxDurationSeconds`, and `outputName`.
-  - Returns: `recordingId`, output path, effective settings.
-- `stopVideoRecording`
-  - Params: `recordingId` (or default to latest).
-  - Returns: metadata including duration, size, codec, and file path.
-- `listVideoRecordings`
-  - Returns: list of archived recordings and metadata.
-- `deleteVideoRecording`
-  - Params: `recordingId`.
-  - Returns: success/failure.
+- `videoRecording`
+  - Params:
+    - `action`: `start` or `stop`.
+    - `platform`: `android` or `ios`.
+    - `deviceId`/`sessionUuid`/`device`: optional device targeting. If omitted, the action applies to all devices on the platform.
+    - `recordingId`: optional (stop only).
+    - Optional overrides for `targetBitrateKbps`, `fps`, `resolution`, `qualityPreset`, `format`,
+      `maxDuration` (seconds, default 30, max 300), and `outputName`.
+  - Returns: per-device recording metadata and any evictions.
 
 ## MCP Resources
 
@@ -93,9 +90,14 @@ Platform-specific capture sources:
 ## Storage and retention
 
 - Archive directory: `~/.auto-mobile/video-archive`.
-- Store `recording.json` metadata next to each file.
+- Store recording metadata in SQLite (`~/.auto-mobile/auto-mobile.db`).
 - Enforce `maxArchiveSizeMb` with LRU eviction (oldest first).
 - Provide stable filenames (`recordingId` + timestamp).
+
+## Video recording configuration socket
+
+- Unix socket: `~/.auto-mobile/video-recording.sock`.
+- Supports `config/get` and `config/set` requests for live video recording defaults.
 
 ## Performance considerations
 

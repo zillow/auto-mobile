@@ -22,6 +22,7 @@ import { PID_FILE_PATH, DAEMON_VERSION } from "./constants";
 import { executionTracker } from "../server/executionTracker";
 import { closeDatabase, getDatabase } from "../db";
 import { startupBenchmark } from "../utils/startupBenchmark";
+import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./videoRecordingSocketServer";
 
 /**
  * Main daemon process
@@ -93,6 +94,8 @@ export class Daemon {
     await this.socketServer.start();
     startupBenchmark.endPhase("socketServerStart");
     logger.info("Unix socket server started");
+
+    await startVideoRecordingSocketServer();
 
     // Write PID file
     await this.writePidFile();
@@ -635,6 +638,8 @@ export class Daemon {
     if (this.socketServer) {
       await this.socketServer.close();
     }
+
+    await stopVideoRecordingSocketServer();
 
     // Close all active HTTP sessions
     for (const [sessionId, streamableTransport] of this.transports) {

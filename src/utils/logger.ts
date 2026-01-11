@@ -179,7 +179,7 @@ const writeToLogFile = async (level: string, message: string, args: any[]) => {
       // Handle objects by converting them to strings, filtering sensitive data
       const argsStr = args.map(arg => {
         if (typeof arg === "object") {
-          return safeStringify(arg);
+          return sanitizeMessage(safeStringify(arg));
         }
         return sanitizeMessage(String(arg));
       }).join(" ");
@@ -188,6 +188,7 @@ const writeToLogFile = async (level: string, message: string, args: any[]) => {
     if (logMessage.length > 1000) {
       logMessage = logMessage.substring(0, 1000) + "... (truncated)";
     }
+    logMessage = logMessage.replace(/[\r\n\t]/g, " ");
     logStream.write(logMessage + "\n");
 
     // Also write to STDOUT if enabled

@@ -341,24 +341,6 @@
     }
   },
   {
-    "name": "deleteVideoRecording",
-    "description": "Delete an archived video recording by ID.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "recordingId": {
-          "type": "string",
-          "description": "Recording ID to delete"
-        }
-      },
-      "required": [
-        "recordingId"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "disableDemoMode",
     "description": "Disable demo mode",
     "inputSchema": {
@@ -1165,16 +1147,6 @@
     }
   },
   {
-    "name": "listVideoRecordings",
-    "description": "List archived video recordings and their metadata.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {},
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "navigateTo",
     "description": "Navigate to screen using navigation graph",
     "inputSchema": {
@@ -1907,120 +1879,6 @@
     }
   },
   {
-    "name": "startVideoRecording",
-    "description": "Start a low-overhead video recording for the active device.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Target platform"
-        },
-        "deviceId": {
-          "type": "string",
-          "description": "Optional device ID override"
-        },
-        "qualityPreset": {
-          "type": "string",
-          "enum": [
-            "low",
-            "medium",
-            "high"
-          ],
-          "description": "Recording quality preset"
-        },
-        "targetBitrateKbps": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "description": "Target bitrate in Kbps"
-        },
-        "maxThroughputMbps": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Max throughput in Mbps"
-        },
-        "fps": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "description": "Frames per second"
-        },
-        "resolution": {
-          "type": "object",
-          "properties": {
-            "width": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "description": "Override resolution width in pixels"
-            },
-            "height": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "description": "Override resolution height in pixels"
-            }
-          },
-          "required": [
-            "width",
-            "height"
-          ],
-          "additionalProperties": false,
-          "description": "Override capture resolution"
-        },
-        "format": {
-          "type": "string",
-          "enum": [
-            "mp4"
-          ],
-          "description": "Video format"
-        },
-        "maxDurationSeconds": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "description": "Maximum recording duration in seconds"
-        },
-        "outputName": {
-          "type": "string",
-          "description": "Optional label to identify the recording"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "stopVideoRecording",
-    "description": "Stop an active video recording and archive it.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "recordingId": {
-          "type": "string",
-          "description": "Recording ID to stop (defaults to latest active recording)"
-        }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "swipeOn",
     "description": "Swipe/scroll on screen or elements",
     "inputSchema": {
@@ -2320,6 +2178,119 @@
       },
       "required": [
         "appId"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "videoRecording",
+    "description": "Start or stop a low-overhead video recording for the active device.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "start",
+            "stop"
+          ],
+          "description": "Action to perform"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Target platform"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Optional device ID override"
+        },
+        "recordingId": {
+          "type": "string",
+          "description": "Recording ID to stop"
+        },
+        "qualityPreset": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "description": "Recording quality preset"
+        },
+        "targetBitrateKbps": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Target bitrate in Kbps"
+        },
+        "maxThroughputMbps": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Max throughput in Mbps"
+        },
+        "fps": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Frames per second"
+        },
+        "resolution": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Override resolution width in pixels"
+            },
+            "height": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "description": "Override resolution height in pixels"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "additionalProperties": false,
+          "description": "Override capture resolution"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "mp4"
+          ],
+          "description": "Video format"
+        },
+        "maxDuration": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "description": "Max seconds to record video for (default 30, max 300)"
+        },
+        "outputName": {
+          "type": "string",
+          "description": "Optional label to identify the recording"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action",
+        "platform"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

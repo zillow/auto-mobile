@@ -32,6 +32,11 @@ export interface DeviceAwareToolHandler<T = any> {
     (device: BootedDevice, args: T, progress?: ProgressCallback, signal?: AbortSignal): Promise<any>;
 }
 
+export interface DeviceAwareToolOptions<T = any> {
+  shouldEnsureDevice?: (args: T) => boolean;
+  nonDeviceHandler?: ToolHandler<T>;
+}
+
 // Interface for a registered tool
 export interface RegisteredTool {
   name: string;
@@ -105,10 +110,15 @@ class ToolRegistryClass {
     schema: any,
     handler: DeviceAwareToolHandler,
     supportsProgress: boolean = false,
-    debugOnly: boolean = false
+    debugOnly: boolean = false,
+    options: DeviceAwareToolOptions = {}
   ): void {
     // Create a wrapper that handles device ID injection
     const wrappedHandler: ToolHandler = async (args: any, progress?: ProgressCallback, signal?: AbortSignal) => {
+      const shouldResolveDevice = options.shouldEnsureDevice
+        ? options.shouldEnsureDevice(args)
+        : true;
+
       // Check for session UUID and create execution context
       let providedDeviceId = args.deviceId;
       const baseSessionUuid = args.sessionUuid;
@@ -117,7 +127,7 @@ class ToolRegistryClass {
       let sessionUuid = baseSessionUuid;
       const keepScreenAwake = typeof args.keepScreenAwake === "boolean" ? args.keepScreenAwake : undefined;
 
-      if (deviceLabel) {
+      if (deviceLabel && shouldResolveDevice) {
         if (!DaemonState.getInstance().isInitialized()) {
           throw new ActionableError("Device labels require an active daemon session.");
         }
@@ -156,7 +166,7 @@ class ToolRegistryClass {
       });
 
       // If session UUID provided, resolve device from session
-      if (sessionUuid && DaemonState.getInstance().isInitialized()) {
+      if (shouldResolveDevice && sessionUuid && DaemonState.getInstance().isInitialized()) {
         logger.info(`[ToolRegistry] Entering session-based device assignment for ${sessionUuid}`);
         const sessionManager = DaemonState.getInstance().getSessionManager();
         const devicePool = DaemonState.getInstance().getDevicePool();
@@ -172,14 +182,19 @@ class ToolRegistryClass {
       // Extract platform from args, default to "android" for backward compatibility
       const platform: SomePlatform = args.platform || "either";
 
-      // Ensure device is ready and get the device ID
-      logger.info(`[ToolRegistry] ${name}: Resolving device for platform=${platform}, providedDeviceId=${providedDeviceId}`);
-      const device = await this.deviceSessionManager.ensureDeviceReady(
-        platform,
-        providedDeviceId,
-        { skipAccessibilityDownload: name === "observe" }
-      );
-      logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
+      let device: BootedDevice | undefined;
+      if (shouldResolveDevice) {
+        // Ensure device is ready and get the device ID
+        logger.info(`[ToolRegistry] ${name}: Resolving device for platform=${platform}, providedDeviceId=${providedDeviceId}`);
+        device = await this.deviceSessionManager.ensureDeviceReady(
+          platform,
+          providedDeviceId,
+          { skipAccessibilityDownload: name === "observe" }
+        );
+        logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
+      } else {
+        logger.info(`[ToolRegistry] ${name}: Skipping device resolution.`);
+      }
 
       try {
         // Record tool call for navigation graph correlation
@@ -198,7 +213,12 @@ class ToolRegistryClass {
         }
 
         let response: any | undefined;
-        if (device !== undefined) {
+        if (!shouldResolveDevice) {
+          if (!options.nonDeviceHandler) {
+            throw new ActionableError(`Tool ${name} requires a device.`);
+          }
+          response = await options.nonDeviceHandler(args, progress, signal);
+        } else if (device !== undefined) {
           // Check if memory performance audit mode is enabled
           const memPerfAuditEnabled = serverConfig.isMemPerfAuditEnabled();
 
@@ -258,7 +278,7 @@ class ToolRegistryClass {
         }
 
         // Update session cache if sessionUuid provided
-        if (sessionUuid && DaemonState.getInstance().isInitialized()) {
+        if (shouldResolveDevice && sessionUuid && DaemonState.getInstance().isInitialized()) {
           const sessionManager = DaemonState.getInstance().getSessionManager();
           const devicePool = DaemonState.getInstance().getDevicePool();
           const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool, { keepScreenAwake });
@@ -284,7 +304,7 @@ class ToolRegistryClass {
         }
         throw new ActionableError(`Failed to execute tool ${name}: ${error}`);
       } finally {
-        if (name === "executePlan" && args?.cleanupAppId) {
+        if (device && name === "executePlan" && args?.cleanupAppId) {
           await this.cleanupService.cleanup(device, {
             appId: args.cleanupAppId,
             clearAppData: args.cleanupClearAppData,
@@ -293,7 +313,7 @@ class ToolRegistryClass {
 
         // Auto-release session after executePlan completes
         // This frees the device immediately for parallel test execution
-        if (sessionUuid && name === "executePlan" && DaemonState.getInstance().isInitialized()) {
+        if (shouldResolveDevice && sessionUuid && name === "executePlan" && DaemonState.getInstance().isInitialized()) {
           try {
             const sessionManager = DaemonState.getInstance().getSessionManager();
             const devicePool = DaemonState.getInstance().getDevicePool();

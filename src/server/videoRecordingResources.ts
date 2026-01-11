@@ -4,19 +4,10 @@ import {
   getVideoRecordingMetadata,
   listVideoRecordings,
 } from "./videoRecordingManager";
+import { buildVideoArchiveItemUri, VIDEO_RESOURCE_URIS } from "./videoRecordingResourceUris";
 import { logger } from "../utils/logger";
 import * as fs from "fs/promises";
 import type { VideoRecordingMetadata } from "../models";
-
-export const VIDEO_RESOURCE_URIS = {
-  LATEST: "automobile:video/latest",
-  ARCHIVE: "automobile:video/archive",
-  ARCHIVE_ITEM: "automobile:video/archive/{recordingId}",
-} as const;
-
-export function buildVideoArchiveItemUri(recordingId: string): string {
-  return `automobile:video/archive/${recordingId}`;
-}
 
 function getVideoMimeType(metadata: VideoRecordingMetadata): string {
   if (metadata.format === "mp4") {
@@ -70,7 +61,7 @@ async function getLatestVideoRecording(): Promise<ResourceContent> {
         uri: VIDEO_RESOURCE_URIS.LATEST,
         mimeType: "application/json",
         text: JSON.stringify({
-          error: "No video recordings available. Call startVideoRecording first.",
+          error: "No video recordings available. Call videoRecording with action \"start\" first.",
         }, null, 2),
       };
     }

@@ -57,4 +57,12 @@ export type {
   FeatureFlag,
   NewFeatureFlag,
   FeatureFlagUpdate,
+  VideoRecordingsTable,
+  VideoRecording,
+  NewVideoRecording,
+  VideoRecordingUpdate,
+  VideoRecordingConfigsTable,
+  VideoRecordingConfig,
+  NewVideoRecordingConfig,
+  VideoRecordingConfigUpdate,
 } from "./types";

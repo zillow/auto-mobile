@@ -4,6 +4,8 @@ import path from "node:path";
 import fs from "fs-extra";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeVideoCaptureBackend } from "../fakes/FakeVideoCaptureBackend";
+import { FakeVideoRecordingRepository } from "../fakes/FakeVideoRecordingRepository";
+import { FakeVideoRecordingConfigRepository } from "../fakes/FakeVideoRecordingConfigRepository";
 import { VideoRecorderService } from "../../src/features/video";
 import type { BootedDevice } from "../../src/models";
 import {
@@ -38,7 +40,10 @@ describe("videoRecordingManager", () => {
 
     await setVideoRecordingManagerDependencies({
       videoRecorderService: service,
+      recordingRepository: new FakeVideoRecordingRepository(),
+      configRepository: new FakeVideoRecordingConfigRepository(),
       timer: fakeTimer,
+      now: () => new Date(fakeTimer.now()),
     });
 
     testDevice = {

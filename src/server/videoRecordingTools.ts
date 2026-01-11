@@ -1,19 +1,26 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
-import { ActionableError, BootedDevice, VideoFormat, VideoQualityPreset } from "../models";
+import {
+  ActionableError,
+  BootedDevice,
+  VideoFormat,
+  VideoQualityPreset,
+} from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import {
-  deleteVideoRecording,
-  listVideoRecordings,
+  listActiveVideoRecordings,
   startVideoRecording,
   stopVideoRecording,
 } from "./videoRecordingManager";
-import { ResourceRegistry } from "./resourceRegistry";
-import { buildVideoArchiveItemUri, VIDEO_RESOURCE_URIS } from "./videoRecordingResources";
 import type { VideoRecordingConfigInput } from "../models";
+import { DeviceSessionManager } from "../utils/DeviceSessionManager";
+import type { VideoRecordingRecord } from "../db/videoRecordingRepository";
 
-export interface StartVideoRecordingArgs {
+const DEFAULT_MAX_DURATION_SECONDS = 30;
+
+export interface VideoRecordingArgs {
+  action: "start" | "stop";
   platform: "android" | "ios";
   deviceId?: string;
   qualityPreset?: VideoQualityPreset;
@@ -25,18 +32,11 @@ export interface StartVideoRecordingArgs {
     height: number;
   };
   format?: VideoFormat;
-  maxDurationSeconds?: number;
+  maxDuration?: number;
   outputName?: string;
+  recordingId?: string;
   sessionUuid?: string;
   device?: string;
-}
-
-export interface StopVideoRecordingArgs {
-  recordingId?: string;
-}
-
-export interface DeleteVideoRecordingArgs {
-  recordingId: string;
 }
 
 const resolutionSchema = z.object({
@@ -44,30 +44,28 @@ const resolutionSchema = z.object({
   height: z.number().int().positive().describe("Override resolution height in pixels"),
 });
 
-const startVideoRecordingSchema = addDeviceTargetingToSchema(z.object({
+const videoRecordingSchema = addDeviceTargetingToSchema(z.object({
+  action: z.enum(["start", "stop"]).describe("Action to perform"),
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   deviceId: z.string().optional().describe("Optional device ID override"),
+  recordingId: z.string().optional().describe("Recording ID to stop"),
   qualityPreset: z.enum(["low", "medium", "high"]).optional().describe("Recording quality preset"),
   targetBitrateKbps: z.number().int().positive().optional().describe("Target bitrate in Kbps"),
   maxThroughputMbps: z.number().positive().optional().describe("Max throughput in Mbps"),
   fps: z.number().int().positive().optional().describe("Frames per second"),
   resolution: resolutionSchema.optional().describe("Override capture resolution"),
   format: z.enum(["mp4"]).optional().describe("Video format"),
-  maxDurationSeconds: z.number().int().positive().optional().describe("Maximum recording duration in seconds"),
+  maxDuration: z
+    .number()
+    .int()
+    .positive()
+    .max(300)
+    .optional()
+    .describe("Max seconds to record video for (default 30, max 300)"),
   outputName: z.string().optional().describe("Optional label to identify the recording"),
 }));
 
-const stopVideoRecordingSchema = z.object({
-  recordingId: z.string().optional().describe("Recording ID to stop (defaults to latest active recording)"),
-});
-
-const deleteVideoRecordingSchema = z.object({
-  recordingId: z.string().describe("Recording ID to delete"),
-});
-
-const listVideoRecordingsSchema = z.object({});
-
-function buildConfigOverrides(args: StartVideoRecordingArgs): VideoRecordingConfigInput {
+function buildConfigOverrides(args: VideoRecordingArgs): VideoRecordingConfigInput {
   const overrides: VideoRecordingConfigInput = {};
   if (args.qualityPreset) {
     overrides.qualityPreset = args.qualityPreset;
@@ -90,132 +88,228 @@ function buildConfigOverrides(args: StartVideoRecordingArgs): VideoRecordingConf
   return overrides;
 }
 
+function shouldTargetAllDevices(args: VideoRecordingArgs): boolean {
+  return !args.deviceId && !args.device && !args.sessionUuid;
+}
+
+async function resolveTargetDevices(
+  device: BootedDevice,
+  args: VideoRecordingArgs
+): Promise<BootedDevice[]> {
+  if (!shouldTargetAllDevices(args)) {
+    return [device];
+  }
+
+  const devices = await DeviceSessionManager.getInstance().detectConnectedPlatforms();
+  const matching = devices.filter(candidate => candidate.platform === device.platform);
+
+  if (matching.length === 0) {
+    return [device];
+  }
+
+  const unique = new Map<string, BootedDevice>();
+  for (const candidate of [device, ...matching]) {
+    unique.set(candidate.deviceId, candidate);
+  }
+  return Array.from(unique.values());
+}
+
+function selectLatestRecording(records: VideoRecordingRecord[]): VideoRecordingRecord {
+  return records
+    .slice()
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.startedAt);
+      const rightTime = Date.parse(right.startedAt);
+      return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
+    })[0];
+}
+
+async function stopRecordingById(recordingId: string) {
+  const results: Array<Record<string, unknown>> = [];
+  const evictedRecordingIds: string[] = [];
+  const activeRecords = await listActiveVideoRecordings();
+  const matching = activeRecords.find(record => record.recordingId === recordingId);
+
+  try {
+    const { metadata, evictedRecordingIds: evicted } = await stopVideoRecording(recordingId);
+    const codec = metadata.codec ?? "unknown";
+    const durationMs = metadata.durationMs ?? 0;
+    const sizeBytes = metadata.sizeBytes ?? 0;
+
+    results.push({
+      recordingId: metadata.recordingId,
+      filePath: metadata.filePath,
+      durationMs,
+      sizeBytes,
+      codec,
+      metadata: { ...metadata, durationMs, sizeBytes, codec },
+      deviceId: matching?.deviceId,
+      platform: matching?.platform,
+    });
+
+    for (const evictedId of evicted) {
+      evictedRecordingIds.push(evictedId);
+    }
+  } catch (error) {
+    throw new ActionableError(`Failed to stop video recording: ${error}`);
+  }
+
+  return createJSONToolResponse({
+    action: "stop",
+    count: results.length,
+    recordings: results,
+    evictedRecordingIds: evictedRecordingIds.length > 0 ? evictedRecordingIds : undefined,
+  });
+}
+
 export function registerVideoRecordingTools(): void {
-  const startVideoRecordingHandler = async (
+  const videoRecordingHandler = async (
     device: BootedDevice,
-    args: StartVideoRecordingArgs
+    args: VideoRecordingArgs
   ) => {
-    try {
-      const active = await startVideoRecording({
-        device,
-        configOverrides: buildConfigOverrides(args),
-        outputName: args.outputName,
-        maxDurationSeconds: args.maxDurationSeconds,
-      });
+    if (args.action === "start") {
+      const targetDevices = await resolveTargetDevices(device, args);
+      const maxDurationSeconds = args.maxDuration ?? DEFAULT_MAX_DURATION_SECONDS;
+      const recordings: Array<Record<string, unknown>> = [];
+      const failures: Array<Record<string, unknown>> = [];
 
-      return createJSONToolResponse({
-        message: `Started video recording ${active.recordingId}`,
-        recordingId: active.recordingId,
-        outputPath: active.outputPath,
-        startedAt: active.startedAt,
-        outputName: active.outputName,
-        deviceId: device.deviceId,
-        platform: device.platform,
-        settings: {
-          ...active.config,
-          resolution: active.config.resolution,
-          maxDurationSeconds: args.maxDurationSeconds,
-        },
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to start video recording: ${error}`);
-    }
-  };
+      for (const target of targetDevices) {
+        try {
+          const active = await startVideoRecording({
+            device: target,
+            configOverrides: buildConfigOverrides(args),
+            outputName: args.outputName,
+            maxDurationSeconds: args.maxDuration,
+          });
 
-  const stopVideoRecordingHandler = async (args: StopVideoRecordingArgs) => {
-    try {
-      const metadata = await stopVideoRecording(args.recordingId);
-      const codec = metadata.codec ?? "unknown";
-      const durationMs = metadata.durationMs ?? 0;
-      const sizeBytes = metadata.sizeBytes ?? 0;
-
-      await ResourceRegistry.notifyResourcesUpdated([
-        VIDEO_RESOURCE_URIS.LATEST,
-        VIDEO_RESOURCE_URIS.ARCHIVE,
-        buildVideoArchiveItemUri(metadata.recordingId),
-      ]);
-
-      return createJSONToolResponse({
-        message: `Stopped video recording ${metadata.recordingId}`,
-        recordingId: metadata.recordingId,
-        filePath: metadata.filePath,
-        durationMs,
-        sizeBytes,
-        codec,
-        metadata: { ...metadata, durationMs, sizeBytes, codec },
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to stop video recording: ${error}`);
-    }
-  };
-
-  const listVideoRecordingsHandler = async () => {
-    try {
-      const recordings = await listVideoRecordings();
-      return createJSONToolResponse({
-        recordings,
-        count: recordings.length,
-      });
-    } catch (error) {
-      throw new ActionableError(`Failed to list video recordings: ${error}`);
-    }
-  };
-
-  const deleteVideoRecordingHandler = async (args: DeleteVideoRecordingArgs) => {
-    try {
-      const deleted = await deleteVideoRecording(args.recordingId);
-
-      if (!deleted) {
-        return createJSONToolResponse({
-          success: false,
-          deleted: false,
-          recordingId: args.recordingId,
-          error: `Recording not found: ${args.recordingId}`,
-        });
+          recordings.push({
+            recordingId: active.recordingId,
+            outputPath: active.outputPath,
+            startedAt: active.startedAt,
+            outputName: active.outputName,
+            deviceId: target.deviceId,
+            platform: target.platform,
+            settings: {
+              ...active.config,
+              resolution: active.config.resolution,
+              maxDurationSeconds,
+            },
+          });
+        } catch (error) {
+          failures.push({
+            deviceId: target.deviceId,
+            platform: target.platform,
+            error: String(error),
+          });
+        }
       }
 
-      await ResourceRegistry.notifyResourcesUpdated([
-        VIDEO_RESOURCE_URIS.LATEST,
-        VIDEO_RESOURCE_URIS.ARCHIVE,
-        buildVideoArchiveItemUri(args.recordingId),
-      ]);
+      if (recordings.length === 0) {
+        const message = failures.length > 0
+          ? `Failed to start video recordings: ${failures.map(failure => failure.error).join("; ")}`
+          : "Failed to start video recordings.";
+        throw new ActionableError(message);
+      }
 
       return createJSONToolResponse({
-        success: true,
-        deleted: true,
-        recordingId: args.recordingId,
-        message: `Deleted video recording ${args.recordingId}`,
+        action: "start",
+        count: recordings.length,
+        recordings,
+        failures: failures.length > 0 ? failures : undefined,
       });
-    } catch (error) {
-      throw new ActionableError(`Failed to delete video recording: ${error}`);
     }
+
+    if (args.action === "stop") {
+      if (args.recordingId) {
+        return stopRecordingById(args.recordingId);
+      }
+
+      const results: Array<Record<string, unknown>> = [];
+      const failures: Array<Record<string, unknown>> = [];
+      const evictedRecordingIds: string[] = [];
+      const targetDevices = await resolveTargetDevices(device, args);
+      const activeRecords = await listActiveVideoRecordings({ platform: device.platform });
+
+      for (const target of targetDevices) {
+        const matches = activeRecords.filter(record => record.deviceId === target.deviceId);
+        if (matches.length === 0) {
+          failures.push({
+            deviceId: target.deviceId,
+            platform: target.platform,
+            error: "No active video recording found for device.",
+          });
+          continue;
+        }
+
+        const latest = selectLatestRecording(matches);
+        try {
+          const { metadata, evictedRecordingIds: evicted } = await stopVideoRecording(latest.recordingId);
+          const codec = metadata.codec ?? "unknown";
+          const durationMs = metadata.durationMs ?? 0;
+          const sizeBytes = metadata.sizeBytes ?? 0;
+
+          results.push({
+            recordingId: metadata.recordingId,
+            filePath: metadata.filePath,
+            durationMs,
+            sizeBytes,
+            codec,
+            metadata: { ...metadata, durationMs, sizeBytes, codec },
+            deviceId: target.deviceId,
+            platform: target.platform,
+          });
+
+          for (const evictedId of evicted) {
+            evictedRecordingIds.push(evictedId);
+          }
+        } catch (error) {
+          failures.push({
+            deviceId: target.deviceId,
+            platform: target.platform,
+            error: String(error),
+          });
+        }
+      }
+
+      if (results.length === 0) {
+        const message = failures.length > 0
+          ? `Failed to stop video recordings: ${failures.map(failure => failure.error).join("; ")}`
+          : "Failed to stop video recordings.";
+        throw new ActionableError(message);
+      }
+
+      return createJSONToolResponse({
+        action: "stop",
+        count: results.length,
+        recordings: results,
+        failures: failures.length > 0 ? failures : undefined,
+        evictedRecordingIds: evictedRecordingIds.length > 0 ? evictedRecordingIds : undefined,
+      });
+    }
+
+    throw new ActionableError(`Unsupported videoRecording action: ${args.action}`);
+  };
+
+  const videoRecordingNonDeviceHandler = async (args: VideoRecordingArgs) => {
+    if (args.action === "stop" && args.recordingId) {
+      return stopRecordingById(args.recordingId);
+    }
+
+    throw new ActionableError(
+      "Video recording start/stop requires a connected device unless recordingId is provided."
+    );
   };
 
   ToolRegistry.registerDeviceAware(
-    "startVideoRecording",
-    "Start a low-overhead video recording for the active device.",
-    startVideoRecordingSchema,
-    startVideoRecordingHandler
-  );
-
-  ToolRegistry.register(
-    "stopVideoRecording",
-    "Stop an active video recording and archive it.",
-    stopVideoRecordingSchema,
-    stopVideoRecordingHandler
-  );
-
-  ToolRegistry.register(
-    "listVideoRecordings",
-    "List archived video recordings and their metadata.",
-    listVideoRecordingsSchema,
-    listVideoRecordingsHandler
-  );
-
-  ToolRegistry.register(
-    "deleteVideoRecording",
-    "Delete an archived video recording by ID.",
-    deleteVideoRecordingSchema,
-    deleteVideoRecordingHandler
+    "videoRecording",
+    "Start or stop a low-overhead video recording for the active device.",
+    videoRecordingSchema,
+    videoRecordingHandler,
+    false,
+    false,
+    {
+      shouldEnsureDevice: args => !(args.action === "stop" && args.recordingId),
+      nonDeviceHandler: videoRecordingNonDeviceHandler,
+    }
   );
 }

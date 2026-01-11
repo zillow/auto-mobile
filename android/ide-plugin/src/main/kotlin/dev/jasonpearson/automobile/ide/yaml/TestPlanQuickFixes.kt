@@ -159,7 +159,7 @@ object TestPlanQuickFixFactory {
         "getDeepLinks",
         "getNavigationGraph", "explore", "identifyInteractions",
         "captureDeviceSnapshot", "restoreDeviceSnapshot", "listSnapshots", "deleteSnapshot",
-        "startVideoRecording", "stopVideoRecording", "listVideoRecordings", "deleteVideoRecording",
+        "videoRecording",
         "listDeviceImages",
         "debugSearch", "bugReport",
         "doctor",

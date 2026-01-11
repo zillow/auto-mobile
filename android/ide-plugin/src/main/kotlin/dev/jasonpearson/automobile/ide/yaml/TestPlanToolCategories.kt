@@ -73,10 +73,7 @@ object TestPlanToolCategories {
             "deleteSnapshot"
         ),
         "Video recording" to setOf(
-            "startVideoRecording",
-            "stopVideoRecording",
-            "listVideoRecordings",
-            "deleteVideoRecording"
+            "videoRecording"
         ),
         "Debugging" to setOf(
             "debugSearch",

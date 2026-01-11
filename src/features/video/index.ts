@@ -10,7 +10,6 @@ export type {
   RecordingResult,
   StartVideoRecordingOptions,
   ActiveVideoRecording,
-  VideoArchiveEvictionResult,
   VideoRecorderServiceDependencies,
 } from "./VideoRecorderService";
 export {

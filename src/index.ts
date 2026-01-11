@@ -9,6 +9,7 @@ import { logger } from "./utils/logger";
 import { runCliCommand } from "./cli";
 import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
+import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./daemon/videoRecordingSocketServer";
 import { execSync } from "node:child_process";
 import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
@@ -561,6 +562,8 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
     }
     transports.clear();
 
+    await stopVideoRecordingSocketServer();
+
     server.close(() => {
       logger.info("Streamable HTTP server shut down");
       logger.close();
@@ -682,6 +685,8 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
     }
     sessions.clear();
 
+    await stopVideoRecordingSocketServer();
+
     server.close(() => {
       logger.info("SSE server shut down");
       logger.close();
@@ -695,12 +700,14 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
 
 process.on("SIGINT", async () => {
   logger.info("Received SIGINT signal, shutting down");
+  await stopVideoRecordingSocketServer();
   logger.close();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
   logger.info("Received SIGTERM signal, shutting down");
+  await stopVideoRecordingSocketServer();
   logger.close();
   process.exit(0);
 });
@@ -805,37 +812,40 @@ async function main() {
       // prevent Node.js from exiting naturally. Force exit with code 0 to ensure clean termination.
       logger.close();
       process.exit(0);
-    } else if (transport.type === "streamable") {
-      // Run as Streamable HTTP server
-      logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
-      logger.enableStdoutLogging();
-      await startStreamableServer(transport, debug);
-    } else if (transport.type === "sse") {
-      // Run as SSE server (deprecated)
-      logger.info(`Starting SSE transport on ${transport.host}:${transport.port} (deprecated - consider using streamable)`);
-      logger.enableStdoutLogging();
-      await startSSEServer(transport, debug);
     } else {
-      // Run as MCP server with STDIO transport (default)
-      const stdioTransport = new StdioServerTransport();
-      let server;
-      try {
-        server = createMcpServer({ debug });
-      } catch (error) {
-        logger.error("Failed to create MCP server:", error);
-        throw error;
-      }
-      try {
-        logger.info("Connecting MCP server to stdio transport");
-        startupBenchmark.startPhase("serverListening");
-        await server.connect(stdioTransport);
-        startupBenchmark.endPhase("serverListening");
-        logger.info("MCP server connected to stdio transport");
-        logger.info("AutoMobile MCP server running on stdio");
-        startupBenchmark.emit("mcp-server", { transport: "stdio" });
-      } catch (error) {
-        logger.error("MCP server connect failed:", error);
-        throw error;
+      await startVideoRecordingSocketServer();
+      if (transport.type === "streamable") {
+        // Run as Streamable HTTP server
+        logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
+        logger.enableStdoutLogging();
+        await startStreamableServer(transport, debug);
+      } else if (transport.type === "sse") {
+        // Run as SSE server (deprecated)
+        logger.info(`Starting SSE transport on ${transport.host}:${transport.port} (deprecated - consider using streamable)`);
+        logger.enableStdoutLogging();
+        await startSSEServer(transport, debug);
+      } else {
+        // Run as MCP server with STDIO transport (default)
+        const stdioTransport = new StdioServerTransport();
+        let server;
+        try {
+          server = createMcpServer({ debug });
+        } catch (error) {
+          logger.error("Failed to create MCP server:", error);
+          throw error;
+        }
+        try {
+          logger.info("Connecting MCP server to stdio transport");
+          startupBenchmark.startPhase("serverListening");
+          await server.connect(stdioTransport);
+          startupBenchmark.endPhase("serverListening");
+          logger.info("MCP server connected to stdio transport");
+          logger.info("AutoMobile MCP server running on stdio");
+          startupBenchmark.emit("mcp-server", { transport: "stdio" });
+        } catch (error) {
+          logger.error("MCP server connect failed:", error);
+          throw error;
+        }
       }
     }
   } catch (err) {
