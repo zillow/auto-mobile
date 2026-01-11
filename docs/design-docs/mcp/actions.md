@@ -54,7 +54,8 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 
 #### Testing & Debugging
 
-- 🧪 `executePlan` executes a series of tool calls from a YAML plan content, stopping if any step fails.
+- 🧪 `executePlan` (daemon mode only) executes a series of tool calls from a YAML plan content, stopping if any step fails.
+- 🔒 `criticalSection` (daemon mode only) coordinates multiple devices at a synchronization barrier for serialized steps.
 - 🩺 `doctor` runs diagnostic checks to verify AutoMobile setup and environment configuration.
 - 🐛 `bugReport` generates a comprehensive bug report including screen state, view hierarchy, logcat, and screenshot.
 - 🔍 `debugSearch` debugs element search operations to understand why elements aren't found or wrong elements are selected.

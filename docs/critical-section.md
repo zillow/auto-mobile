@@ -4,6 +4,10 @@
 
 The `criticalSection` tool provides multi-device synchronization for serialized execution of steps. It implements a barrier synchronization pattern where all devices must arrive at the critical section before any can proceed, and then executes steps one device at a time.
 
+## Availability
+
+The `criticalSection` tool is available only when the AutoMobile daemon is running (daemon-backed MCP server). It is not registered in standalone MCP mode.
+
 ## Use Cases
 
 Critical sections are useful when you need to:

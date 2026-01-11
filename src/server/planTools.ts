@@ -253,7 +253,7 @@ const executePlanTool = async (device: BootedDevice, params: {
   }
 };
 
-// Register plan tools. Note that only AutoMobile CLI includes this since we do not execute plans in MCP mode.
+// Register plan tools for daemon-backed MCP servers and CLI usage.
 export const registerPlanTools = () => {
   ToolRegistry.registerDeviceAware(
     "executePlan",

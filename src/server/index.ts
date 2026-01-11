@@ -53,6 +53,7 @@ export interface McpServerOptions {
   debug?: boolean;
   sessionContext?: { sessionId?: string };
   planExecutionLock?: PlanExecutionLock;
+  daemonMode?: boolean;
 }
 
 function formatToolParamError(toolName: string, error: unknown): string {
@@ -85,6 +86,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   // Plan execution lock with per-session scope to prevent interference during executePlan
   // Each test thread gets its own sessionUuid, enabling parallel execution on different devices
   const planExecutionLock = options.planExecutionLock ?? createDefaultPlanExecutionLock();
+  const daemonMode = options.daemonMode ?? false;
   void FeatureFlagService.getInstance()
     .initialize()
     .catch(error => {
@@ -103,10 +105,12 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerNavigationTools();
   registerNotificationTools();
   registerDaemonTools();
-  registerPlanTools();
+  if (daemonMode) {
+    registerPlanTools();
+    registerCriticalSectionTools();
+  }
   registerDoctorTools();
   registerFeatureFlagTools();
-  registerCriticalSectionTools();
   registerVideoRecordingTools();
   registerSnapshotTools();
   registerBiometricTools();

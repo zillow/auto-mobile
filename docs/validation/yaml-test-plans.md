@@ -39,7 +39,7 @@ The schema validates:
 
 Validation happens automatically in two places:
 
-**MCP Server (`executePlan` tool):**
+**Daemon-backed MCP Server (`executePlan` tool, daemon mode only):**
 - Validates YAML before parsing
 - Runs in TypeScript using AJV (Another JSON Schema Validator)
 - Reports errors with line/column numbers when possible

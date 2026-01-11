@@ -325,7 +325,11 @@ export class Daemon {
           // Create and connect MCP server
           let mcpServer;
           try {
-            mcpServer = createMcpServer({ debug: this.debug, sessionContext });
+            mcpServer = createMcpServer({
+              debug: this.debug,
+              sessionContext,
+              daemonMode: true
+            });
           } catch (error) {
             logger.error("Failed to create MCP server:", error);
             sendJsonRpcError("Server error", error);
