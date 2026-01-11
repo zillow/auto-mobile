@@ -14,9 +14,6 @@ import { runDoctor } from "../doctor";
 export const doctorSchema = z.object({
   android: z.boolean().optional().describe("Run Android-specific checks only"),
   ios: z.boolean().optional().describe("Run iOS-specific checks only"),
-  installCmdlineTools: z.boolean().optional().describe(
-    "Automatically download and install Android SDK Command-line Tools to ANDROID_HOME if missing (default: false)"
-  ),
 }).strict();
 
 /**
@@ -25,7 +22,6 @@ export const doctorSchema = z.object({
 export interface DoctorArgs {
   android?: boolean;
   ios?: boolean;
-  installCmdlineTools?: boolean;
 }
 
 /**
@@ -40,7 +36,6 @@ export function registerDoctorTools(): void {
       const report = await runDoctor({
         android: args.android,
         ios: args.ios,
-        installCmdlineTools: args.installCmdlineTools,
       });
 
       return createJSONToolResponse(report);
