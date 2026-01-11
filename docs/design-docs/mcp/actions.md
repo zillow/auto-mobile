@@ -33,10 +33,7 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 - 🌐 `openLink` launches URLs or deep links.
 - 🧰 `systemTray`, `homeScreen`, and `recentApps` control system surfaces.
 - 🔔 `postNotification` posts notifications from the app-under-test when SDK hooks are installed.
-- 🌍 `setLocale` changes app/system locale (e.g., "ar-SA", "ja-JP").
-- 🕒 `setTimeZone` changes device time zone.
-- ⬅️ `setTextDirection` enables/disables RTL layout.
-- 🕐 `set24HourFormat` toggles 24-hour time format.
+- 🌍 `changeLocalization` sets locale, time zone, text direction, and time format in one call.
 
 #### Navigation & Exploration
 

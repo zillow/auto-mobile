@@ -360,11 +360,7 @@ Session-based Execution:
     "checkRunningDevices"
   ];
   const systemConfigTools = [
-    "setLocale",
-    "setTimeZone",
-    "setTextDirection",
-    "set24HourFormat",
-    "getCalendarSystem"
+    "changeLocalization"
   ];
 
   // Group tools by category (based on their prefixes or common patterns)

@@ -50,6 +50,18 @@ Returns recent UI performance audit results:
 - Frame drop counts
 - Render time statistics
 
+### Localization Settings
+
+**URI**: `automobile:devices/{deviceId}/localization`
+
+Returns current localization settings for a device:
+
+- Locale tag
+- Time zone
+- Text direction
+- Time format
+- Calendar system
+
 ## Using Resources
 
 AI agents can request resources via MCP:

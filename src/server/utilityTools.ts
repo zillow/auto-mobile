@@ -28,29 +28,18 @@ export const setActiveDeviceSchema = addSessionUuidToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
-export const setLocaleSchema = addDeviceTargetingToSchema(z.object({
-  languageTag: z.string().min(1).describe("Locale tag (e.g., ar-SA, ja-JP)"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
+const changeLocalizationBaseSchema = z.object({
+  platform: z.enum(["android", "ios"]).describe("Platform"),
+  locale: z.string().min(1).optional().describe("Locale tag (e.g., ar-SA, ja-JP)"),
+  timeZone: z.string().min(1).optional().describe("Zone ID (e.g., America/Los_Angeles)"),
+  textDirection: z.enum(["ltr", "rtl"]).optional().describe("Text direction"),
+  timeFormat: z.enum(["12", "24"]).optional().describe("Time format")
+});
 
-export const setTimeZoneSchema = addDeviceTargetingToSchema(z.object({
-  zoneId: z.string().min(1).describe("Zone ID (e.g., America/Los_Angeles)"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
-
-export const setTextDirectionSchema = addDeviceTargetingToSchema(z.object({
-  rtl: z.boolean().describe("RTL layout"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
-
-export const set24HourFormatSchema = addDeviceTargetingToSchema(z.object({
-  enabled: z.boolean().describe("24-hour format"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
-
-export const getCalendarSystemSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
+export const changeLocalizationSchema = addDeviceTargetingToSchema(changeLocalizationBaseSchema).refine(values =>
+  values.locale || values.timeZone || values.textDirection || values.timeFormat, {
+  message: "At least one of locale, timeZone, textDirection, or timeFormat must be provided."
+});
 
 // Export interfaces for type safety
 export interface DemoModeArgs extends DemoModeOptions {
@@ -63,28 +52,12 @@ export interface SetActiveDeviceArgs {
     platform: Platform;
 }
 
-export interface SetLocaleArgs {
-  languageTag: string;
+export interface ChangeLocalizationArgs {
   platform: Platform;
-}
-
-export interface SetTimeZoneArgs {
-  zoneId: string;
-  platform: Platform;
-}
-
-export interface SetTextDirectionArgs {
-  rtl: boolean;
-  platform: Platform;
-}
-
-export interface Set24HourFormatArgs {
-  enabled: boolean;
-  platform: Platform;
-}
-
-export interface GetCalendarSystemArgs {
-  platform: Platform;
+  locale?: string;
+  timeZone?: string;
+  textDirection?: "ltr" | "rtl";
+  timeFormat?: "12" | "24";
 }
 
 // Register tools
@@ -141,68 +114,65 @@ export function registerUtilityTools() {
     }
   };
 
-  const setLocaleHandler = async (device: BootedDevice, args: SetLocaleArgs) => {
+  const changeLocalizationHandler = async (device: BootedDevice, args: ChangeLocalizationArgs) => {
     const manager = new SystemConfigurationManager(device);
-    const result = await manager.setLocale(args.languageTag);
-    const message = result.success
-      ? `Locale set to ${args.languageTag}`
-      : `Failed to set locale${result.error ? `: ${result.error}` : ""}`;
+    const changes: {
+      locale?: string;
+      timeZone?: string;
+      textDirection?: "ltr" | "rtl";
+      timeFormat?: "12" | "24";
+    } = {};
+    const errors: string[] = [];
+
+    if (args.locale !== undefined) {
+      const result = await manager.setLocale(args.locale, { broadcast: false });
+      if (result.success) {
+        changes.locale = result.languageTag;
+      } else {
+        errors.push(result.error ?? "Failed to set locale");
+      }
+    }
+
+    if (args.timeZone !== undefined) {
+      const result = await manager.setTimeZone(args.timeZone);
+      if (result.success) {
+        changes.timeZone = result.zoneId;
+      } else {
+        errors.push(result.error ?? "Failed to set time zone");
+      }
+    }
+
+    if (args.textDirection !== undefined) {
+      const rtl = args.textDirection === "rtl";
+      const result = await manager.setTextDirection(rtl, { broadcast: false });
+      if (result.success) {
+        changes.textDirection = rtl ? "rtl" : "ltr";
+      } else {
+        errors.push(result.error ?? "Failed to set text direction");
+      }
+    }
+
+    if (args.timeFormat !== undefined) {
+      const enabled = args.timeFormat === "24";
+      const result = await manager.set24HourFormat(enabled);
+      if (result.success) {
+        changes.timeFormat = enabled ? "24" : "12";
+      } else {
+        errors.push(result.error ?? "Failed to set time format");
+      }
+    }
+
+    const success = errors.length === 0;
+    let intentBroadcast = false;
+    if (Object.keys(changes).length > 0 && device.platform === "android") {
+      intentBroadcast = await manager.broadcastLocaleChange();
+    }
 
     return createJSONToolResponse({
-      message,
-      ...result
-    });
-  };
-
-  const setTimeZoneHandler = async (device: BootedDevice, args: SetTimeZoneArgs) => {
-    const manager = new SystemConfigurationManager(device);
-    const result = await manager.setTimeZone(args.zoneId);
-    const message = result.success
-      ? `Time zone set to ${args.zoneId}`
-      : `Failed to set time zone${result.error ? `: ${result.error}` : ""}`;
-
-    return createJSONToolResponse({
-      message,
-      ...result
-    });
-  };
-
-  const setTextDirectionHandler = async (device: BootedDevice, args: SetTextDirectionArgs) => {
-    const manager = new SystemConfigurationManager(device);
-    const result = await manager.setTextDirection(args.rtl);
-    const message = result.success
-      ? `Text direction set to ${args.rtl ? "RTL" : "LTR"}`
-      : `Failed to set text direction${result.error ? `: ${result.error}` : ""}`;
-
-    return createJSONToolResponse({
-      message,
-      ...result
-    });
-  };
-
-  const set24HourFormatHandler = async (device: BootedDevice, args: Set24HourFormatArgs) => {
-    const manager = new SystemConfigurationManager(device);
-    const result = await manager.set24HourFormat(args.enabled);
-    const message = result.success
-      ? `24-hour format ${args.enabled ? "enabled" : "disabled"}`
-      : `Failed to set 24-hour format${result.error ? `: ${result.error}` : ""}`;
-
-    return createJSONToolResponse({
-      message,
-      ...result
-    });
-  };
-
-  const getCalendarSystemHandler = async (device: BootedDevice, _args: GetCalendarSystemArgs) => {
-    const manager = new SystemConfigurationManager(device);
-    const result = await manager.getCalendarSystem();
-    const message = result.success
-      ? `Calendar system: ${result.calendarSystem ?? "unknown"}`
-      : `Failed to read calendar system${result.error ? `: ${result.error}` : ""}`;
-
-    return createJSONToolResponse({
-      message,
-      ...result
+      success,
+      changes,
+      intentBroadcast,
+      ...(success ? {} : { error: errors.join("; ") })
     });
   };
 
@@ -222,37 +192,9 @@ export function registerUtilityTools() {
   );
 
   ToolRegistry.registerDeviceAware(
-    "setLocale",
-    "Switch locale",
-    setLocaleSchema,
-    setLocaleHandler
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "setTimeZone",
-    "Change time zone",
-    setTimeZoneSchema,
-    setTimeZoneHandler
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "setTextDirection",
-    "Set RTL layout direction",
-    setTextDirectionSchema,
-    setTextDirectionHandler
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "set24HourFormat",
-    "Set 24-hour time format",
-    set24HourFormatSchema,
-    set24HourFormatHandler
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "getCalendarSystem",
-    "Get calendar system",
-    getCalendarSystemSchema,
-    getCalendarSystemHandler
+    "changeLocalization",
+    "Change locale, time zone, text direction, and time format",
+    changeLocalizationSchema,
+    changeLocalizationHandler
   );
 }

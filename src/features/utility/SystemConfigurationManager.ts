@@ -3,6 +3,7 @@ import { logger } from "../../utils/logger";
 import {
   BootedDevice,
   GetCalendarSystemResult,
+  LocalizationSettingsResult,
   Set24HourFormatResult,
   SetLocaleResult,
   SetTextDirectionResult,
@@ -28,7 +29,7 @@ export class SystemConfigurationManager {
     this.adb = adb ?? new AdbClient(device);
   }
 
-  async setLocale(languageTag: string): Promise<SetLocaleResult> {
+  async setLocale(languageTag: string, options: { broadcast?: boolean } = {}): Promise<SetLocaleResult> {
     const trimmedTag = languageTag.trim();
     if (!trimmedTag) {
       return {
@@ -89,13 +90,9 @@ export class SystemConfigurationManager {
       };
     }
 
-    let broadcasted = false;
-    try {
-      await this.adb.executeCommand("shell am broadcast -a android.intent.action.LOCALE_CHANGED");
-      broadcasted = true;
-    } catch (error) {
-      logger.warn(`[SystemConfigurationManager] Failed to broadcast locale change: ${error}`);
-    }
+    const broadcasted = options.broadcast === false
+      ? false
+      : await this.broadcastLocaleChange();
 
     return {
       success: true,
@@ -144,7 +141,7 @@ export class SystemConfigurationManager {
     }
   }
 
-  async setTextDirection(rtl: boolean): Promise<SetTextDirectionResult> {
+  async setTextDirection(rtl: boolean, options: { broadcast?: boolean } = {}): Promise<SetTextDirectionResult> {
     if (this.device.platform !== "android") {
       return {
         success: false,
@@ -192,13 +189,9 @@ export class SystemConfigurationManager {
       };
     }
 
-    let broadcasted = false;
-    try {
-      await this.adb.executeCommand("shell am broadcast -a android.intent.action.LOCALE_CHANGED");
-      broadcasted = true;
-    } catch (error) {
-      logger.warn(`[SystemConfigurationManager] Failed to broadcast RTL change: ${error}`);
-    }
+    const broadcasted = options.broadcast === false
+      ? false
+      : await this.broadcastLocaleChange();
 
     return {
       success: true,
@@ -207,6 +200,20 @@ export class SystemConfigurationManager {
       settings: appliedSettings,
       broadcasted
     };
+  }
+
+  async broadcastLocaleChange(): Promise<boolean> {
+    if (this.device.platform !== "android") {
+      return false;
+    }
+
+    try {
+      await this.adb.executeCommand("shell am broadcast -a android.intent.action.LOCALE_CHANGED");
+      return true;
+    } catch (error) {
+      logger.warn(`[SystemConfigurationManager] Failed to broadcast localization change: ${error}`);
+      return false;
+    }
   }
 
   async set24HourFormat(enabled: boolean): Promise<Set24HourFormatResult> {
@@ -276,6 +283,36 @@ export class SystemConfigurationManager {
       calendarSystem: DEFAULT_CALENDAR_SYSTEM,
       locale: locale ?? null,
       source: "default"
+    };
+  }
+
+  async getLocalizationSettings(): Promise<LocalizationSettingsResult> {
+    if (this.device.platform !== "android") {
+      return {
+        success: false,
+        error: this.getPlatformError()
+      };
+    }
+
+    const locale = await this.getCurrentLocaleTag();
+    const timeZone = await this.readSetting("shell getprop persist.sys.timezone");
+    const timeFormat = this.normalizeTimeFormat(
+      await this.readSetting("shell settings get system time_12_24")
+    );
+    const debugForceRtl = await this.readSetting("shell settings get global debug.force_rtl");
+    const forceRtl = await this.readSetting("shell settings get global force_rtl");
+    const rtlSetting = this.parseBooleanSetting(debugForceRtl) ?? this.parseBooleanSetting(forceRtl);
+    const textDirection = rtlSetting === null ? null : (rtlSetting ? "rtl" : "ltr");
+    const calendarResult = await this.getCalendarSystem();
+
+    return {
+      success: calendarResult.success,
+      locale,
+      timeZone,
+      textDirection,
+      timeFormat,
+      calendarSystem: calendarResult.calendarSystem ?? null,
+      error: calendarResult.error
     };
   }
 

@@ -114,6 +114,66 @@
     }
   },
   {
+    "name": "changeLocalization",
+    "description": "Change locale, time zone, text direction, and time format",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Locale tag (e.g., ar-SA, ja-JP)"
+        },
+        "timeZone": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Zone ID (e.g., America/Los_Angeles)"
+        },
+        "textDirection": {
+          "type": "string",
+          "enum": [
+            "ltr",
+            "rtl"
+          ],
+          "description": "Text direction"
+        },
+        "timeFormat": {
+          "type": "string",
+          "enum": [
+            "12",
+            "24"
+          ],
+          "description": "Time format"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
     "name": "clearText",
     "description": "Clear text from focused input",
     "inputSchema": {
@@ -707,40 +767,6 @@
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
         }
       },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "getCalendarSystem",
-    "description": "Get calendar system",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "platform"
-      ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
@@ -1566,45 +1592,6 @@
     }
   },
   {
-    "name": "set24HourFormat",
-    "description": "Set 24-hour time format",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "24-hour format"
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "enabled",
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "setActiveDevice",
     "description": "Set active device",
     "inputSchema": {
@@ -1633,125 +1620,6 @@
       },
       "required": [
         "deviceId",
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "setLocale",
-    "description": "Switch locale",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "languageTag": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Locale tag (e.g., ar-SA, ja-JP)"
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "languageTag",
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "setTextDirection",
-    "description": "Set RTL layout direction",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "rtl": {
-          "type": "boolean",
-          "description": "RTL layout"
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "rtl",
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "setTimeZone",
-    "description": "Change time zone",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "zoneId": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Zone ID (e.g., America/Los_Angeles)"
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "zoneId",
         "platform"
       ],
       "additionalProperties": false,

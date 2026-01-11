@@ -44,11 +44,7 @@ object TestPlanToolCategories {
             "rotate",
             "shake",
             "systemTray",
-            "setLocale",
-            "setTimeZone",
-            "setTextDirection",
-            "set24HourFormat",
-            "getCalendarSystem"
+            "changeLocalization"
         ),
         "Demo mode" to setOf(
             "demoMode"
