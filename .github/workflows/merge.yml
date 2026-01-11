@@ -363,6 +363,70 @@ jobs:
           name: playground-app-apk
           path: android/playground/app/build/outputs/apk/debug/playground-app-debug.apk
 
+  publish-junit-runner-snapshot:
+    name: "Publish JUnitRunner Snapshot"
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs:
+      - build-ide-plugin
+      - ide-plugin-unit-tests
+      - validate-xml
+      - ktfmt
+      - validate-shell-scripts
+      - validate-mkdocs-nav
+      - validate-documentation-links
+      - mcp-build-and-test
+      - junit-runner-unit-tests
+      - junit-runner-emulator-tests
+      - playground-automobile-emulator-tests
+      - android-accessibility-service-unit-tests
+      - build-junit-runner-library
+      - build-android-accessibility-service
+      - build-playground-app
+      - benchmark-context-thresholds
+    env:
+      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME || vars.MAVEN_USERNAME }}
+      MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD || vars.MAVEN_PASSWORD }}
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Read JUnitRunner version"
+        id: junit-runner-version
+        shell: bash
+        run: |
+          version_line=$(grep -E '^version = "' android/junit-runner/build.gradle.kts || true)
+          if [ -z "$version_line" ]; then
+            echo "Could not find JUnitRunner version in android/junit-runner/build.gradle.kts" >&2
+            exit 1
+          fi
+          version=$(echo "$version_line" | sed -E 's/version = "([^"]+)"/\1/')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "JUnitRunner version: $version"
+
+      - name: "Verify Maven Central credentials"
+        if: ${{ endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}
+        shell: bash
+        run: |
+          if [ -z "$MAVEN_USERNAME" ] || [ -z "$MAVEN_PASSWORD" ]; then
+            echo "Missing MAVEN_USERNAME or MAVEN_PASSWORD for snapshot publish." >&2
+            exit 1
+          fi
+
+      - uses: ./.github/actions/gradle-task-run
+        if: ${{ endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}
+        with:
+          gradle-tasks: ":junit-runner:publishToMavenCentral"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: "Skip snapshot publish (non-snapshot version)"
+        if: ${{ !endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}
+        run: |
+          echo "Skipping publish. Version is ${{ steps.junit-runner-version.outputs.version }}."
+
 #  playground-app-unit-tests:
 #    name: "Build Playground App"
 #    runs-on: ubuntu-latest

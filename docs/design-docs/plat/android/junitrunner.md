@@ -9,15 +9,16 @@ modules that cover the UI you want to test.
 testImplementation("dev.jasonpearson.auto-mobile:auto-mobile-junit-runner:x.y.z")
 ```
 
-Note that this artifact hasn't been published to Maven Central just yet and is forthcoming.
+This artifact is intended for Maven Central distribution. Use the latest release version once published.
 
-In the meantime, publish to your mavenLocal (`~/.m2`) via:
+For local development or testing unpublished changes, publish to your mavenLocal (`~/.m2`) via:
 
 ```
-./gradlew publishToMavenLocal
+cd android
+./gradlew :junit-runner:publishToMavenLocal
 ```
 
-and use the above testImplementation dependency with `x.y.z` version from `android/junit-runner/build.gradle.kts`.
+and use the above testImplementation dependency with the version from `android/junit-runner/build.gradle.kts`.
 
 ## Configuration
 
@@ -122,9 +123,26 @@ android {
 }
 ```
 
+## Publishing (Manual)
+
+1. Update `version` in `android/junit-runner/build.gradle.kts` to a release value (no `-SNAPSHOT`).
+2. Ensure Maven Central credentials are available as Gradle properties (`mavenCentralUsername`,
+   `mavenCentralPassword`). These can live in `~/.gradle/gradle.properties` or be provided via
+   `ORG_GRADLE_PROJECT_` environment variables.
+3. Ensure signing credentials are configured (for example `signingInMemoryKey` and
+   `signingInMemoryKeyPassword`, or the `signing.*` Gradle properties).
+4. From `android/`, run:
+
+```
+./gradlew :junit-runner:publishToMavenCentral
+```
+
+5. Release the deployment in https://central.sonatype.com (or run
+   `./gradlew :junit-runner:publishAndReleaseToMavenCentral` to auto-release).
+
 ## Best Practices
 
-1. **Use mavenLocal for development** - Until published to Maven Central
+1. **Use mavenLocal for local iteration** - Helpful for testing unpublished changes
 2. **Enable the [Accessibility Service](accessibility-service.md)** - Required for real-time view hierarchy access
 3. **Configure API keys securely** - Use environment variables in CI, avoid hardcoding
 4. **Enable timing optimization** - Use historical timing data to order tests efficiently

@@ -267,9 +267,11 @@ Add to your `build.gradle`:
 
 ```gradle
 dependencies {
-    testImplementation 'dev.jasonpearson.auto-mobile:auto-mobile-junit-runner:1.0.0'
+    testImplementation 'dev.jasonpearson.auto-mobile:auto-mobile-junit-runner:x.y.z'
 }
 ```
+
+This artifact is intended for Maven Central distribution. Use the latest release version once published.
 
 Ensure AutoMobile daemon dependencies are available:
 
@@ -278,3 +280,13 @@ Ensure AutoMobile daemon dependencies are available:
 # The runner will start the daemon automatically when needed.
 npm install -g auto-mobile
 ```
+
+## Publishing (Maintainers)
+
+```bash
+cd android
+./gradlew :junit-runner:publishToMavenCentral
+```
+
+Release the deployment in https://central.sonatype.com (or use
+`./gradlew :junit-runner:publishAndReleaseToMavenCentral` for auto-release).

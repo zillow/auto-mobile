@@ -1,4 +1,15 @@
 dependencyResolutionManagement {
+  val mavenUsername = System.getenv("MAVEN_USERNAME")
+  if (!mavenUsername.isNullOrBlank() &&
+      System.getProperty("org.gradle.project.mavenCentralUsername").isNullOrBlank()) {
+    System.setProperty("org.gradle.project.mavenCentralUsername", mavenUsername)
+  }
+  val mavenPassword = System.getenv("MAVEN_PASSWORD")
+  if (!mavenPassword.isNullOrBlank() &&
+      System.getProperty("org.gradle.project.mavenCentralPassword").isNullOrBlank()) {
+    System.setProperty("org.gradle.project.mavenCentralPassword", mavenPassword)
+  }
+
   @Suppress("UnstableApiUsage") repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
   // Use Maven Central as the default repository (where Gradle will download dependencies) in all
   // subprojects.

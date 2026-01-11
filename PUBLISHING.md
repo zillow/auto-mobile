@@ -1,6 +1,7 @@
 # npm Publishing
 
 This guide covers publishing `@kaeawc/auto-mobile` to npm.
+For Android JUnitRunner (Maven Central), see `docs/design-docs/plat/android/junitrunner.md`.
 
 ## Prerequisites
 
