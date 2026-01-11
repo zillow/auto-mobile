@@ -249,36 +249,6 @@
     }
   },
   {
-    "name": "deleteSnapshot",
-    "description": "Delete a snapshot permanently",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "snapshotName": {
-          "type": "string",
-          "description": "Name of the snapshot to delete"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "snapshotName"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "demoMode",
     "description": "Enable or disable demo mode for screenshots and screen recordings",
     "inputSchema": {
