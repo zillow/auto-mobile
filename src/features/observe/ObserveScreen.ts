@@ -57,6 +57,9 @@ export class ObserveScreen {
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
   private static observeResultCacheDir: string = path.join("/tmp/auto-mobile", "observe_results");
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private static latestScreenshotPath: string | null = null;
+  private static latestScreenshotError: string | null = null;
+  private static latestScreenshotTimestamp: number | null = null;
 
   /**
    * Get the most recent cached observe result from memory (static accessor).
@@ -83,10 +86,29 @@ export class ObserveScreen {
   }
 
   /**
+   * Get the most recent cached screenshot path (if any).
+   */
+  static getRecentCachedScreenshotPath(): string | undefined {
+    const state = ObserveScreen.getLatestScreenshotState();
+    return state?.path ?? undefined;
+  }
+
+  /**
+   * Get the most recent cached screenshot error (if any).
+   */
+  static getRecentCachedScreenshotError(): string | undefined {
+    const state = ObserveScreen.getLatestScreenshotState();
+    return state?.error ?? undefined;
+  }
+
+  /**
    * Clear the in-memory cache (for testing purposes).
    */
   static clearCache(): void {
     ObserveScreen.observeResultCache.clear();
+    ObserveScreen.latestScreenshotPath = null;
+    ObserveScreen.latestScreenshotError = null;
+    ObserveScreen.latestScreenshotTimestamp = null;
   }
 
   constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null, webdriver: WebDriverAgent | null = null) {
@@ -107,6 +129,32 @@ export class ObserveScreen {
     if (!fs.existsSync(ObserveScreen.observeResultCacheDir)) {
       fs.mkdirSync(ObserveScreen.observeResultCacheDir, { recursive: true });
     }
+  }
+
+  private static getLatestScreenshotState(): { path: string | null; error: string | null } | null {
+    const timestamp = ObserveScreen.latestScreenshotTimestamp;
+    if (!timestamp) {
+      return null;
+    }
+
+    const age = Date.now() - timestamp;
+    if (age > ObserveScreen.OBSERVE_RESULT_CACHE_TTL_MS) {
+      ObserveScreen.latestScreenshotPath = null;
+      ObserveScreen.latestScreenshotError = null;
+      ObserveScreen.latestScreenshotTimestamp = null;
+      return null;
+    }
+
+    return {
+      path: ObserveScreen.latestScreenshotPath,
+      error: ObserveScreen.latestScreenshotError
+    };
+  }
+
+  private static updateLatestScreenshotCache(path?: string, error?: string): void {
+    ObserveScreen.latestScreenshotPath = path ?? null;
+    ObserveScreen.latestScreenshotError = error ?? null;
+    ObserveScreen.latestScreenshotTimestamp = Date.now();
   }
 
   /**
@@ -402,6 +450,51 @@ export class ObserveScreen {
 
         perf.end();
         break;
+    }
+  }
+
+  /**
+   * Capture a screenshot for the latest observation.
+   */
+  private async captureObservationScreenshot(
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
+  ): Promise<void> {
+    if (this.device.platform === "ios") {
+      ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture not supported on iOS");
+      return;
+    }
+
+    try {
+      const screenshotResult = await perf.track("screenshot", () =>
+        this.screenshotUtil.execute({ format: "png" }, signal)
+      );
+
+      if (!screenshotResult.success) {
+        const errorMessage = screenshotResult.error || "Failed to capture screenshot";
+        ObserveScreen.updateLatestScreenshotCache(undefined, errorMessage);
+        logger.warn(`[OBSERVE] Screenshot capture failed: ${errorMessage}`);
+        return;
+      }
+
+      if (!screenshotResult.path) {
+        ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture returned no file path");
+        logger.warn("[OBSERVE] Screenshot capture succeeded but no file path was returned");
+        return;
+      }
+
+      const exists = await fs.pathExists(screenshotResult.path);
+      if (!exists) {
+        ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot file missing after capture");
+        logger.warn(`[OBSERVE] Screenshot capture reported success but file missing: ${screenshotResult.path}`);
+        return;
+      }
+
+      ObserveScreen.updateLatestScreenshotCache(screenshotResult.path);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      ObserveScreen.updateLatestScreenshotCache(undefined, errorMessage);
+      logger.warn(`[OBSERVE] Screenshot capture failed: ${errorMessage}`);
     }
   }
 
@@ -869,21 +962,29 @@ export class ObserveScreen {
    */
   private async getLatestScreenshotPath(): Promise<string | undefined> {
     try {
+      const cachedPath = ObserveScreen.getRecentCachedScreenshotPath();
+      if (cachedPath) {
+        const exists = await fs.pathExists(cachedPath);
+        if (exists) {
+          return cachedPath;
+        }
+      }
+
       const cacheDir = path.join("/tmp/auto-mobile", "screenshots");
       if (!fs.existsSync(cacheDir)) {
         return undefined;
       }
 
       const files = await readdirAsync(cacheDir);
-      const pngFiles = files.filter(f => f.endsWith(".png"));
+      const imageFiles = files.filter(f => f.endsWith(".png") || f.endsWith(".webp"));
 
-      if (pngFiles.length === 0) {
+      if (imageFiles.length === 0) {
         return undefined;
       }
 
       // Sort by modification time (most recent first)
       const fileStats = await Promise.all(
-        pngFiles.map(async f => {
+        imageFiles.map(async f => {
           const fullPath = path.join(cacheDir, f);
           const stat = await statAsync(fullPath);
           return { path: fullPath, mtime: stat.mtime };
@@ -928,6 +1029,9 @@ export class ObserveScreen {
       // Collect all data components with parallelization
       // Note: collectAllData tracks its phases internally, so we just call it directly
       await this.collectAllData(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
+
+      // Capture screenshot for latest observation resource
+      await this.captureObservationScreenshot(perf, signal);
 
       // Attach recomposition metrics if enabled
       await RecompositionTracker.getInstance().processObservation(result, this.device);
@@ -987,6 +1091,8 @@ export class ObserveScreen {
       return result;
     } catch (err) {
       logger.error("Critical error in observe command:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      ObserveScreen.updateLatestScreenshotCache(undefined, `Observation failed: ${errorMessage}`);
       return {
         updatedAt: new Date().toISOString(),
         screenSize: { width: 0, height: 0 },

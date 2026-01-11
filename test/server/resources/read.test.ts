@@ -106,7 +106,7 @@ describe("MCP Resources Read", () => {
       expect(content.text).toBeDefined();
       const data = JSON.parse(content.text!);
       expect(data).toHaveProperty("error");
-      expect(data.error).toContain("No screenshot available");
+      expect(data.error).toContain("No observation available");
     } else {
       // Screenshot available
       expect(content.mimeType).toMatch(/^image\/(png|webp)$/);

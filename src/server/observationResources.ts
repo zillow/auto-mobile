@@ -3,7 +3,6 @@ import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { logger } from "../utils/logger";
 import { stringifyToolResponse } from "../utils/toolUtils";
 import * as fs from "fs/promises";
-import * as path from "path";
 
 // Resource URIs
 export const RESOURCE_URIS = {
@@ -14,31 +13,17 @@ export const RESOURCE_URIS = {
 // Helper to get the latest screenshot path from cache
 async function getLatestScreenshotPath(): Promise<string | undefined> {
   try {
-    const cacheDir = path.join("/tmp/auto-mobile", "screenshots");
-    const stat = await fs.stat(cacheDir);
-    if (!stat.isDirectory()) {
+    const screenshotPath = ObserveScreen.getRecentCachedScreenshotPath();
+    if (!screenshotPath) {
       return undefined;
     }
 
-    const files = await fs.readdir(cacheDir);
-    const imageFiles = files.filter(f => f.endsWith(".png") || f.endsWith(".webp"));
-
-    if (imageFiles.length === 0) {
+    const fileStat = await fs.stat(screenshotPath);
+    if (!fileStat.isFile()) {
       return undefined;
     }
 
-    // Sort by modification time (most recent first)
-    const fileStats = await Promise.all(
-      imageFiles.map(async f => {
-        const fullPath = path.join(cacheDir, f);
-        const fileStat = await fs.stat(fullPath);
-        return { path: fullPath, mtime: fileStat.mtime };
-      })
-    );
-
-    fileStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-
-    return fileStats[0]?.path;
+    return screenshotPath;
   } catch (error) {
     logger.warn(`[ObservationResources] Failed to get latest screenshot: ${error}`);
     return undefined;
@@ -81,14 +66,29 @@ async function getLatestObservation(): Promise<ResourceContent> {
 // Handler for latest screenshot resource (image/png as blob)
 async function getLatestScreenshot(): Promise<ResourceContent> {
   try {
-    const screenshotPath = await getLatestScreenshotPath();
-
-    if (!screenshotPath) {
+    const cachedResult = ObserveScreen.getRecentCachedResult();
+    if (!cachedResult) {
       return {
         uri: RESOURCE_URIS.LATEST_SCREENSHOT,
         mimeType: "application/json",
         text: JSON.stringify({
-          error: "No screenshot available. Call the 'observe' tool first to capture a screenshot."
+          error: "No observation available. Call the 'observe' tool first to capture a screenshot."
+        }, null, 2)
+      };
+    }
+
+    const screenshotPath = await getLatestScreenshotPath();
+
+    if (!screenshotPath) {
+      const screenshotError = ObserveScreen.getRecentCachedScreenshotError();
+      const errorMessage = screenshotError
+        ? `No screenshot available from the latest observation: ${screenshotError}`
+        : "No screenshot available. Call the 'observe' tool again to capture a screenshot.";
+      return {
+        uri: RESOURCE_URIS.LATEST_SCREENSHOT,
+        mimeType: "application/json",
+        text: JSON.stringify({
+          error: errorMessage
         }, null, 2)
       };
     }
