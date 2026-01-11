@@ -11,6 +11,7 @@ import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./daemon/videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./daemon/testRecordingSocketServer";
+import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./daemon/deviceSnapshotSocketServer";
 import { execSync } from "node:child_process";
 import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
@@ -565,6 +566,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
 
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
+    await stopDeviceSnapshotSocketServer();
 
     server.close(() => {
       logger.info("Streamable HTTP server shut down");
@@ -689,6 +691,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
 
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
+    await stopDeviceSnapshotSocketServer();
 
     server.close(() => {
       logger.info("SSE server shut down");
@@ -705,6 +708,7 @@ process.on("SIGINT", async () => {
   logger.info("Received SIGINT signal, shutting down");
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
+  await stopDeviceSnapshotSocketServer();
   logger.close();
   process.exit(0);
 });
@@ -713,6 +717,7 @@ process.on("SIGTERM", async () => {
   logger.info("Received SIGTERM signal, shutting down");
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
+  await stopDeviceSnapshotSocketServer();
   logger.close();
   process.exit(0);
 });
@@ -820,6 +825,7 @@ async function main() {
     } else {
       await startVideoRecordingSocketServer();
       await startTestRecordingSocketServer();
+      await startDeviceSnapshotSocketServer();
       if (transport.type === "streamable") {
         // Run as Streamable HTTP server
         logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);

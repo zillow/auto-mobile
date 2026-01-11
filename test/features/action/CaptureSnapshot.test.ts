@@ -3,7 +3,7 @@ import { CaptureSnapshot } from "../../../src/features/action/CaptureSnapshot";
 import { BootedDevice } from "../../../src/models";
 import { FakeAdbClient } from "../../fakes/FakeAdbClient";
 import { FakeTimer } from "../../fakes/FakeTimer";
-import { SnapshotStorage } from "../../../src/utils/snapshotStorage";
+import { DeviceSnapshotStore } from "../../../src/utils/DeviceSnapshotStore";
 import { promises as fs } from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -13,7 +13,7 @@ describe("CaptureSnapshot", () => {
   let fakeAdb: FakeAdbClient;
   let fakeTimer: FakeTimer;
   let captureSnapshot: CaptureSnapshot;
-  let storage: SnapshotStorage;
+  let store: DeviceSnapshotStore;
   let testBasePath: string;
 
   beforeEach(async () => {
@@ -31,11 +31,10 @@ describe("CaptureSnapshot", () => {
 
     // Create secure temporary directory for tests
     testBasePath = await fs.mkdtemp(path.join(os.tmpdir(), "snapshot-test-"));
-    storage = new SnapshotStorage(testBasePath);
+    store = new DeviceSnapshotStore(testBasePath);
 
     // Create CaptureSnapshot instance with fakes
-    captureSnapshot = new CaptureSnapshot(device, fakeAdb as any, undefined, fakeTimer);
-    (captureSnapshot as any).storage = storage;
+    captureSnapshot = new CaptureSnapshot(device, fakeAdb as any, undefined, fakeTimer, store);
 
     // Setup default command results
     fakeAdb.setCommandResult("shell pm list packages", "package:com.example.app\npackage:com.system.app");
@@ -231,13 +230,18 @@ describe("CaptureSnapshot", () => {
         isEmulator: false
       };
 
-      const capturePhysical = new CaptureSnapshot(physicalDevice, fakeAdb as any, undefined, fakeTimer);
-      (capturePhysical as any).storage = storage;
+      const capturePhysical = new CaptureSnapshot(
+        physicalDevice,
+        fakeAdb as any,
+        undefined,
+        fakeTimer,
+        store
+      );
       (capturePhysical as any).getForegroundApp = async () => "com.example.app";
 
       // Create backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -263,8 +267,8 @@ describe("CaptureSnapshot", () => {
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
 
       // Create backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -283,7 +287,7 @@ describe("CaptureSnapshot", () => {
       expect(result.manifest.settings?.system).toEqual({ screen_brightness: "128" });
 
       // Verify settings were written to file
-      const settingsPath = storage.getSettingsPath(snapshotName);
+      const settingsPath = store.getSettingsPath(snapshotName);
       const settingsContent = await fs.readFile(settingsPath, "utf-8");
       const settings = JSON.parse(settingsContent);
       expect(settings.global).toEqual({ airplane_mode_on: "0" });
@@ -300,8 +304,8 @@ describe("CaptureSnapshot", () => {
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
 
       // Create backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -330,8 +334,8 @@ describe("CaptureSnapshot", () => {
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
 
       // Create backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -355,8 +359,8 @@ describe("CaptureSnapshot", () => {
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
 
       // Create backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -377,30 +381,6 @@ describe("CaptureSnapshot", () => {
   });
 
   describe("error scenarios", () => {
-    it("should throw error when snapshot already exists", async () => {
-      const snapshotName = "duplicate-snapshot";
-
-      // Create existing snapshot
-      const manifest = {
-        snapshotName,
-        timestamp: new Date().toISOString(),
-        deviceId: device.deviceId,
-        deviceName: device.name,
-        platform: "android" as const,
-        snapshotType: "adb" as const,
-        includeAppData: false,
-        includeSettings: false
-      };
-      await storage.saveManifest(manifest);
-
-      await expect(captureSnapshot.execute({
-        snapshotName,
-        includeAppData: false,
-        includeSettings: false,
-        useVmSnapshot: false
-      })).rejects.toThrow("Snapshot 'duplicate-snapshot' already exists");
-    });
-
     it("should throw error for non-Android platform", () => {
       const iosDevice: BootedDevice = {
         deviceId: "ios-device",
@@ -431,27 +411,6 @@ describe("CaptureSnapshot", () => {
       })).rejects.toThrow("App data backup failed");
     });
 
-    it("should generate snapshot name when not provided", async () => {
-      // Mock getForegroundApp
-      (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
-
-      // Create backup file with generated name
-      const generatedName = storage.generateSnapshotName(device.name);
-      const backupFilePath = storage.getBackupFilePath(generatedName);
-      const appDataPath = storage.getAppDataPath(generatedName);
-      await fs.mkdir(appDataPath, { recursive: true });
-      await fs.writeFile(backupFilePath, "backup data", "utf-8");
-
-      const result = await captureSnapshot.execute({
-        includeAppData: true,
-        includeSettings: false,
-        useVmSnapshot: false,
-        userApps: "current"
-      });
-
-      expect(result.snapshotName).toMatch(/^Pixel_5_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}/);
-      expect(result.manifest.deviceName).toBe("Pixel_5");
-    });
   });
 
   describe("edge cases", () => {
@@ -540,9 +499,9 @@ describe("CaptureSnapshot", () => {
     it("should backup successfully when user confirms within timeout", async () => {
       // Setup: Create a fake backup file to simulate successful backup
       const snapshotName = "test-snapshot";
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
 
       // Mock getForegroundApp to return the test app
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
@@ -587,7 +546,7 @@ describe("CaptureSnapshot", () => {
         useVmSnapshot: false,
         userApps: "current",
         strictBackupMode: false,
-        backupTimeout: 30000
+        backupTimeoutMs: 30000
       });
 
       // Should complete gracefully even without backup file
@@ -603,8 +562,8 @@ describe("CaptureSnapshot", () => {
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
 
       // Create backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -632,8 +591,8 @@ describe("CaptureSnapshot", () => {
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
 
       // Create dummy backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -664,8 +623,8 @@ describe("CaptureSnapshot", () => {
       fakeAdb.setCommandResult("shell dumpsys package com.example.app2", "flags=0x1234 ALLOW_BACKUP");
 
       // Create dummy backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -697,8 +656,8 @@ describe("CaptureSnapshot", () => {
       fakeAdb.setCommandResult("shell dumpsys package com.example.app2", "flags=0x1234 ALLOW_BACKUP=false");
 
       // Create dummy backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
@@ -726,8 +685,8 @@ describe("CaptureSnapshot", () => {
       (captureSnapshot as any).getForegroundApp = async () => "com.example.app";
 
       // Create dummy backup file
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 

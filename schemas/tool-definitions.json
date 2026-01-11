@@ -48,72 +48,6 @@
     }
   },
   {
-    "name": "captureDeviceSnapshot",
-    "description": "Capture current device state as a snapshot for later restoration. Supports both VM snapshots (emulators) and ADB-based capture (all devices).",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "snapshotName": {
-          "type": "string",
-          "description": "Name for the snapshot (auto-generated if not provided)"
-        },
-        "includeAppData": {
-          "type": "boolean",
-          "default": true,
-          "description": "Include app data directories in snapshot"
-        },
-        "includeSettings": {
-          "type": "boolean",
-          "default": true,
-          "description": "Include system settings in snapshot"
-        },
-        "useVmSnapshot": {
-          "type": "boolean",
-          "default": true,
-          "description": "Use emulator VM snapshot if available (faster, emulator only)"
-        },
-        "strictBackupMode": {
-          "type": "boolean",
-          "default": false,
-          "description": "If true, fail entire snapshot if app data backup fails or times out"
-        },
-        "backupTimeout": {
-          "type": "number",
-          "default": 30000,
-          "description": "Timeout in milliseconds for adb backup user confirmation (default: 30000ms)"
-        },
-        "userApps": {
-          "type": "string",
-          "enum": [
-            "current",
-            "all"
-          ],
-          "default": "current",
-          "description": "Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)"
-        },
-        "vmSnapshotTimeoutMs": {
-          "type": "number",
-          "default": 30000,
-          "description": "Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "changeLocalization",
     "description": "Change locale, time zone, text direction, and time format",
     "inputSchema": {
@@ -361,36 +295,6 @@
     }
   },
   {
-    "name": "deleteSnapshot",
-    "description": "Delete a snapshot permanently",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "snapshotName": {
-          "type": "string",
-          "description": "Name of the snapshot to delete"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "snapshotName"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "demoMode",
     "description": "Enable or disable demo mode for screenshots and screen recordings",
     "inputSchema": {
@@ -470,6 +374,76 @@
       "required": [
         "action",
         "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deviceSnapshot",
+    "description": "Capture or restore a device snapshot for the active device.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "capture",
+            "restore"
+          ],
+          "description": "Action to perform"
+        },
+        "snapshotName": {
+          "type": "string",
+          "description": "Name for the snapshot"
+        },
+        "includeAppData": {
+          "type": "boolean",
+          "description": "Include app data directories in snapshot"
+        },
+        "includeSettings": {
+          "type": "boolean",
+          "description": "Include system settings in snapshot"
+        },
+        "useVmSnapshot": {
+          "type": "boolean",
+          "description": "Use emulator VM snapshot if available (faster, emulator only)"
+        },
+        "strictBackupMode": {
+          "type": "boolean",
+          "description": "If true, fail entire snapshot if app data backup fails or times out"
+        },
+        "backupTimeoutMs": {
+          "type": "number",
+          "description": "Timeout in milliseconds for adb backup user confirmation"
+        },
+        "userApps": {
+          "type": "string",
+          "enum": [
+            "current",
+            "all"
+          ],
+          "description": "Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)"
+        },
+        "vmSnapshotTimeoutMs": {
+          "type": "number",
+          "description": "Timeout in milliseconds for emulator VM snapshot commands"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -1111,33 +1085,6 @@
     }
   },
   {
-    "name": "listSnapshots",
-    "description": "List all available snapshots for a device",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "deviceId": {
-          "type": "string",
-          "description": "Filter snapshots by device ID"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "navigateTo",
     "description": "Navigate to screen using navigation graph",
     "inputSchema": {
@@ -1459,46 +1406,6 @@
       },
       "required": [
         "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "restoreDeviceSnapshot",
-    "description": "Restore device to a previously captured snapshot state. Clears current state and restores apps, settings, and data.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "snapshotName": {
-          "type": "string",
-          "description": "Name of the snapshot to restore"
-        },
-        "useVmSnapshot": {
-          "type": "boolean",
-          "default": true,
-          "description": "Use emulator VM snapshot if available (faster, emulator only)"
-        },
-        "vmSnapshotTimeoutMs": {
-          "type": "number",
-          "default": 30000,
-          "description": "Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "snapshotName"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

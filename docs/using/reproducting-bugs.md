@@ -15,7 +15,7 @@ When you receive a bug report, ask your AI agent:
 
 The agent will:
 1. Navigate to screen (if specified), otherwise it will attempt to find the behavior in the app
-2. Take a snapshot of device state using the [captureDeviceSnapshot](../features/snapshots.md#capturedevicesnapshot) MCP tool call.
+2. Take a snapshot of device state using the [deviceSnapshot](../features/snapshots.md#devicesnapshot) MCP tool call (`action: "capture"`).
 3. Reproduce any steps or context provided to approximate the state.
 
 Once a bug is reproduced, you can create an [automated test](ui-tests.md).

@@ -1,7 +1,7 @@
 import type {
   AccessibilityAuditConfig,
 } from "../models/AccessibilityAudit";
-import type { VideoRecordingConfigInput } from "../models/VideoRecording";
+import type { VideoRecordingConfigInput, DeviceSnapshotConfigInput } from "../models";
 
 export type PlanExecutionLockScope = "session" | "global";
 
@@ -19,6 +19,7 @@ class ServerConfig {
   private _predictiveUiEnabled: boolean = false;
   private _planExecutionLockScope: PlanExecutionLockScope = "session";
   private _videoRecordingDefaults: VideoRecordingConfigInput = {};
+  private _deviceSnapshotDefaults: DeviceSnapshotConfigInput = {};
 
   private constructor() {}
 
@@ -95,6 +96,14 @@ class ServerConfig {
 
   getVideoRecordingDefaults(): VideoRecordingConfigInput {
     return { ...this._videoRecordingDefaults };
+  }
+
+  setDeviceSnapshotDefaults(defaults: DeviceSnapshotConfigInput): void {
+    this._deviceSnapshotDefaults = { ...defaults };
+  }
+
+  getDeviceSnapshotDefaults(): DeviceSnapshotConfigInput {
+    return { ...this._deviceSnapshotDefaults };
   }
 }
 

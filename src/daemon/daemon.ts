@@ -24,6 +24,7 @@ import { closeDatabase, getDatabase } from "../db";
 import { startupBenchmark } from "../utils/startupBenchmark";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./testRecordingSocketServer";
+import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./deviceSnapshotSocketServer";
 
 /**
  * Main daemon process
@@ -98,6 +99,7 @@ export class Daemon {
 
     await startVideoRecordingSocketServer();
     await startTestRecordingSocketServer();
+    await startDeviceSnapshotSocketServer();
 
     // Write PID file
     await this.writePidFile();
@@ -647,6 +649,7 @@ export class Daemon {
 
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
+    await stopDeviceSnapshotSocketServer();
 
     // Close all active HTTP sessions
     for (const [sessionId, streamableTransport] of this.transports) {

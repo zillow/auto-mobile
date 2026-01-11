@@ -1,4 +1,4 @@
-import { BootedDevice, ActionableError } from "../../models";
+import { BootedDevice, ActionableError, DeviceSnapshotManifest } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
 import {
@@ -6,19 +6,19 @@ import {
   evaluateVmSnapshotResult,
   formatVmSnapshotExecutionError
 } from "../../utils/android-cmdline-tools/vmSnapshot";
-import { SnapshotStorage, SnapshotManifest } from "../../utils/snapshotStorage";
+import { DeviceSnapshotStore } from "../../utils/DeviceSnapshotStore";
 import { logger } from "../../utils/logger";
 import { promises as fs } from "fs";
 import * as path from "path";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface CaptureSnapshotArgs {
-  snapshotName?: string;
+  snapshotName: string;
   includeAppData?: boolean;
   includeSettings?: boolean;
   useVmSnapshot?: boolean;
   strictBackupMode?: boolean; // If true, fail entire snapshot if app data backup fails
-  backupTimeout?: number; // Timeout in milliseconds for adb backup (default: 30000ms)
+  backupTimeoutMs?: number; // Timeout in milliseconds for adb backup (default: 30000ms)
   userApps?: "current" | "all"; // Which apps to backup: "current" (foreground app only) or "all" (all user apps)
   vmSnapshotTimeoutMs?: number; // Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)
 }
@@ -27,7 +27,7 @@ export interface CaptureSnapshotResult {
   snapshotName: string;
   timestamp: string;
   snapshotType: "vm" | "adb";
-  manifest: SnapshotManifest;
+  manifest: DeviceSnapshotManifest;
 }
 
 /**
@@ -38,10 +38,16 @@ export class CaptureSnapshot {
   private device: BootedDevice;
   private adb: AdbClient;
   private emulator: AndroidEmulatorClient;
-  private storage: SnapshotStorage;
+  private store: DeviceSnapshotStore;
   private timer: Timer;
 
-  constructor(device: BootedDevice, adb?: AdbClient, emulator?: AndroidEmulatorClient, timer: Timer = defaultTimer) {
+  constructor(
+    device: BootedDevice,
+    adb?: AdbClient,
+    emulator?: AndroidEmulatorClient,
+    timer: Timer = defaultTimer,
+    store: DeviceSnapshotStore = new DeviceSnapshotStore()
+  ) {
     if (device.platform !== "android") {
       throw new ActionableError("Snapshot capture is currently only supported for Android devices");
     }
@@ -49,7 +55,7 @@ export class CaptureSnapshot {
     this.device = device;
     this.adb = adb || new AdbClient(device);
     this.emulator = emulator || new AndroidEmulatorClient();
-    this.storage = new SnapshotStorage();
+    this.store = store;
     this.timer = timer;
   }
 
@@ -58,23 +64,15 @@ export class CaptureSnapshot {
    */
   async execute(args: CaptureSnapshotArgs): Promise<CaptureSnapshotResult> {
     const {
-      snapshotName: userProvidedName,
+      snapshotName,
       includeAppData = true,
       includeSettings = true,
       useVmSnapshot = true,
       strictBackupMode = false,
-      backupTimeout = 30000,
+      backupTimeoutMs = 30000,
       userApps = "current",
       vmSnapshotTimeoutMs = 30000
     } = args;
-
-    // Generate snapshot name if not provided
-    const snapshotName = userProvidedName || this.storage.generateSnapshotName(this.device.name);
-
-    // Check if snapshot already exists
-    if (await this.storage.snapshotExists(snapshotName)) {
-      throw new ActionableError(`Snapshot '${snapshotName}' already exists. Please choose a different name or delete the existing snapshot.`);
-    }
 
     logger.info(`Capturing snapshot '${snapshotName}' for device ${this.device.deviceId}`);
 
@@ -82,16 +80,20 @@ export class CaptureSnapshot {
     const isEmulator = this.device.deviceId.startsWith("emulator-");
     const shouldUseVmSnapshot = useVmSnapshot && isEmulator;
 
-    let manifest: SnapshotManifest;
+    let manifest: DeviceSnapshotManifest;
 
     if (shouldUseVmSnapshot) {
       manifest = await this.captureVmSnapshot(snapshotName, includeSettings, vmSnapshotTimeoutMs);
     } else {
-      manifest = await this.captureAdbSnapshot(snapshotName, includeAppData, includeSettings, strictBackupMode, backupTimeout, userApps);
+      manifest = await this.captureAdbSnapshot(
+        snapshotName,
+        includeAppData,
+        includeSettings,
+        strictBackupMode,
+        backupTimeoutMs,
+        userApps
+      );
     }
-
-    // Save manifest
-    await this.storage.saveManifest(manifest);
 
     logger.info(`Snapshot '${snapshotName}' captured successfully (type: ${manifest.snapshotType})`);
 
@@ -110,7 +112,7 @@ export class CaptureSnapshot {
     snapshotName: string,
     includeSettings: boolean,
     vmSnapshotTimeoutMs: number
-  ): Promise<SnapshotManifest> {
+  ): Promise<DeviceSnapshotManifest> {
     logger.info(`Using VM snapshot for emulator ${this.device.deviceId}`);
 
     try {
@@ -142,7 +144,7 @@ export class CaptureSnapshot {
       const foregroundApp = await this.getForegroundApp();
 
       // Create manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: this.device.deviceId,
@@ -171,9 +173,9 @@ export class CaptureSnapshot {
     includeAppData: boolean,
     includeSettings: boolean,
     strictBackupMode: boolean,
-    backupTimeout: number,
+    backupTimeoutMs: number,
     userApps: "current" | "all"
-  ): Promise<SnapshotManifest> {
+  ): Promise<DeviceSnapshotManifest> {
     logger.info(`Using ADB-based snapshot for device ${this.device.deviceId}`);
 
     try {
@@ -194,11 +196,18 @@ export class CaptureSnapshot {
       // Capture app data if requested
       let appDataBackup;
       if (includeAppData) {
-        appDataBackup = await this.captureAppData(snapshotName, packages, strictBackupMode, backupTimeout, userApps, foregroundApp);
+        appDataBackup = await this.captureAppData(
+          snapshotName,
+          packages,
+          strictBackupMode,
+          backupTimeoutMs,
+          userApps,
+          foregroundApp
+        );
       }
 
       // Create manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: this.device.deviceId,
@@ -299,10 +308,10 @@ export class CaptureSnapshot {
     settings: any
   ): Promise<void> {
     // Ensure snapshot directory exists before writing
-    const snapshotDir = this.storage.getSnapshotPath(snapshotName);
+    const snapshotDir = this.store.getSnapshotPath(snapshotName);
     await fs.mkdir(snapshotDir, { recursive: true });
 
-    const settingsPath = this.storage.getSettingsPath(snapshotName);
+    const settingsPath = this.store.getSettingsPath(snapshotName);
     await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
     logger.info(`Saved settings to ${settingsPath}`);
   }
@@ -314,13 +323,13 @@ export class CaptureSnapshot {
     snapshotName: string,
     packages: string[],
     strictBackupMode: boolean,
-    backupTimeout: number,
+    backupTimeoutMs: number,
     userApps: "current" | "all",
     foregroundApp: string | undefined
-  ): Promise<SnapshotManifest["appDataBackup"]> {
+  ): Promise<DeviceSnapshotManifest["appDataBackup"]> {
     logger.info(`Capturing app data (scope: ${userApps})`);
 
-    const appDataPath = this.storage.getAppDataPath(snapshotName);
+    const appDataPath = this.store.getAppDataPath(snapshotName);
     await fs.mkdir(appDataPath, { recursive: true });
 
     // Save package list for reference
@@ -379,8 +388,8 @@ export class CaptureSnapshot {
     }
 
     // Attempt adb backup
-    const backupFilePath = this.storage.getBackupFilePath(snapshotName);
-    const backupResult = await this.performAdbBackup(allowedPackages, backupFilePath, backupTimeout);
+    const backupFilePath = this.store.getBackupFilePath(snapshotName);
+    const backupResult = await this.performAdbBackup(allowedPackages, backupFilePath, backupTimeoutMs);
 
     // Check if backup succeeded
     let backupSucceeded = false;

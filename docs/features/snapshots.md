@@ -12,25 +12,26 @@ The snapshot feature provides deterministic device state management for mobile t
 - **Comprehensive State Capture**: Includes app data, system settings, package list, and foreground app state
 - **Host-based Storage**: Snapshots stored in `~/.automobile/snapshots/` for fast access and easy management
 
-## MCP Tools
+## MCP Tool
 
-### captureDeviceSnapshot
+### deviceSnapshot
 
-Capture the current device state as a snapshot.
+Capture or restore device snapshots.
 
 **Parameters:**
-- `snapshotName` (optional): Custom name for the snapshot (auto-generated if not provided)
-- `includeAppData` (optional, default: true): Include app data directories in snapshot
-- `includeSettings` (optional, default: true): Include system settings (global/secure/system)
-- `useVmSnapshot` (optional, default: true): Use emulator VM snapshot if available (faster for emulators)
-- `vmSnapshotTimeoutMs` (optional, default: 30000): Timeout in milliseconds for emulator VM snapshot commands
-- `strictBackupMode` (optional, default: false): If true, fail entire snapshot if app data backup fails or times out
-- `backupTimeout` (optional, default: 30000): Timeout in milliseconds for adb backup user confirmation
-- `userApps` (optional, default: "current"): Which apps to backup - "current" (foreground app only) or "all" (all user-installed apps)
+- `action` (required): `"capture"` or `"restore"`
+- `snapshotName` (capture: optional, restore: required): Name for the snapshot
+- `includeAppData` (capture only): Include app data directories in snapshot
+- `includeSettings` (capture only): Include system settings (global/secure/system)
+- `useVmSnapshot` (capture/restore): Use emulator VM snapshot if available (faster for emulators)
+- `vmSnapshotTimeoutMs` (capture/restore): Timeout in milliseconds for emulator VM snapshot commands
+- `strictBackupMode` (capture only): If true, fail entire snapshot if app data backup fails or times out
+- `backupTimeoutMs` (capture only): Timeout in milliseconds for adb backup user confirmation
+- `userApps` (capture only): Which apps to backup - `"current"` (foreground app only) or `"all"` (all user-installed apps)
 - `sessionUuid` (optional): Session UUID for multi-device targeting
 - `device` (optional): Device label for multi-device control
 
-**Returns:**
+**Capture response:**
 ```json
 {
   "message": "Snapshot 'Pixel_5_2026-01-08_12-30-45' captured successfully",
@@ -39,39 +40,12 @@ Capture the current device state as a snapshot.
   "timestamp": "2026-01-08T12:30:45.123Z",
   "deviceId": "emulator-5554",
   "deviceName": "Pixel_5",
-  "manifest": { ... }
+  "manifest": { ... },
+  "evictedSnapshotNames": ["older-snapshot"]
 }
 ```
 
-**Example:**
-```javascript
-// Capture with auto-generated name
-await captureDeviceSnapshot({});
-
-// Capture with custom name
-await captureDeviceSnapshot({
-  snapshotName: "clean-state-before-login-test"
-});
-
-// Capture with ADB method (for physical devices or when VM snapshot not desired)
-await captureDeviceSnapshot({
-  snapshotName: "physical-device-state",
-  useVmSnapshot: false
-});
-```
-
-### restoreDeviceSnapshot
-
-Restore device to a previously captured snapshot state.
-
-**Parameters:**
-- `snapshotName` (required): Name of the snapshot to restore
-- `useVmSnapshot` (optional, default: true): Use emulator VM snapshot if available
-- `vmSnapshotTimeoutMs` (optional, default: 30000): Timeout in milliseconds for emulator VM snapshot commands
-- `sessionUuid` (optional): Session UUID for multi-device targeting
-- `device` (optional): Device label for multi-device control
-
-**Returns:**
+**Restore response:**
 ```json
 {
   "message": "Snapshot 'clean-state-before-login-test' restored successfully",
@@ -83,77 +57,67 @@ Restore device to a previously captured snapshot state.
 }
 ```
 
-**Example:**
+**Examples:**
 ```javascript
+// Capture with auto-generated name
+await deviceSnapshot({ action: "capture" });
+
+// Capture with custom name
+await deviceSnapshot({
+  action: "capture",
+  snapshotName: "clean-state-before-login-test"
+});
+
 // Restore a snapshot
-await restoreDeviceSnapshot({
+await deviceSnapshot({
+  action: "restore",
   snapshotName: "clean-state-before-login-test"
 });
 ```
 
-### listSnapshots
+## MCP Resources
 
-List all available snapshots, optionally filtered by device ID.
+### automobile:deviceSnapshots/archive
 
-**Parameters:**
-- `deviceId` (optional): Filter snapshots by device ID
-- `sessionUuid` (optional): Session UUID for multi-device targeting
-- `device` (optional): Device label for multi-device control
+List archived device snapshots.
 
 **Returns:**
 ```json
 {
-  "message": "Found 3 snapshot(s)",
   "snapshots": [
     {
       "snapshotName": "Pixel_5_2026-01-08_12-30-45",
-      "timestamp": "2026-01-08T12:30:45.123Z",
       "deviceId": "emulator-5554",
       "deviceName": "Pixel_5",
+      "platform": "android",
       "snapshotType": "vm",
-      "size": "45.23 MB"
-    },
-    ...
+      "includeAppData": true,
+      "includeSettings": true,
+      "createdAt": "2026-01-08T12:30:45.123Z",
+      "lastAccessedAt": "2026-01-08T12:30:45.123Z",
+      "sizeBytes": 47448064,
+      "sizeLabel": "45.23 MB"
+    }
   ],
-  "count": 3,
-  "deviceId": "emulator-5554"
+  "count": 1,
+  "totalSizeBytes": 47448064,
+  "maxArchiveSizeMb": 100
 }
 ```
 
-**Example:**
-```javascript
-// List all snapshots
-await listSnapshots({});
+## Configuration
 
-// List snapshots for specific device
-await listSnapshots({
-  deviceId: "emulator-5554"
-});
-```
+Device snapshot defaults can be read or updated via the Unix socket at `~/.auto-mobile/device-snapshot.sock`.
 
-### deleteSnapshot
-
-Delete a snapshot permanently.
-
-**Parameters:**
-- `snapshotName` (required): Name of the snapshot to delete
-- `sessionUuid` (optional): Session UUID for multi-device targeting
-- `device` (optional): Device label for multi-device control
-
-**Returns:**
-```json
-{
-  "message": "Snapshot 'old-snapshot' deleted successfully",
-  "snapshotName": "old-snapshot"
-}
-```
-
-**Example:**
-```javascript
-await deleteSnapshot({
-  snapshotName: "old-snapshot"
-});
-```
+**Defaults:**
+- `includeAppData`: `true`
+- `includeSettings`: `true`
+- `useVmSnapshot`: `true`
+- `strictBackupMode`: `false`
+- `backupTimeoutMs`: `30000`
+- `userApps`: `"current"`
+- `vmSnapshotTimeoutMs`: `30000`
+- `maxArchiveSizeMb`: `100`
 
 ## Snapshot Types
 
@@ -209,12 +173,11 @@ await deleteSnapshot({
 
 ## Storage Location
 
-Snapshots are stored in `~/.automobile/snapshots/` with the following structure:
+Snapshot payloads are stored in `~/.automobile/snapshots/` (ADB snapshots), and metadata is tracked in SQLite at `~/.auto-mobile/auto-mobile.db`:
 
 ```
 ~/.automobile/snapshots/
 ├── Pixel_5_2026-01-08_12-30-45/
-│   ├── manifest.json          # Snapshot metadata (includes backup status)
 │   ├── settings.json          # Device settings (ADB snapshots only)
 │   └── app_data/              # App data directory (ADB snapshots only)
 │       ├── packages.txt       # List of installed packages
@@ -223,7 +186,7 @@ Snapshots are stored in `~/.automobile/snapshots/` with the following structure:
     └── ...
 ```
 
-VM snapshots themselves are stored in the emulator AVD directory and persist across emulator restarts. Deleting a snapshot via `deleteSnapshot` removes AutoMobile metadata but does not delete the emulator's VM snapshot.
+VM snapshots themselves are stored in the emulator AVD directory and persist across emulator restarts. Automatic cleanup removes AutoMobile metadata and host snapshot payloads, but does not delete the emulator's VM snapshot.
 
 ## Use Cases
 
@@ -233,10 +196,10 @@ Eliminate state pollution between test runs by starting each test from an identi
 
 ```javascript
 // Setup: Capture clean state
-await captureDeviceSnapshot({ snapshotName: "clean-base-state" });
+await deviceSnapshot({ action: "capture", snapshotName: "clean-base-state" });
 
 // Before each test
-await restoreDeviceSnapshot({ snapshotName: "clean-base-state" });
+await deviceSnapshot({ action: "restore", snapshotName: "clean-base-state" });
 
 // Run test...
 ```
@@ -247,13 +210,13 @@ Run multiple tests in parallel with each starting from the same snapshot:
 
 ```javascript
 // Create base snapshot once
-await captureDeviceSnapshot({ snapshotName: "test-base" });
+await deviceSnapshot({ action: "capture", snapshotName: "test-base" });
 
 // In parallel test runners
 await Promise.all([
-  runTest1(() => restoreDeviceSnapshot({ snapshotName: "test-base" })),
-  runTest2(() => restoreDeviceSnapshot({ snapshotName: "test-base" })),
-  runTest3(() => restoreDeviceSnapshot({ snapshotName: "test-base" }))
+  runTest1(() => deviceSnapshot({ action: "restore", snapshotName: "test-base" })),
+  runTest2(() => deviceSnapshot({ action: "restore", snapshotName: "test-base" })),
+  runTest3(() => deviceSnapshot({ action: "restore", snapshotName: "test-base" }))
 ]);
 ```
 
@@ -267,12 +230,12 @@ try {
   await runComplexTest();
 } catch (error) {
   // Capture state at failure point
-  await captureDeviceSnapshot({ snapshotName: "failure-state" });
+  await deviceSnapshot({ action: "capture", snapshotName: "failure-state" });
   throw error;
 }
 
 // Later, restore and debug
-await restoreDeviceSnapshot({ snapshotName: "failure-state" });
+await deviceSnapshot({ action: "restore", snapshotName: "failure-state" });
 ```
 
 ### 4. Regression Detection
@@ -281,10 +244,10 @@ Compare snapshots across app versions to detect unintended changes:
 
 ```javascript
 // Version 1.0
-await captureDeviceSnapshot({ snapshotName: "v1.0-baseline" });
+await deviceSnapshot({ action: "capture", snapshotName: "v1.0-baseline" });
 
 // Version 1.1
-await captureDeviceSnapshot({ snapshotName: "v1.1-baseline" });
+await deviceSnapshot({ action: "capture", snapshotName: "v1.1-baseline" });
 
 // Compare manifests programmatically
 const v1 = await loadManifest("v1.0-baseline");
@@ -325,7 +288,8 @@ The snapshot manifest includes detailed backup information:
 
 **Current App Only (default)**:
 ```javascript
-await captureDeviceSnapshot({
+await deviceSnapshot({
+  action: "capture",
   userApps: "current",  // Only backup foreground app
   includeAppData: true
 });
@@ -333,7 +297,8 @@ await captureDeviceSnapshot({
 
 **All User Apps**:
 ```javascript
-await captureDeviceSnapshot({
+await deviceSnapshot({
+  action: "capture",
   userApps: "all",  // Backup all user-installed apps
   includeAppData: true
 });
@@ -341,9 +306,10 @@ await captureDeviceSnapshot({
 
 **Strict Mode** (fail if backup times out):
 ```javascript
-await captureDeviceSnapshot({
+await deviceSnapshot({
+  action: "capture",
   strictBackupMode: true,  // Fail entire snapshot if backup fails
-  backupTimeout: 60000     // Wait 60 seconds for user confirmation
+  backupTimeoutMs: 60000   // Wait 60 seconds for user confirmation
 });
 ```
 
@@ -372,7 +338,7 @@ await captureDeviceSnapshot({
 ## Best Practices
 
 1. **Use VM Snapshots for Emulators**: Significantly faster than ADB snapshots
-2. **Clean Up Old Snapshots**: Use `deleteSnapshot` to remove unused snapshots
+2. **Manage Archive Size**: Automatic cleanup enforces `maxArchiveSizeMb` (adjust via the device snapshot socket config)
 3. **Descriptive Names**: Use meaningful snapshot names for easier management
 4. **Base Snapshots**: Create a "golden" base snapshot and restore from it
 5. **Device Matching**: Ensure snapshots are restored to compatible devices (same platform)
@@ -389,7 +355,7 @@ await captureDeviceSnapshot({
 
 ### Snapshot Restore Fails
 
-- Verify snapshot exists using `listSnapshots`
+- Verify snapshot exists using the `automobile:deviceSnapshots/archive` resource
 - Check platform compatibility (snapshot vs device)
 - For VM snapshots, ensure emulator is running
 - If the emulator reports device offline, reconnect or restart the emulator
@@ -398,4 +364,4 @@ await captureDeviceSnapshot({
 
 - Disable `includeAppData` for smaller snapshots
 - Use ADB snapshots instead of VM snapshots
-- Regularly clean up old snapshots
+- Adjust `maxArchiveSizeMb` to control archive size

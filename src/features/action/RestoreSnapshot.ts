@@ -1,4 +1,4 @@
-import { BootedDevice, ActionableError } from "../../models";
+import { BootedDevice, ActionableError, DeviceSnapshotManifest } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
 import {
@@ -6,7 +6,7 @@ import {
   evaluateVmSnapshotResult,
   formatVmSnapshotExecutionError
 } from "../../utils/android-cmdline-tools/vmSnapshot";
-import { SnapshotStorage, SnapshotManifest } from "../../utils/snapshotStorage";
+import { DeviceSnapshotStore } from "../../utils/DeviceSnapshotStore";
 import { logger } from "../../utils/logger";
 import { promises as fs } from "fs";
 import * as path from "path";
@@ -14,6 +14,7 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface RestoreSnapshotArgs {
   snapshotName: string;
+  manifest: DeviceSnapshotManifest;
   useVmSnapshot?: boolean;
   vmSnapshotTimeoutMs?: number; // Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)
 }
@@ -31,10 +32,16 @@ export class RestoreSnapshot {
   private device: BootedDevice;
   private adb: AdbClient;
   private emulator: AndroidEmulatorClient;
-  private storage: SnapshotStorage;
+  private store: DeviceSnapshotStore;
   private timer: Timer;
 
-  constructor(device: BootedDevice, adb?: AdbClient, emulator?: AndroidEmulatorClient, timer: Timer = defaultTimer) {
+  constructor(
+    device: BootedDevice,
+    adb?: AdbClient,
+    emulator?: AndroidEmulatorClient,
+    timer: Timer = defaultTimer,
+    store: DeviceSnapshotStore = new DeviceSnapshotStore()
+  ) {
     if (device.platform !== "android") {
       throw new ActionableError("Snapshot restore is currently only supported for Android devices");
     }
@@ -42,7 +49,7 @@ export class RestoreSnapshot {
     this.device = device;
     this.adb = adb || new AdbClient(device);
     this.emulator = emulator || new AndroidEmulatorClient();
-    this.storage = new SnapshotStorage();
+    this.store = store;
     this.timer = timer;
   }
 
@@ -50,15 +57,7 @@ export class RestoreSnapshot {
    * Execute snapshot restoration
    */
   async execute(args: RestoreSnapshotArgs): Promise<RestoreSnapshotResult> {
-    const { snapshotName, useVmSnapshot = true, vmSnapshotTimeoutMs = 30000 } = args;
-
-    // Check if snapshot exists
-    if (!(await this.storage.snapshotExists(snapshotName))) {
-      throw new ActionableError(`Snapshot '${snapshotName}' not found`);
-    }
-
-    // Load snapshot manifest
-    const manifest = await this.storage.loadManifest(snapshotName);
+    const { snapshotName, manifest, useVmSnapshot = true, vmSnapshotTimeoutMs = 30000 } = args;
 
     logger.info(`Restoring snapshot '${snapshotName}' (type: ${manifest.snapshotType}) to device ${this.device.deviceId}`);
 
@@ -92,7 +91,7 @@ export class RestoreSnapshot {
    */
   private async restoreVmSnapshot(
     snapshotName: string,
-    manifest: SnapshotManifest,
+    manifest: DeviceSnapshotManifest,
     vmSnapshotTimeoutMs: number
   ): Promise<void> {
     logger.info(`Restoring VM snapshot for emulator ${this.device.deviceId}`);
@@ -132,7 +131,7 @@ export class RestoreSnapshot {
    */
   private async restoreAdbSnapshot(
     snapshotName: string,
-    manifest: SnapshotManifest
+    manifest: DeviceSnapshotManifest
   ): Promise<void> {
     logger.info(`Restoring ADB-based snapshot for device ${this.device.deviceId}`);
 
@@ -236,7 +235,7 @@ export class RestoreSnapshot {
    */
   private async restoreAppData(
     snapshotName: string,
-    manifest: SnapshotManifest
+    manifest: DeviceSnapshotManifest
   ): Promise<void> {
     logger.info("Restoring app data");
 
@@ -255,7 +254,7 @@ export class RestoreSnapshot {
     }
 
     // Get backup file path
-    const backupFilePath = path.join(this.storage.getAppDataPath(snapshotName), backupFile);
+    const backupFilePath = path.join(this.store.getAppDataPath(snapshotName), backupFile);
 
     try {
       // Check if backup file exists

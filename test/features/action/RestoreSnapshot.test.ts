@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { RestoreSnapshot } from "../../../src/features/action/RestoreSnapshot";
-import { BootedDevice } from "../../../src/models";
+import { BootedDevice, DeviceSnapshotManifest } from "../../../src/models";
 import { FakeAdbClient } from "../../fakes/FakeAdbClient";
 import { FakeTimer } from "../../fakes/FakeTimer";
-import { SnapshotStorage, SnapshotManifest } from "../../../src/utils/snapshotStorage";
+import { DeviceSnapshotStore } from "../../../src/utils/DeviceSnapshotStore";
 import { promises as fs } from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -13,7 +13,7 @@ describe("RestoreSnapshot", () => {
   let fakeAdb: FakeAdbClient;
   let fakeTimer: FakeTimer;
   let restoreSnapshot: RestoreSnapshot;
-  let storage: SnapshotStorage;
+  let store: DeviceSnapshotStore;
   let testBasePath: string;
 
   beforeEach(async () => {
@@ -31,11 +31,10 @@ describe("RestoreSnapshot", () => {
 
     // Create secure temporary directory for tests
     testBasePath = await fs.mkdtemp(path.join(os.tmpdir(), "snapshot-restore-test-"));
-    storage = new SnapshotStorage(testBasePath);
+    store = new DeviceSnapshotStore(testBasePath);
 
     // Create RestoreSnapshot instance with fakes
-    restoreSnapshot = new RestoreSnapshot(device, fakeAdb as any, undefined, fakeTimer);
-    (restoreSnapshot as any).storage = storage;
+    restoreSnapshot = new RestoreSnapshot(device, fakeAdb as any, undefined, fakeTimer, store);
 
     // Setup default command results
     fakeAdb.setCommandResult("shell pm clear com.example.app", "Success");
@@ -60,7 +59,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-vm-restore";
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -71,14 +70,13 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup VM snapshot load command
       fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "OK");
 
       const result = await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true
       });
 
@@ -92,7 +90,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-vm-fail";
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -103,14 +101,13 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup VM snapshot load command to fail
       fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "", "KO: snapshot load failed");
 
       await expect(restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true
       })).rejects.toThrow("Failed to restore VM snapshot");
     });
@@ -119,7 +116,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-vm-fail-stdout";
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -130,14 +127,13 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup VM snapshot load command to fail (KO in stdout)
       fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "KO: snapshot load failed");
 
       await expect(restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true
       })).rejects.toThrow("Failed to restore VM snapshot");
     });
@@ -146,7 +142,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-vm-empty-response";
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -157,14 +153,13 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup VM snapshot load command with empty output
       fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "", "");
 
       await expect(restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true
       })).rejects.toThrow("no response from emulator");
     });
@@ -173,7 +168,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-vm-offline";
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -184,8 +179,6 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup VM snapshot load command to throw offline error
       fakeAdb.setCommandError(
@@ -195,6 +188,7 @@ describe("RestoreSnapshot", () => {
 
       await expect(restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true
       })).rejects.toThrow("offline");
     });
@@ -204,7 +198,7 @@ describe("RestoreSnapshot", () => {
       const vmSnapshotTimeoutMs = 15000;
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -215,14 +209,13 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup VM snapshot load command
       fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "OK");
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true,
         vmSnapshotTimeoutMs
       });
@@ -237,7 +230,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-vm-as-adb";
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -248,11 +241,10 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       const result = await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -272,11 +264,16 @@ describe("RestoreSnapshot", () => {
         isEmulator: false
       };
 
-      const restorePhysical = new RestoreSnapshot(physicalDevice, fakeAdb as any, undefined, fakeTimer);
-      (restorePhysical as any).storage = storage;
+      const restorePhysical = new RestoreSnapshot(
+        physicalDevice,
+        fakeAdb as any,
+        undefined,
+        fakeTimer,
+        store
+      );
 
       // Create VM snapshot manifest (but can't restore on physical device)
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -287,11 +284,10 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       const result = await restorePhysical.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true
       });
 
@@ -306,7 +302,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-restore-settings";
 
       // Create manifest with settings
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -322,8 +318,6 @@ describe("RestoreSnapshot", () => {
         }
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup settings restore commands
       fakeAdb.setCommandResult("shell settings put global airplane_mode_on '1'", "");
@@ -335,6 +329,7 @@ describe("RestoreSnapshot", () => {
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -351,7 +346,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-settings-special";
 
       // Create manifest with settings containing special characters
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -367,14 +362,13 @@ describe("RestoreSnapshot", () => {
         }
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup settings restore command with escaped value
       fakeAdb.setCommandResult("shell settings put global test_key 'value with spaces and '\\''quotes'\\'''", "");
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -386,7 +380,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-empty-settings";
 
       // Create manifest with empty settings
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -402,11 +396,10 @@ describe("RestoreSnapshot", () => {
         }
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -418,7 +411,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-no-settings-restore";
 
       // Create manifest without settings
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -429,11 +422,10 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -443,18 +435,11 @@ describe("RestoreSnapshot", () => {
   });
 
   describe("error scenarios", () => {
-    it("should throw error when snapshot does not exist", async () => {
-      await expect(restoreSnapshot.execute({
-        snapshotName: "non-existent-snapshot",
-        useVmSnapshot: false
-      })).rejects.toThrow("Snapshot 'non-existent-snapshot' not found");
-    });
-
     it("should throw error for platform mismatch", async () => {
       const snapshotName = "test-platform-mismatch";
 
       // Create manifest for different platform
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: "ios-device",
@@ -465,11 +450,10 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       await expect(restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       })).rejects.toThrow("Snapshot platform 'ios' does not match device platform 'android'");
     });
@@ -490,7 +474,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-clear-fail";
 
       // Create manifest with packages
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -502,8 +486,6 @@ describe("RestoreSnapshot", () => {
         packages: ["com.example.app1", "com.example.app2"]
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup clear commands - one succeeds, one fails
       fakeAdb.setCommandResult("shell pm clear com.example.app1", "Success");
@@ -512,6 +494,7 @@ describe("RestoreSnapshot", () => {
       // Should not throw, just log warnings
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -525,7 +508,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-no-clear";
 
       // Create manifest without app data
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -537,11 +520,10 @@ describe("RestoreSnapshot", () => {
         packages: ["com.example.app"]
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -553,7 +535,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-empty-packages";
 
       // Create manifest with empty packages
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -565,11 +547,10 @@ describe("RestoreSnapshot", () => {
         packages: []
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -581,7 +562,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-no-foreground";
 
       // Create manifest without foreground app
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -592,11 +573,10 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -608,7 +588,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-missing-backup";
 
       // Create manifest with backup metadata but no actual file
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -628,12 +608,11 @@ describe("RestoreSnapshot", () => {
         }
       };
 
-      // Save manifest but don't create backup file
-      await storage.saveManifest(manifest);
 
       // Should not throw, just skip restore
       const result = await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -645,7 +624,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-empty-backup";
 
       // Create manifest with backup
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -666,16 +645,15 @@ describe("RestoreSnapshot", () => {
       };
 
       // Create empty backup file
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
       await fs.writeFile(backupFilePath, "", "utf-8"); // Empty file
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       const result = await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -689,7 +667,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-snapshot";
 
       // Create manifest with backup data
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -711,19 +689,18 @@ describe("RestoreSnapshot", () => {
       };
 
       // Create backup file
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup restore command result
       fakeAdb.setCommandResult(`restore "${backupFilePath}"`, "");
 
       const result = await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -741,7 +718,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-snapshot-timeout";
 
       // Create manifest with backup data
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -763,13 +740,11 @@ describe("RestoreSnapshot", () => {
       };
 
       // Create backup file
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Override executeCommand for restore to simulate delay
       const originalExecute = fakeAdb.executeCommand.bind(fakeAdb);
@@ -785,6 +760,7 @@ describe("RestoreSnapshot", () => {
       // Start restore in background
       const restorePromise = restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -802,7 +778,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-no-backup";
 
       // Create manifest without backup data
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -822,14 +798,13 @@ describe("RestoreSnapshot", () => {
       };
 
       // Create app data directory but no backup file
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       const result = await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -843,7 +818,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-clear";
 
       // Create manifest with packages
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -865,13 +840,11 @@ describe("RestoreSnapshot", () => {
       };
 
       // Create backup file
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup clear commands
       fakeAdb.setCommandResult("shell pm clear com.example.app1", "Success");
@@ -880,6 +853,7 @@ describe("RestoreSnapshot", () => {
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -893,7 +867,7 @@ describe("RestoreSnapshot", () => {
       const foregroundApp = "com.example.app";
 
       // Create manifest with foreground app
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -916,18 +890,17 @@ describe("RestoreSnapshot", () => {
       };
 
       // Create backup file
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       fakeAdb.setCommandResult(`restore "${backupFilePath}"`, "");
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 
@@ -941,7 +914,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-vm";
 
       // Create VM snapshot manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -952,14 +925,13 @@ describe("RestoreSnapshot", () => {
         includeSettings: false
       };
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       // Setup VM snapshot load command
       fakeAdb.setCommandResult(`emu avd snapshot load ${snapshotName}`, "OK");
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: true
       });
 
@@ -974,7 +946,7 @@ describe("RestoreSnapshot", () => {
       const snapshotName = "test-fast";
 
       // Create manifest
-      const manifest: SnapshotManifest = {
+      const manifest: DeviceSnapshotManifest = {
         snapshotName,
         timestamp: new Date().toISOString(),
         deviceId: device.deviceId,
@@ -996,13 +968,11 @@ describe("RestoreSnapshot", () => {
       };
 
       // Create backup file
-      const appDataPath = storage.getAppDataPath(snapshotName);
+      const appDataPath = store.getAppDataPath(snapshotName);
       await fs.mkdir(appDataPath, { recursive: true });
-      const backupFilePath = storage.getBackupFilePath(snapshotName);
+      const backupFilePath = store.getBackupFilePath(snapshotName);
       await fs.writeFile(backupFilePath, "backup data", "utf-8");
 
-      // Save manifest
-      await storage.saveManifest(manifest);
 
       fakeAdb.setCommandResult(`restore "${backupFilePath}"`, "");
 
@@ -1010,6 +980,7 @@ describe("RestoreSnapshot", () => {
 
       await restoreSnapshot.execute({
         snapshotName,
+        manifest,
         useVmSnapshot: false
       });
 

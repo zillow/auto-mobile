@@ -332,6 +332,28 @@ export interface FeatureFlagsTable {
   updated_at: string;
 }
 
+// Device snapshot tables
+export interface DeviceSnapshotsTable {
+  snapshot_name: string;
+  device_id: string;
+  device_name: string;
+  platform: "android" | "ios";
+  snapshot_type: string;
+  include_app_data: number;
+  include_settings: number;
+  created_at: string;
+  last_accessed_at: string;
+  size_bytes: number;
+  manifest_json: string;
+}
+
+export interface DeviceSnapshotConfigsTable {
+  key: string;
+  config_json: string;
+  updated_at: string;
+  created_at: Generated<string>;
+}
+
 // Video recording tables
 export interface VideoRecordingsTable {
   recording_id: string;
@@ -382,6 +404,8 @@ export interface Database {
   recomposition_metrics: RecompositionMetricsTable;
   test_executions: TestExecutionsTable;
   feature_flags: FeatureFlagsTable;
+  device_snapshots: DeviceSnapshotsTable;
+  device_snapshot_configs: DeviceSnapshotConfigsTable;
   video_recordings: VideoRecordingsTable;
   video_recording_configs: VideoRecordingConfigsTable;
   test_coverage_sessions: TestCoverageSessionsTable;
@@ -463,6 +487,14 @@ export type RecompositionMetricsUpdate = Updateable<RecompositionMetricsTable>;
 export type FeatureFlag = Selectable<FeatureFlagsTable>;
 export type NewFeatureFlag = Insertable<FeatureFlagsTable>;
 export type FeatureFlagUpdate = Updateable<FeatureFlagsTable>;
+
+export type DeviceSnapshot = Selectable<DeviceSnapshotsTable>;
+export type NewDeviceSnapshot = Insertable<DeviceSnapshotsTable>;
+export type DeviceSnapshotUpdate = Updateable<DeviceSnapshotsTable>;
+
+export type DeviceSnapshotConfig = Selectable<DeviceSnapshotConfigsTable>;
+export type NewDeviceSnapshotConfig = Insertable<DeviceSnapshotConfigsTable>;
+export type DeviceSnapshotConfigUpdate = Updateable<DeviceSnapshotConfigsTable>;
 
 export type VideoRecording = Selectable<VideoRecordingsTable>;
 export type NewVideoRecording = Insertable<VideoRecordingsTable>;
