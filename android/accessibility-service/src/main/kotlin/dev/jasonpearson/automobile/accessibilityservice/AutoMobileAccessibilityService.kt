@@ -20,12 +20,12 @@ import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import dev.jasonpearson.automobile.accessibilityservice.models.RecompositionSnapshot
 import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
 import dev.jasonpearson.automobile.accessibilityservice.models.InteractionElement
 import dev.jasonpearson.automobile.accessibilityservice.models.InteractionEvent
-import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
+import dev.jasonpearson.automobile.accessibilityservice.models.RecompositionSnapshot
 import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
+import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import dev.jasonpearson.automobile.accessibilityservice.perf.SystemTimeProvider
@@ -76,7 +76,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private lateinit var webSocketServer: WebSocketServer
   private lateinit var hierarchyDebouncer: HierarchyDebouncer
   private val navigationEventAccumulator = NavigationEventAccumulator()
-  private val clipboardManager by lazy { getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager }
+  private val clipboardManager by lazy {
+    getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+  }
   private var lastWindowClassName: String? = null
 
   // Job for collecting hierarchy flow results
@@ -230,7 +232,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               perfProvider = perfProvider,
               quickDebounceMs = 5L,
               animationSkipWindowMs = 100L,
-              extractHierarchy = { extractHierarchyDirect() },
+              extractHierarchy = { disableAllFiltering ->
+                extractHierarchyDirect(disableAllFiltering)
+              },
           )
 
       // Subscribe to hierarchy updates from the debouncer
@@ -267,7 +271,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           WebSocketServer(
               port = 8765,
               scope = serviceScope,
-              onRequestHierarchy = { extractHierarchyNow() },
+              onRequestHierarchy = { disableAllFiltering ->
+                extractHierarchyNow(disableAllFiltering)
+              },
               onRequestHierarchyIfStale = { sinceTimestamp ->
                 hierarchyDebouncer.extractIfStale(sinceTimestamp)
               },
@@ -396,14 +402,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       }
 
       when (event.eventType) {
-        AccessibilityEvent.TYPE_VIEW_CLICKED ->
-            recordInteractionEvent(event, "tap")
-        AccessibilityEvent.TYPE_VIEW_LONG_CLICKED ->
-            recordInteractionEvent(event, "longPress")
-        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED ->
-            recordInteractionEvent(event, "inputText")
-        AccessibilityEvent.TYPE_VIEW_SCROLLED ->
-            recordInteractionEvent(event, "swipe")
+        AccessibilityEvent.TYPE_VIEW_CLICKED -> recordInteractionEvent(event, "tap")
+        AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> recordInteractionEvent(event, "longPress")
+        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> recordInteractionEvent(event, "inputText")
+        AccessibilityEvent.TYPE_VIEW_SCROLLED -> recordInteractionEvent(event, "swipe")
       }
 
       // Delegate to the smart debouncer for content/window changes
@@ -532,7 +534,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
    * Direct hierarchy extraction without debouncing. Used by the HierarchyDebouncer. Extracts from
    * all visible windows to capture popups, toolbars, etc.
    */
-  private fun extractHierarchyDirect(): ViewHierarchy? {
+  private fun extractHierarchyDirect(disableAllFiltering: Boolean = false): ViewHierarchy? {
     // Get all windows to capture popups, toolbars, and other floating windows
     val allWindows = windows
     val rootNode = rootInActiveWindow
@@ -545,10 +547,26 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
     // Use multi-window extraction if windows are available, otherwise fall back to single window
     return if (!allWindows.isNullOrEmpty()) {
-      Log.d(TAG, "Extracting from ${allWindows.size} windows")
-      viewHierarchyExtractor.extractFromAllWindows(allWindows, rootNode, null, screenDimensions)
+      Log.d(
+          TAG,
+          "Extracting from ${allWindows.size} windows (disableAllFiltering: $disableAllFiltering)",
+      )
+      viewHierarchyExtractor.extractFromAllWindows(
+          allWindows,
+          rootNode,
+          null,
+          screenDimensions,
+          true,
+          disableAllFiltering,
+      )
     } else {
-      viewHierarchyExtractor.extractFromActiveWindow(rootNode, null, screenDimensions)
+      viewHierarchyExtractor.extractFromActiveWindow(
+          rootNode,
+          null,
+          screenDimensions,
+          true,
+          disableAllFiltering,
+      )
     }
   }
 
@@ -556,9 +574,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
    * Extract hierarchy immediately and broadcast, bypassing the debouncer. Used for explicit
    * WebSocket requests where we need fresh data immediately.
    */
-  private fun extractHierarchyNow() {
-    Log.d(TAG, "extractHierarchyNow")
-    hierarchyDebouncer.extractNow()
+  private fun extractHierarchyNow(disableAllFiltering: Boolean = false) {
+    Log.d(TAG, "extractHierarchyNow (disableAllFiltering: $disableAllFiltering)")
+    hierarchyDebouncer.extractNow(disableAllFiltering)
   }
 
   /** Writes the hierarchy to a file for synchronous access */
@@ -592,7 +610,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         }
 
         val textFilter = intent.getStringExtra("text")
-        val hierarchy = extractHierarchy(textFilter)
+        val disableAllFiltering = intent.getBooleanExtra("disableAllFiltering", false)
+        val hierarchy = extractHierarchy(textFilter, disableAllFiltering)
         if (hierarchy != null) {
           val filename = "hierarchy_$uuid.json"
           writeHierarchyToFile(hierarchy, filename)
@@ -614,7 +633,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
-  private fun extractHierarchy(textFilter: String? = null): ViewHierarchy? {
+  private fun extractHierarchy(
+      textFilter: String? = null,
+      disableAllFiltering: Boolean = false,
+  ): ViewHierarchy? {
     val allWindows = windows
     val rootNode = rootInActiveWindow
     val screenDimensions = getScreenDimensions()
@@ -629,9 +651,17 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           rootNode,
           textFilter,
           screenDimensions,
+          true,
+          disableAllFiltering,
       )
     } else {
-      viewHierarchyExtractor.extractFromActiveWindow(rootNode, textFilter, screenDimensions)
+      viewHierarchyExtractor.extractFromActiveWindow(
+          rootNode,
+          textFilter,
+          screenDimensions,
+          true,
+          disableAllFiltering,
+      )
     }
   }
 
@@ -661,6 +691,15 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     try {
       val jsonString =
           perfProvider.track("serializeHierarchy") { jsonCompact.encodeToString(hierarchy) }
+
+      // Debug: Check if text labels are in the serialized hierarchy
+      val hasTapText = jsonString.contains("\"text\":\"Tap\"")
+      val hasDiscoverText = jsonString.contains("\"text\":\"Discover\"")
+      Log.d(
+          TAG,
+          "[BROADCAST] Hierarchy contains: Tap=$hasTapText, Discover=$hasDiscoverText, size=${jsonString.length}",
+      )
+
       val messageBuilder: (kotlinx.serialization.json.JsonElement?) -> String = { perfTiming ->
         buildString {
           append(
@@ -887,8 +926,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
-   * Perform a two-finger swipe gesture for TalkBack mode scrolling.
-   * This allows scrolling content without moving the TalkBack focus cursor.
+   * Perform a two-finger swipe gesture for TalkBack mode scrolling. This allows scrolling content
+   * without moving the TalkBack focus cursor.
    *
    * @param requestId Optional request ID for response correlation
    * @param x1 Starting X coordinate
@@ -905,10 +944,13 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       x2: Int,
       y2: Int,
       duration: Long,
-      offset: Int = 100
+      offset: Int = 100,
   ) {
     val startTime = System.currentTimeMillis()
-    Log.d(TAG, "performTwoFingerSwipe: ($x1, $y1) -> ($x2, $y2) duration=${duration}ms, offset=${offset}px")
+    Log.d(
+        TAG,
+        "performTwoFingerSwipe: ($x1, $y1) -> ($x2, $y2) duration=${duration}ms, offset=${offset}px",
+    )
     perfProvider.serial("performTwoFingerSwipe")
 
     try {
@@ -949,7 +991,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                   val completedTime = System.currentTimeMillis()
                   val totalTime = completedTime - startTime
                   val gestureTime = completedTime - gestureBuiltTime
-                  Log.d(TAG, "Two-finger swipe completed: gesture=${gestureTime}ms, total=${totalTime}ms")
+                  Log.d(
+                      TAG,
+                      "Two-finger swipe completed: gesture=${gestureTime}ms, total=${totalTime}ms",
+                  )
 
                   // Broadcast success result
                   serviceScope.launch {
@@ -1566,8 +1611,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
-   * Perform clipboard operations using ClipboardManager and AccessibilityService.
-   * Supports copy, paste, clear, and get operations.
+   * Perform clipboard operations using ClipboardManager and AccessibilityService. Supports copy,
+   * paste, clear, and get operations.
    */
   private fun performClipboard(requestId: String?, action: String, text: String?) {
     val startTime = System.currentTimeMillis()
@@ -1577,90 +1622,96 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     try {
       perfProvider.startOperation("executeClipboardAction")
 
-      val (success, resultText, error) = when (action) {
-        "copy" -> {
-          if (text == null || text.isEmpty()) {
-            Triple(false, null, "Text is required for copy action")
-          } else {
-            try {
-              val clip = ClipData.newPlainText("AutoMobile", text)
-              clipboardManager.setPrimaryClip(clip)
-              Log.d(TAG, "Clipboard copy successful (${text.length} chars)")
-              Triple(true, null, null)
-            } catch (e: Exception) {
-              Log.e(TAG, "Clipboard copy failed", e)
-              Triple(false, null, "Copy failed: ${e.message}")
-            }
-          }
-        }
-        "get" -> {
-          try {
-            val clip = clipboardManager.primaryClip
-            val clipText = clip?.getItemAt(0)?.text?.toString()
-            if (clipText != null) {
-              Log.d(TAG, "Clipboard get successful (${clipText.length} chars)")
-              Triple(true, clipText, null)
-            } else {
-              Log.d(TAG, "Clipboard is empty")
-              Triple(true, "", null)
-            }
-          } catch (e: Exception) {
-            Log.e(TAG, "Clipboard get failed", e)
-            Triple(false, null, "Get failed: ${e.message}")
-          }
-        }
-        "clear" -> {
-          try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-              clipboardManager.clearPrimaryClip()
-              Log.d(TAG, "Clipboard cleared using clearPrimaryClip()")
-            } else {
-              // Fallback for API < 28: set empty clip
-              val emptyClip = ClipData.newPlainText("", "")
-              clipboardManager.setPrimaryClip(emptyClip)
-              Log.d(TAG, "Clipboard cleared using empty clip (API < 28)")
-            }
-            Triple(true, null, null)
-          } catch (e: Exception) {
-            Log.e(TAG, "Clipboard clear failed", e)
-            Triple(false, null, "Clear failed: ${e.message}")
-          }
-        }
-        "paste" -> {
-          try {
-            perfProvider.startOperation("findFocusedNode")
-            val focusedNode = findFocusedEditableNode(rootInActiveWindow)
-            perfProvider.endOperation("findFocusedNode")
-
-            if (focusedNode == null) {
-              Log.w(TAG, "No focused editable node found for paste")
-              Triple(false, null, "No focused input field found. Focus a text field before pasting.")
-            } else {
-              perfProvider.startOperation("performPaste")
-              val pasteSuccess = focusedNode.performAction(
-                android.view.accessibility.AccessibilityNodeInfo.ACTION_PASTE
-              )
-              focusedNode.recycle()
-              perfProvider.endOperation("performPaste")
-
-              if (pasteSuccess) {
-                Log.d(TAG, "Clipboard paste successful")
-                Triple(true, null, null)
+      val (success, resultText, error) =
+          when (action) {
+            "copy" -> {
+              if (text == null || text.isEmpty()) {
+                Triple(false, null, "Text is required for copy action")
               } else {
-                Log.w(TAG, "Paste action returned false")
-                Triple(false, null, "Paste action failed")
+                try {
+                  val clip = ClipData.newPlainText("AutoMobile", text)
+                  clipboardManager.setPrimaryClip(clip)
+                  Log.d(TAG, "Clipboard copy successful (${text.length} chars)")
+                  Triple(true, null, null)
+                } catch (e: Exception) {
+                  Log.e(TAG, "Clipboard copy failed", e)
+                  Triple(false, null, "Copy failed: ${e.message}")
+                }
               }
             }
-          } catch (e: Exception) {
-            Log.e(TAG, "Clipboard paste failed", e)
-            Triple(false, null, "Paste failed: ${e.message}")
+            "get" -> {
+              try {
+                val clip = clipboardManager.primaryClip
+                val clipText = clip?.getItemAt(0)?.text?.toString()
+                if (clipText != null) {
+                  Log.d(TAG, "Clipboard get successful (${clipText.length} chars)")
+                  Triple(true, clipText, null)
+                } else {
+                  Log.d(TAG, "Clipboard is empty")
+                  Triple(true, "", null)
+                }
+              } catch (e: Exception) {
+                Log.e(TAG, "Clipboard get failed", e)
+                Triple(false, null, "Get failed: ${e.message}")
+              }
+            }
+            "clear" -> {
+              try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                  clipboardManager.clearPrimaryClip()
+                  Log.d(TAG, "Clipboard cleared using clearPrimaryClip()")
+                } else {
+                  // Fallback for API < 28: set empty clip
+                  val emptyClip = ClipData.newPlainText("", "")
+                  clipboardManager.setPrimaryClip(emptyClip)
+                  Log.d(TAG, "Clipboard cleared using empty clip (API < 28)")
+                }
+                Triple(true, null, null)
+              } catch (e: Exception) {
+                Log.e(TAG, "Clipboard clear failed", e)
+                Triple(false, null, "Clear failed: ${e.message}")
+              }
+            }
+            "paste" -> {
+              try {
+                perfProvider.startOperation("findFocusedNode")
+                val focusedNode = findFocusedEditableNode(rootInActiveWindow)
+                perfProvider.endOperation("findFocusedNode")
+
+                if (focusedNode == null) {
+                  Log.w(TAG, "No focused editable node found for paste")
+                  Triple(
+                      false,
+                      null,
+                      "No focused input field found. Focus a text field before pasting.",
+                  )
+                } else {
+                  perfProvider.startOperation("performPaste")
+                  val pasteSuccess =
+                      focusedNode.performAction(
+                          android.view.accessibility.AccessibilityNodeInfo.ACTION_PASTE
+                      )
+                  focusedNode.recycle()
+                  perfProvider.endOperation("performPaste")
+
+                  if (pasteSuccess) {
+                    Log.d(TAG, "Clipboard paste successful")
+                    Triple(true, null, null)
+                  } else {
+                    Log.w(TAG, "Paste action returned false")
+                    Triple(false, null, "Paste action failed")
+                  }
+                }
+              } catch (e: Exception) {
+                Log.e(TAG, "Clipboard paste failed", e)
+                Triple(false, null, "Paste failed: ${e.message}")
+              }
+            }
+            else -> {
+              Log.w(TAG, "Unknown clipboard action: $action")
+              Triple(false, null, "Unknown action: $action")
+            }
           }
-        }
-        else -> {
-          Log.w(TAG, "Unknown clipboard action: $action")
-          Triple(false, null, "Unknown action: $action")
-        }
-      }
 
       perfProvider.endOperation("executeClipboardAction")
       perfProvider.end()
@@ -1679,14 +1730,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       val errorTime = System.currentTimeMillis()
       Log.e(TAG, "Error performing clipboard operation", e)
       kotlinx.coroutines.runBlocking {
-        broadcastClipboardResult(
-          requestId,
-          action,
-          false,
-          null,
-          e.message,
-          errorTime - startTime
-        )
+        broadcastClipboardResult(requestId, action, false, null, e.message, errorTime - startTime)
       }
     }
   }
@@ -2033,12 +2077,24 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append(""","totalTimeMs":$totalTimeMs""")
           if (text != null) {
             // Escape text for JSON
-            val escapedText = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+            val escapedText =
+                text
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
             append(""","text":"$escapedText"""")
           }
           if (error != null) {
             // Escape error message for JSON
-            val escapedError = error.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+            val escapedError =
+                error
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
             append(""","error":"$escapedError"""")
           }
           if (perfTiming != null) {
@@ -2202,8 +2258,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
-   * Get the current accessibility focus element.
-   * Returns the element that currently has accessibility focus (TalkBack cursor position).
+   * Get the current accessibility focus element. Returns the element that currently has
+   * accessibility focus (TalkBack cursor position).
    */
   private fun handleGetCurrentFocus(requestId: String?) {
     val startTime = System.currentTimeMillis()
@@ -2220,9 +2276,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         perfProvider.end()
         val totalTime = System.currentTimeMillis() - startTime
         Log.d(TAG, "No accessibility focus found")
-        serviceScope.launch {
-          broadcastCurrentFocusResult(requestId, null, totalTime)
-        }
+        serviceScope.launch { broadcastCurrentFocusResult(requestId, null, totalTime) }
         return
       }
 
@@ -2236,9 +2290,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       val totalTime = System.currentTimeMillis() - startTime
       Log.d(TAG, "Current focus extracted in ${totalTime}ms")
 
-      serviceScope.launch {
-        broadcastCurrentFocusResult(requestId, focusedElement, totalTime)
-      }
+      serviceScope.launch { broadcastCurrentFocusResult(requestId, focusedElement, totalTime) }
     } catch (e: Exception) {
       perfProvider.end()
       val errorTime = System.currentTimeMillis()
@@ -2250,8 +2302,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
-   * Get the traversal order of focusable elements.
-   * Returns an ordered list of all accessibility-focusable elements in TalkBack traversal order.
+   * Get the traversal order of focusable elements. Returns an ordered list of all
+   * accessibility-focusable elements in TalkBack traversal order.
    */
   private fun handleGetTraversalOrder(requestId: String?) {
     val startTime = System.currentTimeMillis()
@@ -2276,27 +2328,26 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       }
 
       // Extract traversal order using ViewHierarchyExtractor
-      val traversalResult = if (!allWindows.isNullOrEmpty()) {
-        viewHierarchyExtractor.extractTraversalOrderFromAllWindows(
-          allWindows,
-          rootNode,
-          screenDimensions
-        )
-      } else {
-        viewHierarchyExtractor.extractTraversalOrderFromActiveWindow(
-          rootNode,
-          screenDimensions
-        )
-      }
+      val traversalResult =
+          if (!allWindows.isNullOrEmpty()) {
+            viewHierarchyExtractor.extractTraversalOrderFromAllWindows(
+                allWindows,
+                rootNode,
+                screenDimensions,
+            )
+          } else {
+            viewHierarchyExtractor.extractTraversalOrderFromActiveWindow(rootNode, screenDimensions)
+          }
       perfProvider.endOperation("extractTraversalOrder")
       perfProvider.end()
 
       val totalTime = System.currentTimeMillis() - startTime
-      Log.d(TAG, "Traversal order extracted: ${traversalResult.elements.size} elements in ${totalTime}ms")
+      Log.d(
+          TAG,
+          "Traversal order extracted: ${traversalResult.elements.size} elements in ${totalTime}ms",
+      )
 
-      serviceScope.launch {
-        broadcastTraversalOrderResult(requestId, traversalResult, totalTime)
-      }
+      serviceScope.launch { broadcastTraversalOrderResult(requestId, traversalResult, totalTime) }
     } catch (e: Exception) {
       perfProvider.end()
       val errorTime = System.currentTimeMillis()
@@ -2338,7 +2389,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append("}")
         }
       }
-      Log.d(TAG, "Broadcasted current focus result to ${webSocketServer.getConnectionCount()} clients")
+      Log.d(
+          TAG,
+          "Broadcasted current focus result to ${webSocketServer.getConnectionCount()} clients",
+      )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting current focus result", e)
     }
@@ -2356,16 +2410,21 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
 
     try {
-      webSocketServer.broadcast(buildString {
-        append("""{"type":"current_focus_result","timestamp":${System.currentTimeMillis()}""")
-        if (requestId != null) {
-          append(""","requestId":"$requestId"""")
-        }
-        append(""","totalTimeMs":$totalTimeMs""")
-        append(""","error":"${error ?: "Unknown error"}"""")
-        append("}")
-      })
-      Log.d(TAG, "Broadcasted current focus error to ${webSocketServer.getConnectionCount()} clients")
+      webSocketServer.broadcast(
+          buildString {
+            append("""{"type":"current_focus_result","timestamp":${System.currentTimeMillis()}""")
+            if (requestId != null) {
+              append(""","requestId":"$requestId"""")
+            }
+            append(""","totalTimeMs":$totalTimeMs""")
+            append(""","error":"${error ?: "Unknown error"}"""")
+            append("}")
+          }
+      )
+      Log.d(
+          TAG,
+          "Broadcasted current focus error to ${webSocketServer.getConnectionCount()} clients",
+      )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting current focus error", e)
     }
@@ -2390,10 +2449,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
             append(""","requestId":"$requestId"""")
           }
           append(""","totalTimeMs":$totalTimeMs""")
-          val resultJson = jsonCompact.encodeToString(
-            dev.jasonpearson.automobile.accessibilityservice.models.TraversalOrderResult.serializer(),
-            traversalResult
-          )
+          val resultJson =
+              jsonCompact.encodeToString(
+                  dev.jasonpearson.automobile.accessibilityservice.models.TraversalOrderResult
+                      .serializer(),
+                  traversalResult,
+              )
           append(""","result":$resultJson""")
           if (perfTiming != null) {
             append(""","perfTiming":$perfTiming""")
@@ -2401,7 +2462,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append("}")
         }
       }
-      Log.d(TAG, "Broadcasted traversal order result to ${webSocketServer.getConnectionCount()} clients")
+      Log.d(
+          TAG,
+          "Broadcasted traversal order result to ${webSocketServer.getConnectionCount()} clients",
+      )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting traversal order result", e)
     }
@@ -2419,16 +2483,21 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
 
     try {
-      webSocketServer.broadcast(buildString {
-        append("""{"type":"traversal_order_result","timestamp":${System.currentTimeMillis()}""")
-        if (requestId != null) {
-          append(""","requestId":"$requestId"""")
-        }
-        append(""","totalTimeMs":$totalTimeMs""")
-        append(""","error":"${error ?: "Unknown error"}"""")
-        append("}")
-      })
-      Log.d(TAG, "Broadcasted traversal order error to ${webSocketServer.getConnectionCount()} clients")
+      webSocketServer.broadcast(
+          buildString {
+            append("""{"type":"traversal_order_result","timestamp":${System.currentTimeMillis()}""")
+            if (requestId != null) {
+              append(""","requestId":"$requestId"""")
+            }
+            append(""","totalTimeMs":$totalTimeMs""")
+            append(""","error":"${error ?: "Unknown error"}"""")
+            append("}")
+          }
+      )
+      Log.d(
+          TAG,
+          "Broadcasted traversal order error to ${webSocketServer.getConnectionCount()} clients",
+      )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting traversal order error", e)
     }

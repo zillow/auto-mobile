@@ -50,6 +50,8 @@ data class WebSocketRequest(
     val sinceTimestamp: Long? =
         null, // For request_hierarchy_if_stale: extract only if no events since this timestamp
     val enabled: Boolean? = null,
+    // Filtering/optimization control
+    val disableAllFiltering: Boolean? = null, // If true, disable all filtering and optimizations
 )
 
 /**
@@ -60,7 +62,7 @@ class WebSocketServer(
     private val port: Int = 8765,
     private val scope: CoroutineScope,
     private val perfProvider: PerfProvider = PerfProvider.instance,
-    private val onRequestHierarchy: (() -> Unit)? = null,
+    private val onRequestHierarchy: ((disableAllFiltering: Boolean) -> Unit)? = null,
     private val onRequestHierarchyIfStale: ((sinceTimestamp: Long) -> Unit)? = null,
     private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
     private val onRequestSwipe:
@@ -303,8 +305,9 @@ class WebSocketServer(
       val request = json.decodeFromString<WebSocketRequest>(message)
       when (request.type) {
         "request_hierarchy" -> {
-          Log.d(TAG, "Received hierarchy request (requestId: ${request.requestId})")
-          onRequestHierarchy?.invoke()
+          val disableAllFiltering = request.disableAllFiltering ?: false
+          Log.d(TAG, "Received hierarchy request (requestId: ${request.requestId}, disableAllFiltering: $disableAllFiltering)")
+          onRequestHierarchy?.invoke(disableAllFiltering)
         }
         "request_hierarchy_if_stale" -> {
           val sinceTimestamp = request.sinceTimestamp
@@ -319,7 +322,8 @@ class WebSocketServer(
                 TAG,
                 "request_hierarchy_if_stale missing sinceTimestamp, treating as regular request",
             )
-            onRequestHierarchy?.invoke()
+            val disableAllFiltering = request.disableAllFiltering ?: false
+            onRequestHierarchy?.invoke(disableAllFiltering)
           }
         }
         "request_screenshot" -> {

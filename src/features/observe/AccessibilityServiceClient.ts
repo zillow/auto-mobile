@@ -227,13 +227,15 @@ export interface AccessibilityService {
    * @param perf - Optional performance tracker for timing measurements
    * @param skipWaitForFresh - If true, skip WebSocket wait and go straight to sync method
    * @param minTimestamp - If provided, cached data must have updatedAt >= this value to be considered fresh
+   * @param disableAllFiltering - If true, disable all filtering and optimizations (for rawViewHierarchy)
    * @returns Promise<ViewHierarchyResult | null> - The converted hierarchy or null if service unavailable
    */
   getAccessibilityHierarchy(
     queryOptions?: ViewHierarchyQueryOptions,
     perf?: PerformanceTracker,
     skipWaitForFresh?: boolean,
-    minTimestamp?: number
+    minTimestamp?: number,
+    disableAllFiltering?: boolean
   ): Promise<ViewHierarchyResult | null>;
 
   /**
@@ -269,10 +271,12 @@ export interface AccessibilityService {
    * Falls back to ADB broadcast if WebSocket send fails
    *
    * @param perf - Optional performance tracker for timing
+   * @param disableAllFiltering - If true, disable all filtering and optimizations
    * @returns Promise with hierarchy and perfTiming, or null if failed
    */
   requestHierarchySync(
-    perf?: PerformanceTracker
+    perf?: PerformanceTracker,
+    disableAllFiltering?: boolean
   ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null>;
 
   /**
@@ -1593,6 +1597,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     skipWaitForFresh: boolean = false,
     minTimestamp: number = 0,
+    disableAllFiltering: boolean = false,
     signal?: AbortSignal
   ): Promise<ViewHierarchyResult | null> {
     const startTime = Date.now();
@@ -1628,7 +1633,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
         logger.info(`[ACCESSIBILITY_SERVICE] WebSocket returned ${hierarchyData ? "stale" : "no"} data (fresh=${isFresh}), syncing for fresh data`);
 
         const syncResult = await perf.track("syncRequest", () =>
-          this.requestHierarchySync(perf, signal)
+          this.requestHierarchySync(perf, disableAllFiltering, signal)
         );
 
         if (syncResult) {
@@ -1681,7 +1686,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
    * Send a message via WebSocket to request hierarchy extraction
    * @returns true if message was sent successfully
    */
-  private sendHierarchyRequest(): boolean {
+  private sendHierarchyRequest(disableAllFiltering: boolean = false): boolean {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       logger.warn("[ACCESSIBILITY_SERVICE] Cannot send request - WebSocket not connected");
       return false;
@@ -1689,9 +1694,13 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
     try {
       const requestId = `req_${Date.now()}_${generateSecureId()}`;
-      const message = JSON.stringify({ type: "request_hierarchy", requestId });
+      const message = JSON.stringify({
+        type: "request_hierarchy",
+        requestId,
+        disableAllFiltering
+      });
       this.ws.send(message);
-      logger.debug(`[ACCESSIBILITY_SERVICE] Sent hierarchy request via WebSocket (requestId: ${requestId})`);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent hierarchy request via WebSocket (requestId: ${requestId}, disableAllFiltering: ${disableAllFiltering})`);
       return true;
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to send WebSocket request: ${error}`);
@@ -1779,6 +1788,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
    */
   async requestHierarchySync(
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    disableAllFiltering: boolean = false,
     signal?: AbortSignal
   ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null> {
     const startTime = Date.now();
@@ -1788,7 +1798,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
       // Try WebSocket request first (faster path)
       const sentViaWebSocket = await perf.track("sendWsRequest", async () => {
-        return this.sendHierarchyRequest();
+        return this.sendHierarchyRequest(disableAllFiltering);
       });
 
       // Fall back to ADB broadcast if WebSocket failed
@@ -1797,7 +1807,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
         const uuid = `sync_${Date.now()}_${generateSecureId()}`;
         await perf.track("sendBroadcast", async () => {
           await this.adb.executeCommand(
-            `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid}"`,
+            `shell "am broadcast -a dev.jasonpearson.automobile.EXTRACT_HIERARCHY --es uuid ${uuid} --ez disableAllFiltering ${disableAllFiltering}"`,
             undefined,
             undefined,
             undefined,

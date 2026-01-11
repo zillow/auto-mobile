@@ -51,12 +51,14 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
    * @param textFilter Optional text filter
    * @param screenDimensions Optional screen dimensions for offscreen filtering
    * @param dedupeTextContentDesc When true, omit content-desc when it equals text (default: true)
+   * @param disableAllFiltering When true, disable all optimizations and filtering (for rawViewHierarchy)
    */
   fun extractFromActiveWindow(
       rootNode: AccessibilityNodeInfo?,
       textFilter: String? = null,
       screenDimensions: ScreenDimensions? = null,
       dedupeTextContentDesc: Boolean = true,
+      disableAllFiltering: Boolean = false,
   ): ViewHierarchy? {
     if (rootNode == null) {
       Log.w(TAG, "Root node is null")
@@ -77,24 +79,40 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               dedupeTextContentDesc,
               accessibilityFocusedNode,
           )
-      val optimizedElement = rootElement?.let { wrapOptimizedElements(optimizeHierarchy(it)) }
-      val filteredElement =
-          optimizedElement?.let {
-            if (OCCLUSION_FILTER_ENABLED) {
-              applyOcclusionFilteringSingleWindow(it)
-            } else {
-              it
-            }
+
+      // Skip optimization and filtering if disableAllFiltering is true
+      val processedElement = if (disableAllFiltering) {
+        rootElement
+      } else {
+        val optimizedList = rootElement?.let { optimizeHierarchy(it) }
+        Log.d(TAG, "[PROCESS] After optimizeHierarchy: ${optimizedList?.size} elements")
+
+        val wrappedElement = optimizedList?.let { wrapOptimizedElements(it) }
+        val wrappedTextCount = wrappedElement?.let { countTextNodes(it) } ?: 0
+        Log.d(TAG, "[PROCESS] After wrapOptimizedElements: hasElement=${wrappedElement != null}, textNodes=$wrappedTextCount")
+
+        val finalElement = wrappedElement?.let {
+          if (OCCLUSION_FILTER_ENABLED) {
+            val filtered = applyOcclusionFilteringSingleWindow(it)
+            val filteredTextCount = filtered?.let { countTextNodes(it) } ?: 0
+            Log.d(TAG, "[PROCESS] After applyOcclusionFiltering: hasElement=${filtered != null}, textNodes=$filteredTextCount")
+            filtered
+          } else {
+            it
           }
+        }
+        finalElement
+      }
+
       val intentChooserDetected =
-          filteredElement?.let { detectIntentChooserIndicators(it) } ?: false
+          processedElement?.let { detectIntentChooserIndicators(it) } ?: false
       val notificationPermissionDetected =
-          filteredElement?.let {
+          processedElement?.let {
             detectNotificationPermissionDialog(it, rootNode.packageName?.toString())
           }
 
       val unifiedHierarchy =
-          filteredElement?.let {
+          processedElement?.let {
             val nodeElement = encodeChildrenToNodeElement(listOf(it))
             nodeElement?.let { root -> UIElementInfo(node = root) }
           }
@@ -125,6 +143,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
    * @param textFilter Optional text filter
    * @param screenDimensions Optional screen dimensions for offscreen filtering
    * @param dedupeTextContentDesc When true, omit content-desc when it equals text (default: true)
+   * @param disableAllFiltering When true, disable all optimizations and filtering (for rawViewHierarchy)
    */
   fun extractFromAllWindows(
       windows: List<AccessibilityWindowInfo>,
@@ -132,6 +151,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       textFilter: String? = null,
       screenDimensions: ScreenDimensions? = null,
       dedupeTextContentDesc: Boolean = true,
+      disableAllFiltering: Boolean = false,
   ): ViewHierarchy {
     if (windows.isEmpty() && activeWindowRoot == null) {
       Log.w(TAG, "No windows available for extraction")
@@ -192,22 +212,37 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
                 dedupeTextContentDesc,
                 accessibilityFocusedNode,
             )
-        val optimizedElement = element?.let { wrapOptimizedElements(optimizeHierarchy(it)) }
+        // Skip optimization if disableAllFiltering is true
+        val processedElement = if (disableAllFiltering) {
+          element
+        } else {
+          element?.let {
+            val optimizedList = optimizeHierarchy(it)
+            val wrapped = wrapOptimizedElements(optimizedList)
+            // Debug: Check if Tab elements have text children
+            if (wrapped != null && window.isActive) {
+              val wrappedJson = json.encodeToString(UIElementInfo.serializer(), wrapped)
+              val hasTabText = wrappedJson.contains("\"text\":\"Tap\"")
+              Log.d(TAG, "[WRAP-ACTIVE] Has Tap text after wrap: $hasTabText")
+            }
+            wrapped
+          }
+        }
         val packageName = rootNode.packageName?.toString()
-        if (!intentChooserDetected && optimizedElement != null) {
-          intentChooserDetected = detectIntentChooserIndicators(optimizedElement)
+        if (!intentChooserDetected && processedElement != null) {
+          intentChooserDetected = detectIntentChooserIndicators(processedElement)
         }
 
         if (window.isActive) {
-          mainHierarchy = optimizedElement
+          mainHierarchy = processedElement
           mainPackageName = packageName
-          if (notificationPermissionDetected == null && optimizedElement != null) {
+          if (notificationPermissionDetected == null && processedElement != null) {
             notificationPermissionDetected =
-                detectNotificationPermissionDialog(optimizedElement, packageName)
+                detectNotificationPermissionDialog(processedElement, packageName)
           }
         }
 
-        if (optimizedElement != null) {
+        if (processedElement != null) {
           windowEntries.add(
               WindowEntry(
                   windowId = window.id,
@@ -216,7 +251,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
                   packageName = packageName,
                   isActive = window.isActive,
                   isFocused = window.isFocused,
-                  hierarchy = optimizedElement,
+                  hierarchy = processedElement,
               )
           )
         }
@@ -236,7 +271,12 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               dedupeTextContentDesc,
               accessibilityFocusedNode,
           )
-      mainHierarchy = element?.let { wrapOptimizedElements(optimizeHierarchy(it)) }
+      // Skip optimization if disableAllFiltering is true
+      mainHierarchy = if (disableAllFiltering) {
+        element
+      } else {
+        element?.let { wrapOptimizedElements(optimizeHierarchy(it)) }
+      }
       mainPackageName = activeWindowRoot.packageName?.toString()
       if (!intentChooserDetected && mainHierarchy != null) {
         intentChooserDetected = detectIntentChooserIndicators(mainHierarchy!!)
@@ -261,7 +301,8 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       }
     }
 
-    if (OCCLUSION_FILTER_ENABLED && windowEntries.isNotEmpty()) {
+    // Skip occlusion filtering if disableAllFiltering is true
+    if (!disableAllFiltering && OCCLUSION_FILTER_ENABLED && windowEntries.isNotEmpty()) {
       val occlusionInfo = buildOcclusionInfo(windowEntries)
       val filteredEntries =
           windowEntries.mapNotNull { windowEntry ->
@@ -278,6 +319,13 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       windowEntries.clear()
       windowEntries.addAll(filteredEntries)
       mainHierarchy = windowEntries.firstOrNull { it.isActive }?.hierarchy ?: mainHierarchy
+
+      // Debug: Check if Tab text survives occlusion filtering
+      mainHierarchy?.let {
+        val filteredJson = json.encodeToString(UIElementInfo.serializer(), it)
+        val hasTabText = filteredJson.contains("\"text\":\"Tap\"")
+        Log.d(TAG, "[OCCLUSION-FILTERED] Has Tap text after filtering: $hasTabText")
+      }
     }
 
     if (windowEntries.isEmpty()) {
@@ -861,32 +909,103 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
    * Optimizes the hierarchy by:
    * 1. Promoting children of bounds-only wrapper nodes (structural nodes with only bounds)
    * 2. Filtering out bounds-only intermediate nodes
+   * 3. Preserving text-bearing children of interactive elements (e.g., Tab labels)
    *
    * This significantly reduces hierarchy size for complex UIs like YouTube.
    */
   private fun optimizeHierarchy(element: UIElementInfo): List<UIElementInfo> {
-    // First, recursively optimize children
-    val optimizedNode = element.node?.let { optimizeNode(it) }
-
     // Check if this element is a bounds-only wrapper (has no useful properties)
     val isBoundsOnlyWrapper = !meetsFilterCriteria(element)
 
-    if (isBoundsOnlyWrapper) {
+    // Special handling: Never promote children of interactive elements (clickable/focusable)
+    // This preserves Tab labels, NavigationBar labels, and other text children of interactive parents
+    val isInteractive = element.clickable == "true" || element.focusable == "true" ||
+                        element.selected == "true" || element.longClickable == "true"
+
+    // Debug logging
+    val elementDesc = buildString {
+      append("text=${element.text?.take(20)}, ")
+      append("resId=${element.resourceId?.substringAfterLast('.')?.take(15)}, ")
+      append("clickable=${element.clickable}, focusable=${element.focusable}, ")
+      append("bounds=${element.bounds}, ")
+      append("hasNode=${element.node != null}")
+    }
+    Log.d(TAG, "[OPT] Element: $elementDesc, boundsOnly=$isBoundsOnlyWrapper, interactive=$isInteractive")
+
+    // Now recursively optimize children
+    val optimizedNode = element.node?.let { optimizeNode(it) }
+
+    // Only promote children (flatten hierarchy) if this is a bounds-only wrapper AND not interactive
+    if (isBoundsOnlyWrapper && !isInteractive) {
       if (optimizedNode == null) {
+        Log.d(TAG, "[OPT] -> FILTER OUT (bounds-only, no children)")
         return emptyList()
       }
 
       val optimizedChildren = decodeOptimizedChildren(optimizedNode)
       if (optimizedChildren == null) {
+        Log.d(TAG, "[OPT] -> KEEP AS-IS (couldn't decode children)")
         return listOf(element.copy(node = optimizedNode))
       }
       if (optimizedChildren.isEmpty()) {
+        Log.d(TAG, "[OPT] -> FILTER OUT (bounds-only, empty children)")
         return emptyList()
       }
+      Log.d(TAG, "[OPT] -> PROMOTE ${optimizedChildren.size} children")
       return optimizedChildren
     }
 
+    Log.d(TAG, "[OPT] -> KEEP (meets criteria or interactive)")
     return listOf(element.copy(node = optimizedNode))
+  }
+
+  /** Check if a node or its children have text content */
+  private fun hasTextInNode(nodeElement: JsonElement?): Boolean {
+    if (nodeElement == null) return false
+
+    return when (nodeElement) {
+      is JsonObject -> {
+        try {
+          val element = json.decodeFromJsonElement(UIElementInfo.serializer(), nodeElement)
+          !element.text.isNullOrBlank() || hasTextInNode(element.node)
+        } catch (e: Exception) {
+          false
+        }
+      }
+      is JsonArray -> {
+        nodeElement.jsonArray.any { hasTextInNode(it) }
+      }
+      else -> false
+    }
+  }
+
+  /** Count text nodes recursively in hierarchy */
+  private fun countTextNodes(element: UIElementInfo): Int {
+    val hasText = if (!element.text.isNullOrBlank()) 1 else 0
+    val childrenCount = element.node?.let { node ->
+      when (node) {
+        is JsonObject -> {
+          try {
+            val child = json.decodeFromJsonElement(UIElementInfo.serializer(), node)
+            countTextNodes(child)
+          } catch (e: Exception) {
+            0
+          }
+        }
+        is JsonArray -> {
+          node.jsonArray.sumOf { childJson ->
+            try {
+              val child = json.decodeFromJsonElement(UIElementInfo.serializer(), childJson)
+              countTextNodes(child)
+            } catch (e: Exception) {
+              0
+            }
+          }
+        }
+        else -> 0
+      }
+    } ?: 0
+    return hasText + childrenCount
   }
 
   /** Recursively optimize node children (handles both single element and array). */
@@ -904,6 +1023,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     return when {
       nodeElement is JsonObject -> {
         val optimizedChildren = optimizeChild(nodeElement)
+        Log.d(TAG, "[OPT-NODE] JsonObject: 1 child -> ${optimizedChildren.size} optimized")
         when {
           optimizedChildren.isEmpty() -> null
           optimizedChildren.size == 1 -> optimizedChildren[0]
@@ -911,8 +1031,10 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         }
       }
       nodeElement is JsonArray -> {
+        val inputCount = nodeElement.jsonArray.size
         val optimizedChildren =
             nodeElement.jsonArray.flatMap { childJson -> optimizeChild(childJson) }
+        Log.d(TAG, "[OPT-NODE] JsonArray: $inputCount children -> ${optimizedChildren.size} optimized")
         when {
           optimizedChildren.isEmpty() -> null
           optimizedChildren.size == 1 -> optimizedChildren[0]
@@ -948,6 +1070,65 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
   )
 
   private data class OcclusionInfo(val coverage: Double, val occludedBy: String?)
+
+  /**
+   * Represents the relationship between two nodes in a tree hierarchy.
+   */
+  enum class NodeRelationship {
+    /** Nodes share the same direct parent */
+    SIBLING,
+    /** Occluder is a sibling of one of the node's ancestors */
+    UNCLE,
+    /** Occluder is a descendant (child/grandchild) of the node */
+    DESCENDANT,
+    /** No special relationship */
+    UNRELATED
+  }
+
+  /**
+   * Determines the relationship between a node and a potential occluder based on their paths
+   * and traversal order.
+   *
+   * @param nodePath The path of the node being checked (e.g., "0.0.0.1.0")
+   * @param occluderPath The path of the potential occluder (e.g., "0.0.0.1.1")
+   * @param nodeOrder The traversal order of the node
+   * @param nodeSubtreeEnd The end of the node's subtree in traversal order
+   * @param occluderOrder The traversal order of the occluder
+   * @return The relationship between the two nodes
+   */
+  internal fun determineNodeRelationship(
+      nodePath: String,
+      occluderPath: String,
+      nodeOrder: Int,
+      nodeSubtreeEnd: Int,
+      occluderOrder: Int,
+  ): NodeRelationship {
+    // Check if occluder is a descendant (child/grandchild) using traversal order
+    val isDescendant = occluderOrder > nodeOrder && occluderOrder <= nodeSubtreeEnd
+    if (isDescendant) {
+      return NodeRelationship.DESCENDANT
+    }
+
+    // Extract parent paths
+    val nodeParentPath = nodePath.substringBeforeLast('.', "")
+    val occluderParentPath = occluderPath.substringBeforeLast('.', "")
+
+    // Check if they're direct siblings (same parent)
+    if (nodeParentPath.isNotEmpty() && nodeParentPath == occluderParentPath) {
+      return NodeRelationship.SIBLING
+    }
+
+    // Check if occluder is a sibling of any ancestor (uncle/cousin)
+    // If occluder's parent is a prefix of node's path, they share a common ancestor
+    val isUncle = occluderParentPath.isNotEmpty() &&
+                  nodePath.startsWith(occluderParentPath + ".") &&
+                  occluderParentPath != nodeParentPath
+    if (isUncle) {
+      return NodeRelationship.UNCLE
+    }
+
+    return NodeRelationship.UNRELATED
+  }
 
   private fun applyOcclusionFilteringSingleWindow(element: UIElementInfo): UIElementInfo? {
     val windowEntry =
@@ -1005,11 +1186,33 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       var maxOverlap = 0
       var occludedBy: String? = null
 
+      // Debug: Track occlusion for text nodes
+      val isDebugNode = node.element.text == "Tap" || node.element.text == "Discover"
+      if (isDebugNode) {
+        Log.d(TAG, "[OCCLUSION] Node text='${node.element.text}', bounds=${node.bounds}, path='${node.key.path}', order=${node.order}, subtreeEnd=${node.subtreeEnd}")
+      }
+
       for (j in i + 1 until sortedNodes.size) {
         val occluder = sortedNodes[j]
         if (occluder.windowKey == node.windowKey) {
-          val isDescendant = occluder.order > node.order && occluder.order <= node.subtreeEnd
-          if (isDescendant) {
+          // Determine relationship between node and occluder
+          val relationship = determineNodeRelationship(
+              nodePath = node.key.path,
+              occluderPath = occluder.key.path,
+              nodeOrder = node.order,
+              nodeSubtreeEnd = node.subtreeEnd,
+              occluderOrder = occluder.order,
+          )
+
+          if (isDebugNode) {
+            Log.d(TAG, "[OCCLUSION]   Check relation: occluderPath='${occluder.key.path}', relationship=$relationship")
+          }
+
+          // Skip descendants, siblings, and uncles - they should not occlude each other
+          if (relationship != NodeRelationship.UNRELATED) {
+            if (isDebugNode) {
+              Log.d(TAG, "[OCCLUSION]   Skip $relationship: text='${occluder.element.text}', bounds=${occluder.bounds}, order=${occluder.order}")
+            }
             continue
           }
         }
@@ -1017,6 +1220,10 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         val intersection = intersectBounds(node.bounds, occluder.bounds) ?: continue
         val overlapArea = intersection.width * intersection.height
         if (overlapArea <= 0) continue
+
+        if (isDebugNode) {
+          Log.d(TAG, "[OCCLUSION]   Occluder: text='${occluder.element.text}', bounds=${occluder.bounds}, overlap=$overlapArea, order=${occluder.order}")
+        }
 
         intersections.add(intersection)
 
@@ -1030,6 +1237,9 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         val coveredArea =
             calculateUnionArea(intersections, maxArea = (totalArea * OCCLUSION_THRESHOLD).toInt())
         val coverage = coveredArea.toDouble() / totalArea.toDouble()
+        if (isDebugNode) {
+          Log.d(TAG, "[OCCLUSION]   Result: coverage=$coverage (${(coverage*100).toInt()}%), threshold=$OCCLUSION_THRESHOLD, coveredArea=$coveredArea, totalArea=$totalArea")
+        }
         if (coverage > 0.0) {
           occlusionInfo[node.key] = OcclusionInfo(coverage = coverage, occludedBy = occludedBy)
         }
@@ -1093,6 +1303,11 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
           else -> null
         }
 
+    // Debug logging for Tab text nodes
+    if (element.text == "Tap" || element.text == "Discover") {
+      Log.d(TAG, "[FILTER] text='${element.text}', path='$path', state=$occlusionState, coverage=${info?.coverage}, occludedBy='${info?.occludedBy}'")
+    }
+
     val children = decodeChildrenFromNode(element.node)
     val filteredChildren =
         children.mapIndexedNotNull { index, child ->
@@ -1103,6 +1318,9 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     val filteredNodeElement = encodeChildrenToNodeElement(filteredChildren)
 
     if (occlusionState == "hidden" && !isRoot) {
+      if (element.text == "Tap" || element.text == "Discover") {
+        Log.d(TAG, "[FILTER] -> REMOVED text='${element.text}'")
+      }
       return null
     }
 

@@ -73,7 +73,13 @@ export class RawViewHierarchy {
         logger.info("[RawViewHierarchy] Extracting via accessibility service");
         try {
           const perf = new NoOpPerformanceTracker();
-          const hierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(undefined, perf);
+          const hierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(
+            undefined,
+            perf,
+            false,
+            0,
+            true // disableAllFiltering - get unfiltered/unoptimized hierarchy
+          );
 
           if (hierarchy) {
             // Get the raw hierarchy data before conversion

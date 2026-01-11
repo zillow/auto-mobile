@@ -337,6 +337,184 @@ class ViewHierarchyExtractorTest {
     assertTrue("JSON should contain extras field", jsonString.contains("\"extras\""))
   }
 
+  // MARK: - Node Relationship Tests
+
+  @Test
+  fun `determineNodeRelationship detects direct siblings`() {
+    // Two nodes with same parent "0.0.0" - they are siblings
+    val nodePath = "0.0.0.0"
+    val occluderPath = "0.0.0.1"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 5,
+        nodeSubtreeEnd = 5,
+        occluderOrder = 6,
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.SIBLING, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship detects uncles - sibling of parent`() {
+    // Node at "0.0.0.1.0" (child of "0.0.0.1")
+    // Occluder at "0.0.0.2" (sibling of "0.0.0.1", which is the node's parent)
+    // This is the NavigationBar case - occluder is uncle of node
+    val nodePath = "0.0.0.1.0"
+    val occluderPath = "0.0.0.2"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 10,
+        nodeSubtreeEnd = 10,
+        occluderOrder = 11,
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.UNCLE, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship detects uncles - sibling of grandparent`() {
+    // Node deeply nested at "0.0.0.1.0.0"
+    // Occluder at "0.0.0.2" (sibling of grandparent)
+    val nodePath = "0.0.0.1.0.0"
+    val occluderPath = "0.0.0.2"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 15,
+        nodeSubtreeEnd = 15,
+        occluderOrder = 16,
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.UNCLE, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship detects descendants using traversal order`() {
+    // Occluder is a child of the node (traversal order within subtree)
+    val nodePath = "0.0.0.1"
+    val occluderPath = "0.0.0.1.0"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 10,
+        nodeSubtreeEnd = 15, // Subtree ends at 15
+        occluderOrder = 11, // Child is at 11, within [10, 15]
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.DESCENDANT, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship detects descendants with multiple children`() {
+    // Node has multiple descendants
+    val nodePath = "0.0.0.1"
+    val occluderPath = "0.0.0.1.2.0"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 10,
+        nodeSubtreeEnd = 20,
+        occluderOrder = 18, // Deep descendant within subtree
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.DESCENDANT, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship detects unrelated nodes - different branches`() {
+    // Nodes in completely different branches
+    val nodePath = "0.0.0.1.0"
+    val occluderPath = "0.0.1.0.0"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 10,
+        nodeSubtreeEnd = 12,
+        occluderOrder = 20,
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.UNRELATED, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship detects unrelated nodes - cousin relationship`() {
+    // Cousins: share grandparent but different parents
+    val nodePath = "0.0.0.1.0"
+    val occluderPath = "0.0.0.2.0"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 10,
+        nodeSubtreeEnd = 10,
+        occluderOrder = 15,
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.UNRELATED, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship handles root node edge case`() {
+    // Root node (empty parent path)
+    val nodePath = "0"
+    val occluderPath = "1"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = nodePath,
+        occluderPath = occluderPath,
+        nodeOrder = 0,
+        nodeSubtreeEnd = 100,
+        occluderOrder = 101,
+    )
+
+    // Root nodes are not siblings (empty parent path check)
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.UNRELATED, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship TabRow structure - text and role description as siblings`() {
+    // Real TabRow case: Text "Tap" and role description are siblings
+    val textPath = "0.0.0.0.0.0.1.0.0.0.0"
+    val roleDescPath = "0.0.0.0.0.0.1.0.0.0.1"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = textPath,
+        occluderPath = roleDescPath,
+        nodeOrder = 10,
+        nodeSubtreeEnd = 10,
+        occluderOrder = 11,
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.SIBLING, relationship)
+  }
+
+  @Test
+  fun `determineNodeRelationship NavigationBar structure - text nested with uncle`() {
+    // Real NavigationBar case: Text is nested, occluder is uncle
+    // Text: "0.0.0.0.0.0.1.0.0.1.0" (in wrapper "0.0.0.0.0.0.1.0.0.1")
+    // Occluder: "0.0.0.0.0.0.1.0.0.2" (sibling of wrapper's parent)
+    val textPath = "0.0.0.0.0.0.1.0.0.1.0"
+    val occluderPath = "0.0.0.0.0.0.1.0.0.2"
+
+    val relationship = extractor.determineNodeRelationship(
+        nodePath = textPath,
+        occluderPath = occluderPath,
+        nodeOrder = 10,
+        nodeSubtreeEnd = 10,
+        occluderOrder = 11,
+    )
+
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.UNCLE, relationship)
+  }
+
   // Helper method to extract children from hierarchy (this would be made public in the actual
   // extractor for testing)
   private fun ViewHierarchyExtractor.extractChildrenFromHierarchy(
