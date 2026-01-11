@@ -4,6 +4,7 @@
   <!-- Permissions required for accessibility service -->
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.MANAGE_CA_CERTIFICATES" />
 
   <application
         android:allowBackup="true"
@@ -35,6 +36,18 @@
           android:name="android.accessibilityservice"
           android:resource="@xml/accessibility_service_config" />
       </service>
+
+      <receiver
+        android:name=".AutoMobileDeviceAdminReceiver"
+        android:exported="true"
+        android:permission="android.permission.BIND_DEVICE_ADMIN">
+        <meta-data
+          android:name="android.app.device_admin"
+          android:resource="@xml/device_admin_policies" />
+        <intent-filter>
+          <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+        </intent-filter>
+      </receiver>
 
   </application>
 

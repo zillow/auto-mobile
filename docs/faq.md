@@ -4,8 +4,10 @@
 
 ### Do I need root access on my device?
 
-No, AutoMobile is designed to work entirely within standard `adb` permissions. All functionality operates without requiring
-device root access, making it suitable for both physical devices and emulators. If you can access it over `adb`, it works.
+No, core AutoMobile automation works within standard `adb` permissions and does not require device root access, making it
+suitable for both physical devices and emulators. Some advanced operations (like CA certificate management or certain
+secure settings on physical devices) require provisioning the AutoMobile accessibility service as a device owner. If you
+can access it over `adb`, core features work.
 
 AutoMobile detects existing Android SDK/ADB installs via environment variables and common locations, but it does not
 install the SDK or command line tools for you.

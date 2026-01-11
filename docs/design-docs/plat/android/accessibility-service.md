@@ -64,6 +64,33 @@ The capability detection caches results during the session to avoid redundant de
 
 Most physical devices block `settings put secure` unless the device is rooted, configured as device owner, or grants special shell permissions. When those privileges are missing, settings-based toggling fails with permission errors and manual enablement is required.
 
+## Device Owner Mode (Optional)
+
+AutoMobile bundles a `DeviceAdminReceiver` in the accessibility service APK to support provisioning as a device owner. When the app is configured as device owner, it can use `DevicePolicyManager` APIs that are otherwise blocked on physical devices, including CA certificate management.
+
+### Setup (Factory Reset Required)
+
+1. Factory reset the device and keep a single user profile.
+2. Ensure the AutoMobile accessibility service APK is installed.
+3. Provision device owner via ADB:
+
+```bash
+adb shell dpm set-device-owner dev.jasonpearson.automobile.accessibilityservice/.AutoMobileDeviceAdminReceiver
+```
+
+If provisioning succeeds, `DevicePolicyManager.isDeviceOwnerApp` will return true for the AutoMobile package.
+
+### CA Certificate Management
+
+The accessibility service WebSocket interface supports CA certificate operations when device owner is active:
+
+- `install_ca_cert` with a PEM or base64-encoded DER payload. Returns an alias (SHA-256 fingerprint).
+- `install_ca_cert_from_path` with a device file path (e.g., `/sdcard/Download/automobile/ca_certs/...`).
+- `remove_ca_cert` with the alias (or certificate payload) to uninstall.
+- `get_device_owner_status` to report device owner and admin activation state.
+
+These operations are currently available via the accessibility service WebSocket client (not exposed as MCP tools).
+
 ### Error Handling
 
 The setup process provides categorized error messages for common failure scenarios:

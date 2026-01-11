@@ -43,6 +43,10 @@ data class WebSocketRequest(
     // Text input parameters
     val text: String? = null,
     val resourceId: String? = null, // Optional: target specific element by resource-id
+    // Certificate parameters
+    val certificate: String? = null,
+    val alias: String? = null,
+    val devicePath: String? = null,
     // Action parameters (IME or node actions)
     val action: String? =
         null, // IME action: done, next, search, send, go, previous; node action: long_click
@@ -104,6 +108,14 @@ class WebSocketServer(
     private val onRequestClipboard:
         ((requestId: String?, action: String, text: String?) -> Unit)? =
         null,
+    private val onRequestInstallCaCert: ((requestId: String?, certificate: String) -> Unit)? = null,
+    private val onRequestRemoveCaCert:
+        ((requestId: String?, alias: String?, certificate: String?) -> Unit)? =
+        null,
+    private val onRequestInstallCaCertFromPath:
+        ((requestId: String?, devicePath: String) -> Unit)? =
+        null,
+    private val onGetDeviceOwnerStatus: ((requestId: String?) -> Unit)? = null,
     private val onSetRecompositionTracking: ((enabled: Boolean) -> Unit)? = null,
     private val onGetCurrentFocus: ((requestId: String?) -> Unit)? = null,
     private val onGetTraversalOrder: ((requestId: String?) -> Unit)? = null,
@@ -432,6 +444,38 @@ class WebSocketServer(
           } else {
             Log.w(TAG, "Clipboard request missing required action")
           }
+        }
+        "install_ca_cert" -> {
+          Log.d(TAG, "Received install_ca_cert request (requestId: ${request.requestId})")
+          val certificate = request.certificate
+          if (!certificate.isNullOrBlank()) {
+            onRequestInstallCaCert?.invoke(request.requestId, certificate)
+          } else {
+            Log.w(TAG, "install_ca_cert request missing certificate")
+          }
+        }
+        "install_ca_cert_from_path" -> {
+          Log.d(TAG, "Received install_ca_cert_from_path request (requestId: ${request.requestId})")
+          val devicePath = request.devicePath
+          if (!devicePath.isNullOrBlank()) {
+            onRequestInstallCaCertFromPath?.invoke(request.requestId, devicePath)
+          } else {
+            Log.w(TAG, "install_ca_cert_from_path request missing devicePath")
+          }
+        }
+        "remove_ca_cert" -> {
+          Log.d(TAG, "Received remove_ca_cert request (requestId: ${request.requestId})")
+          val alias = request.alias
+          val certificate = request.certificate
+          if (!alias.isNullOrBlank() || !certificate.isNullOrBlank()) {
+            onRequestRemoveCaCert?.invoke(request.requestId, alias, certificate)
+          } else {
+            Log.w(TAG, "remove_ca_cert request missing alias and certificate")
+          }
+        }
+        "get_device_owner_status" -> {
+          Log.d(TAG, "Received get_device_owner_status request (requestId: ${request.requestId})")
+          onGetDeviceOwnerStatus?.invoke(request.requestId)
         }
         "set_recomposition_tracking" -> {
           val enabled = request.enabled

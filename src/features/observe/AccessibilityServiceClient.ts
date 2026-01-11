@@ -1,4 +1,7 @@
 import WebSocket from "ws";
+import fs from "fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { randomBytes } from "crypto";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
@@ -20,6 +23,11 @@ import { ElementParser } from "../utility/ElementParser";
 function generateSecureId(): string {
   return randomBytes(4).toString("hex");
 }
+
+const quoteForAdbArg = (value: string): string => {
+  const escaped = value.replace(/\\/g, "\\\\").replace(/\"/g, "\\\"");
+  return `"${escaped}"`;
+};
 
 /**
  * Interface for accessibility service node format
@@ -178,6 +186,31 @@ export interface A11yClipboardResult {
   success: boolean;
   action: "copy" | "paste" | "clear" | "get";
   text?: string; // For 'get' action, the clipboard content
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for CA certificate result from accessibility service
+ */
+export interface A11yCaCertResult {
+  success: boolean;
+  action: "install" | "remove";
+  alias?: string;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for device owner status result from accessibility service
+ */
+export interface A11yDeviceOwnerStatusResult {
+  success: boolean;
+  isDeviceOwner: boolean;
+  isAdminActive: boolean;
+  packageName?: string;
   totalTimeMs: number;
   error?: string;
   perfTiming?: AndroidPerfTiming[];
@@ -434,6 +467,43 @@ export interface AccessibilityService {
   ): Promise<A11yClipboardResult>;
 
   /**
+   * Request CA certificate installation via the accessibility service (device owner only).
+   * The certificate payload can be PEM or base64-encoded DER.
+   */
+  requestInstallCaCertificate(
+    certificate: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yCaCertResult>;
+
+  /**
+   * Request CA certificate installation from a host file path.
+   */
+  requestInstallCaCertificateFromFile(
+    certificatePath: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yCaCertResult>;
+
+  /**
+   * Request CA certificate removal via the accessibility service (device owner only).
+   * Uses the alias returned from installation.
+   */
+  requestRemoveCaCertificate(
+    alias: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yCaCertResult>;
+
+  /**
+   * Request device owner status from the accessibility service.
+   */
+  requestDeviceOwnerStatus(
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yDeviceOwnerStatusResult>;
+
+  /**
    * Request a screenshot from the accessibility service
    *
    * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
@@ -486,6 +556,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
   private static readonly WEBSOCKET_PORT = 8765;
   private static readonly WEBSOCKET_URL = `ws://localhost:${AccessibilityServiceClient.WEBSOCKET_PORT}/ws`;
+  private static readonly DEVICE_CERT_DIR = "/sdcard/Download/automobile/ca_certs";
 
   // Singleton instances per device
   private static instances: Map<string, AccessibilityServiceClient> = new Map();
@@ -536,6 +607,14 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Clipboard handling
   private pendingClipboardResolve: ((result: A11yClipboardResult) => void) | null = null;
   private pendingClipboardRequestId: string | null = null;
+
+  // CA certificate handling
+  private pendingCaCertResolve: ((result: A11yCaCertResult) => void) | null = null;
+  private pendingCaCertRequestId: string | null = null;
+
+  // Device owner status handling
+  private pendingDeviceOwnerStatusResolve: ((result: A11yDeviceOwnerStatusResult) => void) | null = null;
+  private pendingDeviceOwnerStatusRequestId: string | null = null;
 
   private interactionListeners: Set<(event: InteractionEvent) => void> = new Set();
 
@@ -1057,6 +1136,45 @@ export class AccessibilityServiceClient implements AccessibilityService {
           text: clipboardMessage.text,
           totalTimeMs: clipboardMessage.totalTimeMs,
           error: clipboardMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle CA certificate result
+      if (message.type === "ca_cert_result" && this.pendingCaCertResolve) {
+        const caCertMessage = message as any;
+        const perfTiming = caCertMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] CA cert result (requestId: ${caCertMessage.requestId}, action: ${caCertMessage.action}, success: ${caCertMessage.success}, totalTimeMs: ${caCertMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingCaCertResolve;
+        this.pendingCaCertResolve = null;
+        this.pendingCaCertRequestId = null;
+        resolve({
+          success: caCertMessage.success,
+          action: caCertMessage.action,
+          alias: caCertMessage.alias,
+          totalTimeMs: caCertMessage.totalTimeMs,
+          error: caCertMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle device owner status result
+      if (message.type === "device_owner_status_result" && this.pendingDeviceOwnerStatusResolve) {
+        const statusMessage = message as any;
+        const perfTiming = statusMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Device owner status result (requestId: ${statusMessage.requestId}, success: ${statusMessage.success}, totalTimeMs: ${statusMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingDeviceOwnerStatusResolve;
+        this.pendingDeviceOwnerStatusResolve = null;
+        this.pendingDeviceOwnerStatusRequestId = null;
+        resolve({
+          success: statusMessage.success,
+          isDeviceOwner: statusMessage.isDeviceOwner ?? false,
+          isAdminActive: statusMessage.isAdminActive ?? false,
+          packageName: statusMessage.packageName,
+          totalTimeMs: statusMessage.totalTimeMs,
+          error: statusMessage.error,
           perfTiming
         });
       }
@@ -2795,6 +2913,413 @@ export class AccessibilityServiceClient implements AccessibilityService {
         error: `${error}`
       };
     }
+  }
+
+  /**
+   * Request installation of a CA certificate via the accessibility service.
+   * The certificate payload can be PEM or base64-encoded DER.
+   */
+  async requestInstallCaCertificate(
+    certificate: string,
+    timeoutMs: number = 10000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yCaCertResult> {
+    const startTime = Date.now();
+    const trimmed = certificate.trim();
+
+    if (!trimmed) {
+      return {
+        success: false,
+        action: "install",
+        totalTimeMs: Date.now() - startTime,
+        error: "Certificate payload is required"
+      };
+    }
+
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for CA cert install");
+        return {
+          success: false,
+          action: "install",
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      const requestId = `ca_cert_install_${Date.now()}_${generateSecureId()}`;
+      this.pendingCaCertRequestId = requestId;
+
+      const caCertPromise = new Promise<A11yCaCertResult>(resolve => {
+        this.pendingCaCertResolve = resolve;
+
+        this.timer.setTimeout(() => {
+          if (this.pendingCaCertResolve === resolve) {
+            this.pendingCaCertResolve = null;
+            this.pendingCaCertRequestId = null;
+            resolve({
+              success: false,
+              action: "install",
+              totalTimeMs: Date.now() - startTime,
+              error: `CA cert install timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "install_ca_cert",
+          requestId,
+          certificate: trimmed
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent CA cert install request (requestId: ${requestId})`);
+      });
+
+      const result = await perf.track("waitForCaCertInstall", () => caCertPromise);
+      const clientDuration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] CA cert install completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, alias=${result.alias ?? "unknown"}`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] CA cert install failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] CA cert install request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        action: "install",
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request installation of a CA certificate from a host file path.
+   * Pushes the file to the device before requesting installation.
+   */
+  async requestInstallCaCertificateFromFile(
+    certificatePath: string,
+    timeoutMs: number = 10000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yCaCertResult> {
+    const startTime = Date.now();
+    const resolvedPath = this.resolveCertificatePath(certificatePath);
+
+    if (!resolvedPath) {
+      return {
+        success: false,
+        action: "install",
+        totalTimeMs: Date.now() - startTime,
+        error: "certificatePath must be a valid host file path"
+      };
+    }
+
+    try {
+      const stats = await fs.stat(resolvedPath);
+      if (!stats.isFile()) {
+        return {
+          success: false,
+          action: "install",
+          totalTimeMs: Date.now() - startTime,
+          error: `Certificate path is not a file: ${resolvedPath}`
+        };
+      }
+
+      if (stats.size === 0) {
+        return {
+          success: false,
+          action: "install",
+          totalTimeMs: Date.now() - startTime,
+          error: `Certificate file is empty: ${resolvedPath}`
+        };
+      }
+
+      const devicePath = await perf.track("pushCertificate", async () => {
+        return this.pushCertificateToDevice(resolvedPath);
+      });
+
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for CA cert install");
+        return {
+          success: false,
+          action: "install",
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      const requestId = `ca_cert_install_${Date.now()}_${generateSecureId()}`;
+      this.pendingCaCertRequestId = requestId;
+
+      const caCertPromise = new Promise<A11yCaCertResult>(resolve => {
+        this.pendingCaCertResolve = resolve;
+
+        this.timer.setTimeout(() => {
+          if (this.pendingCaCertResolve === resolve) {
+            this.pendingCaCertResolve = null;
+            this.pendingCaCertRequestId = null;
+            resolve({
+              success: false,
+              action: "install",
+              totalTimeMs: Date.now() - startTime,
+              error: `CA cert install timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "install_ca_cert_from_path",
+          requestId,
+          devicePath
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent CA cert install request (requestId: ${requestId}, devicePath: ${devicePath})`);
+      });
+
+      const result = await perf.track("waitForCaCertInstall", () => caCertPromise);
+      const clientDuration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] CA cert install completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, alias=${result.alias ?? "unknown"}`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] CA cert install failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        action: "install",
+        totalTimeMs: Date.now() - startTime,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
+   * Request removal of a CA certificate via the accessibility service.
+   * Uses the alias returned from installation.
+   */
+  async requestRemoveCaCertificate(
+    alias: string,
+    timeoutMs: number = 10000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yCaCertResult> {
+    const startTime = Date.now();
+    const trimmedAlias = alias.trim();
+
+    if (!trimmedAlias) {
+      return {
+        success: false,
+        action: "remove",
+        totalTimeMs: Date.now() - startTime,
+        error: "Certificate alias is required"
+      };
+    }
+
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for CA cert removal");
+        return {
+          success: false,
+          action: "remove",
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      const requestId = `ca_cert_remove_${Date.now()}_${generateSecureId()}`;
+      this.pendingCaCertRequestId = requestId;
+
+      const caCertPromise = new Promise<A11yCaCertResult>(resolve => {
+        this.pendingCaCertResolve = resolve;
+
+        this.timer.setTimeout(() => {
+          if (this.pendingCaCertResolve === resolve) {
+            this.pendingCaCertResolve = null;
+            this.pendingCaCertRequestId = null;
+            resolve({
+              success: false,
+              action: "remove",
+              totalTimeMs: Date.now() - startTime,
+              error: `CA cert removal timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "remove_ca_cert",
+          requestId,
+          alias: trimmedAlias
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent CA cert removal request (requestId: ${requestId}, alias: ${trimmedAlias})`);
+      });
+
+      const result = await perf.track("waitForCaCertRemoval", () => caCertPromise);
+      const clientDuration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] CA cert removal completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, alias=${result.alias ?? trimmedAlias}`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] CA cert removal failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] CA cert removal request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        action: "remove",
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request device owner status via the accessibility service.
+   */
+  async requestDeviceOwnerStatus(
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yDeviceOwnerStatusResult> {
+    const startTime = Date.now();
+
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for device owner status");
+        return {
+          success: false,
+          isDeviceOwner: false,
+          isAdminActive: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      const requestId = `device_owner_status_${Date.now()}_${generateSecureId()}`;
+      this.pendingDeviceOwnerStatusRequestId = requestId;
+
+      const statusPromise = new Promise<A11yDeviceOwnerStatusResult>(resolve => {
+        this.pendingDeviceOwnerStatusResolve = resolve;
+
+        this.timer.setTimeout(() => {
+          if (this.pendingDeviceOwnerStatusResolve === resolve) {
+            this.pendingDeviceOwnerStatusResolve = null;
+            this.pendingDeviceOwnerStatusRequestId = null;
+            resolve({
+              success: false,
+              isDeviceOwner: false,
+              isAdminActive: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Device owner status timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "get_device_owner_status",
+          requestId
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent device owner status request (requestId: ${requestId})`);
+      });
+
+      const result = await perf.track("waitForDeviceOwnerStatus", () => statusPromise);
+      const clientDuration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Device owner status received: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, owner=${result.isDeviceOwner}, admin=${result.isAdminActive}`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Device owner status failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Device owner status request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        isDeviceOwner: false,
+        isAdminActive: false,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  private resolveCertificatePath(certificatePath: string): string | null {
+    const trimmedPath = certificatePath.trim();
+    if (!trimmedPath) {
+      return null;
+    }
+
+    if (trimmedPath.startsWith("file://")) {
+      try {
+        return fileURLToPath(trimmedPath);
+      } catch (error) {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Failed to parse certificate file URL: ${error}`);
+        return null;
+      }
+    }
+
+    if (trimmedPath.startsWith("content://") || trimmedPath.startsWith("/sdcard")) {
+      return null;
+    }
+
+    return path.resolve(trimmedPath);
+  }
+
+  private async pushCertificateToDevice(sourcePath: string): Promise<string> {
+    const deviceDir = AccessibilityServiceClient.DEVICE_CERT_DIR;
+    await this.adb.executeCommand(`shell mkdir -p ${deviceDir}`, undefined, undefined, true);
+
+    const devicePath = this.buildDeviceCertificatePath(sourcePath);
+    await this.adb.executeCommand(
+      `push ${quoteForAdbArg(sourcePath)} ${quoteForAdbArg(devicePath)}`,
+      undefined,
+      undefined,
+      true
+    );
+
+    return devicePath;
+  }
+
+  private buildDeviceCertificatePath(sourcePath: string): string {
+    const ext = path.extname(sourcePath) || ".crt";
+    const base = path.basename(sourcePath, ext);
+    const fileName = `${base}_${Date.now()}_${generateSecureId()}${ext}`;
+    return `${AccessibilityServiceClient.DEVICE_CERT_DIR}/${fileName}`;
   }
 
   /**
