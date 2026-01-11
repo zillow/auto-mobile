@@ -249,52 +249,6 @@
     }
   },
   {
-    "name": "daemon_refresh_devices",
-    "description": "Refresh device pool by discovering connected devices",
-    "inputSchema": {
-      "type": "object",
-      "properties": {},
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "daemon_release_session",
-    "description": "Release a session and free its device",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "sessionId": {
-          "type": "string",
-          "description": "Session UUID to release"
-        }
-      },
-      "required": [
-        "sessionId"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "daemon_session_info",
-    "description": "Get information about an existing session",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "sessionId": {
-          "type": "string",
-          "description": "Session UUID"
-        }
-      },
-      "required": [
-        "sessionId"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "demoMode",
     "description": "Enable or disable demo mode for screenshots and screen recordings",
     "inputSchema": {

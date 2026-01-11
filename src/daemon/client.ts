@@ -238,6 +238,57 @@ export class DaemonClient {
   }
 
   /**
+   * Call a daemon method directly over the socket
+   */
+  async callDaemonMethod(
+    method: string,
+    params: Record<string, any> = {}
+  ): Promise<any> {
+    if (!this.connected) {
+      await this.connect();
+    }
+
+    const requestId = randomUUID();
+
+    const request: DaemonRequest = {
+      id: requestId,
+      type: "daemon_request",
+      method,
+      params,
+    };
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(requestId);
+        reject(
+          new DaemonUnavailableError(
+            `Daemon request timeout after ${this.connectionTimeout}ms`
+          )
+        );
+      }, this.connectionTimeout);
+
+      this.pendingRequests.set(requestId, {
+        resolve: response => {
+          resolve(response.result);
+        },
+        reject,
+        timeout,
+      });
+
+      if (!this.socket) {
+        clearTimeout(timeout);
+        this.pendingRequests.delete(requestId);
+        reject(
+          new DaemonUnavailableError("Socket connection lost")
+        );
+        return;
+      }
+
+      this.socket.write(JSON.stringify(request) + "\n");
+    });
+  }
+
+  /**
    * Close the connection
    */
   async close(): Promise<void> {

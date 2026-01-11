@@ -18,7 +18,6 @@ object ValidTools {
         "listDeviceImages",
         "debugSearch", "bugReport",
         "doctor",
-        "daemon_session_info", "daemon_release_session",
         "biometricAuth", "clipboard"
     )
 
