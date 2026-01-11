@@ -629,7 +629,7 @@ export async function runDaemonCommand(
           const client = manager.createClient();
           try {
             await client.connect();
-            const result = await client.callTool("daemon_session_info", { sessionId });
+            const result = await client.callDaemonMethod("daemon/sessionInfo", { sessionId });
             console.log(JSON.stringify(result));
             await client.close();
           } catch (error) {
@@ -667,7 +667,7 @@ export async function runDaemonCommand(
           const client = manager.createClient();
           try {
             await client.connect();
-            await client.callTool("daemon_release_session", { sessionId });
+            await client.callDaemonMethod("daemon/releaseSession", { sessionId });
             console.log(`Session ${sessionId} released`);
             await client.close();
           } catch (error) {

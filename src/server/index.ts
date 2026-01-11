@@ -26,7 +26,6 @@ import { registerDeepLinkTools } from "./deepLinkTools";
 import { registerDebugTools } from "./debugTools";
 import { registerNavigationTools } from "./navigationTools";
 import { registerNotificationTools } from "./notificationTools";
-import { registerDaemonTools } from "./daemonTools";
 import { registerPlanTools } from "./planTools";
 import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
@@ -105,7 +104,6 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerDeepLinkTools();
   registerNavigationTools();
   registerNotificationTools();
-  registerDaemonTools();
   if (daemonMode) {
     registerPlanTools();
     registerCriticalSectionTools();

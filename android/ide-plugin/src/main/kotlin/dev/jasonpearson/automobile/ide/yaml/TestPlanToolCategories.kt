@@ -77,11 +77,6 @@ object TestPlanToolCategories {
         "Doctor" to setOf(
             "doctor"
         ),
-        "Daemon" to setOf(
-            "daemon_refresh_devices",
-            "daemon_session_info",
-            "daemon_release_session"
-        ),
         "Biometrics" to setOf(
             "biometricAuth"
         )

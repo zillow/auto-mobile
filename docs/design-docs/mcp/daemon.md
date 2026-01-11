@@ -67,12 +67,23 @@ The daemon listens on a Unix socket at:
 /tmp/auto-mobile-daemon-<uid>.sock
 ```
 
-## MCP Tools
+## Socket Methods
 
-### `daemon_session_info`
+### `listDevices`
+List connected devices; when the daemon is active, responses include `poolStatus` with pool counts.
+
+Daemon management operations are available via the unix socket interface:
+
+### `daemon/availableDevices`
+Query available devices in the pool.
+
+### `daemon/refreshDevices`
+Refresh the device pool by discovering connected devices.
+
+### `daemon/sessionInfo`
 Get information about an active session.
 
-### `daemon_release_session`
+### `daemon/releaseSession`
 Release a session and return device to pool.
 
 ## Implementation

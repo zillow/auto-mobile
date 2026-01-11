@@ -249,46 +249,30 @@
     }
   },
   {
-    "name": "daemon_refresh_devices",
-    "description": "Refresh device pool by discovering connected devices",
-    "inputSchema": {
-      "type": "object",
-      "properties": {},
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "daemon_release_session",
-    "description": "Release a session and free its device",
+    "name": "deleteSnapshot",
+    "description": "Delete a snapshot permanently",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "sessionId": {
+        "snapshotName": {
           "type": "string",
-          "description": "Session UUID to release"
+          "description": "Name of the snapshot to delete"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
         }
       },
       "required": [
-        "sessionId"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "daemon_session_info",
-    "description": "Get information about an existing session",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "sessionId": {
-          "type": "string",
-          "description": "Session UUID"
-        }
-      },
-      "required": [
-        "sessionId"
+        "snapshotName"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

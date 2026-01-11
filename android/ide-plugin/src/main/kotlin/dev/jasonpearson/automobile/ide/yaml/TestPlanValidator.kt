@@ -77,9 +77,7 @@ object TestPlanValidator {
         // Debugging
         "debugSearch", "bugReport",
         // Doctor
-        "doctor",
-        // Daemon
-        "daemon_session_info", "daemon_release_session"
+        "doctor"
     )
 
     /**

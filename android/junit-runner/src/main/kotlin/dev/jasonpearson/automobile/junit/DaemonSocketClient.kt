@@ -397,7 +397,11 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
     }
   }
 
-  fun callDaemonMethod(method: String, timeoutMs: Long): DaemonResponse {
+  fun callDaemonMethod(
+      method: String,
+      timeoutMs: Long,
+      params: JsonObject = JsonObject(emptyMap()),
+  ): DaemonResponse {
     if (!isConnected()) {
       throw DaemonUnavailableException("Daemon socket connection is not available")
     }
@@ -408,7 +412,7 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
             id = requestId,
             type = "daemon_request",
             method = method,
-            params = JsonObject(emptyMap()),
+            params = params,
         )
 
     val responseFuture = CompletableFuture<DaemonResponse>()

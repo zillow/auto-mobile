@@ -5,10 +5,10 @@ export interface DaemonRequest {
   /** Unique request ID for tracking */
   id: string;
   /** Request type */
-  type: "mcp_request";
-  /** MCP method name (e.g., "tools/call") */
+  type: "mcp_request" | "daemon_request";
+  /** MCP or daemon method name (e.g., "tools/call", "daemon/availableDevices") */
   method: string;
-  /** MCP method parameters */
+  /** MCP or daemon method parameters */
   params: any;
 }
 

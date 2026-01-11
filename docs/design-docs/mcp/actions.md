@@ -67,5 +67,4 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 #### Daemon & Session Management
 
 - 📋 Device pool status is exposed via the `automobile:devices/booted` resource.
-- 📋 `daemon_session_info` gets information about an existing session.
-- 🔓 `daemon_release_session` releases a session and frees its device.
+- Daemon management operations are exposed via the unix socket API (not MCP tools).

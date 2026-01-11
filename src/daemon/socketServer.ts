@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { SOCKET_PATH } from "./constants";
 import { DaemonState } from "./daemonState";
+import { DaemonStateAccess, handleDaemonRequest } from "./daemonRequestHandlers";
 
 /**
  * Unix Socket Server that proxies requests to the HTTP MCP server
@@ -28,12 +29,18 @@ export class UnixSocketServer {
   private sessions: Map<string, SessionContext> = new Map();
   private socketPath: string;
   private mcpEndpoint: string;
+  private daemonState: DaemonStateAccess;
   private mcpClient: Client | null = null;
   private mcpClientPromise: Promise<Client> | null = null;
 
-  constructor(socketPath: string = SOCKET_PATH, mcpEndpoint: string) {
+  constructor(
+    socketPath: string = SOCKET_PATH,
+    mcpEndpoint: string,
+    daemonState: DaemonStateAccess = DaemonState.getInstance()
+  ) {
     this.socketPath = socketPath;
     this.mcpEndpoint = mcpEndpoint;
+    this.daemonState = daemonState;
     logger.info(`UnixSocketServer initialized with endpoint: "${mcpEndpoint}"`);
     if (!mcpEndpoint) {
       logger.error("ERROR: mcpEndpoint is empty or undefined!");
@@ -142,7 +149,15 @@ export class UnixSocketServer {
     // Enqueue request to maintain order
     return this.enqueueRequest(session, async () => {
       try {
-        // Get or create MCP client for this session
+        if (request.method.startsWith("daemon/")) {
+          const daemonResponse = await handleDaemonRequest(request, this.daemonState);
+          return {
+            id: request.id,
+            type: "mcp_response",
+            ...daemonResponse,
+          };
+        }
+
         const mcpClient = await this.getMcpClient();
 
         const result = await this.handleIdeRequest(mcpClient, request);
@@ -198,28 +213,6 @@ export class UnixSocketServer {
       }
       case "ide/ping": {
         return { ok: true, timestamp: Date.now() };
-      }
-      case "daemon/refreshDevices": {
-        // Direct device pool refresh without going through MCP
-        const state = DaemonState.getInstance();
-        if (!state.isInitialized()) {
-          return {
-            success: false,
-            error: "Daemon not initialized",
-            addedDevices: 0,
-            totalDevices: 0,
-          };
-        }
-        const pool = state.getDevicePool();
-        const addedCount = await pool.refreshDevices();
-        const stats = pool.getStats();
-        return {
-          success: true,
-          addedDevices: addedCount,
-          totalDevices: stats.total,
-          availableDevices: stats.idle,
-          stats: stats,
-        };
       }
       default:
         throw new Error(`Unsupported daemon method: ${request.method}`);
