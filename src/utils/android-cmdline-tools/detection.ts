@@ -16,10 +16,54 @@ export interface AndroidToolInfo {
   description: string;
 }
 
+export interface AndroidHomeWithSystemImages {
+  androidHome: string;
+  systemImagesPath: string;
+}
+
 // Create default system detection instance
 const createDefaultSystemDetection = (): SystemDetection => {
   return new DefaultSystemDetection();
 };
+
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
+export function getCmdlineToolsRoot(toolsPath: string): string {
+  const normalized = normalizePath(toolsPath);
+  if (normalized.endsWith("/cmdline-tools/latest")) {
+    return normalized.replace(/\/cmdline-tools\/latest$/, "");
+  }
+  if (normalized.endsWith("/cmdline-tools")) {
+    return normalized.replace(/\/cmdline-tools$/, "");
+  }
+  return normalized;
+}
+
+export function isHomebrewToolsPath(toolsPath: string): boolean {
+  const normalized = normalizePath(toolsPath).toLowerCase();
+  return normalized.includes("/homebrew/") || normalized.includes("/share/android-commandlinetools/");
+}
+
+export function getAndroidHomeWithSystemImages(
+  systemDetection = createDefaultSystemDetection()
+): AndroidHomeWithSystemImages | null {
+  const androidHome = getAndroidSdkFromEnvironment(systemDetection);
+  if (!androidHome) {
+    return null;
+  }
+
+  const systemImagesPath = join(androidHome, "system-images");
+  if (!systemDetection.fileExistsSync(systemImagesPath)) {
+    return null;
+  }
+
+  return {
+    androidHome,
+    systemImagesPath
+  };
+}
 
 /**
  * In-memory cache for detection results
@@ -118,9 +162,18 @@ export function getHomebrewAndroidToolsPath(systemDetection = createDefaultSyste
     return null;
   }
 
-  // Actual Homebrew structure is /opt/homebrew/share/android-commandlinetools/cmdline-tools/latest
-  const homebrewPath = "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest";
-  return systemDetection.fileExistsSync(homebrewPath) ? homebrewPath : null;
+  const homebrewPaths = [
+    "/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest",
+    "/usr/local/share/android-commandlinetools/cmdline-tools/latest"
+  ];
+
+  for (const homebrewPath of homebrewPaths) {
+    if (systemDetection.fileExistsSync(homebrewPath)) {
+      return homebrewPath;
+    }
+  }
+
+  return null;
 }
 
 /**

@@ -4,11 +4,116 @@
  */
 
 import { existsSync } from "node:fs";
-import { CheckResult } from "../types";
-import { getAndroidSdkFromEnvironment } from "../../utils/android-cmdline-tools/detection";
+import { CheckResult, DoctorOptions } from "../types";
+import {
+  detectAndroidCommandLineTools,
+  getAndroidHomeWithSystemImages,
+  getAndroidSdkFromEnvironment,
+  getBestAndroidToolsLocation,
+  getCmdlineToolsRoot,
+  isHomebrewToolsPath
+} from "../../utils/android-cmdline-tools/detection";
+import { installCmdlineTools } from "../../utils/android-cmdline-tools/cmdlineToolsInstaller";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
 import { logger } from "../../utils/logger";
+
+export interface AndroidDoctorDependencies {
+  detectAndroidCommandLineTools: typeof detectAndroidCommandLineTools;
+  getBestAndroidToolsLocation: typeof getBestAndroidToolsLocation;
+  getAndroidHomeWithSystemImages: typeof getAndroidHomeWithSystemImages;
+  getAndroidSdkFromEnvironment: typeof getAndroidSdkFromEnvironment;
+  installCmdlineTools: typeof installCmdlineTools;
+  logger: typeof logger;
+}
+
+const createAndroidDoctorDependencies = (): AndroidDoctorDependencies => ({
+  detectAndroidCommandLineTools,
+  getBestAndroidToolsLocation,
+  getAndroidHomeWithSystemImages,
+  getAndroidSdkFromEnvironment,
+  installCmdlineTools,
+  logger
+});
+
+function normalizePath(value: string): string {
+  return value.replace(/\\/g, "/");
+}
+
+/**
+ * Check Android command line tools installation and Homebrew mismatch
+ */
+export async function checkAndroidCommandLineTools(
+  options: DoctorOptions = {},
+  dependencies = createAndroidDoctorDependencies()
+): Promise<CheckResult> {
+  const name = "Android Command Line Tools";
+
+  if (options.installCmdlineTools) {
+    const androidHome = dependencies.getAndroidSdkFromEnvironment();
+    if (!androidHome) {
+      return {
+        name,
+        status: "warn",
+        message: "ANDROID_HOME is not set; cannot install command line tools.",
+        recommendation: "Set ANDROID_HOME and rerun: auto-mobile --cli doctor --install-cmdline-tools"
+      };
+    }
+
+    const installResult = await dependencies.installCmdlineTools({ androidHome });
+    return {
+      name,
+      status: installResult.success ? "pass" : "fail",
+      message: installResult.message,
+      value: installResult.installedPath ?? installResult.androidHome,
+      recommendation: installResult.success
+        ? undefined
+        : "Install Android command line tools into ANDROID_HOME."
+    };
+  }
+
+  let locations: Awaited<ReturnType<typeof detectAndroidCommandLineTools>>;
+  try {
+    locations = await dependencies.detectAndroidCommandLineTools();
+  } catch (error) {
+    dependencies.logger.debug(`Failed to detect Android command line tools: ${error}`);
+    return {
+      name,
+      status: "warn",
+      message: "Failed to detect Android command line tools."
+    };
+  }
+
+  const bestLocation = dependencies.getBestAndroidToolsLocation(locations);
+  if (!bestLocation) {
+    return {
+      name,
+      status: "warn",
+      message: "Android command line tools not detected.",
+      recommendation: "Install command line tools into ANDROID_HOME."
+    };
+  }
+
+  const androidHomeInfo = dependencies.getAndroidHomeWithSystemImages();
+  if (androidHomeInfo && isHomebrewToolsPath(bestLocation.path)) {
+    const toolsRoot = getCmdlineToolsRoot(bestLocation.path);
+    if (normalizePath(toolsRoot) !== normalizePath(androidHomeInfo.androidHome)) {
+      return {
+        name,
+        status: "warn",
+        message: "Homebrew cmdline-tools detected while system images are in ANDROID_HOME.",
+        recommendation: "Install command line tools into ANDROID_HOME or run: auto-mobile --cli doctor --install-cmdline-tools"
+      };
+    }
+  }
+
+  return {
+    name,
+    status: "pass",
+    message: "Android command line tools detected.",
+    value: bestLocation.path
+  };
+}
 
 /**
  * Check ANDROID_HOME environment variable
@@ -229,11 +334,12 @@ export async function checkAvailableAvds(): Promise<CheckResult> {
 /**
  * Run all Android checks
  */
-export async function runAndroidChecks(): Promise<CheckResult[]> {
+export async function runAndroidChecks(options: DoctorOptions = {}): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
 
   // Run checks sequentially to avoid overwhelming the system
   results.push(await checkAndroidHome());
+  results.push(await checkAndroidCommandLineTools(options));
   results.push(await checkJavaHome());
   results.push(await checkAdbInstallation());
   results.push(await checkAdbVersion());

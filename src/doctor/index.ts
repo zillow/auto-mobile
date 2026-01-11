@@ -74,7 +74,7 @@ export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorRepo
   // Run Android checks if applicable
   let androidChecks: CheckResult[] | undefined;
   if (runAndroid) {
-    androidChecks = await runAndroidChecks();
+    androidChecks = await runAndroidChecks(options);
     allChecks.push(...androidChecks);
   }
 

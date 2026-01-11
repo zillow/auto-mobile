@@ -462,6 +462,10 @@
         "ios": {
           "type": "boolean",
           "description": "Run iOS-specific checks only"
+        },
+        "installCmdlineTools": {
+          "type": "boolean",
+          "description": "Install Android command line tools into ANDROID_HOME"
         }
       },
       "additionalProperties": false,

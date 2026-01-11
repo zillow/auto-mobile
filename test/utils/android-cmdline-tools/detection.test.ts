@@ -11,7 +11,10 @@ import {
   detectAndroidSdkTools,
   detectAndroidCommandLineTools,
   ANDROID_TOOLS,
-  clearDetectionCache
+  clearDetectionCache,
+  getAndroidHomeWithSystemImages,
+  getCmdlineToolsRoot,
+  isHomebrewToolsPath
 } from "../../../src/utils/android-cmdline-tools/detection";
 import { FakeSystemDetection } from "../../fakes/FakeSystemDetection";
 
@@ -116,6 +119,15 @@ describe("Android Command Line Tools - Detection", () => {
 
       expect(path).toBeNull();
     });
+
+    test("should return Intel Homebrew path when it exists on macOS", () => {
+      systemDetection.setPlatform("darwin");
+      systemDetection.addExistingFile("/usr/local/share/android-commandlinetools/cmdline-tools/latest");
+
+      const path = getHomebrewAndroidToolsPath(systemDetection);
+
+      expect(path).toBe("/usr/local/share/android-commandlinetools/cmdline-tools/latest");
+    });
   });
 
   describe("getAndroidSdkFromEnvironment", () => {
@@ -151,6 +163,49 @@ describe("Android Command Line Tools - Detection", () => {
       const path = getAndroidSdkFromEnvironment(systemDetection);
 
       expect(path).toBeNull();
+    });
+  });
+
+  describe("getAndroidHomeWithSystemImages", () => {
+    test("should return android home when system-images exists", () => {
+      systemDetection.setEnvVar("ANDROID_HOME", "/android/sdk");
+      systemDetection.addExistingFile("/android/sdk");
+      systemDetection.addExistingFile("/android/sdk/system-images");
+
+      const result = getAndroidHomeWithSystemImages(systemDetection);
+
+      expect(result).not.toBeNull();
+      expect(result?.androidHome).toBe("/android/sdk");
+      expect(result?.systemImagesPath).toBe("/android/sdk/system-images");
+    });
+
+    test("should return null when system-images is missing", () => {
+      systemDetection.setEnvVar("ANDROID_HOME", "/android/sdk");
+      systemDetection.addExistingFile("/android/sdk");
+
+      const result = getAndroidHomeWithSystemImages(systemDetection);
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("isHomebrewToolsPath", () => {
+    test("should detect Homebrew paths by prefix", () => {
+      expect(isHomebrewToolsPath("/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest")).toBe(true);
+      expect(isHomebrewToolsPath("/usr/local/share/android-commandlinetools/cmdline-tools/latest")).toBe(true);
+      expect(isHomebrewToolsPath("/Users/test/Library/Android/sdk/cmdline-tools/latest")).toBe(false);
+    });
+  });
+
+  describe("getCmdlineToolsRoot", () => {
+    test("should strip cmdline-tools/latest suffix", () => {
+      const result = getCmdlineToolsRoot("/Users/test/Library/Android/sdk/cmdline-tools/latest");
+      expect(result).toBe("/Users/test/Library/Android/sdk");
+    });
+
+    test("should return normalized path when no suffix matches", () => {
+      const result = getCmdlineToolsRoot("C:\\Android\\Sdk");
+      expect(result).toBe("C:/Android/Sdk");
     });
   });
 
