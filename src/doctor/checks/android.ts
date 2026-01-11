@@ -23,6 +23,7 @@ export interface AndroidDoctorDependencies {
   getBestAndroidToolsLocation: typeof getBestAndroidToolsLocation;
   getAndroidHomeWithSystemImages: typeof getAndroidHomeWithSystemImages;
   getAndroidSdkFromEnvironment: typeof getAndroidSdkFromEnvironment;
+  getAndroidSdkEnvValue: () => string | undefined;
   installCmdlineTools: typeof installCmdlineTools;
   logger: typeof logger;
 }
@@ -32,6 +33,7 @@ const createAndroidDoctorDependencies = (): AndroidDoctorDependencies => ({
   getBestAndroidToolsLocation,
   getAndroidHomeWithSystemImages,
   getAndroidSdkFromEnvironment,
+  getAndroidSdkEnvValue: () => process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT,
   installCmdlineTools,
   logger
 });
@@ -50,7 +52,8 @@ export async function checkAndroidCommandLineTools(
   const name = "Android Command Line Tools";
 
   if (options.installCmdlineTools) {
-    const androidHome = dependencies.getAndroidSdkFromEnvironment();
+    const androidHome = dependencies.getAndroidSdkFromEnvironment()
+      || dependencies.getAndroidSdkEnvValue();
     if (!androidHome) {
       return {
         name,

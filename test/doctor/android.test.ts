@@ -9,6 +9,7 @@ describe("Android doctor command line tools check", () => {
     getBestAndroidToolsLocation: () => null,
     getAndroidHomeWithSystemImages: () => null,
     getAndroidSdkFromEnvironment: () => "/Users/test/Library/Android/sdk",
+    getAndroidSdkEnvValue: () => "/Users/test/Library/Android/sdk",
     installCmdlineTools: async () => ({
       success: true,
       message: "Installed",
@@ -73,7 +74,8 @@ describe("Android doctor command line tools check", () => {
   test("should warn when install is requested without ANDROID_HOME", async () => {
     const result = await checkAndroidCommandLineTools({ installCmdlineTools: true }, {
       ...baseDependencies,
-      getAndroidSdkFromEnvironment: () => null
+      getAndroidSdkFromEnvironment: () => null,
+      getAndroidSdkEnvValue: () => undefined
     });
 
     expect(result.status).toBe("warn");
@@ -104,5 +106,32 @@ describe("Android doctor command line tools check", () => {
     expect(installCalls).toHaveLength(1);
     expect(result.status).toBe("pass");
     expect(result.value).toContain("cmdline-tools/latest");
+  });
+
+  test("should allow install when env var is set but path does not exist", async () => {
+    const fakeTimer = new FakeTimer();
+    const installCalls: string[] = [];
+
+    const resultPromise = checkAndroidCommandLineTools({ installCmdlineTools: true }, {
+      ...baseDependencies,
+      getAndroidSdkFromEnvironment: () => null,
+      getAndroidSdkEnvValue: () => "/Users/test/Library/Android/sdk",
+      installCmdlineTools: async () => {
+        installCalls.push("install");
+        await fakeTimer.sleep(0);
+        return {
+          success: true,
+          message: "Installed",
+          androidHome: "/Users/test/Library/Android/sdk",
+          installedPath: "/Users/test/Library/Android/sdk/cmdline-tools/latest"
+        };
+      }
+    });
+
+    fakeTimer.advanceTime(0);
+    const result = await resultPromise;
+
+    expect(installCalls).toHaveLength(1);
+    expect(result.status).toBe("pass");
   });
 });
