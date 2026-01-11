@@ -106,7 +106,7 @@ with `automobile.junit.memory.heapdump.dir`.
 ### Historical Test Timing
 
 On startup, the runner requests historical execution timing data from the AutoMobile daemon using the
-`getTestTimings` MCP tool. This data is cached for the JVM and can optionally drive test ordering.
+`automobile:test-timings` MCP resource. This data is cached for the JVM and can optionally drive test ordering.
 When `automobile.junit.timing.ordering=auto`, the runner chooses longest-first when effective parallel
 forks are greater than 1 after device availability is applied, otherwise shortest-first. Set
 `automobile.junit.timing.ordering=none` to disable ordering.

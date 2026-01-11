@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
 
 interface AutoMobileClient {
   val transportName: String
@@ -135,4 +136,19 @@ internal fun <T> decodeToolResponse(
   val text = response.content.firstOrNull { it.type == "text" }?.text
       ?: throw McpConnectionException("Tool response missing text content")
   return json.decodeFromString(serializer, text)
+}
+
+internal fun <T> decodeResourceResponse(
+    json: Json,
+    contents: List<McpResourceContent>,
+    serializer: KSerializer<T>,
+): T {
+  val text = contents.firstOrNull { !it.text.isNullOrBlank() }?.text
+      ?: throw McpConnectionException("Resource response missing text content")
+  val element = json.decodeFromString(JsonElement.serializer(), text)
+  val error = (element as? JsonObject)?.get("error")?.jsonPrimitive?.content
+  if (!error.isNullOrBlank()) {
+    throw McpConnectionException(error)
+  }
+  return json.decodeFromJsonElement(serializer, element)
 }

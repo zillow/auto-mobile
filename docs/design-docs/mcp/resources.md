@@ -35,6 +35,7 @@ Returns historical test execution data:
 - Average execution duration
 - Success/failure rates
 - Device information
+- Supports query parameters for filtering and sorting (e.g., lookbackDays, limit, minSamples, orderBy, sessionUuid).
 
 See [Daemon](daemon.md) for test timing aggregation.
 

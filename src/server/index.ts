@@ -30,7 +30,6 @@ import { registerDaemonTools } from "./daemonTools";
 import { registerPlanTools } from "./planTools";
 import { registerDoctorTools } from "./doctorTools";
 import { registerFeatureFlagTools } from "./featureFlagTools";
-import { registerTestTimingTools } from "./testTimingTools";
 import { registerCriticalSectionTools } from "./criticalSectionTools";
 import { registerVideoRecordingTools } from "./videoRecordingTools";
 import { registerSnapshotTools } from "./snapshotTools";
@@ -105,7 +104,6 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerNotificationTools();
   registerDaemonTools();
   registerPlanTools();
-  registerTestTimingTools();
   registerDoctorTools();
   registerFeatureFlagTools();
   registerCriticalSectionTools();

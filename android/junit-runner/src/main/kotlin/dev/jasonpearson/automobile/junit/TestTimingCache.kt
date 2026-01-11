@@ -1,5 +1,7 @@
 package dev.jasonpearson.automobile.junit
 
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -7,6 +9,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -42,6 +45,7 @@ internal data class TestTimingSummary(
 internal data class TestTimingKey(val testClass: String, val testMethod: String)
 
 internal object TestTimingCache {
+  private const val TEST_TIMING_RESOURCE_URI = "automobile:test-timings"
   private const val DEFAULT_LOOKBACK_DAYS = 90
   private const val DEFAULT_LIMIT = 1000
   private const val DEFAULT_MIN_SAMPLES = 1
@@ -109,35 +113,62 @@ internal object TestTimingCache {
   }
 
   private fun loadFromDaemon() {
-    val args = buildRequestArgs()
+    val uri = buildRequestUri()
     try {
       val response =
-          DaemonSocketClientManager.callTool("getTestTimings", args, resolveTimeoutMs())
-      val payload = extractToolPayload(response)
+          DaemonSocketClientManager.readResource(uri, resolveTimeoutMs())
+      val payload = extractResourcePayload(response)
       if (payload.isNullOrBlank()) {
         return
       }
 
-      val parsed = json.decodeFromString(TestTimingSummary.serializer(), payload)
+      val element = json.decodeFromString(JsonElement.serializer(), payload)
+      val error = (element as? JsonObject)?.get("error")?.jsonPrimitive?.content
+      if (!error.isNullOrBlank()) {
+        return
+      }
+
+      val parsed = json.decodeFromJsonElement(TestTimingSummary.serializer(), element)
       summary = parsed
       timingMap = parsed.testTimings.associateBy { TestTimingKey(it.testClass, it.testMethod) }
     } catch (e: Exception) {
     }
   }
 
-  private fun buildRequestArgs(): JsonObject {
-    val values = mutableMapOf<String, JsonElement>()
-    values["lookbackDays"] = JsonPrimitive(resolvePositiveIntProperty(
-        "automobile.junit.timing.lookback.days",
-        DEFAULT_LOOKBACK_DAYS
-    ))
-    values["limit"] = JsonPrimitive(resolvePositiveIntProperty(
-        "automobile.junit.timing.limit",
-        DEFAULT_LIMIT
-    ))
-    values["minSamples"] = JsonPrimitive(resolveMinSamples())
-    values["devicePlatform"] = JsonPrimitive("android")
-    return JsonObject(values)
+  private fun buildRequestUri(): String {
+    val params = mutableListOf<Pair<String, String>>()
+    fun addParam(key: String, value: String) {
+      params.add(key to value)
+    }
+
+    addParam(
+        "lookbackDays",
+        resolvePositiveIntProperty(
+            "automobile.junit.timing.lookback.days",
+            DEFAULT_LOOKBACK_DAYS
+        ).toString()
+    )
+    addParam(
+        "limit",
+        resolvePositiveIntProperty(
+            "automobile.junit.timing.limit",
+            DEFAULT_LIMIT
+        ).toString()
+    )
+    addParam("minSamples", resolveMinSamples().toString())
+    addParam("devicePlatform", "android")
+    val sessionUuid = DaemonSocketClientManager.sessionUuid()
+    if (sessionUuid.isNotBlank()) {
+      addParam("sessionUuid", sessionUuid)
+    }
+
+    if (params.isEmpty()) {
+      return TEST_TIMING_RESOURCE_URI
+    }
+
+    val query =
+        params.joinToString("&") { (key, value) -> "$key=${encodeQueryParam(value)}" }
+    return "$TEST_TIMING_RESOURCE_URI?$query"
   }
 
   private fun resolveMinSamples(): Int {
@@ -165,21 +196,21 @@ internal object TestTimingCache {
     return if (value != null && value > 0) value else DEFAULT_TIMEOUT_MS
   }
 
-  private fun extractToolPayload(response: DaemonResponse): String? {
+  private fun extractResourcePayload(response: DaemonResponse): String? {
     if (!response.success) {
       return null
     }
 
     val resultElement = response.result ?: return null
     val resultObject = resultElement.jsonObject
-    val contentElement = resultObject["content"]
+    val contentElement = resultObject["contents"]
     if (contentElement !is JsonArray || contentElement.isEmpty()) {
       return null
     }
     val first = contentElement.first().jsonObject
-    if (first["type"]?.jsonPrimitive?.content != "text") {
-      return null
-    }
     return first["text"]?.jsonPrimitive?.content
   }
+
+  private fun encodeQueryParam(value: String): String =
+      URLEncoder.encode(value, StandardCharsets.UTF_8.name())
 }

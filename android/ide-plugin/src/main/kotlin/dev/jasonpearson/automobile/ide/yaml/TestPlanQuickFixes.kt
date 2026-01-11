@@ -161,7 +161,6 @@ object TestPlanQuickFixFactory {
         "captureDeviceSnapshot", "restoreDeviceSnapshot", "listSnapshots", "deleteSnapshot",
         "startVideoRecording", "stopVideoRecording", "listVideoRecordings", "deleteVideoRecording",
         "listDeviceImages",
-        "getTestTimings",
         "debugSearch", "bugReport",
         "doctor",
         "daemon_available_devices", "daemon_session_info", "daemon_release_session"

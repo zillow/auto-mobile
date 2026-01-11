@@ -1,9 +1,9 @@
 package dev.jasonpearson.automobile.ide.daemon
 
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
 data class TestTimingStatusCounts(
@@ -79,63 +79,51 @@ data class TestTimingQuery(
     val sessionUuid: String? = null,
 )
 
-fun TestTimingQuery.toJsonObject(): JsonObject =
-    buildJsonObject {
-      if (lookbackDays != null) {
-        put("lookbackDays", JsonPrimitive(lookbackDays))
-      }
-      if (limit != null) {
-        put("limit", JsonPrimitive(limit))
-      }
-      if (minSamples != null) {
-        put("minSamples", JsonPrimitive(minSamples))
-      }
-      if (orderBy != null) {
-        put("orderBy", JsonPrimitive(orderBy.apiValue))
-      }
-      if (orderDirection != null) {
-        put("orderDirection", JsonPrimitive(orderDirection.apiValue))
-      }
-      if (!testClass.isNullOrBlank()) {
-        put("testClass", JsonPrimitive(testClass))
-      }
-      if (!testMethod.isNullOrBlank()) {
-        put("testMethod", JsonPrimitive(testMethod))
-      }
-      if (!deviceId.isNullOrBlank()) {
-        put("deviceId", JsonPrimitive(deviceId))
-      }
-      if (!deviceName.isNullOrBlank()) {
-        put("deviceName", JsonPrimitive(deviceName))
-      }
-      if (!devicePlatform.isNullOrBlank()) {
-        put("devicePlatform", JsonPrimitive(devicePlatform))
-      }
-      if (!deviceType.isNullOrBlank()) {
-        put("deviceType", JsonPrimitive(deviceType))
-      }
-      if (!appVersion.isNullOrBlank()) {
-        put("appVersion", JsonPrimitive(appVersion))
-      }
-      if (!gitCommit.isNullOrBlank()) {
-        put("gitCommit", JsonPrimitive(gitCommit))
-      }
-      if (targetSdk != null) {
-        put("targetSdk", JsonPrimitive(targetSdk))
-      }
-      if (!jdkVersion.isNullOrBlank()) {
-        put("jdkVersion", JsonPrimitive(jdkVersion))
-      }
-      if (!jvmTarget.isNullOrBlank()) {
-        put("jvmTarget", JsonPrimitive(jvmTarget))
-      }
-      if (!gradleVersion.isNullOrBlank()) {
-        put("gradleVersion", JsonPrimitive(gradleVersion))
-      }
-      if (isCi != null) {
-        put("isCi", JsonPrimitive(isCi))
-      }
-      if (!sessionUuid.isNullOrBlank()) {
-        put("sessionUuid", JsonPrimitive(sessionUuid))
-      }
+private const val TEST_TIMING_RESOURCE_URI = "automobile:test-timings"
+
+fun TestTimingQuery.toResourceUri(): String {
+  val params = mutableListOf<Pair<String, String>>()
+  fun addParam(key: String, value: String?) {
+    if (!value.isNullOrBlank()) {
+      params.add(key to value)
     }
+  }
+  fun addInt(key: String, value: Int?) {
+    if (value != null) {
+      params.add(key to value.toString())
+    }
+  }
+
+  addInt("lookbackDays", lookbackDays)
+  addInt("limit", limit)
+  addInt("minSamples", minSamples)
+  addParam("orderBy", orderBy?.apiValue)
+  addParam("orderDirection", orderDirection?.apiValue)
+  addParam("testClass", testClass)
+  addParam("testMethod", testMethod)
+  addParam("deviceId", deviceId)
+  addParam("deviceName", deviceName)
+  addParam("devicePlatform", devicePlatform)
+  addParam("deviceType", deviceType)
+  addParam("appVersion", appVersion)
+  addParam("gitCommit", gitCommit)
+  addInt("targetSdk", targetSdk)
+  addParam("jdkVersion", jdkVersion)
+  addParam("jvmTarget", jvmTarget)
+  addParam("gradleVersion", gradleVersion)
+  if (isCi != null) {
+    params.add("isCi" to isCi.toString())
+  }
+  addParam("sessionUuid", sessionUuid)
+
+  if (params.isEmpty()) {
+    return TEST_TIMING_RESOURCE_URI
+  }
+
+  val query =
+      params.joinToString("&") { (key, value) -> "$key=${encodeQueryParam(value)}" }
+  return "$TEST_TIMING_RESOURCE_URI?$query"
+}
+
+private fun encodeQueryParam(value: String): String =
+    URLEncoder.encode(value, StandardCharsets.UTF_8.name())

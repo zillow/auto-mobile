@@ -99,8 +99,8 @@ class McpHttpClient(
   }
 
   override fun getTestTimings(query: TestTimingQuery): TestTimingSummary {
-    val response = callTool("getTestTimings", query.toJsonObject())
-    return decodeToolResponse(json, response, TestTimingSummary.serializer())
+    val contents = readResource(query.toResourceUri())
+    return decodeResourceResponse(json, contents, TestTimingSummary.serializer())
   }
 
   override fun startTestRecording(platform: String): TestRecordingStartResult {

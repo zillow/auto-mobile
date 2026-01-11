@@ -40,6 +40,15 @@ internal object DaemonSocketClientManager {
     return socketClient.callTool(toolName, arguments, timeoutMs)
   }
 
+  fun readResource(uri: String, timeoutMs: Long): DaemonResponse {
+    val socketClient = getOrCreateClient()
+    return socketClient.readResource(uri, timeoutMs)
+  }
+
+  fun sessionUuid(): String {
+    return getOrCreateClient().sessionUuid
+  }
+
   private fun getOrCreateClient(): DaemonSocketClient {
     // Each thread gets its own connection for parallel execution
     val existing = threadLocalClient.get()
@@ -300,7 +309,7 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
   @Volatile private var closed = false
 
   // Unique session UUID for this client/thread to enable per-thread plan execution locking
-  private val sessionUuid: String = UUID.randomUUID().toString()
+  val sessionUuid: String = UUID.randomUUID().toString()
 
   private val channel: SocketChannel = connect()
   private val reader: BufferedReader
@@ -333,6 +342,33 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
             type = "mcp_request",
             method = "tools/call",
             params = buildJsonParams(toolName, arguments),
+        )
+
+    val responseFuture = CompletableFuture<DaemonResponse>()
+    pending[requestId] = responseFuture
+
+    sendRequest(request)
+
+    return try {
+      responseFuture.get(timeoutMs, TimeUnit.MILLISECONDS)
+    } catch (e: TimeoutException) {
+      pending.remove(requestId)
+      throw DaemonUnavailableException("Daemon request timeout after ${timeoutMs}ms")
+    }
+  }
+
+  fun readResource(uri: String, timeoutMs: Long): DaemonResponse {
+    if (!isConnected()) {
+      throw DaemonUnavailableException("Daemon socket connection is not available")
+    }
+
+    val requestId = UUID.randomUUID().toString()
+    val request =
+        DaemonRequest(
+            id = requestId,
+            type = "mcp_request",
+            method = "resources/read",
+            params = JsonObject(mapOf("uri" to JsonPrimitive(uri))),
         )
 
     val responseFuture = CompletableFuture<DaemonResponse>()

@@ -75,8 +75,6 @@ object TestPlanValidator {
         "startVideoRecording", "stopVideoRecording", "listVideoRecordings", "deleteVideoRecording",
         // Device images
         "listDeviceImages",
-        // Testing tools
-        "getTestTimings",
         // Debugging
         "debugSearch", "bugReport",
         // Doctor

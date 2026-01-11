@@ -78,9 +78,6 @@ object TestPlanToolCategories {
             "listVideoRecordings",
             "deleteVideoRecording"
         ),
-        "Testing" to setOf(
-            "getTestTimings"
-        ),
         "Debugging" to setOf(
             "debugSearch",
             "bugReport"
