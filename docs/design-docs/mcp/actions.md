@@ -31,7 +31,7 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 
 - 🔄 `rotate` sets portrait or landscape.
 - 🌐 `openLink` launches URLs or deep links.
-- 🧰 `openSystemTray`, `homeScreen`, and `recentApps` control system surfaces.
+- 🧰 `systemTray`, `homeScreen`, and `recentApps` control system surfaces.
 - 🔔 `postNotification` posts notifications from the app-under-test when SDK hooks are installed.
 - 🌍 `setLocale` changes app/system locale (e.g., "ar-SA", "ja-JP").
 - 🕒 `setTimeZone` changes device time zone.

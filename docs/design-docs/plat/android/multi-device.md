@@ -60,10 +60,11 @@ steps:
         action: send
         label: Send message
 
-  - tool: openSystemTray
+  - tool: systemTray
     device: B
-    lookFor: { text: "Hello" }
-    timeoutMs: 5000
+    action: find
+    notification: { body: "Hello" }
+    awaitTimeout: 5000
     label: Verify notification
 ```
 

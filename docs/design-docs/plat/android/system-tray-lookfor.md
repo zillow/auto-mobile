@@ -3,27 +3,20 @@
 ## Goal
 
 Enable agents to open the notification shade and wait for a matching
-notification by text or resource ID.
+notification by text.
 
 ## Proposed MCP tool
 
-Option A (extend existing):
-
 ```
-openSystemTray({
-  lookFor?: { text?: string, resourceId?: string },
-  timeoutMs?: number,
-  pollIntervalMs?: number
-})
-```
-
-Option B (new):
-
-```
-lookForNotification({
-  text?: string,
-  resourceId?: string,
-  timeoutMs?: number
+systemTray({
+  action: "open" | "find" | "tap" | "dismiss" | "clearAll",
+  notification?: {
+    title?: string,
+    body?: string,
+    appId?: string,
+    tapActionLabel?: string
+  },
+  awaitTimeout?: number
 })
 ```
 
@@ -71,8 +64,8 @@ Notes:
 
 ## Plan
 
-1. Add `lookFor` and timeout handling to tray open.
-2. Use accessibility node search to match notifications.
+1. Add `systemTray` with open/find/tap/dismiss/clearAll actions.
+2. Use accessibility node search to match notification text.
 3. Return structured match details for action chaining.
 
 ## Risks

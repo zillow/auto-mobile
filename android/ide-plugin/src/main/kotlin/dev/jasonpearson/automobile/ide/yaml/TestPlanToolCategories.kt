@@ -43,7 +43,7 @@ object TestPlanToolCategories {
         "Device configuration" to setOf(
             "rotate",
             "shake",
-            "openSystemTray",
+            "systemTray",
             "setLocale",
             "setTimeZone",
             "setTextDirection",

@@ -8,7 +8,7 @@ object ValidTools {
         "pressButton", "pressKey", "homeScreen", "recentApps", "openLink", "navigateTo",
         "observe", "rawViewHierarchy",
         "listDevices", "startDevice", "killDevice", "setActiveDevice",
-        "rotate", "shake", "openSystemTray", "setLocale", "setTimeZone",
+        "rotate", "shake", "systemTray", "setLocale", "setTimeZone",
         "setTextDirection", "set24HourFormat", "getCalendarSystem",
         "enableDemoMode", "disableDemoMode",
         "executePlan", "criticalSection",

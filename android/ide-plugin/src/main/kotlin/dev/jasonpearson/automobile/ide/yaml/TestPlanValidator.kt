@@ -59,7 +59,7 @@ object TestPlanValidator {
         // Device management
         "listDevices", "startDevice", "killDevice", "setActiveDevice",
         // Device configuration
-        "rotate", "shake", "openSystemTray", "setLocale", "setTimeZone",
+        "rotate", "shake", "systemTray", "setLocale", "setTimeZone",
         "setTextDirection", "set24HourFormat", "getCalendarSystem",
         // Demo mode
         "enableDemoMode", "disableDemoMode",

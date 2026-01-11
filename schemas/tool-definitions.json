@@ -1396,40 +1396,6 @@
     }
   },
   {
-    "name": "openSystemTray",
-    "description": "Open system notification tray",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "pinchOn",
     "description": "Pinch to zoom",
     "inputSchema": {
@@ -2258,6 +2224,80 @@
       },
       "required": [
         "direction",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "systemTray",
+    "description": "System tray actions for notifications (open/find/tap/dismiss/clearAll)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "open",
+            "find",
+            "tap",
+            "dismiss",
+            "clearAll"
+          ],
+          "description": "System tray action"
+        },
+        "notification": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Notification title (case-insensitive, partial match)"
+            },
+            "body": {
+              "type": "string",
+              "description": "Notification body (case-insensitive, partial match)"
+            },
+            "appId": {
+              "type": "string",
+              "description": "Notification app package ID (Android only)"
+            },
+            "tapActionLabel": {
+              "type": "string",
+              "description": "Notification action button label to tap (tap only)"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Notification match criteria"
+        },
+        "awaitTimeout": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Wait timeout ms (default: 5000)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action",
         "platform"
       ],
       "additionalProperties": false,
