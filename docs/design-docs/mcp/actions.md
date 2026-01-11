@@ -44,7 +44,7 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 
 #### Advanced Device Management
 
-- 📱 `listDevices` lists all connected devices (physical and emulators).
+- 📱 `listDevices` lists all connected devices (physical and emulators); when the daemon is active it includes pool status in `poolStatus`.
 - 🚀 `startDevice` starts a device with the specified device image.
 - ❌ `killDevice` terminates a running device.
 - 🔧 `setActiveDevice` sets the active device for subsequent operations.
@@ -66,6 +66,5 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 
 #### Daemon & Session Management
 
-- 🔢 `daemon_available_devices` queries number of available devices in daemon pool.
 - 📋 `daemon_session_info` gets information about an existing session.
 - 🔓 `daemon_release_session` releases a session and frees its device.

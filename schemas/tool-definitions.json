@@ -315,16 +315,6 @@
     }
   },
   {
-    "name": "daemon_available_devices",
-    "description": "Query number of available devices in daemon pool",
-    "inputSchema": {
-      "type": "object",
-      "properties": {},
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "daemon_refresh_devices",
     "description": "Refresh device pool by discovering connected devices",
     "inputSchema": {

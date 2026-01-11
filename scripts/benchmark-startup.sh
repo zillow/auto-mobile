@@ -187,7 +187,7 @@ daemon_call() {
   local request
   request=$(jq -c -n \
     --arg id "$request_id" \
-    '{id:$id, type:"mcp_request", method:"tools/call", params:{name:"daemon_available_devices", arguments:{}}}')
+    '{id:$id, type:"mcp_request", method:"tools/call", params:{name:"listDevices", arguments:{platform:"android"}}}')
 
   local response
   if [[ "$daemon_socket_client" == "python" ]]; then
@@ -395,13 +395,13 @@ run_mcp_server() {
 
   mcp_send 3 '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-  if ! mcp_call 3 4 "daemon_available_devices" '{}' 10 >/dev/null; then
+  if ! mcp_call 3 4 "listDevices" '{"platform":"android"}' 10 >/dev/null; then
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
     exec 5<&-
     rm -rf "$fifo_dir"
-    echo "Failed to call daemon_available_devices" >&2
+    echo "Failed to call listDevices" >&2
     return 1
   fi
   local time_to_first_tool_call_ms

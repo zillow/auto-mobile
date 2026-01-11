@@ -539,30 +539,6 @@ export async function runDaemonCommand(
         break;
       }
 
-      case "available-devices": {
-        // Check if running in daemon process
-        if (DaemonState.getInstance().isInitialized()) {
-          // Running inside daemon process
-          const pool = DaemonState.getInstance().getDevicePool();
-          const idleDevices = pool.getIdleDevices();
-          console.log(JSON.stringify({ availableDevices: idleDevices.length }));
-        } else {
-          // Running from CLI - query daemon via socket
-          const client = new DaemonClient();
-          try {
-            await client.connect();
-            const result = await client.callTool("daemon_available_devices", {});
-            console.log(JSON.stringify(result));
-            await client.close();
-          } catch (error) {
-            throw new ActionableError(
-              `Failed to query available devices: ${error instanceof Error ? error.message : String(error)}`
-            );
-          }
-        }
-        break;
-      }
-
       case "session-info": {
         if (args.length === 0) {
           throw new ActionableError("session-info requires a session ID argument");
@@ -648,7 +624,6 @@ export async function runDaemonCommand(
         console.log("  restart               Restart the daemon");
         console.log("  health                Check daemon health");
         console.log("  diagnose              Run full diagnostics");
-        console.log("  available-devices     Query number of available devices");
         console.log("  session-info <id>     Get information about a session");
         console.log("  release-session <id>  Release a session and free its device");
         process.exit(1);

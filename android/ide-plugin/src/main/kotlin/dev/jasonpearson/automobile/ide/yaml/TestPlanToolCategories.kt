@@ -78,7 +78,6 @@ object TestPlanToolCategories {
             "doctor"
         ),
         "Daemon" to setOf(
-            "daemon_available_devices",
             "daemon_refresh_devices",
             "daemon_session_info",
             "daemon_release_session"

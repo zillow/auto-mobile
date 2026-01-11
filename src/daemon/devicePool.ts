@@ -283,7 +283,7 @@ export class DevicePool {
           `  Error: ${currentStats.error}\n\n` +
           `Suggestions:\n` +
           `  - Start an emulator or connect a physical device\n` +
-          `  - Check device pool status: auto-mobile --daemon available-devices\n` +
+          `  - Check device pool status: auto-mobile --cli listDevices --platform android\n` +
           `  - Verify ADB is working: adb devices`
         );
       } else {
@@ -413,7 +413,7 @@ export class DevicePool {
           `  Error: ${stats.error}\n\n` +
           `Suggestions:\n` +
           `  - Start an emulator or connect a physical device\n` +
-          `  - Check device pool status: auto-mobile --daemon available-devices\n` +
+          `  - Check device pool status: auto-mobile --cli listDevices --platform android\n` +
           `  - Verify ADB is working: adb devices`
         );
       }

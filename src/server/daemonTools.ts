@@ -3,57 +3,12 @@ import { ToolRegistry } from "./toolRegistry";
 import { DaemonState } from "../daemon/daemonState";
 import { ActionableError } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { logger } from "../utils/logger";
 
 /**
  * Register internal daemon tools
  * These tools are used for daemon state queries and management
  */
 export function registerDaemonTools(): void {
-
-  // Available Devices Tool
-  ToolRegistry.register(
-    "daemon_available_devices",
-    "Query number of available devices in daemon pool",
-    z.object({}).strict(),
-    async () => {
-      try {
-        logger.info("[daemon_available_devices] TOOL CALLED!");
-        const state = DaemonState.getInstance();
-        logger.info("[daemon_available_devices] Got DaemonState instance");
-        const isInitialized = state.isInitialized();
-        logger.info(`[daemon_available_devices] DaemonState initialized: ${isInitialized}`);
-
-        if (!isInitialized) {
-          logger.error("[daemon_available_devices] DaemonState not initialized!");
-          return createJSONToolResponse({
-            message: "Daemon not running or device pool not initialized",
-            availableDevices: 0,
-            totalDevices: 0,
-          });
-        }
-
-        const devicePool = state.getDevicePool();
-        logger.info("[daemon_available_devices] Got device pool");
-        const stats = devicePool.getStats();
-        logger.info(`[daemon_available_devices] Device pool stats: ${JSON.stringify(stats)}`);
-
-        return createJSONToolResponse({
-          message: `Device pool status: ${stats.idle} idle, ${stats.assigned} assigned, ${stats.error} error (${stats.total} total)`,
-          availableDevices: stats.idle,
-          totalDevices: stats.total,
-          assignedDevices: stats.assigned,
-          errorDevices: stats.error,
-          stats: stats,
-        });
-      } catch (error) {
-        logger.error(`[daemon_available_devices] ERROR: ${error}`);
-        logger.error(`[daemon_available_devices] Stack: ${error instanceof Error ? error.stack : "no stack"}`);
-        throw error;
-      }
-    }
-  );
-
   // Session Info Tool
   ToolRegistry.register(
     "daemon_session_info",

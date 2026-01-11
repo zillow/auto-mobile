@@ -162,7 +162,7 @@ object TestPlanQuickFixFactory {
         "listDeviceImages",
         "debugSearch", "bugReport",
         "doctor",
-        "daemon_available_devices", "daemon_session_info", "daemon_release_session"
+        "daemon_session_info", "daemon_release_session"
     )
 
     /**

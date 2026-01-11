@@ -221,28 +221,6 @@ export class UnixSocketServer {
           stats: stats,
         };
       }
-      case "daemon/availableDevices": {
-        // Direct device pool query without going through MCP
-        const state = DaemonState.getInstance();
-        if (!state.isInitialized()) {
-          return {
-            success: false,
-            error: "Daemon not initialized",
-            availableDevices: 0,
-            totalDevices: 0,
-          };
-        }
-        const pool = state.getDevicePool();
-        const stats = pool.getStats();
-        return {
-          success: true,
-          availableDevices: stats.idle,
-          totalDevices: stats.total,
-          assignedDevices: stats.assigned,
-          errorDevices: stats.error,
-          stats: stats,
-        };
-      }
       default:
         throw new Error(`Unsupported daemon method: ${request.method}`);
     }

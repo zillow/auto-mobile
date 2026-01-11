@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -125,6 +126,7 @@ internal object DaemonSocketClientManager {
    */
   private fun waitForDevicePoolReady(timeoutMs: Long) {
     val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
+    val json = Json { ignoreUnknownKeys = true }
     if (debugMode) {
       println("Waiting for daemon device pool to initialize...")
     }
@@ -162,16 +164,27 @@ internal object DaemonSocketClientManager {
           nextRefreshTime = now + 2000 // Schedule next refresh in 2 seconds
         }
 
-        val response = socketClient.callDaemonMethod(
-            "daemon/availableDevices",
+        val response = socketClient.callTool(
+            "listDevices",
+            JsonObject(mapOf("platform" to JsonPrimitive("android"))),
             5000
         )
         socketClient.close()
 
         if (response.success) {
-          val totalDevices = response.result
-              ?.jsonObject?.get("totalDevices")
-              ?.jsonPrimitive?.intOrNull ?: 0
+          val payloadText = response.result
+              ?.jsonObject?.get("content")
+              ?.jsonArray?.firstOrNull()
+              ?.jsonObject?.get("text")
+              ?.jsonPrimitive?.content
+          val parsedResult = payloadText?.let { json.parseToJsonElement(it).jsonObject }
+          val poolStatus = parsedResult?.get("poolStatus")?.jsonObject
+          val totalDevices = poolStatus
+              ?.get("total")
+              ?.jsonPrimitive
+              ?.intOrNull
+              ?: parsedResult?.get("totalCount")?.jsonPrimitive?.intOrNull
+              ?: 0
 
           if (totalDevices > 0) {
             if (debugMode) {

@@ -79,7 +79,7 @@ object TestPlanValidator {
         // Doctor
         "doctor",
         // Daemon
-        "daemon_available_devices", "daemon_session_info", "daemon_release_session"
+        "daemon_session_info", "daemon_release_session"
     )
 
     /**

@@ -67,8 +67,8 @@ The daemon listens on a Unix socket at:
 
 ## MCP Tools
 
-### `daemon_available_devices`
-Query available devices in the pool.
+### `listDevices`
+List connected devices; when the daemon is active, responses include `poolStatus` with pool counts.
 
 ### `daemon_session_info`
 Get information about an active session.

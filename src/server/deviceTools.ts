@@ -3,6 +3,7 @@ import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
+import { DaemonState } from "../daemon/daemonState";
 import { notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
 import { syncInstalledAppResources } from "./appResources";
 
@@ -102,14 +103,48 @@ export function registerDeviceTools() {
       const virtualCount = devices.filter(d => d.isVirtual).length;
       const physicalCount = devices.filter(d => !d.isVirtual).length;
 
-      return createJSONToolResponse({
+      const response: {
+        message: string;
+        devices: Array<BootedDevice & { isVirtual: boolean }>;
+        totalCount: number;
+        virtualCount: number;
+        physicalCount: number;
+        platform: SomePlatform;
+        poolStatus?: {
+          idle: number;
+          assigned: number;
+          error: number;
+          total: number;
+        };
+      } = {
         message: `Found ${devices.length} connected ${args.platform} devices`,
         devices: devices,
         totalCount: devices.length,
         virtualCount: virtualCount,
         physicalCount: physicalCount,
         platform: args.platform
-      });
+      };
+
+      if (DaemonState.getInstance().isInitialized()) {
+        if (args.platform === "android") {
+          const stats = DaemonState.getInstance().getDevicePool().getStats();
+          response.poolStatus = {
+            idle: stats.idle,
+            assigned: stats.assigned,
+            error: stats.error,
+            total: stats.total
+          };
+        } else {
+          response.poolStatus = {
+            idle: 0,
+            assigned: 0,
+            error: 0,
+            total: 0
+          };
+        }
+      }
+
+      return createJSONToolResponse(response);
     } catch (error) {
       throw new ActionableError(`Failed to list ${args.platform} devices: ${error}`);
     }
