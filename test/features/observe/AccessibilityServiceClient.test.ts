@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { AccessibilityServiceClient } from "../../../src/features/observe/AccessibilityServiceClient";
+import { NavigationGraphManager } from "../../../src/features/navigation/NavigationGraphManager";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
@@ -249,6 +250,49 @@ describe("AccessibilityServiceClient", function() {
         expect(result.fresh).toBe(false);
       } finally {
         await testClient.close();
+      }
+    });
+
+    test("should seed navigation graph from hierarchy updates", async function() {
+      NavigationGraphManager.resetInstance();
+      const navManager = NavigationGraphManager.getInstance();
+
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory,
+        fakeTimer
+      );
+
+      try {
+        const resultPromise = testClient.getLatestHierarchy(true, 2000);
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "hierarchy_update",
+          timestamp: Date.now(),
+          data: {
+            updatedAt: Date.now(),
+            packageName: "com.google.android.deskclock",
+            hierarchy: {
+              "text": "6:43 AM",
+              "content-desc": "6:43 AM",
+              "resource-id": "com.google.android.deskclock:id/digital_clock",
+            }
+          }
+        }));
+
+        await resultPromise;
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(navManager.getCurrentAppId()).toBe("com.google.android.deskclock");
+        expect(navManager.getCurrentScreen()).not.toBeNull();
+      } finally {
+        await testClient.close();
+        NavigationGraphManager.resetInstance();
       }
     });
   });

@@ -704,7 +704,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
   public getHierarchyNavigationDetector(): HierarchyNavigationDetector {
     if (!this.hierarchyNavigationDetector) {
       this.hierarchyNavigationDetector = new HierarchyNavigationDetector(
-        NavigationGraphManager.getInstance()
+        NavigationGraphManager.getInstance(),
+        { timer: this.timer }
       );
     }
     return this.hierarchyNavigationDetector;
@@ -945,14 +946,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
         logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.updatedAt})`);
 
         // Notify hierarchy navigation detector for view hierarchy-based navigation detection
-        if (this.hierarchyNavigationDetector) {
-          if (!message.data.hierarchy) {
-            logger.warn("[ACCESSIBILITY_SERVICE] Skipping navigation detection: hierarchy missing in update");
-          } else if (message.data.error) {
-            logger.warn(`[ACCESSIBILITY_SERVICE] Skipping navigation detection due to hierarchy error: ${message.data.error}`);
-          } else {
-            this.hierarchyNavigationDetector.onHierarchyUpdate(message.data);
-          }
+        if (!message.data.hierarchy) {
+          logger.warn("[ACCESSIBILITY_SERVICE] Skipping navigation detection: hierarchy missing in update");
+        } else if (message.data.error) {
+          logger.warn(`[ACCESSIBILITY_SERVICE] Skipping navigation detection due to hierarchy error: ${message.data.error}`);
+        } else {
+          this.getHierarchyNavigationDetector().onHierarchyUpdate(message.data);
         }
       }
 
