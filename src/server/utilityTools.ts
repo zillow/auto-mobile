@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
 import { ActionableError } from "../models/ActionableError";
 import { DemoMode } from "../features/utility/DemoMode";
+import type { DemoModeOptions } from "../features/utility/DemoMode";
 import { SystemConfigurationManager } from "../features/utility/SystemConfigurationManager";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -10,7 +11,8 @@ import { BootedDevice, Platform } from "../models";
 import { addDeviceTargetingToSchema, addSessionUuidToSchema } from "./toolSchemaHelpers";
 
 // Schema definitions
-export const enableDemoModeSchema = addDeviceTargetingToSchema(z.object({
+export const demoModeSchema = addDeviceTargetingToSchema(z.object({
+  action: z.enum(["enable", "disable"]).describe("Demo mode action"),
   time: z.string().optional().describe("Time in HHMM (e.g., 1000)"),
   batteryLevel: z.number().min(0).max(100).optional().describe("Battery % (0-100)"),
   batteryPlugged: z.boolean().optional().describe("Charging status"),
@@ -18,10 +20,6 @@ export const enableDemoModeSchema = addDeviceTargetingToSchema(z.object({
   mobileDataType: z.enum(["4g", "5g", "lte", "3g", "edge", "none"]).optional().describe("Data type"),
   mobileSignalLevel: z.number().min(0).max(4).optional().describe("Signal strength (0-4)"),
   hideNotifications: z.boolean().optional().describe("Hide notifications"),
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
-
-export const disableDemoModeSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
@@ -55,15 +53,9 @@ export const getCalendarSystemSchema = addDeviceTargetingToSchema(z.object({
 }));
 
 // Export interfaces for type safety
-export interface EnableDemoModeArgs {
-  time?: string;
-  batteryLevel?: number;
-  batteryPlugged?: boolean;
-  wifiLevel?: number;
-  mobileDataType?: "4g" | "5g" | "lte" | "3g" | "edge" | "none";
-  mobileSignalLevel?: number;
-  hideNotifications?: boolean;
-    platform: Platform;
+export interface DemoModeArgs extends DemoModeOptions {
+  action: "enable" | "disable";
+  platform: Platform;
 }
 
 export interface SetActiveDeviceArgs {
@@ -97,39 +89,40 @@ export interface GetCalendarSystemArgs {
 
 // Register tools
 export function registerUtilityTools() {
-  // Enable demo mode handler
-  const enableDemoModeHandler = async (device: BootedDevice, args: EnableDemoModeArgs) => {
+  // Demo mode handler
+  const demoModeHandler = async (device: BootedDevice, args: DemoModeArgs) => {
     try {
       const demoMode = new DemoMode(device);
-      const result = await demoMode.execute(args);
 
-      return createJSONToolResponse({
-        message: "Demo mode enabled",
-        observation: result.observation,
-        ...result,
-        demoModeEnabled: true
-      });
-    } catch (error) {
-      logger.error("Failed to enable demo mode:", error);
-      throw new ActionableError(`Failed to enable demo mode: ${error}`);
-    }
-  };
+      if (args.action === "enable") {
+        const options: DemoModeOptions = {
+          time: args.time,
+          batteryLevel: args.batteryLevel,
+          batteryPlugged: args.batteryPlugged,
+          wifiLevel: args.wifiLevel,
+          mobileDataType: args.mobileDataType,
+          mobileSignalLevel: args.mobileSignalLevel,
+          hideNotifications: args.hideNotifications,
+        };
+        const result = await demoMode.execute(options);
+        const message = result.success ? "Demo mode enabled" : "Failed to enable demo mode";
 
-  // Disable demo mode handler
-  const disableDemoModeHandler = async (device: BootedDevice) => {
-    try {
-      const demoMode = new DemoMode(device);
+        return createJSONToolResponse({
+          message,
+          ...result
+        });
+      }
+
       const result = await demoMode.exitDemoMode();
+      const message = result.success ? "Demo mode disabled" : "Failed to disable demo mode";
 
       return createJSONToolResponse({
-        message: "Demo mode disabled",
-        observation: result.observation,
-        ...result,
-        demoModeEnabled: false
+        message,
+        ...result
       });
     } catch (error) {
-      logger.error("Failed to disable demo mode:", error);
-      throw new ActionableError(`Failed to disable demo mode: ${error}`);
+      logger.error("Failed to set demo mode:", error);
+      throw new ActionableError(`Failed to set demo mode: ${error}`);
     }
   };
 
@@ -215,17 +208,10 @@ export function registerUtilityTools() {
 
   // Register with the tool registry
   ToolRegistry.registerDeviceAware(
-    "enableDemoMode",
-    "Enable demo mode",
-    enableDemoModeSchema,
-    enableDemoModeHandler
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "disableDemoMode",
-    "Disable demo mode",
-    disableDemoModeSchema,
-    disableDemoModeHandler
+    "demoMode",
+    "Enable or disable demo mode for screenshots and screen recordings",
+    demoModeSchema,
+    demoModeHandler
   );
 
   ToolRegistry.register(

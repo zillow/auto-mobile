@@ -51,8 +51,7 @@ object TestPlanToolCategories {
             "getCalendarSystem"
         ),
         "Demo mode" to setOf(
-            "enableDemoMode",
-            "disableDemoMode"
+            "demoMode"
         ),
         "Plan execution" to setOf(
             "executePlan",

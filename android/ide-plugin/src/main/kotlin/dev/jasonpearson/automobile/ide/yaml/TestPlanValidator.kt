@@ -62,7 +62,7 @@ object TestPlanValidator {
         "rotate", "shake", "systemTray", "setLocale", "setTimeZone",
         "setTextDirection", "set24HourFormat", "getCalendarSystem",
         // Demo mode
-        "enableDemoMode", "disableDemoMode",
+        "demoMode",
         // Testing
         "executePlan", "criticalSection",
         // Deep links

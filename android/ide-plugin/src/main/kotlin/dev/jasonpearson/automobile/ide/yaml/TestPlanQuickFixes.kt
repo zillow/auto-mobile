@@ -154,7 +154,7 @@ object TestPlanQuickFixFactory {
         "listDevices", "startDevice", "killDevice", "setActiveDevice",
         "rotate", "shake", "systemTray", "setLocale", "setTimeZone",
         "setTextDirection", "set24HourFormat", "getCalendarSystem",
-        "enableDemoMode", "disableDemoMode",
+        "demoMode",
         "executePlan", "criticalSection",
         "getDeepLinks",
         "getNavigationGraph", "explore", "identifyInteractions",

@@ -352,8 +352,7 @@ Session-based Execution:
 
   const deviceTools = [
     "setActiveDevice",
-    "enableDemoMode",
-    "disableDemoMode",
+    "demoMode",
     "listDeviceImages",
     "listDevices",
     "startDevice",

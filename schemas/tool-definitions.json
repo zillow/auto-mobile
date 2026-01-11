@@ -341,11 +341,61 @@
     }
   },
   {
-    "name": "disableDemoMode",
-    "description": "Disable demo mode",
+    "name": "demoMode",
+    "description": "Enable or disable demo mode for screenshots and screen recordings",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "enable",
+            "disable"
+          ],
+          "description": "Demo mode action"
+        },
+        "time": {
+          "type": "string",
+          "description": "Time in HHMM (e.g., 1000)"
+        },
+        "batteryLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Battery % (0-100)"
+        },
+        "batteryPlugged": {
+          "type": "boolean",
+          "description": "Charging status"
+        },
+        "wifiLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "WiFi strength (0-4)"
+        },
+        "mobileDataType": {
+          "type": "string",
+          "enum": [
+            "4g",
+            "5g",
+            "lte",
+            "3g",
+            "edge",
+            "none"
+          ],
+          "description": "Data type"
+        },
+        "mobileSignalLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4,
+          "description": "Signal strength (0-4)"
+        },
+        "hideNotifications": {
+          "type": "boolean",
+          "description": "Hide notifications"
+        },
         "platform": {
           "type": "string",
           "enum": [
@@ -368,6 +418,7 @@
         }
       },
       "required": [
+        "action",
         "platform"
       ],
       "additionalProperties": false,
@@ -465,82 +516,6 @@
       "required": [
         "source",
         "target",
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "enableDemoMode",
-    "description": "Enable demo mode",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "time": {
-          "type": "string",
-          "description": "Time in HHMM (e.g., 1000)"
-        },
-        "batteryLevel": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100,
-          "description": "Battery % (0-100)"
-        },
-        "batteryPlugged": {
-          "type": "boolean",
-          "description": "Charging status"
-        },
-        "wifiLevel": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 4,
-          "description": "WiFi strength (0-4)"
-        },
-        "mobileDataType": {
-          "type": "string",
-          "enum": [
-            "4g",
-            "5g",
-            "lte",
-            "3g",
-            "edge",
-            "none"
-          ],
-          "description": "Data type"
-        },
-        "mobileSignalLevel": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 4,
-          "description": "Signal strength (0-4)"
-        },
-        "hideNotifications": {
-          "type": "boolean",
-          "description": "Hide notifications"
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
         "platform"
       ],
       "additionalProperties": false,
