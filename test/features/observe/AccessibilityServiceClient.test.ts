@@ -295,6 +295,60 @@ describe("AccessibilityServiceClient", function() {
         NavigationGraphManager.resetInstance();
       }
     });
+
+    test("should preserve SDK screen names when hierarchy updates follow navigation events", async function() {
+      NavigationGraphManager.resetInstance();
+      const navManager = NavigationGraphManager.getInstance();
+
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory,
+        fakeTimer
+      );
+
+      try {
+        const resultPromise = testClient.getLatestHierarchy(true, 2000);
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "navigation_event",
+          event: {
+            destination: "SdkHome",
+            source: "SdkStart",
+            arguments: {},
+            metadata: {},
+            timestamp: Date.now(),
+            sequenceNumber: 1,
+            applicationId: "com.example.sdk",
+          }
+        }));
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "hierarchy_update",
+          timestamp: Date.now(),
+          data: {
+            updatedAt: Date.now(),
+            packageName: "com.example.sdk",
+            hierarchy: {
+              "text": "SDK Home",
+              "resource-id": "com.example.sdk:id/home",
+            }
+          }
+        }));
+
+        await resultPromise;
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(navManager.getCurrentScreen()).toBe("SdkHome");
+      } finally {
+        await testClient.close();
+        NavigationGraphManager.resetInstance();
+      }
+    });
   });
 
   describe("convertToViewHierarchyResult", function() {

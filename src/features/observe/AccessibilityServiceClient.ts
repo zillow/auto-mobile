@@ -634,6 +634,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
   // Hierarchy navigation detector for view hierarchy-based navigation
   private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
+  // Track apps that emit SDK navigation events so we can avoid overriding screen names
+  private sdkNavigationAppIds: Set<string> = new Set();
 
   /**
    * Private constructor - use getInstance() instead
@@ -950,6 +952,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
           logger.warn("[ACCESSIBILITY_SERVICE] Skipping navigation detection: hierarchy missing in update");
         } else if (message.data.error) {
           logger.warn(`[ACCESSIBILITY_SERVICE] Skipping navigation detection due to hierarchy error: ${message.data.error}`);
+        } else if (!this.shouldUseHierarchyNavigation(message.data.packageName)) {
+          logger.debug(`[ACCESSIBILITY_SERVICE] Skipping hierarchy navigation for SDK app: ${message.data.packageName}`);
         } else {
           this.getHierarchyNavigationDetector().onHierarchyUpdate(message.data);
         }
@@ -1243,6 +1247,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
         const navMessage = message as any;
         const event = navMessage.event as NavigationEvent;
         if (event) {
+          if (event.applicationId) {
+            this.sdkNavigationAppIds.add(event.applicationId);
+          }
           // applicationId is included in the serialized event from Android SDK
           logger.debug(
             `[ACCESSIBILITY_SERVICE] Navigation event: ${event.destination} ` +
@@ -1273,6 +1280,13 @@ export class AccessibilityServiceClient implements AccessibilityService {
     }
     const timeSinceTimeout = Date.now() - this.lastWebSocketTimeout;
     return timeSinceTimeout < AccessibilityServiceClient.WEBSOCKET_TIMEOUT_COOLDOWN_MS;
+  }
+
+  private shouldUseHierarchyNavigation(packageName?: string): boolean {
+    if (!packageName) {
+      return true;
+    }
+    return !this.sdkNavigationAppIds.has(packageName);
   }
 
   /**
