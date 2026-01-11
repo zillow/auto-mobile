@@ -324,7 +324,7 @@ Usage:
   auto-mobile --cli help [tool-name]
 
 Examples:
-  auto-mobile --cli listDevices
+  auto-mobile --cli listDeviceImages
   auto-mobile --cli observe
   auto-mobile --cli tapOn --text "Submit"
   auto-mobile --cli startDevice --avdName "pixel_7_api_34"
@@ -354,7 +354,6 @@ Session-based Execution:
     "setActiveDevice",
     "demoMode",
     "listDeviceImages",
-    "listDevices",
     "startDevice",
     "killDevice",
     "checkRunningDevices"

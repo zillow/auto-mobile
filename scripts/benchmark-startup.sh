@@ -117,21 +117,19 @@ mcp_read() {
   return 1
 }
 
-mcp_call() {
+mcp_read_resource() {
   local fd_in="$1"
   local fd_out="$2"
-  local tool="$3"
-  local args_json="$4"
-  local timeout_sec="$5"
+  local uri="$3"
+  local timeout_sec="$4"
   local request_id
   request_id=$(mcp_next_id)
 
   local request
   request=$(jq -c -n \
     --argjson id "$request_id" \
-    --arg tool "$tool" \
-    --argjson args "$args_json" \
-    '{jsonrpc:"2.0", id:$id, method:"tools/call", params:{name:$tool, arguments:$args}}')
+    --arg uri "$uri" \
+    '{jsonrpc:"2.0", id:$id, method:"resources/read", params:{uri:$uri}}')
 
   mcp_send "$fd_in" "$request"
   mcp_read "$fd_out" "$timeout_sec"
@@ -187,7 +185,7 @@ daemon_call() {
   local request
   request=$(jq -c -n \
     --arg id "$request_id" \
-    '{id:$id, type:"mcp_request", method:"tools/call", params:{name:"listDevices", arguments:{platform:"android"}}}')
+    '{id:$id, type:"mcp_request", method:"resources/read", params:{uri:"automobile:devices/booted"}}')
 
   local response
   if [[ "$daemon_socket_client" == "python" ]]; then
@@ -304,12 +302,12 @@ measure_device_discovery() {
 
   if [[ "$device_count" -eq 1 ]]; then
     start_ms=$(get_time_ms)
-    response=$(mcp_call "$fd_in" "$fd_out" "listDevices" '{"platform":"android"}' 10) || {
-      jq -n --arg reason "listDevices failed" '{skipped:true, reason:$reason, scenarios:[]}'
+    response=$(mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10) || {
+      jq -n --arg reason "booted devices resource read failed" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
     }
     if jq -e '.error' >/dev/null 2>&1 <<<"$response"; then
-      jq -n --arg reason "listDevices returned error" '{skipped:true, reason:$reason, scenarios:[]}'
+      jq -n --arg reason "booted devices resource returned error" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
     fi
     duration_ms=$(( $(get_time_ms) - start_ms ))
@@ -317,12 +315,12 @@ measure_device_discovery() {
       '. + [{name:"singleDevice", durationMs:$duration, deviceCount:$count}]' <<<"$scenarios")
   else
     start_ms=$(get_time_ms)
-    response=$(mcp_call "$fd_in" "$fd_out" "listDevices" '{"platform":"android"}' 10) || {
-      jq -n --arg reason "listDevices failed" '{skipped:true, reason:$reason, scenarios:[]}'
+    response=$(mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10) || {
+      jq -n --arg reason "booted devices resource read failed" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
     }
     if jq -e '.error' >/dev/null 2>&1 <<<"$response"; then
-      jq -n --arg reason "listDevices returned error" '{skipped:true, reason:$reason, scenarios:[]}'
+      jq -n --arg reason "booted devices resource returned error" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
     fi
     duration_ms=$(( $(get_time_ms) - start_ms ))
@@ -332,7 +330,7 @@ measure_device_discovery() {
 
   if run_adb kill-server >/dev/null 2>&1; then
     start_ms=$(get_time_ms)
-    response=$(mcp_call "$fd_in" "$fd_out" "listDevices" '{"platform":"android"}' 10) || response=""
+    response=$(mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10) || response=""
     if [[ -n "$response" ]] && ! jq -e '.error' >/dev/null 2>&1 <<<"$response"; then
       duration_ms=$(( $(get_time_ms) - start_ms ))
       scenarios=$(jq --argjson duration "$duration_ms" --argjson count "$device_count" \
@@ -395,13 +393,13 @@ run_mcp_server() {
 
   mcp_send 3 '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-  if ! mcp_call 3 4 "listDevices" '{"platform":"android"}' 10 >/dev/null; then
+  if ! mcp_read_resource 3 4 "automobile:devices/booted" 10 >/dev/null; then
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
     exec 5<&-
     rm -rf "$fifo_dir"
-    echo "Failed to call listDevices" >&2
+    echo "Failed to read booted devices resource" >&2
     return 1
   fi
   local time_to_first_tool_call_ms

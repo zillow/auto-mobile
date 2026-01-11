@@ -26,8 +26,6 @@ describe("MCP Tools Registry", () => {
     expect(toolNames).toContain("listApps");
     expect(toolNames).toContain("launchApp");
 
-    // Should include device tools (MCP device management)
-    expect(toolNames).toContain("listDevices");
   });
 
   test("should maintain singleton registry across server instances", () => {
@@ -78,7 +76,7 @@ describe("MCP Tools Registry", () => {
       utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog", "demoMode"],
 
       // Emulator tools (AVD management)
-      emulator: ["listDeviceImages", "listDevices", "checkRunningDevices", "startDevice", "killDevice"]
+      emulator: ["listDeviceImages", "checkRunningDevices", "startDevice", "killDevice"]
     };
 
     // Check that each category has at least one tool registered

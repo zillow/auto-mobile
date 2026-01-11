@@ -176,6 +176,20 @@ export class DaemonClient {
    * Call a tool on the daemon
    */
   async callTool(toolName: string, params: Record<string, any>): Promise<any> {
+    return this.sendRequest("tools/call", {
+      name: toolName,
+      arguments: params,
+    });
+  }
+
+  /**
+   * Read a resource from the daemon
+   */
+  async readResource(uri: string): Promise<any> {
+    return this.sendRequest("resources/read", { uri });
+  }
+
+  private async sendRequest(method: string, params: Record<string, any>): Promise<any> {
     // Ensure we're connected
     if (!this.connected) {
       await this.connect();
@@ -187,11 +201,8 @@ export class DaemonClient {
     const request: DaemonRequest = {
       id: requestId,
       type: "mcp_request",
-      method: "tools/call",
-      params: {
-        name: toolName,
-        arguments: params,
-      },
+      method,
+      params,
     };
 
     // Send request
@@ -244,3 +255,12 @@ export class DaemonClient {
     this.pendingRequests.clear();
   }
 }
+
+export interface DaemonClientLike {
+  connect(): Promise<void>;
+  close(): Promise<void>;
+  callTool(toolName: string, params: Record<string, any>): Promise<any>;
+  readResource(uri: string): Promise<any>;
+}
+
+export type DaemonClientFactory = () => DaemonClientLike;

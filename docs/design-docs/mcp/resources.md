@@ -24,6 +24,20 @@ Returns the current navigation graph showing:
 
 See [Navigation Graph](navigation-graph.md) for details.
 
+### Booted Devices
+
+**URI**: `automobile:devices/booted`
+
+Returns booted device inventory across Android and iOS, including:
+
+- Total, per-platform, virtual, and physical device counts
+- Optional daemon pool status (idle/assigned/error) when the daemon is active
+- Per-device pool assignment (status + session UUID) when available
+
+**URI Template**: `automobile:devices/booted/{platform}`
+
+This resource replaces the removed `listDevices` and `daemon_available_devices` tools.
+
 ### Test Timing History
 
 **URI**: `

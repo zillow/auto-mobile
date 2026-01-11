@@ -1063,28 +1063,6 @@
     }
   },
   {
-    "name": "listDevices",
-    "description": "List connected devices",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        }
-      },
-      "required": [
-        "platform"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
     "name": "navigateTo",
     "description": "Navigate to screen using navigation graph",
     "inputSchema": {

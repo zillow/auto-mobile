@@ -2,6 +2,8 @@ import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
 import { logger } from "../utils/logger";
 import { BootedDevice, Platform } from "../models";
+import { DaemonState } from "../daemon/daemonState";
+import type { DevicePool } from "../daemon/devicePool";
 
 // Resource URIs
 export const BOOTED_DEVICE_RESOURCE_URIS = {
@@ -14,7 +16,10 @@ export interface BootedDeviceInfo {
   name: string;
   platform: Platform;
   deviceId: string;
-  source: "local";
+  source: "local" | "remote";
+  isVirtual: boolean;
+  poolStatus?: PoolDeviceStatus;
+  assignedSession?: string;
 }
 
 // Resource content schema
@@ -22,8 +27,26 @@ export interface BootedDevicesResourceContent {
   totalCount: number;
   androidCount: number;
   iosCount: number;
+  virtualCount: number;
+  physicalCount: number;
   lastUpdated: string;  // ISO 8601
+  poolStatus?: PoolStatusSummary;
   devices: BootedDeviceInfo[];
+}
+
+export type PoolDeviceStatus = "idle" | "assigned" | "error";
+
+export interface PoolStatusSummary {
+  enabled: boolean;
+  idle: number;
+  assigned: number;
+  error: number;
+  total: number;
+}
+
+interface PoolDeviceInfo {
+  poolStatus: PoolDeviceStatus;
+  assignedSession?: string;
 }
 
 // Module-level device manager for dependency injection
@@ -49,12 +72,51 @@ export function getDeviceManager(): PlatformDeviceManager {
 }
 
 // Convert BootedDevice to BootedDeviceInfo
-function toBootedDeviceInfo(device: BootedDevice): BootedDeviceInfo {
-  return {
+function toBootedDeviceInfo(device: BootedDevice, poolInfo?: PoolDeviceInfo): BootedDeviceInfo {
+  const info: BootedDeviceInfo = {
     name: device.name,
     platform: device.platform,
     deviceId: device.deviceId,
-    source: device.source || "local"
+    source: device.source || "local",
+    isVirtual: isVirtualDevice(device)
+  };
+
+  if (!poolInfo) {
+    return info;
+  }
+
+  return {
+    ...info,
+    poolStatus: poolInfo.poolStatus,
+    ...(poolInfo.assignedSession ? { assignedSession: poolInfo.assignedSession } : {})
+  };
+}
+
+function isVirtualDevice(device: BootedDevice): boolean {
+  if (device.platform === "android") {
+    return device.deviceId.startsWith("emulator-");
+  }
+
+  return device.deviceId.includes("-") && device.deviceId.length > 30;
+}
+
+function getPoolDeviceInfo(devicePool: DevicePool | null, deviceId: string): PoolDeviceInfo | undefined {
+  if (!devicePool) {
+    return undefined;
+  }
+
+  const pooledDevice = devicePool.getDevice(deviceId);
+  if (!pooledDevice) {
+    return undefined;
+  }
+
+  const poolStatus: PoolDeviceStatus = pooledDevice.status === "busy"
+    ? "assigned"
+    : pooledDevice.status;
+
+  return {
+    poolStatus,
+    assignedSession: pooledDevice.sessionId || undefined
   };
 }
 
@@ -96,6 +158,26 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
   const devices: BootedDeviceInfo[] = [];
   let androidCount = 0;
   let iosCount = 0;
+  let devicePool: DevicePool | null = null;
+  let poolStatus: PoolStatusSummary | undefined;
+
+  const daemonState = DaemonState.getInstance();
+  if (daemonState.isInitialized()) {
+    try {
+      devicePool = daemonState.getDevicePool();
+      const stats = devicePool.getStats();
+      poolStatus = {
+        enabled: true,
+        idle: stats.idle,
+        assigned: stats.assigned,
+        error: stats.error,
+        total: stats.total
+      };
+    } catch (error) {
+      logger.warn(`[BootedDeviceResources] Failed to read device pool status: ${error}`);
+      devicePool = null;
+    }
+  }
 
   try {
     // Fetch Android booted devices if requested
@@ -103,7 +185,7 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
       try {
         const androidDevices = await deviceManager.getBootedDevices("android");
         for (const device of androidDevices) {
-          devices.push(toBootedDeviceInfo(device));
+          devices.push(toBootedDeviceInfo(device, getPoolDeviceInfo(devicePool, device.deviceId)));
           androidCount++;
         }
       } catch (error) {
@@ -116,7 +198,7 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
       try {
         const iosDevices = await deviceManager.getBootedDevices("ios");
         for (const device of iosDevices) {
-          devices.push(toBootedDeviceInfo(device));
+          devices.push(toBootedDeviceInfo(device, getPoolDeviceInfo(devicePool, device.deviceId)));
           iosCount++;
         }
       } catch (error) {
@@ -127,11 +209,17 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
     logger.error(`[BootedDeviceResources] Error fetching booted devices: ${error}`);
   }
 
+  const virtualCount = devices.filter(device => device.isVirtual).length;
+  const physicalCount = devices.length - virtualCount;
+
   return {
     totalCount: devices.length,
     androidCount,
     iosCount,
+    virtualCount,
+    physicalCount,
     lastUpdated: new Date().toISOString(),
+    poolStatus,
     devices
   };
 }

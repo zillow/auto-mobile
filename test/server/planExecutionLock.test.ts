@@ -69,7 +69,7 @@ describe("Plan execution lock", () => {
       await client.request({
         method: "tools/call",
         params: {
-          name: "listDevices",
+          name: "listDeviceImages",
           arguments: { platform: "android" },
         },
       }, z.any());
@@ -89,7 +89,7 @@ describe("Plan execution lock", () => {
     const result = await client.request({
       method: "tools/call",
       params: {
-        name: "listDevices",
+        name: "listDeviceImages",
         arguments: { platform: "android" },
       },
     }, z.any());

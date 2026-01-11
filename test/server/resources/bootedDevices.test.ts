@@ -4,6 +4,9 @@ import { ResourceRegistry } from "../../../src/server/resourceRegistry";
 import { FakeDeviceUtils } from "../../fakes/FakeDeviceUtils";
 import { setDeviceManager, BootedDevicesResourceContent } from "../../../src/server/bootedDeviceResources";
 import { BootedDevice } from "../../../src/models";
+import { DaemonState } from "../../../src/daemon/daemonState";
+import { DevicePool } from "../../../src/daemon/devicePool";
+import { SessionManager } from "../../../src/daemon/sessionManager";
 import { z } from "zod";
 
 describe("MCP Booted Device Resources", () => {
@@ -48,6 +51,12 @@ describe("MCP Booted Device Resources", () => {
     // Set up fake device utils before each test
     fakeDeviceUtils = new FakeDeviceUtils();
     setDeviceManager(fakeDeviceUtils);
+  });
+
+  afterEach(() => {
+    if (DaemonState.getInstance().isInitialized()) {
+      DaemonState.getInstance().reset();
+    }
   });
 
   afterAll(async () => {
@@ -148,7 +157,10 @@ describe("MCP Booted Device Resources", () => {
       expect(data.totalCount).toBe(3);
       expect(data.androidCount).toBe(2);
       expect(data.iosCount).toBe(1);
+      expect(data.virtualCount).toBe(3);
+      expect(data.physicalCount).toBe(0);
       expect(data.devices).toHaveLength(3);
+      expect(data.poolStatus).toBeUndefined();
 
       // Verify lastUpdated is a valid ISO 8601 date
       expect(() => new Date(data.lastUpdated)).not.toThrow();
@@ -178,7 +190,10 @@ describe("MCP Booted Device Resources", () => {
       expect(data.totalCount).toBe(0);
       expect(data.androidCount).toBe(0);
       expect(data.iosCount).toBe(0);
+      expect(data.virtualCount).toBe(0);
+      expect(data.physicalCount).toBe(0);
       expect(data.devices).toHaveLength(0);
+      expect(data.poolStatus).toBeUndefined();
     });
 
     test("should filter correctly for android platform", async function() {
@@ -214,6 +229,8 @@ describe("MCP Booted Device Resources", () => {
       expect(data.totalCount).toBe(2);
       expect(data.androidCount).toBe(2);
       expect(data.iosCount).toBe(0);
+      expect(data.virtualCount).toBe(2);
+      expect(data.physicalCount).toBe(0);
       expect(data.devices).toHaveLength(2);
 
       // Verify all devices are Android
@@ -255,6 +272,8 @@ describe("MCP Booted Device Resources", () => {
       expect(data.totalCount).toBe(2);
       expect(data.androidCount).toBe(0);
       expect(data.iosCount).toBe(2);
+      expect(data.virtualCount).toBe(2);
+      expect(data.physicalCount).toBe(0);
       expect(data.devices).toHaveLength(2);
 
       // Verify all devices are iOS
@@ -293,6 +312,60 @@ describe("MCP Booted Device Resources", () => {
       expect(device.platform).toBe("android");
       expect(device.deviceId).toBe("emulator-5554");
       expect(device.source).toBe("local");
+      expect(device.isVirtual).toBe(true);
+      expect(device.poolStatus).toBeUndefined();
+    });
+
+    test("should include pool status when daemon is initialized", async function() {
+      fakeDeviceUtils.setBootedDevices("android", [mockAndroidDevice1, mockAndroidDevice2]);
+
+      const sessionManager = new SessionManager();
+      const devicePool = new DevicePool(sessionManager);
+      await devicePool.initializeWithDevices([
+        mockAndroidDevice1.deviceId,
+        mockAndroidDevice2.deviceId
+      ]);
+
+      const sessionId = "session-123";
+      await devicePool.assignDeviceToSession(sessionId);
+      DaemonState.getInstance().initialize(sessionManager, devicePool);
+
+      const { client } = fixture.getContext();
+
+      const readResourceResponseSchema = z.object({
+        contents: z.array(z.object({
+          uri: z.string(),
+          mimeType: z.string().optional(),
+          text: z.string().optional(),
+          blob: z.string().optional()
+        }))
+      });
+
+      const result = await client.request({
+        method: "resources/read",
+        params: {
+          uri: "automobile:devices/booted"
+        }
+      }, readResourceResponseSchema);
+
+      const data: BootedDevicesResourceContent = JSON.parse(result.contents[0].text!);
+      expect(data.poolStatus).toEqual({
+        enabled: true,
+        idle: 1,
+        assigned: 1,
+        error: 0,
+        total: 2
+      });
+
+      const assignedDevice = data.devices.find(device => device.assignedSession === sessionId);
+      expect(assignedDevice).toBeDefined();
+      expect(assignedDevice?.poolStatus).toBe("assigned");
+
+      const idleDevice = data.devices.find(
+        device => device.deviceId !== assignedDevice?.deviceId
+      );
+      expect(idleDevice).toBeDefined();
+      expect(idleDevice?.poolStatus).toBe("idle");
     });
 
     test("should return error for invalid platform", async function() {

@@ -972,7 +972,7 @@ App lifecycle management is unaffected by TalkBack state.
 
 **Implementation Changes**: **None**
 
-### listDevices / startDevice / killDevice Tools
+### startDevice / killDevice Tools
 
 **Current Behavior**:
 - Device management via ADB

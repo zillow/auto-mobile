@@ -2,13 +2,19 @@ import { SessionManager } from "./sessionManager";
 import { DevicePool } from "./devicePool";
 import { logger } from "../utils/logger";
 
+export interface DaemonStateLike {
+  isInitialized(): boolean;
+  getSessionManager(): SessionManager;
+  getDevicePool(): DevicePool;
+}
+
 /**
  * Singleton for accessing daemon state
  *
  * Provides access to SessionManager and DevicePool instances
  * for both the daemon process and internal command handlers.
  */
-export class DaemonState {
+export class DaemonState implements DaemonStateLike {
   private static instance: DaemonState;
   private sessionManager: SessionManager | null = null;
   private devicePool: DevicePool | null = null;

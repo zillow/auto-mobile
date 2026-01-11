@@ -161,7 +161,7 @@ export class DeviceSelector {
    * Get Android emulators (using correct terminology)
    */
   private static async getAndroidEmulators(): Promise<AvailableDevice[]> {
-    // This would integrate with mcp_AutoMobile_listDevices
+    // This would integrate with automobile:devices/booted resource
     // For now, returning mock data based on known device
     return [
       {

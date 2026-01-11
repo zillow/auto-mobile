@@ -3,16 +3,11 @@ import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
-import { DaemonState } from "../daemon/daemonState";
 import { notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
 import { syncInstalledAppResources } from "./appResources";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
-});
-
-export const listDevicesSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 });
 
@@ -43,10 +38,6 @@ export interface StartDeviceArgs {
 
 export interface KillDeviceArgs {
   device: BootedDevice;
-}
-
-export interface ListDevicesArgs {
-  platform: SomePlatform;
 }
 
 export interface ListDeviceImagesArgs {
@@ -80,76 +71,6 @@ export function resetDeviceToolsDependencies(): void {
 }
 
 export function registerDeviceTools() {
-  // List all connected devices (physical and emulators) handler
-  const listBootedDevicesHandler = async (args: ListDevicesArgs) => {
-    try {
-      const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
-      const bootedDevices = await deviceUtils.getBootedDevices(args.platform);
-
-      // Categorize devices by type
-      const devices = bootedDevices.map(device => {
-        // For Android: emulator devices have deviceId starting with "emulator-"
-        // For iOS: simulator devices typically have deviceId as UUID format or contain "simulator"
-        const isVirtual = args.platform === "android"
-          ? device.deviceId.startsWith("emulator-")
-          : device.deviceId.includes("-") && device.deviceId.length > 30; // iOS simulators typically have long UUID-like IDs
-
-        return {
-          ...device,
-          isVirtual
-        };
-      });
-
-      const virtualCount = devices.filter(d => d.isVirtual).length;
-      const physicalCount = devices.filter(d => !d.isVirtual).length;
-
-      const response: {
-        message: string;
-        devices: Array<BootedDevice & { isVirtual: boolean }>;
-        totalCount: number;
-        virtualCount: number;
-        physicalCount: number;
-        platform: SomePlatform;
-        poolStatus?: {
-          idle: number;
-          assigned: number;
-          error: number;
-          total: number;
-        };
-      } = {
-        message: `Found ${devices.length} connected ${args.platform} devices`,
-        devices: devices,
-        totalCount: devices.length,
-        virtualCount: virtualCount,
-        physicalCount: physicalCount,
-        platform: args.platform
-      };
-
-      if (DaemonState.getInstance().isInitialized()) {
-        if (args.platform === "android") {
-          const stats = DaemonState.getInstance().getDevicePool().getStats();
-          response.poolStatus = {
-            idle: stats.idle,
-            assigned: stats.assigned,
-            error: stats.error,
-            total: stats.total
-          };
-        } else {
-          response.poolStatus = {
-            idle: 0,
-            assigned: 0,
-            error: 0,
-            total: 0
-          };
-        }
-      }
-
-      return createJSONToolResponse(response);
-    } catch (error) {
-      throw new ActionableError(`Failed to list ${args.platform} devices: ${error}`);
-    }
-  };
-
   // List AVDs handler
   const listDeviceImagesHandler = async (args: ListDeviceImagesArgs) => {
     try {
@@ -227,13 +148,6 @@ export function registerDeviceTools() {
   };
 
   // Register with the tool registry
-  ToolRegistry.register(
-    "listDevices",
-    "List connected devices",
-    listDevicesSchema,
-    listBootedDevicesHandler
-  );
-
   ToolRegistry.register(
     "listDeviceImages",
     "List device images",
