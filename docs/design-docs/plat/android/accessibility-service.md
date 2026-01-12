@@ -44,6 +44,27 @@ If settings-based toggling is unavailable or denied:
 
 This is the only fallback path; AutoMobile does not drive these UI steps programmatically.
 
+## Overlay Permissions
+
+The accessibility service can draw overlays for debugging and inspection. When the
+`SYSTEM_ALERT_WINDOW` permission is granted, AutoMobile uses `TYPE_APPLICATION_OVERLAY`.
+If the permission is missing, it falls back to `TYPE_ACCESSIBILITY_OVERLAY`, which only
+requires the accessibility service permission.
+
+### Granting SYSTEM_ALERT_WINDOW
+
+- Settings: Open Settings > Apps > Special access > Display over other apps, then enable
+  AutoMobile Accessibility Service.
+- ADB (automated test environments):
+
+```bash
+adb shell appops set dev.jasonpearson.automobile.accessibilityservice \
+  SYSTEM_ALERT_WINDOW allow
+```
+
+The accessibility service can also launch the overlay permission settings screen via
+`ACTION_MANAGE_OVERLAY_PERMISSION` when requested over WebSocket (`get_permission`).
+
 ### Capability Detection
 
 AutoMobile automatically detects whether settings-based toggling is supported on a device:
