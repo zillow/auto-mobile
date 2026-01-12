@@ -92,6 +92,9 @@ bun run benchmark-startup --warm
 bun run benchmark-startup --server-only
 bun run benchmark-startup --daemon-only
 
+# Stream benchmark stdio as it is read
+bun run benchmark-startup --verbose
+
 # Change regression threshold multiplier
 bun run benchmark-startup --threshold 1.3
 ```

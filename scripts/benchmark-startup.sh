@@ -3,7 +3,7 @@
 # Benchmark script to measure MCP server and daemon startup time.
 #
 # Usage:
-#   bun run benchmark-startup [--cold] [--warm] [--server-only] [--daemon-only]
+#   bun run benchmark-startup [--cold] [--warm] [--server-only] [--daemon-only] [--verbose]
 #     [--output path/to/report.json] [--compare path/to/baseline.json] [--threshold 1.3]
 #
 # Options:
@@ -11,6 +11,7 @@
 #   --warm        Run warm-start measurement (includes a warm-up run)
 #   --server-only Skip daemon benchmarking
 #   --daemon-only Skip MCP server benchmarking
+#   --verbose     Print MCP/daemon stdio as it is read
 #   --output      Write JSON report to file
 #   --compare     Compare against a baseline JSON file
 #   --threshold   Regression multiplier (default 1.3)
@@ -21,6 +22,8 @@
 
 DEFAULT_TIMEOUT_MS=15000
 MCP_PROTOCOL_VERSION="2024-11-05"
+STDERR_TAIL_LINES=20
+verbose="false"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -49,24 +52,150 @@ get_time_ms() {
   fi
 }
 
+environment_summary() {
+  local bun_version="unknown"
+  if command -v bun >/dev/null 2>&1; then
+    bun_version=$(bun --version 2>/dev/null || echo "unknown")
+  fi
+  local os_info="unknown"
+  if command -v uname >/dev/null 2>&1; then
+    os_info=$(uname -a 2>/dev/null || echo "unknown")
+  fi
+  printf 'bun %s; %s' "$bun_version" "$os_info"
+}
+
+describe_process() {
+  local pid="$1"
+  if [[ -z "$pid" ]]; then
+    echo "unknown"
+    return
+  fi
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    echo "running (PID $pid)"
+  else
+    echo "not running (PID $pid)"
+  fi
+}
+
+log_line() {
+  local log_path="$1"
+  local line="$2"
+  local prefix="$3"
+  if [[ -n "$log_path" ]]; then
+    printf '%s\n' "$line" >> "$log_path"
+  fi
+  if [[ "$verbose" == "true" ]]; then
+    printf '%s%s\n' "$prefix" "$line" >&2
+  fi
+}
+
+drain_fd() {
+  local fd="$1"
+  local log_path="$2"
+  local prefix="$3"
+  local last_line_var="$4"
+  local line=""
+  local last_line=""
+
+  while IFS= read -r -t 0 line <&"$fd"; do
+    log_line "$log_path" "$line" "$prefix"
+    last_line="$line"
+  done
+
+  if [[ -n "$last_line" && -n "$last_line_var" ]]; then
+    printf -v "$last_line_var" '%s' "$last_line"
+  fi
+}
+
+build_error_message() {
+  local summary="$1"
+  local wait_target="$2"
+  local elapsed_ms="$3"
+  local pid="$4"
+  local last_stdout="$5"
+  local last_stderr="$6"
+  local stderr_log="$7"
+  local extra_info="$8"
+
+  local message="ERROR: $summary"
+
+  if [[ -n "$elapsed_ms" ]]; then
+    if [[ -n "$wait_target" ]]; then
+      message+=$'\n  Waited: '"${elapsed_ms}ms for ${wait_target}"
+    else
+      message+=$'\n  Waited: '"${elapsed_ms}ms"
+    fi
+  elif [[ -n "$wait_target" ]]; then
+    message+=$'\n  Waiting for: '"$wait_target"
+  fi
+
+  if [[ -n "$pid" ]]; then
+    message+=$'\n  Process state: '"$(describe_process "$pid")"
+  fi
+
+  if [[ -n "$last_stdout" ]]; then
+    message+=$'\n  Last stdout message: '"$last_stdout"
+  fi
+
+  if [[ -n "$last_stderr" ]]; then
+    message+=$'\n  Last stderr message: '"$last_stderr"
+  fi
+
+  if [[ -n "$extra_info" ]]; then
+    message+=$'\n  '"$extra_info"
+  fi
+
+  if [[ -n "$stderr_log" && -s "$stderr_log" ]]; then
+    message+=$'\n\n  Recent stderr output:'
+    message+=$'\n'
+    message+="$(tail -n "$STDERR_TAIL_LINES" "$stderr_log" | sed 's/^/  /')"
+  fi
+
+  local env_info
+  env_info=$(environment_summary)
+  if [[ -n "$env_info" ]]; then
+    message+=$'\n\n  Environment: '"$env_info"
+  fi
+
+  printf '%s\n' "$message"
+}
+
 wait_for_startup_report() {
   local fd="$1"
   local timeout_ms="$2"
+  local stderr_log="$3"
+  local report_var="$4"
+  local last_line_var="$5"
+  local prefix="$6"
   local start_ms
   start_ms=$(get_time_ms)
+  local last_non_report=""
 
   while true; do
     local line=""
     if IFS= read -r -t 1 line <&"$fd"; then
+      log_line "$stderr_log" "$line" "$prefix"
       if [[ "$line" == STARTUP_BENCHMARK* ]]; then
-        echo "${line#STARTUP_BENCHMARK }"
+        local report="${line#STARTUP_BENCHMARK }"
+        if [[ -n "$report_var" ]]; then
+          printf -v "$report_var" '%s' "$report"
+        else
+          printf '%s\n' "$report"
+        fi
+        if [[ -n "$last_line_var" ]]; then
+          printf -v "$last_line_var" '%s' "$last_non_report"
+        fi
         return 0
       fi
+      last_non_report="$line"
     fi
 
     local now_ms
     now_ms=$(get_time_ms)
     if (( now_ms - start_ms >= timeout_ms )); then
+      if [[ -n "$last_line_var" ]]; then
+        printf -v "$last_line_var" '%s' "$last_non_report"
+      fi
       return 1
     fi
   done
@@ -109,9 +238,17 @@ mcp_send() {
 mcp_read() {
   local fd="$1"
   local timeout_sec="$2"
+  local out_var="$3"
   local line=""
   if IFS= read -r -t "$timeout_sec" line <&"$fd"; then
-    echo "$line"
+    if [[ "$verbose" == "true" ]]; then
+      printf 'mcp-stdout> %s\n' "$line" >&2
+    fi
+    if [[ -n "$out_var" ]]; then
+      printf -v "$out_var" '%s' "$line"
+    else
+      printf '%s\n' "$line"
+    fi
     return 0
   fi
   return 1
@@ -122,6 +259,7 @@ mcp_read_resource() {
   local fd_out="$2"
   local uri="$3"
   local timeout_sec="$4"
+  local out_var="$5"
   local request_id
   request_id=$(mcp_next_id)
 
@@ -132,7 +270,15 @@ mcp_read_resource() {
     '{jsonrpc:"2.0", id:$id, method:"resources/read", params:{uri:$uri}}')
 
   mcp_send "$fd_in" "$request"
-  mcp_read "$fd_out" "$timeout_sec"
+  local response=""
+  if ! mcp_read "$fd_out" "$timeout_sec" response; then
+    return 1
+  fi
+  if [[ -n "$out_var" ]]; then
+    printf -v "$out_var" '%s' "$response"
+  else
+    printf '%s\n' "$response"
+  fi
 }
 
 find_available_port() {
@@ -246,11 +392,24 @@ wait_for_daemon_responsive() {
   local socket_path="$1"
   local timeout_ms="$2"
   local start_ms="$3"
+  local out_var="$4"
+  local stderr_fd="$5"
+  local stderr_log="$6"
+  local last_line_var="$7"
+  local prefix="$8"
 
   while (( $(get_time_ms) - start_ms < timeout_ms )); do
     if daemon_call "$socket_path"; then
-      echo $(( $(get_time_ms) - start_ms ))
+      local elapsed_ms=$(( $(get_time_ms) - start_ms ))
+      if [[ -n "$out_var" ]]; then
+        printf -v "$out_var" '%s' "$elapsed_ms"
+      else
+        echo "$elapsed_ms"
+      fi
       return 0
+    fi
+    if [[ -n "$stderr_fd" ]]; then
+      drain_fd "$stderr_fd" "$stderr_log" "$prefix" "$last_line_var"
     fi
     sleep 0.1
   done
@@ -296,16 +455,16 @@ measure_device_discovery() {
   fi
 
   local scenarios="[]"
-  local response
+  local response=""
   local start_ms
   local duration_ms
 
   if [[ "$device_count" -eq 1 ]]; then
     start_ms=$(get_time_ms)
-    response=$(mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10) || {
+    if ! mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10 response; then
       jq -n --arg reason "booted devices resource read failed" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
-    }
+    fi
     if jq -e '.error' >/dev/null 2>&1 <<<"$response"; then
       jq -n --arg reason "booted devices resource returned error" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
@@ -315,10 +474,10 @@ measure_device_discovery() {
       '. + [{name:"singleDevice", durationMs:$duration, deviceCount:$count}]' <<<"$scenarios")
   else
     start_ms=$(get_time_ms)
-    response=$(mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10) || {
+    if ! mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10 response; then
       jq -n --arg reason "booted devices resource read failed" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
-    }
+    fi
     if jq -e '.error' >/dev/null 2>&1 <<<"$response"; then
       jq -n --arg reason "booted devices resource returned error" '{skipped:true, reason:$reason, scenarios:[]}'
       return 0
@@ -330,7 +489,8 @@ measure_device_discovery() {
 
   if run_adb kill-server >/dev/null 2>&1; then
     start_ms=$(get_time_ms)
-    response=$(mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10) || response=""
+    response=""
+    mcp_read_resource "$fd_in" "$fd_out" "automobile:devices/booted" 10 response || response=""
     if [[ -n "$response" ]] && ! jq -e '.error' >/dev/null 2>&1 <<<"$response"; then
       duration_ms=$(( $(get_time_ms) - start_ms ))
       scenarios=$(jq --argjson duration "$duration_ms" --argjson count "$device_count" \
@@ -354,7 +514,9 @@ run_mcp_server() {
   local stdin_fifo="$fifo_dir/stdin"
   local stdout_fifo="$fifo_dir/stdout"
   local stderr_fifo="$fifo_dir/stderr"
+  local stderr_log="$fifo_dir/stderr.log"
   mkfifo "$stdin_fifo" "$stdout_fifo" "$stderr_fifo"
+  : > "$stderr_log"
 
   local start_ms
   start_ms=$(get_time_ms)
@@ -368,6 +530,8 @@ run_mcp_server() {
   exec 3>"$stdin_fifo"
   exec 4<"$stdout_fifo"
   exec 5<"$stderr_fifo"
+  local last_stdout_message=""
+  local last_stderr_message=""
 
   mcp_request_id=0
   local init_id
@@ -379,40 +543,80 @@ run_mcp_server() {
     '{jsonrpc:"2.0", id:$id, method:"initialize", params:{protocolVersion:$version, capabilities:{}, clientInfo:{name:"startup-bench", version:"1.0.0"}}}')
   mcp_send 3 "$init_request"
 
-  if ! mcp_read 4 10 >/dev/null; then
+  local init_response=""
+  if ! mcp_read 4 10 init_response; then
+    drain_fd 5 "$stderr_log" "mcp-stderr> " last_stderr_message
+    local elapsed_ms=$(( $(get_time_ms) - start_ms ))
+    local error_message
+    error_message=$(build_error_message \
+      "Failed to read initialize response" \
+      "initialize response on stdout (fd 4)" \
+      "$elapsed_ms" \
+      "$server_pid" \
+      "$last_stdout_message" \
+      "$last_stderr_message" \
+      "$stderr_log" \
+      "Mode: $mode")
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
     exec 5<&-
     rm -rf "$fifo_dir"
-    echo "Failed to read initialize response" >&2
+    printf '%s\n' "$error_message"
     return 1
   fi
+  last_stdout_message="$init_response"
   local time_to_first_connection_ms
   time_to_first_connection_ms=$(( $(get_time_ms) - start_ms ))
 
   mcp_send 3 '{"jsonrpc":"2.0","method":"notifications/initialized"}'
 
-  if ! mcp_read_resource 3 4 "automobile:devices/booted" 10 >/dev/null; then
+  local booted_response=""
+  if ! mcp_read_resource 3 4 "automobile:devices/booted" 10 booted_response; then
+    drain_fd 5 "$stderr_log" "mcp-stderr> " last_stderr_message
+    local elapsed_ms=$(( $(get_time_ms) - start_ms ))
+    local error_message
+    error_message=$(build_error_message \
+      "Failed to read booted devices resource response" \
+      "resources/read response on stdout (fd 4)" \
+      "$elapsed_ms" \
+      "$server_pid" \
+      "$last_stdout_message" \
+      "$last_stderr_message" \
+      "$stderr_log" \
+      "Mode: $mode; Resource: automobile:devices/booted")
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
     exec 5<&-
     rm -rf "$fifo_dir"
-    echo "Failed to read booted devices resource" >&2
+    printf '%s\n' "$error_message"
     return 1
   fi
+  last_stdout_message="$booted_response"
   local time_to_first_tool_call_ms
   time_to_first_tool_call_ms=$(( $(get_time_ms) - start_ms ))
 
   local startup_report
-  if ! startup_report=$(wait_for_startup_report 5 "$DEFAULT_TIMEOUT_MS"); then
+  if ! wait_for_startup_report 5 "$DEFAULT_TIMEOUT_MS" "$stderr_log" startup_report last_stderr_message "mcp-stderr> "; then
+    drain_fd 5 "$stderr_log" "mcp-stderr> " last_stderr_message
+    local elapsed_ms=$(( $(get_time_ms) - start_ms ))
+    local error_message
+    error_message=$(build_error_message \
+      "Timed out waiting for startup report" \
+      "startup report on stderr (fd 5)" \
+      "$elapsed_ms" \
+      "$server_pid" \
+      "$last_stdout_message" \
+      "$last_stderr_message" \
+      "$stderr_log" \
+      "Mode: $mode")
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
     exec 5<&-
     rm -rf "$fifo_dir"
-    echo "Timed out waiting for startup report" >&2
+    printf '%s\n' "$error_message"
     return 1
   fi
 
@@ -478,9 +682,12 @@ run_daemon() {
   local socket_path="/tmp/auto-mobile-daemon-bench-${token}.sock"
   local pid_path="/tmp/auto-mobile-daemon-bench-${token}.pid"
 
-  local stderr_fifo
-  stderr_fifo=$(mktemp -u)
+  local run_dir
+  run_dir=$(mktemp -d)
+  local stderr_fifo="$run_dir/stderr"
+  local stderr_log="$run_dir/stderr.log"
   mkfifo "$stderr_fifo"
+  : > "$stderr_log"
 
   local spawn_start
   spawn_start=$(get_time_ms)
@@ -495,13 +702,26 @@ run_daemon() {
   spawn_ms=$(( $(get_time_ms) - spawn_start ))
 
   exec 5<"$stderr_fifo"
+  local last_stderr_message=""
 
   local startup_report
-  if ! startup_report=$(wait_for_startup_report 5 "$DEFAULT_TIMEOUT_MS"); then
+  if ! wait_for_startup_report 5 "$DEFAULT_TIMEOUT_MS" "$stderr_log" startup_report last_stderr_message "daemon-stderr> "; then
+    drain_fd 5 "$stderr_log" "daemon-stderr> " last_stderr_message
+    local elapsed_ms=$(( $(get_time_ms) - spawn_start ))
+    local error_message
+    error_message=$(build_error_message \
+      "Timed out waiting for daemon startup report" \
+      "startup report on stderr (fd 5)" \
+      "$elapsed_ms" \
+      "$daemon_pid" \
+      "" \
+      "$last_stderr_message" \
+      "$stderr_log" \
+      "Mode: $mode; Port: $port; Socket: $socket_path")
     stop_process "$daemon_pid"
     exec 5<&-
-    rm -f "$stderr_fifo"
-    echo "Timed out waiting for daemon startup report" >&2
+    rm -rf "$run_dir"
+    printf '%s\n' "$error_message"
     return 1
   fi
 
@@ -509,11 +729,31 @@ run_daemon() {
   time_to_ready_ms=$(( $(get_time_ms) - spawn_start ))
 
   local time_to_responsive_ms
-  if ! time_to_responsive_ms=$(wait_for_daemon_responsive "$socket_path" "$DEFAULT_TIMEOUT_MS" "$spawn_start"); then
+  if ! wait_for_daemon_responsive \
+    "$socket_path" \
+    "$DEFAULT_TIMEOUT_MS" \
+    "$spawn_start" \
+    time_to_responsive_ms \
+    5 \
+    "$stderr_log" \
+    last_stderr_message \
+    "daemon-stderr> "; then
+    drain_fd 5 "$stderr_log" "daemon-stderr> " last_stderr_message
+    local elapsed_ms=$(( $(get_time_ms) - spawn_start ))
+    local error_message
+    error_message=$(build_error_message \
+      "Timed out waiting for daemon responsiveness" \
+      "daemon responsiveness on socket ${socket_path}" \
+      "$elapsed_ms" \
+      "$daemon_pid" \
+      "" \
+      "$last_stderr_message" \
+      "$stderr_log" \
+      "Mode: $mode; Port: $port; Socket: $socket_path")
     stop_process "$daemon_pid"
     exec 5<&-
-    rm -f "$stderr_fifo" "$socket_path" "$pid_path"
-    echo "Timed out waiting for daemon responsiveness" >&2
+    rm -rf "$run_dir" "$socket_path" "$pid_path"
+    printf '%s\n' "$error_message"
     return 1
   fi
 
@@ -526,7 +766,7 @@ run_daemon() {
 
   stop_process "$daemon_pid"
   exec 5<&-
-  rm -f "$stderr_fifo" "$socket_path" "$pid_path"
+  rm -rf "$run_dir" "$socket_path" "$pid_path"
 
   local run_json
   run_json=$(jq -c -n \
@@ -584,6 +824,10 @@ while [[ $# -gt 0 ]]; do
       run_server="false"
       shift
       ;;
+    --verbose)
+      verbose="true"
+      shift
+      ;;
     *)
       echo "Unknown option: $1" >&2
       exit 1
@@ -629,15 +873,17 @@ fi
 
 if [[ "$run_server" == "true" ]]; then
   if [[ "$run_warm" == "true" ]]; then
-    if ! run_mcp_server "warm" "false" "$adb_available" "$adb_device_count" "$adb_error" >/dev/null; then
-      echo "Warm-up MCP server run failed" >&2
+    if ! run_error=$(run_mcp_server "warm" "false" "$adb_available" "$adb_device_count" "$adb_error"); then
+      printf '%s\n' "$run_error" >&2
+      echo "Warm-up MCP server run failed (see details above)" >&2
       exit 1
     fi
   fi
 
   if [[ "$run_cold" == "true" ]]; then
     if ! run_json=$(run_mcp_server "cold" "true" "$adb_available" "$adb_device_count" "$adb_error"); then
-      echo "Cold MCP server benchmark failed" >&2
+      printf '%s\n' "$run_json" >&2
+      echo "Cold MCP server benchmark failed (see details above)" >&2
       exit 1
     fi
     server_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$server_runs_json")
@@ -649,7 +895,8 @@ if [[ "$run_server" == "true" ]]; then
 
   if [[ "$run_warm" == "true" ]]; then
     if ! run_json=$(run_mcp_server "warm" "false" "$adb_available" "$adb_device_count" "$adb_error"); then
-      echo "Warm MCP server benchmark failed" >&2
+      printf '%s\n' "$run_json" >&2
+      echo "Warm MCP server benchmark failed (see details above)" >&2
       exit 1
     fi
     server_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$server_runs_json")
@@ -664,15 +911,17 @@ fi
 
 if [[ "$run_daemon" == "true" ]]; then
   if [[ "$run_warm" == "true" ]]; then
-    if ! run_daemon "warm" >/dev/null; then
-      echo "Warm-up daemon run failed" >&2
+    if ! run_error=$(run_daemon "warm"); then
+      printf '%s\n' "$run_error" >&2
+      echo "Warm-up daemon run failed (see details above)" >&2
       exit 1
     fi
   fi
 
   if [[ "$run_cold" == "true" ]]; then
     if ! run_json=$(run_daemon "cold"); then
-      echo "Cold daemon benchmark failed" >&2
+      printf '%s\n' "$run_json" >&2
+      echo "Cold daemon benchmark failed (see details above)" >&2
       exit 1
     fi
     daemon_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$daemon_runs_json")
@@ -684,7 +933,8 @@ if [[ "$run_daemon" == "true" ]]; then
 
   if [[ "$run_warm" == "true" ]]; then
     if ! run_json=$(run_daemon "warm"); then
-      echo "Warm daemon benchmark failed" >&2
+      printf '%s\n' "$run_json" >&2
+      echo "Warm daemon benchmark failed (see details above)" >&2
       exit 1
     fi
     daemon_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$daemon_runs_json")
