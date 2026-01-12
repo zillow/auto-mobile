@@ -28,7 +28,7 @@ if [ ! -f "$SCENARIO_SCRIPT" ]; then
   echo "❌ Error: Scenario not found: $SCENARIO_SCRIPT"
   echo ""
   echo "Available scenarios:"
-  ls -1 "$SCRIPT_DIR/scenarios" | sed 's/\.sh$//' | sed 's/^/  - /'
+  find "$SCRIPT_DIR/scenarios" -maxdepth 1 -name "*.sh" -type f -exec basename {} .sh \; | sed 's/^/  - /' | sort
   exit 1
 fi
 
@@ -130,20 +130,10 @@ echo ""
 echo "🎞️  Merging videos side-by-side..."
 
 # Get video durations
-DEVICE_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$DEVICE_VIDEO")
 CLI_DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$CLI_VIDEO")
-
-# echo "   Device video: ${DEVICE_DURATION}s"
-# echo "   CLI video: ${CLI_DURATION}s"
-
-# Calculate offset - device recording starts before terminal recording
-# Account for startup time between device recording start and first action
-DEVICE_OFFSET=0  # Skip first 2 seconds of device video where nothing is happening yet
 
 # Determine shortest duration (use CLI duration since it's typically shorter)
 SHORTEST_DURATION=$CLI_DURATION
-
-# echo "   Using duration: ${SHORTEST_DURATION}s (with ${DEVICE_OFFSET}s device offset)"
 
 # Scale both videos to fit within target dimensions, place side-by-side
 # Use trim filter to skip initial idle time in device video and sync both videos

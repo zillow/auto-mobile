@@ -1,6 +1,5 @@
 import fs from "fs-extra";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import {
   ActionableError,
   BootedDevice,
@@ -10,7 +9,6 @@ import {
 } from "../models";
 import {
   PlatformVideoCaptureBackend,
-  FfmpegVideoCaptureBackend,
   VideoRecorderService,
   parseVideoRecordingConfig,
   type ActiveVideoRecording,
@@ -65,14 +63,6 @@ let moduleDependencies: VideoRecordingManagerDependencies | null = null;
 let managerInitialized = false;
 
 const autoStopTimers = new Map<string, { timer: Timer; handle: NodeJS.Timeout }>();
-
-async function checkFfmpegAvailable(): Promise<boolean> {
-  return new Promise(resolve => {
-    const process = spawn("ffmpeg", ["-version"], { stdio: "ignore" });
-    process.once("error", () => resolve(false));
-    process.once("exit", code => resolve(code === 0));
-  });
-}
 
 async function selectBackend(): Promise<VideoCaptureBackend> {
   // Use PlatformVideoCaptureBackend for now as it's more reliable

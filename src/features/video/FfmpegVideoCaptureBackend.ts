@@ -185,7 +185,7 @@ export class FfmpegVideoCaptureBackend implements VideoCaptureBackend {
 
     // Log screenrecord stderr
     const screenrecordStderr: string[] = [];
-    sourceProcess.stderr.on("data", (chunk) => {
+    sourceProcess.stderr.on("data", chunk => {
       const text = chunk.toString();
       screenrecordStderr.push(text);
       logger.info(`[FfmpegVideoCapture] screenrecord stderr: ${text.trim()}`);
@@ -193,7 +193,7 @@ export class FfmpegVideoCaptureBackend implements VideoCaptureBackend {
 
     // Log when data flows
     let bytesReceived = 0;
-    sourceProcess.stdout.on("data", (chunk) => {
+    sourceProcess.stdout.on("data", chunk => {
       bytesReceived += chunk.length;
       if (bytesReceived % (1024 * 100) === 0) { // Log every 100KB
         logger.info(`[FfmpegVideoCapture] Received ${bytesReceived} bytes from screenrecord`);

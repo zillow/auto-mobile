@@ -82,7 +82,7 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
       );
 
       expect(args).toContain("-f");
-      expect(args).toContain("h264");
+      expect(args).toContain("mp4");
       expect(args).toContain("-i");
       expect(args).toContain("pipe:0");
       expect(args).toContain("-r");

@@ -198,7 +198,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       const pullProcess = spawn(adbPath, pullArgs, { stdio: ["ignore", "pipe", "pipe"] });
 
       await new Promise<void>((resolve, reject) => {
-        pullProcess.once("exit", (code) => {
+        pullProcess.once("exit", code => {
           if (code === 0) {
             logger.info(`[VideoCapture] File pulled successfully`);
             resolve();
@@ -206,7 +206,7 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
             reject(new Error(`adb pull failed with exit code ${code}`));
           }
         });
-        pullProcess.once("error", (err) => reject(err));
+        pullProcess.once("error", err => reject(err));
       });
 
       // Clean up temp file on device
@@ -214,12 +214,12 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       const rmArgs = [...baseArgs, "shell", "rm", backendHandle.deviceTempPath];
       const rmProcess = spawn(adbPath, rmArgs, { stdio: ["ignore", "pipe", "pipe"] });
 
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         rmProcess.once("exit", () => {
           logger.info(`[VideoCapture] Temp file cleaned up`);
           resolve();
         });
-        rmProcess.once("error", (err) => {
+        rmProcess.once("error", err => {
           logger.warn(`[VideoCapture] Failed to clean up temp file: ${err}`);
           resolve(); // Don't fail the whole operation if cleanup fails
         });
