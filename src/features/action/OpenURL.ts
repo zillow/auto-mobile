@@ -119,7 +119,21 @@ export class OpenURL extends BaseVisualChange {
    * @returns Result of the URL opening operation
    */
   private async executeAndroidOpenURL(url: string): Promise<OpenURLResult> {
-    await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${url}"`);
+    // Convert opaque URIs to hierarchical URIs to work around Android am start limitation
+    // Example: automobile:playground/path -> automobile://playground/path
+    // This is needed because am start -d truncates opaque URIs at the first colon
+    let processedUrl = url;
+    const opaqueUriMatch = url.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):([^/])/);
+    if (opaqueUriMatch) {
+      // This looks like an opaque URI (scheme:ssp without //)
+      // Convert to hierarchical format by adding //
+      const scheme = opaqueUriMatch[1];
+      const ssp = url.substring(scheme.length + 1);
+      processedUrl = `${scheme}://${ssp}`;
+      logger.info(`[OpenURL] Converted opaque URI to hierarchical: ${url} -> ${processedUrl}`);
+    }
+
+    await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${processedUrl}"`);
 
     return {
       success: true,

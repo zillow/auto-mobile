@@ -213,19 +213,34 @@ object DeepLinkManager {
       return null
     }
 
-    // For opaque URIs (automobile:playground/path), extract host and path from scheme-specific part
-    val ssp = uri.schemeSpecificPart
-    if (ssp == null || !ssp.startsWith(HOST)) {
-      Log.d(TAG, "Invalid host. Expected scheme-specific part to start with: $HOST")
-      return null
+    // Determine if this is a hierarchical URI (automobile://playground/path) or opaque URI (automobile:playground/path)
+    val path = if (uri.host != null) {
+      // Hierarchical URI: automobile://playground/path
+      Log.d(TAG, "Parsing hierarchical URI format")
+      if (uri.host != HOST) {
+        Log.d(TAG, "Invalid host. Expected: $HOST, got: ${uri.host}")
+        return null
+      }
+      // Extract path (already starts with "/")
+      uri.path ?: ""
+    } else {
+      // Opaque URI: automobile:playground/path
+      Log.d(TAG, "Parsing opaque URI format")
+      val ssp = uri.schemeSpecificPart
+      if (ssp == null || !ssp.startsWith(HOST)) {
+        Log.d(TAG, "Invalid host. Expected scheme-specific part to start with: $HOST")
+        return null
+      }
+      // Extract path from scheme-specific part (remove "playground" prefix)
+      if (ssp.length > HOST.length) ssp.substring(HOST.length) else ""
     }
 
-    // Extract path from scheme-specific part (remove "playground" prefix)
-    val path = if (ssp.length > HOST.length) ssp.substring(HOST.length) else ""
-    if (path.isEmpty() && ssp != HOST) {
+    if (path.isEmpty() && uri.schemeSpecificPart != HOST && uri.host != HOST) {
       Log.d(TAG, "Invalid URI format")
       return null
     }
+
+    Log.d(TAG, "Extracted path: '$path'")
 
     val destination =
         when {
@@ -357,7 +372,29 @@ object DeepLinkManager {
   /** Validate if a URI is a valid deep link for this app */
   fun isValidDeepLink(uri: Uri): Boolean {
     Log.d(TAG, "Validating deep link: $uri")
-    val isValid = uri.scheme == SCHEME && uri.schemeSpecificPart?.startsWith(HOST) == true && parseDeepLink(uri) != null
+
+    // Check scheme first
+    if (uri.scheme != SCHEME) {
+      Log.d(TAG, "Deep link validation result: false (invalid scheme)")
+      return false
+    }
+
+    // Handle both hierarchical (automobile://playground/path) and opaque (automobile:playground/path) URIs
+    val hasValidHost = if (uri.host != null) {
+      // Hierarchical URI: check host
+      uri.host == HOST
+    } else {
+      // Opaque URI: check scheme-specific part
+      uri.schemeSpecificPart?.startsWith(HOST) == true
+    }
+
+    if (!hasValidHost) {
+      Log.d(TAG, "Deep link validation result: false (invalid host)")
+      return false
+    }
+
+    // Try to parse the deep link
+    val isValid = parseDeepLink(uri) != null
     Log.d(TAG, "Deep link validation result: $isValid")
     return isValid
   }
