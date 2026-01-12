@@ -233,6 +233,108 @@ describe("TapOnElement TalkBack mode detection", () => {
     });
   });
 
+  describe("executeAndroidTapWithAccessibility doubleTap behavior", () => {
+    let mockAccessibilityService: any;
+
+    beforeEach(() => {
+      executeAndroidTapWithAccessibility.mockRestore();
+
+      mockAccessibilityService = {
+        requestTapCoordinates: async () => ({ success: true, totalTimeMs: 1 })
+      };
+
+      (tapOnElement as any).accessibilityService = mockAccessibilityService;
+    });
+
+    test("issues two accessibility taps with a delay", async () => {
+      const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
+        .mockResolvedValue({ success: true, totalTimeMs: 1 });
+
+      const element = {
+        "resource-id": "test:id/button"
+      } as any;
+
+      await (tapOnElement as any).executeAndroidTapWithAccessibility(
+        "doubleTap",
+        50,
+        50,
+        element,
+        500,
+        {},
+        undefined
+      );
+
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(2);
+      expect(requestTapCoordinates.mock.calls).toEqual([
+        [50, 50, 50],
+        [50, 50, 50]
+      ]);
+      expect(fakeTimer.wasSleepCalled(200)).toBe(true);
+      expect(executeAndroidTapWithCoordinates).not.toHaveBeenCalled();
+    });
+
+    test("falls back to coordinate double tap if the first accessibility tap fails", async () => {
+      const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
+        .mockResolvedValueOnce({ success: false, totalTimeMs: 1, error: "nope" });
+
+      const element = {
+        "resource-id": "test:id/button"
+      } as any;
+
+      await (tapOnElement as any).executeAndroidTapWithAccessibility(
+        "doubleTap",
+        50,
+        50,
+        element,
+        500,
+        {},
+        undefined
+      );
+
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(1);
+      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledTimes(1);
+      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledWith(
+        "doubleTap",
+        50,
+        50,
+        500,
+        element,
+        undefined
+      );
+    });
+
+    test("falls back to a single coordinate tap if the second accessibility tap fails", async () => {
+      const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
+        .mockResolvedValueOnce({ success: true, totalTimeMs: 1 })
+        .mockResolvedValueOnce({ success: false, totalTimeMs: 1, error: "nope" });
+
+      const element = {
+        "resource-id": "test:id/button"
+      } as any;
+
+      await (tapOnElement as any).executeAndroidTapWithAccessibility(
+        "doubleTap",
+        50,
+        50,
+        element,
+        500,
+        {},
+        undefined
+      );
+
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(2);
+      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledTimes(1);
+      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledWith(
+        "tap",
+        50,
+        50,
+        500,
+        element,
+        undefined
+      );
+    });
+  });
+
   describe("clickable parent resolution", () => {
     test("uses clickable parent when child is not clickable", () => {
       const viewHierarchy = {

@@ -803,6 +803,24 @@ export class TapOnElement extends BaseVisualChange {
     // This is faster than ADB and precise (uses exact coordinates, not resource-id lookup).
     // Use short duration (50ms) for tap/doubleTap to avoid being interpreted as long press
     const tapDuration = action === "longPress" ? durationMs : 50;
+    if (action === "doubleTap") {
+      const firstTap = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
+      if (!firstTap.success) {
+        logger.warn(`[TapOnElement] Accessibility coordinate double tap failed (first tap: ${firstTap.error}), falling back to ADB double tap at (${x}, ${y})`);
+        await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
+        return;
+      }
+
+      await this.timer.sleep(200);
+
+      const secondTap = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
+      if (!secondTap.success) {
+        logger.warn(`[TapOnElement] Accessibility coordinate double tap failed (second tap: ${secondTap.error}), falling back to ADB tap at (${x}, ${y})`);
+        await this.executeAndroidTapWithCoordinates("tap", x, y, durationMs, element, signal);
+      }
+      return;
+    }
+
     const result = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
     if (!result.success) {
       logger.warn(`[TapOnElement] Accessibility coordinate tap failed (${result.error}), falling back to ADB tap at (${x}, ${y})`);
