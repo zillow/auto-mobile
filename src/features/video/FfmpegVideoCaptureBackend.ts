@@ -168,36 +168,63 @@ export class FfmpegVideoCaptureBackend implements VideoCaptureBackend {
     const adb = new AdbClient(device);
     const { adbPath, baseArgs } = await adb.getBaseCommandParts();
 
+    // Remove --output-format flag as it's not supported by screenrecord
+    // screenrecord always outputs in mp4 format which contains h264
     const screenrecordArgs = [
       ...baseArgs,
       "exec-out",
       "screenrecord",
-      "--output-format=h264",
       "-",
     ];
+
+    logger.info(`[FfmpegVideoCapture] Starting screenrecord: ${adbPath} ${screenrecordArgs.join(" ")}`);
 
     const sourceProcess = spawn(adbPath, screenrecordArgs, {
       stdio: ["ignore", "pipe", "pipe"],
     });
 
+    // Log screenrecord stderr
+    const screenrecordStderr: string[] = [];
+    sourceProcess.stderr.on("data", (chunk) => {
+      const text = chunk.toString();
+      screenrecordStderr.push(text);
+      logger.info(`[FfmpegVideoCapture] screenrecord stderr: ${text.trim()}`);
+    });
+
+    // Log when data flows
+    let bytesReceived = 0;
+    sourceProcess.stdout.on("data", (chunk) => {
+      bytesReceived += chunk.length;
+      if (bytesReceived % (1024 * 100) === 0) { // Log every 100KB
+        logger.info(`[FfmpegVideoCapture] Received ${bytesReceived} bytes from screenrecord`);
+      }
+    });
+
     try {
       await this.waitForSpawn(sourceProcess);
+      logger.info(`[FfmpegVideoCapture] screenrecord process spawned`);
     } catch (error) {
+      logger.error(`[FfmpegVideoCapture] Failed to spawn screenrecord: ${error}`);
       throw new ActionableError(`Failed to start Android screenrecord: ${error}`);
     }
 
     const hwAccel = await this.detectHardwareAccel();
     const ffmpegArgs = await this.buildFfmpegArgs(config, hwAccel, true);
 
+    logger.info(`[FfmpegVideoCapture] Starting ffmpeg: ${this.ffmpegPath} ${ffmpegArgs.join(" ")}`);
+
     const ffmpegProcess = spawn(this.ffmpegPath, ffmpegArgs, {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
     sourceProcess.stdout.pipe(ffmpegProcess.stdin);
+    logger.info(`[FfmpegVideoCapture] Piped screenrecord stdout to ffmpeg stdin`);
 
     try {
       await this.waitForSpawn(ffmpegProcess);
+      logger.info(`[FfmpegVideoCapture] ffmpeg process spawned`);
     } catch (error) {
+      logger.error(`[FfmpegVideoCapture] Failed to spawn ffmpeg: ${error}`);
       sourceProcess.kill("SIGKILL");
       throw new ActionableError(`Failed to start FFmpeg encoder: ${error}`);
     }
@@ -266,7 +293,8 @@ export class FfmpegVideoCaptureBackend implements VideoCaptureBackend {
     const args: string[] = [];
 
     if (pipedInput) {
-      args.push("-f", "h264", "-i", "pipe:0");
+      // screenrecord outputs MP4 container format to stdout, not raw h264
+      args.push("-f", "mp4", "-i", "pipe:0");
     } else {
       throw new ActionableError("Direct screen capture not yet implemented for iOS");
     }

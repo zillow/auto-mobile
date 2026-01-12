@@ -75,14 +75,10 @@ async function checkFfmpegAvailable(): Promise<boolean> {
 }
 
 async function selectBackend(): Promise<VideoCaptureBackend> {
-  const ffmpegAvailable = await checkFfmpegAvailable();
-
-  if (ffmpegAvailable) {
-    logger.debug("[VideoRecording] FFmpeg available, using FfmpegVideoCaptureBackend");
-    return new FfmpegVideoCaptureBackend();
-  }
-
-  logger.debug("[VideoRecording] FFmpeg not available, using PlatformVideoCaptureBackend");
+  // Use PlatformVideoCaptureBackend for now as it's more reliable
+  // FfmpegVideoCaptureBackend has issues with MP4-over-pipe from screenrecord
+  // (MP4 format needs seeking to write moov atom, which doesn't work well over stdin)
+  logger.debug("[VideoRecording] Using PlatformVideoCaptureBackend");
   return new PlatformVideoCaptureBackend();
 }
 

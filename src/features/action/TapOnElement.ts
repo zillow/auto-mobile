@@ -684,11 +684,15 @@ export class TapOnElement extends BaseVisualChange {
       ? isTalkBackEnabled
       : await this.accessibilityDetector.isAccessibilityEnabled(this.device.id, this.adb);
 
-    if (talkBackEnabled) {
+    const resourceId = element?.["resource-id"];
+
+    // Use accessibility service only if TalkBack is enabled AND element has resource-id
+    // Otherwise fall back to coordinate-based tapping
+    if (talkBackEnabled && resourceId) {
       // TalkBack mode: Use AccessibilityService ACTION_CLICK
       await this.executeAndroidTapWithAccessibility(action, element, durationMs, options, signal);
     } else {
-      // Standard mode: Use coordinate-based taps
+      // Standard mode or no resource-id: Use coordinate-based taps
       await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
     }
   }
