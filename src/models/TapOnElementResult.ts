@@ -15,7 +15,9 @@ export interface TapOnElementResult {
   pressRecognized?: boolean;
   contextMenuOpened?: boolean;
   selectionStarted?: boolean;
-  awaitedElement?: Element;
-  awaitDuration?: number;
-  awaitTimeout?: boolean;
+  searchUntil?: {
+    durationMs: number;
+    requestCount: number;
+    changeCount: number;
+  };
 }

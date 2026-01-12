@@ -4,7 +4,6 @@ export type FeatureFlagKey =
   | "ui-perf-mode"
   | "ui-perf-debug"
   | "mem-perf-audit"
-  | "strict-await"
   | "accessibility-audit"
   | "predictive-ui"
   | "force-accessibility-mode"
@@ -49,12 +48,6 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     key: "mem-perf-audit",
     label: "Memory audit",
     description: "Run memory audits during tool execution.",
-    defaultValue: false,
-  },
-  {
-    key: "strict-await",
-    label: "Strict await",
-    description: "Treat await timeouts as failures instead of warnings.",
     defaultValue: false,
   },
   {

@@ -24,6 +24,9 @@ import { SelectionStateTracker, SelectionCaptureState, TakeScreenshotCapturer } 
 import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
 import type { Timer } from "../../utils/SystemTimer";
+import { NodeCryptoService } from "../../utils/crypto";
+
+type SearchUntilStats = NonNullable<TapOnElementResult["searchUntil"]>;
 
 /**
  * Command to tap on UI element containing specified text
@@ -36,8 +39,9 @@ export class TapOnElement extends BaseVisualChange {
   private visionConfig: VisionFallbackConfig;
   private selectionStateTracker: SelectionStateTracker;
   private accessibilityDetector: AccessibilityDetector;
-  private static readonly MAX_ATTEMPTS = 5;
-  private static readonly AWAIT_POLL_INTERVAL_MS = 100;
+  private static readonly SEARCH_UNTIL_DEFAULT_MS = 500;
+  private static readonly SEARCH_UNTIL_MIN_MS = 100;
+  private static readonly SEARCH_UNTIL_MAX_MS = 12000;
 
   constructor(
     device: BootedDevice,
@@ -78,49 +82,172 @@ export class TapOnElement extends BaseVisualChange {
     };
   }
 
-  async handleElementResult(
-    element: Element | null,
+  private getSearchUntilDuration(options: TapOnElementOptions): number {
+    const duration = options.searchUntil?.duration ?? TapOnElement.SEARCH_UNTIL_DEFAULT_MS;
+
+    if (!Number.isFinite(duration)) {
+      throw new ActionableError("searchUntil.duration must be a number");
+    }
+
+    if (duration < TapOnElement.SEARCH_UNTIL_MIN_MS) {
+      throw new ActionableError(
+        `searchUntil.duration must be at least ${TapOnElement.SEARCH_UNTIL_MIN_MS}ms`
+      );
+    }
+
+    if (duration > TapOnElement.SEARCH_UNTIL_MAX_MS) {
+      throw new ActionableError(
+        `searchUntil.duration must be at most ${TapOnElement.SEARCH_UNTIL_MAX_MS}ms`
+      );
+    }
+
+    return Math.round(duration);
+  }
+
+  private hashViewHierarchy(viewHierarchy: ViewHierarchyResult | null): string | null {
+    if (!viewHierarchy) {
+      return null;
+    }
+    try {
+      return NodeCryptoService.generateCacheKey(JSON.stringify(viewHierarchy.hierarchy));
+    } catch (error) {
+      logger.debug(`[TapOnElement] Failed to hash view hierarchy: ${error}`);
+      return null;
+    }
+  }
+
+  private findElementInHierarchy(
     options: TapOnElementOptions,
-    attempt: number,
-    observeResult?: ObserveResult,
-    signal?: AbortSignal,
-    containerFound: boolean = true
-  ): Promise<Element> {
-    if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
-      const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
-      await this.timer.sleep(delayNextAttempt);
+    viewHierarchy: ViewHierarchyResult
+  ): { element: Element | null; containerFound: boolean } {
+    const containerFound = this.isContainerAvailable(viewHierarchy, options.container);
+    if (options.text) {
+      return {
+        element: this.elementUtils.findElementByText(
+          viewHierarchy,
+          options.text,
+          options.container,
+          true,
+          false,
+        ),
+        containerFound
+      };
+    }
+    if (options.elementId) {
+      return {
+        element: this.elementUtils.findElementByResourceId(
+          viewHierarchy,
+          options.elementId,
+          options.container,
+        ),
+        containerFound
+      };
+    }
+    throw new ActionableError("tapOn requires non-blank text or elementId to interact with");
+  }
 
-      let latestViewHierarchy: ViewHierarchyResult | null = null;
-
-      // Platform-specific view hierarchy retrieval
-      switch (this.device.platform) {
-        case "android":
-          const queryOptions = {
-            query: options.text || options.elementId || "",
-            containerElementId: options.container?.elementId
-          };
-          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(queryOptions, undefined, false, 0, signal);
-          break;
-        case "ios":
-          latestViewHierarchy = await this.webdriver.getViewHierarchy(this.device);
-          break;
-        default:
-          throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
-      }
-
-      if (latestViewHierarchy) {
-        logger.info(`Retrying to find element after ${delayNextAttempt}ms delay`);
-        return await this.findElementToTap(
-          options,
-          latestViewHierarchy,
-          attempt + 1,
-          observeResult,
-          signal
+  private async refreshViewHierarchy(
+    timeoutMs: number,
+    signal?: AbortSignal
+  ): Promise<ViewHierarchyResult | null> {
+    const effectiveTimeoutMs = Math.max(0, timeoutMs);
+    switch (this.device.platform) {
+      case "android": {
+        const syncResult = await this.accessibilityService.requestHierarchySync(
+          new NoOpPerformanceTracker(),
+          false,
+          signal,
+          effectiveTimeoutMs
         );
+        return syncResult
+          ? this.accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy)
+          : null;
+      }
+      case "ios":
+        return this.webdriver.getViewHierarchy(this.device);
+      default:
+        throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
+    }
+  }
+
+  private async searchForElement(
+    options: TapOnElementOptions,
+    observeResult: ObserveResult,
+    signal?: AbortSignal
+  ): Promise<{
+    element: Element | null;
+    viewHierarchy: ViewHierarchyResult;
+    containerFound: boolean;
+    stats: SearchUntilStats;
+  }> {
+    const viewHierarchy = observeResult.viewHierarchy;
+    if (!viewHierarchy) {
+      throw new ActionableError("Unable to get view hierarchy, cannot tap on element");
+    }
+
+    const searchDurationMs = this.getSearchUntilDuration(options);
+    const startTime = this.timer.now();
+    let requestCount = 0;
+    let changeCount = 0;
+    let lastHash = this.hashViewHierarchy(viewHierarchy);
+
+    let latestViewHierarchy = viewHierarchy;
+    const initialSearch = this.findElementInHierarchy(options, latestViewHierarchy);
+    let element = initialSearch.element;
+    let containerFoundEver = initialSearch.containerFound;
+
+    if (!element) {
+      const deadline = startTime + searchDurationMs;
+      while (this.timer.now() < deadline) {
+        throwIfAborted(signal);
+        const remainingTimeMs = Math.max(0, deadline - this.timer.now());
+        const refreshedHierarchy = await this.refreshViewHierarchy(remainingTimeMs, signal);
+        requestCount += 1;
+
+        if (!refreshedHierarchy) {
+          continue;
+        }
+
+        latestViewHierarchy = refreshedHierarchy;
+        const hash = this.hashViewHierarchy(refreshedHierarchy);
+        if (hash && hash !== lastHash) {
+          changeCount += 1;
+          lastHash = hash;
+        } else if (hash && !lastHash) {
+          changeCount += 1;
+          lastHash = hash;
+        }
+
+        const searchResult = this.findElementInHierarchy(options, refreshedHierarchy);
+        element = searchResult.element;
+        containerFoundEver = containerFoundEver || searchResult.containerFound;
+        if (element) {
+          break;
+        }
       }
     }
 
-    if (!element && options.container && !containerFound) {
+    const stats: SearchUntilStats = {
+      durationMs: Math.max(0, Math.round(this.timer.now() - startTime)),
+      requestCount,
+      changeCount
+    };
+
+    return {
+      element,
+      viewHierarchy: latestViewHierarchy,
+      containerFound: containerFoundEver,
+      stats
+    };
+  }
+
+  private async handleElementNotFound(
+    options: TapOnElementOptions,
+    observeResult?: ObserveResult,
+    containerFound: boolean = true,
+    signal?: AbortSignal
+  ): Promise<never> {
+    if (options.container && !containerFound) {
       const containerLabel = options.container.elementId
         ? `elementId '${options.container.elementId}'`
         : `text '${options.container.text}'`;
@@ -129,12 +256,10 @@ export class TapOnElement extends BaseVisualChange {
       );
     }
 
-    // Vision fallback: Try Claude vision API if all retries exhausted
-    if (!element && attempt >= TapOnElement.MAX_ATTEMPTS && this.visionConfig.enabled && observeResult) {
-      logger.info("🔍 Element not found after retries, trying vision fallback...");
+    if (this.visionConfig.enabled && observeResult) {
+      logger.info("🔍 Element not found after polling, trying vision fallback...");
 
       try {
-        // Take a screenshot for vision analysis
         const screenshot = new TakeScreenshot(this.device, this.adb);
         const screenshotResult = await screenshot.execute({}, signal);
 
@@ -154,7 +279,6 @@ export class TapOnElement extends BaseVisualChange {
           }
         );
 
-        // If high confidence navigation steps provided, throw error with steps
         if (visionResult.confidence === "high" && visionResult.navigationSteps && visionResult.navigationSteps.length > 0) {
           const stepsText = visionResult.navigationSteps
             .map((step, i) => `${i + 1}. ${step.description}`)
@@ -166,7 +290,6 @@ export class TapOnElement extends BaseVisualChange {
           );
         }
 
-        // If alternative selectors found, throw error with suggestions
         if (visionResult.alternativeSelectors && visionResult.alternativeSelectors.length > 0) {
           const suggestions = visionResult.alternativeSelectors
             .map(alt => `- ${alt.type}: "${alt.value}" (${alt.reasoning})`)
@@ -178,7 +301,6 @@ export class TapOnElement extends BaseVisualChange {
           );
         }
 
-        // Otherwise, throw detailed error with vision insights
         throw new ActionableError(
           `Element not found. ${visionResult.reason || "No clear path found."}\n\n` +
           `(Cost: $${visionResult.costUsd.toFixed(4)}, Confidence: ${visionResult.confidence})`
@@ -189,25 +311,20 @@ export class TapOnElement extends BaseVisualChange {
           throw error;
         }
         logger.error("Vision fallback failed:", error);
-        // Fall through to standard error
       }
     }
 
-    if (!element) {
-      if (options.text) {
-        const containerHint = options.container
-          ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
-          : "";
-        throw new ActionableError(`Element not found with provided text '${options.text}'${containerHint}`);
-      } else {
-        const containerHint = options.container
-          ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
-          : "";
-        throw new ActionableError(`Element not found with provided elementId '${options.elementId}'${containerHint}`);
-      }
+    if (options.text) {
+      const containerHint = options.container
+        ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
+        : "";
+      throw new ActionableError(`Element not found with provided text '${options.text}'${containerHint}`);
     }
 
-    return element;
+    const containerHint = options.container
+      ? ` within container ${options.container.elementId ? `elementId '${options.container.elementId}'` : `text '${options.container.text}'`}`
+      : "";
+    throw new ActionableError(`Element not found with provided elementId '${options.elementId}'${containerHint}`);
   }
 
   private isContainerAvailable(
@@ -219,39 +336,6 @@ export class TapOnElement extends BaseVisualChange {
     }
 
     return this.elementUtils.hasContainerElement(viewHierarchy, container);
-  }
-
-  async findElementToTap(
-    options: TapOnElementOptions,
-    viewHierarchy: ViewHierarchyResult,
-    attempt: number = 0,
-    observeResult?: ObserveResult,
-    signal?: AbortSignal
-  ): Promise<Element> {
-    const containerFound = this.isContainerAvailable(viewHierarchy, options.container);
-    if (options.text) {
-      // Find the UI element that contains the text
-      const element = this.elementUtils.findElementByText(
-        viewHierarchy,
-        options.text,
-        options.container,
-        true,
-        false,
-      );
-
-      return await this.handleElementResult(element, options, attempt, observeResult, signal, containerFound);
-    } else if (options.elementId) {
-      // Find the UI element that matches the id
-      const element = this.elementUtils.findElementByResourceId(
-        viewHierarchy,
-        options.elementId,
-        options.container,
-      );
-
-      return await this.handleElementResult(element, options, attempt, observeResult, signal, containerFound);
-    } else {
-      throw new ActionableError(`tapOn requires non-blank text or elementId to interact with`);
-    }
   }
 
   private isTruthyFlag(value: unknown): boolean {
@@ -454,6 +538,7 @@ export class TapOnElement extends BaseVisualChange {
     perf.serial("tapOnElement");
     let previousObserveResult: ObserveResult | null = null;
     let selectionCapture: SelectionCaptureState | null = null;
+    let searchUntilStats: SearchUntilStats | undefined;
 
     try {
       throwIfAborted(signal);
@@ -463,15 +548,22 @@ export class TapOnElement extends BaseVisualChange {
           previousObserveResult = observeResult;
           throwIfAborted(signal);
 
-          const viewHierarchy = observeResult.viewHierarchy;
+          let viewHierarchy = observeResult.viewHierarchy;
           if (!viewHierarchy) {
             perf.end();
             return { success: false, error: "Unable to get view hierarchy, cannot tap on element" };
           }
 
-          const element = await perf.track("findElement", () =>
-            this.findElementToTap(options, viewHierarchy, 0, observeResult, signal)
+          const searchOutcome = await perf.track("findElement", () =>
+            this.searchForElement(options, observeResult, signal)
           );
+          searchUntilStats = searchOutcome.stats;
+          observeResult.viewHierarchy = searchOutcome.viewHierarchy;
+          viewHierarchy = searchOutcome.viewHierarchy;
+          if (!searchOutcome.element) {
+            await this.handleElementNotFound(options, observeResult, searchOutcome.containerFound, signal);
+          }
+          const element = searchOutcome.element as Element;
           const initialTapPoint = this.elementUtils.getElementCenter(element);
           let action = options.action;
           const longPressDuration = this.getLongPressDuration(options, this.device.platform);
@@ -486,6 +578,7 @@ export class TapOnElement extends BaseVisualChange {
               return {
                 success: true,
                 element: element,
+                searchUntil: searchOutcome.stats,
                 wasAlreadyFocused: true,
                 focusChanged: false,
                 x: initialTapPoint.x,
@@ -547,6 +640,7 @@ export class TapOnElement extends BaseVisualChange {
             success: true,
             action,
             element: tapElement,
+            searchUntil: searchOutcome.stats,
           };
         },
         {
@@ -568,7 +662,7 @@ export class TapOnElement extends BaseVisualChange {
               action: options.action,
               duration: options.duration,
               container: options.container,
-              await: options.await,
+              searchUntil: options.searchUntil,
               platform: this.device.platform
             }
           }
@@ -596,42 +690,7 @@ export class TapOnElement extends BaseVisualChange {
           ...metadata
         };
       }
-      if (!result.success || !options.await?.element) {
-        return result;
-      }
-
-      if (!options.await.element.id && !options.await.element.text) {
-        return {
-          ...result,
-          success: false,
-          error: "await.element requires either id or text",
-          awaitTimeout: true,
-          awaitDuration: 0
-        };
-      }
-
-      const awaitOutcome = await this.waitForAwaitElement(
-        options.await,
-        result.observation
-      );
-
-      const awaitResult: TapOnElementResult = {
-        ...result,
-        awaitedElement: awaitOutcome.awaitedElement,
-        awaitDuration: awaitOutcome.awaitDuration,
-        awaitTimeout: awaitOutcome.awaitTimeout,
-        observation: awaitOutcome.observation || result.observation
-      };
-
-      if (awaitOutcome.awaitTimeout && options.strictAwait) {
-        return {
-          ...awaitResult,
-          success: false,
-          error: "Tap succeeded but awaited element not found within timeout"
-        };
-      }
-
-      return awaitResult;
+      return result;
     } catch (error) {
       perf.end();
 
@@ -654,6 +713,7 @@ export class TapOnElement extends BaseVisualChange {
         element: {
           bounds: { left: 0, top: 0, right: 0, bottom: 0 }
         } as Element,
+        ...(searchUntilStats ? { searchUntil: searchUntilStats } : {}),
         ...(debugContext ? { debug: { elementSearch: debugContext } } : {})
       };
     }
@@ -972,91 +1032,5 @@ export class TapOnElement extends BaseVisualChange {
       }
     });
     return found;
-  }
-
-  private async waitForAwaitElement(
-    awaitOptions: NonNullable<TapOnElementOptions["await"]>,
-    initialObservation?: ObserveResult
-  ): Promise<{
-    awaitedElement?: Element;
-    awaitDuration: number;
-    awaitTimeout: boolean;
-    observation?: ObserveResult;
-  }> {
-    const startTime = this.timer.now();
-    const timeoutMs = awaitOptions.timeout ?? 5000;
-    const queryOptions = {
-      text: awaitOptions.element.text,
-      elementId: awaitOptions.element.id
-    };
-
-    if (initialObservation?.viewHierarchy) {
-      const existing = this.findAwaitElement(awaitOptions, initialObservation.viewHierarchy);
-      if (existing) {
-        return {
-          awaitedElement: existing,
-          awaitDuration: this.timer.now() - startTime,
-          awaitTimeout: false,
-          observation: initialObservation
-        };
-      }
-    }
-
-    let lastObservation: ObserveResult | undefined;
-
-    while (this.timer.now() - startTime < timeoutMs) {
-      const observation = await this.observeScreen.execute(
-        queryOptions,
-        new NoOpPerformanceTracker(),
-        false,
-        startTime
-      );
-      lastObservation = observation;
-
-      if (observation.viewHierarchy) {
-        const found = this.findAwaitElement(awaitOptions, observation.viewHierarchy);
-        if (found) {
-          return {
-            awaitedElement: found,
-            awaitDuration: this.timer.now() - startTime,
-            awaitTimeout: false,
-            observation
-          };
-        }
-      }
-
-      await this.timer.sleep(TapOnElement.AWAIT_POLL_INTERVAL_MS);
-    }
-
-    return {
-      awaitDuration: this.timer.now() - startTime,
-      awaitTimeout: true,
-      observation: lastObservation
-    };
-  }
-
-  private findAwaitElement(
-    awaitOptions: NonNullable<TapOnElementOptions["await"]>,
-    viewHierarchy: ViewHierarchyResult
-  ): Element | null {
-    if (awaitOptions.element.id) {
-      return this.elementUtils.findElementByResourceId(
-        viewHierarchy,
-        awaitOptions.element.id,
-        undefined
-      );
-    }
-
-    if (awaitOptions.element.text) {
-      return this.elementUtils.findElementByText(
-        viewHierarchy,
-        awaitOptions.element.text,
-        undefined,
-        true,
-        false
-      );
-    }
-
-    return null;
   }
 }

@@ -43,11 +43,6 @@ setFeatureFlag("mem-perf-audit", true)
 
 ### Behavior Flags
 
-**`strict-await`** - Strict element waiting behavior
-```typescript
-setFeatureFlag("strict-await", true)
-```
-
 **`accessibility-audit`** - Enable accessibility checks
 ```typescript
 setFeatureFlag("accessibility-audit", true)

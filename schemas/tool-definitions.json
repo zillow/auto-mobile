@@ -1771,34 +1771,18 @@
           "type": "number",
           "description": "Long press duration (ms)"
         },
-        "await": {
+        "searchUntil": {
           "type": "object",
           "properties": {
-            "element": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Element ID to wait for"
-                },
-                "text": {
-                  "type": "string",
-                  "description": "Element text to wait for"
-                }
-              },
-              "additionalProperties": false,
-              "description": "Element to wait for"
-            },
-            "timeout": {
+            "duration": {
               "type": "number",
-              "description": "Wait timeout ms (default: 5000)"
+              "minimum": 100,
+              "maximum": 12000,
+              "description": "Polling duration (ms, default: 500)"
             }
           },
-          "required": [
-            "element"
-          ],
           "additionalProperties": false,
-          "description": "Wait for element after tap"
+          "description": "Poll for element before tapping"
         },
         "platform": {
           "type": "string",
