@@ -57,6 +57,9 @@ data class WebSocketRequest(
     val sinceTimestamp: Long? =
         null, // For request_hierarchy_if_stale: extract only if no events since this timestamp
     val enabled: Boolean? = null,
+    // Permission request parameters
+    val permission: String? = null,
+    val requestPermission: Boolean? = null,
     // Filtering/optimization control
     val disableAllFiltering: Boolean? = null, // If true, disable all filtering and optimizations
 )
@@ -122,6 +125,9 @@ class WebSocketServer(
         ((requestId: String?, devicePath: String) -> Unit)? =
         null,
     private val onGetDeviceOwnerStatus: ((requestId: String?) -> Unit)? = null,
+    private val onGetPermission:
+        ((requestId: String?, permission: String?, requestPermission: Boolean?) -> Unit)? =
+        null,
     private val onSetRecompositionTracking: ((enabled: Boolean) -> Unit)? = null,
     private val onGetCurrentFocus: ((requestId: String?) -> Unit)? = null,
     private val onGetTraversalOrder: ((requestId: String?) -> Unit)? = null,
@@ -493,6 +499,13 @@ class WebSocketServer(
         "get_device_owner_status" -> {
           Log.d(TAG, "Received get_device_owner_status request (requestId: ${request.requestId})")
           onGetDeviceOwnerStatus?.invoke(request.requestId)
+        }
+        "get_permission" -> {
+          Log.d(
+              TAG,
+              "Received get_permission request (requestId: ${request.requestId}, permission: ${request.permission}, requestPermission: ${request.requestPermission})",
+          )
+          onGetPermission?.invoke(request.requestId, request.permission, request.requestPermission)
         }
         "set_recomposition_tracking" -> {
           val enabled = request.enabled

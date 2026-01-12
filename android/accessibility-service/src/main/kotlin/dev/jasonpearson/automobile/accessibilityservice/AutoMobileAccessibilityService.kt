@@ -81,6 +81,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private lateinit var hierarchyDebouncer: HierarchyDebouncer
   private val navigationEventAccumulator = NavigationEventAccumulator()
   private lateinit var overlayManager: OverlayManager
+  private val permissionManager by lazy { PermissionManager(this) }
   private val clipboardManager by lazy {
     getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
   }
@@ -339,6 +340,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                 performRemoveCaCertificate(requestId, alias, certificate)
               },
               onGetDeviceOwnerStatus = { requestId -> performGetDeviceOwnerStatus(requestId) },
+              onGetPermission = { requestId, permission, requestPermission ->
+                handleGetPermission(requestId, permission, requestPermission)
+              },
               onSetRecompositionTracking = { enabled -> setRecompositionTrackingEnabled(enabled) },
               onGetCurrentFocus = { requestId -> handleGetCurrentFocus(requestId) },
               onGetTraversalOrder = { requestId -> handleGetTraversalOrder(requestId) },
@@ -2668,6 +2672,53 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
   }
 
+  /** Broadcast permission result to WebSocket clients */
+  private suspend fun broadcastPermissionResult(
+      requestId: String?,
+      result: PermissionManager.PermissionState,
+      totalTimeMs: Long,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping permission result broadcast")
+      return
+    }
+
+    try {
+      val success = result.error == null
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"permission_result","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","success":$success""")
+          append(""","totalTimeMs":$totalTimeMs""")
+          append(""","permission":"${escapeJsonString(result.permission)}"""")
+          append(""","granted":${result.granted}""")
+          append(""","requestLaunched":${result.requestLaunched}""")
+          append(""","canRequest":${result.canRequest}""")
+          append(""","requiresSettings":${result.requiresSettings}""")
+          if (result.instructions != null) {
+            append(""","instructions":"${escapeJsonString(result.instructions)}"""")
+          }
+          if (result.adbCommand != null) {
+            append(""","adbCommand":"${escapeJsonString(result.adbCommand)}"""")
+          }
+          if (result.error != null) {
+            append(""","error":"${escapeJsonString(result.error)}"""")
+          }
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted permission result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting permission result", e)
+    }
+  }
+
   /** Broadcast swipe result to WebSocket clients */
   private suspend fun broadcastSwipeResult(
       requestId: String?,
@@ -2849,6 +2900,25 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting navigation event", e)
+    }
+  }
+
+  /** Get permission state and optionally request missing permissions. */
+  private fun handleGetPermission(
+      requestId: String?,
+      permission: String?,
+      requestPermission: Boolean?,
+  ) {
+    val startTime = System.currentTimeMillis()
+    Log.d(
+        TAG,
+        "handleGetPermission (requestId: $requestId, permission: $permission, requestPermission: $requestPermission)",
+    )
+
+    serviceScope.launch {
+      val result = permissionManager.getPermissionState(permission, requestPermission ?: true)
+      val totalTime = System.currentTimeMillis() - startTime
+      broadcastPermissionResult(requestId, result, totalTime)
     }
   }
 

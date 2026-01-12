@@ -80,6 +80,15 @@ interface WebSocketMessage {
   requestId?: string;
   data?: AccessibilityHierarchy;
   format?: string;
+  success?: boolean;
+  totalTimeMs?: number;
+  permission?: string;
+  granted?: boolean;
+  requestLaunched?: boolean;
+  canRequest?: boolean;
+  requiresSettings?: boolean;
+  instructions?: string;
+  adbCommand?: string;
   error?: string;
   event?: InteractionEvent;
 }
@@ -222,6 +231,23 @@ export interface A11yDeviceOwnerStatusResult {
   isAdminActive: boolean;
   packageName?: string;
   totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
+ * Interface for permission status result from accessibility service
+ */
+export interface A11yPermissionResult {
+  success: boolean;
+  permission: string;
+  granted: boolean;
+  totalTimeMs: number;
+  requestLaunched: boolean;
+  canRequest: boolean;
+  requiresSettings: boolean;
+  instructions?: string;
+  adbCommand?: string;
   error?: string;
   perfTiming?: AndroidPerfTiming[];
 }
@@ -516,6 +542,16 @@ export interface AccessibilityService {
   ): Promise<A11yDeviceOwnerStatusResult>;
 
   /**
+   * Request permission status from the accessibility service.
+   */
+  requestPermission(
+    permission: string,
+    requestPermission?: boolean,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yPermissionResult>;
+
+  /**
    * Request a screenshot from the accessibility service
    *
    * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
@@ -629,6 +665,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Device owner status handling
   private pendingDeviceOwnerStatusResolve: ((result: A11yDeviceOwnerStatusResult) => void) | null = null;
   private pendingDeviceOwnerStatusRequestId: string | null = null;
+
+  // Permission handling
+  private pendingPermissionResolve: ((result: A11yPermissionResult) => void) | null = null;
+  private pendingPermissionRequestId: string | null = null;
 
   private interactionListeners: Set<(event: InteractionEvent) => void> = new Set();
 
@@ -1212,6 +1252,30 @@ export class AccessibilityServiceClient implements AccessibilityService {
           packageName: statusMessage.packageName,
           totalTimeMs: statusMessage.totalTimeMs,
           error: statusMessage.error,
+          perfTiming
+        });
+      }
+
+      // Handle permission result
+      if (message.type === "permission_result" && this.pendingPermissionResolve) {
+        const permissionMessage = message as any;
+        const perfTiming = permissionMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.debug(`[ACCESSIBILITY_SERVICE] Permission result (requestId: ${permissionMessage.requestId}, permission: ${permissionMessage.permission}, granted: ${permissionMessage.granted}, totalTimeMs: ${permissionMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingPermissionResolve;
+        this.pendingPermissionResolve = null;
+        this.pendingPermissionRequestId = null;
+        resolve({
+          success: permissionMessage.success ?? false,
+          permission: permissionMessage.permission ?? "unknown",
+          granted: permissionMessage.granted ?? false,
+          totalTimeMs: permissionMessage.totalTimeMs ?? 0,
+          requestLaunched: permissionMessage.requestLaunched ?? false,
+          canRequest: permissionMessage.canRequest ?? false,
+          requiresSettings: permissionMessage.requiresSettings ?? false,
+          instructions: permissionMessage.instructions,
+          adbCommand: permissionMessage.adbCommand,
+          error: permissionMessage.error,
           perfTiming
         });
       }
@@ -3415,6 +3479,111 @@ export class AccessibilityServiceClient implements AccessibilityService {
         isDeviceOwner: false,
         isAdminActive: false,
         totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
+   * Request permission status via the accessibility service.
+   */
+  async requestPermission(
+    permission: string,
+    requestPermission: boolean = true,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yPermissionResult> {
+    const startTime = Date.now();
+    const trimmedPermission = permission.trim();
+
+    if (!trimmedPermission) {
+      return {
+        success: false,
+        permission: "unknown",
+        granted: false,
+        totalTimeMs: Date.now() - startTime,
+        requestLaunched: false,
+        canRequest: false,
+        requiresSettings: false,
+        error: "Permission name is required"
+      };
+    }
+
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for permission request");
+        return {
+          success: false,
+          permission: trimmedPermission,
+          granted: false,
+          totalTimeMs: Date.now() - startTime,
+          requestLaunched: false,
+          canRequest: false,
+          requiresSettings: false,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      const requestId = `permission_${Date.now()}_${generateSecureId()}`;
+      this.pendingPermissionRequestId = requestId;
+
+      const permissionPromise = new Promise<A11yPermissionResult>(resolve => {
+        this.pendingPermissionResolve = resolve;
+
+        this.timer.setTimeout(() => {
+          if (this.pendingPermissionResolve === resolve) {
+            this.pendingPermissionResolve = null;
+            this.pendingPermissionRequestId = null;
+            resolve({
+              success: false,
+              permission: trimmedPermission,
+              granted: false,
+              totalTimeMs: Date.now() - startTime,
+              requestLaunched: false,
+              canRequest: false,
+              requiresSettings: false,
+              error: `Permission request timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "get_permission",
+          requestId,
+          permission: trimmedPermission,
+          requestPermission
+        });
+        this.ws.send(message);
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent permission request (requestId: ${requestId}, permission: ${trimmedPermission})`);
+      });
+
+      const result = await perf.track("waitForPermission", () => permissionPromise);
+      const clientDuration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Permission status received: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms, permission=${result.permission}, granted=${result.granted}`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Permission request failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Permission request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        permission: trimmedPermission,
+        granted: false,
+        totalTimeMs: duration,
+        requestLaunched: false,
+        canRequest: false,
+        requiresSettings: false,
         error: `${error}`
       };
     }

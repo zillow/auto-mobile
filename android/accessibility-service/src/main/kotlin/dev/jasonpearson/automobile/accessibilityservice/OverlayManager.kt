@@ -2,6 +2,7 @@ package dev.jasonpearson.automobile.accessibilityservice
 
 import android.content.Context
 import android.graphics.PixelFormat
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -13,7 +14,13 @@ class OverlayManager(
     private val context: Context,
     private val windowManager: WindowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager,
-    private val canDrawOverlays: (Context) -> Boolean = { Settings.canDrawOverlays(it) },
+    private val canDrawOverlays: (Context) -> Boolean = {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        Settings.canDrawOverlays(it)
+      } else {
+        true
+      }
+    },
     private val viewFactory: (Context) -> View = { OverlayView(it) },
 ) {
 
@@ -64,6 +71,7 @@ class OverlayManager(
     overlayView = null
     overlayAdded = false
     overlayVisible = false
+    overlayLayoutParams = null
   }
 
   internal fun getOverlayViewForTest(): View? = overlayView
