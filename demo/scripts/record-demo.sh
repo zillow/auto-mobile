@@ -10,16 +10,27 @@ OUTPUT_DIR="$DEMO_DIR/output"
 PROJECT_ROOT="$(dirname "$DEMO_DIR")"
 
 # Configuration
-DEMO_NAME="${1:-alarm-demo}"
+DEMO_NAME="${1:-clock-app}"
+SCENARIO_SCRIPT="$SCRIPT_DIR/scenarios/${DEMO_NAME}.sh"
 DEVICE_VIDEO="$OUTPUT_DIR/${DEMO_NAME}-device.mp4"
 CLI_VIDEO="$OUTPUT_DIR/${DEMO_NAME}-cli.mp4"
-FINAL_VIDEO="$OUTPUT_DIR/${DEMO_NAME}-final.mp4"
+FINAL_VIDEO="$OUTPUT_DIR/${DEMO_NAME}.mp4"
 
 echo "🎬 AutoMobile Demo Recorder"
 echo "================================"
 echo "Demo name: $DEMO_NAME"
+echo "Scenario: $SCENARIO_SCRIPT"
 echo "Output dir: $OUTPUT_DIR"
 echo ""
+
+# Check if scenario exists
+if [ ! -f "$SCENARIO_SCRIPT" ]; then
+  echo "❌ Error: Scenario not found: $SCENARIO_SCRIPT"
+  echo ""
+  echo "Available scenarios:"
+  ls -1 "$SCRIPT_DIR/scenarios" | sed 's/\.sh$//' | sed 's/^/  - /'
+  exit 1
+fi
 
 # Clean previous outputs
 rm -f "$DEVICE_VIDEO" "$CLI_VIDEO" "$FINAL_VIDEO"
@@ -47,9 +58,9 @@ echo ""
 echo "🖥️  Recording terminal interaction..."
 CAST_FILE="$OUTPUT_DIR/${DEMO_NAME}.cast"
 asciinema rec "$CAST_FILE" \
-  --command "$SCRIPT_DIR/simulate-claude-code.sh" \
+  --command "$SCENARIO_SCRIPT" \
   --overwrite \
-  --title "Claude Code + AutoMobile Demo" \
+  --title "Claude Code + AutoMobile Demo: ${DEMO_NAME}" \
   --idle-time-limit 2
 
 # Convert cast to gif with agg
