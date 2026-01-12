@@ -11,12 +11,14 @@ NC='\033[0m' # No Color
 
 IMAGE_NAME="${IMAGE_NAME:-auto-mobile:latest}"
 CONTAINER_NAME="auto-mobile-test-$$"
+STDIO_CONTAINER_NAME="${CONTAINER_NAME}-stdio"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 
 # Cleanup function
 cleanup() {
   echo -e "${YELLOW}Cleaning up test container...${NC}"
-  docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+  docker rm -f "${CONTAINER_NAME}" 2> /dev/null || true
+  docker rm -f "${STDIO_CONTAINER_NAME}" 2> /dev/null || true
 }
 trap cleanup EXIT
 
@@ -24,7 +26,7 @@ echo -e "${GREEN}Testing Docker image: ${IMAGE_NAME}${NC}"
 
 # Test 1: Image exists
 echo -e "\n${YELLOW}Test 1: Checking if image exists...${NC}"
-if docker image inspect "${IMAGE_NAME}" &>/dev/null; then
+if docker image inspect "${IMAGE_NAME}" &> /dev/null; then
   echo -e "${GREEN}✓ Image exists${NC}"
 else
   echo -e "${RED}✗ Image not found. Build it first with: docker build -t ${IMAGE_NAME} .${NC}"
@@ -71,7 +73,7 @@ fi
 
 # Test 6: ADB is available
 echo -e "\n${YELLOW}Test 6: Checking ADB...${NC}"
-if docker exec "${CONTAINER_NAME}" which adb &>/dev/null; then
+if docker exec "${CONTAINER_NAME}" which adb &> /dev/null; then
   ADB_VERSION=$(docker exec "${CONTAINER_NAME}" adb version | head -1)
   echo -e "${GREEN}✓ ADB is available: ${ADB_VERSION}${NC}"
 else
@@ -84,7 +86,7 @@ echo -e "\n${YELLOW}Test 7: Checking development tools...${NC}"
 TOOLS=("rg" "ktfmt" "lychee" "shellcheck" "xmlstarlet" "jq")
 ALL_TOOLS_OK=true
 for tool in "${TOOLS[@]}"; do
-  if docker exec "${CONTAINER_NAME}" which "${tool}" &>/dev/null; then
+  if docker exec "${CONTAINER_NAME}" which "${tool}" &> /dev/null; then
     echo -e "${GREEN}  ✓ ${tool} is installed${NC}"
   else
     echo -e "${RED}  ✗ ${tool} not found${NC}"
@@ -128,9 +130,36 @@ fi
 echo -e "\n${YELLOW}Test 11: Testing MCP stdio protocol...${NC}"
 # Create a simple initialize request
 INIT_REQUEST='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
+STDIO_TIMEOUT_SECONDS=15
+STDIO_TEST_OUTPUT="$(mktemp)"
+STDIO_TEST_ERROR="$(mktemp)"
 
 # Test stdio communication (run container with -i flag, send request, check for response)
-RESPONSE=$(echo "${INIT_REQUEST}" | docker run --platform "${DOCKER_PLATFORM}" -i --rm "${IMAGE_NAME}" 2>/dev/null | head -1 || true)
+STDIO_EXIT_CODE=0
+if ! timeout "${STDIO_TIMEOUT_SECONDS}"s docker run --platform "${DOCKER_PLATFORM}" -i --rm \
+  --name "${STDIO_CONTAINER_NAME}" "${IMAGE_NAME}" <<< "${INIT_REQUEST}" \
+  > "${STDIO_TEST_OUTPUT}" 2> "${STDIO_TEST_ERROR}"; then
+  STDIO_EXIT_CODE=$?
+fi
+RESPONSE=$(head -1 "${STDIO_TEST_OUTPUT}" || true)
+
+if [ "${STDIO_EXIT_CODE}" -ne 0 ]; then
+  if [ "${STDIO_EXIT_CODE}" -eq 124 ]; then
+    echo -e "${YELLOW}⚠ MCP stdio test timed out after ${STDIO_TIMEOUT_SECONDS}s${NC}"
+  else
+    echo -e "${YELLOW}⚠ MCP stdio test exited with status ${STDIO_EXIT_CODE}${NC}"
+  fi
+
+  if docker ps -a --format '{{.Names}}' | grep -q "^${STDIO_CONTAINER_NAME}$"; then
+    echo -e "${YELLOW}  Container ${STDIO_CONTAINER_NAME} is still present; recent logs:${NC}"
+    docker logs --tail 50 "${STDIO_CONTAINER_NAME}" || true
+  fi
+
+  echo -e "${YELLOW}  Stdout (first 5 lines):${NC}"
+  sed -n '1,5p' "${STDIO_TEST_OUTPUT}"
+  echo -e "${YELLOW}  Stderr (first 5 lines):${NC}"
+  sed -n '1,5p' "${STDIO_TEST_ERROR}"
+fi
 
 if echo "${RESPONSE}" | grep -q '"jsonrpc":"2.0"'; then
   echo -e "${GREEN}✓ MCP server responds to stdio protocol${NC}"
@@ -140,11 +169,13 @@ else
   echo -e "  Response: ${RESPONSE}"
 fi
 
+rm -f "${STDIO_TEST_OUTPUT}" "${STDIO_TEST_ERROR}"
+
 # Test 12: Android SDK components
 echo -e "\n${YELLOW}Test 12: Verifying Android SDK components...${NC}"
 SDK_COMPONENTS=("platform-tools" "build-tools;35.0.0" "platforms;android-36")
 ALL_COMPONENTS_OK=true
-SDK_LIST=$(docker exec "${CONTAINER_NAME}" sdkmanager --list_installed 2>/dev/null)
+SDK_LIST=$(docker exec "${CONTAINER_NAME}" sdkmanager --list_installed 2> /dev/null)
 for component in "${SDK_COMPONENTS[@]}"; do
   if echo "${SDK_LIST}" | grep -q "${component}"; then
     echo -e "${GREEN}  ✓ ${component} is installed${NC}"

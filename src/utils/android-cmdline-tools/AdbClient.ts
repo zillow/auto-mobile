@@ -42,6 +42,7 @@ export class AdbClient implements AdbExecutor {
   // Static cache for device list
   private static deviceListCache: { devices: BootedDevice[], timestamp: number } | null = null;
   private static readonly DEVICE_LIST_CACHE_TTL = 5000; // 5 seconds
+  private static readonly DEVICE_LIST_TIMEOUT_MS = 5000;
   private static readonly MAX_ADB_RETRIES = 3;
 
   // Static cache for ADB path detection (shared across instances)
@@ -495,9 +496,12 @@ export class AdbClient implements AdbExecutor {
     }
 
     logger.info("Getting list of connected devices");
-    // Use raw ADB command without device ID since we're listing devices
-    const { adbPath, baseArgs } = await this.getBaseCommandParts();
-    const result = await this.execAsync(adbPath, [...baseArgs, "devices"]);
+    const result = await this.executeCommand(
+      "devices",
+      AdbClient.DEVICE_LIST_TIMEOUT_MS,
+      undefined,
+      true
+    );
     const lines = result.stdout.split("\n").slice(1); // Skip the first line which is the header
 
     const devices = lines

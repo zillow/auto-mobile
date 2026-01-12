@@ -60,7 +60,9 @@ function collectRecommendations(allChecks: CheckResult[]): string[] {
 /**
  * Run the doctor diagnostic tool
  */
-export async function runDoctor(options: DoctorOptions = {}): Promise<DoctorReport> {
+export async function runDoctor(
+  options: DoctorOptions = {}
+): Promise<DoctorReport> {
   const allChecks: CheckResult[] = [];
 
   // Always run system checks

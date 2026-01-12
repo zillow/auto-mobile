@@ -481,12 +481,13 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       const emulatorDevices = devices.filter(device => device.deviceId.startsWith("emulator-"));
       const physicalDevices = devices.filter(device => !device.deviceId.startsWith("emulator-"));
 
+      const infoTimeoutMs = 2000;
       for (const device of emulatorDevices) {
         const deviceId = device.deviceId;
         try {
           // Try to get the AVD name from the running emulator
           const adbWithDevice = new AdbClient(device);
-          const result = await adbWithDevice.executeCommand("emu avd name");
+          const result = await adbWithDevice.executeCommand("emu avd name", infoTimeoutMs, undefined, true);
           const avdName = result.stdout.trim().replace(/\r?\n.*$/, ""); // Remove any trailing newlines and additional text
 
           logger.info(`AVD name detection for ${deviceId}: raw="${result.stdout}" (${result.stdout.length} chars), cleaned="${avdName}"`);
@@ -515,7 +516,12 @@ export class AndroidEmulatorClient implements AndroidEmulator {
         try {
           // Try to get the actual device model name
           const adbWithDevice = new AdbClient(device);
-          const result = await adbWithDevice.executeCommand("shell getprop ro.product.model");
+          const result = await adbWithDevice.executeCommand(
+            "shell getprop ro.product.model",
+            infoTimeoutMs,
+            undefined,
+            true
+          );
           const modelName = result.stdout.trim();
 
           if (modelName && modelName !== "unknown" && modelName.length > 0) {
