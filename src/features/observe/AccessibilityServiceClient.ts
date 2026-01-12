@@ -3400,7 +3400,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      const requestId = `permission_${trimmedPermission}_${Date.now()}_${generateSecureId()}`;
+      const requestId = `permission_${Date.now()}_${generateSecureId()}`;
       this.pendingPermissionRequestId = requestId;
 
       const permissionPromise = new Promise<A11yPermissionResult>(resolve => {
