@@ -1,6 +1,7 @@
 package dev.jasonpearson.automobile.accessibilityservice
 
 import android.util.Log
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightShape
 import dev.jasonpearson.automobile.accessibilityservice.perf.PerfProvider
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -29,6 +30,9 @@ data class WebSocketRequest(
     // Tap coordinates parameters
     val x: Int? = null,
     val y: Int? = null,
+    // Highlight parameters
+    val id: String? = null,
+    val shape: HighlightShape? = null,
     // Swipe parameters
     val x1: Int? = null,
     val y1: Int? = null,
@@ -131,6 +135,12 @@ class WebSocketServer(
     private val onSetRecompositionTracking: ((enabled: Boolean) -> Unit)? = null,
     private val onGetCurrentFocus: ((requestId: String?) -> Unit)? = null,
     private val onGetTraversalOrder: ((requestId: String?) -> Unit)? = null,
+    private val onAddHighlight:
+        ((requestId: String?, highlightId: String?, shape: HighlightShape?) -> Unit)? =
+        null,
+    private val onRemoveHighlight: ((requestId: String?, highlightId: String?) -> Unit)? = null,
+    private val onClearHighlights: ((requestId: String?) -> Unit)? = null,
+    private val onListHighlights: ((requestId: String?) -> Unit)? = null,
 ) {
   companion object {
     private const val TAG = "WebSocketServer"
@@ -523,6 +533,22 @@ class WebSocketServer(
         "get_traversal_order" -> {
           Log.d(TAG, "Received get_traversal_order request (requestId: ${request.requestId})")
           onGetTraversalOrder?.invoke(request.requestId)
+        }
+        "add_highlight" -> {
+          Log.d(TAG, "Received add_highlight request (requestId: ${request.requestId})")
+          onAddHighlight?.invoke(request.requestId, request.id, request.shape)
+        }
+        "remove_highlight" -> {
+          Log.d(TAG, "Received remove_highlight request (requestId: ${request.requestId})")
+          onRemoveHighlight?.invoke(request.requestId, request.id)
+        }
+        "clear_highlights" -> {
+          Log.d(TAG, "Received clear_highlights request (requestId: ${request.requestId})")
+          onClearHighlights?.invoke(request.requestId)
+        }
+        "list_highlights" -> {
+          Log.d(TAG, "Received list_highlights request (requestId: ${request.requestId})")
+          onListHighlights?.invoke(request.requestId)
         }
         else -> {
           Log.d(TAG, "Unknown message type: ${request.type}")

@@ -1,6 +1,7 @@
 package dev.jasonpearson.automobile.accessibilityservice
 
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
@@ -33,7 +34,7 @@ class OverlayManager(
   private var overlayVisible = false
   private var overlayLayoutParams: WindowManager.LayoutParams? = null
 
-  fun show() {
+  fun show(): Boolean {
     val view = overlayView ?: viewFactory(context).also { overlayView = it }
 
     if (!overlayAdded) {
@@ -43,12 +44,13 @@ class OverlayManager(
         overlayAdded = true
       } catch (e: Exception) {
         Log.e(TAG, "Failed to add overlay view", e)
-        return
+        return false
       }
     }
 
     view.visibility = View.VISIBLE
     overlayVisible = true
+    return true
   }
 
   fun hide() {
@@ -110,11 +112,20 @@ class OverlayManager(
   }
 }
 
-internal class OverlayView(context: Context) : FrameLayout(context) {
+internal class OverlayView(
+    context: Context,
+    private val drawer: OverlayDrawer? = null,
+) : FrameLayout(context) {
   init {
     isClickable = false
     isFocusable = false
     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     setWillNotDraw(false)
+    drawer?.attachView(this)
+  }
+
+  override fun onDraw(canvas: Canvas) {
+    super.onDraw(canvas)
+    drawer?.draw(canvas)
   }
 }

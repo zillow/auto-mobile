@@ -23,6 +23,8 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightEntry
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightShape
 import dev.jasonpearson.automobile.accessibilityservice.models.InteractionElement
 import dev.jasonpearson.automobile.accessibilityservice.models.InteractionEvent
 import dev.jasonpearson.automobile.accessibilityservice.models.RecompositionSnapshot
@@ -47,6 +49,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -82,6 +85,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private val navigationEventAccumulator = NavigationEventAccumulator()
   private lateinit var overlayManager: OverlayManager
   private val permissionManager by lazy { PermissionManager(this) }
+  private lateinit var overlayDrawer: OverlayDrawer
   private val clipboardManager by lazy {
     getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
   }
@@ -187,7 +191,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     Log.d(TAG, "onServiceConnected")
 
     try {
-      overlayManager = OverlayManager(this)
+      overlayDrawer = OverlayDrawer(screenDimensionsProvider = { getScreenDimensions() })
+      overlayManager = OverlayManager(this, viewFactory = { OverlayView(it, overlayDrawer) })
+      overlayDrawer.attachOverlayManager(overlayManager)
 
       // Register broadcast receiver for commands
       val commandFilter = IntentFilter().apply { addAction(ACTION_EXTRACT_HIERARCHY) }
@@ -346,6 +352,14 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onSetRecompositionTracking = { enabled -> setRecompositionTrackingEnabled(enabled) },
               onGetCurrentFocus = { requestId -> handleGetCurrentFocus(requestId) },
               onGetTraversalOrder = { requestId -> handleGetTraversalOrder(requestId) },
+              onAddHighlight = { requestId, highlightId, shape ->
+                handleAddHighlight(requestId, highlightId, shape)
+              },
+              onRemoveHighlight = { requestId, highlightId ->
+                handleRemoveHighlight(requestId, highlightId)
+              },
+              onClearHighlights = { requestId -> handleClearHighlights(requestId) },
+              onListHighlights = { requestId -> handleListHighlights(requestId) },
           )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -376,6 +390,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       unregisterReceiver(recompositionReceiver)
     } catch (e: Exception) {
       Log.e(TAG, "Error unregistering recomposition receiver", e)
+    }
+
+    if (::overlayDrawer.isInitialized) {
+      overlayDrawer.destroy()
     }
 
     if (::overlayManager.isInitialized) {
@@ -3020,6 +3038,141 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       serviceScope.launch {
         broadcastTraversalOrderError(requestId, e.message, errorTime - startTime)
       }
+    }
+  }
+
+  private fun handleAddHighlight(
+      requestId: String?,
+      highlightId: String?,
+      shape: HighlightShape?,
+  ) {
+    serviceScope.launch {
+      if (!::overlayDrawer.isInitialized) {
+        broadcastHighlightResponse(
+            requestId,
+            false,
+            "Overlay drawer not initialized",
+            emptyList(),
+        )
+        return@launch
+      }
+
+      val result =
+          try {
+            withContext(Dispatchers.Main) { overlayDrawer.addHighlight(highlightId, shape) }
+          } catch (e: Exception) {
+            HighlightOperationResult(false, e.message ?: "Failed to add highlight")
+          }
+
+      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
+    }
+  }
+
+  private fun handleRemoveHighlight(requestId: String?, highlightId: String?) {
+    serviceScope.launch {
+      if (!::overlayDrawer.isInitialized) {
+        broadcastHighlightResponse(
+            requestId,
+            false,
+            "Overlay drawer not initialized",
+            emptyList(),
+        )
+        return@launch
+      }
+
+      val result =
+          try {
+            withContext(Dispatchers.Main) { overlayDrawer.removeHighlight(highlightId) }
+          } catch (e: Exception) {
+            HighlightOperationResult(false, e.message ?: "Failed to remove highlight")
+          }
+
+      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
+    }
+  }
+
+  private fun handleClearHighlights(requestId: String?) {
+    serviceScope.launch {
+      if (!::overlayDrawer.isInitialized) {
+        broadcastHighlightResponse(
+            requestId,
+            false,
+            "Overlay drawer not initialized",
+            emptyList(),
+        )
+        return@launch
+      }
+
+      val result =
+          try {
+            withContext(Dispatchers.Main) { overlayDrawer.clearHighlights() }
+          } catch (e: Exception) {
+            HighlightOperationResult(false, e.message ?: "Failed to clear highlights")
+          }
+
+      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
+    }
+  }
+
+  private fun handleListHighlights(requestId: String?) {
+    serviceScope.launch {
+      if (!::overlayDrawer.isInitialized) {
+        broadcastHighlightResponse(
+            requestId,
+            false,
+            "Overlay drawer not initialized",
+            emptyList(),
+        )
+        return@launch
+      }
+
+      val result =
+          try {
+            val highlights = withContext(Dispatchers.Main) { overlayDrawer.listHighlights() }
+            HighlightOperationResult(true, null, highlights)
+          } catch (e: Exception) {
+            HighlightOperationResult(false, e.message ?: "Failed to list highlights")
+          }
+
+      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
+    }
+  }
+
+  private suspend fun broadcastHighlightResponse(
+      requestId: String?,
+      success: Boolean,
+      error: String?,
+      highlights: List<HighlightEntry>?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping highlight response broadcast")
+      return
+    }
+
+    try {
+      val highlightPayload = highlights ?: emptyList()
+      val highlightsJson =
+          jsonCompact.encodeToString(ListSerializer(HighlightEntry.serializer()), highlightPayload)
+      val errorJson = jsonCompact.encodeToString<String?>(error)
+
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"highlight_response","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","success":$success""")
+          append(""","error":$errorJson""")
+          append(""","highlights":$highlightsJson""")
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted highlight response to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting highlight response", e)
     }
   }
 
