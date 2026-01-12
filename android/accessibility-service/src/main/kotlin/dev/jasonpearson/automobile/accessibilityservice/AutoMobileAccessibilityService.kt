@@ -80,6 +80,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private lateinit var webSocketServer: WebSocketServer
   private lateinit var hierarchyDebouncer: HierarchyDebouncer
   private val navigationEventAccumulator = NavigationEventAccumulator()
+  private lateinit var overlayManager: OverlayManager
   private val clipboardManager by lazy {
     getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
   }
@@ -185,6 +186,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     Log.d(TAG, "onServiceConnected")
 
     try {
+      overlayManager = OverlayManager(this)
+
       // Register broadcast receiver for commands
       val commandFilter = IntentFilter().apply { addAction(ACTION_EXTRACT_HIERARCHY) }
 
@@ -366,6 +369,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       unregisterReceiver(recompositionReceiver)
     } catch (e: Exception) {
       Log.e(TAG, "Error unregistering recomposition receiver", e)
+    }
+
+    if (::overlayManager.isInitialized) {
+      overlayManager.destroy()
     }
 
     // Cancel hierarchy flow subscription
