@@ -84,6 +84,7 @@ export class SwipeOn extends BaseVisualChange {
   private static readonly MAX_ATTEMPTS = 5;
   private static readonly OVERLAY_PADDING = 8;
   private static readonly CANDIDATE_FRACTIONS = [0.5, 0.25, 0.75, 0.15, 0.85];
+  private static readonly OVERLAY_COVERAGE_THRESHOLD = 0.8;
 
   constructor(
     device: BootedDevice,
@@ -819,8 +820,7 @@ export class SwipeOn extends BaseVisualChange {
     for (let i = 0; i < sorted.length; i++) {
       const candidate = sorted[i];
       const isCoveredByLower = sorted.slice(i + 1).some(lower =>
-        this.boundsOverlap(candidate.overlapBounds, lower.overlapBounds) &&
-        this.isAbove(lower, candidate)
+        this.isSignificantlyCovered(candidate, lower)
       );
 
       if (!isCoveredByLower) {
@@ -836,6 +836,24 @@ export class SwipeOn extends BaseVisualChange {
       return a.zOrder.windowRank > b.zOrder.windowRank;
     }
     return a.zOrder.nodeOrder > b.zOrder.nodeOrder;
+  }
+
+  private isSignificantlyCovered(candidate: OverlayCandidate, higher: OverlayCandidate): boolean {
+    if (!this.isAbove(higher, candidate)) {
+      return false;
+    }
+
+    const overlap = this.intersectBounds(candidate.overlapBounds, higher.overlapBounds);
+    if (!overlap) {
+      return false;
+    }
+
+    if (candidate.coverage <= 0) {
+      return false;
+    }
+
+    const overlapRatio = this.boundsArea(overlap) / candidate.coverage;
+    return overlapRatio >= SwipeOn.OVERLAY_COVERAGE_THRESHOLD;
   }
 
   private intersectBounds(a: Element["bounds"], b: Element["bounds"]): Element["bounds"] | null {

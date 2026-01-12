@@ -241,7 +241,7 @@ describe("SwipeOn container overlays", () => {
     expect(call.y1).toBeGreaterThanOrEqual(200);
   });
 
-  test("prefers topmost smaller overlay when it overlaps a larger one", async () => {
+  test("keeps the larger overlay when overlap is partial", async () => {
     const containerNode = createContainerNode("[0,0][1000,2000]", "map-container");
     const overlayLarge = createNode("[0,0][1000,400]", {
       "resource-id": "large-overlay",
@@ -264,6 +264,32 @@ describe("SwipeOn container overlays", () => {
     expect(result.success).toBe(true);
     const [call] = fakeGesture.getSwipeCalls();
     expect(call).toBeDefined();
-    expect(call.y1).toBeGreaterThanOrEqual(200);
+    expect(call.y1).toBeGreaterThan(400);
+  });
+
+  test("prefers the topmost overlay when it covers most of a larger one", async () => {
+    const containerNode = createContainerNode("[0,0][1000,2000]", "map-container");
+    const overlayLarge = createNode("[0,0][1000,1000]", {
+      "resource-id": "large-overlay",
+      "clickable": "true"
+    });
+    const overlaySmall = createNode("[0,0][1000,900]", {
+      "resource-id": "small-overlay",
+      "clickable": "true"
+    });
+
+    const hierarchy = createHierarchy([containerNode, overlayLarge, overlaySmall]);
+    fakeObserveScreen.setObserveResult(createObserveResult(hierarchy));
+
+    const swipeOn = createSwipeOn();
+    const result = await swipeOn.execute({
+      direction: "down",
+      container: { elementId: "map-container" }
+    });
+
+    expect(result.success).toBe(true);
+    const [call] = fakeGesture.getSwipeCalls();
+    expect(call).toBeDefined();
+    expect(call.y1).toBeLessThan(1100);
   });
 });
