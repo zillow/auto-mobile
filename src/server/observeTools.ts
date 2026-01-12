@@ -5,16 +5,37 @@ import { RESOURCE_URIS } from "./observationResources";
 import { ActionableError } from "../models/ActionableError";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
-import { createJSONToolResponse } from "../utils/toolUtils";
-import { BootedDevice } from "../models";
+import { createJSONToolResponse, throwIfAborted } from "../utils/toolUtils";
+import { BootedDevice, Element, ObserveResult, ViewHierarchyResult } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import { IdentifyInteractions, IdentifyInteractionsOptions } from "../features/observe/IdentifyInteractions";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
+import { ElementUtils } from "../features/utility/ElementUtils";
+import { defaultTimer } from "../utils/SystemTimer";
 
 // Schema definitions
+const waitForElementSchema = z.object({
+  id: z.string().optional().describe("Element ID to wait for"),
+  text: z.string().optional().describe("Element text to wait for"),
+}).superRefine((value, ctx) => {
+  const provided = [value.id, value.text].filter(Boolean).length;
+  if (provided !== 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "waitFor.element must specify exactly one of id or text"
+    });
+  }
+});
+
+const waitForSchema = z.object({
+  element: waitForElementSchema.describe("Element to wait for"),
+  timeout: z.number().optional().describe("Wait timeout ms (default: 5000)")
+});
+
 export const observeSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
+  platform: z.enum(["android", "ios"]).describe("Platform"),
+  waitFor: waitForSchema.optional().describe("Wait for element to appear before returning observation")
 }));
 
 export const listAppsSchema = addDeviceTargetingToSchema(z.object({
@@ -37,14 +58,129 @@ export const identifyInteractionsSchema = addDeviceTargetingToSchema(z.object({
   }).optional().describe("Context options")
 }));
 
+const WAIT_FOR_POLL_INTERVAL_MS = 100;
+
+type ObserveWaitForOptions = z.infer<typeof waitForSchema>;
+type ObserveArgs = z.infer<typeof observeSchema>;
+
+const findWaitForElement = (
+  elementUtils: ElementUtils,
+  waitFor: ObserveWaitForOptions,
+  viewHierarchy: ViewHierarchyResult
+): Element | null => {
+  if (waitFor.element.id) {
+    return elementUtils.findElementByResourceId(
+      viewHierarchy,
+      waitFor.element.id,
+      undefined
+    );
+  }
+
+  if (waitFor.element.text) {
+    return elementUtils.findElementByText(
+      viewHierarchy,
+      waitFor.element.text,
+      undefined,
+      true,
+      false
+    );
+  }
+
+  return null;
+};
+
+const waitForObservation = async (
+  observeScreen: ObserveScreen,
+  waitFor: ObserveWaitForOptions,
+  signal?: AbortSignal
+): Promise<{
+  observation: ObserveResult;
+  awaitedElement?: Element;
+  awaitDuration: number;
+  awaitTimeout: boolean;
+}> => {
+  const startTime = defaultTimer.now();
+  const timeoutMs = waitFor.timeout ?? 5000;
+  const elementUtils = new ElementUtils();
+  const queryOptions = {
+    text: waitFor.element.text,
+    elementId: waitFor.element.id
+  };
+
+  throwIfAborted(signal);
+  let observation = await observeScreen.execute(
+    queryOptions,
+    createGlobalPerformanceTracker(),
+    false,
+    startTime,
+    signal
+  );
+  let awaitedElement = observation.viewHierarchy
+    ? findWaitForElement(elementUtils, waitFor, observation.viewHierarchy)
+    : null;
+
+  if (awaitedElement) {
+    return {
+      observation,
+      awaitedElement,
+      awaitDuration: defaultTimer.now() - startTime,
+      awaitTimeout: false
+    };
+  }
+
+  if (defaultTimer.now() - startTime >= timeoutMs) {
+    return {
+      observation,
+      awaitDuration: defaultTimer.now() - startTime,
+      awaitTimeout: true
+    };
+  }
+
+  while (defaultTimer.now() - startTime < timeoutMs) {
+    await defaultTimer.sleep(WAIT_FOR_POLL_INTERVAL_MS);
+    throwIfAborted(signal);
+
+    observation = await observeScreen.execute(
+      queryOptions,
+      createGlobalPerformanceTracker(),
+      false,
+      startTime,
+      signal
+    );
+    awaitedElement = observation.viewHierarchy
+      ? findWaitForElement(elementUtils, waitFor, observation.viewHierarchy)
+      : null;
+
+    if (awaitedElement) {
+      return {
+        observation,
+        awaitedElement,
+        awaitDuration: defaultTimer.now() - startTime,
+        awaitTimeout: false
+      };
+    }
+  }
+
+  return {
+    observation,
+    awaitDuration: defaultTimer.now() - startTime,
+    awaitTimeout: true
+  };
+};
+
 // Register tools (this will be called when this file is imported)
 export function registerObserveTools() {
   // Observe handler
-  const observeHandler = async (device: BootedDevice, _args: unknown, _progress?: unknown, signal?: AbortSignal) => {
+  const observeHandler = async (device: BootedDevice, args: ObserveArgs, _progress?: unknown, signal?: AbortSignal) => {
     try {
-      const perf = createGlobalPerformanceTracker();
       const observeScreen = new ObserveScreen(device);
-      const result = await observeScreen.execute(undefined, perf, true, 0, signal);
+      const waitFor = args.waitFor;
+      const waitOutcome = waitFor
+        ? await waitForObservation(observeScreen, waitFor, signal)
+        : null;
+      const result = waitOutcome
+        ? waitOutcome.observation
+        : await observeScreen.execute(undefined, createGlobalPerformanceTracker(), true, 0, signal);
 
       // Record back stack information in navigation graph if available
       if (result.backStack && result.activeWindow?.appId) {
@@ -60,6 +196,15 @@ export function registerObserveTools() {
         RESOURCE_URIS.LATEST_OBSERVATION,
         RESOURCE_URIS.LATEST_SCREENSHOT
       ]);
+
+      if (waitOutcome) {
+        return createJSONToolResponse({
+          ...result,
+          awaitedElement: waitOutcome.awaitedElement,
+          awaitDuration: waitOutcome.awaitDuration,
+          awaitTimeout: waitOutcome.awaitTimeout
+        });
+      }
 
       return createJSONToolResponse(result);
     } catch (error) {

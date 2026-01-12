@@ -1072,6 +1072,35 @@
           ],
           "description": "Platform"
         },
+        "waitFor": {
+          "type": "object",
+          "properties": {
+            "element": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Element ID to wait for"
+                },
+                "text": {
+                  "type": "string",
+                  "description": "Element text to wait for"
+                }
+              },
+              "additionalProperties": false,
+              "description": "Element to wait for"
+            },
+            "timeout": {
+              "type": "number",
+              "description": "Wait timeout ms (default: 5000)"
+            }
+          },
+          "required": [
+            "element"
+          ],
+          "additionalProperties": false,
+          "description": "Wait for element to appear before returning observation"
+        },
         "sessionUuid": {
           "type": "string",
           "description": "Session UUID for device targeting"

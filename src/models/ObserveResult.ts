@@ -133,6 +133,17 @@ export interface ObserveResult {
   /** Error message if observation failed partially or completely */
   error?: string;
 
+  /**
+   * Element detected while waiting for a match via observe waitFor
+   */
+  awaitedElement?: Element;
+
+  /** Time spent waiting for the element in milliseconds */
+  awaitDuration?: number;
+
+  /** True if the wait timed out without finding the element */
+  awaitTimeout?: boolean;
+
   /** Performance timing data (only present when --debug-perf is enabled) */
   perfTiming?: TimingData;
 
