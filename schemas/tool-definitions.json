@@ -416,6 +416,10 @@
         "ios": {
           "type": "boolean",
           "description": "Run iOS-specific checks only"
+        },
+        "installCmdlineTools": {
+          "type": "boolean",
+          "description": "Automatically download and install Android SDK Command-line Tools to ANDROID_HOME if missing"
         }
       },
       "additionalProperties": false,
