@@ -260,13 +260,17 @@ export class LaunchApp extends BaseVisualChange {
 
     while (this.timer.now() - startTime < timeoutMs) {
       attempts += 1;
-      const result = await viewHierarchy.getViewHierarchy();
-      const hierarchy = result?.hierarchy as { error?: string } | null | undefined;
-      if (hierarchy && !hierarchy.error) {
-        logger.info(`[LaunchApp] iOS hierarchy ready after ${this.timer.now() - startTime}ms`);
-        return;
+      try {
+        const result = await viewHierarchy.getViewHierarchy();
+        const hierarchy = result?.hierarchy as { error?: string } | null | undefined;
+        if (hierarchy && !hierarchy.error) {
+          logger.info(`[LaunchApp] iOS hierarchy ready after ${this.timer.now() - startTime}ms`);
+          return;
+        }
+        logger.debug(`[LaunchApp] iOS hierarchy not ready yet (attempt ${attempts})`);
+      } catch (error) {
+        logger.debug(`[LaunchApp] iOS hierarchy fetch failed (attempt ${attempts}): ${error}`);
       }
-      logger.debug(`[LaunchApp] iOS hierarchy not ready yet (attempt ${attempts})`);
       await this.timer.sleep(pollIntervalMs);
     }
 
