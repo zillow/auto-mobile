@@ -256,7 +256,7 @@ REPORT_JSON=$(jq -n \
   --argjson unusedFiles "$UNUSED_FILES" \
   --argjson unusedDependencies "$UNUSED_DEPS" \
   --argjson other "$OTHER" \
-  --argjson issues "$(cat "$ISSUES_JSON")" \
+  --slurpfile issues "$ISSUES_JSON" \
   '{
     timestamp: $timestamp,
     totalIssues: $totalIssues,
@@ -265,9 +265,9 @@ REPORT_JSON=$(jq -n \
       knip: $knip
     },
     byType: (
-      $issues | group_by(.type) | map({key: .[0].type, value: length}) | from_entries
+      $issues[0] | group_by(.type) | map({key: .[0].type, value: length}) | from_entries
     ),
-    issues: $issues,
+    issues: $issues[0],
     summary: {
       unusedExports: $unusedExports,
       unusedFiles: $unusedFiles,
@@ -323,8 +323,8 @@ else
                 echo "📍 $type_upper ($count):"
                 echo "────────────────────────────────────────────────────────────"
 
-                # Show first 20 issues
-                jq -r ".[] | select(.type == \"$type\") | \"  \(.location) - \(.name)\"" "$ISSUES_JSON" | head -20
+                # Show first 20 issues without triggering pipefail on SIGPIPE
+                jq -r --arg type "$type" 'map(select(.type == $type)) | .[:20][] | "  \(.location) - \(.name)"' "$ISSUES_JSON"
 
                 if [ "$count" -gt 20 ]; then
                     echo "  ... and $((count - 20)) more"
