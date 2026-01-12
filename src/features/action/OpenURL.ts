@@ -119,22 +119,10 @@ export class OpenURL extends BaseVisualChange {
    * @returns Result of the URL opening operation
    */
   private async executeAndroidOpenURL(url: string): Promise<OpenURLResult> {
-    // Convert automobile: opaque URIs to hierarchical URIs to work around Android am start limitation
-    // Example: automobile:playground/path -> automobile://playground/path
-    // This is needed because am start -d truncates opaque URIs at the first colon
-    // Only rewrite automobile: scheme - other schemes (mailto:, tel:, sms:, geo:) should remain unchanged
-    let processedUrl = url;
-    const automobileOpaqueMatch = url.match(/^(automobile):([^/])/);
-    if (automobileOpaqueMatch) {
-      // This is an automobile: opaque URI without //
-      // Convert to hierarchical format by adding //
-      const scheme = automobileOpaqueMatch[1];
-      const ssp = url.substring(scheme.length + 1);
-      processedUrl = `${scheme}://${ssp}`;
-      logger.info(`[OpenURL] Converted automobile opaque URI to hierarchical: ${url} -> ${processedUrl}`);
-    }
-
-    await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${processedUrl}"`);
+    // Pass URL through as-is to am start without any reformatting
+    // Android's Intent system handles both hierarchical (scheme://authority/path)
+    // and opaque (scheme:scheme-specific-part) URIs correctly
+    await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${url}"`);
 
     return {
       success: true,
