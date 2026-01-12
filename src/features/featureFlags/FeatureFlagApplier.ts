@@ -33,9 +33,6 @@ export class DefaultFeatureFlagApplier implements FeatureFlagApplier {
       case "mem-perf-audit":
         serverConfig.setMemPerfAuditMode(enabled);
         break;
-      case "strict-await":
-        serverConfig.setStrictAwaitEnabled(enabled);
-        break;
       case "accessibility-audit":
         serverConfig.setAccessibilityAuditConfig(
           enabled ? applyAccessibilityConfig(config) : null

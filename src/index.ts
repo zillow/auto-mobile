@@ -77,7 +77,6 @@ function parseArgs(): {
   uiPerfMode: boolean;
   uiPerfDebug: boolean;
   memPerfAuditMode: boolean;
-  strictAwait: boolean;
   a11yAuditMode: boolean;
   a11yLevel?: string;
   a11yFailureMode?: string;
@@ -125,9 +124,6 @@ function parseArgs(): {
 
   // Detect memory performance audit mode
   const memPerfAuditMode = args.includes("--mem-perf-audit");
-
-  // Detect strict await mode for tapOn await timeouts
-  const strictAwait = args.includes("--strict-await");
 
   // Detect accessibility audit mode
   const a11yAuditMode = args.includes("--accessibility-audit");
@@ -323,7 +319,6 @@ function parseArgs(): {
     uiPerfMode,
     uiPerfDebug,
     memPerfAuditMode,
-    strictAwait,
     a11yAuditMode,
     a11yLevel,
     a11yFailureMode,
@@ -745,7 +740,6 @@ async function main() {
       uiPerfMode,
       uiPerfDebug,
       memPerfAuditMode,
-      strictAwait,
       a11yAuditMode,
       a11yLevel,
       a11yFailureMode,
@@ -781,7 +775,6 @@ async function main() {
       ["ui-perf-mode", uiPerfMode, "--ui-perf-mode"],
       ["ui-perf-debug", uiPerfDebug, "--ui-perf-debug"],
       ["mem-perf-audit", memPerfAuditMode, "--mem-perf-audit"],
-      ["strict-await", strictAwait, "--strict-await"],
       ["accessibility-audit", a11yAuditMode, "--accessibility-audit", accessibilityConfig],
       ["predictive-ui", predictiveUi, "--predictive/--predictive-ui"],
     ];
@@ -802,7 +795,6 @@ async function main() {
         host: transport.host,
         debug,
         debugPerf,
-        strictAwait,
       });
       return;
     }

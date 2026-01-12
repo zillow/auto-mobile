@@ -309,7 +309,9 @@ export interface AccessibilityService {
    */
   requestHierarchySync(
     perf?: PerformanceTracker,
-    disableAllFiltering?: boolean
+    disableAllFiltering?: boolean,
+    signal?: AbortSignal,
+    timeoutMs?: number
   ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null>;
 
   /**
@@ -1920,9 +1922,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
   async requestHierarchySync(
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
     disableAllFiltering: boolean = false,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    timeoutMs: number = 10000
   ): Promise<{ hierarchy: AccessibilityHierarchy; perfTiming?: AndroidPerfTiming[] } | null> {
     const startTime = Date.now();
+    const effectiveTimeoutMs = Math.max(0, timeoutMs);
 
     try {
       logger.info("[ACCESSIBILITY_SERVICE] Requesting hierarchy sync via WebSocket");
@@ -1949,9 +1953,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
       // Wait for WebSocket push (triggered by either method)
       // The Android service calls broadcastHierarchyUpdate() after extraction
-      // Use 10 second timeout to handle long animations (switch toggles can trigger 10+ concurrent extractions)
+      // Use a configurable timeout to align with caller expectations.
       const freshData = await perf.track("waitForPush", () =>
-        this.waitForFreshData(10000, startTime, signal)
+        this.waitForFreshData(effectiveTimeoutMs, startTime, false, signal)
       );
 
       if (freshData) {

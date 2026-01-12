@@ -16,7 +16,6 @@ import { Rotate } from "../features/action/Rotate";
 import { OpenURL } from "../features/action/OpenURL";
 import { Clipboard } from "../features/action/Clipboard";
 import { ActionableError, BootedDevice, Element, ViewHierarchyResult } from "../models";
-import { serverConfig } from "../utils/ServerConfig";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -80,12 +79,8 @@ export interface TapOnArgs {
   id?: string;
   action: "tap" | "doubleTap" | "longPress" | "focus";
   duration?: number;
-  await?: {
-    element: {
-      id?: string;
-      text?: string;
-    };
-    timeout?: number;
+  searchUntil?: {
+    duration?: number;
   };
   platform: Platform;
 }
@@ -191,13 +186,9 @@ export const tapOnSchema = addDeviceTargetingToSchema(z.object({
   text: z.string().optional().describe("Text to tap (overrides id)"),
   id: z.string().optional().describe("Element ID to tap"),
   duration: z.number().optional().describe("Long press duration (ms)"),
-  await: z.object({
-    element: z.object({
-      id: z.string().optional().describe("Element ID to wait for"),
-      text: z.string().optional().describe("Element text to wait for"),
-    }).describe("Element to wait for"),
-    timeout: z.number().optional().describe("Wait timeout ms (default: 5000)"),
-  }).optional().describe("Wait for element after tap"),
+  searchUntil: z.object({
+    duration: z.number().min(100).max(12000).optional().describe("Polling duration (ms, default: 500)"),
+  }).optional().describe("Poll for element before tapping"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
@@ -1058,12 +1049,15 @@ export function registerInteractionTools() {
       elementId: args.id,
       action: args.action,
       duration: args.duration,
-      await: args.await,
-      strictAwait: serverConfig.isStrictAwaitEnabled(),
+      searchUntil: args.searchUntil,
     }, progress);
 
+    const searchSummary = result.searchUntil
+      ? `${result.searchUntil.changeCount} view hierarchy changes over ${result.searchUntil.requestCount} requests within ${result.searchUntil.durationMs}ms`
+      : undefined;
+
     return createJSONToolResponse({
-      message: `Tapped on element`,
+      message: searchSummary ? `Tapped on element (${searchSummary})` : "Tapped on element",
       observation: result.observation,
       ...result
     });

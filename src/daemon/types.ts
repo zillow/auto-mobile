@@ -74,8 +74,6 @@ export interface DaemonOptions {
   debug?: boolean;
   /** Enable debug performance tracking */
   debugPerf?: boolean;
-  /** Enable strict await mode for tapOn await timeouts */
-  strictAwait?: boolean;
   /** Plan execution lock scope (session or global) */
   planExecutionLockScope?: "session" | "global";
   /** Default video quality preset */

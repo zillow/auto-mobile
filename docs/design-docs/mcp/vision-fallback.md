@@ -11,7 +11,7 @@ Vision fallback is an **internal feature** that is:
 - **Disabled by default** to avoid unexpected API costs
 - Only available when constructing `TapOnElement` with custom vision configuration
 - Not exposed via MCP server or CLI by default
-- Currently integrated into `tapOn` only (invoked after 5 retry attempts fail)
+- Currently integrated into `tapOn` only (invoked after polling times out)
 - Android screenshots only (iOS not yet implemented)
 
 ### How It Works

@@ -15,7 +15,6 @@ class ServerConfig {
   private _uiPerfDebugEnabled: boolean = false;
   private _accessibilityAuditConfig: AccessibilityAuditConfig | null = null;
   private _memPerfAuditEnabled: boolean = false;
-  private _strictAwaitEnabled: boolean = false;
   private _predictiveUiEnabled: boolean = false;
   private _planExecutionLockScope: PlanExecutionLockScope = "session";
   private _videoRecordingDefaults: VideoRecordingConfigInput = {};
@@ -64,14 +63,6 @@ class ServerConfig {
 
   isMemPerfAuditEnabled(): boolean {
     return this._memPerfAuditEnabled;
-  }
-
-  setStrictAwaitEnabled(enabled: boolean): void {
-    this._strictAwaitEnabled = enabled;
-  }
-
-  isStrictAwaitEnabled(): boolean {
-    return this._strictAwaitEnabled;
   }
 
   setPredictiveUiEnabled(enabled: boolean): void {

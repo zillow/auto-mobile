@@ -159,9 +159,6 @@ export class DaemonManager {
     if (options.debugPerf) {
       args.push("--debug-perf");
     }
-    if (options.strictAwait) {
-      args.push("--strict-await");
-    }
     if (options.planExecutionLockScope) {
       args.push("--plan-execution-lock-scope", options.planExecutionLockScope);
     }
@@ -421,8 +418,6 @@ export async function runDaemonCommand(
             options.debug = true;
           } else if (args[i] === "--debug-perf") {
             options.debugPerf = true;
-          } else if (args[i] === "--strict-await") {
-            options.strictAwait = true;
           } else if (args[i] === "--plan-execution-lock-scope") {
             const scope = args[i + 1];
             if (scope === "global" || scope === "session") {
@@ -501,8 +496,6 @@ export async function runDaemonCommand(
             options.debug = true;
           } else if (args[i] === "--debug-perf") {
             options.debugPerf = true;
-          } else if (args[i] === "--strict-await") {
-            options.strictAwait = true;
           } else if (args[i] === "--plan-execution-lock-scope") {
             const scope = args[i + 1];
             if (scope === "global" || scope === "session") {
