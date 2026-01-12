@@ -236,7 +236,7 @@ internal class HighlightOverlayView(context: Context) : View(context) {
   }
 
   internal fun resolveDashPatternPx(patternDp: FloatArray?): FloatArray? {
-    if (patternDp == null || patternDp.size < 2) return null
+    if (patternDp == null || patternDp.size < 2 || patternDp.size % 2 != 0) return null
     val density = resources.displayMetrics.density
     val converted = FloatArray(patternDp.size)
     for (index in patternDp.indices) {

@@ -55,4 +55,13 @@ class HighlightOverlayViewTest {
 
     assertArrayEquals(floatArrayOf(8f, 4f), patternPx, 0.01f)
   }
+
+  @Test
+  fun `dash pattern rejects odd lengths`() {
+    highlightView.resources.displayMetrics.density = 2f
+
+    val patternPx = highlightView.resolveDashPatternPx(floatArrayOf(4f, 2f, 1f))
+
+    assertEquals(null, patternPx)
+  }
 }
