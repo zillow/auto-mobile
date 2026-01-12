@@ -294,6 +294,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onRequestSwipe = { requestId, x1, y1, x2, y2, duration ->
                 performSwipe(requestId, x1, y1, x2, y2, duration)
               },
+              onRequestTapCoordinates = { requestId, x, y, duration ->
+                performTapCoordinates(requestId, x, y, duration)
+              },
               onRequestTwoFingerSwipe = { requestId, x1, y1, x2, y2, duration, offset ->
                 performTwoFingerSwipe(requestId, x1, y1, x2, y2, duration, offset)
               },
@@ -948,6 +951,110 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.e(TAG, "Error performing swipe", e)
       serviceScope.launch {
         broadcastSwipeResult(requestId, false, e.message, errorTime - startTime, null)
+      }
+    }
+  }
+
+  /**
+   * Perform a tap at specific coordinates using AccessibilityService's dispatchGesture API.
+   * This is significantly faster than ADB input tap and more precise than resource-id lookup.
+   *
+   * @param requestId Optional request ID for response correlation
+   * @param x X coordinate to tap
+   * @param y Y coordinate to tap
+   * @param duration Duration of the tap in milliseconds (default 10ms for a quick tap)
+   */
+  private fun performTapCoordinates(requestId: String?, x: Int, y: Int, duration: Long = 10) {
+    val startTime = System.currentTimeMillis()
+    Log.d(TAG, "performTapCoordinates: ($x, $y) duration=${duration}ms")
+    perfProvider.serial("performTapCoordinates")
+
+    try {
+      // Create a tap path (single point, no movement)
+      perfProvider.startOperation("buildPath")
+      val path =
+          Path().apply {
+            moveTo(x.toFloat(), y.toFloat())
+          }
+
+      // Build the gesture description
+      val gesture =
+          GestureDescription.Builder()
+              .addStroke(GestureDescription.StrokeDescription(path, 0, duration))
+              .build()
+      perfProvider.endOperation("buildPath")
+
+      val gestureBuiltTime = System.currentTimeMillis()
+      Log.d(TAG, "Tap gesture built in ${gestureBuiltTime - startTime}ms")
+
+      perfProvider.startOperation("dispatchGesture")
+      // Dispatch the gesture
+      val dispatched =
+          dispatchGesture(
+              gesture,
+              object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                  perfProvider.endOperation("dispatchGesture")
+
+                  // Wait for UI to settle after tap, then extract fresh hierarchy
+                  val freshHierarchy =
+                      hierarchyDebouncer.extractAfterQuiescence(
+                          quiescenceMs = 50L,
+                          maxWaitMs = 500L,
+                          pollIntervalMs = 10L,
+                      )
+                  if (freshHierarchy != null) {
+                    kotlinx.coroutines.runBlocking { broadcastHierarchyUpdate(freshHierarchy, sync = true) }
+                  }
+
+                  perfProvider.end() // end performTapCoordinates block
+                  val completedTime = System.currentTimeMillis()
+                  val totalTime = completedTime - startTime
+                  val gestureTime = completedTime - gestureBuiltTime
+                  Log.d(TAG, "Tap completed: gesture=${gestureTime}ms, total=${totalTime}ms")
+
+                  // Broadcast success result
+                  serviceScope.launch {
+                    broadcastTapCoordinatesResult(requestId, true, null, totalTime)
+                  }
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                  perfProvider.endOperation("dispatchGesture")
+                  perfProvider.end() // end performTapCoordinates block
+                  val cancelledTime = System.currentTimeMillis()
+                  val totalTime = cancelledTime - startTime
+                  Log.w(TAG, "Tap cancelled after ${totalTime}ms")
+
+                  // Broadcast cancelled result
+                  serviceScope.launch {
+                    broadcastTapCoordinatesResult(requestId, false, "Gesture was cancelled", totalTime)
+                  }
+                }
+              },
+              null,
+          )
+
+      if (!dispatched) {
+        perfProvider.endOperation("dispatchGesture")
+        perfProvider.end() // end performTapCoordinates block
+        val failTime = System.currentTimeMillis()
+        Log.e(TAG, "Failed to dispatch tap gesture")
+        serviceScope.launch {
+          broadcastTapCoordinatesResult(
+              requestId,
+              false,
+              "Failed to dispatch gesture",
+              failTime - startTime,
+          )
+        }
+      }
+    } catch (e: Exception) {
+      perfProvider.end() // end performTapCoordinates block
+      val errorTime = System.currentTimeMillis()
+      Log.e(TAG, "Error performing tap", e)
+      serviceScope.launch {
+        broadcastTapCoordinatesResult(requestId, false, e.message, errorTime - startTime)
       }
     }
   }
@@ -2598,6 +2705,42 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.d(TAG, "Broadcasted swipe result to ${webSocketServer.getConnectionCount()} clients")
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting swipe result", e)
+    }
+  }
+
+  /** Broadcast tap coordinates result to WebSocket clients */
+  private suspend fun broadcastTapCoordinatesResult(
+      requestId: String?,
+      success: Boolean,
+      error: String?,
+      totalTimeMs: Long,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping tap coordinates result broadcast")
+      return
+    }
+
+    try {
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"tap_coordinates_result","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","success":$success""")
+          append(""","totalTimeMs":$totalTimeMs""")
+          if (error != null) {
+            append(""","error":"$error"""")
+          }
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted tap coordinates result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting tap coordinates result", e)
     }
   }
 

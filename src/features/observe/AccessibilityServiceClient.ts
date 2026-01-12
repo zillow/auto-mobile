@@ -116,6 +116,16 @@ export interface A11ySwipeResult {
 }
 
 /**
+ * Interface for tap coordinates result from accessibility service
+ */
+export interface A11yTapCoordinatesResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: AndroidPerfTiming[];
+}
+
+/**
  * Interface for drag result from accessibility service
  */
 export interface A11yDragResult {
@@ -583,6 +593,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Swipe handling
   private pendingSwipeResolve: ((result: A11ySwipeResult) => void) | null = null;
   private pendingSwipeRequestId: string | null = null;
+  private pendingTapCoordinatesResolve: ((result: A11yTapCoordinatesResult) => void) | null = null;
+  private pendingTapCoordinatesRequestId: string | null = null;
   private pendingDragResolve: ((result: A11yDragResult) => void) | null = null;
   private pendingDragRequestId: string | null = null;
 
@@ -1011,6 +1023,23 @@ export class AccessibilityServiceClient implements AccessibilityService {
         });
       }
 
+      // Handle tap coordinates result
+      if (message.type === "tap_coordinates_result" && this.pendingTapCoordinatesResolve) {
+        const tapMessage = message as any;
+        const perfTiming = tapMessage.perfTiming as AndroidPerfTiming[] | undefined;
+        logger.info(`[ACCESSIBILITY_SERVICE] Tap coordinates result (requestId: ${tapMessage.requestId}, success: ${tapMessage.success}, totalTimeMs: ${tapMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
+
+        const resolve = this.pendingTapCoordinatesResolve;
+        this.pendingTapCoordinatesResolve = null;
+        this.pendingTapCoordinatesRequestId = null;
+        resolve({
+          success: tapMessage.success,
+          totalTimeMs: tapMessage.totalTimeMs,
+          error: tapMessage.error,
+          perfTiming
+        });
+      }
+
       // Handle drag result
       if (message.type === "drag_result" && this.pendingDragResolve) {
         const dragMessage = message as any;
@@ -1109,21 +1138,24 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle action result
-      if (message.type === "action_result" && this.pendingActionResolve) {
+      if (message.type === "action_result") {
         const actionMessage = message as any;
         const perfTiming = actionMessage.perfTiming as AndroidPerfTiming[] | undefined;
-        logger.debug(`[ACCESSIBILITY_SERVICE] Action result (requestId: ${actionMessage.requestId}, action: ${actionMessage.action}, success: ${actionMessage.success}, totalTimeMs: ${actionMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingActionResolve;
-        this.pendingActionResolve = null;
-        this.pendingActionRequestId = null;
-        resolve({
-          success: actionMessage.success,
-          action: actionMessage.action,
-          totalTimeMs: actionMessage.totalTimeMs,
-          error: actionMessage.error,
-          perfTiming
-        });
+        if (this.pendingActionResolve) {
+          const resolve = this.pendingActionResolve;
+          this.pendingActionResolve = null;
+          this.pendingActionRequestId = null;
+          resolve({
+            success: actionMessage.success,
+            action: actionMessage.action,
+            totalTimeMs: actionMessage.totalTimeMs,
+            error: actionMessage.error,
+            perfTiming
+          });
+        } else {
+          logger.warn(`[ACCESSIBILITY_SERVICE] Received action_result but no pending resolve! This is likely a duplicate result that will be ignored.`);
+        }
       }
 
       // Handle clipboard result
@@ -2181,6 +2213,98 @@ export class AccessibilityServiceClient implements AccessibilityService {
   }
 
   /**
+   * Request a coordinate-based tap from the accessibility service using dispatchGesture.
+   * This is significantly faster than ADB input tap and more precise than resource-id lookup.
+   *
+   * @param x - X coordinate to tap
+   * @param y - Y coordinate to tap
+   * @param duration - Duration of the tap in milliseconds (default 10ms for a quick tap)
+   * @param timeoutMs - Timeout for the request in milliseconds
+   * @param perf - Performance tracker for timing
+   * @returns Promise<A11yTapCoordinatesResult> - The tap result with timing information
+   */
+  async requestTapCoordinates(
+    x: number,
+    y: number,
+    duration: number = 10,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<A11yTapCoordinatesResult> {
+    const startTime = Date.now();
+
+    try {
+      // Ensure WebSocket connection is established
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for tap coordinates");
+        return {
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: "Failed to connect to accessibility service"
+        };
+      }
+
+      // Send tap coordinates request
+      const requestId = `tap_coordinates_${Date.now()}_${generateSecureId()}`;
+      this.pendingTapCoordinatesRequestId = requestId;
+
+      // Create promise that will be resolved when we receive the tap result
+      const tapPromise = new Promise<A11yTapCoordinatesResult>(resolve => {
+        this.pendingTapCoordinatesResolve = resolve;
+
+        // Set up timeout
+        this.timer.setTimeout(() => {
+          if (this.pendingTapCoordinatesResolve === resolve) {
+            this.pendingTapCoordinatesResolve = null;
+            this.pendingTapCoordinatesRequestId = null;
+            resolve({
+              success: false,
+              totalTimeMs: Date.now() - startTime,
+              error: `Tap coordinates timeout after ${timeoutMs}ms`
+            });
+          }
+        }, timeoutMs);
+      });
+
+      // Send the request
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+        const message = JSON.stringify({
+          type: "request_tap_coordinates",
+          requestId,
+          x: Math.round(x),
+          y: Math.round(y),
+          duration
+        });
+        this.ws.send(message);
+        logger.info(`[ACCESSIBILITY_SERVICE] Sent tap coordinates request (requestId: ${requestId}, x: ${x}, y: ${y}, duration: ${duration}ms)`);
+      });
+
+      // Wait for response
+      const result = await perf.track("waitForTap", () => tapPromise);
+
+      const clientDuration = Date.now() - startTime;
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Tap coordinates completed: clientTime=${clientDuration}ms, deviceTotalTime=${result.totalTimeMs}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Tap coordinates failed after ${clientDuration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Tap coordinates request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        totalTimeMs: duration,
+        error: `${error}`
+      };
+    }
+  }
+
+  /**
    * Request a two-finger swipe gesture from the accessibility service for TalkBack mode.
    * This allows scrolling content without moving the TalkBack focus cursor.
    *
@@ -2772,6 +2896,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // Send action request
       const requestId = `action_${Date.now()}_${generateSecureId()}`;
       this.pendingActionRequestId = requestId;
+      logger.info(`[ACCESSIBILITY_SERVICE] Creating action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
 
       // Create promise that will be resolved when we receive the action result
       const actionPromise = new Promise<A11yActionResult>(resolve => {
@@ -2804,7 +2929,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
           resourceId
         });
         this.ws.send(message);
-        logger.debug(`[ACCESSIBILITY_SERVICE] Sent action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
+        logger.info(`[ACCESSIBILITY_SERVICE] Sent action request (requestId: ${requestId}, action: ${action}, resourceId: ${resourceId})`);
       });
 
       // Wait for response

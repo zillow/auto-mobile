@@ -26,6 +26,9 @@ import kotlinx.serialization.json.JsonElement
 data class WebSocketRequest(
     val type: String,
     val requestId: String? = null,
+    // Tap coordinates parameters
+    val x: Int? = null,
+    val y: Int? = null,
     // Swipe parameters
     val x1: Int? = null,
     val y1: Int? = null,
@@ -71,6 +74,9 @@ class WebSocketServer(
     private val onRequestScreenshot: ((requestId: String?) -> Unit)? = null,
     private val onRequestSwipe:
         ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long) -> Unit)? =
+        null,
+    private val onRequestTapCoordinates:
+        ((requestId: String?, x: Int, y: Int, duration: Long) -> Unit)? =
         null,
     private val onRequestTwoFingerSwipe:
         ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, offset: Int) -> Unit)? =
@@ -353,6 +359,17 @@ class WebSocketServer(
             onRequestSwipe?.invoke(request.requestId, x1, y1, x2, y2, duration)
           } else {
             Log.w(TAG, "Swipe request missing required coordinates")
+          }
+        }
+        "request_tap_coordinates" -> {
+          Log.d(TAG, "Received tap coordinates request (requestId: ${request.requestId})")
+          val x = request.x
+          val y = request.y
+          val duration = request.duration ?: 10L
+          if (x != null && y != null) {
+            onRequestTapCoordinates?.invoke(request.requestId, x, y, duration)
+          } else {
+            Log.w(TAG, "Tap coordinates request missing required x/y")
           }
         }
         "request_two_finger_swipe" -> {

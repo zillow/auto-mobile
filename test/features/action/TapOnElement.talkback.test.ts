@@ -120,6 +120,8 @@ describe("TapOnElement TalkBack mode detection", () => {
       expect(executeAndroidTapWithAccessibility).toHaveBeenCalledTimes(1);
       expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith(
         "tap",
+        50,
+        50,
         element,
         500,
         options,
@@ -152,6 +154,8 @@ describe("TapOnElement TalkBack mode detection", () => {
 
       expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith(
         "tap",
+        50,
+        50,
         element,
         500,
         options,
@@ -167,19 +171,19 @@ describe("TapOnElement TalkBack mode detection", () => {
 
       // Test tap
       await (tapOnElement as any).executeAndroidTap("tap", 50, 50, 500, element, undefined, {});
-      expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith("tap", element, 500, {}, undefined);
+      expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith("tap", 50, 50, element, 500, {}, undefined);
 
       executeAndroidTapWithAccessibility.mockClear();
 
       // Test longPress
       await (tapOnElement as any).executeAndroidTap("longPress", 50, 50, 1000, element, undefined, {});
-      expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith("longPress", element, 1000, {}, undefined);
+      expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith("longPress", 50, 50, element, 1000, {}, undefined);
 
       executeAndroidTapWithAccessibility.mockClear();
 
       // Test doubleTap
       await (tapOnElement as any).executeAndroidTap("doubleTap", 50, 50, 500, element, undefined, {});
-      expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith("doubleTap", element, 500, {}, undefined);
+      expect(executeAndroidTapWithAccessibility).toHaveBeenCalledWith("doubleTap", 50, 50, element, 500, {}, undefined);
     });
   });
 

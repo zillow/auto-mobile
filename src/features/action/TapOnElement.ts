@@ -749,8 +749,8 @@ export class TapOnElement extends BaseVisualChange {
     // Use accessibility service only if TalkBack is enabled AND element has resource-id
     // Otherwise fall back to coordinate-based tapping
     if (talkBackEnabled && resourceId) {
-      // TalkBack mode: Use AccessibilityService ACTION_CLICK
-      await this.executeAndroidTapWithAccessibility(action, element, durationMs, options, signal);
+      // TalkBack mode: Use AccessibilityService ACTION_CLICK with coordinate fallback
+      await this.executeAndroidTapWithAccessibility(action, x, y, element, durationMs, options, signal);
     } else {
       // Standard mode or no resource-id: Use coordinate-based taps
       await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
@@ -781,9 +781,12 @@ export class TapOnElement extends BaseVisualChange {
 
   /**
    * Execute tap using AccessibilityService actions (TalkBack mode)
+   * Falls back to coordinate-based tapping if accessibility action fails
    */
   private async executeAndroidTapWithAccessibility(
     action: string,
+    x: number,
+    y: number,
     element: Element,
     durationMs: number,
     options?: TapOnElementOptions,
@@ -791,46 +794,19 @@ export class TapOnElement extends BaseVisualChange {
   ): Promise<void> {
     const resourceId = element?.["resource-id"];
     if (!resourceId) {
-      throw new ActionableError("Cannot perform accessibility action: element has no resource-id");
+      logger.warn("[TapOnElement] Element has no resource-id, falling back to coordinate-based tap");
+      await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
+      return;
     }
 
-    // Determine if we should set accessibility focus first
-    // Default to true for TalkBack mode (mimics user behavior)
-    const shouldFocusFirst = options?.focusFirst ?? true;
-
-    if (shouldFocusFirst && action !== "longPress") {
-      // Set accessibility focus before action (except for long press which handles focus internally)
-      try {
-        await this.accessibilityService.requestAction("focus", resourceId);
-        // Brief delay for TalkBack announcement
-        await this.timer.sleep(100);
-      } catch (error) {
-        logger.warn(`[TapOnElement] Failed to set accessibility focus: ${error}`);
-        // Continue with action anyway
-      }
-    }
-
-    if (action === "tap") {
-      const result = await this.accessibilityService.requestAction("click", resourceId);
-      if (!result.success) {
-        throw new ActionableError(`Failed to perform accessibility click: ${result.error}`);
-      }
-    } else if (action === "longPress") {
-      const result = await this.accessibilityService.requestAction("long_click", resourceId);
-      if (!result.success) {
-        throw new ActionableError(`Failed to perform accessibility long click: ${result.error}`);
-      }
-    } else if (action === "doubleTap") {
-      // Double tap: Two ACTION_CLICK calls with delay
-      const result1 = await this.accessibilityService.requestAction("click", resourceId);
-      if (!result1.success) {
-        throw new ActionableError(`Failed to perform first accessibility click: ${result1.error}`);
-      }
-      await this.timer.sleep(100);
-      const result2 = await this.accessibilityService.requestAction("click", resourceId);
-      if (!result2.success) {
-        throw new ActionableError(`Failed to perform second accessibility click: ${result2.error}`);
-      }
+    // Use coordinate-based taps via accessibility service dispatchGesture.
+    // This is faster than ADB and precise (uses exact coordinates, not resource-id lookup).
+    // Use short duration (50ms) for tap/doubleTap to avoid being interpreted as long press
+    const tapDuration = action === "longPress" ? durationMs : 50;
+    const result = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
+    if (!result.success) {
+      logger.warn(`[TapOnElement] Accessibility coordinate tap failed (${result.error}), falling back to ADB tap at (${x}, ${y})`);
+      await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
     }
   }
 
