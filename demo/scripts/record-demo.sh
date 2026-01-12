@@ -164,5 +164,18 @@ ffmpeg \
 echo ""
 echo "✅ Demo recording complete!"
 echo ""
+
+# Step 6: Create GIF from combined video
+echo "🖼️  Creating GIF from combined video..."
+FINAL_GIF="$OUTPUT_DIR/${DEMO_NAME}.gif"
+ffmpeg -i "$FINAL_VIDEO" \
+  -vf "fps=10,scale=1500:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+  -loop 0 \
+  -y "$FINAL_GIF" > /dev/null 2>&1
+
+echo ""
 echo "🎥 Play final video:"
 echo "   $FINAL_VIDEO"
+echo ""
+echo "🎨 GIF created:"
+echo "   $FINAL_GIF"

@@ -43,19 +43,17 @@ call_mcp_tool "tapOn" --action "tap" --text "Add alarm" --platform "android"
 replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Add alarm\")${RESET}"
 add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Alarm creation dialog opened${RESET}"
 
-# Step 4: Tap minutes field to activate it
+# Step 4: Tap 6 for hours
 echo ""
-add_line "●${GRAY} Setting time to 6:30…${RESET}"
-echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"material_minute_tv\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --id "com.google.android.deskclock:id/material_minute_tv" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"material_minute_tv\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Minutes field activated${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"6\")${RESET}"
+call_mcp_tool "tapOn" --action "tap" --text '"6"' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"6\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Selected 6${RESET}"
 
 # Step 5: Tap 30 minutes
 echo ""
 add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"30\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --text "30" --platform "android"
+call_mcp_tool "tapOn" --action "tap" --text '"30"' --platform "android"
 replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"30\")${RESET}"
 add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Time set to 6:30 AM${RESET}"
 
