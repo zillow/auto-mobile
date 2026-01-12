@@ -10,6 +10,7 @@ import {
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
+import { ElementParser } from "../utility/ElementParser";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
@@ -22,6 +23,7 @@ import { throwIfAborted } from "../../utils/toolUtils";
 import { SelectionStateTracker, SelectionCaptureState, TakeScreenshotCapturer } from "../navigation/SelectionStateTracker";
 import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
+import type { Timer } from "../../utils/SystemTimer";
 
 /**
  * Command to tap on UI element containing specified text
@@ -29,6 +31,7 @@ import { accessibilityDetector as defaultAccessibilityDetector } from "../../uti
 export class TapOnElement extends BaseVisualChange {
   private webdriver: WebDriverAgent;
   private elementUtils: ElementUtils;
+  private elementParser: ElementParser;
   private accessibilityService: AccessibilityServiceClient;
   private visionConfig: VisionFallbackConfig;
   private selectionStateTracker: SelectionStateTracker;
@@ -43,10 +46,12 @@ export class TapOnElement extends BaseVisualChange {
     webdriver: WebDriverAgent | null = null,
     visionConfig?: VisionFallbackConfig,
     selectionStateTracker?: SelectionStateTracker,
-    accessibilityDetector?: AccessibilityDetector
+    accessibilityDetector?: AccessibilityDetector,
+    timer?: Timer
   ) {
-    super(device, adb, axe);
+    super(device, adb, axe, timer);
     this.elementUtils = new ElementUtils();
+    this.elementParser = new ElementParser();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.webdriver = webdriver || new WebDriverAgent(device);
     this.visionConfig = visionConfig || DEFAULT_VISION_CONFIG;
@@ -83,7 +88,7 @@ export class TapOnElement extends BaseVisualChange {
   ): Promise<Element> {
     if (!element && attempt < TapOnElement.MAX_ATTEMPTS) {
       const delayNextAttempt = Math.min(10 * Math.pow(2, attempt), 1000);
-      await new Promise(resolve => setTimeout(resolve, delayNextAttempt));
+      await this.timer.sleep(delayNextAttempt);
 
       let latestViewHierarchy: ViewHierarchyResult | null = null;
 
@@ -249,11 +254,192 @@ export class TapOnElement extends BaseVisualChange {
     }
   }
 
+  private isTruthyFlag(value: unknown): boolean {
+    return value === true || value === "true";
+  }
+
+  private isClickableElement(element: Element): boolean {
+    return this.isTruthyFlag(element.clickable);
+  }
+
+  private isLongClickableElement(element: Element): boolean {
+    return this.isTruthyFlag(element["long-clickable"]) || this.isTruthyFlag(element.longClickable);
+  }
+
+  private isClickableProps(props: Record<string, unknown>): boolean {
+    return this.isTruthyFlag(props.clickable);
+  }
+
+  private isLongClickableProps(props: Record<string, unknown>): boolean {
+    return this.isTruthyFlag(props["long-clickable"]) || this.isTruthyFlag(props.longClickable);
+  }
+
+  private boundsEqual(a: Element["bounds"], b: Element["bounds"]): boolean {
+    return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
+  }
+
+  private nodeMatchesElement(
+    target: Element,
+    props: Record<string, unknown>,
+    parsed: Element
+  ): boolean {
+    if (!this.boundsEqual(parsed.bounds, target.bounds)) {
+      return false;
+    }
+
+    if (target["resource-id"] && props["resource-id"] !== target["resource-id"]) {
+      return false;
+    }
+
+    if (target.text && props.text !== target.text) {
+      return false;
+    }
+
+    if (target["content-desc"] && props["content-desc"] !== target["content-desc"]) {
+      return false;
+    }
+
+    const targetClass = target.class;
+    if (targetClass) {
+      const nodeClass = (props.class ?? props.className) as string | undefined;
+      if (nodeClass !== targetClass) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private findAncestorChain(viewHierarchy: ViewHierarchyResult, target: Element): any[] | null {
+    const roots = [
+      ...this.elementParser.extractRootNodes(viewHierarchy),
+      ...this.elementParser.extractWindowRootNodes(viewHierarchy, "topmost-first")
+    ];
+
+    const stack: any[] = [];
+    const search = (node: any): any[] | null => {
+      stack.push(node);
+      const props = this.elementParser.extractNodeProperties(node);
+      const parsed = this.elementParser.parseNodeBounds(node);
+
+      if (parsed && this.nodeMatchesElement(target, props, parsed)) {
+        const chain = [...stack];
+        stack.pop();
+        return chain;
+      }
+
+      const children = node?.node ? (Array.isArray(node.node) ? node.node : [node.node]) : [];
+      for (const child of children) {
+        const found = search(child);
+        if (found) {
+          stack.pop();
+          return found;
+        }
+      }
+
+      stack.pop();
+      return null;
+    };
+
+    for (const root of roots) {
+      const found = search(root);
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+  private findAncestorByPredicate(
+    chain: any[],
+    predicate: (props: Record<string, unknown>) => boolean,
+    requireResourceId: boolean
+  ): Element | null {
+    for (let i = chain.length - 2; i >= 0; i--) {
+      const node = chain[i];
+      const props = this.elementParser.extractNodeProperties(node);
+      if (!predicate(props)) {
+        continue;
+      }
+      if (requireResourceId && !props["resource-id"]) {
+        continue;
+      }
+      const parsed = this.elementParser.parseNodeBounds(node);
+      if (parsed) {
+        return parsed;
+      }
+    }
+
+    return null;
+  }
+
+  private selectAncestorForAction(
+    chain: any[],
+    action: string,
+    requireResourceId: boolean
+  ): Element | null {
+    const primary = action === "longPress"
+      ? (props: Record<string, unknown>) => this.isLongClickableProps(props)
+      : (props: Record<string, unknown>) => this.isClickableProps(props);
+    const secondary = action === "longPress"
+      ? (props: Record<string, unknown>) => this.isClickableProps(props)
+      : (props: Record<string, unknown>) => this.isLongClickableProps(props);
+
+    return (
+      this.findAncestorByPredicate(chain, primary, requireResourceId) ??
+      this.findAncestorByPredicate(chain, secondary, requireResourceId)
+    );
+  }
+
+  private resolveTapTargetElement(
+    element: Element,
+    viewHierarchy: ViewHierarchyResult | null,
+    action: string,
+    requireResourceId: boolean
+  ): { element: Element; usedParent: boolean } {
+    if (this.device.platform !== "android" || !viewHierarchy) {
+      return { element, usedParent: false };
+    }
+
+    const isLongPress = action === "longPress";
+    const isClickable = this.isClickableElement(element);
+    const isLongClickable = this.isLongClickableElement(element);
+
+    if (!isLongPress && isClickable) {
+      return { element, usedParent: false };
+    }
+
+    if (isLongPress && isLongClickable) {
+      return { element, usedParent: false };
+    }
+
+    const chain = this.findAncestorChain(viewHierarchy, element);
+    if (!chain) {
+      return { element, usedParent: false };
+    }
+
+    const ancestor = this.selectAncestorForAction(chain, action, requireResourceId);
+    if (ancestor) {
+      return { element: ancestor, usedParent: true };
+    }
+
+    if (!isLongPress && isLongClickable) {
+      return { element, usedParent: false };
+    }
+
+    if (isLongPress && isClickable) {
+      return { element, usedParent: false };
+    }
+
+    return { element, usedParent: false };
+  }
+
   /**
    * Execute a tap on text
    * @param options - Command options
    * @param progress - Optional progress callback
-   * @returns Result of the command
+    * @returns Result of the command
    */
   async execute(
     options: TapOnElementOptions,
@@ -286,7 +472,7 @@ export class TapOnElement extends BaseVisualChange {
           const element = await perf.track("findElement", () =>
             this.findElementToTap(options, viewHierarchy, 0, observeResult, signal)
           );
-          const tapPoint = this.elementUtils.getElementCenter(element);
+          const initialTapPoint = this.elementUtils.getElementCenter(element);
           let action = options.action;
           const longPressDuration = this.getLongPressDuration(options, this.device.platform);
 
@@ -302,8 +488,8 @@ export class TapOnElement extends BaseVisualChange {
                 element: element,
                 wasAlreadyFocused: true,
                 focusChanged: false,
-                x: tapPoint.x,
-                y: tapPoint.y
+                x: initialTapPoint.x,
+                y: initialTapPoint.y
               };
             }
 
@@ -312,10 +498,24 @@ export class TapOnElement extends BaseVisualChange {
             options.action = "tap";
           }
 
+          const isTalkBackEnabled = this.device.platform === "android"
+            ? await this.accessibilityDetector.isAccessibilityEnabled(this.device.id, this.adb)
+            : false;
+          const { element: tapElement, usedParent } = this.resolveTapTargetElement(
+            element,
+            viewHierarchy,
+            action,
+            isTalkBackEnabled
+          );
+          if (usedParent) {
+            logger.info("[TapOnElement] Using clickable parent for non-clickable element");
+          }
+          const tapPoint = this.elementUtils.getElementCenter(tapElement);
+
           selectionCapture = await this.selectionStateTracker.prepare({
             action,
             observation: observeResult,
-            element,
+            element: tapElement,
             signal
           });
 
@@ -328,9 +528,10 @@ export class TapOnElement extends BaseVisualChange {
                   tapPoint.x,
                   tapPoint.y,
                   longPressDuration,
-                  element,
+                  tapElement,
                   signal,
-                  options
+                  options,
+                  isTalkBackEnabled
                 );
                 break;
               case "ios":
@@ -345,7 +546,7 @@ export class TapOnElement extends BaseVisualChange {
           return {
             success: true,
             action,
-            element,
+            element: tapElement,
           };
         },
         {
@@ -475,15 +676,15 @@ export class TapOnElement extends BaseVisualChange {
     durationMs: number,
     element: Element,
     signal?: AbortSignal,
-    options?: TapOnElementOptions
+    options?: TapOnElementOptions,
+    isTalkBackEnabled?: boolean
   ): Promise<void> {
     // Check if TalkBack is enabled
-    const isTalkBackEnabled = await this.accessibilityDetector.isAccessibilityEnabled(
-      this.device.id,
-      this.adb
-    );
+    const talkBackEnabled = typeof isTalkBackEnabled === "boolean"
+      ? isTalkBackEnabled
+      : await this.accessibilityDetector.isAccessibilityEnabled(this.device.id, this.adb);
 
-    if (isTalkBackEnabled) {
+    if (talkBackEnabled) {
       // TalkBack mode: Use AccessibilityService ACTION_CLICK
       await this.executeAndroidTapWithAccessibility(action, element, durationMs, options, signal);
     } else {
@@ -509,7 +710,7 @@ export class TapOnElement extends BaseVisualChange {
       await this.executeAndroidLongPress(x, y, durationMs, element?.["resource-id"], signal);
     } else if (action === "doubleTap") {
       await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await this.timer.sleep(200);
       await this.adb.executeCommand(`shell input tap ${x} ${y}`, undefined, undefined, undefined, signal);
     }
   }
@@ -538,7 +739,7 @@ export class TapOnElement extends BaseVisualChange {
       try {
         await this.accessibilityService.requestAction("focus", resourceId);
         // Brief delay for TalkBack announcement
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await this.timer.sleep(100);
       } catch (error) {
         logger.warn(`[TapOnElement] Failed to set accessibility focus: ${error}`);
         // Continue with action anyway
@@ -561,7 +762,7 @@ export class TapOnElement extends BaseVisualChange {
       if (!result1.success) {
         throw new ActionableError(`Failed to perform first accessibility click: ${result1.error}`);
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await this.timer.sleep(100);
       const result2 = await this.accessibilityService.requestAction("click", resourceId);
       if (!result2.success) {
         throw new ActionableError(`Failed to perform second accessibility click: ${result2.error}`);
@@ -590,7 +791,7 @@ export class TapOnElement extends BaseVisualChange {
     } else if (action === "doubleTap") {
       // iOS double tap - perform two quick taps
       await this.axe.tap(x, y);
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await this.timer.sleep(200);
       await this.axe.tap(x, y);
     }
   }
@@ -782,7 +983,7 @@ export class TapOnElement extends BaseVisualChange {
     awaitTimeout: boolean;
     observation?: ObserveResult;
   }> {
-    const startTime = Date.now();
+    const startTime = this.timer.now();
     const timeoutMs = awaitOptions.timeout ?? 5000;
     const queryOptions = {
       text: awaitOptions.element.text,
@@ -794,7 +995,7 @@ export class TapOnElement extends BaseVisualChange {
       if (existing) {
         return {
           awaitedElement: existing,
-          awaitDuration: Date.now() - startTime,
+          awaitDuration: this.timer.now() - startTime,
           awaitTimeout: false,
           observation: initialObservation
         };
@@ -803,7 +1004,7 @@ export class TapOnElement extends BaseVisualChange {
 
     let lastObservation: ObserveResult | undefined;
 
-    while (Date.now() - startTime < timeoutMs) {
+    while (this.timer.now() - startTime < timeoutMs) {
       const observation = await this.observeScreen.execute(
         queryOptions,
         new NoOpPerformanceTracker(),
@@ -817,18 +1018,18 @@ export class TapOnElement extends BaseVisualChange {
         if (found) {
           return {
             awaitedElement: found,
-            awaitDuration: Date.now() - startTime,
+            awaitDuration: this.timer.now() - startTime,
             awaitTimeout: false,
             observation
           };
         }
       }
 
-      await new Promise(resolve => setTimeout(resolve, TapOnElement.AWAIT_POLL_INTERVAL_MS));
+      await this.timer.sleep(TapOnElement.AWAIT_POLL_INTERVAL_MS);
     }
 
     return {
-      awaitDuration: Date.now() - startTime,
+      awaitDuration: this.timer.now() - startTime,
       awaitTimeout: true,
       observation: lastObservation
     };

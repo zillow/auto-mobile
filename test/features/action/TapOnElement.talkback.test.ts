@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, test, spyOn } from "bun:test";
 import { TapOnElement } from "../../../src/features/action/TapOnElement";
+import { FakeAdbClient } from "../../fakes/FakeAdbClient";
 import { FakeAccessibilityDetector } from "../../fakes/FakeAccessibilityDetector";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("TapOnElement TalkBack mode detection", () => {
   let fakeAccessibilityDetector: FakeAccessibilityDetector;
+  let fakeAdb: FakeAdbClient;
+  let fakeTimer: FakeTimer;
   let tapOnElement: TapOnElement;
   let executeAndroidTapWithCoordinates: any;
   let executeAndroidTapWithAccessibility: any;
 
   beforeEach(() => {
     fakeAccessibilityDetector = new FakeAccessibilityDetector();
+    fakeAdb = new FakeAdbClient();
+    fakeTimer = new FakeTimer();
 
     // Create a minimal TapOnElement instance for testing
     tapOnElement = new TapOnElement(
@@ -18,12 +24,13 @@ describe("TapOnElement TalkBack mode detection", () => {
         platform: "android",
         id: "emulator-5554",
       } as any,
-      {} as any,  // adb
+      fakeAdb as any,  // adb
       null,
       null,
       undefined,
       undefined,
-      fakeAccessibilityDetector
+      fakeAccessibilityDetector,
+      fakeTimer
     );
 
     // Spy on the private methods to verify dispatch logic
@@ -219,6 +226,86 @@ describe("TapOnElement TalkBack mode detection", () => {
       await (tapOnElement as any).executeAndroidTap("tap", 50, 50, 500, element, undefined, {});
       expect(executeAndroidTapWithAccessibility).toHaveBeenCalled();
       expect(executeAndroidTapWithCoordinates).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("clickable parent resolution", () => {
+    test("uses clickable parent when child is not clickable", () => {
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              "class": "android.widget.LinearLayout",
+              "clickable": "true",
+              "bounds": "[0,0][100,100]",
+              "resource-id": "parent:id"
+            },
+            node: [
+              {
+                $: {
+                  "class": "android.widget.TextView",
+                  "text": "Markup",
+                  "bounds": "[10,10][50,50]",
+                  "resource-id": "android:id/text1"
+                }
+              }
+            ]
+          }
+        }
+      } as any;
+
+      const childElement = {
+        "bounds": { left: 10, top: 10, right: 50, bottom: 50 },
+        "text": "Markup",
+        "resource-id": "android:id/text1"
+      } as any;
+
+      const result = (tapOnElement as any).resolveTapTargetElement(
+        childElement,
+        viewHierarchy,
+        "tap",
+        true
+      );
+
+      expect(result.usedParent).toBe(true);
+      expect(result.element["resource-id"]).toBe("parent:id");
+    });
+
+    test("prefers long-clickable parent for longPress", () => {
+      const viewHierarchy = {
+        hierarchy: {
+          node: {
+            $: {
+              "class": "android.widget.LinearLayout",
+              "long-clickable": "true",
+              "bounds": "[0,0][100,100]",
+              "resource-id": "parent:long"
+            },
+            node: {
+              $: {
+                class: "android.widget.TextView",
+                text: "Markup",
+                bounds: "[10,10][50,50]"
+              }
+            }
+          }
+        }
+      } as any;
+
+      const childElement = {
+        bounds: { left: 10, top: 10, right: 50, bottom: 50 },
+        text: "Markup"
+      } as any;
+
+      const result = (tapOnElement as any).resolveTapTargetElement(
+        childElement,
+        viewHierarchy,
+        "longPress",
+        true
+      );
+
+      expect(result.usedParent).toBe(true);
+      expect(result.element["resource-id"]).toBe("parent:long");
     });
   });
 });
