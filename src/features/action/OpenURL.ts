@@ -119,6 +119,9 @@ export class OpenURL extends BaseVisualChange {
    * @returns Result of the URL opening operation
    */
   private async executeAndroidOpenURL(url: string): Promise<OpenURLResult> {
+    // Pass URL through as-is to am start without any reformatting
+    // Android's Intent system handles both hierarchical (scheme://authority/path)
+    // and opaque (scheme:scheme-specific-part) URIs correctly
     await this.adb.executeCommand(`shell am start -a android.intent.action.VIEW -d "${url}"`);
 
     return {

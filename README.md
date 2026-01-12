@@ -2,26 +2,19 @@
 
 ![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
-<a href="https://glama.ai/mcp/servers/@kaeawc/auto-mobile">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@kaeawc/auto-mobile/badge" alt="AutoMobile MCP server" />
-</a>
+AutoMobile is a set of tools for mobile automation. Use it for UI testing, development workflows, or AI-powered mobile app interaction through the Model Context Protocol (MCP).
 
-AutoMobile is a set of tools for mobile automation. You can use it for UI testing or as a development workflow
-assistant.
+This is a fork of the original source at https://github.com/zillow/auto-mobile
 
-This is a fork of the original source at []
+## Demo
+
+![AutoMobile Demo](docs/img/clock-app-demo.gif)
 
 ## How it works
 
-- 🔧 **[Powerful MCP Server](docs/features/mcp-server/index.md)**: AutoMobile provides comprehensive [actions](docs/features/mcp-server/actions.md) through MCP
-  tool calls with a fast [observations](docs/features/mcp-server/observation.md) to drive the
-  [interaction loop](docs/features/mcp-server/interaction-loop.md).
-- 🧪 **[Test Execution](docs/features/test-execution/index.md)** - Run tests locally or on CI without extra infrastructure.
-- ⚡ **[UI Performance Audit](docs/features/ui-performance-audit.md)** - Automated detection of jank, poor FPS, and rendering issues during automation.
-
-All together you get a system that looks like this:
-
-![automobile_system_design.png](docs/img/automobile_system_design.png)
+- 🔧 **[Powerful MCP Server](docs/features/mcp-server/index.md)**: Comprehensive [actions](docs/features/mcp-server/actions.md) through MCP tool calls with fast [observations](docs/features/mcp-server/observation.md) to drive the [interaction loop](docs/features/mcp-server/interaction-loop.md)
+- 🧪 **[Test Execution](docs/features/test-execution/index.md)**: Run tests locally or on CI without extra infrastructure
+- ⚡ **[UI Performance Audit](docs/features/ui-performance-audit.md)**: Automated detection of jank, poor FPS, and rendering issues during automation
 
 ## Contributing
 

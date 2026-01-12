@@ -28,6 +28,8 @@ interface AndroidBackendHandle {
   exitState: ProcessExitState;
   exitPromise: Promise<void>;
   stderr: string[];
+  device: BootedDevice;
+  deviceTempPath: string;
 }
 
 interface IosBackendHandle {
@@ -146,22 +148,97 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       throw new Error("Missing backend handle for video recording.");
     }
 
-    await waitForExit(backendHandle.process, backendHandle.exitPromise);
+    logger.info(`[VideoCapture] Stopping recording ${handle.recordingId}`);
 
     if (backendHandle.kind === "android") {
+      // For Android screenrecord, send SIGINT but give it time to finalize
+      // screenrecord needs a few seconds to write the moov atom after being interrupted
+      if (backendHandle.process.exitCode === null && !backendHandle.process.killed) {
+        logger.info(`[VideoCapture] Sending SIGINT to screenrecord`);
+        backendHandle.process.kill("SIGINT");
+      }
+
+      // Wait up to 10 seconds for graceful exit, then force kill
+      const gracefulExitTimeout = 10000;
+      let timeoutId: NodeJS.Timeout | undefined;
+      const timeoutPromise = new Promise<void>(resolve => {
+        timeoutId = setTimeout(() => {
+          if (backendHandle.process.exitCode === null) {
+            logger.warn(`[VideoCapture] screenrecord did not exit gracefully, sending SIGKILL`);
+            backendHandle.process.kill("SIGKILL");
+          }
+          resolve();
+        }, gracefulExitTimeout);
+      });
+
+      await Promise.race([backendHandle.exitPromise, timeoutPromise]);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      await backendHandle.exitPromise;
+
+      logger.info(`[VideoCapture] Process exited with code: ${backendHandle.exitState.exitCode}, signal: ${backendHandle.exitState.signal}`);
+
+      // Give screenrecord extra time to finalize the file on device
+      // Even though the process has exited, file writes may still be in progress
+      logger.info(`[VideoCapture] Waiting 1 second for file to finalize on device`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } else {
+      await waitForExit(backendHandle.process, backendHandle.exitPromise);
+      logger.info(`[VideoCapture] Process exited with code: ${backendHandle.exitState.exitCode}, signal: ${backendHandle.exitState.signal}`);
+    }
+
+    if (backendHandle.kind === "android") {
+      // Pull the file from the device
+      logger.info(`[VideoCapture] Pulling file from device: ${backendHandle.deviceTempPath} -> ${handle.outputPath}`);
+      const adb = new AdbClient(backendHandle.device);
+      const { adbPath, baseArgs } = await adb.getBaseCommandParts();
+
+      const pullArgs = [...baseArgs, "pull", backendHandle.deviceTempPath, handle.outputPath];
+      const pullProcess = spawn(adbPath, pullArgs, { stdio: ["ignore", "pipe", "pipe"] });
+
       await new Promise<void>((resolve, reject) => {
-        backendHandle.outputStream.once("close", resolve);
-        backendHandle.outputStream.once("error", reject);
+        pullProcess.once("exit", code => {
+          if (code === 0) {
+            logger.info(`[VideoCapture] File pulled successfully`);
+            resolve();
+          } else {
+            reject(new Error(`adb pull failed with exit code ${code}`));
+          }
+        });
+        pullProcess.once("error", err => reject(err));
+      });
+
+      // Clean up temp file on device
+      logger.info(`[VideoCapture] Cleaning up temp file on device`);
+      const rmArgs = [...baseArgs, "shell", "rm", backendHandle.deviceTempPath];
+      const rmProcess = spawn(adbPath, rmArgs, { stdio: ["ignore", "pipe", "pipe"] });
+
+      await new Promise<void>(resolve => {
+        rmProcess.once("exit", () => {
+          logger.info(`[VideoCapture] Temp file cleaned up`);
+          resolve();
+        });
+        rmProcess.once("error", err => {
+          logger.warn(`[VideoCapture] Failed to clean up temp file: ${err}`);
+          resolve(); // Don't fail the whole operation if cleanup fails
+        });
       });
     }
 
     const sizeBytes = await this.getFileSize(handle.outputPath);
+    logger.info(`[VideoCapture] Final file size: ${sizeBytes} bytes at ${handle.outputPath}`);
+
     const codec = "h264";
 
     if (backendHandle.exitState.exitCode && backendHandle.exitState.exitCode !== 0) {
       logger.warn(
         `[VideoCapture] Recording exited with code ${backendHandle.exitState.exitCode}: ${backendHandle.stderr.join("")}`
       );
+    }
+
+    if (backendHandle.stderr.length > 0) {
+      logger.info(`[VideoCapture] Stderr output: ${backendHandle.stderr.join("")}`);
     }
 
     return {
@@ -190,9 +267,13 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       );
     }
 
+    // Android screenrecord doesn't support stdout on all versions
+    // Record to a temp file on the device, then pull it
+    const deviceTempPath = `/sdcard/auto-mobile-${config.recordingId}.mp4`;
+
     const args = [
       ...baseArgs,
-      "exec-out",
+      "shell",
       "screenrecord",
       "--bit-rate",
       String(bitrateBps),
@@ -204,19 +285,27 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       args.push("--size", `${config.resolution.width}x${config.resolution.height}`);
     }
 
+    args.push(deviceTempPath);
+
+    logger.info(`[VideoCapture] Starting Android recording: ${adbPath} ${args.join(" ")}`);
+    logger.info(`[VideoCapture] Device temp path: ${deviceTempPath}`);
+    logger.info(`[VideoCapture] Output path: ${config.outputPath}`);
+    logger.info(`[VideoCapture] Bitrate: ${bitrateKbps}kbps (${bitrateBps}bps), Time limit: ${timeLimitSeconds}s`);
+
     const process = spawn(adbPath, args, { stdio: ["ignore", "pipe", "pipe"] });
-    const outputStream = fs.createWriteStream(config.outputPath);
-    process.stdout.pipe(outputStream);
 
     try {
       await this.waitForSpawn(process);
     } catch (error) {
-      outputStream.destroy();
       throw new ActionableError(`Failed to start Android recording: ${error}`);
     }
 
     const stderr: string[] = [];
     const { exitState, exitPromise } = createExitTracker(process, stderr);
+
+    // Create a placeholder for outputStream since AndroidBackendHandle expects it
+    const outputStream = fs.createWriteStream(config.outputPath);
+    outputStream.end(); // Close it immediately since we'll write later
 
     const backendHandle: AndroidBackendHandle = {
       kind: "android",
@@ -225,6 +314,8 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       exitState,
       exitPromise,
       stderr,
+      device,
+      deviceTempPath,
     };
 
     return {
