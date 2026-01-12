@@ -7,6 +7,7 @@ import { ClearAppData } from "./ClearAppData";
 import { logger } from "../../utils/logger";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
+import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetricsCollector";
@@ -193,6 +194,8 @@ export class LaunchApp extends BaseVisualChange {
   ): Promise<LaunchAppResult> {
     logger.info(`executeiOS bundleId ${bundleId}`);
 
+    let observationTimestampMs: number | undefined;
+
     return this.observedInteraction(
       async () => {
         // Check if app is installed
@@ -232,6 +235,8 @@ export class LaunchApp extends BaseVisualChange {
           };
         }
 
+        await this.waitForIosHierarchyReady();
+        observationTimestampMs = this.timer.now();
         return {
           success: true,
           packageName: bundleId,
@@ -239,9 +244,37 @@ export class LaunchApp extends BaseVisualChange {
         };
       },
       {
-        changeExpected: false
+        changeExpected: false,
+        observationTimestampProvider: () => observationTimestampMs
       }
     );
+  }
+
+  private async waitForIosHierarchyReady(
+    timeoutMs: number = 2000,
+    pollIntervalMs: number = 200
+  ): Promise<void> {
+    const viewHierarchy = new ViewHierarchy(this.device, this.adb);
+    const startTime = this.timer.now();
+    let attempts = 0;
+
+    while (this.timer.now() - startTime < timeoutMs) {
+      attempts += 1;
+      try {
+        const result = await viewHierarchy.getViewHierarchy();
+        const hierarchy = result?.hierarchy as { error?: string } | null | undefined;
+        if (hierarchy && !hierarchy.error) {
+          logger.info(`[LaunchApp] iOS hierarchy ready after ${this.timer.now() - startTime}ms`);
+          return;
+        }
+        logger.debug(`[LaunchApp] iOS hierarchy not ready yet (attempt ${attempts})`);
+      } catch (error) {
+        logger.debug(`[LaunchApp] iOS hierarchy fetch failed (attempt ${attempts}): ${error}`);
+      }
+      await this.timer.sleep(pollIntervalMs);
+    }
+
+    logger.warn(`[LaunchApp] Timed out waiting for iOS hierarchy after ${timeoutMs}ms`);
   }
 
   /**
@@ -399,6 +432,7 @@ export class LaunchApp extends BaseVisualChange {
 
     const foregroundWaitTimeoutMs = 5000;
     const foregroundPollIntervalMs = 200;
+    let observationTimestampMs: number | undefined;
 
     const launchResult = await this.observedInteraction(
       async () => {
@@ -417,6 +451,7 @@ export class LaunchApp extends BaseVisualChange {
           foregroundPollIntervalMs,
           perf
         );
+        observationTimestampMs = await this.adb.getDeviceTimestampMs();
         return launchOutcome;
       },
       {
@@ -424,7 +459,8 @@ export class LaunchApp extends BaseVisualChange {
         perf,
         skipPreviousObserve: didTerminateOrClear,
         skipUiStability: skipUiStability ?? false,
-        packageName
+        packageName,
+        observationTimestampProvider: () => observationTimestampMs
       }
     );
 

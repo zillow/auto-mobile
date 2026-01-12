@@ -16,6 +16,7 @@ export class FakeAdbExecutor implements AdbExecutor {
   private devices: BootedDevice[] = [];
   private users: AndroidUser[] = [{ userId: 0, name: "Owner", flags: 13, running: true }];
   private foregroundApp: { packageName: string; userId: number } | null = null;
+  private deviceTimestampMs: number | null = null;
 
   /**
    * Create a proper ExecResult with all required methods
@@ -93,6 +94,14 @@ export class FakeAdbExecutor implements AdbExecutor {
   }
 
   /**
+   * Configure device timestamp for tests that rely on device time.
+   * @param timestampMs - Timestamp in milliseconds (or null to use real time)
+   */
+  setDeviceTimestampMs(timestampMs: number | null): void {
+    this.deviceTimestampMs = timestampMs;
+  }
+
+  /**
    * Get history of executed commands (for test assertions)
    * @returns Array of command strings that were executed
    */
@@ -164,5 +173,9 @@ export class FakeAdbExecutor implements AdbExecutor {
 
   async getForegroundApp(): Promise<{ packageName: string; userId: number } | null> {
     return this.foregroundApp;
+  }
+
+  async getDeviceTimestampMs(): Promise<number> {
+    return this.deviceTimestampMs ?? Date.now();
   }
 }

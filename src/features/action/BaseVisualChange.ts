@@ -28,6 +28,7 @@ export interface ObservedChangeOptions {
   perf?: PerformanceTracker;
   skipPreviousObserve?: boolean;
   skipUiStability?: boolean;
+  observationTimestampProvider?: () => number | undefined;
   signal?: AbortSignal;
   predictionContext?: {
     toolName: string;
@@ -130,6 +131,17 @@ export class BaseVisualChange {
       return block(previousObserveResult!);
     });
 
+    let observationStartTime = actionStartTime;
+    const observationTimestampOverride = options.observationTimestampProvider?.();
+    if (typeof observationTimestampOverride === "number" && !Number.isNaN(observationTimestampOverride)) {
+      if (observationTimestampOverride >= actionStartTime) {
+        observationStartTime = observationTimestampOverride;
+        logger.debug(`[BaseVisualChange] Using observation timestamp override: ${observationStartTime}`);
+      } else {
+        logger.debug(`[BaseVisualChange] Ignoring observation timestamp override (${observationTimestampOverride}) older than action start (${actionStartTime})`);
+      }
+    }
+
     // Get package name for UI stability waiting
     // Priority: options > previousObserveResult.viewHierarchy.packageName > cached
     let packageName = options.packageName;
@@ -185,7 +197,7 @@ export class BaseVisualChange {
       queryOptions: options.queryOptions,
       gfxMetrics,
       perf,
-      actionStartTime,
+      actionStartTime: observationStartTime,
       predictionContext
     });
   }
