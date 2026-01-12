@@ -1163,6 +1163,7 @@ jobs:
               const report = startupReport.report;
               const formatMs = value => (typeof value === 'number' ? `${value.toFixed(1)}ms` : 'n/a');
               const formatBytes = value => (typeof value === 'number' ? `${(value / (1024 * 1024)).toFixed(1)}MB` : 'n/a');
+              const formatNumber = value => (typeof value === 'number' ? value.toLocaleString() : 'n/a');
 
               body += '### Startup Performance\n\n';
 
@@ -1197,6 +1198,22 @@ jobs:
                 for (const run of report.results.daemon.runs || []) {
                   const heap = run.memoryUsage?.heapUsed ? formatBytes(run.memoryUsage.heapUsed) : 'n/a';
                   body += `| ${run.mode} | ${formatMs(run.spawnMs)} | ${formatMs(run.timeToReadyMs)} | ${formatMs(run.timeToResponsiveMs)} | ${heap} |\n`;
+                }
+                body += '\n';
+              }
+
+              if (report.comparisons?.regressions?.length) {
+                body += '#### Startup Thresholds\n\n';
+                body += '| Metric | Actual | Threshold | Regression | Status |\n';
+                body += '|--------|--------|-----------|------------|--------|\n';
+                for (const regression of report.comparisons.regressions) {
+                  const actual = formatNumber(regression.actual);
+                  const threshold = formatNumber(regression.threshold);
+                  const regressionPct = typeof regression.regression === 'number'
+                    ? `${regression.regression >= 0 ? '+' : ''}${regression.regression.toFixed(1)}%`
+                    : 'n/a';
+                  const status = regression.passed ? '✅' : '❌';
+                  body += `| ${regression.metric} | ${actual} | ${threshold} | ${regressionPct} | ${status} |\n`;
                 }
                 body += '\n';
               }
