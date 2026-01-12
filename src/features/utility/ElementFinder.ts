@@ -24,7 +24,7 @@ export class ElementFinder {
       return false;
     }
 
-    return this.findContainerNode(viewHierarchy, container) !== null;
+    return this.findContainerNodeInternal(viewHierarchy, container) !== null;
   }
 
   private findContainerNodeInRoots(
@@ -70,7 +70,7 @@ export class ElementFinder {
     return null;
   }
 
-  private findContainerNode(
+  private findContainerNodeInternal(
     viewHierarchy: ViewHierarchyResult,
     container: { elementId?: string; text?: string }
   ): ViewHierarchyNode | null {
@@ -306,7 +306,7 @@ export class ElementFinder {
     // Create matcher function once instead of repeatedly in the loop
     const matchesText = this.textMatcher.createTextMatcher(text, fuzzyMatch, caseSensitive);
     const containerNode = container
-      ? this.findContainerNode(viewHierarchy, container)
+      ? this.findContainerNodeInternal(viewHierarchy, container)
       : null;
 
     if (container && !containerNode) {
@@ -354,7 +354,7 @@ export class ElementFinder {
     }
 
     const containerNode = container
-      ? this.findContainerNode(viewHierarchy, container)
+      ? this.findContainerNodeInternal(viewHierarchy, container)
       : null;
 
     if (container && !containerNode) {
@@ -381,6 +381,19 @@ export class ElementFinder {
     }
 
     return null;
+  }
+
+  /**
+   * Find the container node in the view hierarchy.
+   * @param viewHierarchy - The view hierarchy to search
+   * @param container - Container element selector
+   * @returns The matching container node or null if not found
+   */
+  findContainerNode(
+    viewHierarchy: ViewHierarchyResult,
+    container: { elementId?: string; text?: string }
+  ): ViewHierarchyNode | null {
+    return this.findContainerNodeInternal(viewHierarchy, container);
   }
 
   /**
