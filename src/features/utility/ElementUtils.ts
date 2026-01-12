@@ -118,6 +118,13 @@ export class ElementUtils {
     return this.finder.findElementByResourceId(viewHierarchy, resourceId, container, partialMatch);
   }
 
+  findContainerNode(
+    viewHierarchy: ViewHierarchyResult,
+    container: { elementId?: string; text?: string }
+  ): ViewHierarchyNode | null {
+    return this.finder.findContainerNode(viewHierarchy, container);
+  }
+
   hasContainerElement(
     viewHierarchy: ViewHierarchyResult,
     container: { elementId?: string; text?: string }
