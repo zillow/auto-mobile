@@ -124,18 +124,18 @@ echo ""
 add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"AutoMobile - Jason Pearson...\")${RESET}"
 call_mcp_tool "tapOn" --action "tap" --text "AutoMobile - Jason Pearson | droidcon New York 2025" --platform "android"
 replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"AutoMobile - Jason Pearson...\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Video opened (44ms tap, 178ms stability, 17ms frames @ 60 FPS)${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Video opened${RESET}"
 
-sleep 2.5
+sleep 5
 
 # Step 11: Open the video
 echo ""
-add_line "●${GRAY} Opening video…${RESET}"
+add_line "●${GRAY} Skipping ad (if any)…${RESET}"
 echo ""
 add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Skip\")${RESET}"
 call_mcp_tool "tapOn" --action "tap" --text "Skip" --platform "android"
 replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"AutoMobile - Jason Pearson...\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Video opened (44ms tap, 178ms stability, 17ms frames @ 60 FPS)${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Skipped ads${RESET}"
 
 sleep 1
 
