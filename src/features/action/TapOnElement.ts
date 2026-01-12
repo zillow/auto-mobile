@@ -472,6 +472,7 @@ export class TapOnElement extends BaseVisualChange {
           const element = await perf.track("findElement", () =>
             this.findElementToTap(options, viewHierarchy, 0, observeResult, signal)
           );
+          const initialTapPoint = this.elementUtils.getElementCenter(element);
           let action = options.action;
           const longPressDuration = this.getLongPressDuration(options, this.device.platform);
 
@@ -487,8 +488,8 @@ export class TapOnElement extends BaseVisualChange {
                 element: element,
                 wasAlreadyFocused: true,
                 focusChanged: false,
-                x: tapPoint.x,
-                y: tapPoint.y
+                x: initialTapPoint.x,
+                y: initialTapPoint.y
               };
             }
 
