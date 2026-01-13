@@ -134,8 +134,7 @@ function estimateToolTokens(): number {
 }
 
 function stripOutputSchema(tool: Record<string, unknown>): Record<string, unknown> {
-  const { outputSchema, ...rest } = tool;
-  return rest;
+  return Object.fromEntries(Object.entries(tool).filter(([key]) => key !== "outputSchema"));
 }
 
 /**

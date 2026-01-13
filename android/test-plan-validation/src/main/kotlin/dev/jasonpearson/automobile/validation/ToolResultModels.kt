@@ -38,7 +38,7 @@ sealed interface ToolResponse {
 @SerialName("tapOn")
 data class TapOnResponse(
     override val success: Boolean,
-    val action: String,
+    val action: String? = null,
     val message: String? = null,
     val element: Element? = null,
     val observation: ObservationSummary? = null,

@@ -89,6 +89,24 @@ class ToolResultParserTest {
   }
 
   @Test
+  fun `parse tapOn response without action for focus noop`() {
+    val payload =
+        """
+        {
+          "success": true,
+          "wasAlreadyFocused": true,
+          "focusChanged": false
+        }
+        """
+            .trimIndent()
+
+    val response = ToolResultParser.parseTapOnResponse(payload)
+
+    assertTrue(response.success)
+    assertNull(response.action)
+  }
+
+  @Test
   fun `parse tool result for unknown tool returns generic response`() {
     val payload =
         """
