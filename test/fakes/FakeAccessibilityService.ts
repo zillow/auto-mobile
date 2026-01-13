@@ -2,6 +2,7 @@ import { AccessibilityService } from "../../src/features/observe/interfaces/Acce
 import {
   ScreenshotResult,
   A11yDragResult,
+  A11yPinchResult,
   A11ySwipeResult,
   A11ySetTextResult,
   A11yImeActionResult,
@@ -55,6 +56,16 @@ export class FakeAccessibilityService implements AccessibilityService {
     timeoutMs: number;
   }> = [];
 
+  private pinchHistory: Array<{
+    centerX: number;
+    centerY: number;
+    distanceStart: number;
+    distanceEnd: number;
+    rotationDegrees: number;
+    duration?: number;
+    timeoutMs?: number;
+  }> = [];
+
   private setTextHistory: Array<{
     text: string;
     resourceId?: string;
@@ -67,6 +78,7 @@ export class FakeAccessibilityService implements AccessibilityService {
   private screenshotRequestCount: number = 0;
   private hierarchyRequestCount: number = 0;
   private dragResult: A11yDragResult | null = null;
+  private pinchResult: A11yPinchResult | null = null;
 
   /**
    * Configure hierarchy data to be returned by getAccessibilityHierarchy
@@ -140,6 +152,14 @@ export class FakeAccessibilityService implements AccessibilityService {
     this.dragResult = result;
   }
 
+  /**
+   * Configure pinch results returned by requestPinch
+   * @param result - The pinch result to return (or null to reset to default success response)
+   */
+  setPinchResult(result: A11yPinchResult | null): void {
+    this.pinchResult = result;
+  }
+
   // Assertion methods
 
   /**
@@ -171,6 +191,22 @@ export class FakeAccessibilityService implements AccessibilityService {
     timeoutMs: number;
   }> {
     return [...this.dragHistory];
+  }
+
+  /**
+   * Get the history of pinch requests
+   * @returns Array of pinch requests with parameters
+   */
+  getPinchHistory(): Array<{
+    centerX: number;
+    centerY: number;
+    distanceStart: number;
+    distanceEnd: number;
+    rotationDegrees: number;
+    duration?: number;
+    timeoutMs?: number;
+  }> {
+    return [...this.pinchHistory];
   }
 
   /**
@@ -385,6 +421,47 @@ export class FakeAccessibilityService implements AccessibilityService {
       success: true,
       totalTimeMs: pressDurationMs + dragDurationMs + holdDurationMs,
       gestureTimeMs: dragDurationMs,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestPinch(
+    centerX: number,
+    centerY: number,
+    distanceStart: number,
+    distanceEnd: number,
+    rotationDegrees: number,
+    duration?: number,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<A11yPinchResult> {
+    await this.applyDelay("pinch");
+    this.checkFailure("pinch");
+
+    this.pinchHistory.push({
+      centerX,
+      centerY,
+      distanceStart,
+      distanceEnd,
+      rotationDegrees,
+      duration,
+      timeoutMs
+    });
+
+    if (this.pinchResult) {
+      const perfTiming = this.pinchResult.perfTiming ?? this.performanceTiming ?? undefined;
+      return {
+        ...this.pinchResult,
+        perfTiming
+      };
+    }
+
+    const resolvedDuration = duration ?? 300;
+
+    return {
+      success: true,
+      totalTimeMs: resolvedDuration,
+      gestureTimeMs: resolvedDuration,
       perfTiming: this.performanceTiming || undefined
     };
   }

@@ -307,6 +307,15 @@ export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
+const pinchOnContainerSchema = z.union([
+  z.object({
+    elementId: z.string().describe("Container ID")
+  }).strict(),
+  z.object({
+    text: z.string().describe("Container text")
+  }).strict()
+]);
+
 export const pinchOnSchema = addDeviceTargetingToSchema(z.object({
   direction: z.enum(["in", "out"]).describe("Pinch direction (in=zoom out, out=zoom in)"),
   distanceStart: z.number().optional().describe("Start distance px"),
@@ -315,10 +324,7 @@ export const pinchOnSchema = addDeviceTargetingToSchema(z.object({
   duration: z.number().optional().describe("Duration ms (default: 300)"),
   rotationDegrees: z.number().optional().describe("Rotation degrees (+ = clockwise)"),
   includeSystemInsets: z.boolean().optional().describe("Include system bars (default false)"),
-  container: z.object({
-    elementId: z.string().optional().describe("Container ID"),
-    text: z.string().optional().describe("Container text")
-  }).optional().describe("Container to pinch within"),
+  container: pinchOnContainerSchema.optional().describe("Container to pinch within"),
   autoTarget: z.boolean().optional().describe("Auto-target surface (default true)"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
