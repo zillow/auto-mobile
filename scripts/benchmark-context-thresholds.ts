@@ -126,11 +126,16 @@ function estimateToolTokens(): number {
   let total = 0;
 
   for (const tool of toolDefinitions) {
-    const toolJson = JSON.stringify(tool, null, 2);
+    const toolJson = JSON.stringify(stripOutputSchema(tool), null, 2);
     total += estimateTokens(toolJson);
   }
 
   return total;
+}
+
+function stripOutputSchema(tool: Record<string, unknown>): Record<string, unknown> {
+  const { outputSchema, ...rest } = tool;
+  return rest;
 }
 
 /**
