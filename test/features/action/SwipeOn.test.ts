@@ -293,3 +293,72 @@ describe("SwipeOn container overlays", () => {
     expect(call.y1).toBeLessThan(1100);
   });
 });
+
+describe("SwipeOn boomerang", () => {
+  const device = { name: "test-device", platform: "android", deviceId: "device-1" } as const;
+  let fakeObserveScreen: FakeObserveScreen;
+  let fakeGesture: FakeGestureExecutor;
+  let fakeAwaitIdle: FakeAwaitIdle;
+  let fakeWindow: FakeWindow;
+  let fakeAccessibilityDetector: FakeAccessibilityDetector;
+  let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
+
+  const createObserveResult = (): ObserveResult => ({
+    timestamp: Date.now(),
+    screenSize: { width: 1000, height: 2000 },
+    systemInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+    viewHierarchy: null
+  });
+
+  const createSwipeOn = () => {
+    const swipeOn = new SwipeOn(device, null, null, null, {
+      executeGesture: fakeGesture,
+      observeScreen: fakeObserveScreen,
+      accessibilityDetector: fakeAccessibilityDetector
+    });
+    (swipeOn as any).awaitIdle = fakeAwaitIdle;
+    (swipeOn as any).window = fakeWindow;
+    return swipeOn;
+  };
+
+  beforeEach(() => {
+    fakeAccessibilityDetector = new FakeAccessibilityDetector();
+    fakeAccessibilityDetector.setTalkBackEnabled(false);
+    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue({} as AccessibilityServiceClient);
+    fakeObserveScreen = new FakeObserveScreen();
+    fakeGesture = new FakeGestureExecutor();
+    fakeAwaitIdle = new FakeAwaitIdle();
+    fakeWindow = new FakeWindow();
+    fakeWindow.setCachedActiveWindow(null);
+  });
+
+  afterEach(() => {
+    getInstanceSpy?.mockRestore();
+  });
+
+  test("performs a round-trip swipe with return speed", async () => {
+    fakeObserveScreen.setObserveResult(createObserveResult());
+
+    const swipeOn = createSwipeOn();
+    const result = await swipeOn.execute({
+      direction: "up",
+      autoTarget: false,
+      duration: 400,
+      boomerang: true,
+      apexPause: 0,
+      returnSpeed: 2
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.duration).toBe(600);
+
+    const calls = fakeGesture.getSwipeCalls();
+    expect(calls).toHaveLength(2);
+    expect(calls[0].options?.duration).toBe(400);
+    expect(calls[1].options?.duration).toBe(200);
+    expect(calls[1].x1).toBe(calls[0].x2);
+    expect(calls[1].y1).toBe(calls[0].y2);
+    expect(calls[1].x2).toBe(calls[0].x1);
+    expect(calls[1].y2).toBe(calls[0].y1);
+  });
+});

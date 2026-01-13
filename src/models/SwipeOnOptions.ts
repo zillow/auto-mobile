@@ -43,6 +43,13 @@ export interface SwipeOnOptions {
    */
   focusTarget?: boolean;
 
+  // Execute a swipe that returns to the start point for dry-run testing (default false)
+  boomerang?: boolean;
+
+  // Boomerang-only settings (internal only)
+  apexPause?: number; // Pause at the far end of the swipe in ms (default 100)
+  returnSpeed?: number; // Multiplier for return speed (default 1.0)
+
   // Gesture options
   speed?: "slow" | "normal" | "fast"; // Speed preset
   duration?: number; // Manual duration override (ms) - internal only

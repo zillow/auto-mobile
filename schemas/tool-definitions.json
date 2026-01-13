@@ -1645,6 +1645,20 @@
           "additionalProperties": false,
           "description": "Swipe until we find a match"
         },
+        "boomerang": {
+          "type": "boolean",
+          "description": "Return to the starting point after swiping (default false)"
+        },
+        "apexPause": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Pause at the furthest point in ms (default 100)"
+        },
+        "returnSpeed": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Return speed multiplier (default 1.0)"
+        },
         "speed": {
           "type": "string",
           "enum": [

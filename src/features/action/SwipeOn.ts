@@ -60,6 +60,7 @@ export interface SwipeOnDependencies {
 type SwipeOnResolvedOptions = SwipeOnOptions & { direction: SwipeDirection };
 
 type SwipeInterval = { start: number; end: number; length: number };
+type BoomerangConfig = { apexPauseMs: number; returnSpeed: number };
 type OverlayCandidate = {
   bounds: Element["bounds"];
   overlapBounds: Element["bounds"];
@@ -85,6 +86,8 @@ export class SwipeOn extends BaseVisualChange {
   private static readonly OVERLAY_PADDING = 8;
   private static readonly CANDIDATE_FRACTIONS = [0.5, 0.25, 0.75, 0.15, 0.85];
   private static readonly OVERLAY_COVERAGE_THRESHOLD = 0.8;
+  private static readonly DEFAULT_APEX_PAUSE_MS = 100;
+  private static readonly DEFAULT_RETURN_SPEED = 1;
 
   constructor(
     device: BootedDevice,
@@ -137,10 +140,16 @@ export class SwipeOn extends BaseVisualChange {
     direction: SwipeDirection,
     containerElement: Element | null,
     gestureOptions?: GestureOptions,
-    perf?: PerformanceTracker
+    perf?: PerformanceTracker,
+    boomerang?: BoomerangConfig
   ): Promise<SwipeResult> {
+    const boomerangEnabled = Boolean(boomerang);
+
     // Only check TalkBack for Android platform
     if (this.device.platform !== "android") {
+      if (boomerangEnabled) {
+        return this.executeBoomerangGesture(x1, y1, x2, y2, gestureOptions, boomerang!, perf);
+      }
       return this.executeGesture.swipe(x1, y1, x2, y2, gestureOptions, perf);
     }
 
@@ -151,6 +160,11 @@ export class SwipeOn extends BaseVisualChange {
     );
 
     if (isTalkBackEnabled) {
+      if (boomerangEnabled) {
+        logger.info("[SwipeOn] TalkBack enabled, boomerang requested; announcing swipeable element");
+        return this.announceSwipeable(x1, y1, x2, y2, containerElement, gestureOptions, perf);
+      }
+
       logger.info("[SwipeOn] TalkBack enabled, using accessibility-aware swipe");
       return this.executeAndroidSwipeWithAccessibility(
         x1, y1, x2, y2,
@@ -160,10 +174,122 @@ export class SwipeOn extends BaseVisualChange {
         perf
       );
     } else {
+      if (boomerangEnabled) {
+        logger.debug("[SwipeOn] TalkBack disabled, using boomerang swipe");
+        return this.executeBoomerangGesture(x1, y1, x2, y2, gestureOptions, boomerang!, perf);
+      }
+
       // Standard mode: Use coordinate-based swipes
       logger.debug("[SwipeOn] TalkBack disabled, using standard swipe");
       return this.executeGesture.swipe(x1, y1, x2, y2, gestureOptions, perf);
     }
+  }
+
+  private async executeBoomerangGesture(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    gestureOptions: GestureOptions | undefined,
+    boomerang: BoomerangConfig,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<SwipeResult> {
+    const forwardDuration = gestureOptions?.duration ?? 300;
+    const returnDuration = this.getReturnDuration(forwardDuration, boomerang.returnSpeed);
+    const totalDuration = forwardDuration + boomerang.apexPauseMs + returnDuration;
+
+    const forwardOptions = this.buildGestureOptions(gestureOptions, forwardDuration);
+    const returnOptions = this.buildGestureOptions(gestureOptions, returnDuration);
+
+    const forwardResult = await this.executeGesture.swipe(x1, y1, x2, y2, forwardOptions, perf);
+    if (!forwardResult.success) {
+      return forwardResult;
+    }
+
+    if (boomerang.apexPauseMs > 0) {
+      await this.timer.sleep(boomerang.apexPauseMs);
+    }
+
+    const returnResult = await this.executeGesture.swipe(x2, y2, x1, y1, returnOptions, perf);
+    if (!returnResult.success) {
+      return {
+        ...returnResult,
+        x1,
+        y1,
+        x2,
+        y2,
+        duration: totalDuration
+      };
+    }
+
+    return {
+      ...forwardResult,
+      x1,
+      y1,
+      x2,
+      y2,
+      duration: totalDuration,
+      a11yTotalTimeMs: this.sumOptional(forwardResult.a11yTotalTimeMs, returnResult.a11yTotalTimeMs),
+      a11yGestureTimeMs: this.sumOptional(forwardResult.a11yGestureTimeMs, returnResult.a11yGestureTimeMs),
+      fallbackReason: forwardResult.fallbackReason ?? returnResult.fallbackReason
+    };
+  }
+
+  private async announceSwipeable(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    containerElement: Element | null,
+    gestureOptions?: GestureOptions,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<SwipeResult> {
+    const duration = gestureOptions?.duration ?? 0;
+    const resourceId = containerElement?.["resource-id"];
+
+    if (!resourceId) {
+      const error = "Boomerang swipe in TalkBack mode requires a container element with a resource-id.";
+      logger.warn(`[SwipeOn] ${error}`);
+      return {
+        success: false,
+        error,
+        x1,
+        y1,
+        x2,
+        y2,
+        duration
+      };
+    }
+
+    const result = await this.accessibilityService.requestAction(
+      "focus",
+      resourceId,
+      5000,
+      perf
+    );
+
+    if (!result.success) {
+      const error = result.error ?? "Failed to set accessibility focus for boomerang swipe.";
+      logger.warn(`[SwipeOn] ${error}`);
+      return {
+        success: false,
+        error,
+        x1,
+        y1,
+        x2,
+        y2,
+        duration
+      };
+    }
+
+    return {
+      success: true,
+      x1,
+      y1,
+      x2,
+      y2,
+      duration
+    };
   }
 
   /**
@@ -442,6 +568,22 @@ export class SwipeOn extends BaseVisualChange {
       }
     }
 
+    if (options.boomerang && options.lookFor) {
+      return "boomerang cannot be used with lookFor";
+    }
+
+    if (!options.boomerang && (options.apexPause !== undefined || options.returnSpeed !== undefined)) {
+      return "apexPause/returnSpeed require boomerang=true";
+    }
+
+    if (options.apexPause !== undefined && options.apexPause < 0) {
+      return "apexPause must be >= 0";
+    }
+
+    if (options.returnSpeed !== undefined && options.returnSpeed <= 0) {
+      return "returnSpeed must be > 0";
+    }
+
     return null;
   }
 
@@ -556,6 +698,9 @@ export class SwipeOn extends BaseVisualChange {
       direction: options.direction,
       lookFor: options.lookFor,
       speed: options.speed,
+      boomerang: options.boomerang,
+      apexPause: options.apexPause,
+      returnSpeed: options.returnSpeed,
       platform: this.device.platform
     };
   }
@@ -596,6 +741,7 @@ export class SwipeOn extends BaseVisualChange {
         );
 
         const duration = this.getDuration(options);
+        const boomerang = this.resolveBoomerangConfig(options);
         const gestureOptions: GestureOptions = {
           duration,
           scrollMode: options.scrollMode
@@ -610,7 +756,8 @@ export class SwipeOn extends BaseVisualChange {
             options.direction,
             null, // No container for screen swipe
             gestureOptions,
-            perf
+            perf,
+            boomerang
           )
         );
 
@@ -662,6 +809,7 @@ export class SwipeOn extends BaseVisualChange {
         );
 
         const duration = this.getDuration(options);
+        const boomerang = this.resolveBoomerangConfig(options);
         const gestureOptions: GestureOptions = {
           duration,
           scrollMode: options.scrollMode
@@ -676,7 +824,8 @@ export class SwipeOn extends BaseVisualChange {
             options.direction,
             element, // Use the container element
             gestureOptions,
-            perf
+            perf,
+            boomerang
           )
         );
 
@@ -1264,6 +1413,7 @@ export class SwipeOn extends BaseVisualChange {
       // Use direction directly (finger swipe direction) for consistency with regular swipes
       const { startX, startY, endX, endY } = swipeCoordinates;
 
+      const boomerang = this.resolveBoomerangConfig(options);
       const gestureOptions: GestureOptions = {
         duration: swipeDuration,
         scrollMode: options.scrollMode
@@ -1280,7 +1430,8 @@ export class SwipeOn extends BaseVisualChange {
             options.direction,
             containerElement, // Use the container element
             gestureOptions,
-            perf
+            perf,
+            boomerang
           );
         },
         {
@@ -1572,5 +1723,34 @@ export class SwipeOn extends BaseVisualChange {
     }
 
     return this.elementUtils.getSwipeDurationFromSpeed(options.speed);
+  }
+
+  private resolveBoomerangConfig(options: SwipeOnResolvedOptions): BoomerangConfig | undefined {
+    if (!options.boomerang) {
+      return undefined;
+    }
+
+    return {
+      apexPauseMs: options.apexPause ?? SwipeOn.DEFAULT_APEX_PAUSE_MS,
+      returnSpeed: options.returnSpeed ?? SwipeOn.DEFAULT_RETURN_SPEED
+    };
+  }
+
+  private buildGestureOptions(base: GestureOptions | undefined, duration: number): GestureOptions {
+    return {
+      ...(base ?? {}),
+      duration
+    };
+  }
+
+  private getReturnDuration(forwardDuration: number, returnSpeed: number): number {
+    return Math.max(1, Math.round(forwardDuration / returnSpeed));
+  }
+
+  private sumOptional(a?: number, b?: number): number | undefined {
+    if (a === undefined && b === undefined) {
+      return undefined;
+    }
+    return (a ?? 0) + (b ?? 0);
   }
 }

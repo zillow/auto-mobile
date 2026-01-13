@@ -113,6 +113,9 @@ export interface SwipeOnArgs {
     elementId?: string;
     text?: string;
   };
+  boomerang?: boolean;
+  apexPause?: number;
+  returnSpeed?: number;
   speed?: "slow" | "normal" | "fast";
   platform: Platform;
 }
@@ -232,6 +235,9 @@ export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
     elementId: z.string().optional().describe("ID of the element to look for"),
     text: z.string().optional().describe("Text to look for"),
   }).optional().describe("Swipe until we find a match"),
+  boomerang: z.boolean().optional().describe("Return to the starting point after swiping (default false)"),
+  apexPause: z.number().min(0).optional().describe("Pause at the furthest point in ms (default 100)"),
+  returnSpeed: z.number().positive().optional().describe("Return speed multiplier (default 1.0)"),
   speed: z.enum(["slow", "normal", "fast"]).optional().describe("Scroll speed"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
@@ -1350,8 +1356,11 @@ export function registerInteractionTools() {
       direction: resolved.direction,
       gestureType: args.gestureType,
       lookFor: args.lookFor,
-      speed: args.speed
-      // duration and scrollMode are internal-only, not exposed in schema
+      speed: args.speed,
+      boomerang: args.boomerang,
+      apexPause: args.apexPause,
+      returnSpeed: args.returnSpeed
+      // duration and scrollMode are internal-only
     };
 
     const result = await swipeOn.execute(options, progress);

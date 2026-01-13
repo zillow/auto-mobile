@@ -183,6 +183,40 @@ describe("SwipeOn TalkBack mode detection", () => {
         expect(executeGestureSwipe).not.toHaveBeenCalled();
       }
     });
+
+    test("boomerang announces swipeable element instead of swiping", async () => {
+      const mockAccessibilityService = {
+        requestAction: async () => ({ success: true })
+      };
+      (swipeOn as any).accessibilityService = mockAccessibilityService;
+      const requestActionSpy = spyOn(mockAccessibilityService, "requestAction")
+        .mockResolvedValue({ success: true });
+
+      const containerElement = {
+        "resource-id": "test:id/scrollView"
+      } as any;
+
+      await (swipeOn as any).executeSwipeGesture(
+        100,
+        500,
+        100,
+        200,
+        "up" as SwipeDirection,
+        containerElement,
+        { duration: 300 },
+        new NoOpPerformanceTracker(),
+        { apexPauseMs: 100, returnSpeed: 1 }
+      );
+
+      expect(requestActionSpy).toHaveBeenCalledWith(
+        "focus",
+        "test:id/scrollView",
+        5000,
+        expect.any(NoOpPerformanceTracker)
+      );
+      expect(executeAndroidSwipeWithAccessibility).not.toHaveBeenCalled();
+      expect(executeGestureSwipe).not.toHaveBeenCalled();
+    });
   });
 
   describe("TalkBack state cache invalidation", () => {
