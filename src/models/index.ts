@@ -16,6 +16,7 @@ export * from "./DeviceSession";
 export * from "./DragAndDropOptions";
 export * from "./DragAndDropResult";
 export * from "./Element";
+export * from "./ElementSelectionStrategy";
 export * from "./ElementBounds";
 export * from "./DeviceInfo";
 export * from "./ExecResult";

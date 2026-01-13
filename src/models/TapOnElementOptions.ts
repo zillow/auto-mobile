@@ -1,10 +1,14 @@
 /**
  * Options for tapping on an element
  */
+import type { ElementSelectionStrategy } from "./ElementSelectionStrategy";
+
 export interface TapOnElementOptions {
   // Element selection - one of these must be provided
   text?: string;
   elementId?: string;
+  // Selection strategy when multiple elements match (default: first)
+  selectionStrategy?: ElementSelectionStrategy;
 
   // Container to restrict search
   container?: {

@@ -1842,6 +1842,14 @@
           "type": "string",
           "description": "Element ID to tap"
         },
+        "selectionStrategy": {
+          "type": "string",
+          "enum": [
+            "first",
+            "random"
+          ],
+          "description": "Element selection strategy when multiple matches are found (default: first)"
+        },
         "duration": {
           "type": "number",
           "description": "Long press duration (ms)"
