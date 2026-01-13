@@ -337,6 +337,129 @@ class ViewHierarchyExtractorTest {
     assertTrue("JSON should contain extras field", jsonString.contains("\"extras\""))
   }
 
+  // MARK: - Occlusion Filtering Tests
+
+  @Test
+  fun `occlusion filter keeps overlapping root-level siblings`() {
+    val siblingOne = elementWithBounds(resourceId = "sibling-one", bounds = bounds(0, 0, 100, 100))
+    val siblingTwo =
+        elementWithBounds(resourceId = "sibling-two", bounds = bounds(50, 50, 150, 150))
+    val root =
+        elementWithBounds(
+            resourceId = "root",
+            bounds = bounds(0, 0, 200, 200),
+            children = listOf(siblingOne, siblingTwo),
+        )
+
+    val filtered = extractor.applyOcclusionFilteringSingleWindowForTest(root)
+
+    assertNotNull(filtered)
+    val siblingOneResult = findElementByResourceId(filtered!!, "sibling-one")
+    val siblingTwoResult = findElementByResourceId(filtered, "sibling-two")
+    assertNotNull(siblingOneResult)
+    assertNotNull(siblingTwoResult)
+    assertNull(siblingOneResult!!.occlusionState)
+    assertNull(siblingOneResult.occludedBy)
+    assertNull(siblingTwoResult!!.occlusionState)
+    assertNull(siblingTwoResult.occludedBy)
+  }
+
+  @Test
+  fun `occlusion filter ignores descendant overlaps`() {
+    val child = elementWithBounds(resourceId = "child", bounds = bounds(0, 0, 100, 100))
+    val parent =
+        elementWithBounds(
+            resourceId = "parent",
+            bounds = bounds(0, 0, 100, 100),
+            children = listOf(child),
+        )
+    val root =
+        elementWithBounds(
+            resourceId = "root",
+            bounds = bounds(0, 0, 120, 120),
+            children = listOf(parent),
+        )
+
+    val filtered = extractor.applyOcclusionFilteringSingleWindowForTest(root)
+
+    assertNotNull(filtered)
+    val parentResult = findElementByResourceId(filtered!!, "parent")
+    val childResult = findElementByResourceId(filtered, "child")
+    assertNotNull(parentResult)
+    assertNotNull(childResult)
+    assertNull(parentResult!!.occlusionState)
+    assertNull(childResult!!.occlusionState)
+  }
+
+  @Test
+  fun `occlusion filter removes unrelated nodes when fully occluded`() {
+    val target =
+        elementWithBounds(resourceId = "hidden-target", bounds = bounds(0, 0, 100, 100))
+    val targetParent = elementWithBounds(resourceId = "target-parent", children = listOf(target))
+    val occluder =
+        elementWithBounds(resourceId = "occluding-node", bounds = bounds(0, 0, 100, 100))
+    val occluderParent =
+        elementWithBounds(resourceId = "occluder-parent", children = listOf(occluder))
+    val root = elementWithBounds(children = listOf(targetParent, occluderParent))
+
+    val filtered = extractor.applyOcclusionFilteringSingleWindowForTest(root)
+
+    assertNotNull(filtered)
+    assertNull(findElementByResourceId(filtered!!, "hidden-target"))
+    assertNotNull(findElementByResourceId(filtered, "occluding-node"))
+  }
+
+  @Test
+  fun `occlusion filter keeps partial overlap and annotates metadata`() {
+    val target =
+        elementWithBounds(resourceId = "partial-target", bounds = bounds(0, 0, 100, 100))
+    val targetParent = elementWithBounds(resourceId = "partial-parent", children = listOf(target))
+    val occluder =
+        elementWithBounds(resourceId = "partial-occluder", bounds = bounds(0, 0, 50, 50))
+    val occluderParent =
+        elementWithBounds(resourceId = "occluder-parent", children = listOf(occluder))
+    val root = elementWithBounds(children = listOf(targetParent, occluderParent))
+
+    val filtered = extractor.applyOcclusionFilteringSingleWindowForTest(root)
+
+    assertNotNull(filtered)
+    val targetResult = findElementByResourceId(filtered!!, "partial-target")
+    assertNotNull(targetResult)
+    assertEquals("partial", targetResult!!.occlusionState)
+    assertEquals("partial-occluder", targetResult.occludedBy)
+  }
+
+  @Test
+  fun `hidden root occlusion retains children`() {
+    val child = elementWithBounds(resourceId = "root-child", bounds = bounds(98, 98, 100, 100))
+    val root =
+        elementWithBounds(
+            resourceId = "root-window",
+            bounds = bounds(0, 0, 100, 100),
+            children = listOf(child),
+        )
+    val occluderRoot =
+        elementWithBounds(resourceId = "occluding-root", bounds = bounds(0, 0, 98, 98))
+
+    val windowEntry = extractor.createWindowEntry(windowId = 1, windowLayer = 0, hierarchy = root)
+    val occluderEntry =
+        extractor.createWindowEntry(windowId = 2, windowLayer = 1, hierarchy = occluderRoot)
+    val occlusionInfo = extractor.buildOcclusionInfoForTest(listOf(windowEntry, occluderEntry))
+    val filtered =
+        extractor.filterOccludedHierarchyForTest(
+            element = root,
+            occlusionInfo = occlusionInfo,
+            windowKey = 1,
+            path = "",
+            isRoot = true,
+        )
+
+    assertNotNull(filtered)
+    assertEquals("hidden", filtered!!.occlusionState)
+    assertEquals("occluding-root", filtered.occludedBy)
+    assertNotNull(findElementByResourceId(filtered, "root-child"))
+  }
+
   // MARK: - Node Relationship Tests
 
   @Test
@@ -529,5 +652,114 @@ class ViewHierarchyExtractorTest {
           @Suppress("UNCHECKED_CAST")
           method.invoke(this, element.node) as List<UIElementInfo>
         }
+  }
+
+  private fun elementWithBounds(
+      resourceId: String? = null,
+      bounds: ElementBounds? = null,
+      children: List<UIElementInfo> = emptyList(),
+  ): UIElementInfo {
+    val node =
+        when {
+          children.isEmpty() -> null
+          children.size == 1 -> json.encodeToJsonElement(UIElementInfo.serializer(), children[0])
+          else -> json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), children)
+        }
+    return UIElementInfo(resourceId = resourceId, bounds = bounds, node = node)
+  }
+
+  private fun bounds(left: Int, top: Int, right: Int, bottom: Int): ElementBounds {
+    return ElementBounds(left, top, right, bottom)
+  }
+
+  private fun findElementByResourceId(
+      element: UIElementInfo,
+      resourceId: String,
+  ): UIElementInfo? {
+    if (element.resourceId == resourceId) {
+      return element
+    }
+    for (child in extractor.extractChildrenFromHierarchy(element)) {
+      val found = findElementByResourceId(child, resourceId)
+      if (found != null) {
+        return found
+      }
+    }
+    return null
+  }
+
+  private fun ViewHierarchyExtractor.applyOcclusionFilteringSingleWindowForTest(
+      element: UIElementInfo
+  ): UIElementInfo? {
+    return this.javaClass
+        .getDeclaredMethod("applyOcclusionFilteringSingleWindow", UIElementInfo::class.java)
+        .let { method ->
+          method.isAccessible = true
+          @Suppress("UNCHECKED_CAST")
+          method.invoke(this, element) as UIElementInfo?
+        }
+  }
+
+  private fun ViewHierarchyExtractor.createWindowEntry(
+      windowId: Int,
+      windowLayer: Int,
+      hierarchy: UIElementInfo,
+      windowType: String = "application",
+      packageName: String? = null,
+      isActive: Boolean = true,
+      isFocused: Boolean = true,
+  ): Any {
+    val windowEntryClass =
+        this.javaClass.declaredClasses.first { it.simpleName == "WindowEntry" }
+    val constructor =
+        windowEntryClass.getDeclaredConstructor(
+            Int::class.javaPrimitiveType,
+            String::class.java,
+            Int::class.javaPrimitiveType,
+            String::class.java,
+            Boolean::class.javaPrimitiveType,
+            Boolean::class.javaPrimitiveType,
+            UIElementInfo::class.java,
+        )
+    constructor.isAccessible = true
+    return constructor.newInstance(
+        windowId,
+        windowType,
+        windowLayer,
+        packageName,
+        isActive,
+        isFocused,
+        hierarchy,
+    )
+  }
+
+  private fun ViewHierarchyExtractor.buildOcclusionInfoForTest(
+      windowEntries: List<Any>
+  ): Map<*, *> {
+    val method = this.javaClass.getDeclaredMethod("buildOcclusionInfo", List::class.java)
+    method.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    return method.invoke(this, windowEntries) as Map<*, *>
+  }
+
+  private fun ViewHierarchyExtractor.filterOccludedHierarchyForTest(
+      element: UIElementInfo,
+      occlusionInfo: Map<*, *>,
+      windowKey: Int,
+      path: String,
+      isRoot: Boolean,
+  ): UIElementInfo? {
+    val method =
+        this.javaClass.getDeclaredMethod(
+            "filterOccludedHierarchy",
+            UIElementInfo::class.java,
+            Map::class.java,
+            Int::class.javaPrimitiveType,
+            String::class.java,
+            Boolean::class.javaPrimitiveType,
+        )
+    method.isAccessible = true
+    @Suppress("UNCHECKED_CAST")
+    return method.invoke(this, element, occlusionInfo, windowKey, path, isRoot) as UIElementInfo?
   }
 }
