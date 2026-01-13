@@ -301,6 +301,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onRequestTwoFingerSwipe = { requestId, x1, y1, x2, y2, duration, offset ->
                 performTwoFingerSwipe(requestId, x1, y1, x2, y2, duration, offset)
               },
+              onRequestDrag = { requestId, x1, y1, x2, y2, duration, holdTime ->
+                performDrag(requestId, x1, y1, x2, y2, duration, holdTime)
+              },
               onRequestPinch = {
                   requestId,
                   centerX,
@@ -955,6 +958,126 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.e(TAG, "Error performing swipe", e)
       serviceScope.launch {
         broadcastSwipeResult(requestId, false, e.message, errorTime - startTime, null)
+      }
+    }
+  }
+
+  /**
+   * Perform a drag gesture using AccessibilityService's dispatchGesture API.
+   *
+   * @param requestId Optional request ID for response correlation
+   * @param x1 Starting X coordinate
+   * @param y1 Starting Y coordinate
+   * @param x2 Ending X coordinate
+   * @param y2 Ending Y coordinate
+   * @param duration Drag duration in milliseconds
+   * @param holdTime Hold time before dragging in milliseconds
+   */
+  private fun performDrag(
+      requestId: String?,
+      x1: Int,
+      y1: Int,
+      x2: Int,
+      y2: Int,
+      duration: Long,
+      holdTime: Long,
+  ) {
+    val startTime = System.currentTimeMillis()
+    Log.d(
+        TAG,
+        "performDrag: ($x1, $y1) -> ($x2, $y2) duration=${duration}ms hold=${holdTime}ms",
+    )
+    perfProvider.serial("performDrag")
+
+    try {
+      perfProvider.startOperation("buildPath")
+      val gestureBuilder = GestureDescription.Builder()
+      val startX = x1.toFloat()
+      val startY = y1.toFloat()
+      val endX = x2.toFloat()
+      val endY = y2.toFloat()
+
+      if (holdTime > 0) {
+        val holdPath =
+            Path().apply {
+              moveTo(startX, startY)
+            }
+        val dragPath =
+            Path().apply {
+              moveTo(startX, startY)
+              lineTo(endX, endY)
+            }
+        gestureBuilder
+            .addStroke(GestureDescription.StrokeDescription(holdPath, 0, holdTime, true))
+            .addStroke(GestureDescription.StrokeDescription(dragPath, holdTime, duration))
+      } else {
+        val dragPath =
+            Path().apply {
+              moveTo(startX, startY)
+              lineTo(endX, endY)
+            }
+        gestureBuilder.addStroke(GestureDescription.StrokeDescription(dragPath, 0, duration))
+      }
+      val gesture = gestureBuilder.build()
+      perfProvider.endOperation("buildPath")
+
+      val gestureBuiltTime = System.currentTimeMillis()
+      Log.d(TAG, "Drag gesture built in ${gestureBuiltTime - startTime}ms")
+
+      perfProvider.startOperation("dispatchGesture")
+      val dispatched =
+          dispatchGesture(
+              gesture,
+              object : GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                  perfProvider.endOperation("dispatchGesture")
+                  perfProvider.end() // end performDrag block
+                  val completedTime = System.currentTimeMillis()
+                  val totalTime = completedTime - startTime
+                  val gestureTime = completedTime - gestureBuiltTime
+                  Log.d(TAG, "Drag completed: gesture=${gestureTime}ms, total=${totalTime}ms")
+
+                  serviceScope.launch {
+                    broadcastDragResult(requestId, true, null, totalTime, gestureTime)
+                  }
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                  perfProvider.endOperation("dispatchGesture")
+                  perfProvider.end() // end performDrag block
+                  val cancelledTime = System.currentTimeMillis()
+                  val totalTime = cancelledTime - startTime
+                  Log.w(TAG, "Drag cancelled after ${totalTime}ms")
+
+                  serviceScope.launch {
+                    broadcastDragResult(requestId, false, "Gesture was cancelled", totalTime, null)
+                  }
+                }
+              },
+              null,
+          )
+
+      if (!dispatched) {
+        perfProvider.endOperation("dispatchGesture")
+        perfProvider.end() // end performDrag block
+        val failTime = System.currentTimeMillis()
+        Log.e(TAG, "Failed to dispatch drag gesture")
+        serviceScope.launch {
+          broadcastDragResult(
+              requestId,
+              false,
+              "Failed to dispatch gesture",
+              failTime - startTime,
+              null,
+          )
+        }
+      }
+    } catch (e: Exception) {
+      perfProvider.end() // end performDrag block
+      val errorTime = System.currentTimeMillis()
+      Log.e(TAG, "Error performing drag", e)
+      serviceScope.launch {
+        broadcastDragResult(requestId, false, e.message, errorTime - startTime, null)
       }
     }
   }
@@ -2756,6 +2879,46 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.d(TAG, "Broadcasted swipe result to ${webSocketServer.getConnectionCount()} clients")
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting swipe result", e)
+    }
+  }
+
+  /** Broadcast drag result to WebSocket clients */
+  private suspend fun broadcastDragResult(
+      requestId: String?,
+      success: Boolean,
+      error: String?,
+      totalTimeMs: Long,
+      gestureTimeMs: Long?,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping drag result broadcast")
+      return
+    }
+
+    try {
+      webSocketServer.broadcastWithPerf { perfTiming ->
+        buildString {
+          append("""{"type":"drag_result","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","success":$success""")
+          append(""","totalTimeMs":$totalTimeMs""")
+          if (gestureTimeMs != null) {
+            append(""","gestureTimeMs":$gestureTimeMs""")
+          }
+          if (error != null) {
+            append(""","error":"$error"""")
+          }
+          if (perfTiming != null) {
+            append(""","perfTiming":$perfTiming""")
+          }
+          append("}")
+        }
+      }
+      Log.d(TAG, "Broadcasted drag result to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting drag result", e)
     }
   }
 
