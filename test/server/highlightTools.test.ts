@@ -18,7 +18,7 @@ describe("Highlight Tools Registration", () => {
     expect(toolNames).toContain("highlight");
   });
 
-  test("validates highlight schema for add and remove actions", () => {
+  test("validates highlight schema for add action", () => {
     registerHighlightTools();
 
     const tool = ToolRegistry.getTool("highlight");
@@ -38,27 +38,16 @@ describe("Highlight Tools Registration", () => {
     };
 
     expect(() => tool!.schema.parse({
-      action: "add",
-      highlightId: "highlight-1",
       platform: "android",
       shape: validShape
     })).not.toThrow();
 
     expect(() => tool!.schema.parse({
-      action: "remove",
-      highlightId: "highlight-1",
       platform: "android"
-    })).not.toThrow();
-
-    expect(() => tool!.schema.parse({
-      action: "add",
-      platform: "android",
-      shape: validShape
     })).toThrow();
 
     expect(() => tool!.schema.parse({
-      action: "remove",
-      platform: "android"
+      shape: validShape
     })).toThrow();
   });
 
@@ -69,8 +58,6 @@ describe("Highlight Tools Registration", () => {
     expect(tool).toBeDefined();
 
     expect(() => tool!.schema.parse({
-      action: "add",
-      highlightId: "highlight-2",
       platform: "android",
       shape: {
         type: "box",
@@ -84,27 +71,25 @@ describe("Highlight Tools Registration", () => {
     })).toThrow();
   });
 
-  test("supports list action without highlightId", () => {
-    registerHighlightTools();
-
-    const tool = ToolRegistry.getTool("highlight");
-    expect(tool).toBeDefined();
-
-    expect(() => tool!.schema.parse({
-      action: "list",
-      platform: "android"
-    })).not.toThrow();
-  });
-
   test("returns unsupported response for iOS", async () => {
     registerHighlightTools();
 
     const tool = ToolRegistry.getTool("highlight");
     expect(tool).toBeDefined();
 
+    const validShape = {
+      type: "box",
+      bounds: {
+        x: 10,
+        y: 20,
+        width: 100,
+        height: 50
+      }
+    };
+
     const parsed = tool!.schema.parse({
-      action: "list",
-      platform: "ios"
+      platform: "ios",
+      shape: validShape
     });
 
     const response = await tool!.handler(parsed);

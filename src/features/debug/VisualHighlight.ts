@@ -7,7 +7,6 @@ import {
   ActionableError,
   BootedDevice,
   HighlightBounds,
-  HighlightEntry,
   HighlightOperationResult,
   HighlightShape,
   HighlightStyle,
@@ -108,31 +107,9 @@ export const highlightShapeSchema: z.ZodType<HighlightShape> = z.discriminatedUn
   highlightPathShapeSchema
 ]);
 
-const highlightStyleResponseSchema = z.object({
-  strokeColor: z.string().nullable().optional(),
-  strokeWidth: z.number().nullable().optional(),
-  dashPattern: z.array(z.number().positive()).nullable().optional(),
-  smoothing: z.enum(["none", "catmull-rom", "bezier", "douglas-peucker"]).nullable().optional(),
-  tension: z.number().nullable().optional(),
-  capStyle: z.enum(["butt", "round", "square"]).nullable().optional(),
-  joinStyle: z.enum(["miter", "round", "bevel"]).nullable().optional()
-}).nullable().optional();
-
-const highlightShapeResponseSchema: z.ZodType<HighlightShape> = z.discriminatedUnion("type", [
-  highlightBoxShapeSchema.extend({ style: highlightStyleResponseSchema }),
-  highlightCircleShapeSchema.extend({ style: highlightStyleResponseSchema }),
-  highlightPathShapeSchema.extend({ style: highlightStyleResponseSchema })
-]);
-
-const highlightEntryResponseSchema: z.ZodType<HighlightEntry> = z.object({
-  id: z.string().min(1),
-  shape: highlightShapeResponseSchema
-});
-
 const highlightResponseSchema: z.ZodType<HighlightOperationResult> = z.object({
   success: z.boolean(),
   error: z.string().nullable().optional(),
-  highlights: z.array(highlightEntryResponseSchema),
   requestId: z.string().optional(),
   timestamp: z.number().optional()
 }).passthrough();
@@ -177,45 +154,6 @@ export class VisualHighlight {
     const response = await this.accessibilityServiceClient.requestAddHighlight(
       highlightId,
       highlightShape,
-      timeoutMs,
-      new NoOpPerformanceTracker()
-    );
-    return this.parseHighlightResponse(response);
-  }
-
-  async removeHighlight(
-    id: string,
-    options: HighlightOperationOptions = {}
-  ): Promise<HighlightOperationResult> {
-    this.ensureAndroidDevice();
-    const highlightId = this.parseHighlightId(id);
-    const timeoutMs = options.timeoutMs ?? DEFAULT_HIGHLIGHT_TIMEOUT_MS;
-    const response = await this.accessibilityServiceClient.requestRemoveHighlight(
-      highlightId,
-      timeoutMs,
-      new NoOpPerformanceTracker()
-    );
-    return this.parseHighlightResponse(response);
-  }
-
-  async clearHighlights(
-    options: HighlightOperationOptions = {}
-  ): Promise<HighlightOperationResult> {
-    this.ensureAndroidDevice();
-    const timeoutMs = options.timeoutMs ?? DEFAULT_HIGHLIGHT_TIMEOUT_MS;
-    const response = await this.accessibilityServiceClient.requestClearHighlights(
-      timeoutMs,
-      new NoOpPerformanceTracker()
-    );
-    return this.parseHighlightResponse(response);
-  }
-
-  async listHighlights(
-    options: HighlightOperationOptions = {}
-  ): Promise<HighlightOperationResult> {
-    this.ensureAndroidDevice();
-    const timeoutMs = options.timeoutMs ?? DEFAULT_HIGHLIGHT_TIMEOUT_MS;
-    const response = await this.accessibilityServiceClient.requestListHighlights(
       timeoutMs,
       new NoOpPerformanceTracker()
     );
@@ -282,36 +220,6 @@ export class VisualHighlightClient {
     const result = await highlight.addHighlight(id, shape, { timeoutMs: options.timeoutMs });
     if (!result.success) {
       throw new ActionableError(result.error || "Failed to add highlight");
-    }
-    return result;
-  }
-
-  async removeHighlight(
-    id: string,
-    options: HighlightOptions
-  ): Promise<HighlightOperationResult> {
-    const highlight = await this.resolveHighlight(options);
-    const result = await highlight.removeHighlight(id, { timeoutMs: options.timeoutMs });
-    if (!result.success) {
-      throw new ActionableError(result.error || "Failed to remove highlight");
-    }
-    return result;
-  }
-
-  async clearHighlights(options: HighlightOptions): Promise<HighlightOperationResult> {
-    const highlight = await this.resolveHighlight(options);
-    const result = await highlight.clearHighlights({ timeoutMs: options.timeoutMs });
-    if (!result.success) {
-      throw new ActionableError(result.error || "Failed to clear highlights");
-    }
-    return result;
-  }
-
-  async listHighlights(options: HighlightOptions): Promise<HighlightOperationResult> {
-    const highlight = await this.resolveHighlight(options);
-    const result = await highlight.listHighlights({ timeoutMs: options.timeoutMs });
-    if (!result.success) {
-      throw new ActionableError(result.error || "Failed to list highlights");
     }
     return result;
   }

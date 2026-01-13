@@ -910,21 +910,6 @@
           "type": "string",
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
         },
-        "action": {
-          "type": "string",
-          "enum": [
-            "add",
-            "remove",
-            "clear",
-            "list"
-          ],
-          "description": "Action to perform"
-        },
-        "highlightId": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Highlight ID (required for add/remove)"
-        },
         "shape": {
           "anyOf": [
             {
@@ -1179,12 +1164,12 @@
               "additionalProperties": false
             }
           ],
-          "description": "Highlight shape definition (required for add)"
+          "description": "Highlight shape definition"
         }
       },
       "required": [
         "platform",
-        "action"
+        "shape"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

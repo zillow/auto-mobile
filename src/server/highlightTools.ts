@@ -7,6 +7,12 @@ import { highlightShapeSchema, VisualHighlightClient } from "../features/debug/V
 
 const UNSUPPORTED_MESSAGE = "Visual highlights are only supported on Android devices.";
 
+const generateHighlightId = (): string => {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 10);
+  return `highlight_${timestamp}_${random}`;
+};
+
 const baseHighlightSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   deviceId: z.string().optional().describe("Optional device ID override"),
@@ -14,74 +20,20 @@ const baseHighlightSchema = addDeviceTargetingToSchema(z.object({
 }));
 
 export const highlightSchema = baseHighlightSchema.extend({
-  action: z.enum(["add", "remove", "clear", "list"]).describe("Action to perform"),
-  highlightId: z.string().min(1).optional().describe("Highlight ID (required for add/remove)"),
-  shape: highlightShapeSchema.optional().describe("Highlight shape definition (required for add)")
-}).superRefine((value, ctx) => {
-  if (value.action === "add") {
-    if (!value.highlightId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["highlightId"],
-        message: "highlightId is required for add"
-      });
-    }
-    if (!value.shape) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["shape"],
-        message: "shape is required for add"
-      });
-    }
-  }
-
-  if (value.action === "remove") {
-    if (!value.highlightId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["highlightId"],
-        message: "highlightId is required for remove"
-      });
-    }
-    if (value.shape) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["shape"],
-        message: "shape is only allowed for add"
-      });
-    }
-  }
-
-  if (value.action === "clear" || value.action === "list") {
-    if (value.highlightId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["highlightId"],
-        message: "highlightId is only allowed for add/remove"
-      });
-    }
-    if (value.shape) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["shape"],
-        message: "shape is only allowed for add"
-      });
-    }
-  }
+  shape: highlightShapeSchema.describe("Highlight shape definition")
 });
 
 export type HighlightArgs = z.infer<typeof highlightSchema>;
 
-const toHighlightResponse = (result: HighlightOperationResult, highlightId?: string) => (
+const toHighlightResponse = (result: HighlightOperationResult, highlightId: string) => (
   createJSONToolResponse({
     success: result.success,
     highlightId,
-    highlights: result.highlights,
     error: result.error ?? undefined
   })
 );
 
-const toHighlightErrorResponse = (error: unknown, highlightId?: string) => {
+const toHighlightErrorResponse = (error: unknown, highlightId: string) => {
   const message = error instanceof ActionableError ? error.message : String(error);
   return createJSONToolResponse({
     success: false,
@@ -92,8 +44,8 @@ const toHighlightErrorResponse = (error: unknown, highlightId?: string) => {
 
 export function registerHighlightTools() {
   const highlightHandler = async (device: BootedDevice, args: HighlightArgs) => {
-    const highlightId = "highlightId" in args ? args.highlightId : undefined;
     const highlightClient = new VisualHighlightClient();
+    const highlightId = generateHighlightId();
     const options = {
       device,
       deviceId: args.deviceId ?? device.deviceId,
@@ -103,24 +55,7 @@ export function registerHighlightTools() {
     };
 
     try {
-      let result: HighlightOperationResult;
-      switch (args.action) {
-        case "add":
-          result = await highlightClient.addHighlight(args.highlightId, args.shape, options);
-          break;
-        case "remove":
-          result = await highlightClient.removeHighlight(args.highlightId, options);
-          break;
-        case "clear":
-          result = await highlightClient.clearHighlights(options);
-          break;
-        case "list":
-          result = await highlightClient.listHighlights(options);
-          break;
-        default:
-          throw new ActionableError(`Unsupported highlight action: ${(args as { action: string }).action}`);
-      }
-
+      const result = await highlightClient.addHighlight(highlightId, args.shape, options);
       return toHighlightResponse(result, highlightId);
     } catch (error) {
       return toHighlightErrorResponse(error, highlightId);
@@ -128,7 +63,7 @@ export function registerHighlightTools() {
   };
 
   const highlightNonDeviceHandler = async (args: HighlightArgs) => {
-    const highlightId = "highlightId" in args ? args.highlightId : undefined;
+    const highlightId = generateHighlightId();
     return createJSONToolResponse({
       success: false,
       highlightId,
