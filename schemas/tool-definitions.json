@@ -966,7 +966,7 @@
   },
   {
     "name": "listApps",
-    "description": "List installed apps",
+    "description": "List installed apps (DEPRECATED: use automobile:apps resource)",
     "inputSchema": {
       "type": "object",
       "properties": {

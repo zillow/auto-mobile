@@ -38,6 +38,25 @@ Returns booted device inventory across Android and iOS, including:
 
 This resource replaces the removed `listDevices` and `daemon_available_devices` tools.
 
+### Installed Apps
+
+**URI**: `automobile:apps`
+
+Returns installed apps for booted devices. `deviceId` is required. Supports query parameters for filtering:
+
+- `platform` (`android` or `ios`)
+- `search` (case-insensitive partial match on package name or display name when available)
+- `type` (`user` or `system`)
+- `profile` (Android user ID, e.g. `0` or `10`)
+- `deviceId` (booted device ID, required)
+
+Example URIs:
+
+- `automobile:apps?deviceId=emulator-5554&platform=android&search=slack&type=user`
+- `automobile:apps?deviceId=YOUR_IOS_DEVICE_ID&platform=ios&search=calendar`
+
+Clients can subscribe to specific `automobile:apps?deviceId=...` URIs for change notifications and re-read filtered URIs after updates.
+
 ### Test Timing History
 
 **URI**: `

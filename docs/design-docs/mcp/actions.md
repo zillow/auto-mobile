@@ -15,7 +15,7 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 
 #### App Management
 
-- 📱 `listApps` enumerates installed apps.
+- 📱 `listApps` enumerates installed apps (deprecated; use the `automobile:apps` resource with query filters).
 - 🚀 `launchApp` starts apps by package name (with optional clear-app-data support).
 - ❌ `terminateApp` force-stops an app by package name.
 - 📦 `installApp` installs an APK.

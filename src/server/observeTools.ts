@@ -236,6 +236,8 @@ export function registerObserveTools() {
 
   // List Apps handler
   const listAppsHandler = async (device: BootedDevice) => {
+    const deprecationNotice =
+      "Deprecated: use the `automobile:apps` MCP resource (e.g. automobile:apps?deviceId=DEVICE_ID&platform=android&search=slack&type=user).";
     try {
       const listInstalledApps = new ListInstalledApps(device);
 
@@ -246,14 +248,15 @@ export function registerObserveTools() {
         const profileAppCount = Object.values(apps.profiles).reduce((count, profileApps) => count + profileApps.length, 0);
         const profileCount = Object.keys(apps.profiles).length;
         return createJSONToolResponse({
-          message: `Listed ${profileAppCount} user app(s) across ${profileCount} profile(s); ${apps.system.length} system app(s) deduped`,
+          message: `${deprecationNotice} Listed ${profileAppCount} user app(s) across ${profileCount} profile(s); ` +
+            `${apps.system.length} system app(s) deduped`,
           profiles: apps.profiles,
           system: apps.system
         });
       } else {
         const apps = await listInstalledApps.execute();
         return createJSONToolResponse({
-          message: `Listed ${apps.length} apps`,
+          message: `${deprecationNotice} Listed ${apps.length} apps`,
           apps
         });
       }
@@ -272,7 +275,7 @@ export function registerObserveTools() {
 
   ToolRegistry.registerDeviceAware(
     "listApps",
-    "List installed apps",
+    "List installed apps (DEPRECATED: use automobile:apps resource)",
     listAppsSchema,
     listAppsHandler
   );
