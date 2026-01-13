@@ -1,483 +1,903 @@
 import { expect, describe, test } from "bun:test";
-import { ScreenFingerprint, AccessibilityHierarchy } from "../../../src/features/navigation/ScreenFingerprint";
+import {
+  ScreenFingerprint,
+  AccessibilityHierarchy,
+  FingerprintConfidence,
+  FingerprintMethod,
+} from "../../../src/features/navigation/ScreenFingerprint";
 
-describe("ScreenFingerprint", () => {
-  describe("compute", () => {
-    test("should compute fingerprint from simple hierarchy", () => {
+describe("ScreenFingerprint - Enhanced Implementation", () => {
+  describe("Tier 1: Navigation ID Strategy", () => {
+    test("should use navigation ID when present (highest confidence)", () => {
       const hierarchy = createHierarchy({
-        "text": "Hello World",
-        "resource-id": "com.app:id/title",
-      });
-
-      const result = ScreenFingerprint.compute(hierarchy);
-
-      expect(result.hash).toBeDefined();
-      expect(result.hash.length).toBe(64); // SHA-256 produces 64 hex chars
-      expect(result.timestamp).toBe(1234567890);
-      expect(result.packageName).toBe("com.test.app");
-      expect(result.elementCount).toBeGreaterThan(0);
-    });
-
-    test("should produce same hash for same hierarchy (determinism)", () => {
-      const hierarchy = createHierarchy({
-        "text": "Screen Title",
-        "resource-id": "com.app:id/header",
-        "node": [
-          { "text": "Button 1", "resource-id": "com.app:id/btn1" },
-          { "text": "Button 2", "resource-id": "com.app:id/btn2" },
-        ],
-      });
-
-      const result1 = ScreenFingerprint.compute(hierarchy);
-      const result2 = ScreenFingerprint.compute(hierarchy);
-
-      expect(result1.hash).toBe(result2.hash);
-    });
-
-    test("should produce different hash for different hierarchy", () => {
-      const hierarchy1 = createHierarchy({
-        "text": "Screen A",
-        "resource-id": "com.app:id/screen_a",
-      });
-
-      const hierarchy2 = createHierarchy({
-        "text": "Screen B",
-        "resource-id": "com.app:id/screen_b",
-      });
-
-      const result1 = ScreenFingerprint.compute(hierarchy1);
-      const result2 = ScreenFingerprint.compute(hierarchy2);
-
-      expect(result1.hash).not.toBe(result2.hash);
-    });
-
-    test("should include text in fingerprint", () => {
-      const hierarchy1 = createHierarchy({
-        text: "Text A",
-      });
-
-      const hierarchy2 = createHierarchy({
-        text: "Text B",
-      });
-
-      const result1 = ScreenFingerprint.compute(hierarchy1);
-      const result2 = ScreenFingerprint.compute(hierarchy2);
-
-      expect(result1.hash).not.toBe(result2.hash);
-    });
-
-    test("should include resource-id in fingerprint", () => {
-      const hierarchy1 = createHierarchy({
-        "resource-id": "com.app:id/screen_a",
-      });
-
-      const hierarchy2 = createHierarchy({
-        "resource-id": "com.app:id/screen_b",
-      });
-
-      const result1 = ScreenFingerprint.compute(hierarchy1);
-      const result2 = ScreenFingerprint.compute(hierarchy2);
-
-      expect(result1.hash).not.toBe(result2.hash);
-    });
-
-    test("should include content-desc in fingerprint", () => {
-      const hierarchy1 = createHierarchy({
-        "content-desc": "Description A",
-      });
-
-      const hierarchy2 = createHierarchy({
-        "content-desc": "Description B",
-      });
-
-      const result1 = ScreenFingerprint.compute(hierarchy1);
-      const result2 = ScreenFingerprint.compute(hierarchy2);
-
-      expect(result1.hash).not.toBe(result2.hash);
-    });
-
-    test("should include test-tag in fingerprint", () => {
-      const hierarchy1 = createHierarchy({
-        "test-tag": "tag_a",
-      });
-
-      const hierarchy2 = createHierarchy({
-        "test-tag": "tag_b",
-      });
-
-      const result1 = ScreenFingerprint.compute(hierarchy1);
-      const result2 = ScreenFingerprint.compute(hierarchy2);
-
-      expect(result1.hash).not.toBe(result2.hash);
-    });
-
-    test("should handle nested hierarchy", () => {
-      const hierarchy = createHierarchy({
-        "resource-id": "com.app:id/root",
-        "node": {
-          "resource-id": "com.app:id/container",
+        node: {
+          "resource-id": "navigation.HomeDestination",
           "node": {
-            "text": "Nested Text",
-            "resource-id": "com.app:id/nested",
+            "text": "Home Screen",
+            "resource-id": "home_screen_content",
           },
         },
       });
 
       const result = ScreenFingerprint.compute(hierarchy);
 
-      expect(result.elementCount).toBeGreaterThanOrEqual(3); // At least 3 elements collected
-    });
-
-    test("should handle array of child nodes", () => {
-      const hierarchy = createHierarchy({
-        "resource-id": "com.app:id/root",
-        "node": [
-          { "text": "Item 1", "resource-id": "com.app:id/item1" },
-          { "text": "Item 2", "resource-id": "com.app:id/item2" },
-          { "text": "Item 3", "resource-id": "com.app:id/item3" },
-        ],
-      });
-
-      const result = ScreenFingerprint.compute(hierarchy);
-
-      expect(result.elementCount).toBeGreaterThanOrEqual(4); // root + 3 items, each with text + id
-    });
-
-    test("should handle empty hierarchy", () => {
-      const hierarchy = createHierarchy({});
-
-      const result = ScreenFingerprint.compute(hierarchy);
-
+      expect(result.method).toBe(FingerprintMethod.NAVIGATION_ID);
+      expect(result.confidence).toBe(FingerprintConfidence.VERY_HIGH);
+      expect(result.navigationId).toBe("navigation.HomeDestination");
       expect(result.hash).toBeDefined();
-      expect(result.elementCount).toBe(0);
     });
 
-    test("should include additional root nodes in fingerprint", () => {
-      const hierarchyWithOverlay = createHierarchy({
-        node: [
-          { "resource-id": "com.app:id/main" },
-          { "text": "Window Content", "resource-id": "com.app:id/window_content" },
-        ],
+    test("should find navigation ID deep in hierarchy", () => {
+      const hierarchy = createHierarchy({
+        node: {
+          className: "Root",
+          node: {
+            className: "Container",
+            node: {
+              "resource-id": "navigation.SettingsScreen",
+              "node": {
+                text: "Settings",
+              },
+            },
+          },
+        },
       });
 
-      const hierarchyWithoutOverlay = createHierarchy({
-        node: [
-          { "resource-id": "com.app:id/main" },
-        ],
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.method).toBe(FingerprintMethod.NAVIGATION_ID);
+      expect(result.navigationId).toBe("navigation.SettingsScreen");
+    });
+
+    test("should produce same hash for same navigation ID", () => {
+      const hierarchy1 = createHierarchy({
+        node: {
+          "resource-id": "navigation.Home",
+          "node": { text: "Different content 1" },
+        },
       });
 
-      const result1 = ScreenFingerprint.compute(hierarchyWithOverlay);
-      const result2 = ScreenFingerprint.compute(hierarchyWithoutOverlay);
+      const hierarchy2 = createHierarchy({
+        node: {
+          "resource-id": "navigation.Home",
+          "node": { text: "Different content 2" },
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should produce different hash for different navigation IDs", () => {
+      const hierarchy1 = createHierarchy({
+        node: { "resource-id": "navigation.Home" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { "resource-id": "navigation.Settings" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
 
       expect(result1.hash).not.toBe(result2.hash);
     });
   });
 
-  describe("scrollable container duplicate filtering", () => {
-    test("should filter duplicate list items by resource-id", () => {
-      const hierarchy = createHierarchy({
-        "resource-id": "com.app:id/screen",
-        "node": {
-          "className": "androidx.recyclerview.widget.RecyclerView",
-          "scrollable": "true",
-          "resource-id": "com.app:id/list",
-          "node": [
-            { "text": "Item 1", "resource-id": "com.app:id/list_item" },
-            { "text": "Item 2", "resource-id": "com.app:id/list_item" },
-            { "text": "Item 3", "resource-id": "com.app:id/list_item" },
-          ],
+  describe("Tier 2: Cached Navigation ID (Keyboard Occlusion)", () => {
+    test("should use cached navigation ID when keyboard detected", () => {
+      const hierarchyWithKeyboard = createHierarchy({
+        node: {
+          "content-desc": "Delete",
+          "node": { "content-desc": "Enter" },
         },
       });
 
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: true,
+      const result = ScreenFingerprint.compute(hierarchyWithKeyboard, {
+        cachedNavigationId: "navigation.TextScreen",
+        cachedNavigationIdTimestamp: 1234567890 - 5000, // 5 seconds ago
       });
 
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      // With filtering, should have fewer elements
-      expect(resultWithFilter.elementCount).toBeLessThan(
-        resultWithoutFilter.elementCount
-      );
+      expect(result.method).toBe(FingerprintMethod.CACHED_NAVIGATION_ID);
+      expect(result.confidence).toBe(FingerprintConfidence.HIGH);
+      expect(result.navigationId).toBe("navigation.TextScreen");
+      expect(result.keyboardDetected).toBe(true);
     });
 
-    test("should detect scrollable by scrollable attribute", () => {
+    test("should not use cached ID if cache expired", () => {
+      const hierarchyWithKeyboard = createHierarchy({
+        node: { "content-desc": "Delete" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchyWithKeyboard, {
+        cachedNavigationId: "navigation.TextScreen",
+        cachedNavigationIdTimestamp: 1234567890 - 15000, // 15 seconds ago (expired)
+        cacheTTL: 10000,
+      });
+
+      expect(result.method).not.toBe(FingerprintMethod.CACHED_NAVIGATION_ID);
+      expect(result.keyboardDetected).toBe(true);
+    });
+
+    test("should not use cached ID if no keyboard detected", () => {
+      const hierarchyWithoutKeyboard = createHierarchy({
+        node: { text: "Regular content" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchyWithoutKeyboard, {
+        cachedNavigationId: "navigation.TextScreen",
+        cachedNavigationIdTimestamp: 1234567890 - 5000,
+      });
+
+      expect(result.method).toBe(FingerprintMethod.SHALLOW_SCROLLABLE);
+      expect(result.keyboardDetected).toBe(false);
+    });
+  });
+
+  describe("Keyboard Detection", () => {
+    test("should detect keyboard from Delete content-desc", () => {
       const hierarchy = createHierarchy({
-        "resource-id": "com.app:id/screen",
-        "node": {
-          "scrollable": "true",
-          "resource-id": "com.app:id/list",
-          "node": [
-            { "text": "A", "resource-id": "com.app:id/item" },
-            { "text": "B", "resource-id": "com.app:id/item" },
-          ],
-        },
+        node: { "content-desc": "Delete" },
       });
 
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: true,
-      });
+      const result = ScreenFingerprint.compute(hierarchy);
 
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      expect(resultWithFilter.elementCount).toBeLessThan(
-        resultWithoutFilter.elementCount
-      );
+      expect(result.keyboardDetected).toBe(true);
     });
 
-    test("should detect RecyclerView by class name", () => {
+    test("should detect keyboard from Enter content-desc", () => {
+      const hierarchy = createHierarchy({
+        node: { "content-desc": "Enter" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.keyboardDetected).toBe(true);
+    });
+
+    test("should detect keyboard from emoji content-desc", () => {
+      const hierarchy = createHierarchy({
+        node: { "content-desc": "Show emoji keyboard" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.keyboardDetected).toBe(true);
+    });
+
+    test("should detect keyboard from resource-id", () => {
+      const hierarchy = createHierarchy({
+        node: { "resource-id": "com.google.android.inputmethod.latin:id/key" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.keyboardDetected).toBe(true);
+    });
+
+    test("should not detect keyboard in normal content", () => {
       const hierarchy = createHierarchy({
         node: {
-          "className": "androidx.recyclerview.widget.RecyclerView",
-          "resource-id": "com.app:id/list",
-          "node": [
-            { "text": "X", "resource-id": "com.app:id/row" },
-            { "text": "Y", "resource-id": "com.app:id/row" },
-          ],
-        },
-      });
-
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: true,
-      });
-
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      expect(resultWithFilter.elementCount).toBeLessThan(
-        resultWithoutFilter.elementCount
-      );
-    });
-
-    test("should detect ListView by class name", () => {
-      const hierarchy = createHierarchy({
-        node: {
-          className: "android.widget.ListView",
-          node: [
-            { "text": "P", "resource-id": "com.app:id/list_item" },
-            { "text": "Q", "resource-id": "com.app:id/list_item" },
-          ],
-        },
-      });
-
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy);
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      expect(resultWithFilter.elementCount).toBeLessThan(
-        resultWithoutFilter.elementCount
-      );
-    });
-
-    test("should detect LazyColumn by class name", () => {
-      const hierarchy = createHierarchy({
-        node: {
-          className: "androidx.compose.foundation.lazy.LazyColumn",
-          node: [
-            { "text": "R", "resource-id": "item" },
-            { "text": "S", "resource-id": "item" },
-          ],
-        },
-      });
-
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy);
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      expect(resultWithFilter.elementCount).toBeLessThan(
-        resultWithoutFilter.elementCount
-      );
-    });
-
-    test("should detect ScrollView by class name", () => {
-      const hierarchy = createHierarchy({
-        node: {
-          className: "android.widget.ScrollView",
-          node: [
-            { "resource-id": "com.app:id/section" },
-            { "resource-id": "com.app:id/section" },
-          ],
-        },
-      });
-
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy);
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      expect(resultWithFilter.elementCount).toBeLessThan(
-        resultWithoutFilter.elementCount
-      );
-    });
-
-    test("should keep first occurrence of each resource-id group", () => {
-      const hierarchy = createHierarchy({
-        node: {
-          scrollable: "true",
-          node: [
-            { "text": "First", "resource-id": "com.app:id/item" },
-            { "text": "Second", "resource-id": "com.app:id/item" },
-            { "text": "Third", "resource-id": "com.app:id/item" },
-          ],
-        },
-      });
-
-      // Without filtering, we get all texts and ids
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      // With filtering, duplicates are removed
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy);
-
-      // Filtering should reduce element count
-      expect(resultWithFilter.elementCount).toBeLessThan(
-        resultWithoutFilter.elementCount
-      );
-      // Should remove duplicates, keeping only first item's elements
-      expect(resultWithFilter.elementCount).toBe(1); // Only the first id:com.app:id/item
-    });
-
-    test("should not filter items outside scrollable containers", () => {
-      const hierarchy = createHierarchy({
-        node: [
-          { "text": "Static 1", "resource-id": "com.app:id/static" },
-          { "text": "Static 2", "resource-id": "com.app:id/static" },
-        ],
-      });
-
-      const resultWithFilter = ScreenFingerprint.compute(hierarchy);
-      const resultWithoutFilter = ScreenFingerprint.compute(hierarchy, {
-        filterDuplicates: false,
-      });
-
-      // Should be the same since items aren't in scrollable container
-      expect(resultWithFilter.elementCount).toBe(
-        resultWithoutFilter.elementCount
-      );
-    });
-
-    test("should handle nested scrollable containers", () => {
-      const hierarchy = createHierarchy({
-        node: {
-          "scrollable": "true",
-          "resource-id": "com.app:id/outer_list",
-          "node": [
-            {
-              "scrollable": "true",
-              "resource-id": "com.app:id/inner_list",
-              "node": [
-                { "text": "Inner 1", "resource-id": "com.app:id/inner_item" },
-                { "text": "Inner 2", "resource-id": "com.app:id/inner_item" },
-              ],
-            },
-          ],
+          "text": "Regular content",
+          "resource-id": "app:id/content",
         },
       });
 
       const result = ScreenFingerprint.compute(hierarchy);
 
-      // Should have filtered duplicates in the inner list
-      expect(result.elementCount).toBeGreaterThan(0);
+      expect(result.keyboardDetected).toBe(false);
     });
   });
 
-  describe("options", () => {
-    test("should exclude resource-ids when includeResourceIds is false", () => {
-      const hierarchy = createHierarchy({
-        "resource-id": "com.app:id/title",
+  describe("Shallow Scrollable Markers", () => {
+    test("should create shallow marker for scrollable container", () => {
+      const hierarchy1 = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "list_container",
+          "className": "RecyclerView",
+          "node": [
+            { "text": "Item 1", "resource-id": "item" },
+            { "text": "Item 2", "resource-id": "item" },
+            { "text": "Item 3", "resource-id": "item" },
+          ],
+        },
       });
 
-      const resultWith = ScreenFingerprint.compute(hierarchy, {
-        includeResourceIds: true,
-      });
-      const resultWithout = ScreenFingerprint.compute(hierarchy, {
-        includeResourceIds: false,
+      const hierarchy2 = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "list_container",
+          "className": "RecyclerView",
+          "node": [
+            { "text": "Item 4", "resource-id": "item" },
+            { "text": "Item 5", "resource-id": "item" },
+          ],
+        },
       });
 
-      expect(resultWith.elementCount).toBe(1);
-      expect(resultWithout.elementCount).toBe(0);
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      // Same fingerprint despite different scrolled content
+      expect(result1.hash).toBe(result2.hash);
+      expect(result1.method).toBe(FingerprintMethod.SHALLOW_SCROLLABLE);
     });
 
-    test("should exclude text when includeText is false", () => {
-      const hierarchy = createHierarchy({
-        text: "Hello",
+    test("should handle scrolling with completely different items", () => {
+      const hierarchyBeforeScroll = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "tap_screen_content",
+          "node": [
+            { "resource-id": "button_regular" },
+            { "resource-id": "button_elevated" },
+            { "resource-id": "press_duration_tracker" },
+          ],
+        },
       });
 
-      const resultWith = ScreenFingerprint.compute(hierarchy, {
-        includeText: true,
-      });
-      const resultWithout = ScreenFingerprint.compute(hierarchy, {
-        includeText: false,
-      });
-
-      expect(resultWith.elementCount).toBe(1);
-      expect(resultWithout.elementCount).toBe(0);
-    });
-
-    test("should exclude content-desc when includeContentDesc is false", () => {
-      const hierarchy = createHierarchy({
-        "content-desc": "Description",
+      const hierarchyAfterScroll = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "tap_screen_content",
+          "node": [
+            { "resource-id": "filter_chip_1" },
+            { "resource-id": "icon_button_delete" },
+            { "resource-id": "slider_control" },
+          ],
+        },
       });
 
-      const resultWith = ScreenFingerprint.compute(hierarchy, {
-        includeContentDesc: true,
-      });
-      const resultWithout = ScreenFingerprint.compute(hierarchy, {
-        includeContentDesc: false,
-      });
+      const result1 = ScreenFingerprint.compute(hierarchyBeforeScroll);
+      const result2 = ScreenFingerprint.compute(hierarchyAfterScroll);
 
-      expect(resultWith.elementCount).toBe(1);
-      expect(resultWithout.elementCount).toBe(0);
-    });
-
-    test("should exclude test-tag when includeTestTags is false", () => {
-      const hierarchy = createHierarchy({
-        "test-tag": "my_tag",
-      });
-
-      const resultWith = ScreenFingerprint.compute(hierarchy, {
-        includeTestTags: true,
-      });
-      const resultWithout = ScreenFingerprint.compute(hierarchy, {
-        includeTestTags: false,
-      });
-
-      expect(resultWith.elementCount).toBe(1);
-      expect(resultWithout.elementCount).toBe(0);
+      // Same screen, just scrolled
+      expect(result1.hash).toBe(result2.hash);
     });
   });
 
-  describe("element ordering", () => {
-    test("should produce same hash regardless of child order", () => {
+  describe("Selected State Preservation", () => {
+    test("should preserve selected state for non-scrollable tabs", () => {
+      const homeTab = createHierarchy({
+        node: [
+          { selected: "true", node: { text: "Home" } },
+          { selected: "false", node: { text: "Profile" } },
+          { selected: "false", node: { text: "Settings" } },
+        ],
+      });
+
+      const settingsTab = createHierarchy({
+        node: [
+          { selected: "false", node: { text: "Home" } },
+          { selected: "false", node: { text: "Profile" } },
+          { selected: "true", node: { text: "Settings" } },
+        ],
+      });
+
+      const result1 = ScreenFingerprint.compute(homeTab);
+      const result2 = ScreenFingerprint.compute(settingsTab);
+
+      // Different selected tabs = different screens
+      expect(result1.hash).not.toBe(result2.hash);
+    });
+
+    test("should preserve selected items in scrollable tab rows (critical)", () => {
+      const homeTabScrolled = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "tab_row",
+          "node": [
+            { selected: "true", node: { text: "Home" } },
+            { selected: "false", node: { text: "Profile" } },
+            { selected: "false", node: { text: "Settings" } },
+          ],
+        },
+      });
+
+      const settingsTabScrolled = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "tab_row",
+          "node": [
+            { selected: "false", node: { text: "Profile" } },
+            { selected: "true", node: { text: "Settings" } },
+            { selected: "false", node: { text: "About" } },
+          ],
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(homeTabScrolled);
+      const result2 = ScreenFingerprint.compute(settingsTabScrolled);
+
+      // Different screens despite same scrollable container
+      expect(result1.hash).not.toBe(result2.hash);
+    });
+
+    test("should handle same screen with scrollable tabs at different positions", () => {
+      const settingsVisible1 = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "tab_row",
+          "node": [
+            { selected: "false", node: { text: "Home" } },
+            { selected: "false", node: { text: "Profile" } },
+            { selected: "true", node: { text: "Settings" } },
+            { selected: "false", node: { text: "About" } },
+          ],
+        },
+      });
+
+      const settingsVisible2 = createHierarchy({
+        node: {
+          "scrollable": "true",
+          "resource-id": "tab_row",
+          "node": [
+            { selected: "false", node: { text: "Profile" } },
+            { selected: "true", node: { text: "Settings" } },
+            { selected: "false", node: { text: "About" } },
+            { selected: "false", node: { text: "Help" } },
+          ],
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(settingsVisible1);
+      const result2 = ScreenFingerprint.compute(settingsVisible2);
+
+      // Same screen (Settings selected) despite different visible tabs
+      expect(result1.hash).toBe(result2.hash);
+    });
+  });
+
+  describe("Dynamic Content Filtering", () => {
+    test("should filter time patterns", () => {
+      const hierarchy1 = createHierarchy({
+        node: { text: "8:55" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { text: "8:56" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      // Same screen despite different time
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter AM/PM time patterns", () => {
+      const hierarchy1 = createHierarchy({
+        node: { text: "8:55 AM" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { text: "9:00 PM" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter pure numbers", () => {
+      const hierarchy1 = createHierarchy({
+        node: { text: "42" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { text: "100" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter percentage patterns", () => {
+      const hierarchy1 = createHierarchy({
+        node: { text: "45%" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { text: "90%" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should keep static text", () => {
+      const hierarchy1 = createHierarchy({
+        node: { text: "Settings" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { text: "Profile" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).not.toBe(result2.hash);
+    });
+
+    test("should filter system UI indicators", () => {
+      const hierarchy1 = createHierarchy({
+        node: { "content-desc": "Battery 50 percent" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { "content-desc": "Battery 75 percent" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter signal strength indicators", () => {
+      const hierarchy1 = createHierarchy({
+        node: { "content-desc": "Phone two bars" },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: { "content-desc": "Phone three bars" },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+  });
+
+  describe("Editable Text Filtering", () => {
+    test("should filter text from EditText fields", () => {
+      const hierarchy1 = createHierarchy({
+        node: {
+          "className": "android.widget.EditText",
+          "text": "user input 1",
+          "resource-id": "edit_field",
+        },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: {
+          "className": "android.widget.EditText",
+          "text": "different user input",
+          "resource-id": "edit_field",
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      // Same screen despite different input text
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter text from text-entry-mode fields", () => {
+      const hierarchy1 = createHierarchy({
+        node: {
+          "text-entry-mode": "true",
+          "text": "input 1",
+        },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: {
+          "text-entry-mode": "true",
+          "text": "input 2",
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter text from editable=true fields", () => {
+      const hierarchy1 = createHierarchy({
+        node: {
+          editable: "true",
+          text: "editable content 1",
+        },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: {
+          editable: "true",
+          text: "editable content 2",
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter text from input/edit resource-id patterns", () => {
+      const hierarchy1 = createHierarchy({
+        node: {
+          "resource-id": "text_input_field",
+          "text": "input 1",
+        },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: {
+          "resource-id": "text_input_field",
+          "text": "input 2",
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+  });
+
+  describe("Keyboard Element Filtering", () => {
+    test("should filter keyboard elements from hierarchy", () => {
+      const hierarchyWithKeyboard = createHierarchy({
+        node: [
+          { "text": "App Content", "resource-id": "app:id/content" },
+          { "content-desc": "Delete", "resource-id": "keyboard:id/delete" },
+          { "content-desc": "Enter", "resource-id": "keyboard:id/enter" },
+        ],
+      });
+
+      const hierarchyWithoutKeyboard = createHierarchy({
+        node: [
+          { "text": "App Content", "resource-id": "app:id/content" },
+        ],
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchyWithKeyboard);
+      const result2 = ScreenFingerprint.compute(hierarchyWithoutKeyboard);
+
+      // Keyboard elements filtered out
+      expect(result1.keyboardDetected).toBe(true);
+      expect(result2.keyboardDetected).toBe(false);
+    });
+  });
+
+  describe("System UI Filtering", () => {
+    test("should filter system UI resource-ids", () => {
       const hierarchy1 = createHierarchy({
         node: [
-          { "resource-id": "com.app:id/a" },
-          { "resource-id": "com.app:id/b" },
-          { "resource-id": "com.app:id/c" },
+          { "resource-id": "com.android.systemui:id/clock" },
+          { "resource-id": "app:id/content" },
         ],
       });
 
       const hierarchy2 = createHierarchy({
         node: [
-          { "resource-id": "com.app:id/c" },
-          { "resource-id": "com.app:id/a" },
-          { "resource-id": "com.app:id/b" },
+          { "resource-id": "com.android.systemui:id/battery" },
+          { "resource-id": "app:id/content" },
         ],
       });
 
       const result1 = ScreenFingerprint.compute(hierarchy1);
       const result2 = ScreenFingerprint.compute(hierarchy2);
 
-      // Hashes should be the same because elements are sorted
+      // Same fingerprint despite different system UI
       expect(result1.hash).toBe(result2.hash);
+    });
+
+    test("should filter android:id/ resource-ids", () => {
+      const hierarchy1 = createHierarchy({
+        node: {
+          "resource-id": "android:id/status_bar",
+        },
+      });
+
+      const hierarchy2 = createHierarchy({
+        node: {
+          "resource-id": "android:id/navigation_bar",
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(hierarchy1);
+      const result2 = ScreenFingerprint.compute(hierarchy2);
+
+      expect(result1.hash).toBe(result2.hash);
+    });
+  });
+
+  describe("Confidence Levels", () => {
+    test("should return VERY_HIGH confidence for navigation ID", () => {
+      const hierarchy = createHierarchy({
+        node: { "resource-id": "navigation.Home" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.confidence).toBe(FingerprintConfidence.VERY_HIGH);
+    });
+
+    test("should return HIGH confidence for cached navigation ID", () => {
+      const hierarchy = createHierarchy({
+        node: { "content-desc": "Delete" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy, {
+        cachedNavigationId: "navigation.Text",
+        cachedNavigationIdTimestamp: 1234567890 - 5000,
+      });
+
+      expect(result.confidence).toBe(FingerprintConfidence.HIGH);
+    });
+
+    test("should return MEDIUM confidence for shallow scrollable", () => {
+      const hierarchy = createHierarchy({
+        node: { text: "Content" },
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.confidence).toBe(FingerprintConfidence.MEDIUM);
+    });
+
+    test("should return LOW_MEDIUM confidence for shallow scrollable with keyboard", () => {
+      const hierarchy = createHierarchy({
+        node: [
+          { text: "Content" },
+          { "content-desc": "Delete" },
+        ],
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.confidence).toBe(FingerprintConfidence.LOW_MEDIUM);
+      expect(result.keyboardDetected).toBe(true);
+    });
+  });
+
+  describe("Real-world Scenarios", () => {
+    test("should handle discover-swipe vs discover-tap collision", () => {
+      // Before selected state fix, these would collide
+      const swipeScreen = createHierarchy({
+        node: {
+          node: [
+            { selected: "true", node: { text: "Swipe" } },
+            { selected: "false", node: { text: "Tap" } },
+          ],
+        },
+      });
+
+      const tapScreen = createHierarchy({
+        node: {
+          node: [
+            { selected: "false", node: { text: "Swipe" } },
+            { selected: "true", node: { text: "Tap" } },
+          ],
+        },
+      });
+
+      const result1 = ScreenFingerprint.compute(swipeScreen);
+      const result2 = ScreenFingerprint.compute(tapScreen);
+
+      // No collision - different screens
+      expect(result1.hash).not.toBe(result2.hash);
+    });
+
+    test("should handle keyboard occlusion with cached ID", () => {
+      const screenWithoutKeyboard = createHierarchy({
+        node: {
+          "resource-id": "navigation.TextScreen",
+          "node": { text: "Type something" },
+        },
+      });
+
+      const screenWithKeyboard = createHierarchy({
+        node: [
+          { "content-desc": "Delete" },
+          { "content-desc": "Enter" },
+        ],
+      });
+
+      const result1 = ScreenFingerprint.compute(screenWithoutKeyboard);
+
+      // Keyboard appears - use cached navigation ID
+      const result2 = ScreenFingerprint.compute(screenWithKeyboard, {
+        cachedNavigationId: result1.navigationId,
+        cachedNavigationIdTimestamp: result1.timestamp,
+      });
+
+      // Same fingerprint despite keyboard
+      expect(result1.hash).toBe(result2.hash);
+    });
+  });
+
+  describe("Edge Cases", () => {
+    test("should handle empty hierarchy", () => {
+      const hierarchy = createHierarchy({});
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.hash).toBeDefined();
+      expect(result.method).toBe(FingerprintMethod.SHALLOW_SCROLLABLE);
+    });
+
+    test("should handle null nodes", () => {
+      const hierarchy = createHierarchy({
+        node: null,
+      });
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.hash).toBeDefined();
+    });
+
+    test("should handle deeply nested hierarchy", () => {
+      let nested: any = { text: "Deep" };
+      for (let i = 0; i < 20; i++) {
+        nested = { node: nested };
+      }
+
+      const hierarchy = createHierarchy(nested);
+
+      const result = ScreenFingerprint.compute(hierarchy);
+
+      expect(result.hash).toBeDefined();
+    });
+  });
+
+  describe("PR Feedback Fixes", () => {
+    test("should include content-desc for selected items without text (icon-only tabs)", () => {
+      const tabsWithIconOnly = {
+        className: "TabRow",
+        scrollable: "true",
+        node: [
+          {
+            "selected": "true",
+            "content-desc": "Home",
+            "resource-id": "tab_home",
+          },
+          {
+            "selected": "false",
+            "content-desc": "Profile",
+            "resource-id": "tab_profile",
+          },
+        ],
+      };
+
+      const hierarchy1 = createHierarchy(tabsWithIconOnly);
+      const hash1 = ScreenFingerprint.compute(hierarchy1).hash;
+
+      // Change selected tab
+      const tabsWithIconOnlyDifferent = {
+        className: "TabRow",
+        scrollable: "true",
+        node: [
+          {
+            "selected": "false",
+            "content-desc": "Home",
+            "resource-id": "tab_home",
+          },
+          {
+            "selected": "true",
+            "content-desc": "Profile",
+            "resource-id": "tab_profile",
+          },
+        ],
+      };
+
+      const hierarchy2 = createHierarchy(tabsWithIconOnlyDifferent);
+      const hash2 = ScreenFingerprint.compute(hierarchy2).hash;
+
+      // Hashes should be different due to different selected tab content-desc
+      expect(hash1).not.toBe(hash2);
+    });
+
+    test("should filter emoji keyboard keys from fingerprints", () => {
+      const withEmojiKey = {
+        className: "Screen",
+        node: [
+          { text: "Main Content" },
+          {
+            "content-desc": "emoji",
+            "className": "KeyboardKey",
+          },
+        ],
+      };
+
+      const withoutEmojiKey = {
+        className: "Screen",
+        node: [{ text: "Main Content" }],
+      };
+
+      const hierarchy1 = createHierarchy(withEmojiKey);
+      const hierarchy2 = createHierarchy(withoutEmojiKey);
+
+      const hash1 = ScreenFingerprint.compute(hierarchy1).hash;
+      const hash2 = ScreenFingerprint.compute(hierarchy2).hash;
+
+      // Hashes should be the same (emoji key filtered out)
+      expect(hash1).toBe(hash2);
+    });
+
+    test("should filter Shift keyboard keys from fingerprints", () => {
+      const withShiftKey = {
+        className: "Screen",
+        node: [
+          { text: "Main Content" },
+          {
+            "content-desc": "Shift",
+            "className": "KeyboardKey",
+          },
+        ],
+      };
+
+      const withoutShiftKey = {
+        className: "Screen",
+        node: [{ text: "Main Content" }],
+      };
+
+      const hierarchy1 = createHierarchy(withShiftKey);
+      const hierarchy2 = createHierarchy(withoutShiftKey);
+
+      const hash1 = ScreenFingerprint.compute(hierarchy1).hash;
+      const hash2 = ScreenFingerprint.compute(hierarchy2).hash;
+
+      // Hashes should be the same (Shift key filtered out)
+      expect(hash1).toBe(hash2);
+    });
+
+    test("should produce same hash when keyboard toggles (emoji/Shift filtered)", () => {
+      const withKeyboardNoToggle = {
+        className: "Screen",
+        node: [
+          { text: "Input Field" },
+          { "content-desc": "Delete" },
+          { "content-desc": "Enter" },
+        ],
+      };
+
+      const withKeyboardAndEmoji = {
+        className: "Screen",
+        node: [
+          { text: "Input Field" },
+          { "content-desc": "Delete" },
+          { "content-desc": "Enter" },
+          { "content-desc": "emoji" },
+        ],
+      };
+
+      const withKeyboardAndShift = {
+        className: "Screen",
+        node: [
+          { text: "Input Field" },
+          { "content-desc": "Delete" },
+          { "content-desc": "Enter" },
+          { "content-desc": "Shift" },
+        ],
+      };
+
+      const h2 = createHierarchy(withKeyboardNoToggle);
+      const h3 = createHierarchy(withKeyboardAndEmoji);
+      const h4 = createHierarchy(withKeyboardAndShift);
+
+      const hash2 = ScreenFingerprint.compute(h2).hash;
+      const hash3 = ScreenFingerprint.compute(h3).hash;
+      const hash4 = ScreenFingerprint.compute(h4).hash;
+
+      // All keyboard variations should produce same hash (keyboard elements filtered)
+      expect(hash2).toBe(hash3);
+      expect(hash3).toBe(hash4);
+      expect(hash2).toBe(hash4);
     });
   });
 });
