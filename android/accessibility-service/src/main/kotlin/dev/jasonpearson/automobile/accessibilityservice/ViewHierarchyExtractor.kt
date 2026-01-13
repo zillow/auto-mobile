@@ -1324,7 +1324,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
       return null
     }
 
-    val nodeToUse = if (occlusionState == "hidden" && isRoot) null else filteredNodeElement
+    val nodeToUse = filteredNodeElement
 
     return element.copy(
         node = nodeToUse,
