@@ -1,4 +1,4 @@
-import type { Element } from "../../models/Element";
+import type { ElementSelectionResult } from "../../models/ElementSelectionResult";
 import type { ViewHierarchyResult } from "../../models/ViewHierarchyResult";
 import type { ElementSelectionStrategy } from "../../models/ElementSelectionStrategy";
 
@@ -12,7 +12,7 @@ export interface ElementSelector {
       caseSensitive?: boolean;
       strategy?: ElementSelectionStrategy;
     }
-  ): Element | null;
+  ): ElementSelectionResult;
 
   selectByResourceId(
     viewHierarchy: ViewHierarchyResult,
@@ -22,5 +22,5 @@ export interface ElementSelector {
       partialMatch?: boolean;
       strategy?: ElementSelectionStrategy;
     }
-  ): Element | null;
+  ): ElementSelectionResult;
 }

@@ -34,7 +34,7 @@ describe("TapOnElement selectionStrategy", () => {
       { hierarchy: { node: {} } }
     );
 
-    expect(result.element).not.toBeNull();
+    expect(result.selection.element).not.toBeNull();
     expect(fakeSelector.lastText).toBe("Match");
     expect(fakeSelector.lastStrategy).toBe("random");
   });

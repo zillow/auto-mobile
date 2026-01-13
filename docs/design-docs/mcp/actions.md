@@ -13,6 +13,32 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 - 🔍 `pinchOn` for zoom in/out gestures.
 - 📳 `shake` for accelerometer simulation.
 
+#### tapOn Response Metadata
+
+Successful `tapOn` calls include `selectedElement` metadata describing which match was chosen.
+
+```json
+{
+  "success": true,
+  "action": "tap",
+  "selectedElement": {
+    "text": "Sarah's Channel",
+    "resourceId": "com.example:id/channel_item",
+    "bounds": {
+      "left": 50,
+      "top": 200,
+      "right": 350,
+      "bottom": 280,
+      "centerX": 200,
+      "centerY": 240
+    },
+    "indexInMatches": 3,
+    "totalMatches": 10,
+    "selectionStrategy": "random"
+  }
+}
+```
+
 #### App Management
 
 - 📱 `listApps` enumerates installed apps (deprecated; use the `automobile:apps` resource with query filters).

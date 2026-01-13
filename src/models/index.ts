@@ -17,6 +17,7 @@ export * from "./DragAndDropOptions";
 export * from "./DragAndDropResult";
 export * from "./Element";
 export * from "./ElementSelectionStrategy";
+export * from "./ElementSelectionResult";
 export * from "./ElementBounds";
 export * from "./DeviceInfo";
 export * from "./ExecResult";
