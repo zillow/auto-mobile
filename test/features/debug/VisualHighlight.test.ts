@@ -24,6 +24,21 @@ describe("VisualHighlight", () => {
     }
   };
 
+  const pathShape: HighlightShape = {
+    type: "path",
+    points: [
+      { x: 5, y: 10 },
+      { x: 25, y: 40 },
+      { x: 50, y: 20 }
+    ],
+    style: {
+      strokeColor: "#FF8800",
+      strokeWidth: 6,
+      smoothing: "catmull-rom",
+      tension: 0.6
+    }
+  };
+
   test("addHighlight returns parsed highlight response", async () => {
     const response: HighlightOperationResult = {
       success: true,
@@ -41,6 +56,28 @@ describe("VisualHighlight", () => {
 
     const highlight = new VisualHighlight(androidDevice, null, fakeClient as any);
     const result = await highlight.addHighlight("highlight-1", highlightShape);
+
+    expect(result.success).toBe(true);
+    expect(result.highlights.length).toBe(1);
+  });
+
+  test("addHighlight accepts path shapes", async () => {
+    const response: HighlightOperationResult = {
+      success: true,
+      highlights: [
+        {
+          id: "path-1",
+          shape: pathShape
+        }
+      ]
+    };
+
+    const fakeClient = {
+      requestAddHighlight: async () => response
+    };
+
+    const highlight = new VisualHighlight(androidDevice, null, fakeClient as any);
+    const result = await highlight.addHighlight("path-1", pathShape);
 
     expect(result.success).toBe(true);
     expect(result.highlights.length).toBe(1);
