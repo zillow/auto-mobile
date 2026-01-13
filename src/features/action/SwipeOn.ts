@@ -317,9 +317,11 @@ export class SwipeOn extends BaseVisualChange {
       }
 
       // Map swipe direction to scroll action
+      // When finger swipes up, content scrolls down (scroll_forward)
+      // When finger swipes down, content scrolls up (scroll_backward)
       const scrollAction = (direction === "up" || direction === "left")
-        ? "scroll_backward"
-        : "scroll_forward";
+        ? "scroll_forward"
+        : "scroll_backward";
 
       logger.info(`[SwipeOn] Attempting ACTION_SCROLL (${scrollAction}) on container: ${containerElement["resource-id"]}`);
 
@@ -804,7 +806,8 @@ export class SwipeOn extends BaseVisualChange {
         const { startX, startY, endX, endY, warning } = this.resolveContainerSwipeCoordinates(
           options,
           viewHierarchy,
-          element
+          element,
+          observeResult
         );
 
         const duration = this.getDuration(options);
@@ -857,11 +860,24 @@ export class SwipeOn extends BaseVisualChange {
   private resolveContainerSwipeCoordinates(
     options: SwipeOnResolvedOptions,
     viewHierarchy: ViewHierarchyResult,
-    containerElement: Element
+    containerElement: Element,
+    observeResult: ObserveResult
   ): { startX: number; startY: number; endX: number; endY: number; warning?: string } {
+    // Apply system insets to container bounds when includeSystemInsets is false (default)
+    let effectiveBounds = containerElement.bounds;
+    if (options.includeSystemInsets !== true && observeResult.systemInsets) {
+      const insets = observeResult.systemInsets;
+      effectiveBounds = {
+        left: Math.max(containerElement.bounds.left, insets.left),
+        top: Math.max(containerElement.bounds.top, insets.top),
+        right: Math.min(containerElement.bounds.right, observeResult.screenSize?.width ?? containerElement.bounds.right) - insets.right,
+        bottom: Math.min(containerElement.bounds.bottom, observeResult.screenSize?.height ?? containerElement.bounds.bottom) - insets.bottom
+      };
+    }
+
     const defaultSwipe = this.elementUtils.getSwipeWithinBounds(
       options.direction,
-      containerElement.bounds
+      effectiveBounds
     );
 
     const overlayCandidates = this.collectOverlayCandidates(viewHierarchy, options.container, containerElement);
@@ -873,7 +889,7 @@ export class SwipeOn extends BaseVisualChange {
     const allOverlayBounds = overlayCandidates.map(overlay => overlay.overlapBounds);
     const safeSwipe = this.computeSafeSwipeCoordinates(
       options.direction,
-      containerElement.bounds,
+      effectiveBounds,
       allOverlayBounds
     );
 
@@ -915,7 +931,11 @@ export class SwipeOn extends BaseVisualChange {
       let nodeOrder = 0;
 
       for (const rootNode of rootNodes) {
-        parser.traverseNode(rootNode, (node: ViewHierarchyNode) => {
+        // Track whether we're inside the container subtree
+        let insideContainer = false;
+        let containerDepth = -1;
+
+        parser.traverseNode(rootNode, (node: ViewHierarchyNode, depth: number) => {
           if (seenNodes.has(node)) {
             return;
           }
@@ -924,7 +944,23 @@ export class SwipeOn extends BaseVisualChange {
           const currentOrder = nodeOrder++;
 
           const nodeProperties = parser.extractNodeProperties(node);
+
+          // Check if this is the container node
           if (this.isContainerNode(node, nodeProperties, containerNode, containerElement, containerBounds)) {
+            insideContainer = true;
+            containerDepth = depth;
+            return; // Skip the container itself
+          }
+
+          // If we were inside the container but have backtracked (depth <= containerDepth),
+          // we've exited the container subtree
+          if (insideContainer && depth <= containerDepth) {
+            insideContainer = false;
+            containerDepth = -1;
+          }
+
+          // Skip nodes that are inside the container (descendants of container)
+          if (insideContainer) {
             return;
           }
 
@@ -1355,7 +1391,8 @@ export class SwipeOn extends BaseVisualChange {
     const swipeCoordinates = this.resolveContainerSwipeCoordinates(
       options,
       lastObservation.viewHierarchy!,
-      containerElement
+      containerElement,
+      lastObservation
     );
     const swipeWarning = swipeCoordinates.warning;
 
