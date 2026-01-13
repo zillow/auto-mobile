@@ -42,6 +42,38 @@ const executePlanSchema = z.object({
   cleanupClearAppData: z.boolean().optional().describe("Clear app data on cleanup")
 });
 
+const executePlanDebugStepSchema = z.object({
+  step: z.string(),
+  status: z.enum(["completed", "failed", "skipped"]),
+  durationMs: z.number().int(),
+  details: z.any().optional()
+});
+
+const executePlanDebugSchema = z.object({
+  executionTimeMs: z.number().int(),
+  steps: z.array(executePlanDebugStepSchema),
+  deviceState: z.object({
+    currentActivity: z.string().optional(),
+    focusedWindow: z.string().optional()
+  }).optional()
+});
+
+const executePlanResultSchema = z.object({
+  success: z.boolean(),
+  executedSteps: z.number().int(),
+  totalSteps: z.number().int(),
+  failedStep: z.object({
+    stepIndex: z.number().int(),
+    tool: z.string(),
+    error: z.string(),
+    device: z.string().optional()
+  }).optional(),
+  error: z.string().optional(),
+  platform: z.enum(["android", "ios"]).optional(),
+  deviceMapping: z.record(z.string()).optional(),
+  debug: executePlanDebugSchema.optional()
+}).passthrough();
+
 const testExecutionRepository = new TestExecutionRepository();
 
 const getDeviceType = (device: BootedDevice): "emulator" | "simulator" | "device" => {
@@ -259,6 +291,9 @@ export const registerPlanTools = () => {
     "executePlan",
     "Execute a series of tool calls from a YAML plan content. Stops execution if any step fails (success: false). Optionally can resume execution from a specific step index.",
     executePlanSchema,
-    executePlanTool
+    executePlanTool,
+    false,
+    false,
+    { outputSchema: executePlanResultSchema }
   );
 };

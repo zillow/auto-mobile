@@ -650,6 +650,120 @@
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "executedSteps": {
+          "type": "integer"
+        },
+        "totalSteps": {
+          "type": "integer"
+        },
+        "failedStep": {
+          "type": "object",
+          "properties": {
+            "stepIndex": {
+              "type": "integer"
+            },
+            "tool": {
+              "type": "string"
+            },
+            "error": {
+              "type": "string"
+            },
+            "device": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "stepIndex",
+            "tool",
+            "error"
+          ],
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ]
+        },
+        "deviceMapping": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "debug": {
+          "type": "object",
+          "properties": {
+            "executionTimeMs": {
+              "type": "integer"
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "step": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "completed",
+                      "failed",
+                      "skipped"
+                    ]
+                  },
+                  "durationMs": {
+                    "type": "integer"
+                  },
+                  "details": {}
+                },
+                "required": [
+                  "step",
+                  "status",
+                  "durationMs"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "deviceState": {
+              "type": "object",
+              "properties": {
+                "currentActivity": {
+                  "type": "string"
+                },
+                "focusedWindow": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "executionTimeMs",
+            "steps"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "success",
+        "executedSteps",
+        "totalSteps"
+      ],
+      "additionalProperties": true,
+      "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },
   {
@@ -1150,6 +1264,459 @@
         "platform"
       ],
       "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "updatedAt": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "screenSize": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "integer"
+            },
+            "height": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        },
+        "systemInsets": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "integer"
+            },
+            "right": {
+              "type": "integer"
+            },
+            "bottom": {
+              "type": "integer"
+            },
+            "left": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "top",
+            "right",
+            "bottom",
+            "left"
+          ],
+          "additionalProperties": false
+        },
+        "rotation": {
+          "type": "integer"
+        },
+        "viewHierarchy": {},
+        "activeWindow": {
+          "type": "object",
+          "properties": {
+            "appId": {
+              "type": "string"
+            },
+            "activityName": {
+              "type": "string"
+            },
+            "layoutSeqSum": {
+              "type": "integer"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "elements": {
+          "type": "object",
+          "properties": {
+            "clickable": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "bounds": {
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "type": "integer"
+                      },
+                      "top": {
+                        "type": "integer"
+                      },
+                      "right": {
+                        "type": "integer"
+                      },
+                      "bottom": {
+                        "type": "integer"
+                      },
+                      "centerX": {
+                        "type": "integer"
+                      },
+                      "centerY": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "top",
+                      "right",
+                      "bottom"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "resource-id": {
+                    "type": "string"
+                  },
+                  "content-desc": {
+                    "type": "string"
+                  },
+                  "class": {
+                    "type": "string"
+                  },
+                  "package": {
+                    "type": "string"
+                  },
+                  "checkable": {
+                    "type": "boolean"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "focusable": {
+                    "type": "boolean"
+                  },
+                  "focused": {
+                    "type": "boolean"
+                  },
+                  "accessibility-focused": {
+                    "type": "boolean"
+                  },
+                  "scrollable": {
+                    "type": "boolean"
+                  },
+                  "selected": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "bounds"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "scrollable": {
+              "type": "array",
+              "items": {
+                "$ref": "#/properties/elements/properties/clickable/items"
+              }
+            },
+            "text": {
+              "type": "array",
+              "items": {
+                "$ref": "#/properties/elements/properties/clickable/items"
+              }
+            }
+          },
+          "required": [
+            "clickable",
+            "scrollable",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        "selectedElements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "resourceId": {
+                "type": "string"
+              },
+              "contentDesc": {
+                "type": "string"
+              },
+              "bounds": {
+                "$ref": "#/properties/elements/properties/clickable/items/properties/bounds"
+              },
+              "indexInMatches": {
+                "type": "integer"
+              },
+              "totalMatches": {
+                "type": "integer"
+              },
+              "selectionStrategy": {
+                "type": "string"
+              },
+              "selectedState": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "accessibility",
+                      "visual"
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method",
+                  "confidence"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "focusedElement": {
+          "$ref": "#/properties/elements/properties/clickable/items"
+        },
+        "accessibilityFocusedElement": {
+          "$ref": "#/properties/elements/properties/clickable/items"
+        },
+        "intentChooserDetected": {
+          "type": "boolean"
+        },
+        "notificationPermissionDetected": {
+          "type": "boolean"
+        },
+        "wakefulness": {
+          "type": "string",
+          "enum": [
+            "Awake",
+            "Asleep",
+            "Dozing"
+          ]
+        },
+        "userId": {
+          "type": "integer"
+        },
+        "backStack": {},
+        "error": {
+          "type": "string"
+        },
+        "awaitedElement": {
+          "$ref": "#/properties/elements/properties/clickable/items"
+        },
+        "awaitDuration": {
+          "type": "integer"
+        },
+        "awaitTimeout": {
+          "type": "boolean"
+        },
+        "perfTiming": {},
+        "perfTimingTruncated": {
+          "type": "boolean"
+        },
+        "gfxMetrics": {},
+        "displayedTimeMetrics": {
+          "type": "array"
+        },
+        "performanceAudit": {},
+        "accessibilityAudit": {},
+        "freshness": {
+          "type": "object",
+          "properties": {
+            "requestedAfter": {
+              "type": "integer"
+            },
+            "actualTimestamp": {
+              "type": "integer"
+            },
+            "isFresh": {
+              "type": "boolean"
+            },
+            "staleDurationMs": {
+              "type": "integer"
+            },
+            "warning": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "isFresh"
+          ],
+          "additionalProperties": true
+        },
+        "recompositionSummary": {},
+        "predictions": {
+          "type": "object",
+          "properties": {
+            "likelyActions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string"
+                      },
+                      "elementId": {
+                        "type": "string"
+                      },
+                      "contentDesc": {
+                        "type": "string"
+                      },
+                      "container": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string"
+                          },
+                          "elementId": {
+                            "type": "string"
+                          },
+                          "contentDesc": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "lookFor": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string"
+                          },
+                          "elementId": {
+                            "type": "string"
+                          },
+                          "contentDesc": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "additionalProperties": true
+                  },
+                  "predictedScreen": {
+                    "type": "string"
+                  },
+                  "predictedElements": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "confidence": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "predictedScreen",
+                  "confidence"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "interactableElements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "elementId": {
+                    "type": "string"
+                  },
+                  "elementText": {
+                    "type": "string"
+                  },
+                  "elementContentDesc": {
+                    "type": "string"
+                  },
+                  "predictedOutcome": {
+                    "type": "object",
+                    "properties": {
+                      "screenName": {
+                        "type": "string"
+                      },
+                      "basedOn": {
+                        "type": "string",
+                        "enum": [
+                          "navigation_graph"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "screenName",
+                      "basedOn"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          },
+          "required": [
+            "likelyActions",
+            "interactableElements"
+          ],
+          "additionalProperties": true
+        },
+        "accessibilityState": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "service": {
+              "type": "string",
+              "enum": [
+                "talkback",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "enabled",
+            "service"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "updatedAt",
+        "screenSize",
+        "systemInsets"
+      ],
+      "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },
@@ -1727,6 +2294,272 @@
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "warning": {
+          "type": "string"
+        },
+        "scrollableCandidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "elementId": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "contentDesc": {
+                "type": "string"
+              },
+              "className": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "targetType": {
+          "type": "string",
+          "enum": [
+            "screen",
+            "element"
+          ]
+        },
+        "element": {
+          "type": "object",
+          "properties": {
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer"
+                },
+                "top": {
+                  "type": "integer"
+                },
+                "right": {
+                  "type": "integer"
+                },
+                "bottom": {
+                  "type": "integer"
+                },
+                "centerX": {
+                  "type": "integer"
+                },
+                "centerY": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "left",
+                "top",
+                "right",
+                "bottom"
+              ],
+              "additionalProperties": false
+            },
+            "text": {
+              "type": "string"
+            },
+            "resource-id": {
+              "type": "string"
+            },
+            "content-desc": {
+              "type": "string"
+            },
+            "class": {
+              "type": "string"
+            },
+            "package": {
+              "type": "string"
+            },
+            "checkable": {
+              "type": "boolean"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focusable": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "accessibility-focused": {
+              "type": "boolean"
+            },
+            "scrollable": {
+              "type": "boolean"
+            },
+            "selected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bounds"
+          ],
+          "additionalProperties": true
+        },
+        "x1": {
+          "type": "integer"
+        },
+        "y1": {
+          "type": "integer"
+        },
+        "x2": {
+          "type": "integer"
+        },
+        "y2": {
+          "type": "integer"
+        },
+        "duration": {
+          "type": "integer"
+        },
+        "easing": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "decelerate",
+            "accelerate",
+            "accelerateDecelerate"
+          ]
+        },
+        "path": {
+          "type": "number"
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "scrollIterations": {
+          "type": "integer"
+        },
+        "elapsedMs": {
+          "type": "integer"
+        },
+        "hierarchyChanged": {
+          "type": "boolean"
+        },
+        "observation": {
+          "type": "object",
+          "properties": {
+            "selectedElements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "contentDesc": {
+                    "type": "string"
+                  },
+                  "bounds": {
+                    "$ref": "#/properties/element/properties/bounds"
+                  },
+                  "indexInMatches": {
+                    "type": "integer"
+                  },
+                  "totalMatches": {
+                    "type": "integer"
+                  },
+                  "selectionStrategy": {
+                    "type": "string"
+                  },
+                  "selectedState": {
+                    "type": "object",
+                    "properties": {
+                      "method": {
+                        "type": "string",
+                        "enum": [
+                          "accessibility",
+                          "visual"
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "method",
+                      "confidence"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            "focusedElement": {
+              "$ref": "#/properties/element"
+            },
+            "accessibilityFocusedElement": {
+              "$ref": "#/properties/element"
+            },
+            "activeWindow": {
+              "type": "object",
+              "properties": {
+                "appId": {
+                  "type": "string"
+                },
+                "activityName": {
+                  "type": "string"
+                },
+                "layoutSeqSum": {
+                  "type": "integer"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        },
+        "a11yTotalTimeMs": {
+          "type": "integer"
+        },
+        "a11yGestureTimeMs": {
+          "type": "integer"
+        },
+        "fallbackReason": {
+          "type": "string"
+        },
+        "debug": {}
+      },
+      "required": [
+        "success",
+        "targetType",
+        "x1",
+        "y1",
+        "x2",
+        "y2",
+        "duration"
+      ],
+      "additionalProperties": true,
+      "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },
   {
@@ -1885,6 +2718,233 @@
         "platform"
       ],
       "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "tap",
+            "doubleTap",
+            "longPress",
+            "focus"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "element": {
+          "type": "object",
+          "properties": {
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer"
+                },
+                "top": {
+                  "type": "integer"
+                },
+                "right": {
+                  "type": "integer"
+                },
+                "bottom": {
+                  "type": "integer"
+                },
+                "centerX": {
+                  "type": "integer"
+                },
+                "centerY": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "left",
+                "top",
+                "right",
+                "bottom"
+              ],
+              "additionalProperties": false
+            },
+            "text": {
+              "type": "string"
+            },
+            "resource-id": {
+              "type": "string"
+            },
+            "content-desc": {
+              "type": "string"
+            },
+            "class": {
+              "type": "string"
+            },
+            "package": {
+              "type": "string"
+            },
+            "checkable": {
+              "type": "boolean"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focusable": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "accessibility-focused": {
+              "type": "boolean"
+            },
+            "scrollable": {
+              "type": "boolean"
+            },
+            "selected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bounds"
+          ],
+          "additionalProperties": true
+        },
+        "observation": {
+          "type": "object",
+          "properties": {
+            "selectedElements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "contentDesc": {
+                    "type": "string"
+                  },
+                  "bounds": {
+                    "$ref": "#/properties/element/properties/bounds"
+                  },
+                  "indexInMatches": {
+                    "type": "integer"
+                  },
+                  "totalMatches": {
+                    "type": "integer"
+                  },
+                  "selectionStrategy": {
+                    "type": "string"
+                  },
+                  "selectedState": {
+                    "type": "object",
+                    "properties": {
+                      "method": {
+                        "type": "string",
+                        "enum": [
+                          "accessibility",
+                          "visual"
+                        ]
+                      },
+                      "confidence": {
+                        "type": "number"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "method",
+                      "confidence"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            "focusedElement": {
+              "$ref": "#/properties/element"
+            },
+            "accessibilityFocusedElement": {
+              "$ref": "#/properties/element"
+            },
+            "activeWindow": {
+              "type": "object",
+              "properties": {
+                "appId": {
+                  "type": "string"
+                },
+                "activityName": {
+                  "type": "string"
+                },
+                "layoutSeqSum": {
+                  "type": "integer"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        },
+        "selectedElement": {
+          "$ref": "#/properties/observation/properties/selectedElements/items"
+        },
+        "selectedElements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/properties/observation/properties/selectedElements/items"
+          }
+        },
+        "error": {
+          "type": "string"
+        },
+        "pressRecognized": {
+          "type": "boolean"
+        },
+        "contextMenuOpened": {
+          "type": "boolean"
+        },
+        "selectionStarted": {
+          "type": "boolean"
+        },
+        "searchUntil": {
+          "type": "object",
+          "properties": {
+            "durationMs": {
+              "type": "integer"
+            },
+            "requestCount": {
+              "type": "integer"
+            },
+            "changeCount": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false
+        },
+        "debug": {}
+      },
+      "required": [
+        "success",
+        "action"
+      ],
+      "additionalProperties": true,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
   },
