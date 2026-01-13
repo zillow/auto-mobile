@@ -4,7 +4,7 @@ import { NavigationGraphManager } from "../../../src/features/navigation/Navigat
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { AndroidAccessibilityServiceManager } from "../../../src/utils/AccessibilityServiceManager";
 import { AdbClient } from "../../../src/utils/android-cmdline-tools/AdbClient";
-import { BootedDevice } from "../../../src/models";
+import { BootedDevice, HighlightShape } from "../../../src/models";
 import {
   FakeWebSocket,
   createInstantFailureWebSocketFactory,
@@ -72,15 +72,24 @@ describe("AccessibilityServiceClient", function() {
     }
   });
 
+  class CapturingWebSocket extends FakeWebSocket {
+    sentMessages: string[] = [];
+
+    send(data: any): void {
+      this.sentMessages.push(data.toString());
+      super.send(data);
+    }
+  }
+
   const createCapturingWebSocketFactory = (): {
-    factory: (url: string) => FakeWebSocket;
-    getSocket: () => FakeWebSocket | null;
+    factory: (url: string) => CapturingWebSocket;
+    getSocket: () => CapturingWebSocket | null;
   } => {
-    let socket: FakeWebSocket | null = null;
+    let socket: CapturingWebSocket | null = null;
 
     return {
       factory: (url: string) => {
-        socket = new FakeWebSocket(url, "none");
+        socket = new CapturingWebSocket(url, "none");
         return socket;
       },
       getSocket: () => socket
@@ -108,6 +117,18 @@ describe("AccessibilityServiceClient", function() {
       await new Promise(resolve => setImmediate(resolve));
     }
     return getSocket();
+  };
+
+  const waitForSentMessages = async (socket: CapturingWebSocket | null, minCount: number = 1): Promise<void> => {
+    if (!socket) {
+      return;
+    }
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (socket.sentMessages.length >= minCount) {
+        return;
+      }
+      await new Promise(resolve => setImmediate(resolve));
+    }
   };
 
   describe("getLatestHierarchy", function() {
@@ -568,6 +589,96 @@ describe("AccessibilityServiceClient", function() {
       } finally {
         // Clean up the test client
         await failingClient.close();
+      }
+    });
+  });
+
+  describe("highlight requests", function() {
+    test("requestAddHighlight sends payload and resolves highlight response", async function() {
+      const highlightTimer = new FakeTimer();
+      highlightTimer.setManualMode();
+
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory,
+        highlightTimer
+      );
+
+      const shape: HighlightShape = {
+        type: "box",
+        bounds: {
+          x: 10,
+          y: 20,
+          width: 100,
+          height: 80
+        },
+        style: {
+          strokeColor: "#FF0000",
+          strokeWidth: 4
+        }
+      };
+
+      try {
+        const requestPromise = testClient.requestAddHighlight("highlight-1", shape, 2000);
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+        await waitForSentMessages(socket);
+
+        expect(socket!.sentMessages.length).toBeGreaterThan(0);
+        const payload = JSON.parse(socket!.sentMessages[0]);
+        expect(payload.type).toBe("add_highlight");
+        expect(payload.id).toBe("highlight-1");
+        expect(payload.shape.bounds.width).toBe(100);
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "highlight_response",
+          requestId: payload.requestId,
+          success: true,
+          error: null,
+          highlights: [
+            {
+              id: "highlight-1",
+              shape
+            }
+          ]
+        }));
+
+        const result = await requestPromise;
+        expect(result.success).toBe(true);
+        expect(result.highlights.length).toBe(1);
+      } finally {
+        await testClient.close();
+      }
+    });
+
+    test("requestListHighlights times out when no response arrives", async function() {
+      const highlightTimer = new FakeTimer();
+      highlightTimer.setManualMode();
+
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory,
+        highlightTimer
+      );
+
+      try {
+        const requestPromise = testClient.requestListHighlights(500);
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+        await waitForSentMessages(socket);
+
+        highlightTimer.advanceTime(600);
+        const result = await requestPromise;
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("Highlight request timeout");
+      } finally {
+        await testClient.close();
       }
     });
   });

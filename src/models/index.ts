@@ -85,5 +85,6 @@ export * from "./ExecutePlanResult";
 export * from "./RawViewHierarchyResult";
 export * from "./DebugSearchResult";
 export * from "./BugReportResult";
+export * from "./VisualHighlight";
 export * from "./VideoRecording";
 export * from "./DeviceSnapshot";
