@@ -13,21 +13,44 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+internal interface DaemonHeartbeatController {
+  fun startBackground(intervalMs: Long): Closeable
+
+  fun registerSession(sessionId: String)
+
+  fun unregisterSession(sessionId: String)
+}
+
 internal object DaemonHeartbeat {
   private const val DEFAULT_INTERVAL_MS = 1_000L
   private val json = Json { ignoreUnknownKeys = true }
   private val backgroundHeartbeat = BackgroundHeartbeatManager()
+  @JvmStatic internal var testController: DaemonHeartbeatController? = null
+  private val defaultController =
+      object : DaemonHeartbeatController {
+        override fun startBackground(intervalMs: Long): Closeable {
+          return backgroundHeartbeat.start(intervalMs)
+        }
+
+        override fun registerSession(sessionId: String) {
+          backgroundHeartbeat.addSession(sessionId)
+        }
+
+        override fun unregisterSession(sessionId: String) {
+          backgroundHeartbeat.removeSession(sessionId)
+        }
+      }
 
   fun startBackground(intervalMs: Long = DEFAULT_INTERVAL_MS): Closeable {
-    return backgroundHeartbeat.start(intervalMs)
+    return controller().startBackground(intervalMs)
   }
 
   fun registerSession(sessionId: String) {
-    backgroundHeartbeat.addSession(sessionId)
+    controller().registerSession(sessionId)
   }
 
   fun unregisterSession(sessionId: String) {
-    backgroundHeartbeat.removeSession(sessionId)
+    controller().unregisterSession(sessionId)
   }
 
   fun start(sessionId: String, intervalMs: Long = DEFAULT_INTERVAL_MS): Closeable {
@@ -127,6 +150,10 @@ internal object DaemonHeartbeat {
         }
       }
     }
+  }
+
+  private fun controller(): DaemonHeartbeatController {
+    return testController ?: defaultController
   }
 
   private fun sendHeartbeat(sessionId: String) {

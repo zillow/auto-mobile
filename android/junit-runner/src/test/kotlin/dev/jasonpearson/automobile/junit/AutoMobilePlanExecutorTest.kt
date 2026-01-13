@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.junit
 
+import dev.jasonpearson.automobile.validation.ErrorToolResult
 import dev.jasonpearson.automobile.validation.TapOnResponse
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -25,12 +26,14 @@ class AutoMobilePlanExecutorTest {
     fakeDeviceChecker = FakeDeviceChecker(devicesAvailable = true)
     DaemonSocketClientManager.testClient = fakeDaemonClient
     AutoMobileSharedUtils.testDeviceChecker = fakeDeviceChecker
+    DaemonHeartbeat.testController = FakeDaemonHeartbeat()
   }
 
   @After
   fun tearDown() {
     DaemonSocketClientManager.testClient = null
     AutoMobileSharedUtils.testDeviceChecker = null
+    DaemonHeartbeat.testController = null
   }
 
   @Test
@@ -152,12 +155,7 @@ class AutoMobilePlanExecutorTest {
 
   @Test
   fun `parsing errors are handled gracefully`() {
-    val step =
-        JsonObject(
-            mapOf(
-                "toolName" to JsonPrimitive("tapOn"),
-            )
-        )
+    val step = JsonObject(emptyMap())
 
     fakeDaemonClient.setResponse(
         "executePlan",
@@ -173,7 +171,10 @@ class AutoMobilePlanExecutorTest {
 
     val result = executePlan()
 
-    assertTrue(result.toolResults.isEmpty())
+    assertEquals(1, result.toolResults.size)
+    val errorResult = result.toolResults[0] as? ErrorToolResult
+    assertNotNull(errorResult)
+    assertTrue(errorResult?.errorMessage?.contains("Missing tool name") == true)
   }
 
   private fun executePlan(): AutoMobilePlanExecutionResult {
@@ -240,4 +241,12 @@ private class FakeDeviceChecker(private val devicesAvailable: Boolean) : DeviceC
   override fun areDevicesAvailable(): Boolean = devicesAvailable
 
   override fun getDeviceCount(): Int = if (devicesAvailable) 1 else 0
+}
+
+private class FakeDaemonHeartbeat : DaemonHeartbeatController {
+  override fun startBackground(intervalMs: Long) = java.io.Closeable {}
+
+  override fun registerSession(sessionId: String) = Unit
+
+  override fun unregisterSession(sessionId: String) = Unit
 }

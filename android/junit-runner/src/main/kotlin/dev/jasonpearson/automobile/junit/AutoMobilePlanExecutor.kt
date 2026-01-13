@@ -1,6 +1,8 @@
 package dev.jasonpearson.automobile.junit
 
+import dev.jasonpearson.automobile.validation.ErrorToolResult
 import dev.jasonpearson.automobile.validation.ToolResult
+import dev.jasonpearson.automobile.validation.ToolResultEntry
 import dev.jasonpearson.automobile.validation.ToolResultParser
 import java.io.File
 import java.util.UUID
@@ -230,7 +232,7 @@ internal object AutoMobilePlanExecutor {
       response: DaemonResponse,
       json: Json,
       debugMode: Boolean,
-  ): List<ToolResult> {
+  ): List<ToolResultEntry> {
     return try {
       val resultElement = response.result ?: return emptyList()
       val contentArray = resultElement.jsonObject["content"] as? JsonArray ?: return emptyList()
@@ -244,21 +246,23 @@ internal object AutoMobilePlanExecutor {
               ?.content
               ?: return emptyList()
       val payload = json.parseToJsonElement(contentText).jsonObject
-      val stepsElement =
-          payload["toolResults"]
-              ?: payload["toolResult"]
-              ?: payload["steps"]
-              ?: return emptyList()
+      val stepsElement = payload["toolResults"] ?: payload["toolResult"] ?: return emptyList()
       val stepsArray = stepsElement as? JsonArray ?: return emptyList()
 
-      stepsArray.mapIndexedNotNull { index, stepElement ->
+      stepsArray.mapIndexed { index, stepElement ->
         parseToolResultStep(index, stepElement, debugMode)
       }
     } catch (e: Exception) {
       if (debugMode) {
         println("Warning: Failed to parse tool results: ${e.message}")
       }
-      emptyList()
+      listOf(
+          buildErrorToolResult(
+              stepIndex = -1,
+              toolName = null,
+              errorMessage = e.message ?: "Failed to parse tool results",
+          )
+      )
     }
   }
 
@@ -266,33 +270,50 @@ internal object AutoMobilePlanExecutor {
       stepIndex: Int,
       stepElement: JsonElement,
       debugMode: Boolean,
-  ): ToolResult? {
-    return try {
-      val stepObject = stepElement as? JsonObject ?: return null
-      val toolName =
-          stepObject["toolName"]?.jsonPrimitive?.content
-              ?: stepObject["tool"]?.jsonPrimitive?.content
-              ?: stepObject["name"]?.jsonPrimitive?.content
-      if (toolName.isNullOrBlank()) {
-        if (debugMode) {
-          println("Warning: Missing tool name for step $stepIndex")
-        }
-        return null
+  ): ToolResultEntry {
+    val stepObject =
+        stepElement as? JsonObject
+            ?: return buildErrorToolResult(
+                stepIndex = stepIndex,
+                toolName = null,
+                errorMessage = "Tool result is not a JSON object",
+                payload = stepElement,
+            )
+    val toolName =
+        stepObject["toolName"]?.jsonPrimitive?.content
+            ?: stepObject["tool"]?.jsonPrimitive?.content
+            ?: stepObject["name"]?.jsonPrimitive?.content
+
+    val resolvedStepIndex =
+        (stepObject["stepIndex"] as? JsonPrimitive)?.intOrNull
+            ?: (stepObject["index"] as? JsonPrimitive)?.intOrNull
+            ?: stepIndex
+
+    if (toolName.isNullOrBlank()) {
+      val errorMessage =
+          extractErrorMessage(stepObject)
+              ?: "Missing tool name for step $resolvedStepIndex"
+      if (debugMode) {
+        println("Warning: $errorMessage")
       }
+      return buildErrorToolResult(
+          stepIndex = resolvedStepIndex,
+          toolName = null,
+          errorMessage = errorMessage,
+          payload = stepObject,
+      )
+    }
 
-      val resolvedStepIndex =
-          (stepObject["stepIndex"] as? JsonPrimitive)?.intOrNull
-              ?: (stepObject["index"] as? JsonPrimitive)?.intOrNull
-              ?: stepIndex
+    val responseElement =
+        stepObject["response"]
+            ?: stepObject["result"]
+            ?: stepObject["payload"]
+            ?: stepObject["output"]
 
-      val responseElement =
-          stepObject["response"]
-              ?: stepObject["result"]
-              ?: stepObject["payload"]
-              ?: stepObject["output"]
-
+    return try {
       when {
-        responseElement != null -> parseToolResultElement(resolvedStepIndex, toolName, responseElement)
+        responseElement != null ->
+            parseToolResultElement(resolvedStepIndex, toolName, responseElement)
         stepObject["content"] != null ->
             ToolResultParser.parseToolResultFromMcpResponse(
                 resolvedStepIndex,
@@ -302,10 +323,19 @@ internal object AutoMobilePlanExecutor {
         else -> ToolResultParser.parseToolResult(resolvedStepIndex, toolName, stepObject)
       }
     } catch (e: Exception) {
+      val errorMessage =
+          extractErrorMessage(stepObject, responseElement)
+              ?: e.message
+              ?: "Failed to parse tool result"
       if (debugMode) {
-        println("Warning: Failed to parse tool result at step $stepIndex: ${e.message}")
+        println("Warning: Failed to parse tool result at step $resolvedStepIndex: $errorMessage")
       }
-      null
+      buildErrorToolResult(
+          stepIndex = resolvedStepIndex,
+          toolName = toolName,
+          errorMessage = errorMessage,
+          payload = stepObject,
+      )
     }
   }
 
@@ -326,10 +356,36 @@ internal object AutoMobilePlanExecutor {
     }
   }
 
+  private fun buildErrorToolResult(
+      stepIndex: Int,
+      toolName: String?,
+      errorMessage: String,
+      payload: JsonElement? = null,
+  ): ErrorToolResult {
+    return ErrorToolResult(
+        stepIndex = stepIndex,
+        toolName = toolName,
+        errorMessage = errorMessage,
+        payload = payload,
+    )
+  }
+
+  private fun extractErrorMessage(
+      stepObject: JsonObject,
+      responseElement: JsonElement? = null,
+  ): String? {
+    val stepError = (stepObject["error"] as? JsonPrimitive)?.content
+    if (!stepError.isNullOrBlank()) {
+      return stepError
+    }
+    val responseError = (responseElement as? JsonObject)?.get("error") as? JsonPrimitive
+    return responseError?.content
+  }
+
   private fun handleFailure(
       result: CommandResult,
       options: AutoMobilePlanExecutionOptions,
-      toolResults: List<ToolResult> = emptyList(),
+      toolResults: List<ToolResultEntry> = emptyList(),
   ): InternalExecutionResult {
 
     val ciMode = System.getProperty("automobile.ci.mode", "false").toBoolean()
@@ -368,7 +424,7 @@ internal object AutoMobilePlanExecutor {
       val errorMessage: String = "",
       val aiRecoveryAttempted: Boolean = false,
       val aiRecoverySuccessful: Boolean = false,
-      val toolResults: List<ToolResult> = emptyList(),
+      val toolResults: List<ToolResultEntry> = emptyList(),
   )
 
   private data class ParsedToolResult(val success: Boolean, val errorMessage: String)

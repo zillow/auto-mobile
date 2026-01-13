@@ -20,14 +20,26 @@ data class McpToolContent(
     val mimeType: String? = null,
 )
 
+sealed interface ToolResultEntry {
+  val stepIndex: Int
+}
+
 @Serializable
 data class ToolResult(
-    val stepIndex: Int,
+    override val stepIndex: Int,
     val toolName: String,
     val success: Boolean,
     val response: ToolResponse,
     val error: String? = null,
-)
+) : ToolResultEntry
+
+@Serializable
+data class ErrorToolResult(
+    override val stepIndex: Int,
+    val toolName: String? = null,
+    val errorMessage: String,
+    val payload: JsonElement? = null,
+) : ToolResultEntry
 
 @Serializable
 sealed interface ToolResponse {
