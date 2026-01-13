@@ -78,6 +78,7 @@ export class DragAndDrop extends BaseVisualChange {
           const targetPoint = this.elementUtils.getElementCenter(target);
           const duration = this.getDuration(options);
           const holdTime = this.getHoldTime(options);
+          const dropDelay = this.getDropDelay(options);
 
           const dragResult = await this.executeAndroidDrag(
             sourcePoint.x,
@@ -89,8 +90,8 @@ export class DragAndDrop extends BaseVisualChange {
             signal
           );
 
-          if (options.dropDelay && options.dropDelay > 0) {
-            await new Promise(resolve => setTimeout(resolve, options.dropDelay));
+          if (dropDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, dropDelay));
           }
 
           const distance = Math.hypot(targetPoint.x - sourcePoint.x, targetPoint.y - sourcePoint.y);
@@ -117,7 +118,7 @@ export class DragAndDrop extends BaseVisualChange {
               target: options.target,
               duration: options.duration,
               holdTime: options.holdTime,
-              dropDelay: options.dropDelay,
+              dropDelay: this.getDropDelay(options),
               platform: this.device.platform
             }
           }
@@ -155,6 +156,9 @@ export class DragAndDrop extends BaseVisualChange {
     const targetSelectorCount = [options.target.text, options.target.elementId].filter(Boolean).length;
     if (targetSelectorCount !== 1) {
       return "dragAndDrop target must specify exactly one of text or elementId";
+    }
+    if (typeof options.dropDelay === "number" && options.dropDelay < 100) {
+      return "dragAndDrop dropDelay must be at least 100ms";
     }
     return null;
   }
@@ -197,6 +201,13 @@ export class DragAndDrop extends BaseVisualChange {
       return options.holdTime;
     }
     return 200;
+  }
+
+  private getDropDelay(options: DragAndDropOptions): number {
+    if (typeof options.dropDelay === "number") {
+      return options.dropDelay;
+    }
+    return 100;
   }
 
   private async executeAndroidDrag(

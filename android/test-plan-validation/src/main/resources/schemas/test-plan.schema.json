@@ -181,7 +181,8 @@
               },
               "dropDelay": {
                 "type": "number",
-                "description": "Drop delay ms (default: 100)"
+                "minimum": 100,
+                "description": "Drop delay ms (min: 100, default: 100)"
               },
               "platform": {
                 "type": "string",
@@ -298,7 +299,8 @@
         },
         "dropDelay": {
           "type": "number",
-          "description": "Drop delay ms (default: 100)"
+          "minimum": 100,
+          "description": "Drop delay ms (min: 100, default: 100)"
         },
         "platform": {
           "type": "string",
