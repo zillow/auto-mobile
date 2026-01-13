@@ -1,13 +1,17 @@
 import { AdbClient } from "./android-cmdline-tools/AdbClient";
 import { logger } from "./logger";
 import * as fs from "fs/promises";
+import { createWriteStream } from "fs";
 import * as path from "path";
 import { exec } from "child_process";
 import { createReadStream } from "fs";
 import { promisify } from "util";
 import { BootedDevice } from "../models";
 import { APK_URL, APK_SHA256_CHECKSUM } from "../constants/release";
+import AdmZip from "adm-zip";
 import crypto from "crypto";
+import http from "http";
+import https from "https";
 import os from "os";
 
 const execAsync = promisify(exec);
@@ -451,13 +455,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         await fs.copyFile(overridePath, apkPath);
       } else {
         logger.info("Downloading APK", { url: AndroidAccessibilityServiceManager.APK_URL, destination: apkPath });
-
-        // Use curl to download the APK
-        const { stderr } = await this.execShell(`curl -L -o "${apkPath}" "${AndroidAccessibilityServiceManager.APK_URL}"`);
-
-        if (stderr && !stderr.includes("100")) {
-          logger.warn("Download may have failed", { stderr });
-        }
+        await this.downloadApkFromUrl(AndroidAccessibilityServiceManager.APK_URL, apkPath);
       }
 
       // Verify the file exists and has reasonable size (should be > 10KB)
@@ -465,6 +463,8 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       if (stats.size < 10000) {
         throw new Error(`Downloaded APK is too small (${stats.size} bytes), likely invalid`);
       }
+
+      this.verifyApkIntegrity(apkPath);
 
       const expectedChecksum = this.getExpectedChecksum();
       // Perform checksum verification (only if checksum is provided)
@@ -498,6 +498,124 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       }
 
       throw new Error(`Failed to download APK: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async downloadApkFromUrl(url: string, destination: string): Promise<void> {
+    try {
+      await this.downloadWithCurl(url, destination);
+      return;
+    } catch (error) {
+      if (!this.isCommandUnavailable(error, "curl")) {
+        throw error;
+      }
+      logger.warn("curl unavailable, falling back to alternate downloader", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    try {
+      await this.downloadWithWget(url, destination);
+      return;
+    } catch (error) {
+      if (!this.isCommandUnavailable(error, "wget")) {
+        throw error;
+      }
+      logger.warn("wget unavailable, falling back to Node HTTP download", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    await this.downloadWithNodeHttp(url, destination, 0);
+  }
+
+  private async downloadWithCurl(url: string, destination: string): Promise<void> {
+    const command = `curl --fail --location --retry 3 --retry-delay 1 --silent --show-error -o "${destination}" "${url}"`;
+    await this.execShell(command);
+  }
+
+  private async downloadWithWget(url: string, destination: string): Promise<void> {
+    const command = `wget --tries=3 --timeout=30 -O "${destination}" "${url}"`;
+    await this.execShell(command);
+  }
+
+  private async downloadWithNodeHttp(url: string, destination: string, redirectCount: number): Promise<void> {
+    if (redirectCount > 5) {
+      throw new Error(`Too many redirects while downloading ${url}`);
+    }
+
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+
+    await new Promise<void>((resolve, reject) => {
+      const transport = url.startsWith("https:") ? https : http;
+      const request = transport.get(
+        url,
+        { headers: { "User-Agent": "auto-mobile" } },
+        response => {
+          const statusCode = response.statusCode ?? 0;
+          if (statusCode >= 300 && statusCode < 400 && response.headers.location) {
+            response.resume();
+            const redirectedUrl = new URL(response.headers.location, url).toString();
+            void this.downloadWithNodeHttp(redirectedUrl, destination, redirectCount + 1)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+
+          if (statusCode !== 200) {
+            response.resume();
+            reject(new Error(`Download failed with status ${statusCode} from ${url}`));
+            return;
+          }
+
+          const fileStream = createWriteStream(destination);
+          response.pipe(fileStream);
+          fileStream.on("finish", () => fileStream.close(() => resolve()));
+          fileStream.on("error", err => {
+            fileStream.close();
+            reject(err);
+          });
+        }
+      );
+
+      request.setTimeout(30000, () => {
+        request.destroy(new Error(`Download request timed out for ${url}`));
+      });
+      request.on("error", reject);
+    });
+  }
+
+  private isCommandUnavailable(error: unknown, command: string): boolean {
+    if (!error || typeof error !== "object") {
+      return false;
+    }
+
+    const err = error as NodeJS.ErrnoException & { stderr?: string };
+    const numericCode = typeof err.code === "number" ? err.code : Number(err.code);
+    if (err.code === "ENOENT" || (!Number.isNaN(numericCode) && numericCode === 127)) {
+      return true;
+    }
+
+    const combinedMessage = `${err.message ?? ""} ${err.stderr ?? ""}`.toLowerCase();
+    if (combinedMessage.includes("command not found") ||
+      combinedMessage.includes("not recognized as an internal or external command") ||
+      combinedMessage.includes(`${command}: not found`)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private verifyApkIntegrity(apkPath: string): void {
+    try {
+      const zip = new AdmZip(apkPath);
+      const entries = zip.getEntries();
+      const hasManifest = entries.some(entry => entry.entryName === "AndroidManifest.xml");
+      if (!hasManifest) {
+        throw new Error("AndroidManifest.xml missing");
+      }
+    } catch (error) {
+      throw new Error(`APK integrity check failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -1010,7 +1128,12 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       normalized.includes("connection timed out") ||
       normalized.includes("timed out") ||
       normalized.includes("name lookup timed out") ||
-      normalized.includes("temporary failure in name resolution")
+      normalized.includes("temporary failure in name resolution") ||
+      normalized.includes("enotfound") ||
+      normalized.includes("econnrefused") ||
+      normalized.includes("ehostunreach") ||
+      normalized.includes("enetunreach") ||
+      normalized.includes("etimedout")
     );
   }
 
