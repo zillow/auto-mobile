@@ -2912,92 +2912,151 @@
     "name": "tapOn",
     "description": "Tap UI elements by text or ID (returns selectedElement metadata)",
     "inputSchema": {
-      "type": "object",
-      "properties": {
-        "container": {
+      "anyOf": [
+        {
           "type": "object",
           "properties": {
-            "elementId": {
+            "container": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "elementId": {
+                      "type": "string",
+                      "description": "Container resource ID"
+                    }
+                  },
+                  "required": [
+                    "elementId"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "Container text"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              ],
+              "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
+            },
+            "action": {
               "type": "string",
-              "description": "Container resource ID"
+              "enum": [
+                "tap",
+                "doubleTap",
+                "longPress",
+                "focus"
+              ],
+              "description": "Action type"
+            },
+            "selectionStrategy": {
+              "type": "string",
+              "enum": [
+                "first",
+                "random"
+              ],
+              "description": "Element selection strategy when multiple matches are found (default: first)"
+            },
+            "duration": {
+              "type": "number",
+              "description": "Long press duration (ms)"
+            },
+            "searchUntil": {
+              "type": "object",
+              "properties": {
+                "duration": {
+                  "type": "number",
+                  "minimum": 100,
+                  "maximum": 12000,
+                  "description": "Polling duration (ms, default: 500)"
+                }
+              },
+              "additionalProperties": false,
+              "description": "Poll for element before tapping"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "android",
+                "ios"
+              ],
+              "description": "Platform"
+            },
+            "sessionUuid": {
+              "type": "string",
+              "description": "Session UUID for device targeting"
+            },
+            "keepScreenAwake": {
+              "type": "boolean",
+              "description": "Keep physical Android devices awake during the session (default: true)"
+            },
+            "device": {
+              "type": "string",
+              "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
             },
             "text": {
               "type": "string",
-              "description": "Container text"
+              "description": "Text to tap (overrides id)"
             }
           },
-          "additionalProperties": false,
-          "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
-        },
-        "action": {
-          "type": "string",
-          "enum": [
-            "tap",
-            "doubleTap",
-            "longPress",
-            "focus"
+          "required": [
+            "action",
+            "platform",
+            "text"
           ],
-          "description": "Action type"
+          "additionalProperties": false
         },
-        "text": {
-          "type": "string",
-          "description": "Text to tap (overrides id)"
-        },
-        "id": {
-          "type": "string",
-          "description": "Element ID to tap"
-        },
-        "selectionStrategy": {
-          "type": "string",
-          "enum": [
-            "first",
-            "random"
-          ],
-          "description": "Element selection strategy when multiple matches are found (default: first)"
-        },
-        "duration": {
-          "type": "number",
-          "description": "Long press duration (ms)"
-        },
-        "searchUntil": {
+        {
           "type": "object",
           "properties": {
+            "container": {
+              "$ref": "#/anyOf/0/properties/container"
+            },
+            "action": {
+              "$ref": "#/anyOf/0/properties/action"
+            },
+            "selectionStrategy": {
+              "$ref": "#/anyOf/0/properties/selectionStrategy"
+            },
             "duration": {
-              "type": "number",
-              "minimum": 100,
-              "maximum": 12000,
-              "description": "Polling duration (ms, default: 500)"
+              "$ref": "#/anyOf/0/properties/duration"
+            },
+            "searchUntil": {
+              "$ref": "#/anyOf/0/properties/searchUntil"
+            },
+            "platform": {
+              "$ref": "#/anyOf/0/properties/platform"
+            },
+            "sessionUuid": {
+              "$ref": "#/anyOf/0/properties/sessionUuid"
+            },
+            "keepScreenAwake": {
+              "$ref": "#/anyOf/0/properties/keepScreenAwake"
+            },
+            "device": {
+              "$ref": "#/anyOf/0/properties/device"
+            },
+            "id": {
+              "type": "string",
+              "description": "Element ID to tap"
             }
           },
-          "additionalProperties": false,
-          "description": "Poll for element before tapping"
-        },
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
+          "required": [
+            "action",
+            "platform",
+            "id"
           ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "additionalProperties": false
         }
-      },
-      "required": [
-        "action",
-        "platform"
       ],
-      "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     },
     "outputSchema": {

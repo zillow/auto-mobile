@@ -52,7 +52,11 @@ describe("MCP Tools Schema", () => {
 
       // Schema should be a valid JSON Schema-like object
       const schema = tool.inputSchema as any;
-      expect(schema).toHaveProperty("type");
+      const hasType = Object.prototype.hasOwnProperty.call(schema, "type");
+      const hasCombinator = ["allOf", "anyOf", "oneOf"].some(
+        key => Array.isArray(schema?.[key])
+      );
+      expect(hasType || hasCombinator).toBe(true);
       if (schema.type === "object") {
         expect(schema).toHaveProperty("properties");
       }

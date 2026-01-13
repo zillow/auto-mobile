@@ -176,25 +176,20 @@ export const shakeSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
-const tapOnContainerSchema = z.object({
-  elementId: z.string().optional().describe("Container resource ID"),
-  text: z.string().optional().describe("Container text")
-}).superRefine((value, ctx) => {
-  if (!value.elementId && !value.text) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "container must include elementId or text"
-    });
-  }
-});
+const tapOnContainerSchema = z.union([
+  z.object({
+    elementId: z.string().describe("Container resource ID")
+  }).strict(),
+  z.object({
+    text: z.string().describe("Container text")
+  }).strict()
+]);
 
-export const tapOnSchema = addDeviceTargetingToSchema(z.object({
+const tapOnSchemaBase = addDeviceTargetingToSchema(z.object({
   container: tapOnContainerSchema.optional().describe(
     "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
-  text: z.string().optional().describe("Text to tap (overrides id)"),
-  id: z.string().optional().describe("Element ID to tap"),
   selectionStrategy: z.enum(["first", "random"]).optional().describe(
     "Element selection strategy when multiple matches are found (default: first)"
   ),
@@ -204,6 +199,15 @@ export const tapOnSchema = addDeviceTargetingToSchema(z.object({
   }).optional().describe("Poll for element before tapping"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
+
+export const tapOnSchema = z.union([
+  tapOnSchemaBase.extend({
+    text: z.string().describe("Text to tap (overrides id)")
+  }).strict(),
+  tapOnSchemaBase.extend({
+    id: z.string().describe("Element ID to tap")
+  }).strict()
+]);
 
 const tapOnResultSchema = z.object({
   success: z.boolean(),

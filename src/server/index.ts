@@ -3,7 +3,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
-import { ZodError } from "zod";
+import { ZodError, type ZodIssue } from "zod";
 import { ActionableError } from "../models";
 import { logger } from "../utils/logger";
 import { executionTracker } from "./executionTracker";
@@ -57,12 +57,30 @@ export interface McpServerOptions {
   daemonMode?: boolean;
 }
 
+function flattenZodIssues(issues: ZodIssue[]): ZodIssue[] {
+  const flattened: ZodIssue[] = [];
+
+  const visit = (issue: ZodIssue) => {
+    if (issue.code === "invalid_union") {
+      issue.unionErrors.forEach(unionError => {
+        unionError.issues.forEach(visit);
+      });
+      return;
+    }
+    flattened.push(issue);
+  };
+
+  issues.forEach(visit);
+  return flattened;
+}
+
 function formatToolParamError(toolName: string, error: unknown): string {
   if (!(error instanceof ZodError)) {
     return String(error);
   }
 
-  const issues = error.issues.map(issue => {
+  const flattenedIssues = flattenZodIssues(error.issues);
+  const issues = flattenedIssues.map(issue => {
     const path = issue.path.length ? issue.path.join(".") : "parameters";
     if (issue.code === "invalid_type") {
       return `${path} expected ${issue.expected}, received ${issue.received}`;
@@ -72,7 +90,7 @@ function formatToolParamError(toolName: string, error: unknown): string {
 
   const hints: string[] = [];
   if (toolName === "swipeOn" || toolName === "tapOn") {
-    const containerIssue = error.issues.find(issue => issue.path[0] === "container");
+    const containerIssue = flattenedIssues.find(issue => issue.path[0] === "container");
     if (containerIssue) {
       hints.push("container must be an object like { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }");
     }
