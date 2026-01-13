@@ -28,7 +28,7 @@ App management tools that support work profiles:
 - `installApp` - Install APKs to the auto-selected profile
 - `launchApp` - Launch apps in the auto-selected profile
 - `terminateApp` - Terminate apps in the auto-selected profile
-- `listApps` - List apps from all profiles with userId and foreground status (recent is a placeholder)
+- `listApps` (deprecated; use `automobile:apps`) - List apps from all profiles with userId and foreground status (recent is a placeholder)
 
 ## Setting Up Work Profile on Android Emulator
 
@@ -129,21 +129,50 @@ await launchApp({ packageName: "com.example.app" });
 ### Example: List Apps from All Profiles
 
 ```typescript
-// Lists apps from all profiles with detailed info
-const apps = await listApps();
+const response = await client.request({
+  method: "resources/read",
+  params: { uri: "automobile:apps?deviceId=emulator-5554&platform=android" }
+});
+const apps = JSON.parse(response.contents[0].text);
 
-// Result includes grouped user apps and deduped system apps:
+// Result includes per-device user + system apps:
 // {
-//   profiles: {
-//     "0": [
-//       { packageName: "com.example.personal", userId: 0, foreground: false, recent: false }
-//     ],
-//     "10": [
-//       { packageName: "com.example.work", userId: 10, foreground: true, recent: false }
-//     ]
-//   },
-//   system: [
-//     { packageName: "com.android.chrome", userIds: [0, 10], foreground: false, recent: false }
+//   query: { deviceId: "emulator-5554", platform: "android" },
+//   totalCount: 3,
+//   deviceCount: 1,
+//   lastUpdated: "...",
+//   devices: [
+//     {
+//       deviceId: "emulator-5554",
+//       platform: "android",
+//       totalCount: 3,
+//       lastUpdated: "...",
+//       apps: [
+//         {
+//           packageName: "com.example.personal",
+//           type: "user",
+//           userId: 0,
+//           userProfile: "personal",
+//           foreground: false,
+//           recent: false
+//         },
+//         {
+//           packageName: "com.example.work",
+//           type: "user",
+//           userId: 10,
+//           userProfile: "work",
+//           foreground: true,
+//           recent: false
+//         },
+//         {
+//           packageName: "com.android.chrome",
+//           type: "system",
+//           userIds: [0, 10],
+//           foreground: false,
+//           recent: false
+//         }
+//       ]
+//     }
 //   ]
 // }
 ```
@@ -183,7 +212,7 @@ adb install --user 10 app.apk
 # List all installations
 adb shell pm list packages -f com.example.app --all-users
 
-# AutoMobile's listApps will return both with unique userIds
+# AutoMobile's `automobile:apps` resource will return both with unique userIds
 ```
 
 ## Troubleshooting

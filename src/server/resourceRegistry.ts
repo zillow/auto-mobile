@@ -201,7 +201,8 @@ class ResourceRegistryClass {
     }
 
     const resource = this.getResource(uri);
-    if (!resource) {
+    const templateMatch = resource ? undefined : this.matchTemplate(uri);
+    if (!resource && !templateMatch) {
       return;
     }
 
@@ -210,7 +211,7 @@ class ResourceRegistryClass {
       await this.server.server.notification({
         method: "notifications/resources/updated",
         params: {
-          uri: resource.uri
+          uri: resource ? resource.uri : uri
         }
       });
     } catch (error) {

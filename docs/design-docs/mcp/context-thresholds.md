@@ -23,7 +23,7 @@ The MCP context threshold system enforces limits on the token count of tool defi
 3. **Threshold Configuration** (`scripts/context-thresholds.json`)
    - JSON configuration file defining threshold limits
    - Versioned and checked into source control
-   - Currently set at baseline + 10% buffer
+   - Currently set with manual headroom for resource/template growth
    - Categories: tools, resources, resourceTemplates, total
 
 4. **CI Enforcement** (`.github/workflows/context-thresholds.yml`)
@@ -58,33 +58,33 @@ The configuration file (`scripts/context-thresholds.json`) has the following str
 {
   "version": "1.0.0",
   "metadata": {
-    "generatedAt": "2026-01-08",
-    "description": "MCP context usage thresholds based on baseline measurement with 10% buffer",
+    "generatedAt": "2026-01-13",
+    "description": "MCP context usage thresholds with manual headroom for resource/template growth",
     "baseline": {
-      "tools": 13125,
-      "resources": 322,
-      "resourceTemplates": 468,
-      "total": 13915
+      "tools": 10382,
+      "resources": 431,
+      "resourceTemplates": 1412,
+      "total": 12225
     },
-    "buffer": "10%"
+    "buffer": "custom"
   },
   "thresholds": {
-    "tools": 14438,
-    "resources": 354,
-    "resourceTemplates": 515,
-    "total": 15307
+    "tools": 14000,
+    "resources": 1000,
+    "resourceTemplates": 2000,
+    "total": 17000
   }
 }
 ```
 
-### Current Baselines (as of 2026-01-08)
+### Current Baselines (as of 2026-01-13)
 
-| Category | Baseline | Threshold (10% buffer) | Usage |
+| Category | Baseline | Threshold (current) | Usage |
 |----------|----------|------------------------|-------|
-| Tools | 13,125 tokens | 14,438 tokens | 91% |
-| Resources | 322 tokens | 354 tokens | 91% |
-| Resource Templates | 468 tokens | 515 tokens | 91% |
-| **Total** | **13,915 tokens** | **15,307 tokens** | **91%** |
+| Tools | 10,382 tokens | 14,000 tokens | 74% |
+| Resources | 431 tokens | 1,000 tokens | 43% |
+| Resource Templates | 1,412 tokens | 2,000 tokens | 71% |
+| **Total** | **12,225 tokens** | **17,000 tokens** | **72%** |
 
 ## Benchmark Report Format
 
@@ -97,11 +97,11 @@ MCP CONTEXT THRESHOLD BENCHMARK REPORT
 
 Category                     Actual / Threshold       Usage  Status
 --------------------------------------------------------------------------------
-  Tools                        13125 / 14438    ( 91%)  ✓ PASS
-  Resources                      322 / 354      ( 91%)  ✓ PASS
-  Resource Templates             468 / 515      ( 91%)  ✓ PASS
+  Tools                        10382 / 14000    ( 74%)  ✓ PASS
+  Resources                      431 / 1000     ( 43%)  ✓ PASS
+  Resource Templates            1412 / 2000     ( 71%)  ✓ PASS
 --------------------------------------------------------------------------------
-  TOTAL                        13915 / 15307    ( 91%)  ✓ PASS
+  TOTAL                        12225 / 17000    ( 72%)  ✓ PASS
 ================================================================================
 
 Overall Status: ✓ PASSED
@@ -111,39 +111,39 @@ Overall Status: ✓ PASSED
 
 ```json
 {
-  "timestamp": "2026-01-08T13:24:58.771Z",
+  "timestamp": "2026-01-13T02:54:55.664Z",
   "passed": true,
   "results": {
     "tools": {
-      "actual": 13125,
-      "threshold": 14438,
+      "actual": 10382,
+      "threshold": 14000,
       "passed": true,
-      "usage": 91
+      "usage": 74
     },
     "resources": {
-      "actual": 322,
-      "threshold": 354,
+      "actual": 431,
+      "threshold": 1000,
       "passed": true,
-      "usage": 91
+      "usage": 43
     },
     "resourceTemplates": {
-      "actual": 468,
-      "threshold": 515,
+      "actual": 1412,
+      "threshold": 2000,
       "passed": true,
-      "usage": 91
+      "usage": 71
     },
     "total": {
-      "actual": 13915,
-      "threshold": 15307,
+      "actual": 12225,
+      "threshold": 17000,
       "passed": true,
-      "usage": 91
+      "usage": 72
     }
   },
   "thresholds": {
-    "tools": 14438,
-    "resources": 354,
-    "resourceTemplates": 515,
-    "total": 15307
+    "tools": 14000,
+    "resources": 1000,
+    "resourceTemplates": 2000,
+    "total": 17000
   },
   "violations": []
 }
@@ -169,14 +169,14 @@ The GitHub Actions workflow runs automatically on:
 
 | Category | Actual | Threshold | Usage | Status |
 |----------|--------|-----------|-------|--------|
-| Tools | 13,125 | 14,438 | 91% | ✅ |
-| Resources | 322 | 354 | 91% | ✅ |
-| Resource Templates | 468 | 515 | 91% | ✅ |
-| **Total** | **13,915** | **15,307** | **91%** | ✅ |
+| Tools | 10,382 | 14,000 | 74% | ✅ |
+| Resources | 431 | 1,000 | 43% | ✅ |
+| Resource Templates | 1,412 | 2,000 | 71% | ✅ |
+| **Total** | **12,225** | **17,000** | **72%** | ✅ |
 
 **Overall Status:** ✅ PASSED
 
-_Generated at 2026-01-08T13:24:58.771Z_
+_Generated at 2026-01-13T02:54:55.664Z_
 ```
 
 ## Updating Thresholds
@@ -189,7 +189,7 @@ When legitimate changes require increasing thresholds:
    ```
 
 2. Update `scripts/context-thresholds.json` with new thresholds
-   - Consider appropriate buffer (typically 10-20%)
+   - Set headroom based on expected growth
    - Update metadata section with rationale
 
 3. Commit changes and include justification in PR description
@@ -198,13 +198,12 @@ When legitimate changes require increasing thresholds:
 
 ## Rationale
 
-### Why 10% Buffer?
+### Why Manual Headroom?
 
-The 10% buffer allows for:
-- Small incremental improvements to existing tools
-- Minor documentation updates
-- Flexibility for refactoring without threshold violations
-- Catches significant regressions while allowing natural growth
+Manual headroom allows for:
+- Larger shifts between tools, resources, and templates
+- Planned growth without constant threshold churn
+- Guardrails against unexpected regressions
 
 ### Category Tracking
 

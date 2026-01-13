@@ -64,15 +64,15 @@ Thresholds are defined in `scripts/context-thresholds.json`:
 {
   "version": "1.0.0",
   "thresholds": {
-    "tools": 14438,
-    "resources": 354,
-    "resourceTemplates": 515,
-    "total": 15307
+    "tools": 14000,
+    "resources": 1000,
+    "resourceTemplates": 2000,
+    "total": 17000
   }
 }
 ```
 
-Current thresholds represent baseline + 10% buffer to allow for incremental growth while preventing significant regressions.
+Current thresholds are manually set to allow headroom for resource and template growth while preventing significant regressions.
 
 ## Startup Benchmark
 
