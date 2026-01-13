@@ -503,6 +503,41 @@ describe("AccessibilityServiceManager", function() {
       const stats = await fs.stat(apkPath);
       expect(stats.size).toBe(payload.length);
     });
+
+    test("should fall back to node checksum when sha tools are unavailable", async function() {
+      const payload = Buffer.alloc(12000, 2);
+      const expectedChecksum = crypto.createHash("sha256").update(payload).digest("hex");
+      AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
+
+      const executedCommands: string[] = [];
+      let downloadedPath: string | null = null;
+      (accessibilityServiceClient as any).execShell = async (command: string) => {
+        executedCommands.push(command);
+        if (command.startsWith("curl ")) {
+          const match = command.match(/-o "([^"]+)"/);
+          const outputPath = match?.[1];
+          if (!outputPath) {
+            throw new Error("Missing output path for APK download");
+          }
+          downloadedPath = outputPath;
+          await fs.mkdir(path.dirname(outputPath), { recursive: true });
+          await fs.writeFile(outputPath, payload);
+          return { stdout: "", stderr: "" };
+        }
+        if (command.includes("sha256sum") || command.includes("shasum -a 256")) {
+          throw new Error("command not found");
+        }
+        return { stdout: "", stderr: "" };
+      };
+
+      const apkPath = await accessibilityServiceClient.downloadApk();
+      const stats = await fs.stat(apkPath);
+      expect(stats.size).toBe(payload.length);
+      expect(apkPath).toBe(downloadedPath);
+      expect(executedCommands.some(command => command.includes("sha256sum"))).toBe(true);
+      expect(executedCommands.some(command => command.includes("shasum -a 256"))).toBe(true);
+      expect(executedCommands.some(command => command.includes("curl -L -o"))).toBe(true);
+    });
   });
 
   describe("setup", function() {
