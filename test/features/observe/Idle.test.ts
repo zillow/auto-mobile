@@ -95,6 +95,7 @@ describe("Idle - Unit Tests", function() {
         90th percentile: 12.3ms
         95th percentile: 15.7ms
         99th percentile: 22.1ms
+        Total frames rendered: 120
         Number Missed Vsync: 5
         Number Slow UI thread: 3
         Number Frame deadline missed: 2
@@ -106,6 +107,7 @@ describe("Idle - Unit Tests", function() {
       expect(result.percentile90th).toBe(12.3);
       expect(result.percentile95th).toBe(15.7);
       expect(result.percentile99th).toBe(22.1);
+      expect(result.totalFrames).toBe(120);
       expect(result.missedVsync).toBe(5);
       expect(result.slowUiThread).toBe(3);
       expect(result.frameDeadlineMissed).toBe(2);
@@ -123,6 +125,7 @@ describe("Idle - Unit Tests", function() {
       expect(result.percentile90th).toBeNull();
       expect(result.percentile95th).toBeNull();
       expect(result.percentile99th).toBeNull();
+      expect(result.totalFrames).toBeNull();
       expect(result.missedVsync).toBe(5);
       expect(result.slowUiThread).toBeNull();
       expect(result.frameDeadlineMissed).toBeNull();
@@ -134,6 +137,7 @@ describe("Idle - Unit Tests", function() {
         90th percentile: 12ms
         95th percentile: 15ms
         99th percentile: 22ms
+        Total frames rendered: 42
       `;
 
       const result = idle.parseMetrics(stdout);
@@ -142,17 +146,20 @@ describe("Idle - Unit Tests", function() {
       expect(result.percentile90th).toBe(12);
       expect(result.percentile95th).toBe(15);
       expect(result.percentile99th).toBe(22);
+      expect(result.totalFrames).toBe(42);
     });
 
     test("should return null for invalid numeric values", function() {
       const stdout = `
         50th percentile: invalidms
+        Total frames rendered: notanumber
         Number Missed Vsync: notanumber
       `;
 
       const result = idle.parseMetrics(stdout);
 
       expect(result.percentile50th).toBeNull();
+      expect(result.totalFrames).toBeNull();
       expect(result.missedVsync).toBeNull();
     });
   });
@@ -162,12 +169,14 @@ describe("Idle - Unit Tests", function() {
       const current = {
         missedVsync: 10,
         slowUiThread: 5,
-        frameDeadlineMissed: 3
+        frameDeadlineMissed: 3,
+        totalFrames: 100
       };
       const previous = {
         missedVsync: 7,
         slowUiThread: 2,
-        frameDeadlineMissed: 1
+        frameDeadlineMissed: 1,
+        totalFrames: 90
       };
 
       const result = idle.calculateDeltas(current, previous);
@@ -175,18 +184,21 @@ describe("Idle - Unit Tests", function() {
       expect(result.missedVsyncDelta).toBe(3);
       expect(result.slowUiThreadDelta).toBe(3);
       expect(result.frameDeadlineMissedDelta).toBe(2);
+      expect(result.totalFramesDelta).toBe(10);
     });
 
     test("should return zero deltas when previous values are null", function() {
       const current = {
         missedVsync: 10,
         slowUiThread: 5,
-        frameDeadlineMissed: 3
+        frameDeadlineMissed: 3,
+        totalFrames: 100
       };
       const previous = {
         missedVsync: null,
         slowUiThread: null,
-        frameDeadlineMissed: null
+        frameDeadlineMissed: null,
+        totalFrames: null
       };
 
       const result = idle.calculateDeltas(current, previous);
@@ -194,18 +206,21 @@ describe("Idle - Unit Tests", function() {
       expect(result.missedVsyncDelta).toBe(0);
       expect(result.slowUiThreadDelta).toBe(0);
       expect(result.frameDeadlineMissedDelta).toBe(0);
+      expect(result.totalFramesDelta).toBeNull();
     });
 
     test("should return zero deltas when current values are null", function() {
       const current = {
         missedVsync: null,
         slowUiThread: null,
-        frameDeadlineMissed: null
+        frameDeadlineMissed: null,
+        totalFrames: null
       };
       const previous = {
         missedVsync: 7,
         slowUiThread: 2,
-        frameDeadlineMissed: 1
+        frameDeadlineMissed: 1,
+        totalFrames: 80
       };
 
       const result = idle.calculateDeltas(current, previous);
@@ -213,18 +228,21 @@ describe("Idle - Unit Tests", function() {
       expect(result.missedVsyncDelta).toBe(0);
       expect(result.slowUiThreadDelta).toBe(0);
       expect(result.frameDeadlineMissedDelta).toBe(0);
+      expect(result.totalFramesDelta).toBeNull();
     });
 
     test("should handle mixed null and valid values", function() {
       const current = {
         missedVsync: 10,
         slowUiThread: null,
-        frameDeadlineMissed: 3
+        frameDeadlineMissed: 3,
+        totalFrames: 50
       };
       const previous = {
         missedVsync: 7,
         slowUiThread: 2,
-        frameDeadlineMissed: null
+        frameDeadlineMissed: null,
+        totalFrames: null
       };
 
       const result = idle.calculateDeltas(current, previous);
@@ -232,6 +250,7 @@ describe("Idle - Unit Tests", function() {
       expect(result.missedVsyncDelta).toBe(3);
       expect(result.slowUiThreadDelta).toBe(0);
       expect(result.frameDeadlineMissedDelta).toBe(0);
+      expect(result.totalFramesDelta).toBeNull();
     });
   });
 
@@ -240,7 +259,8 @@ describe("Idle - Unit Tests", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
-        frameDeadlineMissedDelta: 0
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
       };
       const percentiles = {
         percentile50th: 50,
@@ -248,7 +268,7 @@ describe("Idle - Unit Tests", function() {
         percentile95th: 150
       };
 
-      const result = idle.checkStabilityCriteria(deltas, percentiles);
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
 
       expect(result).toBe(true);
     });
@@ -257,7 +277,8 @@ describe("Idle - Unit Tests", function() {
       const deltas = {
         missedVsyncDelta: 1,
         slowUiThreadDelta: 0,
-        frameDeadlineMissedDelta: 0
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
       };
       const percentiles = {
         percentile50th: 50,
@@ -265,7 +286,7 @@ describe("Idle - Unit Tests", function() {
         percentile95th: 150
       };
 
-      const result = idle.checkStabilityCriteria(deltas, percentiles);
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
 
       expect(result).toBe(false);
     });
@@ -274,7 +295,8 @@ describe("Idle - Unit Tests", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
-        frameDeadlineMissedDelta: 0
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
       };
       const percentiles = {
         percentile50th: 250, // > 200
@@ -282,7 +304,7 @@ describe("Idle - Unit Tests", function() {
         percentile95th: 150
       };
 
-      const result = idle.checkStabilityCriteria(deltas, percentiles);
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
 
       expect(result).toBe(false);
     });
@@ -291,7 +313,8 @@ describe("Idle - Unit Tests", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
-        frameDeadlineMissedDelta: 0
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
       };
       const percentiles = {
         percentile50th: 50,
@@ -299,7 +322,7 @@ describe("Idle - Unit Tests", function() {
         percentile95th: 150
       };
 
-      const result = idle.checkStabilityCriteria(deltas, percentiles);
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
 
       expect(result).toBe(false);
     });
@@ -308,7 +331,8 @@ describe("Idle - Unit Tests", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
-        frameDeadlineMissedDelta: 0
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
       };
       const percentiles = {
         percentile50th: 50,
@@ -316,7 +340,7 @@ describe("Idle - Unit Tests", function() {
         percentile95th: 450 // > 400
       };
 
-      const result = idle.checkStabilityCriteria(deltas, percentiles);
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
 
       expect(result).toBe(false);
     });
@@ -325,7 +349,8 @@ describe("Idle - Unit Tests", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
-        frameDeadlineMissedDelta: 0
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
       };
       const percentiles = {
         percentile50th: null,
@@ -333,7 +358,7 @@ describe("Idle - Unit Tests", function() {
         percentile95th: null
       };
 
-      const result = idle.checkStabilityCriteria(deltas, percentiles);
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
 
       expect(result).toBe(true); // null values become 0, which passes thresholds
     });
@@ -342,7 +367,8 @@ describe("Idle - Unit Tests", function() {
       const deltas = {
         missedVsyncDelta: 0,
         slowUiThreadDelta: 0,
-        frameDeadlineMissedDelta: 0
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
       };
       const percentiles = {
         percentile50th: 99.9, // floors to 99 (< 100)
@@ -350,7 +376,43 @@ describe("Idle - Unit Tests", function() {
         percentile95th: 199.9 // floors to 199 (< 200)
       };
 
-      const result = idle.checkStabilityCriteria(deltas, percentiles);
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
+
+      expect(result).toBe(true);
+    });
+
+    test("should ignore percentiles when no new frames are rendered", function() {
+      const deltas = {
+        missedVsyncDelta: 0,
+        slowUiThreadDelta: 0,
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 0
+      };
+      const percentiles = {
+        percentile50th: 550,
+        percentile90th: 550,
+        percentile95th: 550
+      };
+
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 10);
+
+      expect(result).toBe(true);
+    });
+
+    test("should ignore percentiles when there are too few frames", function() {
+      const deltas = {
+        missedVsyncDelta: 0,
+        slowUiThreadDelta: 0,
+        frameDeadlineMissedDelta: 0,
+        totalFramesDelta: 1
+      };
+      const percentiles = {
+        percentile50th: 550,
+        percentile90th: 550,
+        percentile95th: 550
+      };
+
+      const result = idle.checkStabilityCriteria(deltas, percentiles, 2);
 
       expect(result).toBe(true);
     });

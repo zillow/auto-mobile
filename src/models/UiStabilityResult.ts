@@ -4,5 +4,6 @@ export interface UiStabilityResult {
   updatedPrevMissedVsync: number | null;
   updatedPrevSlowUiThread: number | null;
   updatedPrevFrameDeadlineMissed: number | null;
+  updatedPrevTotalFrames: number | null;
   updatedFirstGfxInfoLog: boolean;
 }
