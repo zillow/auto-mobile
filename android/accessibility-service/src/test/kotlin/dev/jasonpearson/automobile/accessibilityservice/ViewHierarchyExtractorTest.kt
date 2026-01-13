@@ -463,7 +463,7 @@ class ViewHierarchyExtractorTest {
 
   @Test
   fun `determineNodeRelationship handles root node edge case`() {
-    // Root node (empty parent path)
+    // Root-level siblings (empty parent path)
     val nodePath = "0"
     val occluderPath = "1"
 
@@ -475,8 +475,7 @@ class ViewHierarchyExtractorTest {
         occluderOrder = 101,
     )
 
-    // Root nodes are not siblings (empty parent path check)
-    assertEquals(ViewHierarchyExtractor.NodeRelationship.UNRELATED, relationship)
+    assertEquals(ViewHierarchyExtractor.NodeRelationship.SIBLING, relationship)
   }
 
   @Test

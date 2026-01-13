@@ -1113,8 +1113,8 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     val nodeParentPath = nodePath.substringBeforeLast('.', "")
     val occluderParentPath = occluderPath.substringBeforeLast('.', "")
 
-    // Check if they're direct siblings (same parent)
-    if (nodeParentPath.isNotEmpty() && nodeParentPath == occluderParentPath) {
+    // Check if they're direct siblings (same parent). Root-level siblings have empty parent paths.
+    if (nodeParentPath == occluderParentPath) {
       return NodeRelationship.SIBLING
     }
 
