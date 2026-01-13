@@ -3,6 +3,7 @@ import { logger } from "./logger";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { exec } from "child_process";
+import { createReadStream } from "fs";
 import { promisify } from "util";
 import { BootedDevice } from "../models";
 import { APK_URL, APK_SHA256_CHECKSUM } from "../constants/release";
@@ -124,6 +125,49 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     this.cachedEnabled = null;
     this.cachedToggleCapabilities = null;
     logger.info("[ACCESSIBILITY_SERVICE] Cleared all availability caches");
+  }
+
+  private async execShell(command: string): Promise<{ stdout: string; stderr: string }> {
+    return execAsync(command);
+  }
+
+  private async tryChecksumCommand(command: string, tool: string): Promise<string | null> {
+    try {
+      const { stdout } = await this.execShell(command);
+      const checksum = stdout.trim().split(/\s+/)[0];
+      if (!checksum) {
+        logger.warn("APK checksum command returned no output", { tool });
+        return null;
+      }
+      return checksum;
+    } catch (error) {
+      logger.info("APK checksum tool unavailable, falling back", {
+        tool,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+
+  private async computeFileSha256(apkPath: string): Promise<{ checksum: string; source: "sha256sum" | "shasum" | "node" }> {
+    const sha256sum = await this.tryChecksumCommand(`sha256sum "${apkPath}"`, "sha256sum");
+    if (sha256sum) {
+      return { checksum: sha256sum, source: "sha256sum" };
+    }
+
+    const shasum = await this.tryChecksumCommand(`shasum -a 256 "${apkPath}"`, "shasum");
+    if (shasum) {
+      return { checksum: shasum, source: "shasum" };
+    }
+
+    const hash = crypto.createHash("sha256");
+    await new Promise<void>((resolve, reject) => {
+      const stream = createReadStream(apkPath);
+      stream.on("data", chunk => hash.update(chunk));
+      stream.on("error", reject);
+      stream.on("end", () => resolve());
+    });
+    return { checksum: hash.digest("hex"), source: "node" };
   }
 
   /**
@@ -410,7 +454,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         logger.info("Downloading APK", { url: AndroidAccessibilityServiceManager.APK_URL, destination: apkPath });
 
         // Use curl to download the APK
-        const { stderr } = await execAsync(`curl -L -o "${apkPath}" "${AndroidAccessibilityServiceManager.APK_URL}"`);
+        const { stderr } = await this.execShell(`curl -L -o "${apkPath}" "${AndroidAccessibilityServiceManager.APK_URL}"`);
 
         if (stderr && !stderr.includes("100")) {
           logger.warn("Download may have failed", { stderr });
@@ -426,18 +470,19 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
       const expectedChecksum = this.getExpectedChecksum();
       // Perform checksum verification (only if checksum is provided)
       if (expectedChecksum.length > 0) {
-        const { stdout: sha256sum } = await execAsync(`sha256sum "${apkPath}"`);
-        const actualChecksum = sha256sum.split(" ")[0];
+        const { checksum: actualChecksum, source } = await this.computeFileSha256(apkPath);
+        const normalizedActual = actualChecksum.toLowerCase();
+        const normalizedExpected = expectedChecksum.toLowerCase();
 
-        if (actualChecksum !== expectedChecksum) {
+        if (normalizedActual !== normalizedExpected) {
           logger.warn("APK checksum verification failed", {
-            expected: expectedChecksum,
-            actual: actualChecksum
+            expected: normalizedExpected,
+            actual: normalizedActual
           });
-          throw new Error(`APK checksum verification failed. Expected: ${expectedChecksum}, Got: ${actualChecksum}`);
+          throw new Error(`APK checksum verification failed. Expected: ${normalizedExpected}, Got: ${normalizedActual}`);
         }
 
-        logger.info("APK checksum verified successfully", { checksum: actualChecksum });
+        logger.info("APK checksum verified successfully", { checksum: normalizedActual, source });
       } else {
         logger.warn("APK checksum verification SKIPPED - no checksum provided (development mode)", {
           apkUrl: AndroidAccessibilityServiceManager.APK_URL
