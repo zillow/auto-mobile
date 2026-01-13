@@ -195,15 +195,19 @@ export const tapOnSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
+const dragAndDropSelectorSchema = (label: "Source" | "Target") =>
+  z.union([
+    z.object({
+      text: z.string().describe(`${label} text`)
+    }).strict(),
+    z.object({
+      elementId: z.string().describe(`${label} ID`)
+    }).strict()
+  ]).describe(`${label} element`);
+
 export const dragAndDropSchema = addDeviceTargetingToSchema(z.object({
-  source: z.object({
-    text: z.string().optional().describe("Source text"),
-    elementId: z.string().optional().describe("Source ID")
-  }).describe("Source element"),
-  target: z.object({
-    text: z.string().optional().describe("Target text"),
-    elementId: z.string().optional().describe("Target ID")
-  }).describe("Target element"),
+  source: dragAndDropSelectorSchema("Source"),
+  target: dragAndDropSelectorSchema("Target"),
   duration: z.number().optional().describe("Drag duration ms (default: 500)"),
   holdTime: z.number().optional().describe("Hold time ms (default: 200)"),
   dropDelay: z.number().optional().describe("Drop delay ms (default: 100)"),

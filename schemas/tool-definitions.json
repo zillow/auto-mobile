@@ -433,33 +433,65 @@
       "type": "object",
       "properties": {
         "source": {
-          "type": "object",
-          "properties": {
-            "text": {
-              "type": "string",
-              "description": "Source text"
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Source text"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
             },
-            "elementId": {
-              "type": "string",
-              "description": "Source ID"
+            {
+              "type": "object",
+              "properties": {
+                "elementId": {
+                  "type": "string",
+                  "description": "Source ID"
+                }
+              },
+              "required": [
+                "elementId"
+              ],
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false,
+          ],
           "description": "Source element"
         },
         "target": {
-          "type": "object",
-          "properties": {
-            "text": {
-              "type": "string",
-              "description": "Target text"
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Target text"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
             },
-            "elementId": {
-              "type": "string",
-              "description": "Target ID"
+            {
+              "type": "object",
+              "properties": {
+                "elementId": {
+                  "type": "string",
+                  "description": "Target ID"
+                }
+              },
+              "required": [
+                "elementId"
+              ],
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false,
+          ],
           "description": "Target element"
         },
         "duration": {
