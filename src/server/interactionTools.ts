@@ -1686,7 +1686,7 @@ export function registerInteractionTools() {
 
   ToolRegistry.registerDeviceAware(
     "tapOn",
-    "Tap UI elements by text or ID",
+    "Tap UI elements by text or ID (returns selectedElement metadata)",
     tapOnSchema,
     tapOnHandler,
     true // Supports progress notifications

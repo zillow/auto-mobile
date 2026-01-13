@@ -40,7 +40,10 @@ describe("DefaultElementSelector", () => {
 
     const match = selector.selectByText(viewHierarchy, "Match", { strategy: "first" });
 
-    expect(match?.bounds).toEqual({ left: 0, top: 0, right: 10, bottom: 10 });
+    expect(match.element?.bounds).toEqual({ left: 0, top: 0, right: 10, bottom: 10 });
+    expect(match.indexInMatches).toBe(0);
+    expect(match.totalMatches).toBe(2);
+    expect(match.strategy).toBe("first");
   });
 
   test("random strategy returns different matches across calls", () => {
@@ -55,7 +58,11 @@ describe("DefaultElementSelector", () => {
     const first = selector.selectByText(viewHierarchy, "Match", { strategy: "random" });
     const second = selector.selectByText(viewHierarchy, "Match", { strategy: "random" });
 
-    expect(first?.bounds).not.toEqual(second?.bounds);
+    expect(first.element?.bounds).not.toEqual(second.element?.bounds);
+    expect(first.indexInMatches).toBe(0);
+    expect(second.indexInMatches).toBe(1);
+    expect(first.totalMatches).toBe(2);
+    expect(second.totalMatches).toBe(2);
   });
 
   test("random strategy prefers exact matches over fuzzy", () => {
@@ -67,7 +74,8 @@ describe("DefaultElementSelector", () => {
 
     const match = selector.selectByText(viewHierarchy, "Match", { strategy: "random" });
 
-    expect(match?.text).toBe("Match");
+    expect(match.element?.text).toBe("Match");
+    expect(match.totalMatches).toBe(1);
   });
 
   test("returns null when no matches are found", () => {
@@ -78,7 +86,9 @@ describe("DefaultElementSelector", () => {
 
     const match = selector.selectByText(viewHierarchy, "Match", { strategy: "first" });
 
-    expect(match).toBeNull();
+    expect(match.element).toBeNull();
+    expect(match.indexInMatches).toBe(-1);
+    expect(match.totalMatches).toBe(0);
   });
 
   test("random strategy returns single match for resource ID", () => {
@@ -89,6 +99,7 @@ describe("DefaultElementSelector", () => {
 
     const match = selector.selectByResourceId(viewHierarchy, "test:id/button", { strategy: "random" });
 
-    expect(match?.["resource-id"]).toBe("test:id/button");
+    expect(match.element?.["resource-id"]).toBe("test:id/button");
+    expect(match.totalMatches).toBe(1);
   });
 });

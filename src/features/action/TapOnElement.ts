@@ -3,8 +3,10 @@ import {
   ActionableError,
   BootedDevice,
   Element,
+  ElementSelectionResult,
   ObserveResult,
   TapOnElementResult,
+  TapOnSelectedElement,
   ViewHierarchyResult
 } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
@@ -124,11 +126,11 @@ export class TapOnElement extends BaseVisualChange {
   private findElementInHierarchy(
     options: TapOnElementOptions,
     viewHierarchy: ViewHierarchyResult
-  ): { element: Element | null; containerFound: boolean } {
+  ): { selection: ElementSelectionResult; containerFound: boolean } {
     const containerFound = this.isContainerAvailable(viewHierarchy, options.container);
     if (options.text) {
       return {
-        element: this.elementSelector.selectByText(viewHierarchy, options.text, {
+        selection: this.elementSelector.selectByText(viewHierarchy, options.text, {
           container: options.container,
           fuzzyMatch: true,
           caseSensitive: false,
@@ -139,7 +141,7 @@ export class TapOnElement extends BaseVisualChange {
     }
     if (options.elementId) {
       return {
-        element: this.elementSelector.selectByResourceId(viewHierarchy, options.elementId, {
+        selection: this.elementSelector.selectByResourceId(viewHierarchy, options.elementId, {
           container: options.container,
           partialMatch: false,
           strategy: options.selectionStrategy
@@ -179,7 +181,7 @@ export class TapOnElement extends BaseVisualChange {
     observeResult: ObserveResult,
     signal?: AbortSignal
   ): Promise<{
-    element: Element | null;
+    selection: ElementSelectionResult;
     viewHierarchy: ViewHierarchyResult;
     containerFound: boolean;
     stats: SearchUntilStats;
@@ -197,7 +199,8 @@ export class TapOnElement extends BaseVisualChange {
 
     let latestViewHierarchy = viewHierarchy;
     const initialSearch = this.findElementInHierarchy(options, latestViewHierarchy);
-    let element = initialSearch.element;
+    let selection = initialSearch.selection;
+    let element = selection.element;
     let containerFoundEver = initialSearch.containerFound;
 
     if (!element) {
@@ -223,7 +226,8 @@ export class TapOnElement extends BaseVisualChange {
         }
 
         const searchResult = this.findElementInHierarchy(options, refreshedHierarchy);
-        element = searchResult.element;
+        selection = searchResult.selection;
+        element = selection.element;
         containerFoundEver = containerFoundEver || searchResult.containerFound;
         if (element) {
           break;
@@ -238,10 +242,45 @@ export class TapOnElement extends BaseVisualChange {
     };
 
     return {
-      element,
+      selection,
       viewHierarchy: latestViewHierarchy,
       containerFound: containerFoundEver,
       stats
+    };
+  }
+
+  private buildSelectedElementMetadata(selection: ElementSelectionResult): TapOnSelectedElement | undefined {
+    if (!selection.element) {
+      return undefined;
+    }
+
+    const bounds = selection.element.bounds;
+    const center = this.elementUtils.getElementCenter(selection.element);
+    const text = typeof selection.element.text === "string" && selection.element.text.length > 0
+      ? selection.element.text
+      : (typeof selection.element["content-desc"] === "string"
+        ? selection.element["content-desc"]
+        : (typeof selection.element["ios-accessibility-label"] === "string"
+          ? selection.element["ios-accessibility-label"]
+          : ""));
+    const resourceId = typeof selection.element["resource-id"] === "string"
+      ? selection.element["resource-id"]
+      : "";
+
+    return {
+      text,
+      resourceId,
+      bounds: {
+        left: bounds.left,
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        centerX: center.x,
+        centerY: center.y
+      },
+      indexInMatches: selection.indexInMatches,
+      totalMatches: selection.totalMatches,
+      selectionStrategy: selection.strategy
     };
   }
 
@@ -564,10 +603,12 @@ export class TapOnElement extends BaseVisualChange {
           searchUntilStats = searchOutcome.stats;
           observeResult.viewHierarchy = searchOutcome.viewHierarchy;
           viewHierarchy = searchOutcome.viewHierarchy;
-          if (!searchOutcome.element) {
+          if (!searchOutcome.selection.element) {
             await this.handleElementNotFound(options, observeResult, searchOutcome.containerFound, signal);
           }
-          const element = searchOutcome.element as Element;
+          const selection = searchOutcome.selection;
+          const element = selection.element as Element;
+          const selectedElementMetadata = this.buildSelectedElementMetadata(selection);
           const initialTapPoint = this.elementUtils.getElementCenter(element);
           let action = options.action;
           const longPressDuration = this.getLongPressDuration(options, this.device.platform);
@@ -582,6 +623,7 @@ export class TapOnElement extends BaseVisualChange {
               return {
                 success: true,
                 element: element,
+                selectedElement: selectedElementMetadata,
                 searchUntil: searchOutcome.stats,
                 wasAlreadyFocused: true,
                 focusChanged: false,
@@ -644,6 +686,7 @@ export class TapOnElement extends BaseVisualChange {
             success: true,
             action,
             element: tapElement,
+            selectedElement: selectedElementMetadata,
             searchUntil: searchOutcome.stats,
           };
         },

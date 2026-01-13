@@ -9,6 +9,7 @@ import {
   ActiveWindowInfo,
   TapResult,
   TapOnElementResult,
+  TapOnSelectedElement,
   ExitDialogResult,
   LaunchAppResult,
   TerminateAppResult,
@@ -67,6 +68,43 @@ export class ResultFaker {
       "scrollable": overrides.scrollable ?? faker.datatype.boolean(0.3),
       "selected": overrides.selected ?? faker.datatype.boolean(0.3),
       ...overrides
+    };
+  }
+
+  /**
+   * Generate fake TapOnSelectedElement metadata
+   */
+  static tapOnSelectedElement(
+    element: Element,
+    overrides: Partial<TapOnSelectedElement> = {}
+  ): TapOnSelectedElement {
+    const bounds = element.bounds;
+    const centerX = Math.floor((bounds.left + bounds.right) / 2);
+    const centerY = Math.floor((bounds.top + bounds.bottom) / 2);
+    const text = typeof element.text === "string" && element.text.length > 0
+      ? element.text
+      : (typeof element["content-desc"] === "string"
+        ? element["content-desc"]
+        : (typeof element["ios-accessibility-label"] === "string"
+          ? element["ios-accessibility-label"]
+          : ""));
+
+    return {
+      text: overrides.text ?? text,
+      resourceId: overrides.resourceId ?? (typeof element["resource-id"] === "string"
+        ? element["resource-id"]
+        : ""),
+      bounds: overrides.bounds ?? {
+        left: bounds.left,
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        centerX,
+        centerY
+      },
+      indexInMatches: overrides.indexInMatches ?? 0,
+      totalMatches: overrides.totalMatches ?? 1,
+      selectionStrategy: overrides.selectionStrategy ?? "first"
     };
   }
 
@@ -169,16 +207,14 @@ export class ResultFaker {
    * Generate fake TapOnTextResult
    */
   static tapOnTextResult(overrides: Partial<TapOnElementResult> = {}): TapOnElementResult {
-    const text = overrides.text ?? faker.lorem.words({ min: 1, max: 5 });
-    const x = overrides.x ?? faker.number.int({ min: 0, max: 1080 });
-    const y = overrides.y ?? faker.number.int({ min: 0, max: 1920 });
+    const element = overrides.element ?? this.element();
+    const selectedElement = overrides.selectedElement ?? this.tapOnSelectedElement(element);
 
     return {
       success: overrides.success ?? true,
-      text,
-      element: overrides.element ?? this.element({ text }),
-      x,
-      y,
+      action: overrides.action ?? "tap",
+      element,
+      selectedElement,
       observation: overrides.observation ?? this.observeResult(),
       error: overrides.error
     };

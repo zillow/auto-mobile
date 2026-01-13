@@ -1805,7 +1805,7 @@
   },
   {
     "name": "tapOn",
-    "description": "Tap UI elements by text or ID",
+    "description": "Tap UI elements by text or ID (returns selectedElement metadata)",
     "inputSchema": {
       "type": "object",
       "properties": {
