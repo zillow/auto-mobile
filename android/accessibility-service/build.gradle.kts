@@ -39,6 +39,12 @@ android {
     }
   }
 
+  lint {
+    // Suppress ProtectedPermissions for MANAGE_CA_CERTIFICATES
+    // This permission is used when the app is set as device owner/profile owner
+    disable += "ProtectedPermissions"
+  }
+
   buildFeatures { compose = true }
 
   compileOptions {

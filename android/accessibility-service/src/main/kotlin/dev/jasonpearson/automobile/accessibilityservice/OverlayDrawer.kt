@@ -1,270 +1,337 @@
 package dev.jasonpearson.automobile.accessibilityservice
 
-import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
-import android.graphics.PathEffect
-import android.graphics.Rect
 import android.graphics.RectF
-import android.os.Handler
-import android.os.Looper
-import android.provider.Settings
+import android.util.Log
 import android.view.View
-import android.view.WindowManager
-import kotlin.math.ceil
-import kotlin.math.floor
-import kotlin.math.max
-import kotlin.math.min
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightBounds
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightEntry
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightShape
+import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 
-enum class ShapeType {
-  BOX,
-  CIRCLE,
-}
-
-data class HighlightShape(
-    val type: ShapeType,
-    val bounds: RectF,
-    val style: HighlightStyle = HighlightStyle(),
-)
-
-/** Style values are in dp so they remain consistent across densities. */
-data class HighlightStyle(
-    val strokeColor: Int = Color.RED,
-    val strokeWidthDp: Float = 8f,
-    val fillColor: Int? = null,
-    val dashPattern: FloatArray? = null,
+data class HighlightOperationResult(
+    val success: Boolean,
+    val error: String? = null,
+    val highlights: List<HighlightEntry>? = null,
 )
 
 class OverlayDrawer(
-    context: Context,
-    windowManager: WindowManager? = null,
-    canDrawOverlays: (Context) -> Boolean = { Settings.canDrawOverlays(it) },
-    private val mainHandler: Handler = Handler(Looper.getMainLooper()),
+    private var overlayManager: OverlayManager? = null,
+    private val screenDimensionsProvider: (() -> ScreenDimensions?)? = null,
+    private val colorParser: (String) -> Int = { Color.parseColor(it) },
 ) {
 
-  private val view: HighlightOverlayView
-  private val manager: OverlayManager
+    companion object {
+        private const val TAG = "OverlayDrawer"
+        private const val DEFAULT_STROKE_COLOR = "#FF0000"
+        private const val DEFAULT_STROKE_WIDTH = 4f
+    }
 
-  init {
-    view = HighlightOverlayView(context)
-    val resolvedWindowManager =
-        windowManager ?: context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    manager =
-        OverlayManager(
-            context,
-            windowManager = resolvedWindowManager,
-            canDrawOverlays = canDrawOverlays,
-            viewFactory = { view },
+    private val lock = Any()
+    private val highlights = LinkedHashMap<String, HighlightRenderState>()
+    private var overlayView: View? = null
+
+    fun attachOverlayManager(manager: OverlayManager) {
+        overlayManager = manager
+    }
+
+    fun attachView(view: View) {
+        overlayView = view
+    }
+
+    fun addHighlight(id: String?, shape: HighlightShape?): HighlightOperationResult {
+        if (id.isNullOrBlank()) {
+            return HighlightOperationResult(false, "Missing highlight id", snapshotHighlights())
+        }
+        if (shape == null) {
+            return HighlightOperationResult(false, "Missing highlight shape", snapshotHighlights())
+        }
+
+        val renderResult = buildRenderState(shape)
+        val renderState = renderResult.state
+        if (renderState == null) {
+            return HighlightOperationResult(
+                false,
+                renderResult.error ?: "Invalid highlight shape",
+                snapshotHighlights(),
+            )
+        }
+
+        val overlayError = ensureOverlayVisible()
+        if (overlayError != null) {
+            return HighlightOperationResult(false, overlayError, snapshotHighlights())
+        }
+
+        synchronized(lock) { highlights[id] = renderState }
+        overlayView?.invalidate()
+        return HighlightOperationResult(true, null, snapshotHighlights())
+    }
+
+    fun removeHighlight(id: String?): HighlightOperationResult {
+        if (id.isNullOrBlank()) {
+            return HighlightOperationResult(false, "Missing highlight id", snapshotHighlights())
+        }
+
+        val snapshot =
+            synchronized(lock) {
+                highlights.remove(id)
+                if (highlights.isEmpty()) {
+                    overlayManager?.hide()
+                }
+                highlights.map { (storedId, renderState) ->
+                    HighlightEntry(id = storedId, shape = renderState.shape)
+                }
+            }
+
+        overlayView?.invalidate()
+        return HighlightOperationResult(true, null, snapshot)
+    }
+
+    fun clearHighlights(): HighlightOperationResult {
+        synchronized(lock) {
+            highlights.clear()
+            overlayManager?.hide()
+        }
+        overlayView?.invalidate()
+        return HighlightOperationResult(true, null, emptyList())
+    }
+
+    fun listHighlights(): List<HighlightEntry> {
+        return snapshotHighlights()
+    }
+
+    fun destroy() {
+        synchronized(lock) {
+            highlights.clear()
+            overlayManager?.hide()
+        }
+        overlayView = null
+        overlayManager = null
+    }
+
+    internal fun draw(canvas: Canvas) {
+        val snapshot = synchronized(lock) { highlights.values.toList() }
+        snapshot.forEach { renderState ->
+            when (renderState.shapeType) {
+                ShapeType.BOX -> drawBox(canvas, renderState)
+                ShapeType.CIRCLE -> drawCircle(canvas, renderState)
+            }
+        }
+    }
+
+    private fun drawBox(canvas: Canvas, renderState: HighlightRenderState) {
+        renderState.fillPaint?.let { canvas.drawRect(renderState.rect, it) }
+        renderState.strokePaint?.let { canvas.drawRect(renderState.rect, it) }
+    }
+
+    private fun drawCircle(canvas: Canvas, renderState: HighlightRenderState) {
+        renderState.fillPaint?.let { canvas.drawOval(renderState.rect, it) }
+        renderState.strokePaint?.let { canvas.drawOval(renderState.rect, it) }
+    }
+
+    private fun ensureOverlayVisible(): String? {
+        val manager = overlayManager ?: return "Overlay not initialized"
+        if (!manager.show()) {
+            return "Overlay not available"
+        }
+        if (overlayView == null) {
+            Log.w(TAG, "Overlay view missing after show()")
+            return "Overlay view unavailable"
+        }
+        return null
+    }
+
+    private fun buildRenderState(shape: HighlightShape): HighlightRenderResult {
+        val shapeType =
+            when (shape.type) {
+                "box" -> ShapeType.BOX
+                "circle" -> ShapeType.CIRCLE
+                else ->
+                    return HighlightRenderResult(
+                        error = "Unsupported highlight shape: ${shape.type}"
+                    )
+            }
+
+        if (!shape.bounds.hasValidSize()) {
+            return HighlightRenderResult(
+                error = "Highlight bounds must have positive width and height"
+            )
+        }
+
+        val rectResult = resolveRect(shape.bounds)
+        val rect = rectResult.rect
+        if (rect == null) {
+            return HighlightRenderResult(error = rectResult.error ?: "Invalid highlight bounds")
+        }
+        // Treat empty style (all fields null) as equivalent to null style
+        val effectiveStyle =
+            shape.style?.takeIf {
+                it.strokeColor != null ||
+                    it.strokeWidth != null ||
+                    it.fillColor != null ||
+                    it.dashPattern != null
+            }
+        val hasStroke =
+            effectiveStyle == null ||
+                effectiveStyle.strokeColor != null ||
+                effectiveStyle.strokeWidth != null
+        val fillColor = effectiveStyle?.fillColor
+        val dashPattern = effectiveStyle?.dashPattern
+
+        if (!hasStroke && fillColor == null) {
+            return HighlightRenderResult(error = "Highlight style must include stroke or fill")
+        }
+
+        val strokePaint =
+            if (hasStroke) {
+                val strokeWidth = effectiveStyle?.strokeWidth ?: DEFAULT_STROKE_WIDTH
+                if (strokeWidth <= 0f) {
+                    return HighlightRenderResult(error = "strokeWidth must be greater than 0")
+                }
+
+                val strokeColor = effectiveStyle?.strokeColor ?: DEFAULT_STROKE_COLOR
+                val parsedStrokeColor =
+                    parseColor(strokeColor)
+                        ?: return HighlightRenderResult(error = "Invalid strokeColor: $strokeColor")
+
+                val paint =
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = parsedStrokeColor
+                        this.style = Paint.Style.STROKE
+                        this.strokeWidth = strokeWidth
+                    }
+
+                if (dashPattern != null) {
+                    if (dashPattern.isEmpty() || dashPattern.any { it <= 0f }) {
+                        return HighlightRenderResult(
+                            error = "dashPattern must contain positive values"
+                        )
+                    }
+                    paint.pathEffect = DashPathEffect(dashPattern.toFloatArray(), 0f)
+                }
+
+                paint
+            } else {
+                null
+            }
+
+        val fillPaint =
+            if (fillColor != null) {
+                val parsedFillColor =
+                    parseColor(fillColor)
+                        ?: return HighlightRenderResult(error = "Invalid fillColor: $fillColor")
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = parsedFillColor
+                    this.style = Paint.Style.FILL
+                }
+            } else {
+                null
+            }
+
+        return HighlightRenderResult(
+            state =
+                HighlightRenderState(
+                    shape = shape,
+                    rect = rect,
+                    shapeType = shapeType,
+                    strokePaint = strokePaint,
+                    fillPaint = fillPaint,
+                )
         )
-  }
-
-  fun addHighlight(id: String, shape: HighlightShape) {
-    runOnMain {
-      view.setHighlight(id, shape)
-      manager.show()
-    }
-  }
-
-  fun removeHighlight(id: String) {
-    runOnMain {
-      view.removeHighlight(id)
-      if (!view.hasHighlights()) {
-        manager.hide()
-      }
-    }
-  }
-
-  fun clearAll() {
-    runOnMain {
-      view.clearHighlights()
-      manager.hide()
-    }
-  }
-
-  fun updateHighlight(id: String, shape: HighlightShape) {
-    runOnMain {
-      view.setHighlight(id, shape)
-      manager.show()
-    }
-  }
-
-  internal fun getHighlightViewForTest(): HighlightOverlayView = view
-
-  private fun runOnMain(action: () -> Unit) {
-    if (Looper.myLooper() == Looper.getMainLooper()) {
-      action()
-    } else {
-      mainHandler.post { action() }
-    }
-  }
-}
-
-internal class HighlightOverlayView(context: Context) : View(context) {
-
-  private data class ResolvedHighlight(
-      val shape: HighlightShape,
-      val drawBounds: RectF,
-      val strokeWidthPx: Float,
-      val pathEffect: PathEffect?,
-  )
-
-  private val highlights = LinkedHashMap<String, ResolvedHighlight>()
-  private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-  private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-
-  init {
-    isClickable = false
-    isFocusable = false
-    importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-    setWillNotDraw(false)
-  }
-
-  fun setHighlight(id: String, shape: HighlightShape) {
-    val resolved = resolveHighlight(shape)
-    val previous = highlights.put(id, resolved)
-    invalidateDirtyRect(previous, resolved)
-  }
-
-  fun removeHighlight(id: String) {
-    val removed = highlights.remove(id) ?: return
-    invalidateDirtyRect(removed, null)
-  }
-
-  fun clearHighlights() {
-    if (highlights.isEmpty()) return
-    val dirtyRect = unionHighlightsRect(highlights.values)
-    highlights.clear()
-    dirtyRect?.let { postInvalidateOnAnimation(it.left, it.top, it.right, it.bottom) }
-  }
-
-  fun hasHighlights(): Boolean = highlights.isNotEmpty()
-
-  internal fun getHighlightForTest(id: String): HighlightShape? = highlights[id]?.shape
-
-  override fun onDraw(canvas: Canvas) {
-    super.onDraw(canvas)
-    for (highlight in highlights.values) {
-      drawHighlight(canvas, highlight)
-    }
-  }
-
-  private fun drawHighlight(canvas: Canvas, highlight: ResolvedHighlight) {
-    val bounds = highlight.drawBounds
-    val style = highlight.shape.style
-
-    style.fillColor?.let { color ->
-      fillPaint.color = color
-      drawShape(canvas, highlight.shape.type, bounds, fillPaint)
     }
 
-    strokePaint.color = style.strokeColor
-    strokePaint.strokeWidth = highlight.strokeWidthPx
-    strokePaint.pathEffect = highlight.pathEffect
-    drawShape(canvas, highlight.shape.type, bounds, strokePaint)
-  }
-
-  private fun drawShape(canvas: Canvas, type: ShapeType, bounds: RectF, paint: Paint) {
-    when (type) {
-      ShapeType.BOX -> canvas.drawRect(bounds, paint)
-      ShapeType.CIRCLE -> {
-        val radius = bounds.width() / 2f
-        canvas.drawCircle(bounds.centerX(), bounds.centerY(), radius, paint)
-      }
+    private fun parseColor(color: String): Int? {
+        return try {
+            colorParser(color)
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "Failed to parse color: $color", e)
+            null
+        }
     }
-  }
 
-  private fun resolveHighlight(shape: HighlightShape): ResolvedHighlight {
-    val safeStyle = shape.style.copy(dashPattern = shape.style.dashPattern?.clone())
-    val safeShape = shape.copy(bounds = RectF(shape.bounds), style = safeStyle)
-    val drawBounds = resolveDrawBounds(safeShape)
-    val strokeWidthPx = resolveStrokeWidthPx(safeStyle.strokeWidthDp)
-    val dashPatternPx = resolveDashPatternPx(safeStyle.dashPattern)
-    val pathEffect = dashPatternPx?.let { DashPathEffect(it, 0f) }
-    return ResolvedHighlight(
-        shape = safeShape,
-        drawBounds = drawBounds,
-        strokeWidthPx = strokeWidthPx,
-        pathEffect = pathEffect,
+    private fun snapshotHighlights(): List<HighlightEntry> {
+        return synchronized(lock) {
+            highlights.map { (id, renderState) ->
+                HighlightEntry(id = id, shape = renderState.shape)
+            }
+        }
+    }
+
+    private data class HighlightRenderState(
+        val shape: HighlightShape,
+        val rect: RectF,
+        val shapeType: ShapeType,
+        val strokePaint: Paint?,
+        val fillPaint: Paint?,
     )
-  }
 
-  private fun resolveDrawBounds(shape: HighlightShape): RectF {
-    val normalized = normalizeBounds(shape.bounds)
-    return when (shape.type) {
-      ShapeType.BOX -> normalized
-      ShapeType.CIRCLE -> {
-        val radius = resolveCircleRadius(normalized)
-        val centerX = normalized.centerX()
-        val centerY = normalized.centerY()
-        RectF(centerX - radius, centerY - radius, centerX + radius, centerY + radius)
-      }
+    private fun resolveRect(bounds: HighlightBounds): HighlightRectResult {
+        val scale = resolveScale(bounds)
+        if (scale.error != null) {
+            return HighlightRectResult(error = scale.error)
+        }
+        val scaleX = scale.scaleX ?: 1f
+        val scaleY = scale.scaleY ?: 1f
+        return HighlightRectResult(rect = bounds.toRectF(scaleX, scaleY))
     }
-  }
 
-  private fun invalidateDirtyRect(old: ResolvedHighlight?, new: ResolvedHighlight?) {
-    val dirtyRect = combinedDirtyRect(old, new)
-    dirtyRect?.let { postInvalidateOnAnimation(it.left, it.top, it.right, it.bottom) }
-  }
+    private fun resolveScale(bounds: HighlightBounds): HighlightScaleResult {
+        val sourceWidth = bounds.sourceWidth
+        val sourceHeight = bounds.sourceHeight
 
-  private fun combinedDirtyRect(old: ResolvedHighlight?, new: ResolvedHighlight?): Rect? {
-    val oldRect = old?.let { calculateDirtyRect(it.drawBounds, it.strokeWidthPx) }
-    val newRect = new?.let { calculateDirtyRect(it.drawBounds, it.strokeWidthPx) }
-    return unionRect(oldRect, newRect)
-  }
+        if (sourceWidth == null && sourceHeight == null) {
+            return HighlightScaleResult()
+        }
 
-  private fun unionHighlightsRect(highlights: Collection<ResolvedHighlight>): Rect? {
-    var union: Rect? = null
-    for (highlight in highlights) {
-      val rect = calculateDirtyRect(highlight.drawBounds, highlight.strokeWidthPx)
-      union = unionRect(union, rect)
+        if (sourceWidth == null || sourceHeight == null) {
+            Log.w(TAG, "Highlight bounds missing sourceWidth/sourceHeight; ignoring scaling.")
+            return HighlightScaleResult()
+        }
+
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            return HighlightScaleResult(
+                error = "sourceWidth and sourceHeight must be greater than 0"
+            )
+        }
+
+        val targetDimensions = resolveTargetDimensions()
+        if (targetDimensions == null || !targetDimensions.isValid()) {
+            Log.w(TAG, "Unable to resolve target dimensions; ignoring scaling.")
+            return HighlightScaleResult()
+        }
+
+        return HighlightScaleResult(
+            scaleX = targetDimensions.width.toFloat() / sourceWidth.toFloat(),
+            scaleY = targetDimensions.height.toFloat() / sourceHeight.toFloat(),
+        )
     }
-    return union
-  }
 
-  private fun unionRect(first: Rect?, second: Rect?): Rect? {
-    return when {
-      first == null -> second
-      second == null -> first
-      else -> Rect(first).apply { union(second) }
+    private fun resolveTargetDimensions(): ScreenDimensions? {
+        val view = overlayView
+        if (view != null && view.width > 0 && view.height > 0) {
+            return ScreenDimensions(view.width, view.height)
+        }
+        return screenDimensionsProvider?.invoke()
     }
-  }
 
-  internal fun resolveStrokeWidthPx(strokeWidthDp: Float): Float {
-    return max(0f, strokeWidthDp) * resources.displayMetrics.density
-  }
+    private data class HighlightRectResult(val rect: RectF? = null, val error: String? = null)
 
-  internal fun resolveDashPatternPx(patternDp: FloatArray?): FloatArray? {
-    if (patternDp == null || patternDp.size < 2 || patternDp.size % 2 != 0) return null
-    val density = resources.displayMetrics.density
-    val converted = FloatArray(patternDp.size)
-    for (index in patternDp.indices) {
-      converted[index] = patternDp[index] * density
+    private data class HighlightScaleResult(
+        val scaleX: Float? = null,
+        val scaleY: Float? = null,
+        val error: String? = null,
+    )
+
+    private data class HighlightRenderResult(
+        val state: HighlightRenderState? = null,
+        val error: String? = null,
+    )
+
+    private enum class ShapeType {
+        BOX,
+        CIRCLE,
     }
-    return if (converted.any { it <= 0f }) null else converted
-  }
-
-  internal fun resolveCircleRadius(bounds: RectF): Float {
-    val normalized = normalizeBounds(bounds)
-    return min(normalized.width(), normalized.height()) / 2f
-  }
-
-  internal fun calculateDirtyRect(bounds: RectF, strokeWidthPx: Float): Rect {
-    val halfStroke = strokeWidthPx / 2f
-    val normalized = normalizeBounds(bounds)
-    val left = floor(normalized.left - halfStroke).toInt()
-    val top = floor(normalized.top - halfStroke).toInt()
-    val right = ceil(normalized.right + halfStroke).toInt()
-    val bottom = ceil(normalized.bottom + halfStroke).toInt()
-    return Rect(left, top, right, bottom)
-  }
-
-  private fun normalizeBounds(bounds: RectF): RectF {
-    val left = min(bounds.left, bounds.right)
-    val right = max(bounds.left, bounds.right)
-    val top = min(bounds.top, bounds.bottom)
-    val bottom = max(bounds.top, bounds.bottom)
-    return RectF(left, top, right, bottom)
-  }
 }

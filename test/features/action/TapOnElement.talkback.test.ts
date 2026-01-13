@@ -325,7 +325,7 @@ describe("TapOnElement TalkBack mode detection", () => {
       expect(requestTapCoordinates).toHaveBeenCalledTimes(2);
       expect(executeAndroidTapWithCoordinates).toHaveBeenCalledTimes(1);
       expect(executeAndroidTapWithCoordinates).toHaveBeenCalledWith(
-        "tap",
+        "doubleTap",
         50,
         50,
         500,

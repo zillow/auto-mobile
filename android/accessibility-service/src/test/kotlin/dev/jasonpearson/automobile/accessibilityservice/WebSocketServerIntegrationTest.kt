@@ -1,6 +1,8 @@
 package dev.jasonpearson.automobile.accessibilityservice
 
 import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightEntry
+import dev.jasonpearson.automobile.accessibilityservice.models.HighlightShape
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
 import io.ktor.client.HttpClient
@@ -20,7 +22,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
@@ -46,12 +51,45 @@ class WebSocketServerIntegrationTest {
   private lateinit var server: WebSocketServer
   private lateinit var testScope: CoroutineScope
   private val json = Json { ignoreUnknownKeys = true }
+  private val highlightLock = Any()
+  private val highlightStore = LinkedHashMap<String, HighlightShape>()
 
   @Before
   fun setUp() {
     testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     // Use port 0 to let OS assign an available port, avoiding conflicts when tests run in parallel
-    server = WebSocketServer(port = 0, scope = testScope)
+    synchronized(highlightLock) { highlightStore.clear() }
+    server =
+        WebSocketServer(
+            port = 0,
+            scope = testScope,
+            onAddHighlight = { requestId, highlightId, shape ->
+              val error =
+                  when {
+                    highlightId.isNullOrBlank() -> "Missing highlight id"
+                    shape == null -> "Missing highlight shape"
+                    else -> null
+                  }
+              if (error == null) {
+                synchronized(highlightLock) { highlightStore[highlightId!!] = shape!! }
+              }
+              enqueueHighlightResponse(requestId, error == null, error, null)
+            },
+            onRemoveHighlight = { requestId, highlightId ->
+              val error = if (highlightId.isNullOrBlank()) "Missing highlight id" else null
+              if (error == null) {
+                synchronized(highlightLock) { highlightStore.remove(highlightId) }
+              }
+              enqueueHighlightResponse(requestId, error == null, error, null)
+            },
+            onClearHighlights = { requestId ->
+              synchronized(highlightLock) { highlightStore.clear() }
+              enqueueHighlightResponse(requestId, true, null, null)
+            },
+            onListHighlights = { requestId ->
+              enqueueHighlightResponse(requestId, true, null, null)
+            },
+        )
   }
 
   /** Get the actual port the server is listening on. Must be called after server.start(). */
@@ -83,6 +121,35 @@ class WebSocketServerIntegrationTest {
         delay(checkIntervalMs)
       }
     }
+  }
+
+  private fun enqueueHighlightResponse(
+      requestId: String?,
+      success: Boolean,
+      error: String?,
+      highlights: List<HighlightEntry>?,
+  ) {
+    val highlightSnapshot =
+        highlights
+            ?: synchronized(highlightLock) {
+              highlightStore.map { (id, shape) -> HighlightEntry(id = id, shape = shape) }
+            }
+    val highlightsJson =
+        json.encodeToString(ListSerializer(HighlightEntry.serializer()), highlightSnapshot)
+    val errorJson = json.encodeToString<String?>(error)
+    val message =
+        buildString {
+          append("""{"type":"highlight_response","timestamp":${System.currentTimeMillis()}""")
+          if (requestId != null) {
+            append(""","requestId":"$requestId"""")
+          }
+          append(""","success":$success""")
+          append(""","error":$errorJson""")
+          append(""","highlights":$highlightsJson""")
+          append("}")
+        }
+
+    testScope.launch { server.broadcast(message) }
   }
 
   @Test
@@ -308,6 +375,224 @@ class WebSocketServerIntegrationTest {
 
       // Then - connection should be cleaned up
       assertEquals("Connection should be cleaned up", 0, server.getConnectionCount())
+    }
+  }
+
+  @Test
+  fun `add_highlight returns highlight response`() = runBlocking {
+    server.start()
+
+    val client = HttpClient(CIO) { install(WebSockets) }
+    client.use { client ->
+      client.webSocket(
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
+      ) {
+        incoming.receive() // Connection message
+
+        val requestId = "req-add"
+        val message =
+            """{"type":"add_highlight","requestId":"$requestId","id":"highlight-1","shape":{"type":"box","bounds":{"x":10,"y":20,"width":100,"height":80},"style":{"strokeColor":"#FF0000","strokeWidth":4,"fillColor":null,"dashPattern":null}}}"""
+        send(Frame.Text(message))
+
+        val responseFrame = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val responseJson = json.parseToJsonElement(responseFrame.readText()).jsonObject
+
+        assertEquals("highlight_response", responseJson["type"]?.jsonPrimitive?.content)
+        assertEquals(requestId, responseJson["requestId"]?.jsonPrimitive?.content)
+        assertEquals("true", responseJson["success"]?.jsonPrimitive?.content)
+        assertEquals("null", responseJson["error"]?.toString())
+        val highlights = responseJson["highlights"]?.jsonArray
+        assertNotNull("Should include highlights array", highlights)
+        assertEquals(1, highlights?.size)
+      }
+    }
+  }
+
+  @Test
+  fun `list_highlights returns stored highlights`() = runBlocking {
+    server.start()
+
+    val client = HttpClient(CIO) { install(WebSockets) }
+    client.use { client ->
+      client.webSocket(
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
+      ) {
+        incoming.receive() // Connection message
+
+        val addRequestId = "req-add"
+        val addMessage =
+            """{"type":"add_highlight","requestId":"$addRequestId","id":"highlight-1","shape":{"type":"box","bounds":{"x":15,"y":25,"width":120,"height":90},"style":{"strokeColor":"#00FF00","strokeWidth":6,"fillColor":null,"dashPattern":null}}}"""
+        send(Frame.Text(addMessage))
+        withTimeout(1000) { incoming.receive() } // add response
+
+        val listRequestId = "req-list"
+        send(Frame.Text("""{"type":"list_highlights","requestId":"$listRequestId"}"""))
+
+        val responseFrame = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val responseJson = json.parseToJsonElement(responseFrame.readText()).jsonObject
+
+        assertEquals("highlight_response", responseJson["type"]?.jsonPrimitive?.content)
+        assertEquals(listRequestId, responseJson["requestId"]?.jsonPrimitive?.content)
+        assertEquals("true", responseJson["success"]?.jsonPrimitive?.content)
+
+        val highlights = responseJson["highlights"]?.jsonArray
+        assertNotNull("Should include highlights array", highlights)
+        assertEquals(1, highlights?.size)
+        val highlight = highlights?.firstOrNull()?.jsonObject
+        assertEquals("highlight-1", highlight?.get("id")?.jsonPrimitive?.content)
+      }
+    }
+  }
+
+  @Test
+  fun `remove_highlight removes stored highlight`() = runBlocking {
+    server.start()
+
+    val client = HttpClient(CIO) { install(WebSockets) }
+    client.use { client ->
+      client.webSocket(
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
+      ) {
+        incoming.receive() // Connection message
+
+        val addMessage =
+            """{"type":"add_highlight","requestId":"req-add","id":"highlight-1","shape":{"type":"circle","bounds":{"x":40,"y":50,"width":60,"height":60},"style":{"strokeColor":"#0000FF","strokeWidth":5,"fillColor":null,"dashPattern":null}}}"""
+        send(Frame.Text(addMessage))
+        withTimeout(1000) { incoming.receive() } // add response
+
+        val removeRequestId = "req-remove"
+        send(Frame.Text("""{"type":"remove_highlight","requestId":"$removeRequestId","id":"highlight-1"}"""))
+        val removeResponse = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val removeJson = json.parseToJsonElement(removeResponse.readText()).jsonObject
+        assertEquals("true", removeJson["success"]?.jsonPrimitive?.content)
+        val removeHighlights = removeJson["highlights"]?.jsonArray
+        assertNotNull("Should include highlights array", removeHighlights)
+        assertEquals(0, removeHighlights?.size)
+
+        val listRequestId = "req-list"
+        send(Frame.Text("""{"type":"list_highlights","requestId":"$listRequestId"}"""))
+        val listResponse = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val listJson = json.parseToJsonElement(listResponse.readText()).jsonObject
+        val highlights = listJson["highlights"]?.jsonArray
+        assertEquals(0, highlights?.size)
+      }
+    }
+  }
+
+  @Test
+  fun `remove_highlight is idempotent`() = runBlocking {
+    server.start()
+
+    val client = HttpClient(CIO) { install(WebSockets) }
+    client.use { client ->
+      client.webSocket(
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
+      ) {
+        incoming.receive() // Connection message
+
+        val removeRequestId = "req-remove-missing"
+        send(
+            Frame.Text(
+                """{"type":"remove_highlight","requestId":"$removeRequestId","id":"missing-highlight"}"""
+            )
+        )
+        val removeResponse = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val removeJson = json.parseToJsonElement(removeResponse.readText()).jsonObject
+
+        assertEquals("highlight_response", removeJson["type"]?.jsonPrimitive?.content)
+        assertEquals(removeRequestId, removeJson["requestId"]?.jsonPrimitive?.content)
+        assertEquals("true", removeJson["success"]?.jsonPrimitive?.content)
+        val highlights = removeJson["highlights"]?.jsonArray
+        assertNotNull("Should include highlights array", highlights)
+        assertEquals(0, highlights?.size)
+      }
+    }
+  }
+
+  @Test
+  fun `clear_highlights removes all highlights`() = runBlocking {
+    server.start()
+
+    val client = HttpClient(CIO) { install(WebSockets) }
+    client.use { client ->
+      client.webSocket(
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
+      ) {
+        incoming.receive() // Connection message
+
+        val addMessageOne =
+            """{"type":"add_highlight","requestId":"req-add-1","id":"highlight-1","shape":{"type":"box","bounds":{"x":5,"y":10,"width":50,"height":40},"style":{"strokeColor":"#FF00FF","strokeWidth":3,"fillColor":null,"dashPattern":null}}}"""
+        val addMessageTwo =
+            """{"type":"add_highlight","requestId":"req-add-2","id":"highlight-2","shape":{"type":"box","bounds":{"x":60,"y":70,"width":80,"height":90},"style":{"strokeColor":"#00FFFF","strokeWidth":3,"fillColor":null,"dashPattern":null}}}"""
+        send(Frame.Text(addMessageOne))
+        withTimeout(1000) { incoming.receive() } // add response
+        send(Frame.Text(addMessageTwo))
+        withTimeout(1000) { incoming.receive() } // add response
+
+        val clearRequestId = "req-clear"
+        send(Frame.Text("""{"type":"clear_highlights","requestId":"$clearRequestId"}"""))
+        val clearResponse = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val clearJson = json.parseToJsonElement(clearResponse.readText()).jsonObject
+        assertEquals("true", clearJson["success"]?.jsonPrimitive?.content)
+        val clearHighlights = clearJson["highlights"]?.jsonArray
+        assertNotNull("Should include highlights array", clearHighlights)
+        assertEquals(0, clearHighlights?.size)
+
+        val listRequestId = "req-list"
+        send(Frame.Text("""{"type":"list_highlights","requestId":"$listRequestId"}"""))
+        val listResponse = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val listJson = json.parseToJsonElement(listResponse.readText()).jsonObject
+        val highlights = listJson["highlights"]?.jsonArray
+        assertEquals(0, highlights?.size)
+      }
+    }
+  }
+
+  @Test
+  fun `invalid add_highlight returns error response`() = runBlocking {
+    server.start()
+
+    val client = HttpClient(CIO) { install(WebSockets) }
+    client.use { client ->
+      client.webSocket(
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
+      ) {
+        incoming.receive() // Connection message
+
+        val requestId = "req-invalid"
+        val message =
+            """{"type":"add_highlight","requestId":"$requestId","shape":{"type":"box","bounds":{"x":10,"y":20,"width":100,"height":80},"style":{"strokeColor":"#FF0000","strokeWidth":4,"fillColor":null,"dashPattern":null}}}"""
+        send(Frame.Text(message))
+
+        val responseFrame = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val responseJson = json.parseToJsonElement(responseFrame.readText()).jsonObject
+
+        assertEquals("highlight_response", responseJson["type"]?.jsonPrimitive?.content)
+        assertEquals(requestId, responseJson["requestId"]?.jsonPrimitive?.content)
+        assertEquals("false", responseJson["success"]?.jsonPrimitive?.content)
+        assertEquals("Missing highlight id", responseJson["error"]?.jsonPrimitive?.content)
+        val highlights = responseJson["highlights"]?.jsonArray
+        assertNotNull("Should include highlights array", highlights)
+        assertEquals(0, highlights?.size)
+      }
     }
   }
 }

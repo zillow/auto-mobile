@@ -803,28 +803,38 @@ export class TapOnElement extends BaseVisualChange {
     // This is faster than ADB and precise (uses exact coordinates, not resource-id lookup).
     // Use short duration (50ms) for tap/doubleTap to avoid being interpreted as long press
     const tapDuration = action === "longPress" ? durationMs : 50;
+
+    // For double tap, we need to perform two accessibility taps
     if (action === "doubleTap") {
-      const firstTap = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
-      if (!firstTap.success) {
-        logger.warn(`[TapOnElement] Accessibility coordinate double tap failed (first tap: ${firstTap.error}), falling back to ADB double tap at (${x}, ${y})`);
+      // First tap
+      const firstResult = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
+      if (!firstResult.success) {
+        logger.warn(
+          `[TapOnElement] First accessibility tap failed (${firstResult.error}), falling back to full ADB double tap at (${x}, ${y})`
+        );
         await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
         return;
       }
 
+      // Wait between taps (standard double-tap interval)
       await this.timer.sleep(200);
 
-      const secondTap = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
-      if (!secondTap.success) {
-        logger.warn(`[TapOnElement] Accessibility coordinate double tap failed (second tap: ${secondTap.error}), falling back to ADB tap at (${x}, ${y})`);
-        await this.executeAndroidTapWithCoordinates("tap", x, y, durationMs, element, signal);
+      // Second tap
+      const secondResult = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
+      if (!secondResult.success) {
+        logger.warn(
+          `[TapOnElement] Second accessibility tap failed (${secondResult.error}), retrying full ADB double tap at (${x}, ${y})`
+        );
+        // Retry full double tap via ADB to preserve double-tap timing
+        await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
       }
-      return;
-    }
-
-    const result = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
-    if (!result.success) {
-      logger.warn(`[TapOnElement] Accessibility coordinate tap failed (${result.error}), falling back to ADB tap at (${x}, ${y})`);
-      await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
+    } else {
+      // For single tap or long press
+      const result = await this.accessibilityService.requestTapCoordinates(x, y, tapDuration);
+      if (!result.success) {
+        logger.warn(`[TapOnElement] Accessibility coordinate tap failed (${result.error}), falling back to ADB tap at (${x}, ${y})`);
+        await this.executeAndroidTapWithCoordinates(action, x, y, durationMs, element, signal);
+      }
     }
   }
 
