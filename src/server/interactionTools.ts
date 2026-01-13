@@ -1062,8 +1062,20 @@ export function registerInteractionTools() {
       searchUntil: args.searchUntil,
     }, progress);
 
-    const searchSummary = result.searchUntil
-      ? `${result.searchUntil.changeCount} view hierarchy changes over ${result.searchUntil.requestCount} requests within ${result.searchUntil.durationMs}ms`
+    const searchStats = result.searchUntil;
+    const freshness = result.observation?.freshness;
+    const hasFreshnessTimestamp = typeof freshness?.requestedAfter === "number"
+      && typeof freshness?.actualTimestamp === "number";
+    const hasConfirmedFreshObservation = hasFreshnessTimestamp
+      && freshness.actualTimestamp >= freshness.requestedAfter;
+    const shouldIncludeSearchSummary = Boolean(searchStats)
+      && (
+        searchStats.requestCount > 0
+        || searchStats.changeCount > 0
+        || (Boolean(args.searchUntil) && hasConfirmedFreshObservation)
+      );
+    const searchSummary = shouldIncludeSearchSummary && searchStats
+      ? `${searchStats.changeCount} view hierarchy changes over ${searchStats.requestCount} requests within ${searchStats.durationMs}ms`
       : undefined;
 
     return createJSONToolResponse({
