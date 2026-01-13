@@ -38,19 +38,16 @@ describe("Highlight Tools Registration", () => {
     };
 
     expect(() => tool!.schema.parse({
-      highlightId: "highlight-1",
       platform: "android",
       shape: validShape
     })).not.toThrow();
 
     expect(() => tool!.schema.parse({
-      platform: "android",
-      shape: validShape
+      platform: "android"
     })).toThrow();
 
     expect(() => tool!.schema.parse({
-      highlightId: "highlight-1",
-      platform: "android"
+      shape: validShape
     })).toThrow();
   });
 
@@ -61,7 +58,6 @@ describe("Highlight Tools Registration", () => {
     expect(tool).toBeDefined();
 
     expect(() => tool!.schema.parse({
-      highlightId: "highlight-2",
       platform: "android",
       shape: {
         type: "box",
@@ -92,7 +88,6 @@ describe("Highlight Tools Registration", () => {
     };
 
     const parsed = tool!.schema.parse({
-      highlightId: "highlight-1",
       platform: "ios",
       shape: validShape
     });

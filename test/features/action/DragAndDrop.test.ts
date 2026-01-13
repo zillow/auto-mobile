@@ -31,17 +31,17 @@ describe("DragAndDrop", () => {
         {
           $: {
             "resource-id": "source-id",
-            text: "Source",
-            bounds: "[0,0][100,100]",
-            class: "android.widget.TextView"
+            "text": "Source",
+            "bounds": "[0,0][100,100]",
+            "class": "android.widget.TextView"
           }
         },
         {
           $: {
             "resource-id": "target-id",
-            text: "Target",
-            bounds: "[200,200][300,300]",
-            class: "android.widget.TextView"
+            "text": "Target",
+            "bounds": "[200,200][300,300]",
+            "class": "android.widget.TextView"
           }
         }
       ]
