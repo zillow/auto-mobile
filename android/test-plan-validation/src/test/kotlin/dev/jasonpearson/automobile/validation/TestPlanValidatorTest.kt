@@ -541,7 +541,7 @@ class TestPlanValidatorTest {
                 target:
                   text: Target
                 params:
-                  duration: 800
+                  dragDurationMs: 800
         """.trimIndent()
 
         val result = TestPlanValidator.validateYaml(yaml)

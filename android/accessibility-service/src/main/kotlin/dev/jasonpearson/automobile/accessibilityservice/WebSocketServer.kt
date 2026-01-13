@@ -41,6 +41,9 @@ data class WebSocketRequest(
     val duration: Long? = null,
     val offset: Int? = null, // Two-finger swipe offset
     val holdTime: Long? = null,
+    val pressDurationMs: Long? = null,
+    val dragDurationMs: Long? = null,
+    val holdDurationMs: Long? = null,
     // Pinch parameters
     val centerX: Int? = null,
     val centerY: Int? = null,
@@ -95,8 +98,9 @@ class WebSocketServer(
             y1: Int,
             x2: Int,
             y2: Int,
-            duration: Long,
-            holdTime: Long,
+            pressDurationMs: Long,
+            dragDurationMs: Long,
+            holdDurationMs: Long,
         ) -> Unit)? =
         null,
     private val onRequestPinch:
@@ -408,10 +412,20 @@ class WebSocketServer(
           val y1 = request.y1
           val x2 = request.x2
           val y2 = request.y2
-          val duration = request.duration ?: 500L
-          val holdTime = request.holdTime ?: 200L
+          val pressDurationMs = request.pressDurationMs ?: request.holdTime ?: 600L
+          val dragDurationMs = request.dragDurationMs ?: request.duration ?: 300L
+          val holdDurationMs = request.holdDurationMs ?: 100L
           if (x1 != null && y1 != null && x2 != null && y2 != null) {
-            onRequestDrag?.invoke(request.requestId, x1, y1, x2, y2, duration, holdTime)
+            onRequestDrag?.invoke(
+                request.requestId,
+                x1,
+                y1,
+                x2,
+                y2,
+                pressDurationMs,
+                dragDurationMs,
+                holdDurationMs,
+            )
           } else {
             Log.w(TAG, "Drag request missing required coordinates")
           }

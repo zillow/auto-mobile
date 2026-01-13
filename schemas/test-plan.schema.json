@@ -171,18 +171,23 @@
               "target": {
                 "$ref": "#/$defs/dragAndDropSelector"
               },
-              "duration": {
+              "pressDurationMs": {
                 "type": "number",
-                "description": "Drag duration ms (default: 500)"
+                "description": "Press duration ms (min: 600, max: 3000, default: 600)",
+                "minimum": 600,
+                "maximum": 3000
               },
-              "holdTime": {
+              "dragDurationMs": {
                 "type": "number",
-                "description": "Hold time ms (default: 200)"
+                "description": "Drag duration ms (min: 300, max: 1000, default: 300)",
+                "minimum": 300,
+                "maximum": 1000
               },
-              "dropDelay": {
+              "holdDurationMs": {
                 "type": "number",
+                "description": "Hold duration ms (min: 100, max: 3000, default: 100)",
                 "minimum": 100,
-                "description": "Drop delay ms (min: 100, default: 100)"
+                "maximum": 3000
               },
               "platform": {
                 "type": "string",
@@ -289,18 +294,23 @@
           "$ref": "#/$defs/dragAndDropSelector",
           "description": "Target element"
         },
-        "duration": {
+        "pressDurationMs": {
           "type": "number",
-          "description": "Drag duration ms (default: 500)"
+          "description": "Press duration ms (min: 600, max: 3000, default: 600)",
+          "minimum": 600,
+          "maximum": 3000
         },
-        "holdTime": {
+        "dragDurationMs": {
           "type": "number",
-          "description": "Hold time ms (default: 200)"
+          "description": "Drag duration ms (min: 300, max: 1000, default: 300)",
+          "minimum": 300,
+          "maximum": 1000
         },
-        "dropDelay": {
+        "holdDurationMs": {
           "type": "number",
+          "description": "Hold duration ms (min: 100, max: 3000, default: 100)",
           "minimum": 100,
-          "description": "Drop delay ms (min: 100, default: 100)"
+          "maximum": 3000
         },
         "platform": {
           "type": "string",

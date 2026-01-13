@@ -6,7 +6,7 @@ export interface DragAndDropTarget {
 export interface DragAndDropOptions {
   source: DragAndDropTarget;
   target: DragAndDropTarget;
-  duration?: number;
-  holdTime?: number;
-  dropDelay?: number;
+  pressDurationMs?: number;
+  dragDurationMs?: number;
+  holdDurationMs?: number;
 }

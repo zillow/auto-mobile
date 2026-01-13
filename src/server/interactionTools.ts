@@ -101,9 +101,9 @@ export interface DragAndDropArgs {
     text?: string;
     elementId?: string;
   };
-  duration?: number;
-  holdTime?: number;
-  dropDelay?: number;
+  pressDurationMs?: number;
+  dragDurationMs?: number;
+  holdDurationMs?: number;
   platform: Platform;
 }
 
@@ -263,9 +263,15 @@ const dragAndDropSelectorSchema = (label: "Source" | "Target") =>
 export const dragAndDropSchema = addDeviceTargetingToSchema(z.object({
   source: dragAndDropSelectorSchema("Source"),
   target: dragAndDropSelectorSchema("Target"),
-  duration: z.number().optional().describe("Drag duration ms (default: 500)"),
-  holdTime: z.number().optional().describe("Hold time ms (default: 200)"),
-  dropDelay: z.number().min(100).optional().describe("Drop delay ms (min: 100, default: 100)"),
+  pressDurationMs: z.number().min(600).max(3000).optional().describe(
+    "Press duration ms (min: 600, max: 3000, default: 600)"
+  ),
+  dragDurationMs: z.number().min(300).max(1000).optional().describe(
+    "Drag duration ms (min: 300, max: 1000, default: 300)"
+  ),
+  holdDurationMs: z.number().min(100).max(3000).optional().describe(
+    "Hold duration ms (min: 100, max: 3000, default: 100)"
+  ),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
@@ -1148,9 +1154,9 @@ export function registerInteractionTools() {
     const result = await dragAndDrop.execute({
       source: args.source,
       target: args.target,
-      duration: args.duration,
-      holdTime: args.holdTime,
-      dropDelay: args.dropDelay
+      pressDurationMs: args.pressDurationMs,
+      dragDurationMs: args.dragDurationMs,
+      holdDurationMs: args.holdDurationMs
     }, progress);
 
     return createJSONToolResponse({

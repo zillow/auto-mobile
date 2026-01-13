@@ -2552,8 +2552,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
    * @param y1 - Starting Y coordinate
    * @param x2 - Ending X coordinate
    * @param y2 - Ending Y coordinate
-   * @param duration - Drag duration in milliseconds
-   * @param holdTime - Hold time before dragging in milliseconds
+   * @param pressDurationMs - Press duration before dragging in milliseconds
+   * @param dragDurationMs - Drag duration in milliseconds
+   * @param holdDurationMs - Hold duration after dragging in milliseconds
    * @param timeoutMs - Maximum time to wait for drag completion in milliseconds
    * @returns Promise<A11yDragResult> - The drag result with timing information
    */
@@ -2562,9 +2563,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
     y1: number,
     x2: number,
     y2: number,
-    duration: number = 500,
-    holdTime: number = 200,
-    timeoutMs: number = 5000
+    pressDurationMs: number,
+    dragDurationMs: number,
+    holdDurationMs: number,
+    timeoutMs: number
   ): Promise<A11yDragResult> {
     const startTime = Date.now();
 
@@ -2607,11 +2609,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
         y1: Math.round(y1),
         x2: Math.round(x2),
         y2: Math.round(y2),
-        duration,
-        holdTime
+        pressDurationMs,
+        dragDurationMs,
+        holdDurationMs
       });
       this.ws.send(message);
-      logger.debug(`[ACCESSIBILITY_SERVICE] Sent drag request (requestId: ${requestId}, ${x1},${y1} -> ${x2},${y2}, duration: ${duration}ms, hold: ${holdTime}ms)`);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent drag request (requestId: ${requestId}, ${x1},${y1} -> ${x2},${y2}, press: ${pressDurationMs}ms, drag: ${dragDurationMs}ms, hold: ${holdDurationMs}ms)`);
 
       const result = await dragPromise;
       const clientDuration = Date.now() - startTime;
