@@ -4,8 +4,9 @@ import { ActionableError } from "../models/ActionableError";
 import { RawViewHierarchy } from "../features/debug/RawViewHierarchy";
 import { DebugSearch } from "../features/debug/DebugSearch";
 import { BugReport } from "../features/debug/BugReport";
+import { highlightShapeSchema } from "../features/debug/VisualHighlight";
 import { createJSONToolResponse } from "../utils/toolUtils";
-import { BootedDevice, Platform } from "../models";
+import { BootedDevice, HighlightShape, Platform } from "../models";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { isDebugModeEnabled } from "../utils/debug";
 
@@ -44,6 +45,13 @@ export interface BugReportArgs {
   logcatLines?: number;
   saveToFile?: boolean;
   saveDir?: string;
+  highlights?: Array<{
+    id: string;
+    description: string;
+    shape: HighlightShape;
+  }>;
+  autoRemoveHighlights?: boolean;
+  includeHighlightsInScreenshot?: boolean;
 }
 
 // Schema definitions
@@ -76,7 +84,14 @@ export const bugReportSchema = addDeviceTargetingToSchema(z.object({
   includeLogcat: z.boolean().optional().describe("Whether to include logcat entries (default: true)"),
   logcatLines: z.number().optional().describe("Number of recent logcat lines to include (default: 100)"),
   saveToFile: z.boolean().optional().describe("Whether to save full report to a file (default: false)"),
-  saveDir: z.string().optional().describe("Directory to save report to")
+  saveDir: z.string().optional().describe("Directory to save report to"),
+  highlights: z.array(z.object({
+    id: z.string().min(1).describe("Unique highlight id"),
+    description: z.string().min(1).describe("Description of the highlight"),
+    shape: highlightShapeSchema
+  })).optional().describe("Highlights to add during report generation"),
+  autoRemoveHighlights: z.boolean().optional().describe("Whether to remove highlights added for this report (default: true)"),
+  includeHighlightsInScreenshot: z.boolean().optional().describe("Whether screenshot should include highlight overlays (default: true)")
 }));
 
 // Register debug tools
@@ -134,7 +149,10 @@ export function registerDebugTools() {
         includeLogcat: args.includeLogcat,
         logcatLines: args.logcatLines,
         saveToFile: args.saveToFile,
-        saveDir: args.saveDir
+        saveDir: args.saveDir,
+        highlights: args.highlights,
+        autoRemoveHighlights: args.autoRemoveHighlights,
+        includeHighlightsInScreenshot: args.includeHighlightsInScreenshot
       });
       return createJSONToolResponse(result);
     } catch (error) {
@@ -163,7 +181,7 @@ export function registerDebugTools() {
 
   ToolRegistry.registerDeviceAware(
     "bugReport",
-    "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, and optionally a screenshot. The report can be saved to a file for sharing with AutoMobile developers.",
+    "Generate a comprehensive bug report for debugging AutoMobile interactions. Captures screen state, view hierarchy, logcat, window info, optional screenshot, and optional visual highlight metadata. The report can be saved to a file for sharing with AutoMobile developers.",
     bugReportSchema,
     bugReportHandler,
     false,

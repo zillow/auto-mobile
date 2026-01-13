@@ -31,6 +31,27 @@ await highlight({
 });
 ```
 
+### Generate bug report with highlights
+```javascript
+await bugReport({
+  platform: "android",
+  includeScreenshot: true,
+  highlights: [
+    {
+      id: "problem-area",
+      description: "Expected button location",
+      shape: {
+        type: "box",
+        bounds: { x: 120, y: 280, width: 220, height: 90 },
+        style: { strokeColor: "#FF0000", strokeWidth: 6 }
+      }
+    }
+  ],
+  includeHighlightsInScreenshot: true,
+  autoRemoveHighlights: true
+});
+```
+
 ### Multiple highlights for comparison
 ```javascript
 await highlight({

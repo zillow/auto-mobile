@@ -4,10 +4,31 @@ import path from "path";
 import { randomBytes } from "crypto";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { BootedDevice, BugReportResult } from "../../models";
+import {
+  BootedDevice,
+  BugReportHighlightEntry,
+  BugReportResult,
+  Element,
+  ElementBounds,
+  HighlightBounds,
+  HighlightEntry,
+  HighlightShape,
+  ViewHierarchyResult
+} from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { VisualHighlight } from "./VisualHighlight";
+import { ElementUtils } from "../utility/ElementUtils";
+
+const HIGHLIGHT_RENDER_DELAY_MS = 250;
+const HIGHLIGHT_NEARBY_ELEMENT_LIMIT = 5;
+
+export interface BugReportHighlightRequest {
+  id: string;
+  description: string;
+  shape: HighlightShape;
+}
 
 export interface BugReportOptions {
   /**
@@ -44,6 +65,21 @@ export interface BugReportOptions {
    * Directory to save report to (default: secure temp directory via fs.mkdtemp)
    */
   saveDir?: string;
+
+  /**
+   * Optional highlights to add during report generation
+   */
+  highlights?: BugReportHighlightRequest[];
+
+  /**
+   * Whether to remove highlights added for this report (default: true)
+   */
+  autoRemoveHighlights?: boolean;
+
+  /**
+   * Whether screenshot should include highlight overlays (default: true)
+   */
+  includeHighlightsInScreenshot?: boolean;
 }
 
 /**
@@ -54,6 +90,8 @@ export class BugReport {
   private readonly adb: AdbClient;
   private viewHierarchy: ViewHierarchy;
   private takeScreenshot: TakeScreenshot;
+  private visualHighlight: VisualHighlight;
+  private elementUtils: ElementUtils;
 
   constructor(
     device: BootedDevice,
@@ -63,6 +101,8 @@ export class BugReport {
     this.adb = adb || new AdbClient(device);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);
     this.takeScreenshot = new TakeScreenshot(device, this.adb);
+    this.visualHighlight = new VisualHighlight(device, this.adb);
+    this.elementUtils = new ElementUtils();
   }
 
   /**
@@ -77,6 +117,12 @@ export class BugReport {
     const includeScreenshot = options.includeScreenshot !== false;
     const includeRawHierarchy = options.includeRawHierarchy !== false;
     const includeLogcat = options.includeLogcat !== false;
+    const includeHighlightsInScreenshot = options.includeHighlightsInScreenshot !== false;
+    const autoRemoveHighlights = options.autoRemoveHighlights !== false;
+    const highlightRequests = options.highlights ?? [];
+    const highlightDescriptions = new Map(
+      highlightRequests.map(highlight => [highlight.id, highlight.description])
+    );
     const logcatLines = options.logcatLines || 100;
 
     logger.info(`[BugReport] Generating report ${reportId}`);
@@ -98,6 +144,8 @@ export class BugReport {
 
     // Run parallel operations
     const operations: Promise<void>[] = [];
+    let viewHierarchyResult: ViewHierarchyResult | null = null;
+    let highlightEntries: HighlightEntry[] = [];
 
     // Get device info
     operations.push(this.getDeviceInfo(result));
@@ -109,20 +157,42 @@ export class BugReport {
     operations.push(this.getWindowState(result));
 
     // Get view hierarchy
-    operations.push(this.getHierarchy(result, includeRawHierarchy));
+    operations.push(
+      this.getHierarchy(result, includeRawHierarchy)
+        .then(hierarchy => {
+          viewHierarchyResult = hierarchy;
+        })
+    );
 
     // Get logcat if requested
     if (includeLogcat) {
       operations.push(this.getLogcat(result, logcatLines, options.appId));
     }
 
-    // Get screenshot if requested
-    if (includeScreenshot) {
-      operations.push(this.getScreenshot(result));
-    }
+    // Handle highlights and screenshot sequencing
+    operations.push(
+      this.handleHighlightsAndScreenshot(
+        result,
+        highlightRequests,
+        includeScreenshot,
+        includeHighlightsInScreenshot,
+        autoRemoveHighlights
+      ).then(entries => {
+        highlightEntries = entries;
+      })
+    );
 
     // Wait for all operations
     await Promise.all(operations);
+
+    if (highlightEntries.length > 0 || highlightRequests.length > 0) {
+      result.highlights = this.buildHighlightEntries(
+        highlightEntries,
+        highlightDescriptions,
+        viewHierarchyResult,
+        result.screenState.screenSize
+      );
+    }
 
     // Save to file if requested
     if (options.saveToFile) {
@@ -251,7 +321,10 @@ export class BugReport {
   /**
    * Get view hierarchy
    */
-  private async getHierarchy(result: BugReportResult, includeRaw: boolean): Promise<void> {
+  private async getHierarchy(
+    result: BugReportResult,
+    includeRaw: boolean
+  ): Promise<ViewHierarchyResult | null> {
     try {
       const perf = new NoOpPerformanceTracker();
 
@@ -304,8 +377,11 @@ export class BugReport {
         result.viewHierarchy.elementCount = elementCount;
         result.viewHierarchy.clickableElements = clickableElements.slice(0, 50);
       }
+
+      return hierarchy;
     } catch (error) {
       result.errors?.push(`Failed to get view hierarchy: ${error}`);
+      return null;
     }
   }
 
@@ -387,6 +463,233 @@ export class BugReport {
     } catch (error) {
       result.errors?.push(`Failed to get screenshot: ${error}`);
     }
+  }
+
+  private async handleHighlightsAndScreenshot(
+    result: BugReportResult,
+    highlightRequests: BugReportHighlightRequest[],
+    includeScreenshot: boolean,
+    includeHighlightsInScreenshot: boolean,
+    autoRemoveHighlights: boolean
+  ): Promise<HighlightEntry[]> {
+    const hasHighlightRequests = highlightRequests.length > 0;
+    const canHighlight = this.device.platform === "android";
+    const addedHighlightIds: string[] = [];
+    let listFailed = false;
+
+    const addHighlights = async () => {
+      if (!hasHighlightRequests) {
+        return;
+      }
+      if (!canHighlight) {
+        result.errors?.push("Visual highlights are only supported on Android devices.");
+        return;
+      }
+
+      for (const highlight of highlightRequests) {
+        try {
+          await this.visualHighlight.addHighlight(highlight.id, highlight.shape);
+          addedHighlightIds.push(highlight.id);
+        } catch (error) {
+          result.errors?.push(`Failed to add highlight ${highlight.id}: ${error}`);
+        }
+      }
+
+      if (addedHighlightIds.length > 0) {
+        await this.waitForHighlightRender();
+      }
+    };
+
+    const listHighlights = async (): Promise<HighlightEntry[]> => {
+      if (!canHighlight) {
+        return [];
+      }
+      try {
+        const response = await this.visualHighlight.listHighlights();
+        return response.highlights ?? [];
+      } catch (error) {
+        listFailed = true;
+        if (hasHighlightRequests || includeScreenshot) {
+          result.errors?.push(`Failed to list highlights: ${error}`);
+        }
+        return [];
+      }
+    };
+
+    const removeHighlights = async () => {
+      if (!autoRemoveHighlights || addedHighlightIds.length === 0 || !canHighlight) {
+        return;
+      }
+      for (const highlightId of addedHighlightIds) {
+        try {
+          await this.visualHighlight.removeHighlight(highlightId);
+        } catch (error) {
+          result.errors?.push(`Failed to remove highlight ${highlightId}: ${error}`);
+        }
+      }
+    };
+
+    if (includeScreenshot && !includeHighlightsInScreenshot) {
+      await this.getScreenshot(result);
+      await addHighlights();
+    } else {
+      await addHighlights();
+      if (includeScreenshot) {
+        await this.getScreenshot(result);
+      }
+    }
+
+    const shouldListHighlights = canHighlight && hasHighlightRequests;
+    let activeHighlights = shouldListHighlights ? await listHighlights() : [];
+
+    if (listFailed && addedHighlightIds.length > 0) {
+      const addedHighlightSet = new Set(addedHighlightIds);
+      activeHighlights = highlightRequests
+        .filter(highlight => addedHighlightSet.has(highlight.id))
+        .map(highlight => ({
+          id: highlight.id,
+          shape: highlight.shape
+        }));
+    }
+
+    await removeHighlights();
+
+    return activeHighlights;
+  }
+
+  private async waitForHighlightRender(): Promise<void> {
+    if (HIGHLIGHT_RENDER_DELAY_MS <= 0) {
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, HIGHLIGHT_RENDER_DELAY_MS));
+  }
+
+  private buildHighlightEntries(
+    highlightEntries: HighlightEntry[],
+    highlightDescriptions: Map<string, string>,
+    viewHierarchy: ViewHierarchyResult | null,
+    screenSize?: { width: number; height: number }
+  ): BugReportHighlightEntry[] {
+    const flattenedElements = viewHierarchy
+      ? this.elementUtils.flattenViewHierarchy(viewHierarchy)
+      : [];
+
+    return highlightEntries.map(entry => {
+      const highlightBounds = this.getHighlightBounds(entry.shape, screenSize);
+      const nearbyElements = highlightBounds
+        ? this.findNearbyElements(highlightBounds, flattenedElements)
+        : [];
+
+      return {
+        id: entry.id,
+        description: highlightDescriptions.get(entry.id),
+        shape: entry.shape,
+        nearbyElements
+      };
+    });
+  }
+
+  private findNearbyElements(
+    highlightBounds: ElementBounds,
+    flattenedElements: Array<{ element: Element; text?: string }>
+  ): BugReportHighlightEntry["nearbyElements"] {
+    if (flattenedElements.length === 0) {
+      return [];
+    }
+
+    const candidates = flattenedElements
+      .map(entry => {
+        const bounds = entry.element.bounds;
+        if (!bounds) {
+          return null;
+        }
+        const distance = this.getBoundsDistance(highlightBounds, bounds);
+        return { ...entry, bounds, distance };
+      })
+      .filter((entry): entry is { element: Element; text?: string; bounds: ElementBounds; distance: number } => (
+        entry !== null
+      ));
+
+    candidates.sort((a, b) => {
+      if (a.distance !== b.distance) {
+        return a.distance - b.distance;
+      }
+      const aClickable = a.element.clickable ? 0 : 1;
+      const bClickable = b.element.clickable ? 0 : 1;
+      if (aClickable !== bClickable) {
+        return aClickable - bClickable;
+      }
+      return this.getBoundsArea(a.bounds) - this.getBoundsArea(b.bounds);
+    });
+
+    return candidates.slice(0, HIGHLIGHT_NEARBY_ELEMENT_LIMIT).map(entry => ({
+      resourceId: entry.element["resource-id"],
+      text: entry.text ?? entry.element.text,
+      contentDesc: entry.element["content-desc"],
+      className: entry.element["class"],
+      bounds: entry.bounds,
+      distance: Math.round(entry.distance),
+      clickable: entry.element.clickable,
+      enabled: entry.element.enabled
+    }));
+  }
+
+  private getHighlightBounds(
+    shape: HighlightShape,
+    screenSize?: { width: number; height: number }
+  ): ElementBounds | null {
+    if (shape.type === "path") {
+      const bounds = shape.bounds ?? this.getBoundsFromPoints(shape.points);
+      return bounds ? this.scaleHighlightBounds(bounds, screenSize) : null;
+    }
+    return this.scaleHighlightBounds(shape.bounds, screenSize);
+  }
+
+  private getBoundsFromPoints(points: Array<{ x: number; y: number }>): HighlightBounds | null {
+    if (!points || points.length === 0) {
+      return null;
+    }
+
+    const xs = points.map(point => point.x);
+    const ys = points.map(point => point.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    return {
+      x: minX,
+      y: minY,
+      width: Math.max(0, maxX - minX),
+      height: Math.max(0, maxY - minY)
+    };
+  }
+
+  private scaleHighlightBounds(
+    bounds: HighlightBounds,
+    screenSize?: { width: number; height: number }
+  ): ElementBounds {
+    const sourceWidth = bounds.sourceWidth ?? undefined;
+    const sourceHeight = bounds.sourceHeight ?? undefined;
+    const scaleX = screenSize && sourceWidth ? screenSize.width / sourceWidth : 1;
+    const scaleY = screenSize && sourceHeight ? screenSize.height / sourceHeight : 1;
+    const left = Math.round(bounds.x * scaleX);
+    const top = Math.round(bounds.y * scaleY);
+    const right = Math.round((bounds.x + bounds.width) * scaleX);
+    const bottom = Math.round((bounds.y + bounds.height) * scaleY);
+
+    return { left, top, right, bottom };
+  }
+
+  private getBoundsDistance(a: ElementBounds, b: ElementBounds): number {
+    const dx = Math.max(0, a.left - b.right, b.left - a.right);
+    const dy = Math.max(0, a.top - b.bottom, b.top - a.bottom);
+    return Math.hypot(dx, dy);
+  }
+
+  private getBoundsArea(bounds: ElementBounds): number {
+    return Math.max(0, bounds.right - bounds.left) *
+      Math.max(0, bounds.bottom - bounds.top);
   }
 
   /**

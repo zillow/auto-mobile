@@ -40,6 +40,27 @@ This captures:
 - Screenshot
 - Device and app information
 
+To capture a screenshot with visual highlights and include highlight metadata:
+
+```javascript
+await bugReport({
+  includeScreenshot: true,
+  highlights: [
+    {
+      id: "login-button",
+      description: "Login button not responding to taps",
+      shape: {
+        type: "box",
+        bounds: { x: 100, y: 300, width: 200, height: 80 },
+        style: { strokeColor: "#FF0000", strokeWidth: 6 }
+      }
+    }
+  ],
+  includeHighlightsInScreenshot: true,
+  autoRemoveHighlights: true
+});
+```
+
 ### Automate Reproduction Steps
 
 Convert your bug reproduction steps into an automated test using [executePlan](../design-docs/mcp/actions.md#testing--debugging):
