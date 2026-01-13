@@ -1,6 +1,7 @@
 import { AccessibilityService } from "../../src/features/observe/interfaces/AccessibilityService";
 import {
   ScreenshotResult,
+  A11yDragResult,
   A11ySwipeResult,
   A11ySetTextResult,
   A11yImeActionResult,
@@ -43,6 +44,17 @@ export class FakeAccessibilityService implements AccessibilityService {
     duration: number;
   }> = [];
 
+  private dragHistory: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    pressDurationMs: number;
+    dragDurationMs: number;
+    holdDurationMs: number;
+    timeoutMs: number;
+  }> = [];
+
   private setTextHistory: Array<{
     text: string;
     resourceId?: string;
@@ -54,6 +66,7 @@ export class FakeAccessibilityService implements AccessibilityService {
 
   private screenshotRequestCount: number = 0;
   private hierarchyRequestCount: number = 0;
+  private dragResult: A11yDragResult | null = null;
 
   /**
    * Configure hierarchy data to be returned by getAccessibilityHierarchy
@@ -119,6 +132,14 @@ export class FakeAccessibilityService implements AccessibilityService {
     this.performanceTiming = perfTiming;
   }
 
+  /**
+   * Configure drag results returned by requestDrag
+   * @param result - The drag result to return (or null to reset to default success response)
+   */
+  setDragResult(result: A11yDragResult | null): void {
+    this.dragResult = result;
+  }
+
   // Assertion methods
 
   /**
@@ -133,6 +154,23 @@ export class FakeAccessibilityService implements AccessibilityService {
     duration: number;
   }> {
     return [...this.swipeHistory];
+  }
+
+  /**
+   * Get the history of drag requests
+   * @returns Array of drag requests with coordinates and durations
+   */
+  getDragHistory(): Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    pressDurationMs: number;
+    dragDurationMs: number;
+    holdDurationMs: number;
+    timeoutMs: number;
+  }> {
+    return [...this.dragHistory];
   }
 
   /**
@@ -186,6 +224,7 @@ export class FakeAccessibilityService implements AccessibilityService {
    */
   clearHistory(): void {
     this.swipeHistory = [];
+    this.dragHistory = [];
     this.setTextHistory = [];
     this.imeActionHistory = [];
     this.screenshotRequestCount = 0;
@@ -306,6 +345,46 @@ export class FakeAccessibilityService implements AccessibilityService {
       success: true,
       totalTimeMs: duration,
       gestureTimeMs: duration,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestDrag(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    pressDurationMs: number,
+    dragDurationMs: number,
+    holdDurationMs: number,
+    timeoutMs: number
+  ): Promise<A11yDragResult> {
+    await this.applyDelay("drag");
+    this.checkFailure("drag");
+
+    this.dragHistory.push({
+      x1,
+      y1,
+      x2,
+      y2,
+      pressDurationMs,
+      dragDurationMs,
+      holdDurationMs,
+      timeoutMs
+    });
+
+    if (this.dragResult) {
+      const perfTiming = this.dragResult.perfTiming ?? this.performanceTiming ?? undefined;
+      return {
+        ...this.dragResult,
+        perfTiming
+      };
+    }
+
+    return {
+      success: true,
+      totalTimeMs: pressDurationMs + dragDurationMs + holdDurationMs,
+      gestureTimeMs: dragDurationMs,
       perfTiming: this.performanceTiming || undefined
     };
   }
