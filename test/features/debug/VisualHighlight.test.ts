@@ -41,13 +41,7 @@ describe("VisualHighlight", () => {
 
   test("addHighlight returns parsed highlight response", async () => {
     const response: HighlightOperationResult = {
-      success: true,
-      highlights: [
-        {
-          id: "highlight-1",
-          shape: highlightShape
-        }
-      ]
+      success: true
     };
 
     const fakeClient = {
@@ -58,18 +52,11 @@ describe("VisualHighlight", () => {
     const result = await highlight.addHighlight("highlight-1", highlightShape);
 
     expect(result.success).toBe(true);
-    expect(result.highlights.length).toBe(1);
   });
 
   test("addHighlight accepts path shapes", async () => {
     const response: HighlightOperationResult = {
-      success: true,
-      highlights: [
-        {
-          id: "path-1",
-          shape: pathShape
-        }
-      ]
+      success: true
     };
 
     const fakeClient = {
@@ -80,7 +67,6 @@ describe("VisualHighlight", () => {
     const result = await highlight.addHighlight("path-1", pathShape);
 
     expect(result.success).toBe(true);
-    expect(result.highlights.length).toBe(1);
   });
 
   test("addHighlight rejects invalid shapes", async () => {
@@ -96,8 +82,7 @@ describe("VisualHighlight", () => {
 
     const fakeClient = {
       requestAddHighlight: async () => ({
-        success: true,
-        highlights: []
+        success: true
       })
     };
 
@@ -108,37 +93,12 @@ describe("VisualHighlight", () => {
   test("addHighlight rejects invalid highlight responses", async () => {
     const fakeClient = {
       requestAddHighlight: async () => ({
-        success: true,
-        highlights: [
-          {
-            id: "",
-            shape: highlightShape
-          }
-        ]
+        invalid: true
       })
     };
 
     const highlight = new VisualHighlight(androidDevice, null, fakeClient as any);
     await expect(highlight.addHighlight("highlight-1", highlightShape)).rejects.toThrow("Invalid highlight response");
-  });
-
-  test("listHighlights rejects non-Android devices", async () => {
-    const iosDevice: BootedDevice = {
-      deviceId: "ios-device",
-      platform: "ios",
-      isEmulator: true,
-      name: "iPhone"
-    };
-
-    const fakeClient = {
-      requestListHighlights: async () => ({
-        success: true,
-        highlights: []
-      })
-    };
-
-    const highlight = new VisualHighlight(iosDevice, null, fakeClient as any);
-    await expect(highlight.listHighlights()).rejects.toThrow("Visual highlights are only supported on Android devices.");
   });
 });
 
@@ -172,8 +132,7 @@ describe("VisualHighlightClient", () => {
     const fakeHighlight = {
       addHighlight: async () => ({
         success: false,
-        error: "Service error",
-        highlights: []
+        error: "Service error"
       })
     };
 
@@ -186,33 +145,5 @@ describe("VisualHighlightClient", () => {
       deviceId: androidDevice.deviceId,
       platform: "android"
     })).rejects.toThrow("Service error");
-  });
-
-  test("listHighlights returns highlight entries on success", async () => {
-    const fakeSessionManager = {
-      ensureDeviceReady: async () => androidDevice
-    };
-
-    const fakeHighlight = {
-      listHighlights: async () => ({
-        success: true,
-        highlights: [
-          { id: "one", shape: highlightShape },
-          { id: "two", shape: highlightShape }
-        ]
-      })
-    };
-
-    const client = new VisualHighlightClient(
-      fakeSessionManager as any,
-      () => fakeHighlight as any
-    );
-
-    const results = await client.listHighlights({
-      deviceId: androidDevice.deviceId,
-      platform: "android"
-    });
-
-    expect(results.highlights.length).toBe(2);
   });
 });

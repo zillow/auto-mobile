@@ -191,8 +191,11 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     Log.d(TAG, "onServiceConnected")
 
     try {
-      overlayDrawer = OverlayDrawer(screenDimensionsProvider = { getScreenDimensions() })
-      overlayManager = OverlayManager(this, viewFactory = { OverlayView(it, overlayDrawer) })
+      overlayDrawer = OverlayDrawer(
+        screenDimensionsProvider = { getScreenDimensions() },
+        systemInsetsProvider = { getTopSystemInset() }
+      )
+      overlayManager = OverlayManager(this, viewFactory = { HighlightOverlayView(it, overlayDrawer) })
       overlayDrawer.attachOverlayManager(overlayManager)
 
       // Register broadcast receiver for commands
@@ -375,11 +378,6 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onAddHighlight = { requestId, highlightId, shape ->
                 handleAddHighlight(requestId, highlightId, shape)
               },
-              onRemoveHighlight = { requestId, highlightId ->
-                handleRemoveHighlight(requestId, highlightId)
-              },
-              onClearHighlights = { requestId -> handleClearHighlights(requestId) },
-              onListHighlights = { requestId -> handleListHighlights(requestId) },
           )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -599,6 +597,31 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     } catch (e: Exception) {
       Log.w(TAG, "Failed to get screen dimensions", e)
       null
+    }
+  }
+
+  /** Get the top system inset (status bar height) for coordinate adjustment. */
+  @Suppress("DEPRECATION")
+  private fun getTopSystemInset(): Int {
+    return try {
+      val windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+      if (windowManager != null) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+          val metrics = windowManager.currentWindowMetrics
+          val insets = metrics.windowInsets.getInsetsIgnoringVisibility(
+            android.view.WindowInsets.Type.systemBars()
+          )
+          insets.top
+        } else {
+          val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+          if (resourceId > 0) resources.getDimensionPixelSize(resourceId) else 0
+        }
+      } else {
+        0
+      }
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to get top system inset", e)
+      0
     }
   }
 
@@ -3258,8 +3281,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         broadcastHighlightResponse(
             requestId,
             false,
-            "Overlay drawer not initialized",
-            emptyList(),
+            "Overlay drawer not initialized"
         )
         return@launch
       }
@@ -3271,77 +3293,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
             HighlightOperationResult(false, e.message ?: "Failed to add highlight")
           }
 
-      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
-    }
-  }
-
-  private fun handleRemoveHighlight(requestId: String?, highlightId: String?) {
-    serviceScope.launch {
-      if (!::overlayDrawer.isInitialized) {
-        broadcastHighlightResponse(
-            requestId,
-            false,
-            "Overlay drawer not initialized",
-            emptyList(),
-        )
-        return@launch
-      }
-
-      val result =
-          try {
-            withContext(Dispatchers.Main) { overlayDrawer.removeHighlight(highlightId) }
-          } catch (e: Exception) {
-            HighlightOperationResult(false, e.message ?: "Failed to remove highlight")
-          }
-
-      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
-    }
-  }
-
-  private fun handleClearHighlights(requestId: String?) {
-    serviceScope.launch {
-      if (!::overlayDrawer.isInitialized) {
-        broadcastHighlightResponse(
-            requestId,
-            false,
-            "Overlay drawer not initialized",
-            emptyList(),
-        )
-        return@launch
-      }
-
-      val result =
-          try {
-            withContext(Dispatchers.Main) { overlayDrawer.clearHighlights() }
-          } catch (e: Exception) {
-            HighlightOperationResult(false, e.message ?: "Failed to clear highlights")
-          }
-
-      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
-    }
-  }
-
-  private fun handleListHighlights(requestId: String?) {
-    serviceScope.launch {
-      if (!::overlayDrawer.isInitialized) {
-        broadcastHighlightResponse(
-            requestId,
-            false,
-            "Overlay drawer not initialized",
-            emptyList(),
-        )
-        return@launch
-      }
-
-      val result =
-          try {
-            val highlights = withContext(Dispatchers.Main) { overlayDrawer.listHighlights() }
-            HighlightOperationResult(true, null, highlights)
-          } catch (e: Exception) {
-            HighlightOperationResult(false, e.message ?: "Failed to list highlights")
-          }
-
-      broadcastHighlightResponse(requestId, result.success, result.error, result.highlights)
+      broadcastHighlightResponse(requestId, result.success, result.error)
     }
   }
 
@@ -3349,7 +3301,6 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       requestId: String?,
       success: Boolean,
       error: String?,
-      highlights: List<HighlightEntry>?,
   ) {
     if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
       Log.d(TAG, "WebSocket server not running, skipping highlight response broadcast")
@@ -3357,9 +3308,6 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     }
 
     try {
-      val highlightPayload = highlights ?: emptyList()
-      val highlightsJson =
-          jsonCompact.encodeToString(ListSerializer(HighlightEntry.serializer()), highlightPayload)
       val errorJson = jsonCompact.encodeToString<String?>(error)
 
       webSocketServer.broadcastWithPerf { perfTiming ->
@@ -3370,7 +3318,6 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           }
           append(""","success":$success""")
           append(""","error":$errorJson""")
-          append(""","highlights":$highlightsJson""")
           if (perfTiming != null) {
             append(""","perfTiming":$perfTiming""")
           }

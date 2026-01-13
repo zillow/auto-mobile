@@ -597,31 +597,6 @@ export interface AccessibilityService {
   ): Promise<HighlightOperationResult>;
 
   /**
-   * Remove a visual highlight overlay entry.
-   */
-  requestRemoveHighlight(
-    id: string,
-    timeoutMs?: number,
-    perf?: PerformanceTracker
-  ): Promise<HighlightOperationResult>;
-
-  /**
-   * Clear all visual highlight overlay entries.
-   */
-  requestClearHighlights(
-    timeoutMs?: number,
-    perf?: PerformanceTracker
-  ): Promise<HighlightOperationResult>;
-
-  /**
-   * List current visual highlight overlay entries.
-   */
-  requestListHighlights(
-    timeoutMs?: number,
-    perf?: PerformanceTracker
-  ): Promise<HighlightOperationResult>;
-
-  /**
    * Request a screenshot from the accessibility service
    *
    * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
@@ -3942,54 +3917,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
     );
   }
 
-  /**
-   * Remove a visual highlight overlay entry.
-   */
-  async requestRemoveHighlight(
-    id: string,
-    timeoutMs: number = 5000,
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<HighlightOperationResult> {
-    return this.requestHighlightOperation(
-      "remove_highlight",
-      { id },
-      timeoutMs,
-      perf
-    );
-  }
-
-  /**
-   * Clear all visual highlight overlay entries.
-   */
-  async requestClearHighlights(
-    timeoutMs: number = 5000,
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<HighlightOperationResult> {
-    return this.requestHighlightOperation(
-      "clear_highlights",
-      {},
-      timeoutMs,
-      perf
-    );
-  }
-
-  /**
-   * List current visual highlight overlay entries.
-   */
-  async requestListHighlights(
-    timeoutMs: number = 5000,
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
-  ): Promise<HighlightOperationResult> {
-    return this.requestHighlightOperation(
-      "list_highlights",
-      {},
-      timeoutMs,
-      perf
-    );
-  }
-
   private async requestHighlightOperation(
-    type: "add_highlight" | "remove_highlight" | "clear_highlights" | "list_highlights",
+    type: "add_highlight",
     payload: { id?: string; shape?: HighlightShape },
     timeoutMs: number,
     perf: PerformanceTracker

@@ -9,7 +9,6 @@ import android.graphics.PathMeasure
 import android.graphics.PointF
 import android.graphics.RectF
 import android.util.Log
-import android.view.View
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightBounds
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightEntry
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightLineCap
@@ -21,17 +20,18 @@ import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 import dev.jasonpearson.automobile.accessibilityservice.models.SmoothingAlgorithm
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 data class HighlightOperationResult(
     val success: Boolean,
     val error: String? = null,
-    val highlights: List<HighlightEntry>? = null,
 )
 
 class OverlayDrawer(
     private var overlayManager: OverlayManager? = null,
     private val screenDimensionsProvider: (() -> ScreenDimensions?)? = null,
+    private val systemInsetsProvider: (() -> Int)? = null,
     private val colorParser: (String) -> Int = { Color.parseColor(it) },
 ) {
 
@@ -50,23 +50,33 @@ class OverlayDrawer(
 
     private val lock = Any()
     private val highlights = LinkedHashMap<String, HighlightRenderState>()
-    private var overlayView: View? = null
+    private var overlayView: HighlightOverlayView? = null
     private val pathSmoother = PathSmoother()
+    private val animator =
+        HighlightAnimator(
+            onAlphaUpdate = { id, alpha -> updateHighlightAlpha(id, alpha) },
+            onDrawProgressUpdate = { id, progress -> updateHighlightDrawProgress(id, progress) },
+            onAnimationComplete = { id ->
+              removeHighlightInternal(id, cancelAnimation = false)
+            },
+            onAnimationActiveChanged = { active -> overlayView?.setAnimationActive(active) },
+        )
 
     fun attachOverlayManager(manager: OverlayManager) {
         overlayManager = manager
     }
 
-    fun attachView(view: View) {
+    internal fun attachView(view: HighlightOverlayView) {
         overlayView = view
+        view.setAnimationActive(animator.isAnimating())
     }
 
     fun addHighlight(id: String?, shape: HighlightShape?): HighlightOperationResult {
         if (id.isNullOrBlank()) {
-            return HighlightOperationResult(false, "Missing highlight id", snapshotHighlights())
+            return HighlightOperationResult(false, "Missing highlight id")
         }
         if (shape == null) {
-            return HighlightOperationResult(false, "Missing highlight shape", snapshotHighlights())
+            return HighlightOperationResult(false, "Missing highlight shape")
         }
 
         val renderResult = buildRenderState(shape)
@@ -75,60 +85,44 @@ class OverlayDrawer(
             return HighlightOperationResult(
                 false,
                 renderResult.error ?: "Invalid highlight shape",
-                snapshotHighlights(),
             )
         }
 
         val overlayError = ensureOverlayVisible()
         if (overlayError != null) {
-            return HighlightOperationResult(false, overlayError, snapshotHighlights())
+            return HighlightOperationResult(false, overlayError)
         }
 
+        animator.cancel(id)
         synchronized(lock) { highlights[id] = renderState }
         overlayView?.invalidate()
-        return HighlightOperationResult(true, null, snapshotHighlights())
-    }
-
-    fun removeHighlight(id: String?): HighlightOperationResult {
-        if (id.isNullOrBlank()) {
-            return HighlightOperationResult(false, "Missing highlight id", snapshotHighlights())
-        }
-
-        val snapshot =
-            synchronized(lock) {
-                highlights.remove(id)
-                if (highlights.isEmpty()) {
-                    overlayManager?.hide()
-                }
-                highlights.map { (storedId, renderState) ->
-                    HighlightEntry(id = storedId, shape = renderState.shape)
-                }
-            }
-
-        overlayView?.invalidate()
-        return HighlightOperationResult(true, null, snapshot)
-    }
-
-    fun clearHighlights(): HighlightOperationResult {
-        synchronized(lock) {
-            highlights.clear()
-            overlayManager?.hide()
-        }
-        overlayView?.invalidate()
-        return HighlightOperationResult(true, null, emptyList())
-    }
-
-    fun listHighlights(): List<HighlightEntry> {
-        return snapshotHighlights()
+        animator.startFadeOut(id)
+        return HighlightOperationResult(true, null)
     }
 
     fun destroy() {
+        animator.cancelAll()
         synchronized(lock) {
             highlights.clear()
             overlayManager?.hide()
         }
         overlayView = null
         overlayManager = null
+    }
+
+    private fun removeHighlightInternal(id: String, cancelAnimation: Boolean) {
+        if (cancelAnimation) {
+            animator.cancel(id)
+        }
+
+        synchronized(lock) {
+            highlights.remove(id)
+            if (highlights.isEmpty()) {
+                overlayManager?.hide()
+            }
+        }
+
+        overlayView?.invalidate()
     }
 
     internal fun draw(canvas: Canvas) {
@@ -144,16 +138,33 @@ class OverlayDrawer(
 
     private fun drawBox(canvas: Canvas, renderState: HighlightRenderState) {
         val rect = renderState.rect ?: return
-        renderState.strokePaint?.let { canvas.drawRect(rect, it) }
+        renderState.strokePaint?.let {
+            applyStrokeAlpha(renderState, it)
+            canvas.drawRect(rect, it)
+        }
     }
 
     private fun drawCircle(canvas: Canvas, renderState: HighlightRenderState) {
         val rect = renderState.rect ?: return
-        renderState.strokePaint?.let { canvas.drawOval(rect, it) }
+        renderState.strokePaint?.let { paint ->
+            applyStrokeAlpha(renderState, paint)
+
+            // Hand-drawn effect: leave a small gap (10 degrees) and draw with progress
+            val maxSweepAngle = 350f // 360 - 10 degrees gap
+            val sweepAngle = maxSweepAngle * renderState.drawProgress
+
+            // Start angle slightly offset for variation (-90 degrees = top of circle)
+            val startAngle = -90f + 5f // Start slightly offset from top
+
+            if (sweepAngle > 0f) {
+                canvas.drawArc(rect, startAngle, sweepAngle, false, paint)
+            }
+        }
     }
 
     private fun drawPath(canvas: Canvas, renderState: HighlightRenderState) {
         val strokePaint = renderState.strokePaint ?: return
+        applyStrokeAlpha(renderState, strokePaint)
         val segments = renderState.pathSegments
         if (segments.isNullOrEmpty()) {
             renderState.path?.let { canvas.drawPath(it, strokePaint) }
@@ -166,6 +177,26 @@ class OverlayDrawer(
             canvas.drawLine(segment.startX, segment.startY, segment.endX, segment.endY, strokePaint)
         }
         strokePaint.strokeWidth = originalWidth
+    }
+
+    private fun updateHighlightAlpha(id: String, alpha: Float) {
+        val clamped = alpha.coerceIn(0f, 1f)
+        synchronized(lock) { highlights[id]?.alpha = clamped }
+        overlayView?.invalidate()
+    }
+
+    private fun updateHighlightDrawProgress(id: String, progress: Float) {
+        val clamped = progress.coerceIn(0f, 1f)
+        synchronized(lock) { highlights[id]?.drawProgress = clamped }
+        overlayView?.invalidate()
+    }
+
+    private fun applyStrokeAlpha(renderState: HighlightRenderState, paint: Paint) {
+        val targetAlpha =
+            (renderState.baseAlpha * renderState.alpha).roundToInt().coerceIn(0, 255)
+        if (paint.alpha != targetAlpha) {
+            paint.alpha = targetAlpha
+        }
     }
 
     private fun ensureOverlayVisible(): String? {
@@ -222,6 +253,7 @@ class OverlayDrawer(
             return HighlightRenderResult(error = rectResult.error ?: "Invalid highlight bounds")
         }
 
+        val baseAlpha = paintResult.strokePaint?.alpha ?: 255
         return HighlightRenderResult(
             state =
                 HighlightRenderState(
@@ -231,6 +263,8 @@ class OverlayDrawer(
                     pathSegments = null,
                     shapeType = shapeType,
                     strokePaint = paintResult.strokePaint,
+                    baseAlpha = baseAlpha,
+                    alpha = 1f,
                 )
         )
     }
@@ -250,7 +284,8 @@ class OverlayDrawer(
         }
         val scaleX = scaleResult.scaleX ?: 1f
         val scaleY = scaleResult.scaleY ?: 1f
-        val pathPoints = points.toPointFList(scaleX, scaleY)
+        val yOffset = systemInsetsProvider?.invoke() ?: 0
+        val pathPoints = points.toPointFList(scaleX, scaleY, yOffset)
         if (pathPoints.any { !it.x.isFinite() || !it.y.isFinite() }) {
             return HighlightRenderResult(error = "Path points must be finite numbers")
         }
@@ -265,6 +300,7 @@ class OverlayDrawer(
         val baseStrokeWidth = paintResult.strokePaint?.strokeWidth ?: DEFAULT_PATH_STROKE_WIDTH
         val pathSegments = buildPathSegments(path, baseStrokeWidth)
 
+        val baseAlpha = paintResult.strokePaint?.alpha ?: 255
         return HighlightRenderResult(
             state =
                 HighlightRenderState(
@@ -274,6 +310,8 @@ class OverlayDrawer(
                     pathSegments = pathSegments,
                     shapeType = ShapeType.PATH,
                     strokePaint = paintResult.strokePaint,
+                    baseAlpha = baseAlpha,
+                    alpha = 1f,
                 )
         )
     }
@@ -469,14 +507,6 @@ class OverlayDrawer(
         }
     }
 
-    private fun snapshotHighlights(): List<HighlightEntry> {
-        return synchronized(lock) {
-            highlights.map { (id, renderState) ->
-                HighlightEntry(id = id, shape = renderState.shape)
-            }
-        }
-    }
-
     private data class HighlightRenderState(
         val shape: HighlightShape,
         val rect: RectF?,
@@ -484,6 +514,9 @@ class OverlayDrawer(
         val pathSegments: List<PathSegment>?,
         val shapeType: ShapeType,
         val strokePaint: Paint?,
+        val baseAlpha: Int,
+        var alpha: Float,
+        var drawProgress: Float = 0f,
     )
 
     private data class HighlightPaintResult(
@@ -506,11 +539,12 @@ class OverlayDrawer(
         }
         val scaleX = scale.scaleX ?: 1f
         val scaleY = scale.scaleY ?: 1f
-        return HighlightRectResult(rect = bounds.toRectF(scaleX, scaleY))
+        val yOffset = systemInsetsProvider?.invoke() ?: 0
+        return HighlightRectResult(rect = bounds.toRectF(scaleX, scaleY, yOffset))
     }
 
-    private fun List<HighlightPoint>.toPointFList(scaleX: Float, scaleY: Float): List<PointF> {
-        return map { point -> PointF(point.x * scaleX, point.y * scaleY) }
+    private fun List<HighlightPoint>.toPointFList(scaleX: Float, scaleY: Float, yOffset: Int = 0): List<PointF> {
+        return map { point -> PointF(point.x * scaleX, (point.y - yOffset) * scaleY) }
     }
 
     private fun resolveScale(bounds: HighlightBounds): HighlightScaleResult {

@@ -654,32 +654,5 @@ describe("AccessibilityServiceClient", function() {
       }
     });
 
-    test("requestListHighlights times out when no response arrives", async function() {
-      const highlightTimer = new FakeTimer();
-      highlightTimer.setManualMode();
-
-      const { factory, getSocket } = createCapturingWebSocketFactory();
-      const testClient = AccessibilityServiceClient.createForTesting(
-        testDevice,
-        adbClient,
-        factory,
-        highlightTimer
-      );
-
-      try {
-        const requestPromise = testClient.requestListHighlights(500);
-        const socket = await waitForSocket(getSocket);
-        expect(socket).not.toBeNull();
-        await waitForSocketOpen(socket);
-        await waitForSentMessages(socket);
-
-        highlightTimer.advanceTime(600);
-        const result = await requestPromise;
-        expect(result.success).toBe(false);
-        expect(result.error).toContain("Highlight request timeout");
-      } finally {
-        await testClient.close();
-      }
-    });
   });
 });

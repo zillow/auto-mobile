@@ -1,7 +1,6 @@
 package dev.jasonpearson.automobile.accessibilityservice
 
 import android.content.Context
-import android.graphics.Canvas
 import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
@@ -9,7 +8,6 @@ import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.widget.FrameLayout
 
 class OverlayManager(
     private val context: Context,
@@ -22,7 +20,7 @@ class OverlayManager(
         true
       }
     },
-    private val viewFactory: (Context) -> View = { OverlayView(it) },
+    private val viewFactory: (Context) -> View = { HighlightOverlayView(it) },
 ) {
 
   companion object {
@@ -109,23 +107,5 @@ class OverlayManager(
       Log.w(TAG, "SYSTEM_ALERT_WINDOW not granted; using accessibility overlay.")
       WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
     }
-  }
-}
-
-internal class OverlayView(
-    context: Context,
-    private val drawer: OverlayDrawer? = null,
-) : FrameLayout(context) {
-  init {
-    isClickable = false
-    isFocusable = false
-    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-    setWillNotDraw(false)
-    drawer?.attachView(this)
-  }
-
-  override fun onDraw(canvas: Canvas) {
-    super.onDraw(canvas)
-    drawer?.draw(canvas)
   }
 }

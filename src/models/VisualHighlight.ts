@@ -59,7 +59,6 @@ export interface HighlightEntry {
 export interface HighlightOperationResult {
   success: boolean;
   error?: string | null;
-  highlights: HighlightEntry[];
   requestId?: string;
   timestamp?: number;
 }
