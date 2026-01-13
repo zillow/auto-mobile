@@ -13,6 +13,15 @@ import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 
+const PRESS_DURATION_MIN_MS = 600;
+const PRESS_DURATION_MAX_MS = 3000;
+const DRAG_DURATION_MIN_MS = 300;
+const DRAG_DURATION_MAX_MS = 1000;
+const HOLD_DURATION_MIN_MS = 100;
+const HOLD_DURATION_MAX_MS = 3000;
+const DROP_DURATION_MS = 100;
+const DRAG_TIMEOUT_BUFFER_MS = 500;
+
 export class DragAndDrop extends BaseVisualChange {
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
@@ -64,6 +73,10 @@ export class DragAndDrop extends BaseVisualChange {
     }
 
     try {
+      const pressDurationMs = this.getPressDurationMs(options);
+      const dragDurationMs = this.getDragDurationMs(options);
+      const holdDurationMs = this.getHoldDurationMs(options);
+
       const result = await this.observedInteraction(
         async (observeResult: ObserveResult) => {
           throwIfAborted(signal);
@@ -76,29 +89,25 @@ export class DragAndDrop extends BaseVisualChange {
           const target = this.resolveTarget(viewHierarchy, options.target, "target");
           const sourcePoint = this.elementUtils.getElementCenter(source);
           const targetPoint = this.elementUtils.getElementCenter(target);
-          const duration = this.getDuration(options);
-          const holdTime = this.getHoldTime(options);
-          const dropDelay = this.getDropDelay(options);
 
           const dragResult = await this.executeAndroidDrag(
             sourcePoint.x,
             sourcePoint.y,
             targetPoint.x,
             targetPoint.y,
-            duration,
-            holdTime,
+            pressDurationMs,
+            dragDurationMs,
+            holdDurationMs,
             signal
           );
 
-          if (dropDelay > 0) {
-            await new Promise(resolve => setTimeout(resolve, dropDelay));
-          }
+          await new Promise(resolve => setTimeout(resolve, DROP_DURATION_MS));
 
           const distance = Math.hypot(targetPoint.x - sourcePoint.x, targetPoint.y - sourcePoint.y);
 
           return {
             success: dragResult.success,
-            duration,
+            duration: dragDurationMs,
             distance,
             a11yTotalTimeMs: dragResult.a11yTotalTimeMs,
             a11yGestureTimeMs: dragResult.a11yGestureTimeMs,
@@ -107,7 +116,6 @@ export class DragAndDrop extends BaseVisualChange {
         },
         {
           changeExpected: false,
-          timeoutMs: 5000,
           progress,
           perf,
           signal,
@@ -116,9 +124,9 @@ export class DragAndDrop extends BaseVisualChange {
             toolArgs: {
               source: options.source,
               target: options.target,
-              duration: options.duration,
-              holdTime: options.holdTime,
-              dropDelay: this.getDropDelay(options),
+              pressDurationMs,
+              dragDurationMs,
+              holdDurationMs,
               platform: this.device.platform
             }
           }
@@ -129,7 +137,7 @@ export class DragAndDrop extends BaseVisualChange {
 
       return {
         ...result,
-        duration: result.duration ?? this.getDuration(options),
+        duration: result.duration ?? this.getDragDurationMs(options),
         distance: result.distance ?? 0
       } as DragAndDropResult;
     } catch (error) {
@@ -157,8 +165,14 @@ export class DragAndDrop extends BaseVisualChange {
     if (targetSelectorCount !== 1) {
       return "dragAndDrop target must specify exactly one of text or elementId";
     }
-    if (typeof options.dropDelay === "number" && options.dropDelay < 100) {
-      return "dragAndDrop dropDelay must be at least 100ms";
+    if (!this.isDurationInRange(options.pressDurationMs, PRESS_DURATION_MIN_MS, PRESS_DURATION_MAX_MS)) {
+      return `dragAndDrop pressDurationMs must be between ${PRESS_DURATION_MIN_MS}ms and ${PRESS_DURATION_MAX_MS}ms`;
+    }
+    if (!this.isDurationInRange(options.dragDurationMs, DRAG_DURATION_MIN_MS, DRAG_DURATION_MAX_MS)) {
+      return `dragAndDrop dragDurationMs must be between ${DRAG_DURATION_MIN_MS}ms and ${DRAG_DURATION_MAX_MS}ms`;
+    }
+    if (!this.isDurationInRange(options.holdDurationMs, HOLD_DURATION_MIN_MS, HOLD_DURATION_MAX_MS)) {
+      return `dragAndDrop holdDurationMs must be between ${HOLD_DURATION_MIN_MS}ms and ${HOLD_DURATION_MAX_MS}ms`;
     }
     return null;
   }
@@ -189,25 +203,36 @@ export class DragAndDrop extends BaseVisualChange {
     throw new ActionableError(`dragAndDrop ${label} requires text or elementId`);
   }
 
-  private getDuration(options: DragAndDropOptions): number {
-    if (typeof options.duration === "number" && options.duration > 0) {
-      return options.duration;
+  private getPressDurationMs(options: DragAndDropOptions): number {
+    if (typeof options.pressDurationMs === "number") {
+      return options.pressDurationMs;
     }
-    return 500;
+    return PRESS_DURATION_MIN_MS;
   }
 
-  private getHoldTime(options: DragAndDropOptions): number {
-    if (typeof options.holdTime === "number" && options.holdTime >= 0) {
-      return options.holdTime;
+  private getDragDurationMs(options: DragAndDropOptions): number {
+    if (typeof options.dragDurationMs === "number") {
+      return options.dragDurationMs;
     }
-    return 200;
+    return DRAG_DURATION_MIN_MS;
   }
 
-  private getDropDelay(options: DragAndDropOptions): number {
-    if (typeof options.dropDelay === "number") {
-      return options.dropDelay;
+  private getHoldDurationMs(options: DragAndDropOptions): number {
+    if (typeof options.holdDurationMs === "number") {
+      return options.holdDurationMs;
     }
-    return 100;
+    return HOLD_DURATION_MIN_MS;
+  }
+
+  private isDurationInRange(value: number | undefined, min: number, max: number): boolean {
+    if (typeof value !== "number") {
+      return true;
+    }
+    return value >= min && value <= max;
+  }
+
+  private getDragTimeoutMs(pressDurationMs: number, dragDurationMs: number, holdDurationMs: number): number {
+    return pressDurationMs + dragDurationMs + holdDurationMs + DROP_DURATION_MS + DRAG_TIMEOUT_BUFFER_MS;
   }
 
   private async executeAndroidDrag(
@@ -215,8 +240,9 @@ export class DragAndDrop extends BaseVisualChange {
     startY: number,
     endX: number,
     endY: number,
-    duration: number,
-    holdTime: number,
+    pressDurationMs: number,
+    dragDurationMs: number,
+    holdDurationMs: number,
     signal?: AbortSignal
   ): Promise<{
     success: boolean;
@@ -231,9 +257,10 @@ export class DragAndDrop extends BaseVisualChange {
       startY,
       endX,
       endY,
-      duration,
-      holdTime,
-      5000
+      pressDurationMs,
+      dragDurationMs,
+      holdDurationMs,
+      this.getDragTimeoutMs(pressDurationMs, dragDurationMs, holdDurationMs)
     );
 
     if (result.success) {

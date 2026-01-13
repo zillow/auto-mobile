@@ -96,7 +96,7 @@ steps:
     target:
       text: Target
     params:
-      duration: 800
+      dragDurationMs: 800
 `;
       const result = validator.validateYaml(yaml);
       expect(result.valid).toBe(true);

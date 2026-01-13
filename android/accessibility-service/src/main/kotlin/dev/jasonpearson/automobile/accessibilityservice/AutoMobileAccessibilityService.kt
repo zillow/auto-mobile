@@ -307,8 +307,25 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onRequestTwoFingerSwipe = { requestId, x1, y1, x2, y2, duration, offset ->
                 performTwoFingerSwipe(requestId, x1, y1, x2, y2, duration, offset)
               },
-              onRequestDrag = { requestId, x1, y1, x2, y2, duration, holdTime ->
-                performDrag(requestId, x1, y1, x2, y2, duration, holdTime)
+              onRequestDrag = {
+                  requestId,
+                  x1,
+                  y1,
+                  x2,
+                  y2,
+                  pressDurationMs,
+                  dragDurationMs,
+                  holdDurationMs ->
+                performDrag(
+                    requestId,
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    pressDurationMs,
+                    dragDurationMs,
+                    holdDurationMs,
+                )
               },
               onRequestPinch = {
                   requestId,
@@ -988,8 +1005,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
    * @param y1 Starting Y coordinate
    * @param x2 Ending X coordinate
    * @param y2 Ending Y coordinate
-   * @param duration Drag duration in milliseconds
-   * @param holdTime Hold time before dragging in milliseconds
+   * @param pressDurationMs Press duration before dragging in milliseconds
+   * @param dragDurationMs Drag duration in milliseconds
+   * @param holdDurationMs Hold duration after dragging in milliseconds
    */
   private fun performDrag(
       requestId: String?,
@@ -997,13 +1015,14 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       y1: Int,
       x2: Int,
       y2: Int,
-      duration: Long,
-      holdTime: Long,
+      pressDurationMs: Long,
+      dragDurationMs: Long,
+      holdDurationMs: Long,
   ) {
     val startTime = System.currentTimeMillis()
     Log.d(
         TAG,
-        "performDrag: ($x1, $y1) -> ($x2, $y2) duration=${duration}ms hold=${holdTime}ms",
+        "performDrag: ($x1, $y1) -> ($x2, $y2) press=${pressDurationMs}ms drag=${dragDurationMs}ms hold=${holdDurationMs}ms",
     )
     perfProvider.serial("performDrag")
 
@@ -1015,26 +1034,51 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       val endX = x2.toFloat()
       val endY = y2.toFloat()
 
-      if (holdTime > 0) {
-        val holdPath =
+      val dragPath =
+          Path().apply {
+            moveTo(startX, startY)
+            lineTo(endX, endY)
+          }
+      val holdEndPath =
+          Path().apply {
+            moveTo(endX, endY)
+          }
+
+      if (pressDurationMs > 0) {
+        val pressPath =
             Path().apply {
               moveTo(startX, startY)
             }
-        val dragPath =
-            Path().apply {
-              moveTo(startX, startY)
-              lineTo(endX, endY)
-            }
-        val holdStroke = GestureDescription.StrokeDescription(holdPath, 0, holdTime, true)
-        val dragStroke = holdStroke.continueStroke(dragPath, holdTime, duration, false)
-        gestureBuilder.addStroke(holdStroke).addStroke(dragStroke)
+        val pressStroke = GestureDescription.StrokeDescription(pressPath, 0, pressDurationMs, true)
+        val dragStroke =
+            pressStroke.continueStroke(
+                dragPath,
+                pressDurationMs,
+                dragDurationMs,
+                holdDurationMs > 0,
+            )
+        gestureBuilder.addStroke(pressStroke).addStroke(dragStroke)
+
+        if (holdDurationMs > 0) {
+          val holdStroke =
+              dragStroke.continueStroke(
+                  holdEndPath,
+                  pressDurationMs + dragDurationMs,
+                  holdDurationMs,
+                  false,
+              )
+          gestureBuilder.addStroke(holdStroke)
+        }
       } else {
-        val dragPath =
-            Path().apply {
-              moveTo(startX, startY)
-              lineTo(endX, endY)
-            }
-        gestureBuilder.addStroke(GestureDescription.StrokeDescription(dragPath, 0, duration))
+        val dragStroke =
+            GestureDescription.StrokeDescription(dragPath, 0, dragDurationMs, holdDurationMs > 0)
+        gestureBuilder.addStroke(dragStroke)
+
+        if (holdDurationMs > 0) {
+          val holdStroke =
+              dragStroke.continueStroke(holdEndPath, dragDurationMs, holdDurationMs, false)
+          gestureBuilder.addStroke(holdStroke)
+        }
       }
       val gesture = gestureBuilder.build()
       perfProvider.endOperation("buildPath")
