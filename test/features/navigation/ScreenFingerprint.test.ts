@@ -754,6 +754,152 @@ describe("ScreenFingerprint - Enhanced Implementation", () => {
       expect(result.hash).toBeDefined();
     });
   });
+
+  describe("PR Feedback Fixes", () => {
+    test("should include content-desc for selected items without text (icon-only tabs)", () => {
+      const tabsWithIconOnly = {
+        className: "TabRow",
+        scrollable: "true",
+        node: [
+          {
+            "selected": "true",
+            "content-desc": "Home",
+            "resource-id": "tab_home",
+          },
+          {
+            "selected": "false",
+            "content-desc": "Profile",
+            "resource-id": "tab_profile",
+          },
+        ],
+      };
+
+      const hierarchy1 = createHierarchy(tabsWithIconOnly);
+      const hash1 = ScreenFingerprint.compute(hierarchy1).hash;
+
+      // Change selected tab
+      const tabsWithIconOnlyDifferent = {
+        className: "TabRow",
+        scrollable: "true",
+        node: [
+          {
+            "selected": "false",
+            "content-desc": "Home",
+            "resource-id": "tab_home",
+          },
+          {
+            "selected": "true",
+            "content-desc": "Profile",
+            "resource-id": "tab_profile",
+          },
+        ],
+      };
+
+      const hierarchy2 = createHierarchy(tabsWithIconOnlyDifferent);
+      const hash2 = ScreenFingerprint.compute(hierarchy2).hash;
+
+      // Hashes should be different due to different selected tab content-desc
+      expect(hash1).not.toBe(hash2);
+    });
+
+    test("should filter emoji keyboard keys from fingerprints", () => {
+      const withEmojiKey = {
+        className: "Screen",
+        node: [
+          { text: "Main Content" },
+          {
+            "content-desc": "emoji",
+            "className": "KeyboardKey",
+          },
+        ],
+      };
+
+      const withoutEmojiKey = {
+        className: "Screen",
+        node: [{ text: "Main Content" }],
+      };
+
+      const hierarchy1 = createHierarchy(withEmojiKey);
+      const hierarchy2 = createHierarchy(withoutEmojiKey);
+
+      const hash1 = ScreenFingerprint.compute(hierarchy1).hash;
+      const hash2 = ScreenFingerprint.compute(hierarchy2).hash;
+
+      // Hashes should be the same (emoji key filtered out)
+      expect(hash1).toBe(hash2);
+    });
+
+    test("should filter Shift keyboard keys from fingerprints", () => {
+      const withShiftKey = {
+        className: "Screen",
+        node: [
+          { text: "Main Content" },
+          {
+            "content-desc": "Shift",
+            "className": "KeyboardKey",
+          },
+        ],
+      };
+
+      const withoutShiftKey = {
+        className: "Screen",
+        node: [{ text: "Main Content" }],
+      };
+
+      const hierarchy1 = createHierarchy(withShiftKey);
+      const hierarchy2 = createHierarchy(withoutShiftKey);
+
+      const hash1 = ScreenFingerprint.compute(hierarchy1).hash;
+      const hash2 = ScreenFingerprint.compute(hierarchy2).hash;
+
+      // Hashes should be the same (Shift key filtered out)
+      expect(hash1).toBe(hash2);
+    });
+
+    test("should produce same hash when keyboard toggles (emoji/Shift filtered)", () => {
+      const withKeyboardNoToggle = {
+        className: "Screen",
+        node: [
+          { text: "Input Field" },
+          { "content-desc": "Delete" },
+          { "content-desc": "Enter" },
+        ],
+      };
+
+      const withKeyboardAndEmoji = {
+        className: "Screen",
+        node: [
+          { text: "Input Field" },
+          { "content-desc": "Delete" },
+          { "content-desc": "Enter" },
+          { "content-desc": "emoji" },
+        ],
+      };
+
+      const withKeyboardAndShift = {
+        className: "Screen",
+        node: [
+          { text: "Input Field" },
+          { "content-desc": "Delete" },
+          { "content-desc": "Enter" },
+          { "content-desc": "Shift" },
+        ],
+      };
+
+      const h2 = createHierarchy(withKeyboardNoToggle);
+      const h3 = createHierarchy(withKeyboardAndEmoji);
+      const h4 = createHierarchy(withKeyboardAndShift);
+
+      const hash2 = ScreenFingerprint.compute(h2).hash;
+      const hash3 = ScreenFingerprint.compute(h3).hash;
+      const hash4 = ScreenFingerprint.compute(h4).hash;
+
+      // All keyboard variations should produce same hash (keyboard elements filtered)
+      expect(hash2).toBe(hash3);
+      expect(hash3).toBe(hash4);
+      expect(hash2).toBe(hash4);
+    });
+  });
 });
 
 // Helper function to create AccessibilityHierarchy

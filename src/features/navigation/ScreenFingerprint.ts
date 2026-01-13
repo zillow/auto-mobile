@@ -329,11 +329,13 @@ export class ScreenFingerprint {
   private static filterHierarchyEnhanced(node: any): any {
     if (!node || typeof node !== "object") {return null;}
 
-    // Skip keyboard elements
+    // Skip keyboard elements (match detectKeyboard indicators)
     if (
       node["content-desc"]?.includes("Delete") ||
       node["content-desc"]?.includes("Enter") ||
       node["content-desc"]?.includes("keyboard") ||
+      node["content-desc"]?.includes("emoji") ||
+      node["content-desc"]?.includes("Shift") ||
       node["resource-id"]?.includes("keyboard") ||
       node["resource-id"]?.includes("inputmethod")
     ) {
@@ -411,7 +413,9 @@ export class ScreenFingerprint {
         !this.isSystemIndicator(desc) &&
         !desc.includes("keyboard") &&
         !desc.includes("Delete") &&
-        !desc.includes("Enter")
+        !desc.includes("Enter") &&
+        !desc.includes("emoji") &&
+        !desc.includes("Shift")
       ) {
         filtered["content-desc"] = desc;
       }
@@ -438,7 +442,7 @@ export class ScreenFingerprint {
   }
 
   /**
-   * Extract selected item information (text or resource-id).
+   * Extract selected item information (text, content-desc, or resource-id).
    */
   private static extractSelectedInfo(node: any): any {
     if (!node || typeof node !== "object") {return null;}
@@ -451,6 +455,11 @@ export class ScreenFingerprint {
     } else if (node.node) {
       const text = this.findTextInChildren(node.node);
       if (text) {info.text = text;}
+    }
+
+    // Fallback to content-desc for icon-only tabs/controls
+    if (!info.text && node["content-desc"]) {
+      info["content-desc"] = node["content-desc"];
     }
 
     // Include resource-id for additional context

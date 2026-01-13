@@ -460,8 +460,8 @@ import { logger } from './utils/logger';
 
 ## Related Documentation
 
-- [Navigation Graph](./navigation-graph.md) - How fingerprints power navigation
-- [AutoMobile SDK](../android/SDK.md) - Adding navigation resource-ids
+- [Navigation Graph](./design-docs/mcp/navigation-graph.md) - How fingerprints power navigation
+- [AutoMobile SDK](./design-docs/plat/android/auto-mobile-sdk.md) - Adding navigation resource-ids
 - Research findings:
   - `scratch/UPDATED_FINDINGS.md` - Final research results
   - `scratch/SCROLLABLE_TABS_FINDINGS.md` - Scrollable tabs discovery
