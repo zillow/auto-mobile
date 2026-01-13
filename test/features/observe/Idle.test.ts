@@ -162,6 +162,40 @@ describe("Idle - Unit Tests", function() {
       expect(result.totalFrames).toBeNull();
       expect(result.missedVsync).toBeNull();
     });
+
+    test("should take first match when multiple gfxinfo sections exist", function() {
+      const stdout = `
+        50th percentile: 10.5ms
+        90th percentile: 15.2ms
+        95th percentile: 18.3ms
+        99th percentile: 25.1ms
+        Total frames rendered: 100
+        Number Missed Vsync: 3
+        Number Slow UI thread: 2
+        Number Frame deadline missed: 1
+
+        50th percentile: 20.0ms
+        90th percentile: 30.0ms
+        95th percentile: 35.0ms
+        99th percentile: 45.0ms
+        Total frames rendered: 250
+        Number Missed Vsync: 10
+        Number Slow UI thread: 8
+        Number Frame deadline missed: 5
+      `;
+
+      const result = idle.parseMetrics(stdout);
+
+      // All metrics should come from the first section to ensure consistency
+      expect(result.percentile50th).toBe(10.5);
+      expect(result.percentile90th).toBe(15.2);
+      expect(result.percentile95th).toBe(18.3);
+      expect(result.percentile99th).toBe(25.1);
+      expect(result.totalFrames).toBe(100); // First match, not max (250)
+      expect(result.missedVsync).toBe(3);
+      expect(result.slowUiThread).toBe(2);
+      expect(result.frameDeadlineMissed).toBe(1);
+    });
   });
 
   describe("calculateDeltas", function() {

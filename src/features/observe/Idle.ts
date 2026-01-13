@@ -222,13 +222,7 @@ export class Idle {
     const percentile90th = this.extractMetric(stdout, /90th percentile:\s+(\d+(?:\.\d+)?)ms/);
     const percentile95th = this.extractMetric(stdout, /95th percentile:\s+(\d+(?:\.\d+)?)ms/);
     const percentile99th = this.extractMetric(stdout, /99th percentile:\s+(\d+(?:\.\d+)?)ms/);
-    let totalFrames: number | null = null;
-    for (const match of stdout.matchAll(/Total frames rendered:\s+(\d+)/g)) {
-      const value = parseInt(match[1], 10);
-      if (!Number.isNaN(value)) {
-        totalFrames = totalFrames === null ? value : Math.max(totalFrames, value);
-      }
-    }
+    const totalFrames = this.extractMetric(stdout, /Total frames rendered:\s+(\d+)/);
     const missedVsync = this.extractMetric(stdout, /Number Missed Vsync:\s+(\d+)/);
     const slowUiThread = this.extractMetric(stdout, /Number Slow UI thread:\s+(\d+)/);
     const frameDeadlineMissed = this.extractMetric(stdout, /Number Frame deadline missed:\s+(\d+)/);
