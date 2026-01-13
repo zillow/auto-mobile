@@ -146,11 +146,13 @@ export class DragAndDrop extends BaseVisualChange {
     if (!options?.source || !options?.target) {
       return "dragAndDrop requires source and target";
     }
-    if (!options.source.text && !options.source.elementId) {
-      return "dragAndDrop source requires text or elementId";
+    const sourceSelectorCount = [options.source.text, options.source.elementId].filter(Boolean).length;
+    if (sourceSelectorCount !== 1) {
+      return "dragAndDrop source must specify exactly one of text or elementId";
     }
-    if (!options.target.text && !options.target.elementId) {
-      return "dragAndDrop target requires text or elementId";
+    const targetSelectorCount = [options.target.text, options.target.elementId].filter(Boolean).length;
+    if (targetSelectorCount !== 1) {
+      return "dragAndDrop target must specify exactly one of text or elementId";
     }
     return null;
   }
@@ -160,6 +162,10 @@ export class DragAndDrop extends BaseVisualChange {
     target: { text?: string; elementId?: string },
     label: "source" | "target"
   ) {
+    const selectorCount = [target.elementId, target.text].filter(Boolean).length;
+    if (selectorCount !== 1) {
+      throw new ActionableError(`dragAndDrop ${label} must specify exactly one of text or elementId`);
+    }
     if (target.elementId) {
       const element = this.elementUtils.findElementByResourceId(viewHierarchy, target.elementId);
       if (!element) {
