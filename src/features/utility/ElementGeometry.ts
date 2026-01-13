@@ -92,8 +92,10 @@ export class ElementGeometry {
 
     const centerX = Math.floor((bounds.left + bounds.right) / 2);
     const centerY = Math.floor((bounds.top + bounds.bottom) / 2);
+    const width = bounds.right - bounds.left;
+    const height = bounds.bottom - bounds.top;
 
-    // Use full available space with 8px padding
+    // Use full available space with padding based on actual dimensions
     let startX = centerX;
     let startY = centerY;
     let endX = centerX;
@@ -102,23 +104,23 @@ export class ElementGeometry {
     switch (direction) {
       case "up":
         // For "up" direction: Swipe finger from bottom to top
-        startY = bounds.bottom - (centerY * 0.25);
-        endY = bounds.top + (centerY * 0.1);
+        startY = bounds.bottom - (height * 0.25);
+        endY = bounds.top + (height * 0.1);
         break;
       case "down":
         // For "down" direction: Swipe finger from top to bottom
-        startY = bounds.top + (centerY * 0.1);
-        endY = bounds.bottom - (centerY * 0.1);
+        startY = bounds.top + (height * 0.1);
+        endY = bounds.bottom - (height * 0.1);
         break;
       case "left":
         // For "left" direction: Swipe finger from right to left
-        startX = bounds.right - (centerY * 0.1);
-        endX = bounds.left + (centerX * 0.1);
+        startX = bounds.right - (width * 0.1);
+        endX = bounds.left + (width * 0.1);
         break;
       case "right":
         // For "right" direction: Swipe finger from left to right
-        startX = bounds.left + (centerY * 0.1);
-        endX = bounds.right - (centerX * 0.1);
+        startX = bounds.left + (width * 0.1);
+        endX = bounds.right - (width * 0.1);
         break;
     }
 

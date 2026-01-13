@@ -7,6 +7,7 @@ import { FakeAccessibilityDetector } from "../../fakes/FakeAccessibilityDetector
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeGestureExecutor } from "../../fakes/FakeGestureExecutor";
 import { FakeWindow } from "../../fakes/FakeWindow";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("SwipeOn autoTarget", () => {
   const device = { name: "test-device", platform: "android", deviceId: "device-1" } as const;
@@ -14,6 +15,7 @@ describe("SwipeOn autoTarget", () => {
   let fakeGesture: FakeGestureExecutor;
   let fakeAwaitIdle: FakeAwaitIdle;
   let fakeWindow: FakeWindow;
+  let fakeTimer: FakeTimer;
   let fakeAccessibilityDetector: FakeAccessibilityDetector;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
 
@@ -50,6 +52,7 @@ describe("SwipeOn autoTarget", () => {
     });
     (swipeOn as any).awaitIdle = fakeAwaitIdle;
     (swipeOn as any).window = fakeWindow;
+    (swipeOn as any).timer = fakeTimer;
     return swipeOn;
   };
 
@@ -61,6 +64,7 @@ describe("SwipeOn autoTarget", () => {
     fakeGesture = new FakeGestureExecutor();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeWindow = new FakeWindow();
+    fakeTimer = new FakeTimer();
     fakeWindow.setCachedActiveWindow(null);
   });
 
@@ -133,6 +137,7 @@ describe("SwipeOn container overlays", () => {
   let fakeGesture: FakeGestureExecutor;
   let fakeAwaitIdle: FakeAwaitIdle;
   let fakeWindow: FakeWindow;
+  let fakeTimer: FakeTimer;
   let fakeAccessibilityDetector: FakeAccessibilityDetector;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
 
@@ -173,6 +178,7 @@ describe("SwipeOn container overlays", () => {
     });
     (swipeOn as any).awaitIdle = fakeAwaitIdle;
     (swipeOn as any).window = fakeWindow;
+    (swipeOn as any).timer = fakeTimer;
     return swipeOn;
   };
 
@@ -184,6 +190,7 @@ describe("SwipeOn container overlays", () => {
     fakeGesture = new FakeGestureExecutor();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeWindow = new FakeWindow();
+    fakeTimer = new FakeTimer();
     fakeWindow.setCachedActiveWindow(null);
   });
 
@@ -219,8 +226,8 @@ describe("SwipeOn container overlays", () => {
     expect(call.y1).toBeGreaterThan(0);
   });
 
-  test("considers clickable elements inside the container subtree", async () => {
-    const childOverlay = createNode("[0,0][1000,200]", {
+  test("ignores clickable elements inside the container subtree", async () => {
+    const childOverlay = createNode("[0,0][1000,800]", {
       "resource-id": "child-overlay",
       "clickable": "true"
     });
@@ -236,9 +243,11 @@ describe("SwipeOn container overlays", () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.warning).toBeUndefined();
     const [call] = fakeGesture.getSwipeCalls();
     expect(call).toBeDefined();
-    expect(call.y1).toBeGreaterThanOrEqual(200);
+    expect(call.x1).toBe(500);
+    expect(call.y1).toBe(200);
   });
 
   test("keeps the larger overlay when overlap is partial", async () => {
@@ -546,6 +555,7 @@ describe("SwipeOn boomerang", () => {
   let fakeGesture: FakeGestureExecutor;
   let fakeAwaitIdle: FakeAwaitIdle;
   let fakeWindow: FakeWindow;
+  let fakeTimer: FakeTimer;
   let fakeAccessibilityDetector: FakeAccessibilityDetector;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
 
@@ -564,6 +574,7 @@ describe("SwipeOn boomerang", () => {
     });
     (swipeOn as any).awaitIdle = fakeAwaitIdle;
     (swipeOn as any).window = fakeWindow;
+    (swipeOn as any).timer = fakeTimer;
     return swipeOn;
   };
 
@@ -575,6 +586,7 @@ describe("SwipeOn boomerang", () => {
     fakeGesture = new FakeGestureExecutor();
     fakeAwaitIdle = new FakeAwaitIdle();
     fakeWindow = new FakeWindow();
+    fakeTimer = new FakeTimer();
     fakeWindow.setCachedActiveWindow(null);
   });
 
