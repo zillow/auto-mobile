@@ -82,6 +82,7 @@ Successful `tapOn` calls include `selectedElement` metadata describing which mat
 - 🐛 `bugReport` generates a comprehensive bug report including screen state, view hierarchy, logcat, and screenshot.
 - 🔍 `debugSearch` debugs element search operations to understand why elements aren't found or wrong elements are selected.
 - 📸 `rawViewHierarchy` gets raw view hierarchy data (XML/JSON) without parsing for debugging.
+- 🖍️ `highlight` draws visual overlays to highlight areas of the screen during debugging (Android only).
 - 🔗 `identifyInteractions` suggests likely interactions with ready-to-use tool calls (debug-only; enable the debug feature flag).
 
 #### Performance & Monitoring

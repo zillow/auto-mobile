@@ -188,7 +188,7 @@ describe("VisualHighlightClient", () => {
     })).rejects.toThrow("Service error");
   });
 
-  test("listHighlights returns shapes on success", async () => {
+  test("listHighlights returns highlight entries on success", async () => {
     const fakeSessionManager = {
       ensureDeviceReady: async () => androidDevice
     };
@@ -213,6 +213,6 @@ describe("VisualHighlightClient", () => {
       platform: "android"
     });
 
-    expect(results.length).toBe(2);
+    expect(results.highlights.length).toBe(2);
   });
 });

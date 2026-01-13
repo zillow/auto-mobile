@@ -138,8 +138,9 @@ const highlightResponseSchema: z.ZodType<HighlightOperationResult> = z.object({
 }).passthrough();
 
 export interface HighlightOptions {
-  deviceId: string;
+  deviceId?: string;
   platform: Platform;
+  device?: BootedDevice;
   sessionUuid?: string;
   timeoutMs?: number;
 }
@@ -276,43 +277,58 @@ export class VisualHighlightClient {
     id: string,
     shape: HighlightShape,
     options: HighlightOptions
-  ): Promise<void> {
+  ): Promise<HighlightOperationResult> {
     const highlight = await this.resolveHighlight(options);
     const result = await highlight.addHighlight(id, shape, { timeoutMs: options.timeoutMs });
     if (!result.success) {
       throw new ActionableError(result.error || "Failed to add highlight");
     }
+    return result;
   }
 
   async removeHighlight(
     id: string,
     options: HighlightOptions
-  ): Promise<void> {
+  ): Promise<HighlightOperationResult> {
     const highlight = await this.resolveHighlight(options);
     const result = await highlight.removeHighlight(id, { timeoutMs: options.timeoutMs });
     if (!result.success) {
       throw new ActionableError(result.error || "Failed to remove highlight");
     }
+    return result;
   }
 
-  async clearHighlights(options: HighlightOptions): Promise<void> {
+  async clearHighlights(options: HighlightOptions): Promise<HighlightOperationResult> {
     const highlight = await this.resolveHighlight(options);
     const result = await highlight.clearHighlights({ timeoutMs: options.timeoutMs });
     if (!result.success) {
       throw new ActionableError(result.error || "Failed to clear highlights");
     }
+    return result;
   }
 
-  async listHighlights(options: HighlightOptions): Promise<HighlightShape[]> {
+  async listHighlights(options: HighlightOptions): Promise<HighlightOperationResult> {
     const highlight = await this.resolveHighlight(options);
     const result = await highlight.listHighlights({ timeoutMs: options.timeoutMs });
     if (!result.success) {
       throw new ActionableError(result.error || "Failed to list highlights");
     }
-    return result.highlights.map(entry => entry.shape);
+    return result;
   }
 
   private async resolveHighlight(options: HighlightOptions): Promise<VisualHighlight> {
+    if (options.device) {
+      if (options.device.platform !== "android") {
+        throw new ActionableError("Visual highlights are only supported on Android devices.");
+      }
+      if (options.device.platform !== options.platform) {
+        throw new ActionableError(
+          `Highlight platform mismatch: requested ${options.platform}, device is ${options.device.platform}.`
+        );
+      }
+      return this.visualHighlightFactory(options.device);
+    }
+
     if (options.platform !== "android") {
       throw new ActionableError("Visual highlights are only supported on Android devices.");
     }

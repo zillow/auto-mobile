@@ -246,6 +246,86 @@
               }
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "tool": {
+                "const": "highlight"
+              }
+            },
+            "required": [
+              "tool"
+            ]
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "$ref": "#/$defs/highlightParams"
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "add",
+                  "remove",
+                  "clear",
+                  "list"
+                ],
+                "description": "Highlight action"
+              },
+              "highlightId": {
+                "type": "string",
+                "description": "Highlight ID",
+                "minLength": 1
+              },
+              "shape": {
+                "$ref": "#/$defs/highlightShape"
+              },
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "android",
+                  "ios"
+                ],
+                "description": "Platform"
+              },
+              "timeoutMs": {
+                "type": "number",
+                "description": "Highlight request timeout ms (default: 5000)"
+              },
+              "sessionUuid": {
+                "type": "string",
+                "description": "Session UUID for device targeting"
+              },
+              "keepScreenAwake": {
+                "type": "boolean",
+                "description": "Keep physical Android devices awake during the session (default: true)"
+              }
+            },
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "action"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "params": {
+                        "required": [
+                          "action"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "params"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
         }
       ]
     },
@@ -325,6 +405,165 @@
       },
       "additionalProperties": true,
       "description": "Parameters for dragAndDrop"
+    },
+    "highlightBounds": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number",
+          "description": "Bounds x-coordinate"
+        },
+        "y": {
+          "type": "number",
+          "description": "Bounds y-coordinate"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Bounds width"
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Bounds height"
+        },
+        "sourceWidth": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "description": "Optional source width for coordinate normalization"
+        },
+        "sourceHeight": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "description": "Optional source height for coordinate normalization"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false,
+      "description": "Highlight bounds"
+    },
+    "highlightStyle": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "strokeColor": {
+          "type": "string",
+          "description": "Stroke color (hex or CSS color)"
+        },
+        "strokeWidth": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Stroke width"
+        },
+        "fillColor": {
+          "type": "string",
+          "description": "Fill color (hex or CSS color)"
+        },
+        "dashPattern": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1,
+          "description": "Dash pattern lengths"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Highlight style"
+    },
+    "highlightShape": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "box",
+            "circle"
+          ],
+          "description": "Highlight shape type"
+        },
+        "bounds": {
+          "$ref": "#/$defs/highlightBounds"
+        },
+        "style": {
+          "$ref": "#/$defs/highlightStyle"
+        }
+      },
+      "required": [
+        "type",
+        "bounds"
+      ],
+      "additionalProperties": false,
+      "description": "Highlight shape definition"
+    },
+    "highlightParams": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "add",
+            "remove",
+            "clear",
+            "list"
+          ],
+          "description": "Highlight action"
+        },
+        "highlightId": {
+          "type": "string",
+          "description": "Highlight ID",
+          "minLength": 1
+        },
+        "shape": {
+          "$ref": "#/$defs/highlightShape"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "timeoutMs": {
+          "type": "number",
+          "description": "Highlight request timeout ms (default: 5000)"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        },
+        "deviceId": {
+          "type": "string",
+          "description": "Device ID override"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": true,
+      "description": "Parameters for highlight"
     },
     "expectation": {
       "type": "object",
