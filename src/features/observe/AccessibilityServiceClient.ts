@@ -4042,10 +4042,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
   }
 
   private normalizeHighlightShape(shape: HighlightShape): HighlightShape {
-    const bounds = shape.bounds;
-    return {
-      ...shape,
-      bounds: {
+    const normalizeBounds = (bounds: HighlightShape["bounds"]): HighlightShape["bounds"] => {
+      if (!bounds) {
+        return bounds;
+      }
+      return {
         x: Math.round(bounds.x),
         y: Math.round(bounds.y),
         width: Math.round(bounds.width),
@@ -4056,7 +4057,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
         sourceHeight: bounds.sourceHeight === null || bounds.sourceHeight === undefined
           ? bounds.sourceHeight
           : Math.round(bounds.sourceHeight)
-      }
+      };
+    };
+
+    if (shape.type === "path") {
+      return {
+        ...shape,
+        bounds: normalizeBounds(shape.bounds)
+      };
+    }
+
+    return {
+      ...shape,
+      bounds: normalizeBounds(shape.bounds)
     };
   }
 }

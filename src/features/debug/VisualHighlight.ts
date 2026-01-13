@@ -6,6 +6,7 @@ import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClien
 import {
   ActionableError,
   BootedDevice,
+  HighlightBounds,
   HighlightEntry,
   HighlightOperationResult,
   HighlightShape,
@@ -23,7 +24,7 @@ const normalizeNullableString = (value: string | null | undefined): string | und
   value === null ? undefined : value
 );
 
-export const highlightBoundsSchema: z.ZodType<HighlightShape["bounds"]> = z.object({
+export const highlightBoundsSchema: z.ZodType<HighlightBounds> = z.object({
   x: z.number().int(),
   y: z.number().int(),
   width: z.number().int().positive(),
@@ -47,50 +48,81 @@ export const highlightBoundsSchema: z.ZodType<HighlightShape["bounds"]> = z.obje
 const highlightStyleSchema: z.ZodType<HighlightStyle> = z.object({
   strokeColor: z.string().min(1).nullable().optional(),
   strokeWidth: z.number().positive().nullable().optional(),
-  fillColor: z.string().min(1).nullable().optional(),
-  dashPattern: z.array(z.number().positive()).nonempty().nullable().optional()
+  dashPattern: z.array(z.number().positive()).nonempty().nullable().optional(),
+  smoothing: z.enum(["none", "catmull-rom", "bezier", "douglas-peucker"]).nullable().optional(),
+  tension: z.number().min(0).max(1).nullable().optional(),
+  capStyle: z.enum(["butt", "round", "square"]).nullable().optional(),
+  joinStyle: z.enum(["miter", "round", "bevel"]).nullable().optional()
 }).superRefine((value, ctx) => {
   const strokeColor = normalizeNullableString(value.strokeColor);
   const strokeWidth = normalizeNullableNumber(value.strokeWidth);
-  const fillColor = normalizeNullableString(value.fillColor);
   const dashPattern = value.dashPattern ?? undefined;
+  const smoothing = value.smoothing ?? undefined;
+  const tension = normalizeNullableNumber(value.tension);
+  const capStyle = value.capStyle ?? undefined;
+  const joinStyle = value.joinStyle ?? undefined;
 
-  const hasStroke = strokeColor !== undefined || strokeWidth !== undefined;
-  const hasFill = fillColor !== undefined;
+  const hasStroke = strokeColor !== undefined
+    || strokeWidth !== undefined
+    || dashPattern !== undefined
+    || smoothing !== undefined
+    || tension !== undefined
+    || capStyle !== undefined
+    || joinStyle !== undefined;
 
-  if (!hasStroke && !hasFill) {
+  if (!hasStroke) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Highlight style must include stroke or fill"
-    });
-  }
-
-  if (dashPattern !== undefined && !hasStroke) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "dashPattern requires strokeColor or strokeWidth"
+      message: "Highlight style must include stroke settings"
     });
   }
 });
 
-export const highlightShapeSchema: z.ZodType<HighlightShape> = z.object({
-  type: z.enum(["box", "circle"]),
+const highlightPointSchema = z.object({
+  x: z.number(),
+  y: z.number()
+});
+
+const highlightBoxShapeSchema = z.object({
+  type: z.literal("box"),
   bounds: highlightBoundsSchema,
   style: highlightStyleSchema.nullable().optional()
 });
 
+const highlightCircleShapeSchema = z.object({
+  type: z.literal("circle"),
+  bounds: highlightBoundsSchema,
+  style: highlightStyleSchema.nullable().optional()
+});
+
+const highlightPathShapeSchema = z.object({
+  type: z.literal("path"),
+  points: z.array(highlightPointSchema).min(2),
+  bounds: highlightBoundsSchema.nullable().optional(),
+  style: highlightStyleSchema.nullable().optional()
+});
+
+export const highlightShapeSchema: z.ZodType<HighlightShape> = z.discriminatedUnion("type", [
+  highlightBoxShapeSchema,
+  highlightCircleShapeSchema,
+  highlightPathShapeSchema
+]);
+
 const highlightStyleResponseSchema = z.object({
   strokeColor: z.string().nullable().optional(),
   strokeWidth: z.number().nullable().optional(),
-  fillColor: z.string().nullable().optional(),
-  dashPattern: z.array(z.number().positive()).nullable().optional()
+  dashPattern: z.array(z.number().positive()).nullable().optional(),
+  smoothing: z.enum(["none", "catmull-rom", "bezier", "douglas-peucker"]).nullable().optional(),
+  tension: z.number().nullable().optional(),
+  capStyle: z.enum(["butt", "round", "square"]).nullable().optional(),
+  joinStyle: z.enum(["miter", "round", "bevel"]).nullable().optional()
 }).nullable().optional();
 
-const highlightShapeResponseSchema: z.ZodType<HighlightShape> = z.object({
-  type: z.enum(["box", "circle"]),
-  bounds: highlightBoundsSchema,
-  style: highlightStyleResponseSchema
-});
+const highlightShapeResponseSchema: z.ZodType<HighlightShape> = z.discriminatedUnion("type", [
+  highlightBoxShapeSchema.extend({ style: highlightStyleResponseSchema }),
+  highlightCircleShapeSchema.extend({ style: highlightStyleResponseSchema }),
+  highlightPathShapeSchema.extend({ style: highlightStyleResponseSchema })
+]);
 
 const highlightEntryResponseSchema: z.ZodType<HighlightEntry> = z.object({
   id: z.string().min(1),

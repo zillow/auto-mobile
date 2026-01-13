@@ -394,7 +394,7 @@ class WebSocketServerIntegrationTest {
 
         val requestId = "req-add"
         val message =
-            """{"type":"add_highlight","requestId":"$requestId","id":"highlight-1","shape":{"type":"box","bounds":{"x":10,"y":20,"width":100,"height":80},"style":{"strokeColor":"#FF0000","strokeWidth":4,"fillColor":null,"dashPattern":null}}}"""
+            """{"type":"add_highlight","requestId":"$requestId","id":"highlight-1","shape":{"type":"box","bounds":{"x":10,"y":20,"width":100,"height":80},"style":{"strokeColor":"#FF0000","strokeWidth":4,"dashPattern":null}}}"""
         send(Frame.Text(message))
 
         val responseFrame = withTimeout(1000) { incoming.receive() } as Frame.Text
@@ -407,6 +407,40 @@ class WebSocketServerIntegrationTest {
         val highlights = responseJson["highlights"]?.jsonArray
         assertNotNull("Should include highlights array", highlights)
         assertEquals(1, highlights?.size)
+      }
+    }
+  }
+
+  @Test
+  fun `add_path_highlight returns highlight response`() = runBlocking {
+    server.start()
+
+    val client = HttpClient(CIO) { install(WebSockets) }
+    client.use { client ->
+      client.webSocket(
+          method = HttpMethod.Get,
+          host = "localhost",
+          port = getServerPort(),
+          path = "/ws",
+      ) {
+        incoming.receive() // Connection message
+
+        val requestId = "req-add-path"
+        val message =
+            """{"type":"add_highlight","requestId":"$requestId","id":"path-1","shape":{"type":"path","points":[{"x":10,"y":20},{"x":40,"y":35},{"x":80,"y":25}],"style":{"strokeColor":"#FF8800","strokeWidth":5,"smoothing":"catmull-rom","tension":0.6}}}"""
+        send(Frame.Text(message))
+
+        val responseFrame = withTimeout(1000) { incoming.receive() } as Frame.Text
+        val responseJson = json.parseToJsonElement(responseFrame.readText()).jsonObject
+
+        assertEquals("highlight_response", responseJson["type"]?.jsonPrimitive?.content)
+        assertEquals(requestId, responseJson["requestId"]?.jsonPrimitive?.content)
+        assertEquals("true", responseJson["success"]?.jsonPrimitive?.content)
+        val highlights = responseJson["highlights"]?.jsonArray
+        assertNotNull("Should include highlights array", highlights)
+        assertEquals(1, highlights?.size)
+        val highlight = highlights?.firstOrNull()?.jsonObject
+        assertEquals("path", highlight?.get("shape")?.jsonObject?.get("type")?.jsonPrimitive?.content)
       }
     }
   }
@@ -427,7 +461,7 @@ class WebSocketServerIntegrationTest {
 
         val addRequestId = "req-add"
         val addMessage =
-            """{"type":"add_highlight","requestId":"$addRequestId","id":"highlight-1","shape":{"type":"box","bounds":{"x":15,"y":25,"width":120,"height":90},"style":{"strokeColor":"#00FF00","strokeWidth":6,"fillColor":null,"dashPattern":null}}}"""
+            """{"type":"add_highlight","requestId":"$addRequestId","id":"highlight-1","shape":{"type":"box","bounds":{"x":15,"y":25,"width":120,"height":90},"style":{"strokeColor":"#00FF00","strokeWidth":6,"dashPattern":null}}}"""
         send(Frame.Text(addMessage))
         withTimeout(1000) { incoming.receive() } // add response
 
@@ -465,7 +499,7 @@ class WebSocketServerIntegrationTest {
         incoming.receive() // Connection message
 
         val addMessage =
-            """{"type":"add_highlight","requestId":"req-add","id":"highlight-1","shape":{"type":"circle","bounds":{"x":40,"y":50,"width":60,"height":60},"style":{"strokeColor":"#0000FF","strokeWidth":5,"fillColor":null,"dashPattern":null}}}"""
+            """{"type":"add_highlight","requestId":"req-add","id":"highlight-1","shape":{"type":"circle","bounds":{"x":40,"y":50,"width":60,"height":60},"style":{"strokeColor":"#0000FF","strokeWidth":5,"dashPattern":null}}}"""
         send(Frame.Text(addMessage))
         withTimeout(1000) { incoming.receive() } // add response
 
@@ -536,9 +570,9 @@ class WebSocketServerIntegrationTest {
         incoming.receive() // Connection message
 
         val addMessageOne =
-            """{"type":"add_highlight","requestId":"req-add-1","id":"highlight-1","shape":{"type":"box","bounds":{"x":5,"y":10,"width":50,"height":40},"style":{"strokeColor":"#FF00FF","strokeWidth":3,"fillColor":null,"dashPattern":null}}}"""
+            """{"type":"add_highlight","requestId":"req-add-1","id":"highlight-1","shape":{"type":"box","bounds":{"x":5,"y":10,"width":50,"height":40},"style":{"strokeColor":"#FF00FF","strokeWidth":3,"dashPattern":null}}}"""
         val addMessageTwo =
-            """{"type":"add_highlight","requestId":"req-add-2","id":"highlight-2","shape":{"type":"box","bounds":{"x":60,"y":70,"width":80,"height":90},"style":{"strokeColor":"#00FFFF","strokeWidth":3,"fillColor":null,"dashPattern":null}}}"""
+            """{"type":"add_highlight","requestId":"req-add-2","id":"highlight-2","shape":{"type":"box","bounds":{"x":60,"y":70,"width":80,"height":90},"style":{"strokeColor":"#00FFFF","strokeWidth":3,"dashPattern":null}}}"""
         send(Frame.Text(addMessageOne))
         withTimeout(1000) { incoming.receive() } // add response
         send(Frame.Text(addMessageTwo))
@@ -579,7 +613,7 @@ class WebSocketServerIntegrationTest {
 
         val requestId = "req-invalid"
         val message =
-            """{"type":"add_highlight","requestId":"$requestId","shape":{"type":"box","bounds":{"x":10,"y":20,"width":100,"height":80},"style":{"strokeColor":"#FF0000","strokeWidth":4,"fillColor":null,"dashPattern":null}}}"""
+            """{"type":"add_highlight","requestId":"$requestId","shape":{"type":"box","bounds":{"x":10,"y":20,"width":100,"height":80},"style":{"strokeColor":"#FF0000","strokeWidth":4,"dashPattern":null}}}"""
         send(Frame.Text(message))
 
         val responseFrame = withTimeout(1000) { incoming.receive() } as Frame.Text
