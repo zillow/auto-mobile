@@ -60,6 +60,7 @@ export class AwaitIdle {
     prevMissedVsync: number | null;
     prevSlowUiThread: number | null;
     prevFrameDeadlineMissed: number | null;
+    prevTotalFrames: number | null;
     firstGfxInfoLog: boolean;
   }> {
     const startTime = Date.now();
@@ -84,6 +85,7 @@ export class AwaitIdle {
       prevMissedVsync: null,
       prevSlowUiThread: null,
       prevFrameDeadlineMissed: null,
+      prevTotalFrames: null,
       firstGfxInfoLog: true
     };
   }
@@ -120,6 +122,7 @@ export class AwaitIdle {
       prevMissedVsync: number | null;
       prevSlowUiThread: number | null;
       prevFrameDeadlineMissed: number | null;
+      prevTotalFrames: number | null;
       firstGfxInfoLog: boolean;
       lastNonIdleTime: number;
     }
@@ -132,6 +135,7 @@ export class AwaitIdle {
       state.prevMissedVsync,
       state.prevSlowUiThread,
       state.prevFrameDeadlineMissed,
+      state.prevTotalFrames,
       state.firstGfxInfoLog
     );
 
@@ -139,6 +143,7 @@ export class AwaitIdle {
       prevMissedVsync: stabilityResult.updatedPrevMissedVsync,
       prevSlowUiThread: stabilityResult.updatedPrevSlowUiThread,
       prevFrameDeadlineMissed: stabilityResult.updatedPrevFrameDeadlineMissed,
+      prevTotalFrames: stabilityResult.updatedPrevTotalFrames,
       firstGfxInfoLog: stabilityResult.updatedFirstGfxInfoLog,
       lastNonIdleTime: stabilityResult.shouldUpdateLastNonIdleTime ? Date.now() : state.lastNonIdleTime
     };
@@ -166,6 +171,7 @@ export class AwaitIdle {
       prevMissedVsync: number | null;
       prevSlowUiThread: number | null;
       prevFrameDeadlineMissed: number | null;
+      prevTotalFrames: number | null;
       firstGfxInfoLog: boolean;
     },
     perf: PerformanceTracker = new NoOpPerformanceTracker(),
