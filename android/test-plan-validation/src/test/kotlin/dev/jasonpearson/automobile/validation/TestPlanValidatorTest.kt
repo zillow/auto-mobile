@@ -531,7 +531,7 @@ class TestPlanValidatorTest {
     }
 
     @Test
-    fun `validates dragAndDrop with top-level selectors`() {
+    fun `validates dragAndDrop with top-level selectors and param overrides`() {
         val yaml = """
             name: drag-and-drop
             steps:
@@ -540,6 +540,8 @@ class TestPlanValidatorTest {
                   text: Source
                 target:
                   text: Target
+                params:
+                  duration: 800
         """.trimIndent()
 
         val result = TestPlanValidator.validateYaml(yaml)

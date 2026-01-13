@@ -200,16 +200,47 @@
                 "description": "Keep physical Android devices awake during the session (default: true)"
               }
             },
-            "anyOf": [
+            "allOf": [
               {
-                "required": [
-                  "params"
+                "anyOf": [
+                  {
+                    "required": [
+                      "source"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "params": {
+                        "required": [
+                          "source"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "params"
+                    ]
+                  }
                 ]
               },
               {
-                "required": [
-                  "source",
-                  "target"
+                "anyOf": [
+                  {
+                    "required": [
+                      "target"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "params": {
+                        "required": [
+                          "target"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "params"
+                    ]
+                  }
                 ]
               }
             ]
@@ -290,10 +321,6 @@
           "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
         }
       },
-      "required": [
-        "source",
-        "target"
-      ],
       "additionalProperties": true,
       "description": "Parameters for dragAndDrop"
     },
