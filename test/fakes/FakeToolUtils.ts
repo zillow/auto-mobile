@@ -2,10 +2,9 @@
  * Fake tool utils implementation for testing
  * Allows configuration and verification of tool response creation
  */
-import { ToolUtils } from "../../src/utils/interfaces/ToolUtils";
-import { stringifyToolResponse } from "../../src/utils/toolUtils";
+import { ToolResponseFormatter, stringifyToolResponse } from "../../src/utils/toolUtils";
 
-export class FakeToolUtils implements ToolUtils {
+export class FakeToolUtils implements ToolResponseFormatter {
   private jsonResponses: any[] = [];
   private imageResponses: Array<{ base64Data: string; mimeType: string }> = [];
 

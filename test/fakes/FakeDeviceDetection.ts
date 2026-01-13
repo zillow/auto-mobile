@@ -2,7 +2,7 @@
  * Fake device detection implementation for testing
  * Allows full control over platform detection results
  */
-import { DeviceDetection, DevicePlatform } from "../../src/utils/interfaces/DeviceDetection";
+import { DeviceDetection, DevicePlatform } from "../../src/utils/DeviceDetection";
 
 export class FakeDeviceDetection implements DeviceDetection {
   private platformMap: Map<string, DevicePlatform> = new Map();
