@@ -105,6 +105,7 @@ nav:
           - 'Feature Flags': design-docs/mcp/feature-flags.md
           - 'Migrations': design-docs/mcp/migrations.md
           - 'Video Recording': design-docs/mcp/video-recording.md
+          - 'Visual Highlighting': design-docs/mcp/visual-highlighting.md
           - 'TalkBack/VoiceOver': design-docs/mcp/talkback-voiceover.md
           - 'Critical Section': critical-section.md
           - 'Resources': design-docs/mcp/resources.md
