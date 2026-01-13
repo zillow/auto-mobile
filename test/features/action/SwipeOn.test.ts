@@ -620,3 +620,67 @@ describe("SwipeOn boomerang", () => {
     expect(calls[1].y2).toBe(calls[0].y1);
   });
 });
+
+describe("SwipeOn lookFor validation", () => {
+  const device = { name: "test-device", platform: "android", deviceId: "device-1" } as const;
+  let fakeObserveScreen: FakeObserveScreen;
+  let fakeGesture: FakeGestureExecutor;
+  let fakeAwaitIdle: FakeAwaitIdle;
+  let fakeWindow: FakeWindow;
+  let fakeTimer: FakeTimer;
+  let fakeAccessibilityDetector: FakeAccessibilityDetector;
+  let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
+
+  const createSwipeOn = () => {
+    const swipeOn = new SwipeOn(device, null, null, null, {
+      executeGesture: fakeGesture,
+      observeScreen: fakeObserveScreen,
+      accessibilityDetector: fakeAccessibilityDetector
+    });
+    (swipeOn as any).awaitIdle = fakeAwaitIdle;
+    (swipeOn as any).window = fakeWindow;
+    (swipeOn as any).timer = fakeTimer;
+    return swipeOn;
+  };
+
+  beforeEach(() => {
+    fakeAccessibilityDetector = new FakeAccessibilityDetector();
+    fakeAccessibilityDetector.setTalkBackEnabled(false);
+    getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue({} as AccessibilityServiceClient);
+    fakeObserveScreen = new FakeObserveScreen();
+    fakeGesture = new FakeGestureExecutor();
+    fakeAwaitIdle = new FakeAwaitIdle();
+    fakeWindow = new FakeWindow();
+    fakeTimer = new FakeTimer();
+    fakeWindow.setCachedActiveWindow(null);
+  });
+
+  afterEach(() => {
+    getInstanceSpy?.mockRestore();
+  });
+
+  test("rejects lookFor without text or elementId", async () => {
+    const swipeOn = createSwipeOn();
+    const result = await swipeOn.execute({
+      direction: "up",
+      lookFor: {}
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("lookFor must specify exactly one of elementId or text");
+  });
+
+  test("rejects lookFor with both text and elementId", async () => {
+    const swipeOn = createSwipeOn();
+    const result = await swipeOn.execute({
+      direction: "up",
+      lookFor: {
+        text: "Settings",
+        elementId: "com.app:id/settings"
+      }
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("lookFor must specify exactly one of elementId or text");
+  });
+});

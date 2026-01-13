@@ -106,13 +106,20 @@ export class DefaultUIStateSetup implements UIStateSetup {
       }
 
       // Build swipeOn arguments with lookFor
+      const lookFor = scrollPosition.targetElement.resourceId
+        ? { elementId: scrollPosition.targetElement.resourceId }
+        : scrollPosition.targetElement.text
+          ? { text: scrollPosition.targetElement.text }
+          : undefined;
+      if (!lookFor) {
+        logger.warn("[UI_STATE_SETUP] Scroll position target element missing text/resourceId; skipping scroll setup");
+        return null;
+      }
+
       const swipeOnArgs: any = {
         platform,
         direction: scrollPosition.direction,
-        lookFor: {
-          text: scrollPosition.targetElement.text,
-          elementId: scrollPosition.targetElement.resourceId
-        }
+        lookFor
       };
 
       // Add container if specified

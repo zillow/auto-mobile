@@ -2518,18 +2518,34 @@
           "description": "swipeFingerTowardsDirection=finger moves in direction (default), scrollTowardsDirection=content scrolls in direction"
         },
         "lookFor": {
-          "type": "object",
-          "properties": {
-            "elementId": {
-              "type": "string",
-              "description": "ID of the element to look for"
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "elementId": {
+                  "type": "string",
+                  "description": "ID of the element to look for"
+                }
+              },
+              "required": [
+                "elementId"
+              ],
+              "additionalProperties": false
             },
-            "text": {
-              "type": "string",
-              "description": "Text to look for"
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Text to look for"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false,
+          ],
           "description": "Swipe until we find a match"
         },
         "boomerang": {
