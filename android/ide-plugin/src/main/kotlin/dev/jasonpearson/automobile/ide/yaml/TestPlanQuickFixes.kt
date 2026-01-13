@@ -146,7 +146,7 @@ object TestPlanQuickFixFactory {
 
     // Valid AutoMobile tool names (should match TestPlanValidator.VALID_TOOLS)
     private val VALID_TOOLS = setOf(
-        "launchApp", "terminateApp", "listApps", "installApp",
+        "launchApp", "terminateApp", "installApp",
         "tapOn", "swipeOn", "pinchOn", "dragAndDrop",
         "inputText", "clearText", "selectAllText", "imeAction",
         "pressButton", "pressKey", "homeScreen", "recentApps", "openLink", "navigateTo",

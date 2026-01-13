@@ -47,7 +47,7 @@ object TestPlanValidator {
     // Valid AutoMobile tool names (extracted from src/server/*Tools.ts)
     private val VALID_TOOLS = setOf(
         // App management
-        "launchApp", "terminateApp", "listApps", "installApp",
+        "launchApp", "terminateApp", "installApp",
         // UI interactions
         "tapOn", "swipeOn", "pinchOn", "dragAndDrop",
         // Input

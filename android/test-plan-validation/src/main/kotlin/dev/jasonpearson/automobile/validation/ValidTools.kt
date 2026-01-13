@@ -2,7 +2,7 @@ package dev.jasonpearson.automobile.validation
 
 object ValidTools {
     val TOOLS = setOf(
-        "launchApp", "terminateApp", "listApps", "installApp",
+        "launchApp", "terminateApp", "installApp",
         "tapOn", "swipeOn", "pinchOn", "dragAndDrop",
         "inputText", "clearText", "selectAllText", "imeAction",
         "pressButton", "pressKey", "homeScreen", "recentApps", "openLink", "navigateTo",
