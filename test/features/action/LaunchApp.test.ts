@@ -26,11 +26,11 @@ describe("LaunchApp", () => {
   });
 
   const configureInstalledApp = () => {
-    fakeAdb.setCommandResponse("shell pm list packages -s --user 0", { stdout: "", stderr: "" });
-    fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
+    fakeAdb.setCommandResponse("shell pm list packages --user 0", {
       stdout: `package:${packageName}\n`,
       stderr: ""
     });
+    fakeAdb.setCommandResponse("shell pm list packages -s --user 0", { stdout: "", stderr: "" });
   };
 
   beforeEach(() => {
