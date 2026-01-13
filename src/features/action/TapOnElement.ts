@@ -89,6 +89,22 @@ export class TapOnElement extends BaseVisualChange {
     };
   }
 
+  private validateOptions(options: TapOnElementOptions): string | null {
+    const selectorCount = [options.text, options.elementId].filter(Boolean).length;
+    if (selectorCount !== 1) {
+      return "tapOn requires exactly one of text or elementId";
+    }
+
+    if (options.container) {
+      const containerSelectorCount = [options.container.elementId, options.container.text].filter(Boolean).length;
+      if (containerSelectorCount !== 1) {
+        return "tapOn container must specify exactly one of elementId or text";
+      }
+    }
+
+    return null;
+  }
+
   private getSearchUntilDuration(options: TapOnElementOptions): number {
     const duration = options.searchUntil?.duration ?? TapOnElement.SEARCH_UNTIL_DEFAULT_MS;
 
@@ -575,6 +591,11 @@ export class TapOnElement extends BaseVisualChange {
   ): Promise<TapOnElementResult> {
     if (!options.action) {
       return this.createErrorResult(options.action, "tap on action is required");
+    }
+
+    const validationError = this.validateOptions(options);
+    if (validationError) {
+      return this.createErrorResult(options.action, validationError);
     }
 
     const perf = createGlobalPerformanceTracker();
