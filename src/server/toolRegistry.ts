@@ -367,6 +367,10 @@ class ToolRegistryClass {
   // Register all tools with an MCP server
   registerWithServer(server: McpServer): void {
     this.tools.forEach(tool => {
+      if (!this.isToolAvailable(tool)) {
+        return;
+      }
+
       // Create a wrapper that adapts our ToolHandler to the MCP server's expected signature
       const wrappedHandler = async (args: any, extra: any) => {
         if (tool.supportsProgress) {

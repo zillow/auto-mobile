@@ -40,7 +40,6 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 - 🗺️ `navigateTo` navigates to a specific screen using learned paths from the navigation graph.
 - 🔍 `explore` automatically explores the app and builds the navigation graph by intelligently selecting and interacting with UI elements.
 - 📊 `getNavigationGraph` retrieves the current navigation graph for debugging and analysis.
-- 🔗 `identifyInteractions` analyzes the current screen and suggests likely interactions with ready-to-use tool calls.
 
 #### Advanced Device Management
 
@@ -57,6 +56,7 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 - 🐛 `bugReport` generates a comprehensive bug report including screen state, view hierarchy, logcat, and screenshot.
 - 🔍 `debugSearch` debugs element search operations to understand why elements aren't found or wrong elements are selected.
 - 📸 `rawViewHierarchy` gets raw view hierarchy data (XML/JSON) without parsing for debugging.
+- 🔗 `identifyInteractions` suggests likely interactions with ready-to-use tool calls (debug-only; enable the debug feature flag).
 
 #### Performance & Monitoring
 
