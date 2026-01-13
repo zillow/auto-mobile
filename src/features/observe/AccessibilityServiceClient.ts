@@ -4050,8 +4050,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
         y: Math.round(bounds.y),
         width: Math.round(bounds.width),
         height: Math.round(bounds.height),
-        sourceWidth: bounds.sourceWidth == null ? bounds.sourceWidth : Math.round(bounds.sourceWidth),
-        sourceHeight: bounds.sourceHeight == null ? bounds.sourceHeight : Math.round(bounds.sourceHeight)
+        sourceWidth: bounds.sourceWidth === null || bounds.sourceWidth === undefined
+          ? bounds.sourceWidth
+          : Math.round(bounds.sourceWidth),
+        sourceHeight: bounds.sourceHeight === null || bounds.sourceHeight === undefined
+          ? bounds.sourceHeight
+          : Math.round(bounds.sourceHeight)
       }
     };
   }
