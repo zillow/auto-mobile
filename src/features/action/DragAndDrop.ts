@@ -37,19 +37,24 @@ export class DragAndDrop extends BaseVisualChange {
       };
     }
 
+    const perf = createGlobalPerformanceTracker();
+    perf.serial("dragAndDrop");
+
     const a11yManager = AndroidAccessibilityServiceManager.getInstance(this.device, this.adb);
-    const isInstalled = await a11yManager.isInstalled();
-    if (!isInstalled) {
+    const isAvailable = await perf.track("a11yAvailable", () => a11yManager.isAvailable());
+    if (!isAvailable) {
+      perf.end();
       return {
         success: false,
         duration: 0,
         distance: 0,
-        error: "dragAndDrop requires the Android accessibility service to be installed"
+        error: "dragAndDrop requires the Android accessibility service to be installed and enabled."
       };
     }
 
     const validationError = this.validateOptions(options);
     if (validationError) {
+      perf.end();
       return {
         success: false,
         duration: 0,
@@ -57,9 +62,6 @@ export class DragAndDrop extends BaseVisualChange {
         error: validationError
       };
     }
-
-    const perf = createGlobalPerformanceTracker();
-    perf.serial("dragAndDrop");
 
     try {
       const result = await this.observedInteraction(
