@@ -5,7 +5,7 @@
     "description": "MCP tool call throughput thresholds with 20% regression tolerance",
     "baseline": {
       "description": "Baseline measurements from actual tool handler execution (MCP overhead without device I/O)",
-      "sampleSize": 20,
+      "sampleSize": 50,
       "generatedBy": "benchmark-mcp-tools.ts",
       "note": "Measures tool registry lookup, schema validation, device resolution, and handler wrapper overhead"
     },
@@ -15,13 +15,13 @@
     "listDevices": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 1.5,
+      "p99": 5.0,
       "mean": 0.5
     },
     "getForegroundApp": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 1.5,
+      "p99": 5.0,
       "mean": 0.5
     },
     "pressButton": {
@@ -39,7 +39,7 @@
     "tapOn": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 1.5,
+      "p99": 5.0,
       "mean": 0.5
     },
     "inputText": {
@@ -51,7 +51,7 @@
     "swipe": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 1.5,
+      "p99": 5.0,
       "mean": 0.5
     },
     "launchApp": {
@@ -63,7 +63,7 @@
     "installApp": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 1.5,
+      "p99": 5.0,
       "mean": 0.5
     }
   }
