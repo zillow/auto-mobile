@@ -21,6 +21,7 @@ npm-debug.log*
 /blog
 /presentation
 android/junit-runner/scratch
+android/junit-runner/.cache/screen-size/
 
 # Generated MkDocs for GitHub Pages
 /site

@@ -35,19 +35,26 @@ internal object DaemonSocketClientManager {
   private val clientLock = Any()
   @Volatile
   private var daemonEnsured = false
+  @JvmStatic internal var testClient: DaemonToolClient? = null
 
   fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse {
-    val socketClient = getOrCreateClient()
-    return socketClient.callTool(toolName, arguments, timeoutMs)
+    val overrideClient = testClient
+    if (overrideClient != null) {
+      return overrideClient.callTool(toolName, arguments, timeoutMs)
+    }
+    return getOrCreateClient().callTool(toolName, arguments, timeoutMs)
   }
 
   fun readResource(uri: String, timeoutMs: Long): DaemonResponse {
-    val socketClient = getOrCreateClient()
-    return socketClient.readResource(uri, timeoutMs)
+    val overrideClient = testClient
+    if (overrideClient != null) {
+      return overrideClient.readResource(uri, timeoutMs)
+    }
+    return getOrCreateClient().readResource(uri, timeoutMs)
   }
 
   fun sessionUuid(): String {
-    return getOrCreateClient().sessionUuid
+    return testClient?.sessionUuid ?: getOrCreateClient().sessionUuid
   }
 
   private fun getOrCreateClient(): DaemonSocketClient {
@@ -315,14 +322,14 @@ internal object DaemonSocketPaths {
   }
 }
 
-internal class DaemonSocketClient(private val socketPath: String) : Closeable {
+internal class DaemonSocketClient(private val socketPath: String) : Closeable, DaemonToolClient {
   private val json = Json { ignoreUnknownKeys = true }
   private val pending = ConcurrentHashMap<String, CompletableFuture<DaemonResponse>>()
   private val writeLock = Any()
   @Volatile private var closed = false
 
   // Unique session UUID for this client/thread to enable per-thread plan execution locking
-  val sessionUuid: String = UUID.randomUUID().toString()
+  override val sessionUuid: String = UUID.randomUUID().toString()
 
   private val channel: SocketChannel = connect()
   private val reader: BufferedReader
@@ -343,7 +350,7 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
     return !closed && channel.isOpen
   }
 
-  fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse {
+  override fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse {
     if (!isConnected()) {
       throw DaemonUnavailableException("Daemon socket connection is not available")
     }
@@ -370,7 +377,7 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable {
     }
   }
 
-  fun readResource(uri: String, timeoutMs: Long): DaemonResponse {
+  override fun readResource(uri: String, timeoutMs: Long): DaemonResponse {
     if (!isConnected()) {
       throw DaemonUnavailableException("Daemon socket connection is not available")
     }
@@ -542,6 +549,15 @@ internal data class DaemonResponse(
     val result: JsonElement? = null,
     val error: String? = null,
 )
+
+/** Interface for daemon tool calls to enable testing with fakes. */
+internal interface DaemonToolClient {
+  fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse
+
+  fun readResource(uri: String, timeoutMs: Long): DaemonResponse
+
+  val sessionUuid: String
+}
 
 internal class DaemonUnavailableException(message: String) : Exception(message)
 
