@@ -338,7 +338,8 @@ function decodeQueryParam(value: string | undefined): string | undefined {
   if (!value) {
     return undefined;
   }
-  const decoded = decodeURIComponent(value).trim();
+  const normalized = value.replace(/\+/g, " ");
+  const decoded = decodeURIComponent(normalized).trim();
   return decoded ? decoded : undefined;
 }
 
