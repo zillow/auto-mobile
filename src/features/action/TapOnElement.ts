@@ -581,6 +581,7 @@ export class TapOnElement extends BaseVisualChange {
               perf.end();
               return {
                 success: true,
+                action,
                 element: element,
                 searchUntil: searchOutcome.stats,
                 wasAlreadyFocused: true,

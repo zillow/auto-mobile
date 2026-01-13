@@ -29,12 +29,13 @@ export interface ToolHandler<T = any> {
 
 // Interface for device-aware tool handlers
 export interface DeviceAwareToolHandler<T = any> {
-    (device: BootedDevice, args: T, progress?: ProgressCallback, signal?: AbortSignal): Promise<any>;
+  (device: BootedDevice, args: T, progress?: ProgressCallback, signal?: AbortSignal): Promise<any>;
 }
 
 export interface DeviceAwareToolOptions<T = any> {
   shouldEnsureDevice?: (args: T) => boolean;
   nonDeviceHandler?: ToolHandler<T>;
+  outputSchema?: any;
 }
 
 // Interface for a registered tool
@@ -44,9 +45,10 @@ export interface RegisteredTool {
   schema: any;
   handler: ToolHandler;
   supportsProgress?: boolean;
-    requiresDevice?: boolean;
-    deviceAwareHandler?: DeviceAwareToolHandler;
+  requiresDevice?: boolean;
+  deviceAwareHandler?: DeviceAwareToolHandler;
   debugOnly?: boolean;
+  outputSchema?: any;
 }
 
 // The registry that holds all tools
@@ -73,7 +75,8 @@ class ToolRegistryClass {
     schema: any,
     handler: ToolHandler,
     supportsProgress: boolean = false,
-    debugOnly: boolean = false
+    debugOnly: boolean = false,
+    outputSchema?: any
   ): void {
     this.tools.set(name, {
       name,
@@ -82,7 +85,8 @@ class ToolRegistryClass {
       handler,
       supportsProgress,
       requiresDevice: false,
-      debugOnly
+      debugOnly,
+      outputSchema
     });
   }
 
@@ -346,7 +350,8 @@ class ToolRegistryClass {
       supportsProgress,
       requiresDevice: true,
       deviceAwareHandler: handler,
-      debugOnly
+      debugOnly,
+      outputSchema: options.outputSchema
     });
   }
 
@@ -392,7 +397,8 @@ class ToolRegistryClass {
     return this.getAllTools().map(tool => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: zodToJsonSchema(tool.schema)
+      inputSchema: zodToJsonSchema(tool.schema),
+      ...(tool.outputSchema ? { outputSchema: zodToJsonSchema(tool.outputSchema) } : {})
     }));
   }
 

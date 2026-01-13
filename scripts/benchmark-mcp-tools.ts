@@ -516,7 +516,7 @@ async function main() {
   let configPath = path.join(__dirname, "tool-thresholds.json");
   let outputPath: string | null = null;
   let baselinePath: string | null = null;
-  let sampleSize = 20; // Default to 20 iterations as requested
+  let sampleSize = 50; // Default to 50 iterations to reduce p99 noise
 
   // Parse command line arguments
   for (let i = 0; i < args.length; i++) {
