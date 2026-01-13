@@ -16,6 +16,7 @@ class HighlightAnimatorTest {
     val animator =
         HighlightAnimator(
             onAlphaUpdate = { _, _ -> },
+            onDrawProgressUpdate = { _, _ -> },
             onAnimationComplete = {},
             onAnimationActiveChanged = {},
         )
@@ -24,7 +25,10 @@ class HighlightAnimatorTest {
 
     val valueAnimator = animator.getAnimatorForTest("highlight")
     assertNotNull(valueAnimator)
-    assertEquals(HighlightAnimator.DEFAULT_FADE_DURATION_MS, valueAnimator!!.duration)
+    val expectedDuration = HighlightAnimator.DEFAULT_FADE_IN_DURATION_MS +
+                          HighlightAnimator.DEFAULT_DISPLAY_DURATION_MS +
+                          HighlightAnimator.DEFAULT_FADE_OUT_DURATION_MS
+    assertEquals(expectedDuration, valueAnimator!!.duration)
     assertTrue(valueAnimator.interpolator is AccelerateDecelerateInterpolator)
   }
 
@@ -36,6 +40,7 @@ class HighlightAnimatorTest {
     val animator =
         HighlightAnimator(
             onAlphaUpdate = { _, alpha -> updates.add(alpha) },
+            onDrawProgressUpdate = { _, _ -> },
             onAnimationComplete = { id -> completions.add(id) },
             onAnimationActiveChanged = { active -> activity.add(active) },
         )
@@ -44,8 +49,11 @@ class HighlightAnimatorTest {
 
     val valueAnimator = animator.getAnimatorForTest("highlight")
     assertNotNull(valueAnimator)
-    valueAnimator!!.setCurrentPlayTime(HighlightAnimator.DEFAULT_FADE_DURATION_MS / 2)
-    valueAnimator.setCurrentPlayTime(HighlightAnimator.DEFAULT_FADE_DURATION_MS)
+    val totalDuration = HighlightAnimator.DEFAULT_FADE_IN_DURATION_MS +
+                       HighlightAnimator.DEFAULT_DISPLAY_DURATION_MS +
+                       HighlightAnimator.DEFAULT_FADE_OUT_DURATION_MS
+    valueAnimator!!.setCurrentPlayTime(totalDuration / 2)
+    valueAnimator.setCurrentPlayTime(totalDuration)
     valueAnimator.end()
 
     assertTrue(updates.isNotEmpty())
@@ -62,6 +70,7 @@ class HighlightAnimatorTest {
     val animator =
         HighlightAnimator(
             onAlphaUpdate = { _, _ -> },
+            onDrawProgressUpdate = { _, _ -> },
             onAnimationComplete = { id -> completions.add(id) },
             onAnimationActiveChanged = { active -> activity.add(active) },
         )
