@@ -24,12 +24,12 @@ describe("ListInstalledApps", function() {
     test("should list all installed packages", async function() {
       // Set up single user with packages
       fakeAdb.setUsers([{ userId: 0, name: "Owner", flags: 13, running: true }]);
-      fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
-        stdout: "package:com.android.chrome\npackage:com.google.android.gms\n",
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
+        stdout: "package:com.android.chrome\npackage:com.google.android.gms\npackage:com.example.myapp\n",
         stderr: ""
       });
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
-        stdout: "package:com.example.myapp\n",
+      fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
+        stdout: "package:com.android.chrome\npackage:com.google.android.gms\n",
         stderr: ""
       });
 
@@ -44,8 +44,12 @@ describe("ListInstalledApps", function() {
 
     test("should filter out empty lines and non-package lines", async function() {
       fakeAdb.setUsers([{ userId: 0, name: "Owner", flags: 13, running: true }]);
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
         stdout: "package:com.example.app\n\nsome other line\npackage:com.test.app\n",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
+        stdout: "",
         stderr: ""
       });
 
@@ -58,7 +62,7 @@ describe("ListInstalledApps", function() {
 
     test("should handle adb command failure gracefully", async function() {
       fakeAdb.setUsers([{ userId: 0, name: "Owner", flags: 13, running: true }]);
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
         stdout: "",
         stderr: "error"
       });
@@ -75,7 +79,7 @@ describe("ListInstalledApps", function() {
 
     test("should trim package names correctly", async function() {
       fakeAdb.setUsers([{ userId: 0, name: "Owner", flags: 13, running: true }]);
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
         stdout: "package: com.example.app \npackage:com.test.app\t\n",
         stderr: ""
       });
@@ -102,20 +106,20 @@ describe("ListInstalledApps", function() {
       fakeAdb.setUsers(users);
 
       // Configure packages for each user
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
+        stdout: "package:com.android.chrome\npackage:com.example.personalapp\n",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
         stdout: "package:com.android.chrome\n",
         stderr: ""
       });
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
-        stdout: "package:com.example.personalapp\n",
+      fakeAdb.setCommandResponse("shell pm list packages --user 10", {
+        stdout: "package:com.android.chrome\npackage:com.example.workapp\n",
         stderr: ""
       });
       fakeAdb.setCommandResponse("shell pm list packages -s --user 10", {
         stdout: "package:com.android.chrome\n",
-        stderr: ""
-      });
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 10", {
-        stdout: "package:com.example.workapp\n",
         stderr: ""
       });
 
@@ -152,20 +156,20 @@ describe("ListInstalledApps", function() {
       fakeAdb.setUsers(users);
       fakeAdb.setForegroundApp({ packageName: "com.android.settings", userId: 10 });
 
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
+        stdout: "package:com.android.settings\n",
+        stderr: ""
+      });
       fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
         stdout: "package:com.android.settings\n",
         stderr: ""
       });
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
-        stdout: "",
+      fakeAdb.setCommandResponse("shell pm list packages --user 10", {
+        stdout: "package:com.android.settings\n",
         stderr: ""
       });
       fakeAdb.setCommandResponse("shell pm list packages -s --user 10", {
         stdout: "package:com.android.settings\n",
-        stderr: ""
-      });
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 10", {
-        stdout: "",
         stderr: ""
       });
 
@@ -175,6 +179,28 @@ describe("ListInstalledApps", function() {
       expect(result.system[0].packageName).toBe("com.android.settings");
       expect(result.system[0].userIds.sort()).toEqual([0, 10]);
       expect(result.system[0].foreground).toBe(true);
+    });
+
+    test("should treat non-system packages as user apps even if not listed in -s", async function() {
+      const users: AndroidUser[] = [
+        { userId: 0, name: "Owner", flags: 13, running: true }
+      ];
+      fakeAdb.setUsers(users);
+
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
+        stdout: "package:com.android.chrome\npackage:com.google.android.apps.weather\n",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
+        stdout: "package:com.android.chrome\n",
+        stderr: ""
+      });
+
+      const result = await listInstalledApps.executeDetailed();
+
+      const userPackages = result.profiles[0].map(app => app.packageName);
+      expect(userPackages).toContain("com.google.android.apps.weather");
+      expect(result.system.some(app => app.packageName === "com.google.android.apps.weather")).toBe(false);
     });
 
     test("should mark foreground app correctly", async function() {
@@ -187,7 +213,7 @@ describe("ListInstalledApps", function() {
       // Set foreground app in work profile
       fakeAdb.setForegroundApp({ packageName: "com.example.workapp", userId: 10 });
 
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
         stdout: "package:com.example.personalapp\n",
         stderr: ""
       });
@@ -195,7 +221,7 @@ describe("ListInstalledApps", function() {
         stdout: "",
         stderr: ""
       });
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 10", {
+      fakeAdb.setCommandResponse("shell pm list packages --user 10", {
         stdout: "package:com.example.workapp\n",
         stderr: ""
       });
@@ -219,12 +245,12 @@ describe("ListInstalledApps", function() {
       ];
       fakeAdb.setUsers(users);
 
-      fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
-        stdout: "package:com.android.chrome\n",
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
+        stdout: "package:com.android.chrome\npackage:com.example.app\n",
         stderr: ""
       });
-      fakeAdb.setCommandResponse("shell pm list packages -3 --user 0", {
-        stdout: "package:com.example.app\n",
+      fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
+        stdout: "package:com.android.chrome\n",
         stderr: ""
       });
 

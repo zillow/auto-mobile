@@ -70,8 +70,10 @@ export class ListInstalledApps {
         try {
           logger.info(`[ListInstalledApps] Listing packages for user ${user.userId}...`);
 
+          const allPackages = await this.listPackagesForUser(user.userId);
           const systemPackages = await this.listPackagesForUser(user.userId, "-s");
-          const userPackages = await this.listPackagesForUser(user.userId, "-3");
+          const systemPackageSet = new Set(systemPackages);
+          const userPackages = allPackages.filter(packageName => !systemPackageSet.has(packageName));
 
           logger.info(`[ListInstalledApps] Found ${userPackages.length} user package(s) and ${systemPackages.length} system package(s) for user ${user.userId}`);
 
@@ -127,9 +129,10 @@ export class ListInstalledApps {
     }
   }
 
-  private async listPackagesForUser(userId: number, filterFlag: "-s" | "-3"): Promise<string[]> {
+  private async listPackagesForUser(userId: number, filterFlag?: "-s" | "-3"): Promise<string[]> {
+    const flag = filterFlag ? ` ${filterFlag}` : "";
     const { stdout } = await this.adb.executeCommand(
-      `shell pm list packages ${filterFlag} --user ${userId}`
+      `shell pm list packages${flag} --user ${userId}`
     );
     return this.parsePackages(stdout);
   }

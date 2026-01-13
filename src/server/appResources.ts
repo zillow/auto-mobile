@@ -62,6 +62,7 @@ export interface AppsResourceContent {
   totalCount: number;
   foregroundApp: string | null;
   lastUpdated: string; // ISO 8601
+  message?: string;
 }
 
 export interface InstalledAppInfo {
@@ -246,7 +247,8 @@ function createAppsResourceContent(
   device: BootedDevice,
   apps: InstalledAppInfo[],
   foregroundApp: string | null,
-  lastUpdated: string
+  lastUpdated: string,
+  message?: string
 ): AppsResourceContent {
   return {
     deviceId: device.deviceId,
@@ -254,8 +256,13 @@ function createAppsResourceContent(
     apps,
     totalCount: apps.length,
     foregroundApp,
-    lastUpdated
+    lastUpdated,
+    ...(message ? { message } : {})
   };
+}
+
+function getAndroidAppsMessage(deviceId: string): string {
+  return `User apps only. Use automobile:apps?deviceId=${deviceId}&type=system to list system apps.`;
 }
 
 async function findBootedDevice(deviceId: string): Promise<BootedDevice | null> {
@@ -276,10 +283,11 @@ async function fetchAppsForDevice(device: BootedDevice): Promise<AppsCacheEntry>
     const installedApps = await listInstalledApps.executeDetailed();
     const { userApps, queryApps } = normalizeAndroidApps(installedApps);
     const foregroundApp = queryApps.find(app => app.foreground)?.packageName ?? null;
+    const message = getAndroidAppsMessage(device.deviceId);
 
     return {
       expiresAt: Date.now() + APPS_CACHE_TTL_MS,
-      content: createAppsResourceContent(device, userApps, foregroundApp, lastUpdated),
+      content: createAppsResourceContent(device, userApps, foregroundApp, lastUpdated, message),
       appsByPackage: buildAppsByPackage(userApps),
       queryApps
     };
@@ -572,7 +580,8 @@ function registerDeviceAppResource(device: BootedDevice): void {
   ResourceRegistry.register(
     uri,
     `Installed Apps (${device.deviceId})`,
-    `List of installed apps for device ${device.deviceId} (${device.platform}).`,
+    `List of installed user apps for device ${device.deviceId} (${device.platform}). ` +
+      `System apps: use automobile:apps?deviceId=${device.deviceId}&type=system.`,
     "application/json",
     () => getAppsResource(device.deviceId)
   );
@@ -690,7 +699,8 @@ export function registerAppResources(): void {
   ResourceRegistry.registerTemplate(
     APP_RESOURCE_TEMPLATES.DEVICE_APPS,
     "Installed Apps",
-    "List of installed apps for a specific device.",
+    "List of installed user apps for a specific device. " +
+      "System apps: use automobile:apps?deviceId=DEVICE_ID&type=system.",
     "application/json",
     async params => getAppsResource(params.deviceId)
   );
@@ -698,7 +708,8 @@ export function registerAppResources(): void {
   ResourceRegistry.registerTemplate(
     APP_RESOURCE_TEMPLATES.DEVICE_APP,
     "Installed App Details",
-    "Details for a specific app installed on a specific device.",
+    "Details for a specific user app installed on a specific device. " +
+      "System apps: use automobile:apps?deviceId=DEVICE_ID&type=system&search=PACKAGE_NAME.",
     "application/json",
     async params => getAppResource(params.deviceId, params.packageName)
   );
