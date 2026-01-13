@@ -5,7 +5,17 @@ import { fileURLToPath } from "node:url";
 import { randomBytes } from "crypto";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
-import { BootedDevice, RecompositionNodeInfo, ViewHierarchyResult, CurrentFocusResult, TraversalOrderResult, Element } from "../../models";
+import {
+  BootedDevice,
+  RecompositionNodeInfo,
+  ViewHierarchyResult,
+  CurrentFocusResult,
+  TraversalOrderResult,
+  Element,
+  HighlightEntry,
+  HighlightOperationResult,
+  HighlightShape
+} from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -91,6 +101,7 @@ interface WebSocketMessage {
   adbCommand?: string;
   error?: string;
   event?: InteractionEvent;
+  highlights?: HighlightEntry[];
 }
 
 /**
@@ -552,6 +563,41 @@ export interface AccessibilityService {
   ): Promise<A11yPermissionResult>;
 
   /**
+   * Add a visual highlight overlay entry.
+   */
+  requestAddHighlight(
+    id: string,
+    shape: HighlightShape,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<HighlightOperationResult>;
+
+  /**
+   * Remove a visual highlight overlay entry.
+   */
+  requestRemoveHighlight(
+    id: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<HighlightOperationResult>;
+
+  /**
+   * Clear all visual highlight overlay entries.
+   */
+  requestClearHighlights(
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<HighlightOperationResult>;
+
+  /**
+   * List current visual highlight overlay entries.
+   */
+  requestListHighlights(
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<HighlightOperationResult>;
+
+  /**
    * Request a screenshot from the accessibility service
    *
    * @param timeoutMs - Maximum time to wait for screenshot in milliseconds
@@ -679,6 +725,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Traversal order handling
   private pendingTraversalOrderResolve: ((result: TraversalOrderResult) => void) | null = null;
   private pendingTraversalOrderRequestId: string | null = null;
+
+  // Highlight handling
+  private pendingHighlightResolve: ((result: HighlightOperationResult) => void) | null = null;
+  private pendingHighlightRequestId: string | null = null;
 
   // WebSocket factory for testing
   private webSocketFactory: (url: string) => WebSocket;
@@ -1338,6 +1388,33 @@ export class AccessibilityServiceClient implements AccessibilityService {
             error: traversalMessage.error || "No result data"
           });
         }
+      }
+
+      // Handle highlight response
+      if (message.type === "highlight_response") {
+        const highlightMessage = message as any;
+        if (!this.pendingHighlightResolve) {
+          logger.debug("[ACCESSIBILITY_SERVICE] Received highlight_response with no pending request");
+          return;
+        }
+        if (
+          this.pendingHighlightRequestId
+          && highlightMessage.requestId
+          && highlightMessage.requestId !== this.pendingHighlightRequestId
+        ) {
+          logger.debug(`[ACCESSIBILITY_SERVICE] Ignoring highlight_response for requestId ${highlightMessage.requestId}`);
+          return;
+        }
+        const resolve = this.pendingHighlightResolve;
+        this.pendingHighlightResolve = null;
+        this.pendingHighlightRequestId = null;
+        resolve({
+          success: highlightMessage.success ?? false,
+          error: highlightMessage.error,
+          highlights: Array.isArray(highlightMessage.highlights) ? highlightMessage.highlights : [],
+          requestId: highlightMessage.requestId,
+          timestamp: highlightMessage.timestamp
+        });
       }
 
       // Handle navigation event
@@ -3819,5 +3896,163 @@ export class AccessibilityServiceClient implements AccessibilityService {
         error: `${error}`
       };
     }
+  }
+
+  /**
+   * Add a visual highlight overlay entry.
+   */
+  async requestAddHighlight(
+    id: string,
+    shape: HighlightShape,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<HighlightOperationResult> {
+    return this.requestHighlightOperation(
+      "add_highlight",
+      { id, shape },
+      timeoutMs,
+      perf
+    );
+  }
+
+  /**
+   * Remove a visual highlight overlay entry.
+   */
+  async requestRemoveHighlight(
+    id: string,
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<HighlightOperationResult> {
+    return this.requestHighlightOperation(
+      "remove_highlight",
+      { id },
+      timeoutMs,
+      perf
+    );
+  }
+
+  /**
+   * Clear all visual highlight overlay entries.
+   */
+  async requestClearHighlights(
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<HighlightOperationResult> {
+    return this.requestHighlightOperation(
+      "clear_highlights",
+      {},
+      timeoutMs,
+      perf
+    );
+  }
+
+  /**
+   * List current visual highlight overlay entries.
+   */
+  async requestListHighlights(
+    timeoutMs: number = 5000,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<HighlightOperationResult> {
+    return this.requestHighlightOperation(
+      "list_highlights",
+      {},
+      timeoutMs,
+      perf
+    );
+  }
+
+  private async requestHighlightOperation(
+    type: "add_highlight" | "remove_highlight" | "clear_highlights" | "list_highlights",
+    payload: { id?: string; shape?: HighlightShape },
+    timeoutMs: number,
+    perf: PerformanceTracker
+  ): Promise<HighlightOperationResult> {
+    const startTime = Date.now();
+
+    try {
+      const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
+      if (!connected) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for highlight operation");
+        return {
+          success: false,
+          error: "Failed to connect to accessibility service",
+          highlights: []
+        };
+      }
+
+      const requestId = `highlight_${Date.now()}_${generateSecureId()}`;
+      this.pendingHighlightRequestId = requestId;
+
+      const highlightPromise = new Promise<HighlightOperationResult>(resolve => {
+        this.pendingHighlightResolve = resolve;
+
+        this.timer.setTimeout(() => {
+          if (this.pendingHighlightResolve === resolve) {
+            this.pendingHighlightResolve = null;
+            this.pendingHighlightRequestId = null;
+            resolve({
+              success: false,
+              error: `Highlight request timeout after ${timeoutMs}ms`,
+              highlights: []
+            });
+          }
+        }, timeoutMs);
+      });
+
+      await perf.track("sendRequest", async () => {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error("WebSocket not connected");
+        }
+
+        const messagePayload: Record<string, unknown> = {
+          type,
+          requestId
+        };
+
+        if (payload.id) {
+          messagePayload.id = payload.id;
+        }
+        if (payload.shape) {
+          messagePayload.shape = this.normalizeHighlightShape(payload.shape);
+        }
+
+        this.ws.send(JSON.stringify(messagePayload));
+        logger.debug(`[ACCESSIBILITY_SERVICE] Sent highlight request (${type}, requestId: ${requestId})`);
+      });
+
+      const result = await perf.track("waitForHighlight", () => highlightPromise);
+      const duration = Date.now() - startTime;
+
+      if (result.success) {
+        logger.info(`[ACCESSIBILITY_SERVICE] Highlight ${type} completed in ${duration}ms`);
+      } else {
+        logger.warn(`[ACCESSIBILITY_SERVICE] Highlight ${type} failed after ${duration}ms: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      logger.warn(`[ACCESSIBILITY_SERVICE] Highlight ${type} request failed after ${duration}ms: ${error}`);
+      return {
+        success: false,
+        error: `${error}`,
+        highlights: []
+      };
+    }
+  }
+
+  private normalizeHighlightShape(shape: HighlightShape): HighlightShape {
+    const bounds = shape.bounds;
+    return {
+      ...shape,
+      bounds: {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Math.round(bounds.width),
+        height: Math.round(bounds.height),
+        sourceWidth: bounds.sourceWidth == null ? bounds.sourceWidth : Math.round(bounds.sourceWidth),
+        sourceHeight: bounds.sourceHeight == null ? bounds.sourceHeight : Math.round(bounds.sourceHeight)
+      }
+    };
   }
 }
