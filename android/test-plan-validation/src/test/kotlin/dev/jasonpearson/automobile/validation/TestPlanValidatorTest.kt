@@ -464,6 +464,88 @@ class TestPlanValidatorTest {
         assertNotNull(tool2Error, "Should report second invalid tool")
     }
 
+    // ========== Tool Parameter Validation Tests ==========
+
+    @Test
+    fun `validates dragAndDrop params in params object`() {
+        val yaml = """
+            name: drag-and-drop
+            steps:
+              - tool: dragAndDrop
+                params:
+                  source:
+                    text: Source
+                  target:
+                    elementId: target-id
+        """.trimIndent()
+
+        val result = TestPlanValidator.validateYaml(yaml)
+        assertTrue(result.valid, "dragAndDrop with valid params should be valid: ${result.errors}")
+    }
+
+    @Test
+    fun `reports missing dragAndDrop target`() {
+        val yaml = """
+            name: drag-and-drop
+            steps:
+              - tool: dragAndDrop
+                params:
+                  source:
+                    text: Source
+        """.trimIndent()
+
+        val result = TestPlanValidator.validateYaml(yaml)
+        assertFalse(result.valid, "dragAndDrop without target should be invalid")
+        assertTrue(
+            result.errors.any { error ->
+                error.field.contains("target", ignoreCase = true) ||
+                error.message.contains("target", ignoreCase = true)
+            },
+            "Should report missing target: ${result.errors}"
+        )
+    }
+
+    @Test
+    fun `reports dragAndDrop source with both text and elementId`() {
+        val yaml = """
+            name: drag-and-drop
+            steps:
+              - tool: dragAndDrop
+                params:
+                  source:
+                    text: Source
+                    elementId: source-id
+                  target:
+                    text: Target
+        """.trimIndent()
+
+        val result = TestPlanValidator.validateYaml(yaml)
+        assertFalse(result.valid, "dragAndDrop source should require exactly one selector")
+        assertTrue(
+            result.errors.any { error ->
+                error.field.contains("source", ignoreCase = true) ||
+                error.message.contains("source", ignoreCase = true)
+            },
+            "Should report invalid source selector: ${result.errors}"
+        )
+    }
+
+    @Test
+    fun `validates dragAndDrop with top-level selectors`() {
+        val yaml = """
+            name: drag-and-drop
+            steps:
+              - tool: dragAndDrop
+                source:
+                  text: Source
+                target:
+                  text: Target
+        """.trimIndent()
+
+        val result = TestPlanValidator.validateYaml(yaml)
+        assertTrue(result.valid, "dragAndDrop with top-level selectors should be valid: ${result.errors}")
+    }
+
     // ========== Error Reporting Tests ==========
 
     @Test
