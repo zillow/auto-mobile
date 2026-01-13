@@ -394,6 +394,30 @@ export interface AccessibilityService {
   ): Promise<A11ySwipeResult>;
 
   /**
+   * Request a drag gesture from the accessibility service using dispatchGesture API.
+   *
+   * @param x1 - Starting X coordinate
+   * @param y1 - Starting Y coordinate
+   * @param x2 - Ending X coordinate
+   * @param y2 - Ending Y coordinate
+   * @param pressDurationMs - Press duration before dragging in milliseconds
+   * @param dragDurationMs - Drag duration in milliseconds
+   * @param holdDurationMs - Hold duration after dragging in milliseconds
+   * @param timeoutMs - Maximum time to wait for drag completion in milliseconds
+   * @returns Promise<A11yDragResult> - The drag result with timing information
+   */
+  requestDrag(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    pressDurationMs: number,
+    dragDurationMs: number,
+    holdDurationMs: number,
+    timeoutMs: number
+  ): Promise<A11yDragResult>;
+
+  /**
    * Request a pinch gesture from the accessibility service using dispatchGesture API.
    * @param centerX - Center X coordinate
    * @param centerY - Center Y coordinate
