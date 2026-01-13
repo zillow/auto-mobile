@@ -260,6 +260,15 @@ const dragAndDropSelectorSchema = (label: "Source" | "Target") =>
     }).strict()
   ]).describe(`${label} element`);
 
+const swipeOnLookForSchema = z.union([
+  z.object({
+    elementId: z.string().describe("ID of the element to look for")
+  }).strict(),
+  z.object({
+    text: z.string().describe("Text to look for")
+  }).strict()
+]);
+
 export const dragAndDropSchema = addDeviceTargetingToSchema(z.object({
   source: dragAndDropSelectorSchema("Source"),
   target: dragAndDropSelectorSchema("Target"),
@@ -296,10 +305,7 @@ export const swipeOnSchema = addDeviceTargetingToSchema(z.object({
   gestureType: z.enum(["swipeFingerTowardsDirection", "scrollTowardsDirection"]).optional().describe(
     `swipeFingerTowardsDirection=finger moves in direction (default), scrollTowardsDirection=content scrolls in direction`
   ),
-  lookFor: z.object({
-    elementId: z.string().optional().describe("ID of the element to look for"),
-    text: z.string().optional().describe("Text to look for"),
-  }).optional().describe("Swipe until we find a match"),
+  lookFor: swipeOnLookForSchema.optional().describe("Swipe until we find a match"),
   boomerang: z.boolean().optional().describe("Return to the starting point after swiping (default false)"),
   apexPause: z.number().min(0).optional().describe("Pause at the furthest point in ms (default 100)"),
   returnSpeed: z.number().positive().optional().describe("Return speed multiplier (default 1.0)"),

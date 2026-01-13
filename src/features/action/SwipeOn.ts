@@ -562,8 +562,9 @@ export class SwipeOn extends BaseVisualChange {
 
     // If lookFor is specified, validate it
     if (options.lookFor) {
-      if (!options.lookFor.text && !options.lookFor.elementId) {
-        return "lookFor requires either text or elementId to search for";
+      const lookForFieldCount = [options.lookFor.elementId, options.lookFor.text].filter(Boolean).length;
+      if (lookForFieldCount !== 1) {
+        return "lookFor must specify exactly one of elementId or text";
       }
     }
 
