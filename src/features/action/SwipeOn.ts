@@ -316,10 +316,8 @@ export class SwipeOn extends BaseVisualChange {
         // Continue anyway
       }
 
-      // Map swipe direction to scroll action
-      // When finger swipes up, content scrolls down (scroll_forward)
-      // When finger swipes down, content scrolls up (scroll_backward)
-      const scrollAction = (direction === "up" || direction === "left")
+      // Map swipe direction to ACTION_SCROLL semantics (forward = down/right, backward = up/left).
+      const scrollAction = (direction === "down" || direction === "right")
         ? "scroll_forward"
         : "scroll_backward";
 
