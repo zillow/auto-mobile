@@ -9,7 +9,7 @@ import {
 } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 
@@ -21,6 +21,7 @@ const HOLD_DURATION_MIN_MS = 100;
 const HOLD_DURATION_MAX_MS = 3000;
 const DROP_DURATION_MS = 100;
 const DRAG_TIMEOUT_BUFFER_MS = 500;
+const HIERARCHY_REFRESH_TIMEOUT_MS = 5000;
 
 export class DragAndDrop extends BaseVisualChange {
   private elementUtils: ElementUtils;
@@ -80,7 +81,7 @@ export class DragAndDrop extends BaseVisualChange {
       const result = await this.observedInteraction(
         async (observeResult: ObserveResult) => {
           throwIfAborted(signal);
-          const viewHierarchy = observeResult.viewHierarchy;
+          const viewHierarchy = await this.resolveViewHierarchy(observeResult, signal);
           if (!viewHierarchy) {
             return { success: false, error: "Unable to get view hierarchy, cannot drag and drop" };
           }
@@ -201,6 +202,36 @@ export class DragAndDrop extends BaseVisualChange {
       return element;
     }
     throw new ActionableError(`dragAndDrop ${label} requires text or elementId`);
+  }
+
+  private async resolveViewHierarchy(
+    observeResult: ObserveResult,
+    signal?: AbortSignal
+  ): Promise<ViewHierarchyResult | null> {
+    // Prefer a fresh hierarchy to avoid stale drag coordinates after navigation/scrolling.
+    const refreshed = await this.refreshViewHierarchy(signal);
+    if (refreshed && !refreshed.hierarchy?.error) {
+      return refreshed;
+    }
+
+    if (observeResult.viewHierarchy && !observeResult.viewHierarchy.hierarchy?.error) {
+      return observeResult.viewHierarchy;
+    }
+
+    return null;
+  }
+
+  private async refreshViewHierarchy(signal?: AbortSignal): Promise<ViewHierarchyResult | null> {
+    const syncResult = await this.accessibilityService.requestHierarchySync(
+      new NoOpPerformanceTracker(),
+      false,
+      signal,
+      HIERARCHY_REFRESH_TIMEOUT_MS
+    );
+
+    return syncResult
+      ? this.accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy)
+      : null;
   }
 
   private getPressDurationMs(options: DragAndDropOptions): number {
