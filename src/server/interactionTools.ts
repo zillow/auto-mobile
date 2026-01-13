@@ -214,7 +214,7 @@ export const dragAndDropSchema = addDeviceTargetingToSchema(z.object({
   target: dragAndDropSelectorSchema("Target"),
   duration: z.number().optional().describe("Drag duration ms (default: 500)"),
   holdTime: z.number().optional().describe("Hold time ms (default: 200)"),
-  dropDelay: z.number().optional().describe("Drop delay ms (default: 100)"),
+  dropDelay: z.number().min(100).optional().describe("Drop delay ms (min: 100, default: 100)"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
