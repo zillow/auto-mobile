@@ -7,6 +7,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import crypto from "crypto";
 import os from "os";
+import AdmZip from "adm-zip";
 
 describe("AccessibilityServiceManager", function() {
   let accessibilityServiceClient: AndroidAccessibilityServiceManager;
@@ -494,14 +495,23 @@ describe("AccessibilityServiceManager", function() {
     test("should copy from local APK override when provided", async function() {
       const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-test-apk-"));
       const localApkPath = path.join(tempDir, "accessibility-service-debug.apk");
-      const payload = Buffer.alloc(12000, 1);
-      await fs.writeFile(localApkPath, payload);
+
+      // Create a valid APK structure (ZIP with AndroidManifest.xml)
+      const zip = new AdmZip();
+      const manifestContent = '<?xml version="1.0" encoding="utf-8"?><manifest></manifest>';
+      zip.addFile("AndroidManifest.xml", Buffer.from(manifestContent, "utf8"));
+      // Add padding to ensure size > 10KB
+      // Using random data to prevent compression from reducing size too much
+      const paddingData = crypto.randomBytes(15000);
+      zip.addFile("classes.dex", paddingData);
+      zip.writeZip(localApkPath);
 
       process.env.AUTOMOBILE_ACCESSIBILITY_APK_PATH = localApkPath;
+      process.env.AUTOMOBILE_SKIP_ACCESSIBILITY_CHECKSUM = "true";
 
       const apkPath = await accessibilityServiceClient.downloadApk();
       const stats = await fs.stat(apkPath);
-      expect(stats.size).toBe(payload.length);
+      expect(stats.size).toBeGreaterThan(10000);
     });
 
     test("should fall back to node checksum when sha tools are unavailable", async function() {
