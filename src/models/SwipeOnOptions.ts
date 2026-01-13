@@ -24,7 +24,7 @@ export interface SwipeOnOptions {
   autoTarget?: boolean;
 
   // Direction - interpretation depends on gestureType
-  direction?: SwipeDirection;
+  direction: SwipeDirection;
 
   // How to interpret the direction parameter
   gestureType?: GestureType;

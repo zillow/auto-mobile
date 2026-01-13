@@ -107,7 +107,7 @@ export interface SwipeOnArgs {
     text?: string;
   };
   autoTarget?: boolean;
-  direction?: "up" | "down" | "left" | "right";
+  direction: "up" | "down" | "left" | "right";
   gestureType?: "swipeFingerTowardsDirection" | "scrollTowardsDirection";
   lookFor?: {
     elementId?: string;
@@ -1348,12 +1348,12 @@ export function registerInteractionTools() {
       });
     }
 
-    // Convert SwipeOnArgs to SwipeOnOptions with resolved direction
+    // Convert SwipeOnArgs to SwipeOnOptions (direction resolution happens in SwipeOn)
     const options: import("../models").SwipeOnOptions = {
       includeSystemInsets: args.includeSystemInsets,
       container: args.container,
       autoTarget: args.autoTarget,
-      direction: resolved.direction,
+      direction: args.direction,
       gestureType: args.gestureType,
       lookFor: args.lookFor,
       speed: args.speed,
