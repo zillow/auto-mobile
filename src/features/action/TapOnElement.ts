@@ -11,6 +11,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { TapOnElementOptions } from "../../models/TapOnElementOptions";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ElementParser } from "../utility/ElementParser";
+import { DefaultElementSelector } from "../utility/DefaultElementSelector";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
@@ -23,6 +24,7 @@ import { throwIfAborted } from "../../utils/toolUtils";
 import { SelectionStateTracker, SelectionCaptureState, TakeScreenshotCapturer } from "../navigation/SelectionStateTracker";
 import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
+import type { ElementSelector } from "../../utils/interfaces/ElementSelector";
 import type { Timer } from "../../utils/SystemTimer";
 import { NodeCryptoService } from "../../utils/crypto";
 
@@ -39,6 +41,7 @@ export class TapOnElement extends BaseVisualChange {
   private visionConfig: VisionFallbackConfig;
   private selectionStateTracker: SelectionStateTracker;
   private accessibilityDetector: AccessibilityDetector;
+  private elementSelector: ElementSelector;
   private static readonly SEARCH_UNTIL_DEFAULT_MS = 500;
   private static readonly SEARCH_UNTIL_MIN_MS = 100;
   private static readonly SEARCH_UNTIL_MAX_MS = 12000;
@@ -51,7 +54,8 @@ export class TapOnElement extends BaseVisualChange {
     visionConfig?: VisionFallbackConfig,
     selectionStateTracker?: SelectionStateTracker,
     accessibilityDetector?: AccessibilityDetector,
-    timer?: Timer
+    timer?: Timer,
+    elementSelector?: ElementSelector
   ) {
     super(device, adb, axe, timer);
     this.elementUtils = new ElementUtils();
@@ -63,6 +67,7 @@ export class TapOnElement extends BaseVisualChange {
       screenshotCapturer: new TakeScreenshotCapturer(device, this.adb)
     });
     this.accessibilityDetector = accessibilityDetector || defaultAccessibilityDetector;
+    this.elementSelector = elementSelector ?? new DefaultElementSelector();
   }
 
   /**
@@ -123,23 +128,22 @@ export class TapOnElement extends BaseVisualChange {
     const containerFound = this.isContainerAvailable(viewHierarchy, options.container);
     if (options.text) {
       return {
-        element: this.elementUtils.findElementByText(
-          viewHierarchy,
-          options.text,
-          options.container,
-          true,
-          false,
-        ),
+        element: this.elementSelector.selectByText(viewHierarchy, options.text, {
+          container: options.container,
+          fuzzyMatch: true,
+          caseSensitive: false,
+          strategy: options.selectionStrategy
+        }),
         containerFound
       };
     }
     if (options.elementId) {
       return {
-        element: this.elementUtils.findElementByResourceId(
-          viewHierarchy,
-          options.elementId,
-          options.container,
-        ),
+        element: this.elementSelector.selectByResourceId(viewHierarchy, options.elementId, {
+          container: options.container,
+          partialMatch: false,
+          strategy: options.selectionStrategy
+        }),
         containerFound
       };
     }
@@ -663,6 +667,7 @@ export class TapOnElement extends BaseVisualChange {
               duration: options.duration,
               container: options.container,
               searchUntil: options.searchUntil,
+              selectionStrategy: options.selectionStrategy,
               platform: this.device.platform
             }
           }

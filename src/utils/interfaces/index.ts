@@ -66,6 +66,7 @@ export { ElementGeometry } from "../../features/utility/ElementGeometry";
 export { ElementParser } from "../../features/utility/ElementParser";
 export { TextMatcher } from "../../features/utility/TextMatcher";
 export { ElementUtils } from "../../features/utility/ElementUtils";
+export { ElementSelector } from "./ElementSelector";
 export {
   NavigationGraph,
   NavigationEvent,

@@ -15,7 +15,7 @@ import { HomeScreen } from "../features/action/HomeScreen";
 import { Rotate } from "../features/action/Rotate";
 import { OpenURL } from "../features/action/OpenURL";
 import { Clipboard } from "../features/action/Clipboard";
-import { ActionableError, BootedDevice, Element, ViewHierarchyResult } from "../models";
+import { ActionableError, BootedDevice, Element, ElementSelectionStrategy, ViewHierarchyResult } from "../models";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -77,6 +77,7 @@ export interface TapOnArgs {
   };
   text?: string;
   id?: string;
+  selectionStrategy?: ElementSelectionStrategy;
   action: "tap" | "doubleTap" | "longPress" | "focus";
   duration?: number;
   searchUntil?: {
@@ -188,6 +189,9 @@ export const tapOnSchema = addDeviceTargetingToSchema(z.object({
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
   text: z.string().optional().describe("Text to tap (overrides id)"),
   id: z.string().optional().describe("Element ID to tap"),
+  selectionStrategy: z.enum(["first", "random"]).optional().describe(
+    "Element selection strategy when multiple matches are found (default: first)"
+  ),
   duration: z.number().optional().describe("Long press duration (ms)"),
   searchUntil: z.object({
     duration: z.number().min(100).max(12000).optional().describe("Polling duration (ms, default: 500)"),
@@ -1057,6 +1061,7 @@ export function registerInteractionTools() {
       container: args.container,
       text: args.text,
       elementId: args.id,
+      selectionStrategy: args.selectionStrategy,
       action: args.action,
       duration: args.duration,
       searchUntil: args.searchUntil,
