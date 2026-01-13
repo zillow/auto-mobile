@@ -147,7 +147,182 @@
           }
         }
       },
-      "description": "A step can have tool-specific parameters either in a 'params' object or as top-level properties (e.g., 'selector', 'appId', 'text', 'direction', etc.)"
+      "description": "A step can have tool-specific parameters either in a 'params' object or as top-level properties (e.g., 'selector', 'appId', 'text', 'direction', etc.)",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tool": {
+                "const": "dragAndDrop"
+              }
+            },
+            "required": [
+              "tool"
+            ]
+          },
+          "then": {
+            "properties": {
+              "params": {
+                "$ref": "#/$defs/dragAndDropParams"
+              },
+              "source": {
+                "$ref": "#/$defs/dragAndDropSelector"
+              },
+              "target": {
+                "$ref": "#/$defs/dragAndDropSelector"
+              },
+              "duration": {
+                "type": "number",
+                "description": "Drag duration ms (default: 500)"
+              },
+              "holdTime": {
+                "type": "number",
+                "description": "Hold time ms (default: 200)"
+              },
+              "dropDelay": {
+                "type": "number",
+                "description": "Drop delay ms (default: 100)"
+              },
+              "platform": {
+                "type": "string",
+                "enum": [
+                  "android",
+                  "ios"
+                ],
+                "description": "Platform"
+              },
+              "sessionUuid": {
+                "type": "string",
+                "description": "Session UUID for device targeting"
+              },
+              "keepScreenAwake": {
+                "type": "boolean",
+                "description": "Keep physical Android devices awake during the session (default: true)"
+              }
+            },
+            "allOf": [
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "source"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "params": {
+                        "required": [
+                          "source"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "params"
+                    ]
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "target"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "params": {
+                        "required": [
+                          "target"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "params"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "dragAndDropSelector": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Element text",
+          "minLength": 1
+        },
+        "elementId": {
+          "type": "string",
+          "description": "Element ID",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "description": "Selector for dragAndDrop elements",
+      "oneOf": [
+        {
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "required": [
+            "elementId"
+          ]
+        }
+      ]
+    },
+    "dragAndDropParams": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/dragAndDropSelector",
+          "description": "Source element"
+        },
+        "target": {
+          "$ref": "#/$defs/dragAndDropSelector",
+          "description": "Target element"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Drag duration ms (default: 500)"
+        },
+        "holdTime": {
+          "type": "number",
+          "description": "Hold time ms (default: 200)"
+        },
+        "dropDelay": {
+          "type": "number",
+          "description": "Drop delay ms (default: 100)"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parameters for dragAndDrop"
     },
     "expectation": {
       "type": "object",

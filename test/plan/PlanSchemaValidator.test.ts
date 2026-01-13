@@ -85,6 +85,22 @@ steps:
       const result = validator.validateYaml(yaml);
       expect(result.valid).toBe(true);
     });
+
+    it("should validate dragAndDrop with top-level selectors and param overrides", () => {
+      const yaml = `
+name: drag-and-drop
+steps:
+  - tool: dragAndDrop
+    source:
+      text: Source
+    target:
+      text: Target
+    params:
+      duration: 800
+`;
+      const result = validator.validateYaml(yaml);
+      expect(result.valid).toBe(true);
+    });
   });
 
   describe("Invalid YAML syntax", () => {
