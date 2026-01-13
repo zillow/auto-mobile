@@ -1,4 +1,4 @@
-import { AccessibilityServiceManager } from "../../src/utils/interfaces/AccessibilityServiceManager";
+import { AccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 
 /**
  * Fake implementation of AccessibilityServiceManager for testing

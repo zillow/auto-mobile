@@ -2,8 +2,7 @@
  * Fake logger implementation for testing
  * Captures logs in memory instead of writing to files
  */
-import { Logger, LogLevel } from "../../src/utils/interfaces/Logger";
-import { LogLevel as LogLevelConstants } from "../../src/utils/logger";
+import { Logger, LogLevel } from "../../src/utils/logger";
 
 export interface CapturedLog {
   level: string;
@@ -13,7 +12,7 @@ export interface CapturedLog {
 }
 
 export class FakeLogger implements Logger {
-  private currentLogLevel: LogLevel = LogLevelConstants.INFO;
+  private currentLogLevel: LogLevel = LogLevel.INFO;
   private logs: CapturedLog[] = [];
   private logToStdout = false;
 
@@ -21,7 +20,7 @@ export class FakeLogger implements Logger {
    * Logs a debug message
    */
   debug(message: string, ...args: any[]): void {
-    if (this.currentLogLevel <= LogLevelConstants.DEBUG) {
+    if (this.currentLogLevel <= LogLevel.DEBUG) {
       this.captureLog("DEBUG", message, args);
     }
   }
@@ -30,7 +29,7 @@ export class FakeLogger implements Logger {
    * Logs an info message
    */
   info(message: string, ...args: any[]): void {
-    if (this.currentLogLevel <= LogLevelConstants.INFO) {
+    if (this.currentLogLevel <= LogLevel.INFO) {
       this.captureLog("INFO", message, args);
     }
   }
@@ -39,7 +38,7 @@ export class FakeLogger implements Logger {
    * Logs a warning message
    */
   warn(message: string, ...args: any[]): void {
-    if (this.currentLogLevel <= LogLevelConstants.WARN) {
+    if (this.currentLogLevel <= LogLevel.WARN) {
       this.captureLog("WARN", message, args);
     }
   }
@@ -48,7 +47,7 @@ export class FakeLogger implements Logger {
    * Logs an error message
    */
   error(message: string, ...args: any[]): void {
-    if (this.currentLogLevel <= LogLevelConstants.ERROR) {
+    if (this.currentLogLevel <= LogLevel.ERROR) {
       this.captureLog("ERROR", message, args);
     }
   }
@@ -66,7 +65,7 @@ export class FakeLogger implements Logger {
   setLevel(level: LogLevel | string): void {
     if (typeof level === "string") {
       const levelStr = level.toUpperCase();
-      const levelValue = (LogLevelConstants as any)[levelStr];
+      const levelValue = (LogLevel as any)[levelStr];
       if (levelValue !== undefined) {
         this.currentLogLevel = levelValue;
       }
@@ -204,7 +203,7 @@ export class FakeLogger implements Logger {
    */
   reset(): void {
     this.clearLogs();
-    this.currentLogLevel = LogLevelConstants.INFO;
+    this.currentLogLevel = LogLevel.INFO;
     this.logToStdout = false;
   }
 

@@ -2,9 +2,9 @@
  * Fake crypto utils implementation for testing
  * Allows configuration of hash results and verification behavior
  */
-import { CryptoUtils } from "../../src/utils/interfaces/CryptoUtils";
+import { CryptoService } from "../../src/utils/crypto";
 
-export class FakeCryptoUtils implements CryptoUtils {
+export class FakeCryptoUtils implements CryptoService {
   private cacheKeyMap: Map<string, string> = new Map();
   private checksumResults: Map<string, boolean> = new Map();
   private defaultCacheKey: string = "fake-cache-key-abc123def456";

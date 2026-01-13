@@ -1,5 +1,5 @@
-import { DeviceSelector } from "../../src/utils/interfaces/DeviceSelector";
-import { AvailableDevice, DeviceSelectionOptions } from "../../src/utils/deviceSelector";
+import { DeviceSelector } from "../../src/utils/DeviceSelectorService";
+import { AvailableDevice, DeviceSelectionOptions } from "../../src/utils/DeviceSelector";
 
 /**
  * Fake implementation of DeviceSelector for testing
