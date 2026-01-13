@@ -2070,18 +2070,34 @@
           "description": "Include system bars (default false)"
         },
         "container": {
-          "type": "object",
-          "properties": {
-            "elementId": {
-              "type": "string",
-              "description": "Container ID"
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "elementId": {
+                  "type": "string",
+                  "description": "Container ID"
+                }
+              },
+              "required": [
+                "elementId"
+              ],
+              "additionalProperties": false
             },
-            "text": {
-              "type": "string",
-              "description": "Container text"
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Container text"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false,
+          ],
           "description": "Container to pinch within"
         },
         "autoTarget": {

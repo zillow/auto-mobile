@@ -91,6 +91,17 @@ export class PinchOn extends BaseVisualChange {
       return this.createErrorResult("distanceEnd must be greater than 0", options);
     }
 
+    if (options.container) {
+      const selectorCount = [options.container.elementId, options.container.text].filter(Boolean).length;
+      if (selectorCount !== 1) {
+        perf.end();
+        return this.createErrorResult(
+          "pinchOn container must specify exactly one of elementId or text",
+          options
+        );
+      }
+    }
+
     try {
       const target = await perf.track("resolveTarget", () => this.resolveTarget(options));
       const { centerX, centerY } = this.getCenter(target.bounds);
