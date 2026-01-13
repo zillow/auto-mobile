@@ -23,6 +23,7 @@ import { registerCriticalSectionTools } from "../src/server/criticalSectionTools
 import { registerVideoRecordingTools } from "../src/server/videoRecordingTools";
 import { registerSnapshotTools } from "../src/server/snapshotTools";
 import { registerBiometricTools } from "../src/server/biometricTools";
+import { registerHighlightTools } from "../src/server/highlightTools";
 import { registerDebugTools } from "../src/server/debugTools";
 
 const OUTPUT_PATH = "schemas/tool-definitions.json";
@@ -42,6 +43,7 @@ function registerAllTools(): void {
   registerVideoRecordingTools();
   registerSnapshotTools();
   registerBiometricTools();
+  registerHighlightTools();
   registerDebugTools();
 }
 

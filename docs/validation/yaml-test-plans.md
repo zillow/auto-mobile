@@ -160,6 +160,7 @@ The schema validates the following tool names:
 - `inputText`
 - `clearText`
 - `pressButton`
+- `highlight`
 - `auditAccessibility`
 - `openLink`
 - `postNotification`
