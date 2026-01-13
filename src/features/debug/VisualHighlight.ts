@@ -7,7 +7,6 @@ import {
   ActionableError,
   BootedDevice,
   HighlightBounds,
-  HighlightEntry,
   HighlightOperationResult,
   HighlightShape,
   HighlightStyle,
@@ -107,27 +106,6 @@ export const highlightShapeSchema: z.ZodType<HighlightShape> = z.discriminatedUn
   highlightCircleShapeSchema,
   highlightPathShapeSchema
 ]);
-
-const highlightStyleResponseSchema = z.object({
-  strokeColor: z.string().nullable().optional(),
-  strokeWidth: z.number().nullable().optional(),
-  dashPattern: z.array(z.number().positive()).nullable().optional(),
-  smoothing: z.enum(["none", "catmull-rom", "bezier", "douglas-peucker"]).nullable().optional(),
-  tension: z.number().nullable().optional(),
-  capStyle: z.enum(["butt", "round", "square"]).nullable().optional(),
-  joinStyle: z.enum(["miter", "round", "bevel"]).nullable().optional()
-}).nullable().optional();
-
-const highlightShapeResponseSchema: z.ZodType<HighlightShape> = z.discriminatedUnion("type", [
-  highlightBoxShapeSchema.extend({ style: highlightStyleResponseSchema }),
-  highlightCircleShapeSchema.extend({ style: highlightStyleResponseSchema }),
-  highlightPathShapeSchema.extend({ style: highlightStyleResponseSchema })
-]);
-
-const highlightEntryResponseSchema: z.ZodType<HighlightEntry> = z.object({
-  id: z.string().min(1),
-  shape: highlightShapeResponseSchema
-});
 
 const highlightResponseSchema: z.ZodType<HighlightOperationResult> = z.object({
   success: z.boolean(),
