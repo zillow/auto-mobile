@@ -5,7 +5,6 @@ object TestPlanToolCategories {
         "App management" to setOf(
             "launchApp",
             "terminateApp",
-            "listApps",
             "installApp"
         ),
         "UI interactions" to setOf(

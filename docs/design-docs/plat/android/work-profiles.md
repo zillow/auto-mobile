@@ -28,7 +28,7 @@ App management tools that support work profiles:
 - `installApp` - Install APKs to the auto-selected profile
 - `launchApp` - Launch apps in the auto-selected profile
 - `terminateApp` - Terminate apps in the auto-selected profile
-- `listApps` (deprecated; use `automobile:apps`) - List apps from all profiles with userId and foreground status (recent is a placeholder)
+- `automobile:apps` resource - List apps from all profiles with userId and foreground status (recent is a placeholder)
 
 ## Setting Up Work Profile on Android Emulator
 

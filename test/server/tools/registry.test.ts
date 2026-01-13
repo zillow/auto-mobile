@@ -23,8 +23,9 @@ describe("MCP Tools Registry", () => {
     expect(toolNames).toContain("tapOn");
 
     // Should include app management tools (MCP app lifecycle)
-    expect(toolNames).toContain("listApps");
     expect(toolNames).toContain("launchApp");
+    expect(toolNames).toContain("terminateApp");
+    expect(toolNames).not.toContain("listApps");
 
   });
 
@@ -70,7 +71,7 @@ describe("MCP Tools Registry", () => {
       interaction: ["tapOn", "sendText", "pressButton", "swipeOn"],
 
       // App management tools (lifecycle management)
-      app: ["listApps", "launchApp", "terminateApp", "installApp"],
+      app: ["launchApp", "terminateApp", "installApp"],
 
       // Utility tools (device state and configuration)
       utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog", "demoMode"],
@@ -89,7 +90,6 @@ describe("MCP Tools Registry", () => {
     // Verify specific core tools are present
     expect(toolNames).toContain("observe", "observe tool should be registered");
     expect(toolNames).toContain("tapOn", "tapOn tool should be registered");
-    expect(toolNames).toContain("listApps", "listApps tool should be registered");
 
     // Verify total tool count is reasonable (should have tools from all categories)
     expect(toolDefinitions.length).toBeGreaterThan(15, "Should have a substantial number of tools registered");

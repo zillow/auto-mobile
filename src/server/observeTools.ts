@@ -4,7 +4,6 @@ import { ResourceRegistry } from "./resourceRegistry";
 import { RESOURCE_URIS } from "./observationResources";
 import { ActionableError } from "../models/ActionableError";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
-import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse, throwIfAborted } from "../utils/toolUtils";
 import { BootedDevice, Element, ObserveResult, ViewHierarchyResult } from "../models";
 import { createGlobalPerformanceTracker } from "../utils/PerformanceTracker";
@@ -85,10 +84,6 @@ const observeResultSchema = z.object({
   predictions: predictionsSchema.optional(),
   accessibilityState: accessibilityStateSchema.optional()
 }).passthrough();
-
-export const listAppsSchema = addDeviceTargetingToSchema(z.object({
-  platform: z.enum(["android", "ios"]).describe("Platform")
-}));
 
 export const identifyInteractionsSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform"),
@@ -282,37 +277,6 @@ export function registerObserveTools() {
     }
   };
 
-  // List Apps handler
-  const listAppsHandler = async (device: BootedDevice) => {
-    const deprecationNotice =
-      "Deprecated: use the `automobile:apps` MCP resource (e.g. automobile:apps?deviceId=DEVICE_ID&platform=android&search=slack&type=user).";
-    try {
-      const listInstalledApps = new ListInstalledApps(device);
-
-      // For Android, return detailed app info with userId, foreground status, etc.
-      // For iOS, return simple package names
-      if (device.platform === "android") {
-        const apps = await listInstalledApps.executeDetailed();
-        const profileAppCount = Object.values(apps.profiles).reduce((count, profileApps) => count + profileApps.length, 0);
-        const profileCount = Object.keys(apps.profiles).length;
-        return createJSONToolResponse({
-          message: `${deprecationNotice} Listed ${profileAppCount} user app(s) across ${profileCount} profile(s); ` +
-            `${apps.system.length} system app(s) deduped`,
-          profiles: apps.profiles,
-          system: apps.system
-        });
-      } else {
-        const apps = await listInstalledApps.execute();
-        return createJSONToolResponse({
-          message: `${deprecationNotice} Listed ${apps.length} apps`,
-          apps
-        });
-      }
-    } catch (error) {
-      throw new ActionableError(`Failed to list apps: ${error}`);
-    }
-  };
-
   // Register with the tool registry using the new device-aware method
   ToolRegistry.registerDeviceAware(
     "observe",
@@ -322,13 +286,6 @@ export function registerObserveTools() {
     false,
     false,
     { outputSchema: observeResultSchema }
-  );
-
-  ToolRegistry.registerDeviceAware(
-    "listApps",
-    "List installed apps (DEPRECATED: use automobile:apps resource)",
-    listAppsSchema,
-    listAppsHandler
   );
 
   ToolRegistry.registerDeviceAware(

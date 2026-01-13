@@ -921,48 +921,164 @@
           "description": "Highlight ID (required for add/remove)"
         },
         "shape": {
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "enum": [
-                "box",
-                "circle"
-              ]
-            },
-            "bounds": {
+          "anyOf": [
+            {
               "type": "object",
               "properties": {
-                "x": {
-                  "type": "integer"
+                "type": {
+                  "type": "string",
+                  "const": "box"
                 },
-                "y": {
-                  "type": "integer"
-                },
-                "width": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                "height": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                "sourceWidth": {
-                  "anyOf": [
-                    {
+                "bounds": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "integer"
+                    },
+                    "y": {
+                      "type": "integer"
+                    },
+                    "width": {
                       "type": "integer",
                       "exclusiveMinimum": 0
                     },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "sourceHeight": {
-                  "anyOf": [
-                    {
+                    "height": {
                       "type": "integer",
                       "exclusiveMinimum": 0
+                    },
+                    "sourceWidth": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sourceHeight": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
+                  "additionalProperties": false
+                },
+                "style": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "strokeColor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "strokeWidth": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "dashPattern": {
+                          "anyOf": [
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "exclusiveMinimum": 0
+                              },
+                              "minItems": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "smoothing": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "catmull-rom",
+                                "bezier",
+                                "douglas-peucker"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tension": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "capStyle": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "butt",
+                                "round",
+                                "square"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "joinStyle": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "miter",
+                                "round",
+                                "bevel"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -971,80 +1087,93 @@
                 }
               },
               "required": [
-                "x",
-                "y",
-                "width",
-                "height"
+                "type",
+                "bounds"
               ],
               "additionalProperties": false
             },
-            "style": {
-              "anyOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "strokeColor": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "strokeWidth": {
-                      "anyOf": [
-                        {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "fillColor": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "dashPattern": {
-                      "anyOf": [
-                        {
-                          "type": "array",
-                          "items": {
-                            "type": "number",
-                            "exclusiveMinimum": 0
-                          },
-                          "minItems": 1
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "additionalProperties": false
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "circle"
                 },
-                {
-                  "type": "null"
+                "bounds": {
+                  "$ref": "#/properties/shape/anyOf/0/properties/bounds"
+                },
+                "style": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/properties/shape/anyOf/0/properties/style/anyOf/0"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
-              ]
+              },
+              "required": [
+                "type",
+                "bounds"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "path"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 2
+                },
+                "bounds": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/properties/shape/anyOf/0/properties/bounds"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "style": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/properties/shape/anyOf/0/properties/style/anyOf/0"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "points"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "type",
-            "bounds"
           ],
-          "additionalProperties": false,
           "description": "Highlight shape definition (required for add)"
         }
       },
@@ -1292,40 +1421,6 @@
       },
       "required": [
         "appId"
-      ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
-    }
-  },
-  {
-    "name": "listApps",
-    "description": "List installed apps (DEPRECATED: use automobile:apps resource)",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ],
-          "description": "Platform"
-        },
-        "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
-        },
-        "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
-        },
-        "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
-        }
-      },
-      "required": [
-        "platform"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"

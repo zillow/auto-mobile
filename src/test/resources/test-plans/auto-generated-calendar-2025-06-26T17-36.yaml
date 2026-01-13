@@ -4,7 +4,7 @@ generated: "2025-06-26T17:36:10.504Z"
 appId: "com.google.android.calendar"
 metadata:
   sessionId: "758e9930-6afb-4b89-8575-2fff9403759b"
-  toolCallCount: 10
+  toolCallCount: 8
   duration: 930938
 steps:
   - tool: "homeScreen"
@@ -14,9 +14,6 @@ steps:
     params:
       button: "back"
     description: "pressButton executed at 2025-06-26T17:36:29.778Z"
-  - tool: "listApps"
-    params:
-    description: "listApps executed at 2025-06-26T17:36:36.214Z"
   - tool: "launchApp"
     params:
       appId: "com.google.android.calendar"

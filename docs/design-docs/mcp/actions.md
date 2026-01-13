@@ -41,7 +41,7 @@ Successful `tapOn` calls include `selectedElement` metadata describing which mat
 
 #### App Management
 
-- 📱 `listApps` enumerates installed apps (deprecated; use the `automobile:apps` resource with query filters).
+- 📱 Installed apps are exposed via the `automobile:apps` resource with query filters.
 - 🚀 `launchApp` starts apps by package name (with optional clear-app-data support).
 - ❌ `terminateApp` force-stops an app by package name.
 - 📦 `installApp` installs an APK.
