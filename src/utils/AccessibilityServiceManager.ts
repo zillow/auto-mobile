@@ -531,12 +531,12 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
 
   private async downloadWithCurl(url: string, destination: string): Promise<void> {
     const command = `curl --fail --location --retry 3 --retry-delay 1 --silent --show-error -o "${destination}" "${url}"`;
-    await execAsync(command);
+    await this.execShell(command);
   }
 
   private async downloadWithWget(url: string, destination: string): Promise<void> {
     const command = `wget --tries=3 --timeout=30 -O "${destination}" "${url}"`;
-    await execAsync(command);
+    await this.execShell(command);
   }
 
   private async downloadWithNodeHttp(url: string, destination: string, redirectCount: number): Promise<void> {

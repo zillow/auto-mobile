@@ -515,7 +515,13 @@ describe("AccessibilityServiceManager", function() {
     });
 
     test("should fall back to node checksum when sha tools are unavailable", async function() {
-      const payload = Buffer.alloc(12000, 2);
+      // Create a valid APK structure (ZIP with AndroidManifest.xml)
+      const zip = new AdmZip();
+      const manifestContent = '<?xml version="1.0" encoding="utf-8"?><manifest></manifest>';
+      zip.addFile("AndroidManifest.xml", Buffer.from(manifestContent, "utf8"));
+      const paddingData = crypto.randomBytes(15000);
+      zip.addFile("classes.dex", paddingData);
+      const payload = zip.toBuffer();
       const expectedChecksum = crypto.createHash("sha256").update(payload).digest("hex");
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
@@ -546,7 +552,7 @@ describe("AccessibilityServiceManager", function() {
       expect(apkPath).toBe(downloadedPath);
       expect(executedCommands.some(command => command.includes("sha256sum"))).toBe(true);
       expect(executedCommands.some(command => command.includes("shasum -a 256"))).toBe(true);
-      expect(executedCommands.some(command => command.includes("curl -L -o"))).toBe(true);
+      expect(executedCommands.some(command => command.startsWith("curl ") && command.includes("-o"))).toBe(true);
     });
   });
 
