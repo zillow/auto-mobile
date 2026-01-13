@@ -5,7 +5,10 @@ import java.util.concurrent.TimeUnit
 /** Shared utilities for AutoMobile tests. */
 object AutoMobileSharedUtils {
   // Phase 5: Lazy device checker initialization
-  val deviceChecker: DeviceAvailabilityChecker by lazy { DeviceAvailabilityChecker() }
+  @JvmStatic internal var testDeviceChecker: DeviceChecker? = null
+  private val defaultDeviceChecker: DeviceChecker by lazy { DeviceAvailabilityChecker() }
+  val deviceChecker: DeviceChecker
+    get() = testDeviceChecker ?: defaultDeviceChecker
 
   fun executeCommand(
       command: List<String>,
@@ -63,16 +66,25 @@ object AutoMobileSharedUtils {
 /** Shared command result data class. */
 data class CommandResult(val exitCode: Int, val output: String, val errorOutput: String)
 
+/** Interface for checking device availability. */
+interface DeviceChecker {
+  fun checkDeviceAvailability()
+
+  fun areDevicesAvailable(): Boolean
+
+  fun getDeviceCount(): Int
+}
+
 /**
  * Shared device availability checker for AutoMobile tests. Handles checking for connected Android
  * devices via adb.
  */
-class DeviceAvailabilityChecker {
+class DeviceAvailabilityChecker : DeviceChecker {
   @Volatile private var deviceCount = 0
 
   @Volatile private var checkComplete = false
 
-  fun checkDeviceAvailability() {
+  override fun checkDeviceAvailability() {
     if (checkComplete) {
       return
     }
@@ -123,7 +135,7 @@ class DeviceAvailabilityChecker {
     }
   }
 
-  fun areDevicesAvailable(): Boolean {
+  override fun areDevicesAvailable(): Boolean {
     if (!checkComplete) {
       checkDeviceAvailability()
     }
@@ -134,7 +146,7 @@ class DeviceAvailabilityChecker {
    * Get the number of connected Android devices. This can be used to limit parallelism to match
    * available devices.
    */
-  fun getDeviceCount(): Int {
+  override fun getDeviceCount(): Int {
     if (!checkComplete) {
       checkDeviceAvailability()
     }
