@@ -393,9 +393,8 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
    * Download APK
    */
   async downloadApk(): Promise<string> {
-    const tempDir = "/tmp/auto-mobile/";
-    const apkPath = path.join(tempDir, `accessibility-service.apk`);
-    await fs.mkdir(tempDir, { recursive: true });
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-"));
+    const apkPath = path.join(tempDir, "accessibility-service.apk");
 
     try {
       const overridePath = this.getApkPathOverride();
@@ -449,7 +448,7 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     } catch (error) {
       // Clean up failed download
       try {
-        await fs.unlink(apkPath);
+        await this.cleanupApk(apkPath);
       } catch {
       }
 
@@ -627,8 +626,22 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
    */
   async cleanupApk(apkPath: string): Promise<void> {
     try {
-      await fs.unlink(apkPath);
-      logger.info("Temporary APK file cleaned up", { path: apkPath });
+      const tempRoot = path.resolve(os.tmpdir());
+      const tempDir = path.resolve(path.dirname(apkPath));
+      const tempBase = path.basename(tempDir);
+      const relativeTempDir = path.relative(tempRoot, tempDir);
+      const isTempDir = Boolean(relativeTempDir)
+        && !relativeTempDir.startsWith("..")
+        && !path.isAbsolute(relativeTempDir)
+        && tempBase.startsWith("auto-mobile-");
+
+      await fs.rm(apkPath, { force: true });
+      if (isTempDir) {
+        await fs.rm(tempDir, { recursive: true, force: true });
+        logger.info("Temporary APK directory cleaned up", { path: tempDir });
+      } else {
+        logger.info("Temporary APK file cleaned up", { path: apkPath });
+      }
     } catch (error) {
       logger.warn("Failed to clean up temporary APK file", {
         path: apkPath,
