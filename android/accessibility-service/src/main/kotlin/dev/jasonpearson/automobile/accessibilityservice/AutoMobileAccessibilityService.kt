@@ -1007,9 +1007,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               moveTo(startX, startY)
               lineTo(endX, endY)
             }
-        gestureBuilder
-            .addStroke(GestureDescription.StrokeDescription(holdPath, 0, holdTime, true))
-            .addStroke(GestureDescription.StrokeDescription(dragPath, holdTime, duration))
+        val holdStroke = GestureDescription.StrokeDescription(holdPath, 0, holdTime, true)
+        val dragStroke = holdStroke.continueStroke(dragPath, holdTime, duration, false)
+        gestureBuilder.addStroke(holdStroke).addStroke(dragStroke)
       } else {
         val dragPath =
             Path().apply {
