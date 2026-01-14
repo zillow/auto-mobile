@@ -16,6 +16,7 @@ class ServerConfig {
   private _accessibilityAuditConfig: AccessibilityAuditConfig | null = null;
   private _memPerfAuditEnabled: boolean = false;
   private _predictiveUiEnabled: boolean = false;
+  private _rawElementSearchEnabled: boolean = false;
   private _planExecutionLockScope: PlanExecutionLockScope = "session";
   private _videoRecordingDefaults: VideoRecordingConfigInput = {};
   private _deviceSnapshotDefaults: DeviceSnapshotConfigInput = {};
@@ -71,6 +72,14 @@ class ServerConfig {
 
   isPredictiveUiEnabled(): boolean {
     return this._predictiveUiEnabled;
+  }
+
+  setRawElementSearchEnabled(enabled: boolean): void {
+    this._rawElementSearchEnabled = enabled;
+  }
+
+  isRawElementSearchEnabled(): boolean {
+    return this._rawElementSearchEnabled;
   }
 
   setPlanExecutionLockScope(scope: PlanExecutionLockScope): void {

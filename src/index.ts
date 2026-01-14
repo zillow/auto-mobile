@@ -83,6 +83,7 @@ function parseArgs(): {
   a11yMinSeverity?: string;
   a11yUseBaseline: boolean;
   predictiveUi: boolean;
+  rawElementSearch: boolean;
   planExecutionLockScope: PlanExecutionLockScope;
   videoRecordingDefaults: VideoRecordingConfigInput;
   daemonMode: boolean;
@@ -132,6 +133,7 @@ function parseArgs(): {
   let a11yMinSeverity: string | undefined;
   let a11yUseBaseline = false;
   const predictiveUi = args.includes("--predictive") || args.includes("--predictive-ui");
+  const rawElementSearch = args.includes("--raw-element-search");
   let planExecutionLockScope: PlanExecutionLockScope = "session";
   const videoRecordingDefaults: VideoRecordingConfigInput = {};
 
@@ -325,6 +327,7 @@ function parseArgs(): {
     a11yMinSeverity,
     a11yUseBaseline,
     predictiveUi,
+    rawElementSearch,
     planExecutionLockScope,
     videoRecordingDefaults,
     daemonMode,
@@ -746,6 +749,7 @@ async function main() {
       a11yMinSeverity,
       a11yUseBaseline,
       predictiveUi,
+      rawElementSearch,
       planExecutionLockScope,
       videoRecordingDefaults,
       daemonMode,
@@ -777,6 +781,7 @@ async function main() {
       ["mem-perf-audit", memPerfAuditMode, "--mem-perf-audit"],
       ["accessibility-audit", a11yAuditMode, "--accessibility-audit", accessibilityConfig],
       ["predictive-ui", predictiveUi, "--predictive/--predictive-ui"],
+      ["raw-element-search", rawElementSearch, "--raw-element-search"],
     ];
 
     for (const [key, enabled, flagLabel, config] of cliOverrides) {

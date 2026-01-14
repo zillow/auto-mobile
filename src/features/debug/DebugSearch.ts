@@ -4,6 +4,7 @@ import { BootedDevice, Element, ViewHierarchyResult, DebugSearchResult, DebugSea
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { ElementUtils } from "../utility/ElementUtils";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { resolveViewHierarchyForSearch } from "../../utils/viewHierarchySearch";
 
 export interface DebugSearchOptions {
   /**
@@ -82,8 +83,9 @@ export class DebugSearch {
     // Get current view hierarchy
     const perf = new NoOpPerformanceTracker();
     const hierarchy = await this.viewHierarchy.getViewHierarchy({}, perf);
+    const searchHierarchy = resolveViewHierarchyForSearch(hierarchy) ?? hierarchy;
 
-    if (!hierarchy || !hierarchy.hierarchy) {
+    if (!searchHierarchy || !searchHierarchy.hierarchy) {
       return {
         query: {
           text: options.text,
@@ -106,7 +108,7 @@ export class DebugSearch {
     const matchesText = this.createTextMatcher(options.text || "", fuzzyMatch, caseSensitive);
 
     // Traverse the hierarchy and find all matches
-    const rootNodes = this.extractRootNodes(hierarchy);
+    const rootNodes = this.extractRootNodes(searchHierarchy);
 
     // If container is specified, find container first
     let containerNode: any = null;

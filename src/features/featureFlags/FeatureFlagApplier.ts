@@ -41,6 +41,9 @@ export class DefaultFeatureFlagApplier implements FeatureFlagApplier {
       case "predictive-ui":
         serverConfig.setPredictiveUiEnabled(enabled);
         break;
+      case "raw-element-search":
+        serverConfig.setRawElementSearchEnabled(enabled);
+        break;
     }
   }
 }

@@ -16,6 +16,8 @@ import { ViewHierarchyQueryOptions } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { serverConfig } from "../../utils/ServerConfig";
+import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 
 /**
  * Interface for element bounds
@@ -406,15 +408,23 @@ export class ViewHierarchy {
     logger.debug(`[VIEW_HIERARCHY] Starting Android getViewHierarchy (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
 
     perf.serial("android_viewHierarchy");
+    const useRawElementSearch = serverConfig.isRawElementSearchEnabled();
 
     // First try accessibility service if available and not skipped
     try {
-      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
+      const accessibilityHierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(
+        queryOptions,
+        perf,
+        skipWaitForFresh,
+        minTimestamp,
+        useRawElementSearch,
+        signal
+      );
       if (accessibilityHierarchy) {
         perf.end();
         const accessibilityDuration = Date.now() - startTime;
         logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);
-        return accessibilityHierarchy;
+        return this.prepareHierarchyForResponse(accessibilityHierarchy);
       }
     } catch (err) {
       logger.warn(`[VIEW_HIERARCHY] Failed to get hierarchy from accessibility service: ${err}`);
@@ -423,23 +433,25 @@ export class ViewHierarchy {
     try {
       // Get fresh view hierarchy via uiautomator
       const viewHierarchy = await perf.track("uiautomatorFallback", () =>
-        this._getViewHierarchyWithoutCache(signal)
+        this._getViewHierarchyWithoutCache(signal, !useRawElementSearch)
       );
       const freshDuration = Date.now() - startTime;
       logger.debug(`[VIEW_HIERARCHY] Fresh hierarchy fetched in ${freshDuration}ms`);
+
+      const preparedHierarchy = this.prepareHierarchyForResponse(viewHierarchy);
 
       // Cache the result using a timestamp
       const timestamp = Date.now();
       logger.debug(`[VIEW_HIERARCHY] Caching view hierarchy with timestamp: ${timestamp}`);
       await perf.track("cacheHierarchy", () =>
-        this.cacheViewHierarchy(timestamp, viewHierarchy)
+        this.cacheViewHierarchy(timestamp, preparedHierarchy)
       );
 
       perf.end();
 
       const totalDuration = Date.now() - startTime;
       logger.debug(`[VIEW_HIERARCHY] *** FRESH HIERARCHY: getViewHierarchy completed in ${totalDuration}ms (fresh hierarchy) ***`);
-      return viewHierarchy;
+      return preparedHierarchy;
     } catch (err) {
       perf.end();
       const totalDuration = Date.now() - startTime;
@@ -452,19 +464,20 @@ export class ViewHierarchy {
           err.message.includes("cat:") ||
           err.message.includes("No such file or directory"))) {
         logger.debug("[VIEW_HIERARCHY] Specific ADB error detected, calling _getViewHierarchyWithoutCache to get its specific error message.");
-        return await this._getViewHierarchyWithoutCache(signal);
+        const fallbackHierarchy = await this._getViewHierarchyWithoutCache(signal, !useRawElementSearch);
+        return this.prepareHierarchyForResponse(fallbackHierarchy);
       }
 
       // If screenshot-related error, fall back to getting view hierarchy without cache
       // (this might also lead to one of the specific errors above if _getViewHierarchyWithoutCache fails)
       if (err instanceof Error && err.message.includes("screenshot")) {
         logger.debug("[VIEW_HIERARCHY] Screenshot error detected, falling back to view hierarchy without cache");
-        const fallbackResult = await this._getViewHierarchyWithoutCache(signal);
+        const fallbackResult = await this._getViewHierarchyWithoutCache(signal, !useRawElementSearch);
         // If the fallback result has a specific error message, preserve it
         if (fallbackResult.hierarchy && (fallbackResult.hierarchy as any).error) {
           return fallbackResult;
         }
-        return fallbackResult;
+        return this.prepareHierarchyForResponse(fallbackResult);
       }
 
       // For all other unhandled errors from getViewHierarchy itself, return the generic message.
@@ -622,7 +635,7 @@ export class ViewHierarchy {
    * @param xmlData - XML string to process
    * @returns Promise with processed view hierarchy result
    */
-  public async processXmlData(xmlData: string): Promise<ViewHierarchyResult> {
+  public async processXmlData(xmlData: string, filter: boolean = true): Promise<ViewHierarchyResult> {
     // Check that we have valid XML data
     if (!this.validateXmlData(xmlData)) {
       logger.warn("Invalid XML data received from uiautomator");
@@ -635,7 +648,7 @@ export class ViewHierarchy {
 
     logger.debug("Starting analysis on view hierarchy");
     const analysisStart = Date.now();
-    const result = await this.parseXmlToViewHierarchy(xmlData);
+    const result = await this.parseXmlToViewHierarchy(xmlData, filter);
 
     logger.debug(`hierarchy analysis took ${Date.now() - analysisStart}ms`);
 
@@ -715,6 +728,29 @@ export class ViewHierarchy {
     const result = JSON.parse(JSON.stringify(viewHierarchy));
     result.hierarchy = this.filterSingleNode(viewHierarchy.hierarchy, true);
     return result;
+  }
+
+  private prepareHierarchyForResponse(rawHierarchy: ViewHierarchyResult): ViewHierarchyResult {
+    if (!serverConfig.isRawElementSearchEnabled()) {
+      return rawHierarchy;
+    }
+
+    if (
+      rawHierarchy?.hierarchy &&
+      typeof rawHierarchy.hierarchy === "object" &&
+      "error" in rawHierarchy.hierarchy &&
+      rawHierarchy.hierarchy.error
+    ) {
+      return rawHierarchy;
+    }
+
+    if (this.device.platform !== "android") {
+      return rawHierarchy;
+    }
+
+    const filtered = this.filterViewHierarchy(rawHierarchy);
+    attachRawViewHierarchy(filtered, rawHierarchy);
+    return filtered;
   }
 
   /**
@@ -896,10 +932,10 @@ export class ViewHierarchy {
    * @param xmlData - XML string to parse
    * @returns Promise with parsed and filtered view hierarchy
    */
-  async parseXmlToViewHierarchy(xmlData: string): Promise<ViewHierarchyResult> {
+  async parseXmlToViewHierarchy(xmlData: string, filter: boolean = true): Promise<ViewHierarchyResult> {
     const parser = new xml2js.Parser({ explicitArray: false });
     const result = await parser.parseStringPromise(xmlData);
-    return this.filterViewHierarchy(result);
+    return filter ? this.filterViewHierarchy(result) : result;
   }
 
   /**
@@ -985,7 +1021,7 @@ export class ViewHierarchy {
    * Retrieve the view hierarchy of the current screen without using cache
    * @returns Promise with parsed XML view hierarchy
    */
-  async _getViewHierarchyWithoutCache(signal?: AbortSignal): Promise<ViewHierarchyResult> {
+  async _getViewHierarchyWithoutCache(signal?: AbortSignal, filter: boolean = true): Promise<ViewHierarchyResult> {
     const dumpStart = Date.now();
 
     try {
@@ -995,7 +1031,7 @@ export class ViewHierarchy {
       logger.debug(`uiautomator dump took ${Date.now() - dumpStart}ms`);
 
       // Process XML data into view hierarchy result
-      const hierarchyResult = await this.processXmlData(xmlData);
+      const hierarchyResult = await this.processXmlData(xmlData, filter);
 
       return hierarchyResult;
     } catch (err) {

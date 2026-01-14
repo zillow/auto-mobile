@@ -30,6 +30,7 @@ import { accessibilityDetector } from "../../utils/AccessibilityDetector";
 import { FeatureFlagService } from "../featureFlags/FeatureFlagService";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
+import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 
 /**
  * Interface for cached observe result
@@ -476,11 +477,15 @@ export class ObserveScreen {
 
         // Filter out completely offscreen nodes to reduce hierarchy size
         if (result.viewHierarchy && result.screenSize?.width > 0 && result.screenSize?.height > 0) {
+          const rawHierarchy = result.viewHierarchy;
           result.viewHierarchy = this.viewHierarchy.filterOffscreenNodes(
-            result.viewHierarchy,
+            rawHierarchy,
             result.screenSize.width,
             result.screenSize.height
           );
+          if (serverConfig.isRawElementSearchEnabled()) {
+            attachRawViewHierarchy(result.viewHierarchy, rawHierarchy);
+          }
         }
 
         perf.end();

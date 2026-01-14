@@ -7,7 +7,8 @@ export type FeatureFlagKey =
   | "accessibility-audit"
   | "predictive-ui"
   | "force-accessibility-mode"
-  | "accessibility-auto-detect";
+  | "accessibility-auto-detect"
+  | "raw-element-search";
 
 export type FeatureFlagConfig = Record<string, unknown>;
 
@@ -66,6 +67,12 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
     key: "predictive-ui",
     label: "Predictive UI",
     description: "Enable predictive UI state generation during observe.",
+    defaultValue: false,
+  },
+  {
+    key: "raw-element-search",
+    label: "Raw element search",
+    description: "Use raw view hierarchies for element search while returning filtered observations.",
     defaultValue: false,
   },
   {
