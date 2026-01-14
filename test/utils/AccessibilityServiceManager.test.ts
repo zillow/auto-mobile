@@ -612,11 +612,17 @@ describe("AccessibilityServiceManager", function() {
       expect(apkPath).toBe(downloadedPath);
       expect(shell.getExecutedCommands().some(command => command.includes("sha256sum"))).toBe(true);
       expect(shell.getExecutedCommands().some(command => command.includes("shasum -a 256"))).toBe(true);
-      expect(shell.getExecutedCommands().some(command => command.includes("curl -L -o"))).toBe(true);
+      expect(shell.getExecutedCommands().some(command => command.startsWith("curl ") && command.includes("-o"))).toBe(true);
     });
 
     test("should download remote APK and verify checksum", async function() {
-      const payload = Buffer.alloc(12000, 3);
+      // Create a valid APK structure (ZIP with AndroidManifest.xml)
+      const zip = new AdmZip();
+      const manifestContent = '<?xml version="1.0" encoding="utf-8"?><manifest></manifest>';
+      zip.addFile("AndroidManifest.xml", Buffer.from(manifestContent, "utf8"));
+      const paddingData = crypto.randomBytes(15000);
+      zip.addFile("classes.dex", paddingData);
+      const payload = zip.toBuffer();
       const expectedChecksum = crypto.createHash("sha256").update(payload).digest("hex");
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
@@ -642,13 +648,19 @@ describe("AccessibilityServiceManager", function() {
       const stats = await fs.stat(apkPath);
       expect(stats.size).toBe(payload.length);
       expect(apkPath).toBe(downloadedPath);
-      expect(shell.getExecutedCommands().some(command => command.includes("curl -L -o"))).toBe(true);
+      expect(shell.getExecutedCommands().some(command => command.startsWith("curl ") && command.includes("-o"))).toBe(true);
       expect(shell.getExecutedCommands().some(command => command.includes("sha256sum"))).toBe(true);
       await accessibilityServiceClient.cleanupApk(apkPath);
     });
 
     test("should fail when checksum does not match", async function() {
-      const payload = Buffer.alloc(12000, 4);
+      // Create a valid APK structure (ZIP with AndroidManifest.xml)
+      const zip = new AdmZip();
+      const manifestContent = '<?xml version="1.0" encoding="utf-8"?><manifest></manifest>';
+      zip.addFile("AndroidManifest.xml", Buffer.from(manifestContent, "utf8"));
+      const paddingData = crypto.randomBytes(15000);
+      zip.addFile("classes.dex", paddingData);
+      const payload = zip.toBuffer();
       const expectedChecksum = crypto.createHash("sha256").update(payload).digest("hex");
       AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(expectedChecksum);
 
