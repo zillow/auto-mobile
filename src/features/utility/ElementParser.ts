@@ -1,5 +1,6 @@
 import { Element } from "../../models/Element";
 import { ElementBounds, ViewHierarchyNode, ViewHierarchyResult } from "../../models";
+import { resolveViewHierarchyForSearch } from "../../utils/viewHierarchySearch";
 
 type WindowSearchOrder = "topmost-first" | "bottommost-first";
 
@@ -77,11 +78,12 @@ export class ElementParser {
    * @returns Array of root nodes
    */
   extractRootNodes(viewHierarchy: ViewHierarchyResult): ViewHierarchyNode[] {
-    if (!viewHierarchy?.hierarchy) {
+    const searchHierarchy = resolveViewHierarchyForSearch(viewHierarchy);
+    if (!searchHierarchy?.hierarchy) {
       return [];
     }
 
-    const hierarchy: any = viewHierarchy.hierarchy;
+    const hierarchy: any = searchHierarchy.hierarchy;
     if (hierarchy && typeof hierarchy === "object" && "error" in hierarchy && hierarchy.error) {
       return [];
     }
@@ -99,11 +101,12 @@ export class ElementParser {
     viewHierarchy: ViewHierarchyResult,
     order: WindowSearchOrder = "topmost-first"
   ): ViewHierarchyNode[][] {
-    if (!viewHierarchy?.windows || viewHierarchy.windows.length === 0) {
+    const searchHierarchy = resolveViewHierarchyForSearch(viewHierarchy);
+    if (!searchHierarchy?.windows || searchHierarchy.windows.length === 0) {
       return [];
     }
 
-    const windowsWithHierarchy = viewHierarchy.windows.filter(window => window.hierarchy);
+    const windowsWithHierarchy = searchHierarchy.windows.filter(window => window.hierarchy);
     if (windowsWithHierarchy.length === 0) {
       return [];
     }
@@ -207,17 +210,18 @@ export class ElementParser {
     viewHierarchy: ViewHierarchyResult,
     options: { includeWindows?: boolean; windowOrder?: WindowSearchOrder } = {}
   ): Array<{ element: Element; index: number; depth: number; text?: string }> {
-    if (!viewHierarchy) {
+    const searchHierarchy = resolveViewHierarchyForSearch(viewHierarchy);
+    if (!searchHierarchy) {
       return [];
     }
 
     const flattenedElements: Array<{ element: Element; index: number; depth: number; text?: string }> = [];
     const rootNodes = options.includeWindows
       ? [
-        ...this.extractRootNodes(viewHierarchy),
-        ...this.extractWindowRootNodes(viewHierarchy, options.windowOrder ?? "topmost-first")
+        ...this.extractRootNodes(searchHierarchy),
+        ...this.extractWindowRootNodes(searchHierarchy, options.windowOrder ?? "topmost-first")
       ]
-      : this.extractRootNodes(viewHierarchy);
+      : this.extractRootNodes(searchHierarchy);
     let currentIndex = 0;
 
     // Process each root node

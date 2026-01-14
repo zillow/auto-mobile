@@ -15,6 +15,9 @@ import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilitySer
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
+import { ViewHierarchy } from "../observe/ViewHierarchy";
+import { serverConfig } from "../../utils/ServerConfig";
+import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 
 const PRESS_DURATION_MIN_MS = 600;
 const PRESS_DURATION_MAX_MS = 3000;
@@ -29,6 +32,7 @@ const HIERARCHY_REFRESH_TIMEOUT_MS = 5000;
 export class DragAndDrop extends BaseVisualChange {
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
+  private viewHierarchy: ViewHierarchy;
 
   constructor(
     device: BootedDevice,
@@ -39,6 +43,7 @@ export class DragAndDrop extends BaseVisualChange {
     super(device, adb, axe, timer);
     this.elementUtils = new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
+    this.viewHierarchy = new ViewHierarchy(device, this.adb);
   }
 
   async execute(
@@ -232,14 +237,31 @@ export class DragAndDrop extends BaseVisualChange {
   private async refreshViewHierarchy(signal?: AbortSignal): Promise<ViewHierarchyResult | null> {
     const syncResult = await this.accessibilityService.requestHierarchySync(
       new NoOpPerformanceTracker(),
-      false,
+      serverConfig.isRawElementSearchEnabled(),
       signal,
       HIERARCHY_REFRESH_TIMEOUT_MS
     );
 
-    return syncResult
+    const rawHierarchy = syncResult
       ? this.accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy)
       : null;
+    if (!rawHierarchy) {
+      return null;
+    }
+    if (!serverConfig.isRawElementSearchEnabled()) {
+      return rawHierarchy;
+    }
+    if (
+      rawHierarchy?.hierarchy &&
+      typeof rawHierarchy.hierarchy === "object" &&
+      "error" in rawHierarchy.hierarchy &&
+      rawHierarchy.hierarchy.error
+    ) {
+      return rawHierarchy;
+    }
+    const filtered = this.viewHierarchy.filterViewHierarchy(rawHierarchy);
+    attachRawViewHierarchy(filtered, rawHierarchy);
+    return filtered;
   }
 
   private getPressDurationMs(options: DragAndDropOptions): number {

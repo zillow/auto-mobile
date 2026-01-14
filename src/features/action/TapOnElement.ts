@@ -29,6 +29,9 @@ import { accessibilityDetector as defaultAccessibilityDetector } from "../../uti
 import type { ElementSelector } from "../../utils/interfaces/ElementSelector";
 import type { Timer } from "../../utils/SystemTimer";
 import { NodeCryptoService } from "../../utils/crypto";
+import { ViewHierarchy } from "../observe/ViewHierarchy";
+import { serverConfig } from "../../utils/ServerConfig";
+import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 
 type SearchUntilStats = NonNullable<TapOnElementResult["searchUntil"]>;
 
@@ -44,6 +47,7 @@ export class TapOnElement extends BaseVisualChange {
   private selectionStateTracker: SelectionStateTracker;
   private accessibilityDetector: AccessibilityDetector;
   private elementSelector: ElementSelector;
+  private viewHierarchy: ViewHierarchy;
   private static readonly SEARCH_UNTIL_DEFAULT_MS = 500;
   private static readonly SEARCH_UNTIL_MIN_MS = 100;
   private static readonly SEARCH_UNTIL_MAX_MS = 12000;
@@ -65,6 +69,7 @@ export class TapOnElement extends BaseVisualChange {
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.webdriver = webdriver || new WebDriverAgent(device);
     this.visionConfig = visionConfig || DEFAULT_VISION_CONFIG;
+    this.viewHierarchy = new ViewHierarchy(device, this.adb);
     this.selectionStateTracker = selectionStateTracker ?? new SelectionStateTracker({
       screenshotCapturer: new TakeScreenshotCapturer(device, this.adb)
     });
@@ -168,8 +173,45 @@ export class TapOnElement extends BaseVisualChange {
     throw new ActionableError("tapOn requires non-blank text or elementId to interact with");
   }
 
+  private prepareViewHierarchyForResponse(
+    rawHierarchy: ViewHierarchyResult,
+    screenSize?: ObserveResult["screenSize"]
+  ): ViewHierarchyResult {
+    if (!serverConfig.isRawElementSearchEnabled()) {
+      return rawHierarchy;
+    }
+
+    if (
+      rawHierarchy?.hierarchy &&
+      typeof rawHierarchy.hierarchy === "object" &&
+      "error" in rawHierarchy.hierarchy &&
+      rawHierarchy.hierarchy.error
+    ) {
+      return rawHierarchy;
+    }
+
+    if (this.device.platform === "android") {
+      const filtered = this.viewHierarchy.filterViewHierarchy(rawHierarchy);
+      attachRawViewHierarchy(filtered, rawHierarchy);
+      return filtered;
+    }
+
+    if (this.device.platform === "ios" && screenSize?.width && screenSize?.height) {
+      const filtered = this.viewHierarchy.filterOffscreenNodes(
+        rawHierarchy,
+        screenSize.width,
+        screenSize.height
+      );
+      attachRawViewHierarchy(filtered, rawHierarchy);
+      return filtered;
+    }
+
+    return rawHierarchy;
+  }
+
   private async refreshViewHierarchy(
     timeoutMs: number,
+    screenSize?: ObserveResult["screenSize"],
     signal?: AbortSignal
   ): Promise<ViewHierarchyResult | null> {
     const effectiveTimeoutMs = Math.max(0, timeoutMs);
@@ -177,16 +219,24 @@ export class TapOnElement extends BaseVisualChange {
       case "android": {
         const syncResult = await this.accessibilityService.requestHierarchySync(
           new NoOpPerformanceTracker(),
-          false,
+          serverConfig.isRawElementSearchEnabled(),
           signal,
           effectiveTimeoutMs
         );
-        return syncResult
+        const rawHierarchy = syncResult
           ? this.accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy)
+          : null;
+        return rawHierarchy
+          ? this.prepareViewHierarchyForResponse(rawHierarchy, screenSize)
           : null;
       }
       case "ios":
-        return this.webdriver.getViewHierarchy(this.device);
+      {
+        const rawHierarchy = await this.webdriver.getViewHierarchy(this.device);
+        return rawHierarchy
+          ? this.prepareViewHierarchyForResponse(rawHierarchy, screenSize)
+          : null;
+      }
       default:
         throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
     }
@@ -224,7 +274,11 @@ export class TapOnElement extends BaseVisualChange {
       while (this.timer.now() < deadline) {
         throwIfAborted(signal);
         const remainingTimeMs = Math.max(0, deadline - this.timer.now());
-        const refreshedHierarchy = await this.refreshViewHierarchy(remainingTimeMs, signal);
+        const refreshedHierarchy = await this.refreshViewHierarchy(
+          remainingTimeMs,
+          observeResult.screenSize,
+          signal
+        );
         requestCount += 1;
 
         if (!refreshedHierarchy) {

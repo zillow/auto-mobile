@@ -27,6 +27,7 @@ import { ObserveScreen } from "../observe/ObserveScreen";
 import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
 import { AccessibilityDetector } from "../../utils/interfaces/AccessibilityDetector";
 import { accessibilityDetector as defaultAccessibilityDetector } from "../../utils/AccessibilityDetector";
+import { serverConfig } from "../../utils/ServerConfig";
 
 export interface GestureExecutor {
   swipe(
@@ -1558,7 +1559,13 @@ export class SwipeOn extends BaseVisualChange {
             query: options.container.text || options.container.elementId || "",
             containerElementId: undefined
           };
-          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(queryOptions);
+          latestViewHierarchy = await this.accessibilityService.getAccessibilityHierarchy(
+            queryOptions,
+            undefined,
+            undefined,
+            undefined,
+            serverConfig.isRawElementSearchEnabled()
+          );
           break;
         case "ios":
           latestViewHierarchy = await this.webdriver.getViewHierarchy(this.device);
