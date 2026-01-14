@@ -123,4 +123,12 @@ export class FeatureFlagService {
       config,
     };
   }
+
+  isEnabled(key: FeatureFlagKey): boolean {
+    const definition = this.definitionByKey.get(key);
+    if (!definition) {
+      return false;
+    }
+    return this.flagsByKey.get(key) ?? definition.defaultValue;
+  }
 }

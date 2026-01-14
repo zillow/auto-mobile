@@ -152,11 +152,12 @@ export class SwipeOn extends BaseVisualChange {
       return this.executeGesture.swipe(x1, y1, x2, y2, gestureOptions, perf);
     }
 
-    // Check if TalkBack is enabled
-    const isTalkBackEnabled = await this.accessibilityDetector.isAccessibilityEnabled(
+    // Check if TalkBack is enabled (not just any accessibility service)
+    const accessibilityService = await this.accessibilityDetector.detectMethod(
       this.device.id,
       this.adb!
     );
+    const isTalkBackEnabled = accessibilityService === "talkback";
 
     if (isTalkBackEnabled) {
       if (boomerangEnabled) {
@@ -1333,15 +1334,16 @@ export class SwipeOn extends BaseVisualChange {
       : `element with id "${options.lookFor!.elementId}"`;
     logger.info(`[SwipeOn] Looking for ${target} with maxTime=${maxTime}ms`);
 
-    // Check if accessibility service (TalkBack) is enabled
+    // Check if TalkBack is enabled (not just any accessibility service)
     const isTalkBackEnabled = await perf.track("checkTalkBack", async () => {
       if (this.device.platform !== "android") {
         return false;
       }
-      return await this.accessibilityDetector.isAccessibilityEnabled(
+      const accessibilityService = await this.accessibilityDetector.detectMethod(
         this.device.deviceId,
         this.adb
       );
+      return accessibilityService === "talkback";
     });
 
     // First check if element is already visible

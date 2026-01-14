@@ -1175,50 +1175,70 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       val endX = x2.toFloat()
       val endY = y2.toFloat()
 
-      val dragPath =
-          Path().apply {
-            moveTo(startX, startY)
-            lineTo(endX, endY)
-          }
-      val holdEndPath =
-          Path().apply {
-            moveTo(endX, endY)
-          }
-
       if (pressDurationMs > 0) {
+        // Phase 1: Press and hold at start position
+        // Use zero-length path (moveTo + lineTo same point) for stationary touch
         val pressPath =
             Path().apply {
               moveTo(startX, startY)
+              lineTo(startX, startY) // Zero-length path = stationary touch
             }
         val pressStroke = GestureDescription.StrokeDescription(pressPath, 0, pressDurationMs, true)
-        val dragStroke =
-            pressStroke.continueStroke(
-                dragPath,
-                pressDurationMs,
-                dragDurationMs,
-                holdDurationMs > 0,
-            )
-        gestureBuilder.addStroke(pressStroke).addStroke(dragStroke)
+        gestureBuilder.addStroke(pressStroke)
+        Log.d(TAG, "Stroke 1 (press): stationary at ($startX, $startY), startTime=0ms, duration=${pressDurationMs}ms, willContinue=true")
+
+        // Phase 2: Drag from start to end with 8 segments for more intermediate touch events
+        val dragPath =
+            Path().apply {
+              moveTo(startX, startY)
+              // Split the drag into 8 segments with variation in both X and Y to ensure hit detection
+              for (i in 1..8) {
+                val t = i / 8.0f
+                val baseX = startX + (endX - startX) * t
+                val baseY = startY + (endY - startY) * t
+                // Add alternating offsets to create a wavy path in both dimensions
+                val xOffset = if (i % 2 == 0) 10f else -10f
+                val yOffset = if (i % 2 == 0) -10f else 10f
+                val x = baseX + xOffset
+                val y = baseY + yOffset
+                lineTo(x, y)
+              }
+            }
+        val dragStroke = GestureDescription.StrokeDescription(dragPath, pressDurationMs, dragDurationMs, holdDurationMs > 0)
+        gestureBuilder.addStroke(dragStroke)
+        Log.d(TAG, "Stroke 2 (drag): ($startX, $startY) -> ($endX, $endY), startTime=${pressDurationMs}ms, duration=${dragDurationMs}ms, willContinue=${holdDurationMs > 0}")
 
         if (holdDurationMs > 0) {
-          val holdStroke =
-              dragStroke.continueStroke(
-                  holdEndPath,
-                  pressDurationMs + dragDurationMs,
-                  holdDurationMs,
-                  false,
-              )
+          // Phase 3: Hold at end position
+          val holdPath =
+              Path().apply {
+                moveTo(endX, endY)
+                lineTo(endX, endY) // Zero-length path = stationary touch
+              }
+          val holdStroke = GestureDescription.StrokeDescription(holdPath, pressDurationMs + dragDurationMs, holdDurationMs, false)
           gestureBuilder.addStroke(holdStroke)
+          Log.d(TAG, "Stroke 3 (hold): stationary at ($endX, $endY), startTime=${pressDurationMs + dragDurationMs}ms, duration=${holdDurationMs}ms, willContinue=false")
         }
       } else {
-        val dragStroke =
-            GestureDescription.StrokeDescription(dragPath, 0, dragDurationMs, holdDurationMs > 0)
+        // Single stroke drag without initial press
+        val dragPath =
+            Path().apply {
+              moveTo(startX, startY)
+              lineTo(endX, endY)
+            }
+        val dragStroke = GestureDescription.StrokeDescription(dragPath, 0, dragDurationMs, holdDurationMs > 0)
         gestureBuilder.addStroke(dragStroke)
+        Log.d(TAG, "Single stroke drag: ($startX, $startY) -> ($endX, $endY), startTime=0ms, duration=${dragDurationMs}ms, willContinue=${holdDurationMs > 0}")
 
         if (holdDurationMs > 0) {
-          val holdStroke =
-              dragStroke.continueStroke(holdEndPath, dragDurationMs, holdDurationMs, false)
+          val holdPath =
+              Path().apply {
+                moveTo(endX, endY)
+                lineTo(endX, endY)
+              }
+          val holdStroke = GestureDescription.StrokeDescription(holdPath, dragDurationMs, holdDurationMs, false)
           gestureBuilder.addStroke(holdStroke)
+          Log.d(TAG, "Hold after drag: stationary at ($endX, $endY), startTime=${dragDurationMs}ms, duration=${holdDurationMs}ms, willContinue=false")
         }
       }
       val gesture = gestureBuilder.build()

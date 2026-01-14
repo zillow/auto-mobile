@@ -82,6 +82,7 @@ export class FakeAccessibilityDetector implements AccessibilityDetector {
     _adb: AdbExecutor,
     _featureFlags?: FeatureFlagService
   ): Promise<AccessibilityService> {
+    this.detectionCallCount++;
     const result = this.detectionResults.get(deviceId) || this.defaultResult;
     return result.service;
   }

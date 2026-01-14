@@ -16,7 +16,7 @@ import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilitySer
 const PRESS_DURATION_MIN_MS = 600;
 const PRESS_DURATION_MAX_MS = 3000;
 const DRAG_DURATION_MIN_MS = 300;
-const DRAG_DURATION_MAX_MS = 1000;
+const DRAG_DURATION_MAX_MS = 2000;
 const HOLD_DURATION_MIN_MS = 100;
 const HOLD_DURATION_MAX_MS = 3000;
 const DROP_DURATION_MS = 100;
