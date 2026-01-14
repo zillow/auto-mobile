@@ -15,11 +15,11 @@ data class HighlightBounds(
 ) {
   fun hasValidSize(): Boolean = width > 0 && height > 0
 
-  fun toRectF(scaleX: Float = 1f, scaleY: Float = 1f, yOffset: Int = 0): RectF {
+  fun toRectF(scaleX: Float = 1f, scaleY: Float = 1f): RectF {
     val left = x.toFloat() * scaleX
-    val top = (y - yOffset).toFloat() * scaleY
+    val top = y.toFloat() * scaleY
     val right = (x + width).toFloat() * scaleX
-    val bottom = (y + height - yOffset).toFloat() * scaleY
+    val bottom = (y + height).toFloat() * scaleY
     return RectF(left, top, right, bottom)
   }
 }

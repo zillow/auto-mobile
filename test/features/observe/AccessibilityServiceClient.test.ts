@@ -82,7 +82,7 @@ describe("AccessibilityServiceClient", function() {
     }
   }
 
-  const createCapturingWebSocketFactory = (): {
+  const createCapturingWebSocketFactory = (timer?: FakeTimer): {
     factory: (url: string) => CapturingWebSocket;
     getSocket: () => CapturingWebSocket | null;
   } => {
@@ -90,7 +90,7 @@ describe("AccessibilityServiceClient", function() {
 
     return {
       factory: (url: string) => {
-        socket = new CapturingWebSocket(url, "none");
+        socket = new CapturingWebSocket(url, "none", 0, timer);
         return socket;
       },
       getSocket: () => socket
@@ -138,15 +138,6 @@ describe("AccessibilityServiceClient", function() {
     }
   };
 
-  const waitForPendingInterval = async (timer: FakeTimer, maxAttempts: number = 5): Promise<void> => {
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      if (timer.getPendingIntervalCount() > 0) {
-        return;
-      }
-      await flushPromises(1);
-    }
-  };
-
   describe("getLatestHierarchy", function() {
     test("should return hierarchy data when WebSocket receives fresh data", async function() {
       const mockHierarchyData = {
@@ -167,13 +158,16 @@ describe("AccessibilityServiceClient", function() {
         }
       };
 
-      fakeTimer.setManualMode();
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      // Use delayed mode with 1ms for fast execution while avoiding manual mode deadlock
+      const testTimer = new FakeTimer();
+      testTimer.setSleepDuration(1);
+
+      const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,
         factory,
-        fakeTimer
+        testTimer
       );
 
       try {
@@ -181,13 +175,12 @@ describe("AccessibilityServiceClient", function() {
         const socket = await waitForSocket(getSocket);
         expect(socket).not.toBeNull();
         await waitForSocketOpen(socket);
-        await waitForPendingInterval(fakeTimer);
+
         socket!.simulateMessage(JSON.stringify({
           type: "hierarchy_update",
           timestamp: Date.now(),
           data: mockHierarchyData
         }));
-        fakeTimer.advanceTime(50);
 
         const result = await resultPromise;
 
@@ -255,7 +248,7 @@ describe("AccessibilityServiceClient", function() {
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,
-        createSuccessWebSocketFactory(),
+        createSuccessWebSocketFactory(fakeTimer),
         fakeTimer
       );
 
@@ -279,7 +272,7 @@ describe("AccessibilityServiceClient", function() {
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,
-        createInstantFailureWebSocketFactory(),
+        createInstantFailureWebSocketFactory(fakeTimer),
         fakeTimer
       );
 
@@ -599,7 +592,7 @@ describe("AccessibilityServiceClient", function() {
       const failingClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,
-        createInstantFailureWebSocketFactory(),
+        createInstantFailureWebSocketFactory(fakeTimer),
         fakeTimer
       );
 
@@ -617,11 +610,10 @@ describe("AccessibilityServiceClient", function() {
     test("should upsert package on added event", async function() {
       const repo = new FakeInstalledAppsRepository();
       const timer = new FakeTimer();
-      timer.setManualMode();
-      timer.advanceTime(1000);
-      const timestamp = timer.now();
+      timer.setSleepDuration(1);
+      const timestamp = Date.now();
 
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const { factory, getSocket } = createCapturingWebSocketFactory(timer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,
@@ -663,8 +655,8 @@ describe("AccessibilityServiceClient", function() {
     test("should remove package for a single user on removed event", async function() {
       const repo = new FakeInstalledAppsRepository();
       const timer = new FakeTimer();
-      timer.setManualMode();
-      const baseTime = timer.now();
+      timer.setSleepDuration(1);
+      const baseTime = Date.now();
 
       await repo.replaceInstalledApps(testDevice.deviceId, [
         {
@@ -685,7 +677,7 @@ describe("AccessibilityServiceClient", function() {
         }
       ]);
 
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const { factory, getSocket } = createCapturingWebSocketFactory(timer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,
@@ -723,8 +715,8 @@ describe("AccessibilityServiceClient", function() {
     test("should remove package for all users when removedForAllUsers is true", async function() {
       const repo = new FakeInstalledAppsRepository();
       const timer = new FakeTimer();
-      timer.setManualMode();
-      const baseTime = timer.now();
+      timer.setSleepDuration(1);
+      const baseTime = Date.now();
 
       await repo.replaceInstalledApps(testDevice.deviceId, [
         {
@@ -745,7 +737,7 @@ describe("AccessibilityServiceClient", function() {
         }
       ]);
 
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const { factory, getSocket } = createCapturingWebSocketFactory(timer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,
@@ -784,9 +776,9 @@ describe("AccessibilityServiceClient", function() {
   describe("highlight requests", function() {
     test("requestAddHighlight sends payload and resolves highlight response", async function() {
       const highlightTimer = new FakeTimer();
-      highlightTimer.setManualMode();
+      highlightTimer.setSleepDuration(1);
 
-      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const { factory, getSocket } = createCapturingWebSocketFactory(highlightTimer);
       const testClient = AccessibilityServiceClient.createForTesting(
         testDevice,
         adbClient,

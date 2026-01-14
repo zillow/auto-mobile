@@ -26,6 +26,11 @@ import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { ElementUtils } from "../features/utility/ElementUtils";
 import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
 import {
+  elementContainerSchema,
+  elementSelectionStrategySchema,
+  elementSelectorSchema
+} from "./elementSelectorSchemas";
+import {
   elementSchema,
   observationSummarySchema,
   scrollableCandidateSchema,
@@ -178,31 +183,13 @@ export const shakeSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
-const tapOnContainerSchema = z.union([
-  z.object({
-    elementId: z.string().describe("Container resource ID")
-  }).strict(),
-  z.object({
-    text: z.string().describe("Container text")
-  }).strict()
-]);
-
-const tapOnSelectorSchema = z.union([
-  z.object({
-    text: z.string().describe("Text to tap")
-  }).strict(),
-  z.object({
-    id: z.string().describe("Element ID to tap")
-  }).strict()
-]);
-
 export const tapOnSchema = addDeviceTargetingToSchema(z.object({
-  container: tapOnContainerSchema.optional().describe(
+  container: elementContainerSchema.optional().describe(
     "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
-  selector: tapOnSelectorSchema.describe("Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"),
+  selector: elementSelectorSchema.describe("Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"),
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
-  selectionStrategy: z.enum(["first", "random"]).optional().describe(
+  selectionStrategy: elementSelectionStrategySchema.optional().describe(
     "Element selection strategy when multiple matches are found (default: first)"
   ),
   duration: z.number().optional().describe("Long press duration (ms)"),

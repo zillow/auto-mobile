@@ -272,8 +272,26 @@
                 "type": "string",
                 "description": "Optional highlight description"
               },
+              "selector": {
+                "$ref": "#/$defs/highlightSelector"
+              },
+              "container": {
+                "$ref": "#/$defs/highlightContainer"
+              },
+              "containerOf": {
+                "type": "boolean",
+                "description": "Whether to highlight the container of the selected element"
+              },
               "shape": {
                 "$ref": "#/$defs/highlightShape"
+              },
+              "selectionStrategy": {
+                "type": "string",
+                "enum": [
+                  "first",
+                  "random"
+                ],
+                "description": "Element selection strategy when multiple matches are found (default: first)"
               },
               "platform": {
                 "type": "string",
@@ -305,10 +323,27 @@
                     ]
                   },
                   {
+                    "required": [
+                      "selector"
+                    ]
+                  },
+                  {
                     "properties": {
                       "params": {
                         "required": [
                           "shape"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "params"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "params": {
+                        "required": [
+                          "selector"
                         ]
                       }
                     },
@@ -508,6 +543,64 @@
       "additionalProperties": false,
       "description": "Highlight shape definition"
     },
+    "highlightSelector": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "description": "Element text",
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "description": "Element ID",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "description": "Selector for highlight elements",
+      "oneOf": [
+        {
+          "required": [
+            "text"
+          ]
+        },
+        {
+          "required": [
+            "id"
+          ]
+        }
+      ]
+    },
+    "highlightContainer": {
+      "type": "object",
+      "properties": {
+        "elementId": {
+          "type": "string",
+          "description": "Container element ID",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "description": "Container text",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "description": "Container selector to scope highlight search",
+      "oneOf": [
+        {
+          "required": [
+            "elementId"
+          ]
+        },
+        {
+          "required": [
+            "text"
+          ]
+        }
+      ]
+    },
     "highlightParams": {
       "type": "object",
       "properties": {
@@ -515,8 +608,26 @@
           "type": "string",
           "description": "Optional highlight description"
         },
+        "selector": {
+          "$ref": "#/$defs/highlightSelector"
+        },
+        "container": {
+          "$ref": "#/$defs/highlightContainer"
+        },
+        "containerOf": {
+          "type": "boolean",
+          "description": "Whether to highlight the container of the selected element"
+        },
         "shape": {
           "$ref": "#/$defs/highlightShape"
+        },
+        "selectionStrategy": {
+          "type": "string",
+          "enum": [
+            "first",
+            "random"
+          ],
+          "description": "Element selection strategy when multiple matches are found (default: first)"
         },
         "platform": {
           "type": "string",
@@ -547,9 +658,6 @@
           "description": "Device ID override"
         }
       },
-      "required": [
-        "shape"
-      ],
       "additionalProperties": true,
       "description": "Parameters for highlight"
     },

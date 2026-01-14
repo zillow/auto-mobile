@@ -242,8 +242,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
     try {
       overlayDrawer = OverlayDrawer(
-        screenDimensionsProvider = { getScreenDimensions() },
-        systemInsetsProvider = { getTopSystemInset() }
+        screenDimensionsProvider = { getScreenDimensions() }
       )
       overlayManager = OverlayManager(this, viewFactory = { HighlightOverlayView(it, overlayDrawer) })
       overlayDrawer.attachOverlayManager(overlayManager)

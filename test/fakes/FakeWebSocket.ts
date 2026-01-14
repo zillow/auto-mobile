@@ -1,4 +1,6 @@
 import { EventEmitter } from "events";
+import { Timer } from "../../src/utils/interfaces/Timer";
+import { defaultTimer } from "../../src/utils/SystemTimer";
 
 /**
  * WebSocket states as defined by the WebSocket API
@@ -18,16 +20,18 @@ export class FakeWebSocket extends EventEmitter {
   public readyState: WebSocketState = WebSocketState.CONNECTING;
   private failureMode: "instant" | "timeout" | "none" = "none";
   private connectTimeoutMs: number = 0;
+  private timer: Timer;
 
-  constructor(url: string, failureMode: "instant" | "timeout" | "none" = "none", connectTimeoutMs: number = 0) {
+  constructor(url: string, failureMode: "instant" | "timeout" | "none" = "none", connectTimeoutMs: number = 0, timer: Timer = defaultTimer) {
     super();
     this.failureMode = failureMode;
     this.connectTimeoutMs = connectTimeoutMs;
+    this.timer = timer;
 
-    // Schedule connection attempt
-    setImmediate(() => {
+    // Schedule connection attempt using timer
+    this.timer.setTimeout(() => {
       this.handleConnection();
-    });
+    }, 0);
   }
 
   private handleConnection(): void {
@@ -38,7 +42,7 @@ export class FakeWebSocket extends EventEmitter {
       this.emit("close");
     } else if (this.failureMode === "timeout") {
       // Simulate timeout after specified duration
-      setTimeout(() => {
+      this.timer.setTimeout(() => {
         if (this.readyState === WebSocketState.CONNECTING) {
           this.readyState = WebSocketState.CLOSED;
           this.emit("error", new Error("Connection timeout"));
@@ -62,10 +66,10 @@ export class FakeWebSocket extends EventEmitter {
   close(): void {
     if (this.readyState === WebSocketState.OPEN || this.readyState === WebSocketState.CONNECTING) {
       this.readyState = WebSocketState.CLOSING;
-      setImmediate(() => {
+      this.timer.setTimeout(() => {
         this.readyState = WebSocketState.CLOSED;
         this.emit("close");
-      });
+      }, 0);
     }
   }
 
@@ -81,14 +85,14 @@ export class FakeWebSocket extends EventEmitter {
  * Factory function that creates FakeWebSockets configured to fail instantly
  * This is useful for testing connection failure scenarios without waiting for timeouts
  */
-export function createInstantFailureWebSocketFactory(): (url: string) => FakeWebSocket {
-  return (url: string) => new FakeWebSocket(url, "instant");
+export function createInstantFailureWebSocketFactory(timer?: Timer): (url: string) => FakeWebSocket {
+  return (url: string) => new FakeWebSocket(url, "instant", 0, timer);
 }
 
 /**
  * Factory function that creates FakeWebSockets that connect successfully
  * This is useful for testing normal operation scenarios
  */
-export function createSuccessWebSocketFactory(): (url: string) => FakeWebSocket {
-  return (url: string) => new FakeWebSocket(url, "none");
+export function createSuccessWebSocketFactory(timer?: Timer): (url: string) => FakeWebSocket {
+  return (url: string) => new FakeWebSocket(url, "none", 0, timer);
 }
