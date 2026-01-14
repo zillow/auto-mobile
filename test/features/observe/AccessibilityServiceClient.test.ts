@@ -138,15 +138,6 @@ describe("AccessibilityServiceClient", function() {
     }
   };
 
-  const waitForPendingInterval = async (timer: FakeTimer, maxAttempts: number = 5): Promise<void> => {
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      if (timer.getPendingIntervalCount() > 0) {
-        return;
-      }
-      await flushPromises(1);
-    }
-  };
-
   describe("getLatestHierarchy", function() {
     test("should return hierarchy data when WebSocket receives fresh data", async function() {
       const mockHierarchyData = {
