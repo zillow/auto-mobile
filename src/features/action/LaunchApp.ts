@@ -16,9 +16,26 @@ import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export type ForegroundCheckMode = "parallel" | "single";
 
+export interface TargetUserDetector {
+  detectTargetUserId(packageName: string, userId?: number): Promise<number>;
+}
+
+export interface InstalledAppsProvider {
+  listInstalledApps(): Promise<string[]>;
+}
+
+export interface LaunchAppDependencies {
+  targetUserDetector?: TargetUserDetector;
+  installedAppsProvider?: InstalledAppsProvider;
+  performanceTrackerFactory?: () => PerformanceTracker;
+}
+
 export class LaunchApp extends BaseVisualChange {
 
   private simctl: SimCtlClient;
+  private targetUserDetector: TargetUserDetector;
+  private installedAppsProvider: InstalledAppsProvider;
+  private performanceTrackerFactory: () => PerformanceTracker;
   /**
    * Create an LaunchApp instance
    * @param device - Optional device
@@ -32,10 +49,18 @@ export class LaunchApp extends BaseVisualChange {
     adb: AdbClient | null = null,
     axe: AxeClient | null = null,
     simctl: SimCtlClient | null = null,
-    timer: Timer = defaultTimer) {
+    timer: Timer = defaultTimer,
+    dependencies: LaunchAppDependencies = {}) {
     super(device, adb, axe, timer);
     this.device = device;
     this.simctl = simctl || new SimCtlClient(this.device);
+    this.targetUserDetector = dependencies.targetUserDetector ?? {
+      detectTargetUserId: (packageName: string, userId?: number) => this.detectTargetUserId(packageName, userId)
+    };
+    this.installedAppsProvider = dependencies.installedAppsProvider ?? {
+      listInstalledApps: () => this.listInstalledApps()
+    };
+    this.performanceTrackerFactory = dependencies.performanceTrackerFactory ?? createGlobalPerformanceTracker;
   }
 
   /**
@@ -277,6 +302,40 @@ export class LaunchApp extends BaseVisualChange {
     logger.warn(`[LaunchApp] Timed out waiting for iOS hierarchy after ${timeoutMs}ms`);
   }
 
+  private async detectTargetUserId(
+    packageName: string,
+    userId?: number
+  ): Promise<number> {
+    if (userId !== undefined) {
+      return userId;
+    }
+
+    // Check if app is in foreground and get its user
+    const foregroundApp = await this.adb.getForegroundApp();
+    if (foregroundApp && foregroundApp.packageName === packageName) {
+      logger.info(`[LaunchApp] App is in foreground in user ${foregroundApp.userId}`);
+      return foregroundApp.userId;
+    }
+
+    // Get list of users and prefer work profile
+    const users = await this.adb.listUsers();
+
+    // Find first work profile (userId > 0 and running)
+    const workProfile = users.find(u => u.userId > 0 && u.running);
+    if (workProfile) {
+      logger.info(`[LaunchApp] Using work profile: user ${workProfile.userId}`);
+      return workProfile.userId;
+    }
+
+    // Fall back to primary user
+    logger.info(`[LaunchApp] Using primary user: user 0`);
+    return 0;
+  }
+
+  private async listInstalledApps(): Promise<string[]> {
+    return (new ListInstalledApps(this.device, this.adb)).execute();
+  }
+
   /**
    * Launch an Android app by package name
    * @param packageName - The package name to launch
@@ -295,43 +354,31 @@ export class LaunchApp extends BaseVisualChange {
     userId?: number,
     skipUiStability?: boolean
   ): Promise<LaunchAppResult> {
-    const perf = createGlobalPerformanceTracker();
+    const perf = this.performanceTrackerFactory();
     perf.serial("launchApp");
 
     logger.info(`executeAndroid: ${packageName}`);
 
-    // Auto-detect target user if not specified
-    const targetUserId = await perf.track("detectTargetUser", async () => {
-      if (userId !== undefined) {
-        return userId;
-      }
+    const [targetUserResult, installedAppsResult] = await Promise.allSettled([
+      // Auto-detect target user if not specified
+      perf.track("detectTargetUser", async () => {
+        return this.targetUserDetector.detectTargetUserId(packageName, userId);
+      }),
+      // Check app status (installation and running)
+      perf.track("checkInstalled", async () => {
+        return this.installedAppsProvider.listInstalledApps();
+      })
+    ]);
 
-      // Check if app is in foreground and get its user
-      const foregroundApp = await this.adb.getForegroundApp();
-      if (foregroundApp && foregroundApp.packageName === packageName) {
-        logger.info(`[LaunchApp] App is in foreground in user ${foregroundApp.userId}`);
-        return foregroundApp.userId;
-      }
+    if (targetUserResult.status === "rejected") {
+      throw targetUserResult.reason;
+    }
+    if (installedAppsResult.status === "rejected") {
+      throw installedAppsResult.reason;
+    }
 
-      // Get list of users and prefer work profile
-      const users = await this.adb.listUsers();
-
-      // Find first work profile (userId > 0 and running)
-      const workProfile = users.find(u => u.userId > 0 && u.running);
-      if (workProfile) {
-        logger.info(`[LaunchApp] Using work profile: user ${workProfile.userId}`);
-        return workProfile.userId;
-      }
-
-      // Fall back to primary user
-      logger.info(`[LaunchApp] Using primary user: user 0`);
-      return 0;
-    });
-
-    // Check app status (installation and running)
-    const installedApps = await perf.track("checkInstalled", async () => {
-      return (new ListInstalledApps(this.device, this.adb)).execute();
-    });
+    const targetUserId = targetUserResult.value;
+    const installedApps = installedAppsResult.value;
     logger.info(`[LaunchApp] Found ${installedApps.length} installed app(s)`);
     logger.info(`[LaunchApp] Looking for package: ${packageName}`);
     logger.info(`[LaunchApp] Installed apps: ${installedApps.join(", ")}`);
