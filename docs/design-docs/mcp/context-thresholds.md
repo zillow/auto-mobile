@@ -8,29 +8,15 @@ The MCP context threshold system enforces limits on the token count of tool defi
 
 ### Components
 
-1. **Context Estimation** (`scripts/estimate-context-usage.ts`)
-   - Estimates token usage for all registered tools and resources
-   - Uses `js-tiktoken` with `cl100k_base` encoding (Claude model tokenizer)
-   - Provides detailed per-item breakdown
-   - Available via `bun run estimate-context`
-
-2. **Threshold Benchmark** (`scripts/benchmark-context-thresholds.ts`)
-   - Reuses estimation logic from context estimator
-   - Compares actual usage against configured thresholds
-   - Outputs both human-readable terminal output and JSON reports
-   - Available via `bun run benchmark-context`
-
-3. **Threshold Configuration** (`scripts/context-thresholds.json`)
-   - JSON configuration file defining threshold limits
-   - Versioned and checked into source control
-   - Currently set with manual headroom for resource/template growth
-   - Categories: tools, resources, resourceTemplates, total
-
-4. **CI Enforcement** (`.github/workflows/context-thresholds.yml`)
-   - Runs on pull requests and main branch pushes
-   - Generates artifact reports retained for 90 days
-   - Posts results as PR comments
-   - Fails CI when thresholds are exceeded
+```mermaid
+flowchart LR
+    A["Context Estimation<br/>scripts/estimate-context-usage.ts<br/>Estimates token usage for tools/resources<br/>Uses js-tiktoken (cl100k_base)<br/>Provides per-item breakdown<br/>bun run estimate-context"] --> B["Threshold Benchmark<br/>scripts/benchmark-context-thresholds.ts<br/>Reuses estimation logic<br/>Compares usage vs thresholds<br/>Human-readable + JSON outputs<br/>bun run benchmark-context"];
+    C["Threshold Configuration<br/>scripts/context-thresholds.json<br/>Versioned JSON limits<br/>Manual headroom for growth<br/>Categories: tools/resources/resourceTemplates/total"] --> B;
+    B --> D["CI Enforcement<br/>.github/workflows/context-thresholds.yml<br/>Runs on PRs + main pushes<br/>Artifacts retained 90 days<br/>Posts PR comments<br/>Fails when thresholds exceeded"];
+    classDef logic fill:#525FE1,stroke-width:0px,color:white;
+    classDef result stroke-width:0px;
+    class A,B,C,D logic;
+```
 
 ## Usage
 
@@ -157,10 +143,20 @@ The GitHub Actions workflow runs automatically on:
 
 ### Workflow Behavior
 
-1. Runs benchmark with JSON output
-2. Uploads report as artifact (90-day retention)
-3. Posts results as PR comment (creates or updates existing comment)
-4. Fails workflow if thresholds exceeded
+```mermaid
+flowchart LR
+    A["Run benchmark<br/>with JSON output"] --> B["Upload report<br/>as artifact (90 days)"];
+    B --> C["Post or update<br/>PR comment"];
+    C --> D{"Thresholds exceeded?"};
+    D -->|"yes"| E["Fail workflow"];
+    D -->|"no"| F["Complete workflow"];
+    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef logic fill:#525FE1,stroke-width:0px,color:white;
+    classDef result stroke-width:0px;
+    class A,B,C logic;
+    class D decision;
+    class E,F result;
+```
 
 ### PR Comment Format
 
@@ -183,18 +179,27 @@ _Generated at 2026-01-13T02:54:55.664Z_
 
 When legitimate changes require increasing thresholds:
 
-1. Run estimation to understand new baseline:
-   ```bash
-   bun run estimate-context
-   ```
+```mermaid
+flowchart LR
+    A["Need higher thresholds"] --> B["Run estimation<br/>(bun run estimate-context)"];
+    B --> C["Update scripts/context-thresholds.json"];
+    C --> D["Commit changes<br/>with PR justification"];
+    D --> E["Ensure CI passes<br/>with new thresholds"];
+    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef logic fill:#525FE1,stroke-width:0px,color:white;
+    classDef result stroke-width:0px;
+    class A,B,C logic;
+    class D,E result;
+```
 
-2. Update `scripts/context-thresholds.json` with new thresholds
-   - Set headroom based on expected growth
-   - Update metadata section with rationale
+Estimation command:
+```bash
+bun run estimate-context
+```
 
-3. Commit changes and include justification in PR description
-
-4. Ensure CI passes with new thresholds
+Update guidance:
+- Set headroom based on expected growth
+- Update metadata section with rationale
 
 ## Rationale
 

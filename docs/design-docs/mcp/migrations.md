@@ -12,10 +12,22 @@ Migrations run on server startup and are managed with Kysely's `Migrator` + `Fil
 
 The migration directory is resolved in this order:
 
-1. `AUTOMOBILE_MIGRATIONS_DIR` environment variable (absolute or relative path).
-2. Module-relative defaults (first match):
-   - `dist/src/db/migrations` when running the bundled server.
-   - `src/db/migrations` when running from source.
+```mermaid
+flowchart LR
+    A["Resolve migrations directory"] --> B{"AUTOMOBILE_MIGRATIONS_DIR set?"};
+    B -->|"yes"| C["Use AUTOMOBILE_MIGRATIONS_DIR path"];
+    B -->|"no"| D{"dist/src/db/migrations exists?"};
+    D -->|"yes"| E["Use dist/src/db/migrations<br/>(bundled server)"];
+    D -->|"no"| F{"src/db/migrations exists?"};
+    F -->|"yes"| G["Use src/db/migrations<br/>(running from source)"];
+    F -->|"no"| H["Throw error with checked paths"];
+    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef logic fill:#525FE1,stroke-width:0px,color:white;
+    classDef result stroke-width:0px;
+    class A,H result;
+    class B,D,F decision;
+    class C,E,G logic;
+```
 
 If no folder is found, the server throws an error describing the checked paths.
 

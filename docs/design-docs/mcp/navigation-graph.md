@@ -396,10 +396,18 @@ Settings Screen: scrollable + _selected: ["Settings"] → hash2
 - `resource-id` containing: keyboard, inputmethod
 
 **Actions**:
-1. Set `keyboardDetected = true`
-2. Filter keyboard elements from hierarchy
-3. Attempt to use cached navigation ID
-4. Degrade confidence level
+```mermaid
+flowchart LR
+    A["Keyboard detected"] --> B["Set keyboardDetected = true"];
+    B --> C["Filter keyboard elements<br/>from hierarchy"];
+    C --> D["Attempt cached<br/>navigation ID"];
+    D --> E["Degrade confidence level"];
+    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef logic fill:#525FE1,stroke-width:0px,color:white;
+    classDef result stroke-width:0px;
+    class A,E result;
+    class B,C,D logic;
+```
 
 **Impact**: Graceful handling of keyboard occlusion
 

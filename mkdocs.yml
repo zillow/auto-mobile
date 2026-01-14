@@ -107,7 +107,7 @@ nav:
           - 'Video Recording': design-docs/mcp/video-recording.md
           - 'Visual Highlighting': design-docs/mcp/visual-highlighting.md
           - 'TalkBack/VoiceOver': design-docs/mcp/talkback-voiceover.md
-          - 'Critical Section': critical-section.md
+          - 'Critical Section': design-docs/mcp/critical-section.md
           - 'Resources': design-docs/mcp/resources.md
           - 'Context Thresholds': design-docs/mcp/context-thresholds.md
       - 'Platform Specific':
