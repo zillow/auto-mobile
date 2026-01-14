@@ -11,7 +11,6 @@ import {
   Element,
   ElementBounds,
   HighlightBounds,
-  HighlightEntry,
   HighlightShape,
   ViewHierarchyResult
 } from "../../models";
@@ -24,9 +23,12 @@ import { ElementUtils } from "../utility/ElementUtils";
 const HIGHLIGHT_RENDER_DELAY_MS = 250;
 const HIGHLIGHT_NEARBY_ELEMENT_LIMIT = 5;
 
+const generateHighlightId = (): string => (
+  `highlight-${Date.now()}-${randomBytes(4).toString("hex")}`
+);
+
 export interface BugReportHighlightRequest {
-  id: string;
-  description: string;
+  description?: string;
   shape: HighlightShape;
 }
 
@@ -72,11 +74,6 @@ export interface BugReportOptions {
   highlights?: BugReportHighlightRequest[];
 
   /**
-   * Whether to remove highlights added for this report (default: true)
-   */
-  autoRemoveHighlights?: boolean;
-
-  /**
    * Whether screenshot should include highlight overlays (default: true)
    */
   includeHighlightsInScreenshot?: boolean;
@@ -118,11 +115,7 @@ export class BugReport {
     const includeRawHierarchy = options.includeRawHierarchy !== false;
     const includeLogcat = options.includeLogcat !== false;
     const includeHighlightsInScreenshot = options.includeHighlightsInScreenshot !== false;
-    const autoRemoveHighlights = options.autoRemoveHighlights !== false;
     const highlightRequests = options.highlights ?? [];
-    const highlightDescriptions = new Map(
-      highlightRequests.map(highlight => [highlight.id, highlight.description])
-    );
     const logcatLines = options.logcatLines || 100;
 
     logger.info(`[BugReport] Generating report ${reportId}`);
@@ -145,7 +138,7 @@ export class BugReport {
     // Run parallel operations
     const operations: Promise<void>[] = [];
     let viewHierarchyResult: ViewHierarchyResult | null = null;
-    let highlightEntries: HighlightEntry[] = [];
+    let addedHighlights: BugReportHighlightRequest[] = [];
 
     // Get device info
     operations.push(this.getDeviceInfo(result));
@@ -175,20 +168,18 @@ export class BugReport {
         result,
         highlightRequests,
         includeScreenshot,
-        includeHighlightsInScreenshot,
-        autoRemoveHighlights
+        includeHighlightsInScreenshot
       ).then(entries => {
-        highlightEntries = entries;
+        addedHighlights = entries;
       })
     );
 
     // Wait for all operations
     await Promise.all(operations);
 
-    if (highlightEntries.length > 0 || highlightRequests.length > 0) {
+    if (addedHighlights.length > 0) {
       result.highlights = this.buildHighlightEntries(
-        highlightEntries,
-        highlightDescriptions,
+        addedHighlights,
         viewHierarchyResult,
         result.screenState.screenSize
       );
@@ -469,13 +460,11 @@ export class BugReport {
     result: BugReportResult,
     highlightRequests: BugReportHighlightRequest[],
     includeScreenshot: boolean,
-    includeHighlightsInScreenshot: boolean,
-    autoRemoveHighlights: boolean
-  ): Promise<HighlightEntry[]> {
+    includeHighlightsInScreenshot: boolean
+  ): Promise<BugReportHighlightRequest[]> {
     const hasHighlightRequests = highlightRequests.length > 0;
     const canHighlight = this.device.platform === "android";
-    const addedHighlightIds: string[] = [];
-    let listFailed = false;
+    const addedHighlights: BugReportHighlightRequest[] = [];
 
     const addHighlights = async () => {
       if (!hasHighlightRequests) {
@@ -488,44 +477,16 @@ export class BugReport {
 
       for (const highlight of highlightRequests) {
         try {
-          await this.visualHighlight.addHighlight(highlight.id, highlight.shape);
-          addedHighlightIds.push(highlight.id);
+          const highlightId = generateHighlightId();
+          await this.visualHighlight.addHighlight(highlightId, highlight.shape);
+          addedHighlights.push(highlight);
         } catch (error) {
-          result.errors?.push(`Failed to add highlight ${highlight.id}: ${error}`);
+          result.errors?.push(`Failed to add highlight: ${error}`);
         }
       }
 
-      if (addedHighlightIds.length > 0) {
+      if (addedHighlights.length > 0) {
         await this.waitForHighlightRender();
-      }
-    };
-
-    const listHighlights = async (): Promise<HighlightEntry[]> => {
-      if (!canHighlight) {
-        return [];
-      }
-      try {
-        const response = await this.visualHighlight.listHighlights();
-        return response.highlights ?? [];
-      } catch (error) {
-        listFailed = true;
-        if (hasHighlightRequests || includeScreenshot) {
-          result.errors?.push(`Failed to list highlights: ${error}`);
-        }
-        return [];
-      }
-    };
-
-    const removeHighlights = async () => {
-      if (!autoRemoveHighlights || addedHighlightIds.length === 0 || !canHighlight) {
-        return;
-      }
-      for (const highlightId of addedHighlightIds) {
-        try {
-          await this.visualHighlight.removeHighlight(highlightId);
-        } catch (error) {
-          result.errors?.push(`Failed to remove highlight ${highlightId}: ${error}`);
-        }
       }
     };
 
@@ -538,23 +499,7 @@ export class BugReport {
         await this.getScreenshot(result);
       }
     }
-
-    const shouldListHighlights = canHighlight && hasHighlightRequests;
-    let activeHighlights = shouldListHighlights ? await listHighlights() : [];
-
-    if (listFailed && addedHighlightIds.length > 0) {
-      const addedHighlightSet = new Set(addedHighlightIds);
-      activeHighlights = highlightRequests
-        .filter(highlight => addedHighlightSet.has(highlight.id))
-        .map(highlight => ({
-          id: highlight.id,
-          shape: highlight.shape
-        }));
-    }
-
-    await removeHighlights();
-
-    return activeHighlights;
+    return addedHighlights;
   }
 
   private async waitForHighlightRender(): Promise<void> {
@@ -565,8 +510,7 @@ export class BugReport {
   }
 
   private buildHighlightEntries(
-    highlightEntries: HighlightEntry[],
-    highlightDescriptions: Map<string, string>,
+    highlightEntries: BugReportHighlightRequest[],
     viewHierarchy: ViewHierarchyResult | null,
     screenSize?: { width: number; height: number }
   ): BugReportHighlightEntry[] {
@@ -581,8 +525,7 @@ export class BugReport {
         : [];
 
       return {
-        id: entry.id,
-        description: highlightDescriptions.get(entry.id),
+        description: entry.description,
         shape: entry.shape,
         nearbyElements
       };

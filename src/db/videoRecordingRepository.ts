@@ -1,5 +1,10 @@
 import { ensureMigrations, getDatabase } from "./database";
-import type { VideoFormat, VideoRecordingConfig, VideoRecordingMetadata } from "../models";
+import type {
+  VideoFormat,
+  VideoRecordingConfig,
+  VideoRecordingHighlightEntry,
+  VideoRecordingMetadata,
+} from "../models";
 import { parseVideoRecordingConfig } from "../features/video";
 import type { NewVideoRecording, VideoRecordingUpdate, VideoRecording as DbVideoRecording } from "./types";
 import { logger } from "../utils/logger";
@@ -30,6 +35,21 @@ function parseConfig(configJson: string): VideoRecordingConfig {
   }
 }
 
+function parseHighlights(
+  highlightsJson: string | null
+): VideoRecordingHighlightEntry[] | undefined {
+  if (!highlightsJson) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(highlightsJson) as VideoRecordingHighlightEntry[];
+    return Array.isArray(parsed) ? parsed : undefined;
+  } catch (error) {
+    logger.warn(`[VideoRecordingRepository] Failed to parse highlights JSON: ${error}`);
+    return undefined;
+  }
+}
+
 function toRecord(row: DbVideoRecording): VideoRecordingRecord {
   return {
     recordingId: row.recording_id,
@@ -48,6 +68,7 @@ function toRecord(row: DbVideoRecording): VideoRecordingRecord {
     endedAt: row.ended_at ?? undefined,
     lastAccessedAt: row.last_accessed_at,
     config: parseConfig(row.config_json),
+    highlights: parseHighlights(row.highlights_json ?? null),
   };
 }
 
@@ -99,6 +120,9 @@ function buildUpdatePayload(update: Partial<VideoRecordingRecord>): VideoRecordi
   if (update.config !== undefined) {
     payload.config_json = JSON.stringify(update.config);
   }
+  if (update.highlights !== undefined) {
+    payload.highlights_json = JSON.stringify(update.highlights ?? []);
+  }
 
   return payload;
 }
@@ -124,6 +148,7 @@ export class VideoRecordingRepository {
       ended_at: record.endedAt ?? null,
       last_accessed_at: record.lastAccessedAt,
       config_json: JSON.stringify(record.config),
+      highlights_json: record.highlights ? JSON.stringify(record.highlights) : null,
     };
 
     await db.insertInto("video_recordings").values(row).execute();

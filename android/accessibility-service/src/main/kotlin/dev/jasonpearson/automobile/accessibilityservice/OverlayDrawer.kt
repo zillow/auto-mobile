@@ -10,7 +10,6 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.util.Log
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightBounds
-import dev.jasonpearson.automobile.accessibilityservice.models.HighlightEntry
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightLineCap
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightLineJoin
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightPoint
@@ -95,8 +94,8 @@ class OverlayDrawer(
 
         animator.cancel(id)
         synchronized(lock) { highlights[id] = renderState }
-        overlayView?.invalidate()
         animator.startFadeOut(id)
+        overlayView?.invalidate()
         return HighlightOperationResult(true, null)
     }
 
@@ -264,7 +263,8 @@ class OverlayDrawer(
                     shapeType = shapeType,
                     strokePaint = paintResult.strokePaint,
                     baseAlpha = baseAlpha,
-                    alpha = 1f,
+                    alpha = 0f,
+                    drawProgress = 0f,
                 )
         )
     }
@@ -311,7 +311,8 @@ class OverlayDrawer(
                     shapeType = ShapeType.PATH,
                     strokePaint = paintResult.strokePaint,
                     baseAlpha = baseAlpha,
-                    alpha = 1f,
+                    alpha = 0f,
+                    drawProgress = 0f,
                 )
         )
     }

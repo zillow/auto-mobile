@@ -812,18 +812,11 @@ describe("AccessibilityServiceClient", function() {
           type: "highlight_response",
           requestId: payload.requestId,
           success: true,
-          error: null,
-          highlights: [
-            {
-              id: "highlight-1",
-              shape
-            }
-          ]
+          error: null
         }));
 
         const result = await requestPromise;
         expect(result.success).toBe(true);
-        expect(result.highlights.length).toBe(1);
       } finally {
         await testClient.close();
       }

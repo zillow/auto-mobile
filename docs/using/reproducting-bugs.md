@@ -47,7 +47,6 @@ await bugReport({
   includeScreenshot: true,
   highlights: [
     {
-      id: "login-button",
       description: "Login button not responding to taps",
       shape: {
         type: "box",
@@ -56,9 +55,61 @@ await bugReport({
       }
     }
   ],
-  includeHighlightsInScreenshot: true,
-  autoRemoveHighlights: true
+  includeHighlightsInScreenshot: true
 });
+```
+
+### Capture Reproduction Video with Highlights
+
+Use `videoRecording` with highlight overlays to make reproduction videos self-explanatory.
+
+**Pre-planned highlights:**
+
+```javascript
+await videoRecording({
+  action: "start",
+  platform: "android",
+  highlights: [
+    {
+      description: "Where the button should be",
+      shape: {
+        type: "circle",
+        bounds: { x: 120, y: 240, width: 80, height: 80 },
+        style: { strokeColor: "#00FF00", strokeWidth: 4 }
+      }
+    },
+    {
+      description: "Where the button actually is",
+      shape: {
+        type: "circle",
+        bounds: { x: 260, y: 260, width: 80, height: 80 },
+        style: { strokeColor: "#FF0000", strokeWidth: 4 }
+      }
+    }
+  ]
+});
+
+// Perform reproduction steps...
+await tapOn({ action: "tap", text: "Login" });
+
+await videoRecording({ action: "stop" });
+```
+
+**Dynamic highlights during recording:**
+
+```javascript
+await videoRecording({ action: "start", platform: "android" });
+
+await tapOn({ action: "tap", text: "Settings" });
+
+await highlight({
+  shape: { type: "box", bounds: { x: 0, y: 500, width: 1080, height: 200 } },
+  platform: "android"
+});
+
+await swipeOn({ direction: "down" });
+
+await videoRecording({ action: "stop" });
 ```
 
 ### Automate Reproduction Steps

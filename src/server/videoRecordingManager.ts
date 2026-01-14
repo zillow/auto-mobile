@@ -5,6 +5,8 @@ import {
   BootedDevice,
   VideoRecordingConfig,
   VideoRecordingConfigInput,
+  VideoRecordingHighlightEntry,
+  VideoRecordingHighlightInput,
   VideoRecordingMetadata,
 } from "../models";
 import {
@@ -24,15 +26,19 @@ import {
 } from "../db/videoRecordingRepository";
 import { VideoRecordingConfigRepository } from "../db/videoRecordingConfigRepository";
 import { buildVideoArchiveItemUri, VIDEO_RESOURCE_URIS } from "./videoRecordingResourceUris";
+import { VisualHighlightClient } from "../features/debug/VisualHighlight";
 
 const DEFAULT_MAX_DURATION_SECONDS = 30;
 const MAX_DURATION_SECONDS = 300;
+// Keep in sync with HighlightAnimator's total fade-in + display + fade-out duration.
+const HIGHLIGHT_ANIMATION_DURATION_MS = 6000;
 
 export interface StartVideoRecordingRequest {
   device: BootedDevice;
   configOverrides?: VideoRecordingConfigInput;
   outputName?: string;
   maxDurationSeconds?: number;
+  highlights?: VideoRecordingHighlightInput[];
 }
 
 export interface StopVideoRecordingResult {
@@ -55,14 +61,34 @@ export interface VideoRecordingManagerDependencies {
   videoRecorderService: VideoRecorderService;
   recordingRepository: VideoRecordingRepository;
   configRepository: VideoRecordingConfigRepository;
+  highlightClient: VisualHighlightClient;
   timer: Timer;
   now: () => Date;
+}
+
+interface RecordedHighlightEntry {
+  description?: string;
+  shape: VideoRecordingHighlightInput["shape"];
+  appearedAtMs: number;
+  disappearedAtMs: number;
+}
+
+interface VideoRecordingHighlightSession {
+  recordingId: string;
+  deviceId: string;
+  platform: BootedDevice["platform"];
+  startedAtMs: number;
+  highlights: RecordedHighlightEntry[];
+  timer: Timer;
+  timers: Set<NodeJS.Timeout>;
 }
 
 let moduleDependencies: VideoRecordingManagerDependencies | null = null;
 let managerInitialized = false;
 
 const autoStopTimers = new Map<string, { timer: Timer; handle: NodeJS.Timeout }>();
+const highlightSessions = new Map<string, VideoRecordingHighlightSession>();
+const highlightSessionsByDeviceId = new Map<string, string>();
 
 async function selectBackend(): Promise<VideoCaptureBackend> {
   // Use PlatformVideoCaptureBackend for now as it's more reliable
@@ -115,6 +141,7 @@ async function getVideoRecordingDependencies(): Promise<VideoRecordingManagerDep
       videoRecorderService: await createRecorderService(),
       recordingRepository: new VideoRecordingRepository(),
       configRepository: new VideoRecordingConfigRepository(),
+      highlightClient: new VisualHighlightClient(),
       timer: defaultTimer,
       now: () => new Date(),
     };
@@ -131,6 +158,7 @@ export async function setVideoRecordingManagerDependencies(
     videoRecorderService: deps.videoRecorderService ?? await createRecorderService(),
     recordingRepository: deps.recordingRepository ?? new VideoRecordingRepository(),
     configRepository: deps.configRepository ?? new VideoRecordingConfigRepository(),
+    highlightClient: deps.highlightClient ?? new VisualHighlightClient(),
     timer: deps.timer ?? defaultTimer,
     now: deps.now ?? (() => new Date()),
   };
@@ -138,6 +166,7 @@ export async function setVideoRecordingManagerDependencies(
     videoRecorderService: deps.videoRecorderService ?? current.videoRecorderService,
     recordingRepository: deps.recordingRepository ?? current.recordingRepository,
     configRepository: deps.configRepository ?? current.configRepository,
+    highlightClient: deps.highlightClient ?? current.highlightClient,
     timer: deps.timer ?? current.timer,
     now: deps.now ?? current.now,
   };
@@ -149,6 +178,13 @@ export function resetVideoRecordingManagerState(): void {
     timer.clearTimeout(handle);
   }
   autoStopTimers.clear();
+  for (const session of highlightSessions.values()) {
+    for (const handle of session.timers) {
+      session.timer.clearTimeout(handle);
+    }
+  }
+  highlightSessions.clear();
+  highlightSessionsByDeviceId.clear();
   managerInitialized = false;
 }
 
@@ -242,6 +278,160 @@ function clearAutoStop(recordingId: string): void {
   }
 }
 
+function getHighlightSessionByDevice(deviceId: string): VideoRecordingHighlightSession | null {
+  const recordingId = highlightSessionsByDeviceId.get(deviceId);
+  if (!recordingId) {
+    return null;
+  }
+  return highlightSessions.get(recordingId) ?? null;
+}
+
+function getElapsedMs(session: VideoRecordingHighlightSession, timestampMs: number): number {
+  if (!Number.isFinite(timestampMs)) {
+    return 0;
+  }
+  return Math.max(0, Math.round(timestampMs - session.startedAtMs));
+}
+
+function toSeconds(valueMs: number): number {
+  const roundedMs = Math.max(0, Math.round(valueMs));
+  return Number((roundedMs / 1000).toFixed(3));
+}
+
+function recordHighlightAdded(
+  session: VideoRecordingHighlightSession,
+  highlight: VideoRecordingHighlightInput,
+  timestampMs: number
+): void {
+  const appearedAtMs = getElapsedMs(session, timestampMs);
+  session.highlights.push({
+    description: highlight.description,
+    shape: highlight.shape,
+    appearedAtMs,
+    disappearedAtMs: appearedAtMs + HIGHLIGHT_ANIMATION_DURATION_MS,
+  });
+}
+
+function generateHighlightId(): string {
+  const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 10);
+  return `highlight_${timestamp}_${random}`;
+}
+
+function finalizeHighlightSession(
+  session: VideoRecordingHighlightSession,
+  endedAt: string
+): VideoRecordingHighlightEntry[] | undefined {
+  if (session.highlights.length === 0) {
+    return undefined;
+  }
+
+  const endedAtMs = Date.parse(endedAt);
+  const elapsedMs = getElapsedMs(session, endedAtMs);
+
+  return session.highlights
+    .map(highlight => {
+      const disappearedAtMs = Math.min(highlight.disappearedAtMs, elapsedMs);
+      return {
+        description: highlight.description,
+        shape: highlight.shape,
+        timeline: {
+          appearedAtSeconds: toSeconds(highlight.appearedAtMs),
+          disappearedAtSeconds: toSeconds(disappearedAtMs),
+        },
+      };
+    })
+    .sort((left, right) => left.timeline.appearedAtSeconds - right.timeline.appearedAtSeconds);
+}
+
+function createHighlightSession(
+  recordingId: string,
+  device: BootedDevice,
+  startedAt: string,
+  timer: Timer
+): VideoRecordingHighlightSession {
+  const startedAtMs = Date.parse(startedAt);
+  return {
+    recordingId,
+    deviceId: device.deviceId,
+    platform: device.platform,
+    startedAtMs: Number.isNaN(startedAtMs) ? Date.now() : startedAtMs,
+    highlights: [],
+    timer,
+    timers: new Set(),
+  };
+}
+
+function disposeHighlightSession(recordingId: string): VideoRecordingHighlightSession | null {
+  const session = highlightSessions.get(recordingId);
+  if (!session) {
+    return null;
+  }
+  for (const handle of session.timers) {
+    session.timer.clearTimeout(handle);
+  }
+  session.timers.clear();
+  highlightSessions.delete(recordingId);
+  highlightSessionsByDeviceId.delete(session.deviceId);
+  return session;
+}
+
+function normalizeHighlightTiming(
+  highlight: VideoRecordingHighlightInput
+): { startMs: number } {
+  const startMs = highlight.timing?.startTimeMs ?? 0;
+  if (!Number.isFinite(startMs) || startMs < 0) {
+    throw new ActionableError("highlight.timing.startTimeMs must be >= 0.");
+  }
+  return { startMs };
+}
+
+async function scheduleRecordingHighlights(
+  session: VideoRecordingHighlightSession,
+  device: BootedDevice,
+  highlights: VideoRecordingHighlightInput[],
+  deps: VideoRecordingManagerDependencies
+): Promise<void> {
+  const options = {
+    device,
+    deviceId: device.deviceId,
+    platform: device.platform,
+  };
+
+  const immediateTasks: Array<Promise<void>> = [];
+
+  const schedule = (delayMs: number, action: () => Promise<void>) => {
+    const timeoutMs = Math.max(0, Math.round(delayMs));
+    if (timeoutMs === 0) {
+      immediateTasks.push(action());
+      return;
+    }
+    const handle = session.timer.setTimeout(() => {
+      void action();
+    }, timeoutMs);
+    session.timers.add(handle);
+  };
+
+  const addHighlight = async (highlight: VideoRecordingHighlightInput) => {
+    try {
+      const highlightId = generateHighlightId();
+      await deps.highlightClient.addHighlight(highlightId, highlight.shape, options);
+      recordHighlightAdded(session, highlight, deps.now().getTime());
+    } catch (error) {
+      logger.warn(`[VideoRecording] Failed to add highlight: ${error}`);
+    }
+  };
+
+  for (const highlight of highlights) {
+    const { startMs } = normalizeHighlightTiming(highlight);
+    schedule(startMs, () => addHighlight(highlight));
+  }
+
+  if (immediateTasks.length > 0) {
+    await Promise.all(immediateTasks);
+  }
+}
+
 async function resolveConfigInput(
   overrides: VideoRecordingConfigInput
 ): Promise<VideoRecordingConfigInput> {
@@ -288,6 +478,7 @@ function toMetadata(record: VideoRecordingRecord): VideoRecordingMetadata {
     endedAt: record.endedAt,
     lastAccessedAt: record.lastAccessedAt,
     config: record.config,
+    highlights: record.highlights,
   };
 }
 
@@ -340,7 +531,8 @@ export async function updateVideoRecordingConfig(
 export async function startVideoRecording(
   request: StartVideoRecordingRequest
 ): Promise<ActiveVideoRecording> {
-  const { videoRecorderService, recordingRepository } = await getVideoRecordingDependencies();
+  const deps = await getVideoRecordingDependencies();
+  const { videoRecorderService, recordingRepository, timer } = deps;
   const existing = await recordingRepository.listRecordings({
     status: "recording",
     deviceId: request.device.deviceId,
@@ -353,6 +545,14 @@ export async function startVideoRecording(
   const overrides = request.configOverrides ?? {};
   const configInput = await resolveConfigInput(overrides);
   const maxDurationSeconds = resolveMaxDurationSeconds(request.maxDurationSeconds);
+  const highlightInputs = request.highlights ?? [];
+
+  if (highlightInputs.length > 0 && request.device.platform !== "android") {
+    throw new ActionableError("Visual highlights are only supported on Android devices.");
+  }
+  for (const highlight of highlightInputs) {
+    normalizeHighlightTiming(highlight);
+  }
 
   const active = await videoRecorderService.startRecording({
     outputName: request.outputName,
@@ -380,6 +580,21 @@ export async function startVideoRecording(
     config: active.config,
   });
 
+  if (request.device.platform === "android") {
+    const highlightSession = createHighlightSession(
+      active.recordingId,
+      request.device,
+      active.startedAt,
+      timer
+    );
+    highlightSessions.set(active.recordingId, highlightSession);
+    highlightSessionsByDeviceId.set(request.device.deviceId, active.recordingId);
+
+    if (highlightInputs.length > 0) {
+      await scheduleRecordingHighlights(highlightSession, request.device, highlightInputs, deps);
+    }
+  }
+
   await scheduleAutoStop(active.recordingId, maxDurationSeconds);
 
   return active;
@@ -388,12 +603,23 @@ export async function startVideoRecording(
 export async function stopVideoRecording(
   recordingId?: string
 ): Promise<StopVideoRecordingResult> {
-  const { videoRecorderService, recordingRepository } = await getVideoRecordingDependencies();
+  const { videoRecorderService, recordingRepository, now } =
+    await getVideoRecordingDependencies();
   const resolvedId = await resolveActiveRecordingId(recordingId);
 
   clearAutoStop(resolvedId);
 
   const metadata = await videoRecorderService.stopRecording(resolvedId);
+  const highlightSession = disposeHighlightSession(resolvedId);
+  if (highlightSession) {
+    const finalizedHighlights = finalizeHighlightSession(
+      highlightSession,
+      metadata.endedAt ?? now().toISOString()
+    );
+    if (finalizedHighlights) {
+      metadata.highlights = finalizedHighlights;
+    }
+  }
   await recordingRepository.updateRecording(resolvedId, {
     status: "completed",
     outputName: metadata.outputName,
@@ -406,6 +632,7 @@ export async function stopVideoRecording(
     endedAt: metadata.endedAt,
     lastAccessedAt: metadata.lastAccessedAt,
     config: metadata.config,
+    highlights: metadata.highlights,
   });
 
   const eviction = await enforceArchiveLimit(metadata.config.maxArchiveSizeMb);
@@ -413,6 +640,18 @@ export async function stopVideoRecording(
   await notifyVideoRecordingResources([metadata.recordingId]);
 
   return { metadata, evictedRecordingIds: eviction.evictedRecordingIds };
+}
+
+export async function recordVideoRecordingHighlightAdded(
+  device: BootedDevice,
+  highlight: VideoRecordingHighlightInput
+): Promise<void> {
+  const session = getHighlightSessionByDevice(device.deviceId);
+  if (!session) {
+    return;
+  }
+  const { now } = await getVideoRecordingDependencies();
+  recordHighlightAdded(session, highlight, now().getTime());
 }
 
 export async function listActiveVideoRecordings(

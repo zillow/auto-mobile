@@ -268,20 +268,9 @@
               "params": {
                 "$ref": "#/$defs/highlightParams"
               },
-              "action": {
+              "description": {
                 "type": "string",
-                "enum": [
-                  "add",
-                  "remove",
-                  "clear",
-                  "list"
-                ],
-                "description": "Highlight action"
-              },
-              "highlightId": {
-                "type": "string",
-                "description": "Highlight ID",
-                "minLength": 1
+                "description": "Optional highlight description"
               },
               "shape": {
                 "$ref": "#/$defs/highlightShape"
@@ -312,14 +301,14 @@
                 "anyOf": [
                   {
                     "required": [
-                      "action"
+                      "shape"
                     ]
                   },
                   {
                     "properties": {
                       "params": {
                         "required": [
-                          "action"
+                          "shape"
                         ]
                       }
                     },
@@ -522,20 +511,9 @@
     "highlightParams": {
       "type": "object",
       "properties": {
-        "action": {
+        "description": {
           "type": "string",
-          "enum": [
-            "add",
-            "remove",
-            "clear",
-            "list"
-          ],
-          "description": "Highlight action"
-        },
-        "highlightId": {
-          "type": "string",
-          "description": "Highlight ID",
-          "minLength": 1
+          "description": "Optional highlight description"
         },
         "shape": {
           "$ref": "#/$defs/highlightShape"
@@ -570,7 +548,7 @@
         }
       },
       "required": [
-        "action"
+        "shape"
       ],
       "additionalProperties": true,
       "description": "Parameters for highlight"

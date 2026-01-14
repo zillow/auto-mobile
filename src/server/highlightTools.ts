@@ -4,6 +4,7 @@ import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, HighlightOperationResult, Platform } from "../models";
 import { highlightShapeSchema, VisualHighlightClient } from "../features/debug/VisualHighlight";
+import { recordVideoRecordingHighlightAdded } from "./videoRecordingManager";
 
 const UNSUPPORTED_MESSAGE = "Visual highlights are only supported on Android devices.";
 
@@ -13,31 +14,27 @@ const generateHighlightId = (): string => {
   return `highlight_${timestamp}_${random}`;
 };
 
-const baseHighlightSchema = addDeviceTargetingToSchema(z.object({
+export const highlightSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   deviceId: z.string().optional().describe("Optional device ID override"),
-  timeoutMs: z.number().int().positive().optional().describe("Highlight request timeout ms (default: 5000)")
-}));
-
-export const highlightSchema = baseHighlightSchema.extend({
+  timeoutMs: z.number().int().positive().optional().describe("Highlight request timeout ms (default: 5000)"),
+  description: z.string().optional().describe("Optional description of the highlight"),
   shape: highlightShapeSchema.describe("Highlight shape definition")
-});
+}));
 
 export type HighlightArgs = z.infer<typeof highlightSchema>;
 
-const toHighlightResponse = (result: HighlightOperationResult, highlightId: string) => (
+const toHighlightResponse = (result: HighlightOperationResult) => (
   createJSONToolResponse({
     success: result.success,
-    highlightId,
     error: result.error ?? undefined
   })
 );
 
-const toHighlightErrorResponse = (error: unknown, highlightId: string) => {
+const toHighlightErrorResponse = (error: unknown) => {
   const message = error instanceof ActionableError ? error.message : String(error);
   return createJSONToolResponse({
     success: false,
-    highlightId,
     error: message
   });
 };
@@ -45,7 +42,6 @@ const toHighlightErrorResponse = (error: unknown, highlightId: string) => {
 export function registerHighlightTools() {
   const highlightHandler = async (device: BootedDevice, args: HighlightArgs) => {
     const highlightClient = new VisualHighlightClient();
-    const highlightId = generateHighlightId();
     const options = {
       device,
       deviceId: args.deviceId ?? device.deviceId,
@@ -55,18 +51,21 @@ export function registerHighlightTools() {
     };
 
     try {
+      const highlightId = generateHighlightId();
       const result = await highlightClient.addHighlight(highlightId, args.shape, options);
-      return toHighlightResponse(result, highlightId);
+      await recordVideoRecordingHighlightAdded(device, {
+        description: args.description,
+        shape: args.shape,
+      });
+      return toHighlightResponse(result);
     } catch (error) {
-      return toHighlightErrorResponse(error, highlightId);
+      return toHighlightErrorResponse(error);
     }
   };
 
   const highlightNonDeviceHandler = async (args: HighlightArgs) => {
-    const highlightId = generateHighlightId();
     return createJSONToolResponse({
       success: false,
-      highlightId,
       error: UNSUPPORTED_MESSAGE
     });
   };

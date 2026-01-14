@@ -51,11 +51,6 @@ export interface HighlightPathShape {
 
 export type HighlightShape = HighlightBoxShape | HighlightCircleShape | HighlightPathShape;
 
-export interface HighlightEntry {
-  id: string;
-  shape: HighlightShape;
-}
-
 export interface HighlightOperationResult {
   success: boolean;
   error?: string | null;

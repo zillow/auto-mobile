@@ -4,6 +4,7 @@ import {
   ActionableError,
   BootedDevice,
   VideoFormat,
+  VideoRecordingHighlightInput,
   VideoQualityPreset,
 } from "../models";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -16,6 +17,7 @@ import {
 import type { VideoRecordingConfigInput } from "../models";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import type { VideoRecordingRecord } from "../db/videoRecordingRepository";
+import { highlightShapeSchema } from "../features/debug/VisualHighlight";
 
 const DEFAULT_MAX_DURATION_SECONDS = 30;
 
@@ -37,11 +39,22 @@ export interface VideoRecordingArgs {
   recordingId?: string;
   sessionUuid?: string;
   device?: string;
+  highlights?: VideoRecordingHighlightInput[];
 }
 
 const resolutionSchema = z.object({
   width: z.number().int().positive().describe("Override resolution width in pixels"),
   height: z.number().int().positive().describe("Override resolution height in pixels"),
+});
+
+const highlightTimingSchema = z.object({
+  startTimeMs: z.number().int().nonnegative().optional().describe("Start time in ms"),
+});
+
+const highlightSchema = z.object({
+  description: z.string().optional().describe("Description of the highlight"),
+  shape: highlightShapeSchema.describe("Highlight shape definition"),
+  timing: highlightTimingSchema.optional().describe("Optional highlight timing"),
 });
 
 const videoRecordingSchema = addDeviceTargetingToSchema(z.object({
@@ -63,6 +76,7 @@ const videoRecordingSchema = addDeviceTargetingToSchema(z.object({
     .optional()
     .describe("Max seconds to record video for (default 30, max 300)"),
   outputName: z.string().optional().describe("Optional label to identify the recording"),
+  highlights: z.array(highlightSchema).optional().describe("Optional highlights to show during recording"),
 }));
 
 function buildConfigOverrides(args: VideoRecordingArgs): VideoRecordingConfigInput {
@@ -180,6 +194,7 @@ export function registerVideoRecordingTools(): void {
             configOverrides: buildConfigOverrides(args),
             outputName: args.outputName,
             maxDurationSeconds: args.maxDuration,
+            highlights: args.highlights,
           });
 
           recordings.push({
@@ -243,7 +258,9 @@ export function registerVideoRecordingTools(): void {
 
         const latest = selectLatestRecording(matches);
         try {
-          const { metadata, evictedRecordingIds: evicted } = await stopVideoRecording(latest.recordingId);
+          const { metadata, evictedRecordingIds: evicted } = await stopVideoRecording(
+            latest.recordingId
+          );
           const codec = metadata.codec ?? "unknown";
           const durationMs = metadata.durationMs ?? 0;
           const sizeBytes = metadata.sizeBytes ?? 0;
