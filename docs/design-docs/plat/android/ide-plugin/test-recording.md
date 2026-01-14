@@ -15,14 +15,26 @@ Test recording allows developers to:
 Recording control uses the test recording Unix socket (`~/.auto-mobile/test-recording.sock`)
 so the IDE can start/stop capture without issuing MCP tool calls.
 
-### 1. Start Recording
+```mermaid
+flowchart LR
+    A["Start recording (IDE)"] --> B["Perform interactions in app"];
+    B --> C["Stop recording"];
+    C --> D["Review and edit generated YAML plan"];
+    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef logic fill:#525FE1,stroke-width:0px,color:white;
+    classDef result stroke-width:0px;
+    class A,B,C logic;
+    class D result;
+```
+
+### Start Recording
 
 From the IDE plugin tool window:
 1. Ensure the AutoMobile server is running
 2. Select the target device from the dropdown
 3. Click "Start Recording" to begin capturing interactions
 
-### 2. Perform Interactions
+### Perform Interactions
 
 Interact with your app normally:
 
@@ -38,7 +50,7 @@ The plugin captures each interaction and records:
 - Screen context (current activity, view hierarchy signature)
 - Timing information
 
-### 3. Stop Recording
+### Stop Recording
 
 Click "Stop Recording" when finished. The plugin will:
 
@@ -46,7 +58,7 @@ Click "Stop Recording" when finished. The plugin will:
 - Display the plan in the editor
 - Validate the plan structure
 
-### 4. Review and Edit
+### Review and Edit
 
 The generated YAML plan can be edited before execution:
 

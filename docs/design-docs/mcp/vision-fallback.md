@@ -16,13 +16,22 @@ Vision fallback is an **internal feature** that is:
 
 ### How It Works
 
-When element finding fails after retries, `TapOnElement` will:
+When element finding fails after retries, `TapOnElement` follows this flow:
 
-1. **Screenshot capture**: Screenshot automatically taken (~100-200ms)
-2. **Claude analysis**: Screenshot analyzed using Claude vision API (~2-5 seconds)
-3. **Smart response**: Based on confidence level, Claude provides:
-   - **High confidence**: Alternative selectors or navigation instructions
-   - **Low confidence**: Detailed error explanation with screen context
+```mermaid
+flowchart LR
+    A["Element finding retries<br/>exhausted"] --> B["Screenshot capture<br/>(~100-200ms)"];
+    B --> C["Claude vision analysis<br/>(~2-5s)"];
+    C --> D{"Confidence high?"};
+    D -->|"yes"| E["Return alternative selectors<br/>or navigation instructions"];
+    D -->|"no"| F["Return detailed error<br/>with screen context"];
+    classDef decision fill:#FF3300,stroke-width:0px,color:white;
+    classDef logic fill:#525FE1,stroke-width:0px,color:white;
+    classDef result stroke-width:0px;
+    class A,E,F result;
+    class B,C logic;
+    class D decision;
+```
 
 ### Configuration
 

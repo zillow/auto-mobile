@@ -15,9 +15,21 @@ AutoMobile automatically detects and handles work profiles across all app manage
 
 - **Auto-detection**: Features automatically detect the appropriate user profile
 - **Priority order**:
-  1. If app is in foreground → use that user profile
-  2. Else if a running work profile exists → use the first running work profile
-  3. Else → use primary user (user 0)
+
+  ```mermaid
+  flowchart LR
+      A["Select user profile"] --> B{"App in foreground?"};
+      B -->|"yes"| C["Use foreground app user profile"];
+      B -->|"no"| D{"Running work profile exists?"};
+      D -->|"yes"| E["Use first running<br/>work profile"];
+      D -->|"no"| F["Use primary user<br/>(user 0)"];
+      classDef decision fill:#FF3300,stroke-width:0px,color:white;
+      classDef logic fill:#525FE1,stroke-width:0px,color:white;
+      classDef result stroke-width:0px;
+      class A logic;
+      class B,D decision;
+      class C,E,F result;
+  ```
 - **userId in responses**: App management tools include the `userId` field indicating which profile was used
 - **Note**: MCP tool schemas do not currently accept a `userId` override; selection is automatic
 

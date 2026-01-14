@@ -29,28 +29,47 @@ Critical sections are useful when you need to:
 
 ### Execution Flow
 
+#### High-Level Flow (No Lock Details)
+
+```mermaid
+sequenceDiagram
+    participant A as Device A
+    participant B as Device B
+    participant C as Coordinator
+
+    A->>C: Reach criticalSection
+    B->>C: Reach criticalSection
+    C-->>A: Barrier released (all arrived)
+    C-->>B: Barrier released (all arrived)
+    C->>A: Execute critical steps (serialized)
+    A-->>C: Step results
+    C->>B: Execute critical steps (serialized)
+    B-->>C: Step results
+    C-->>A: Continue parallel steps
+    C-->>B: Continue parallel steps
 ```
-Device A                    Device B                    Coordinator
-   |                           |                            |
-   |-- Enter Critical -------->|                            |
-   |   Section                 |-- Enter Critical -------->|
-   |                           |   Section                 |
-   |                           |                           |
-   |<--------- Wait at Barrier ------- Wait at Barrier ----|
-   |                           |                           |
-   |<----- Both Arrived, Release Barrier ------------------|
-   |                           |                           |
-   |-- Acquire Lock ---------->|                           |
-   |<-- Lock Granted -----------                           |
-   |                           |                           |
-   |-- Execute Steps           |                           |
-   |-- Release Lock ---------->|                           |
-   |                           |-- Acquire Lock ---------->|
-   |                           |<-- Lock Granted -----------
-   |                           |-- Execute Steps           |
-   |                           |-- Release Lock ---------->|
-   |                           |                           |
-   |<--------------- Cleanup Scheduled (5s delay) ---------|
+
+#### Device-Level Flow (Parallel + Critical Section with Locking)
+
+```mermaid
+sequenceDiagram
+    participant C as Coordinator
+    participant D as Device (track A)
+
+    Note over C,D: Parallel steps (no lock)
+    C->>D: Execute step
+    D-->>C: Step result
+    C->>D: Execute next step
+    D-->>C: Step result
+
+    Note over C,D: Critical section (lock = shared-resource)
+    C-->>D: Wait at barrier
+    D->>C: Arrived at barrier
+    C-->>D: Barrier released (all devices arrived)
+    C->>D: Lock granted + execute critical steps
+    D-->>C: Step results
+    D->>C: Release lock
+    C-->>D: Continue parallel steps
 ```
 
 ## Tool Schema
@@ -450,4 +469,4 @@ bun test test/server/CriticalSectionCoordinator.test.ts
 
 ## See Also
 
-- [critical-section-example.yaml](./critical-section-example.yaml) - Complete working example
+- [critical-section-example.yaml](../../critical-section-example.yaml) - Complete working example
