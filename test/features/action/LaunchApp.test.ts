@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { LaunchApp } from "../../../src/features/action/LaunchApp";
 import { BootedDevice, ObserveResult } from "../../../src/models";
+import { DefaultPerformanceTracker } from "../../../src/utils/PerformanceTracker";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
+import { FakeInstalledAppsProvider } from "../../fakes/FakeInstalledAppsProvider";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
+import { FakeTargetUserDetector } from "../../fakes/FakeTargetUserDetector";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeWindow } from "../../fakes/FakeWindow";
 
@@ -87,5 +90,116 @@ describe("LaunchApp", () => {
     expect(result.success).toBe(true);
     expect(result.observation).toBeDefined();
     expect(fakeTimer.getSleepCallCount()).toBeGreaterThan(0);
+  });
+
+  test("runs target user detection and install check in parallel", async () => {
+    fakeTimer.setManualMode();
+
+    const targetUserDetector = new FakeTargetUserDetector(fakeTimer, {
+      delayMs: 50,
+      resolvedUserId: 10
+    });
+    const installedAppsProvider = new FakeInstalledAppsProvider(fakeTimer, {
+      delayMs: 50,
+      installedApps: []
+    });
+
+    const parallelLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, null, fakeTimer, {
+      targetUserDetector,
+      installedAppsProvider
+    });
+
+    const resultPromise = parallelLaunchApp.execute(packageName, false, false);
+
+    for (let i = 0; i < 50 && fakeTimer.getPendingSleepCount() < 2; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(targetUserDetector.getCallCount()).toBe(1);
+    expect(installedAppsProvider.getCallCount()).toBe(1);
+    expect(fakeTimer.getPendingSleepCount()).toBe(2);
+
+    fakeTimer.advanceTime(50);
+
+    const result = await resultPromise;
+
+    expect(targetUserDetector.getCompletedCount()).toBe(1);
+    expect(installedAppsProvider.getCompletedCount()).toBe(1);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("App is not installed");
+    expect(result.userId).toBe(10);
+  });
+
+  test("waits for both preflight tasks to settle when one fails", async () => {
+    fakeTimer.setManualMode();
+
+    const targetUserDetector = new FakeTargetUserDetector(fakeTimer, {
+      delayMs: 50,
+      resolvedUserId: 10
+    });
+    const installedAppsProvider = new FakeInstalledAppsProvider(fakeTimer, {
+      delayMs: 50,
+      shouldThrow: true,
+      error: new Error("check installed failed")
+    });
+
+    const parallelLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, null, fakeTimer, {
+      targetUserDetector,
+      installedAppsProvider
+    });
+
+    const resultPromise = parallelLaunchApp.execute(packageName, false, false);
+
+    for (let i = 0; i < 50 && fakeTimer.getPendingSleepCount() < 2; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(fakeTimer.getPendingSleepCount()).toBe(2);
+
+    fakeTimer.advanceTime(50);
+
+    await expect(resultPromise).rejects.toThrow("check installed failed");
+    expect(targetUserDetector.getCompletedCount()).toBe(1);
+    expect(installedAppsProvider.getCompletedCount()).toBe(1);
+  });
+
+  test("records perf timing for both preflight tasks when one fails", async () => {
+    fakeTimer.setManualMode();
+
+    const perfTracker = new DefaultPerformanceTracker(fakeTimer);
+    const targetUserDetector = new FakeTargetUserDetector(fakeTimer, {
+      delayMs: 50,
+      resolvedUserId: 10
+    });
+    const installedAppsProvider = new FakeInstalledAppsProvider(fakeTimer, {
+      delayMs: 50,
+      shouldThrow: true,
+      error: new Error("check installed failed")
+    });
+
+    const perfLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, null, fakeTimer, {
+      targetUserDetector,
+      installedAppsProvider,
+      performanceTrackerFactory: () => perfTracker
+    });
+
+    const resultPromise = perfLaunchApp.execute(packageName, false, false);
+
+    for (let i = 0; i < 50 && fakeTimer.getPendingSleepCount() < 2; i += 1) {
+      await Promise.resolve();
+    }
+
+    fakeTimer.advanceTime(50);
+
+    await expect(resultPromise).rejects.toThrow("check installed failed");
+
+    const timings = perfTracker.getTimings();
+    expect(Array.isArray(timings)).toBe(true);
+
+    const launchEntry = (timings as any[]).find(entry => entry.name === "launchApp");
+    expect(launchEntry).toBeDefined();
+    const childNames = (launchEntry.children as any[]).map(entry => entry.name);
+    expect(childNames).toContain("detectTargetUser");
+    expect(childNames).toContain("checkInstalled");
   });
 });
