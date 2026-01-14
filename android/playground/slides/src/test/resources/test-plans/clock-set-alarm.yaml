@@ -9,26 +9,31 @@ steps:
     coldBoot: true
 
   - tool: tapOn
-    text: "Alarm"
+    selector:
+      text: "Alarm"
     action: "tap"
 
   - tool: tapOn
-    id: "com.google.android.deskclock:id/fab"
+    selector:
+      id: "com.google.android.deskclock:id/fab"
     label: Tap add alarm button
     action: "tap"
 
   - tool: tapOn
-    text: "7"
+    selector:
+      text: "7"
     label: Select 7 for hour
     action: "tap"
 
   - tool: tapOn
-    text: "30"
+    selector:
+      text: "30"
     label: Select 30 for minutes
     action: "tap"
 
   - tool: tapOn
-    text: "OK"
+    selector:
+      text: "OK"
     label: Confirm alarm time selection
     action: "tap"
 
