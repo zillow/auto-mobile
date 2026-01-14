@@ -81,8 +81,10 @@ export interface TapOnArgs {
     elementId?: string;
     text?: string;
   };
-  text?: string;
-  id?: string;
+  selector: {
+    text?: string;
+    id?: string;
+  };
   selectionStrategy?: ElementSelectionStrategy;
   action: "tap" | "doubleTap" | "longPress" | "focus";
   duration?: number;
@@ -185,10 +187,20 @@ const tapOnContainerSchema = z.union([
   }).strict()
 ]);
 
-const tapOnSchemaBase = addDeviceTargetingToSchema(z.object({
+const tapOnSelectorSchema = z.union([
+  z.object({
+    text: z.string().describe("Text to tap")
+  }).strict(),
+  z.object({
+    id: z.string().describe("Element ID to tap")
+  }).strict()
+]);
+
+export const tapOnSchema = addDeviceTargetingToSchema(z.object({
   container: tapOnContainerSchema.optional().describe(
     "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
+  selector: tapOnSelectorSchema.describe("Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"),
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
   selectionStrategy: z.enum(["first", "random"]).optional().describe(
     "Element selection strategy when multiple matches are found (default: first)"
@@ -199,15 +211,6 @@ const tapOnSchemaBase = addDeviceTargetingToSchema(z.object({
   }).optional().describe("Poll for element before tapping"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
-
-export const tapOnSchema = z.union([
-  tapOnSchemaBase.extend({
-    text: z.string().describe("Text to tap (overrides id)")
-  }).strict(),
-  tapOnSchemaBase.extend({
-    id: z.string().describe("Element ID to tap")
-  }).strict()
-]);
 
 const tapOnResultSchema = z.object({
   success: z.boolean(),
@@ -1132,8 +1135,8 @@ export function registerInteractionTools() {
     const tapOnTextCommand = new TapOnElement(device);
     const result = await tapOnTextCommand.execute({
       container: args.container,
-      text: args.text,
-      elementId: args.id,
+      text: args.selector.text,
+      elementId: args.selector.id,
       selectionStrategy: args.selectionStrategy,
       action: args.action,
       duration: args.duration,
