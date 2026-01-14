@@ -210,6 +210,29 @@ export class AndroidEmulatorClient implements AndroidEmulator {
     return null;
   }
 
+  private isExternalEmulatorMode(): boolean {
+    return process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
+  }
+
+  private listAvdsFromConfig(): DeviceInfo[] {
+    const { existsSync, readdirSync } = require("fs");
+    const path = require("path");
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    const avdHome = process.env.ANDROID_AVD_HOME || (homeDir ? path.join(homeDir, ".android", "avd") : "");
+
+    if (!avdHome || !existsSync(avdHome)) {
+      return [];
+    }
+
+    const entries = readdirSync(avdHome)
+      .filter((entry: string) => entry.endsWith(".ini"))
+      .map((entry: string) => entry.replace(/\.ini$/, ""))
+      .filter((name: string) => name.length > 0)
+      .map((name: string) => ({ name, platform: "android", isRunning: false, source: "local" } as DeviceInfo));
+
+    return entries;
+  }
+
   /**
    * Gets the emulator path asynchronously via detection.
    * @returns Promise<string>
@@ -378,6 +401,15 @@ export class AndroidEmulatorClient implements AndroidEmulator {
    * @returns Promise with array of AVD names
    */
   async listAvds(): Promise<DeviceInfo[]> {
+    const externalMode = this.isExternalEmulatorMode();
+    if (externalMode) {
+      const avds = this.listAvdsFromConfig();
+      if (avds.length > 0) {
+        logger.info(`Loaded ${avds.length} AVDs from config (external emulator mode).`);
+        return avds;
+      }
+    }
+
     try {
       const result = await this.executeCommand("-list-avds");
       return result.stdout
@@ -390,14 +422,24 @@ export class AndroidEmulatorClient implements AndroidEmulator {
 
       // Check if the error is because emulator is not found
       const errorMsg = error instanceof Error ? error.message : String(error);
-      if (errorMsg.includes("No such file or directory") || errorMsg.includes("command not found") || errorMsg.includes("ENOENT")) {
+      const missingEmulator = errorMsg.includes("No such file or directory") || errorMsg.includes("command not found") || errorMsg.includes("ENOENT");
+      if (missingEmulator && externalMode) {
+        const avds = this.listAvdsFromConfig();
+        if (avds.length > 0) {
+          logger.warn("Emulator binary not found; using AVD config fallback.");
+          return avds;
+        }
+      }
+      if (missingEmulator) {
         throw new ActionableError(
           `Android emulator not found. Please install it using one of these methods:\n` +
           `1. Via Homebrew: brew install android-emulator\n` +
           `2. Via Android Studio: Download from https://developer.android.com/studio\n` +
           `3. Via Android SDK Manager: sdkmanager --install "emulator"\n\n` +
           `Or set ANDROID_HOME to point to your Android SDK installation:\n` +
-          `export ANDROID_HOME=/path/to/android/sdk`
+          `export ANDROID_HOME=/path/to/android/sdk\n\n` +
+          `If running in a container without the emulator, set AUTOMOBILE_EMULATOR_EXTERNAL=true\n` +
+          `and mount your host AVD directory into ~/.android/avd.`
         );
       }
 
@@ -481,6 +523,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       const adb = new AdbClient();
       const devices = await adb.getBootedAndroidDevices();
       const runningDevices: BootedDevice[] = [];
+      const externalMode = this.isExternalEmulatorMode();
 
       // Add local emulator devices
       const emulatorDevices = devices.filter(device => device.deviceId.startsWith("emulator-"));
@@ -516,6 +559,27 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       }
 
       for (const device of physicalDevices) {
+        if (externalMode) {
+          try {
+            const adbWithDevice = new AdbClient(device);
+            const result = await adbWithDevice.executeCommand("emu avd name", infoTimeoutMs, undefined, true);
+            const avdName = result.stdout.trim().replace(/\r?\n.*$/, "");
+
+            if (avdName) {
+              logger.info(`AVD name detection for ${device.deviceId}: raw="${result.stdout}" (${result.stdout.length} chars), cleaned="${avdName}"`);
+              runningDevices.push({
+                name: avdName,
+                platform: "android",
+                deviceId: device.deviceId,
+                source: "local"
+              });
+              continue;
+            }
+          } catch (error) {
+            logger.debug(`Remote AVD name detection failed for ${device.deviceId}: ${error}`);
+          }
+        }
+
         let deviceName = device.deviceId; // Default fallback
 
         try {
@@ -563,6 +627,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
     avdName: string,
   ): Promise<ChildProcess> {
     logger.info(`Using local emulator for AVD: ${avdName}`);
+    const externalMode = this.isExternalEmulatorMode();
 
     // Check if the AVD exists
     const availableAvds = await this.listAvds();
@@ -585,6 +650,11 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       return {} as ChildProcess;
     }
 
+    if (externalMode) {
+      logger.info(`External emulator mode enabled; skipping launch for AVD '${avdName}'`);
+      return {} as ChildProcess;
+    }
+
     // Check architecture compatibility before attempting to start
     const compatibility = await this.checkArchitectureCompatibility(avdName);
     if (!compatibility.compatible && compatibility.reason) {
@@ -593,6 +663,14 @@ export class AndroidEmulatorClient implements AndroidEmulator {
     }
 
     const args = ["-avd", avdName];
+    const headless = process.env.AUTOMOBILE_EMULATOR_HEADLESS === "true";
+    if (headless) {
+      args.push("-no-window", "-no-audio");
+    }
+    const extraArgsRaw = process.env.AUTOMOBILE_EMULATOR_ARGS;
+    if (extraArgsRaw) {
+      args.push(...extraArgsRaw.split(/\s+/).filter(Boolean));
+    }
     logger.info(`Starting emulator with AVD: ${avdName}`);
     logger.debug(`Emulator command: ${this.emulatorPath} ${args.join(" ")}`);
 

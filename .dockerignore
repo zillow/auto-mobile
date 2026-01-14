@@ -131,23 +131,14 @@ docker-compose*.yml
 .hadolint.yaml
 
 # -----------------------------------------------------------------------------
-# Android Build Artifacts
+# Android Sources & Artifacts
 # -----------------------------------------------------------------------------
-# Android source is needed, but not build outputs
-android/build/
-android/.gradle/
-android/**/build/
-android/**/.gradle/
-android/local.properties
-android/**/.cxx/
-android/**/.externalNativeBuild/
+# Android sources are not required for the image build; mount the repo if needed
+android/
 *.apk
 *.aab
 *.dex
 *.class
-
-# Gradle wrapper jar (already in image)
-gradle-wrapper.jar
 
 # -----------------------------------------------------------------------------
 # Local Configuration & Secrets
@@ -188,6 +179,7 @@ venv/
 # -----------------------------------------------------------------------------
 firebender.json
 .config/
+jemalloc-5.3.0.tar.bz2
 # Keep scripts needed for build, exclude only docker/validation/github scripts
 scripts/docker/
 scripts/hadolint/
