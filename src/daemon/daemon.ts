@@ -25,6 +25,8 @@ import { startupBenchmark } from "../utils/startupBenchmark";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./testRecordingSocketServer";
 import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./deviceSnapshotSocketServer";
+import type { InstalledAppsStore } from "../db/installedAppsRepository";
+import { InstalledAppsRepository } from "../db/installedAppsRepository";
 
 /**
  * Main daemon process
@@ -46,13 +48,22 @@ export class Daemon {
   private heartbeatMonitorTimer: NodeJS.Timeout | null = null;
   private sessionManager: SessionManager;
   private devicePool: DevicePool;
+  private daemonSessionId: string;
+  private installedAppsRepository: InstalledAppsStore;
 
-  constructor(options: DaemonOptions = {}) {
+  constructor(options: DaemonOptions = {}, installedAppsRepository?: InstalledAppsStore) {
     this.port = options.port || DEFAULT_DAEMON_PORT;
     this.host = options.host || "localhost";
     this.debug = options.debug || false;
+    this.daemonSessionId = randomUUID();
     this.sessionManager = new SessionManager();
-    this.devicePool = new DevicePool(this.sessionManager);
+    this.installedAppsRepository = installedAppsRepository ?? new InstalledAppsRepository();
+    this.devicePool = new DevicePool(
+      this.sessionManager,
+      this.daemonSessionId,
+      undefined,
+      this.installedAppsRepository
+    );
     // Initialize singleton for daemon state access
     DaemonState.getInstance().initialize(this.sessionManager, this.devicePool);
   }
@@ -67,7 +78,7 @@ export class Daemon {
 
     logger.info("Starting AutoMobile daemon...");
 
-    this.initializeDatabase();
+    await this.initializeDatabase();
 
     // Find an available port
     this.port = await this.findAvailablePort(this.port);
@@ -604,9 +615,12 @@ export class Daemon {
     }
   }
 
-  private initializeDatabase(): void {
+  private async initializeDatabase(): Promise<void> {
     try {
       getDatabase();
+      // Clear installed apps cache from previous daemon sessions
+      await this.installedAppsRepository.clearOldDaemonSessions(this.daemonSessionId);
+      logger.info(`[Daemon] Cleared old daemon session caches, current session: ${this.daemonSessionId}`);
     } catch (error) {
       logger.error(`Failed to initialize database: ${error}`);
     }

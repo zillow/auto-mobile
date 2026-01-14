@@ -3,16 +3,19 @@ import { SessionManager } from "../../src/daemon/sessionManager";
 import { DevicePool } from "../../src/daemon/devicePool";
 import { createToolExecutionContext } from "../../src/server/ToolExecutionContext";
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
+import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
 
 describe("ToolExecutionContext", () => {
   let sessionManager: SessionManager;
   let devicePool: DevicePool;
+  let fakeAppsRepo: FakeInstalledAppsRepository;
   let originalGetInstance: typeof AndroidAccessibilityServiceManager.getInstance;
   const sessionOptions = { keepScreenAwake: false };
 
   beforeEach(async () => {
     sessionManager = new SessionManager();
-    devicePool = new DevicePool(sessionManager);
+    fakeAppsRepo = new FakeInstalledAppsRepository();
+    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", undefined, fakeAppsRepo);
     await devicePool.initializeWithDevices(["device-1"]);
     originalGetInstance = AndroidAccessibilityServiceManager.getInstance;
   });

@@ -622,6 +622,15 @@ export async function syncInstalledAppResources(): Promise<void> {
   for (const deviceId of Array.from(registeredDeviceResources.keys())) {
     if (!currentDeviceIds.has(deviceId)) {
       unregisterDeviceAppResource(deviceId);
+      // Clear installed apps cache when device disappears
+      try {
+        const { InstalledAppsRepository } = await import("../db/installedAppsRepository");
+        const repo = new InstalledAppsRepository();
+        await repo.clearDeviceSession(deviceId);
+        logger.info(`[AppResources] Cleared installed apps cache for disappeared device: ${deviceId}`);
+      } catch (error) {
+        logger.warn(`[AppResources] Failed to clear cache for device ${deviceId}: ${error}`);
+      }
       changed = true;
     }
   }

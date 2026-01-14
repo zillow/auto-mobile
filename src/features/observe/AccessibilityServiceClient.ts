@@ -24,6 +24,7 @@ import { NavigationGraphManager, NavigationEvent } from "../navigation/Navigatio
 import { HierarchyNavigationDetector } from "../navigation/HierarchyNavigationDetector";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { ElementParser } from "../utility/ElementParser";
+import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -100,7 +101,7 @@ interface WebSocketMessage {
   instructions?: string;
   adbCommand?: string;
   error?: string;
-  event?: InteractionEvent;
+  event?: InteractionEvent | NavigationEvent | PackageEvent;
   highlights?: HighlightEntry[];
 }
 
@@ -272,6 +273,14 @@ export interface InteractionEvent {
   text?: string;
   scrollDeltaX?: number;
   scrollDeltaY?: number;
+}
+
+interface PackageEvent {
+  action: "added" | "removed" | "replaced";
+  packageName: string;
+  userId: number;
+  isSystem?: boolean | null;
+  removedForAllUsers?: boolean | null;
 }
 
 /**
@@ -716,6 +725,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private pendingPermissionRequestId: string | null = null;
 
   private interactionListeners: Set<(event: InteractionEvent) => void> = new Set();
+  private installedAppsRepository: InstalledAppsStore | null = null;
 
   // Current focus handling
   private pendingCurrentFocusResolve: ((result: CurrentFocusResult) => void) | null = null;
@@ -747,11 +757,18 @@ export class AccessibilityServiceClient implements AccessibilityService {
    * @param webSocketFactory - Optional WebSocket factory for testing (default: creates real WebSocket)
    * @param timer - Optional timer for testing (default: defaultTimer)
    */
-  private constructor(device: BootedDevice, adb: AdbClient, webSocketFactory?: (url: string) => WebSocket, timer?: Timer) {
+  private constructor(
+    device: BootedDevice,
+    adb: AdbClient,
+    webSocketFactory?: (url: string) => WebSocket,
+    timer?: Timer,
+    installedAppsRepository?: InstalledAppsStore
+  ) {
     this.device = device;
     this.adb = adb;
     this.webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
     this.timer = timer || defaultTimer;
+    this.installedAppsRepository = installedAppsRepository ?? null;
     AndroidAccessibilityServiceManager.getInstance(device, adb);
   }
 
@@ -797,9 +814,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
     device: BootedDevice,
     adb: AdbClient,
     webSocketFactory: (url: string) => WebSocket,
-    timer?: Timer
+    timer?: Timer,
+    installedAppsRepository?: InstalledAppsStore
   ): AccessibilityServiceClient {
-    return new AccessibilityServiceClient(device, adb, webSocketFactory, timer);
+    return new AccessibilityServiceClient(device, adb, webSocketFactory, timer, installedAppsRepository);
   }
 
   /**
@@ -853,6 +871,62 @@ export class AccessibilityServiceClient implements AccessibilityService {
       } catch (error) {
         logger.warn(`[ACCESSIBILITY_SERVICE] Interaction listener error: ${error}`);
       }
+    }
+  }
+
+  private getInstalledAppsRepository(): InstalledAppsStore {
+    if (!this.installedAppsRepository) {
+      this.installedAppsRepository = new InstalledAppsRepository();
+    }
+    return this.installedAppsRepository;
+  }
+
+  private async handlePackageEvent(event: PackageEvent, timestamp?: number): Promise<void> {
+    if (this.device.platform !== "android") {
+      return;
+    }
+
+    if (!event.packageName || !Number.isInteger(event.userId) || event.userId < 0) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Ignoring package event with missing data");
+      return;
+    }
+
+    const deviceId = this.device.deviceId;
+    const eventTimestamp = typeof timestamp === "number" ? timestamp : Date.now();
+    const repo = this.getInstalledAppsRepository();
+
+    try {
+      if (event.action === "removed") {
+        if (event.removedForAllUsers) {
+          await repo.removeInstalledAppForDevice(deviceId, event.packageName);
+        } else {
+          await repo.removeInstalledApp(deviceId, event.userId, event.packageName);
+        }
+      } else {
+        const isSystem = event.isSystem === true;
+        await repo.upsertInstalledApp(
+          deviceId,
+          event.userId,
+          event.packageName,
+          isSystem,
+          eventTimestamp
+        );
+      }
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to apply package event: ${error}`);
+    }
+  }
+
+  private async markInstalledAppsStale(reason: string): Promise<void> {
+    if (this.device.platform !== "android") {
+      return;
+    }
+
+    try {
+      await this.getInstalledAppsRepository().markDeviceStale(this.device.deviceId);
+      logger.info(`[ACCESSIBILITY_SERVICE] Marked installed apps cache stale (${reason})`);
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to mark installed apps stale: ${error}`);
     }
   }
 
@@ -1007,6 +1081,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
           this.isConnecting = false;
           // Reset connection attempts on close to allow future retries
           this.connectionAttempts = 0;
+          void this.markInstalledAppsStale("websocket_closed");
         });
       }));
     } catch (error) {
@@ -1430,6 +1505,14 @@ export class AccessibilityServiceClient implements AccessibilityService {
             `(source: ${event.source}, app: ${event.applicationId || "unknown"}, timestamp: ${event.timestamp})`
           );
           await NavigationGraphManager.getInstance().recordNavigationEvent(event);
+        }
+      }
+
+      if (message.type === "package_event") {
+        const packageMessage = message as any;
+        const event = packageMessage.event as PackageEvent | undefined;
+        if (event) {
+          await this.handlePackageEvent(event, message.timestamp);
         }
       }
 

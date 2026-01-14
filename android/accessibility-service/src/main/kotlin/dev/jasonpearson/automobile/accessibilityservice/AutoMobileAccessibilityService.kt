@@ -11,10 +11,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
+import android.os.UserHandle
 import android.util.Base64
 import android.util.DisplayMetrics
 import android.util.Log
@@ -186,6 +188,55 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         }
       }
 
+  private val packageReceiver =
+      object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+          if (intent == null) {
+            return
+          }
+
+          val action = intent.action ?: return
+          if (
+              action != Intent.ACTION_PACKAGE_ADDED &&
+                  action != Intent.ACTION_PACKAGE_REMOVED &&
+                  action != Intent.ACTION_PACKAGE_REPLACED
+          ) {
+            return
+          }
+
+          val packageName = intent.data?.schemeSpecificPart ?: return
+          val uid = intent.getIntExtra(Intent.EXTRA_UID, -1)
+          val userId = if (uid >= 0) uid else 0
+          val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
+          // EXTRA_REMOVED_FOR_ALL_USERS may not be available in all SDK versions, use string literal
+          val removedForAllUsers = intent.getBooleanExtra("android.intent.extra.REMOVED_FOR_ALL_USERS", false)
+
+          val eventAction =
+              when (action) {
+                Intent.ACTION_PACKAGE_ADDED -> if (isReplacing) "replaced" else "added"
+                Intent.ACTION_PACKAGE_REMOVED -> if (isReplacing) null else "removed"
+                Intent.ACTION_PACKAGE_REPLACED -> "replaced"
+                else -> null
+              } ?: return
+
+          val isSystem =
+              if (eventAction == "removed") {
+                null
+              } else {
+                resolveSystemApp(packageName)
+              }
+
+          Log.d(
+              TAG,
+              "Package event: $eventAction $packageName (userId=$userId, removedForAllUsers=$removedForAllUsers)",
+          )
+
+          serviceScope.launch {
+            broadcastPackageEvent(eventAction, packageName, userId, isSystem, removedForAllUsers)
+          }
+        }
+      }
+
   override fun onServiceConnected() {
     super.onServiceConnected()
     Log.d(TAG, "onServiceConnected")
@@ -231,6 +282,23 @@ class AutoMobileAccessibilityService : AccessibilityService() {
         registerReceiver(recompositionReceiver, recompositionFilter)
       }
       Log.d(TAG, "Recomposition receiver registered")
+
+      // Register broadcast receiver for package changes
+      val packageFilter =
+          IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+          }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        registerReceiver(packageReceiver, packageFilter, RECEIVER_EXPORTED)
+      } else {
+        @SuppressLint("UnspecifiedRegisterReceiverFlag")
+        registerReceiver(packageReceiver, packageFilter)
+      }
+      Log.d(TAG, "Package receiver registered")
 
       // Initialize the navigation event accumulator
       navigationEventAccumulator.initialize()
@@ -410,6 +478,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       Log.e(TAG, "Error unregistering recomposition receiver", e)
     }
 
+    try {
+      unregisterReceiver(packageReceiver)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error unregistering package receiver", e)
+    }
+
     if (::overlayDrawer.isInitialized) {
       overlayDrawer.destroy()
     }
@@ -575,6 +649,51 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     webSocketServer.broadcast(
         """{"type":"interaction_event","timestamp":${interaction.timestamp},"event":$eventJson}"""
     )
+  }
+
+  private fun resolveSystemApp(packageName: String): Boolean? {
+    return try {
+      val appInfo = packageManager.getApplicationInfo(packageName, 0)
+      (appInfo.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) !=
+          0
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed to resolve system flag for $packageName", e)
+      null
+    }
+  }
+
+  private suspend fun broadcastPackageEvent(
+      action: String,
+      packageName: String,
+      userId: Int,
+      isSystem: Boolean?,
+      removedForAllUsers: Boolean,
+  ) {
+    if (!::webSocketServer.isInitialized || !webSocketServer.isRunning()) {
+      Log.d(TAG, "WebSocket server not running, skipping package event broadcast")
+      return
+    }
+
+    try {
+      val timestamp = System.currentTimeMillis()
+      val safeAction = jsonCompact.encodeToString(action)
+      val safePackageName = jsonCompact.encodeToString(packageName)
+      val message = buildString {
+        append("""{"type":"package_event","timestamp":$timestamp,"event":{""")
+        append(""""action":$safeAction,"packageName":$safePackageName,"userId":$userId""")
+        if (isSystem != null) {
+          append(""","isSystem":$isSystem""")
+        }
+        if (removedForAllUsers) {
+          append(""","removedForAllUsers":true""")
+        }
+        append("}}")
+      }
+      webSocketServer.broadcast(message)
+      Log.d(TAG, "Broadcasted package event to ${webSocketServer.getConnectionCount()} clients")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error broadcasting package event", e)
+    }
   }
 
   /** Get current screen dimensions for offscreen filtering. */

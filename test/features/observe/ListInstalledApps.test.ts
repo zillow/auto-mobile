@@ -2,6 +2,9 @@ import { expect, describe, test, beforeEach } from "bun:test";
 import { ListInstalledApps } from "../../../src/features/observe/ListInstalledApps";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { BootedDevice, AndroidUser } from "../../../src/models";
+import type { NewInstalledApp } from "../../../src/db/types";
+import { FakeInstalledAppsRepository } from "../../fakes/FakeInstalledAppsRepository";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("ListInstalledApps", function() {
   let listInstalledApps: ListInstalledApps;
@@ -271,6 +274,92 @@ describe("ListInstalledApps", function() {
       const result = await iosListApps.executeDetailed();
 
       expect(result).toEqual({ profiles: {}, system: [] });
+    });
+  });
+
+  describe("cache", function() {
+    test("should use cached apps when fresh", async function() {
+      const repo = new FakeInstalledAppsRepository();
+      const timer = new FakeTimer();
+      timer.setManualMode();
+      timer.advanceTime(1000);
+      const now = timer.now();
+      const entries: NewInstalledApp[] = [
+        {
+          device_id: mockDevice.deviceId,
+          user_id: 0,
+          package_name: "com.cached.app",
+          is_system: 0,
+          installed_at: now,
+          last_verified_at: now
+        },
+        {
+          device_id: mockDevice.deviceId,
+          user_id: 0,
+          package_name: "com.android.settings",
+          is_system: 1,
+          installed_at: now,
+          last_verified_at: now
+        }
+      ];
+
+      await repo.replaceInstalledApps(mockDevice.deviceId, entries);
+      fakeAdb.setForegroundApp({ packageName: "com.cached.app", userId: 0 });
+
+      const cachedList = new ListInstalledApps(
+        mockDevice,
+        fakeAdb as unknown as any,
+        null,
+        { cacheEnabled: true, installedAppsRepository: repo, timer }
+      );
+      const result = await cachedList.executeDetailed();
+
+      expect(result.profiles[0].some(app => app.packageName === "com.cached.app")).toBe(true);
+      expect(result.system.some(app => app.packageName === "com.android.settings")).toBe(true);
+      expect(fakeAdb.wasCommandExecuted("shell pm list packages")).toBe(false);
+    });
+
+    test("should rebuild cache when stale", async function() {
+      const repo = new FakeInstalledAppsRepository();
+      const timer = new FakeTimer();
+      timer.setManualMode();
+      const staleTime = timer.now();
+      await repo.replaceInstalledApps(mockDevice.deviceId, [
+        {
+          device_id: mockDevice.deviceId,
+          user_id: 0,
+          package_name: "com.stale.app",
+          is_system: 0,
+          installed_at: staleTime,
+          last_verified_at: staleTime
+        }
+      ]);
+
+      timer.advanceTime(5 * 60 * 1000 + 1);
+
+      fakeAdb.setUsers([{ userId: 0, name: "Owner", flags: 13, running: true }]);
+      fakeAdb.setCommandResponse("shell pm list packages --user 0", {
+        stdout: "package:com.example.fresh\n",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell pm list packages -s --user 0", {
+        stdout: "",
+        stderr: ""
+      });
+
+      const cachedList = new ListInstalledApps(
+        mockDevice,
+        fakeAdb as unknown as any,
+        null,
+        { cacheEnabled: true, installedAppsRepository: repo, timer }
+      );
+      await cachedList.executeDetailed();
+
+      expect(fakeAdb.wasCommandExecuted("shell pm list packages --user 0")).toBe(true);
+
+      const stored = await repo.listInstalledApps(mockDevice.deviceId);
+      expect(stored.some(row => row.package_name === "com.example.fresh")).toBe(true);
+      expect(stored.some(row => row.package_name === "com.stale.app")).toBe(false);
     });
   });
 });
