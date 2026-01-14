@@ -12,6 +12,7 @@ import {
   WebSocketState
 } from "../../fakes/FakeWebSocket";
 import { FakeTimer } from "../../fakes/FakeTimer";
+import { FakeInstalledAppsRepository } from "../../fakes/FakeInstalledAppsRepository";
 
 describe("AccessibilityServiceClient", function() {
   let accessibilityServiceClient: AccessibilityServiceClient;
@@ -127,6 +128,12 @@ describe("AccessibilityServiceClient", function() {
       if (socket.sentMessages.length >= minCount) {
         return;
       }
+      await new Promise(resolve => setImmediate(resolve));
+    }
+  };
+
+  const flushPromises = async (iterations: number = 3): Promise<void> => {
+    for (let i = 0; i < iterations; i += 1) {
       await new Promise(resolve => setImmediate(resolve));
     }
   };
@@ -589,6 +596,174 @@ describe("AccessibilityServiceClient", function() {
       } finally {
         // Clean up the test client
         await failingClient.close();
+      }
+    });
+  });
+
+  describe("package events", function() {
+    test("should upsert package on added event", async function() {
+      const repo = new FakeInstalledAppsRepository();
+      const timer = new FakeTimer();
+      timer.setManualMode();
+      timer.advanceTime(1000);
+      const timestamp = timer.now();
+
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory,
+        timer,
+        repo
+      );
+
+      try {
+        await testClient.ensureConnected();
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "package_event",
+          timestamp,
+          event: {
+            action: "added",
+            packageName: "com.example.new",
+            userId: 0,
+            isSystem: false
+          }
+        }));
+
+        await flushPromises();
+
+        const rows = await repo.listInstalledApps(testDevice.deviceId);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].package_name).toBe("com.example.new");
+        expect(rows[0].user_id).toBe(0);
+        expect(rows[0].is_system).toBe(0);
+        expect(rows[0].last_verified_at).toBe(timestamp);
+      } finally {
+        await testClient.close();
+      }
+    });
+
+    test("should remove package for a single user on removed event", async function() {
+      const repo = new FakeInstalledAppsRepository();
+      const timer = new FakeTimer();
+      timer.setManualMode();
+      const baseTime = timer.now();
+
+      await repo.replaceInstalledApps(testDevice.deviceId, [
+        {
+          device_id: testDevice.deviceId,
+          user_id: 0,
+          package_name: "com.example.remove",
+          is_system: 0,
+          installed_at: baseTime,
+          last_verified_at: baseTime
+        },
+        {
+          device_id: testDevice.deviceId,
+          user_id: 10,
+          package_name: "com.example.remove",
+          is_system: 0,
+          installed_at: baseTime,
+          last_verified_at: baseTime
+        }
+      ]);
+
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory,
+        timer,
+        repo
+      );
+
+      try {
+        await testClient.ensureConnected();
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "package_event",
+          timestamp: timer.now(),
+          event: {
+            action: "removed",
+            packageName: "com.example.remove",
+            userId: 0
+          }
+        }));
+
+        await flushPromises();
+
+        const rows = await repo.listInstalledApps(testDevice.deviceId);
+        expect(rows.some(row => row.user_id === 0)).toBe(false);
+        expect(rows.some(row => row.user_id === 10)).toBe(true);
+      } finally {
+        await testClient.close();
+      }
+    });
+
+    test("should remove package for all users when removedForAllUsers is true", async function() {
+      const repo = new FakeInstalledAppsRepository();
+      const timer = new FakeTimer();
+      timer.setManualMode();
+      const baseTime = timer.now();
+
+      await repo.replaceInstalledApps(testDevice.deviceId, [
+        {
+          device_id: testDevice.deviceId,
+          user_id: 0,
+          package_name: "com.example.all",
+          is_system: 0,
+          installed_at: baseTime,
+          last_verified_at: baseTime
+        },
+        {
+          device_id: testDevice.deviceId,
+          user_id: 10,
+          package_name: "com.example.all",
+          is_system: 0,
+          installed_at: baseTime,
+          last_verified_at: baseTime
+        }
+      ]);
+
+      const { factory, getSocket } = createCapturingWebSocketFactory();
+      const testClient = AccessibilityServiceClient.createForTesting(
+        testDevice,
+        adbClient,
+        factory,
+        timer,
+        repo
+      );
+
+      try {
+        await testClient.ensureConnected();
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "package_event",
+          timestamp: timer.now(),
+          event: {
+            action: "removed",
+            packageName: "com.example.all",
+            userId: 0,
+            removedForAllUsers: true
+          }
+        }));
+
+        await flushPromises();
+
+        const rows = await repo.listInstalledApps(testDevice.deviceId);
+        expect(rows).toHaveLength(0);
+      } finally {
+        await testClient.close();
       }
     });
   });

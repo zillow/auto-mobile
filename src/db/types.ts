@@ -16,6 +16,16 @@ export interface DeviceConfigTable {
   updated_at: string;
 }
 
+// Installed apps cache table
+export interface InstalledAppsTable {
+  device_id: string;
+  user_id: number;
+  package_name: string;
+  is_system: number; // SQLite boolean (0/1)
+  installed_at: number;
+  last_verified_at: number;
+}
+
 // Performance thresholds table
 export interface PerformanceThresholdsTable {
   id: Generated<number>;
@@ -384,6 +394,7 @@ export interface VideoRecordingConfigsTable {
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
+  installed_apps: InstalledAppsTable;
   performance_thresholds: PerformanceThresholdsTable;
   performance_audit_results: PerformanceAuditResultsTable;
   navigation_apps: NavigationAppsTable;
@@ -417,6 +428,10 @@ export interface Database {
 export type DeviceConfig = Selectable<DeviceConfigTable>;
 export type NewDeviceConfig = Insertable<DeviceConfigTable>;
 export type DeviceConfigUpdate = Updateable<DeviceConfigTable>;
+
+export type InstalledApp = Selectable<InstalledAppsTable>;
+export type NewInstalledApp = Insertable<InstalledAppsTable>;
+export type InstalledAppUpdate = Updateable<InstalledAppsTable>;
 
 export type PerformanceThresholds = Selectable<PerformanceThresholdsTable>;
 export type NewPerformanceThresholds = Insertable<PerformanceThresholdsTable>;
