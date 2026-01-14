@@ -675,6 +675,16 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private recompositionTrackingConfigured: boolean = false;
   private recompositionTrackingEnabled: boolean = false;
 
+  // Auto-reconnection state
+  private autoReconnectEnabled: boolean = true;
+  private reconnectTimeoutId: ReturnType<Timer["setTimeout"]> | null = null;
+  private static readonly RECONNECT_DELAY_MS = 2000; // Wait 2 seconds before reconnecting
+
+  // Health check state
+  private healthCheckIntervalId: ReturnType<Timer["setInterval"]> | null = null;
+  private static readonly HEALTH_CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
+  private lastHealthCheckTime: number = 0;
+
   // Screenshot handling
   private pendingScreenshotResolve: ((result: ScreenshotResult) => void) | null = null;
   private pendingScreenshotRequestId: string | null = null;
@@ -1058,6 +1068,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
           this.ws = ws;
           this.isConnecting = false;
           this.connectionAttempts = 0; // Reset on successful connection
+
+          // Start health check monitoring
+          this.startHealthCheck();
+
           resolve(true);
         });
 
@@ -1081,6 +1095,25 @@ export class AccessibilityServiceClient implements AccessibilityService {
           // Reset connection attempts on close to allow future retries
           this.connectionAttempts = 0;
           void this.markInstalledAppsStale("websocket_closed");
+
+          // Stop health check
+          this.stopHealthCheck();
+
+          // Attempt automatic reconnection if enabled
+          if (this.autoReconnectEnabled) {
+            logger.info(`[ACCESSIBILITY_SERVICE] Scheduling reconnection in ${AccessibilityServiceClient.RECONNECT_DELAY_MS}ms`);
+            this.reconnectTimeoutId = this.timer.setTimeout(() => {
+              this.reconnectTimeoutId = null;
+              logger.info("[ACCESSIBILITY_SERVICE] Attempting automatic reconnection...");
+              void this.connectWebSocket(new NoOpPerformanceTracker()).then(connected => {
+                if (connected) {
+                  logger.info("[ACCESSIBILITY_SERVICE] Automatic reconnection successful");
+                } else {
+                  logger.warn("[ACCESSIBILITY_SERVICE] Automatic reconnection failed");
+                }
+              });
+            }, AccessibilityServiceClient.RECONNECT_DELAY_MS);
+          }
         });
       }));
     } catch (error) {
@@ -1089,6 +1122,54 @@ export class AccessibilityServiceClient implements AccessibilityService {
       this.portForwardingSetup = false;
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to connect to WebSocket: ${error}`);
       return false;
+    }
+  }
+
+  /**
+   * Start periodic health check to ensure WebSocket stays connected
+   */
+  private startHealthCheck(): void {
+    // Clear any existing health check
+    this.stopHealthCheck();
+
+    logger.debug(`[ACCESSIBILITY_SERVICE] Starting health check (interval: ${AccessibilityServiceClient.HEALTH_CHECK_INTERVAL_MS}ms)`);
+    this.lastHealthCheckTime = Date.now();
+
+    this.healthCheckIntervalId = this.timer.setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastCheck = now - this.lastHealthCheckTime;
+      this.lastHealthCheckTime = now;
+
+      // Check if WebSocket is still connected
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Health check failed: WebSocket not connected");
+        this.stopHealthCheck();
+
+        // Attempt reconnection if auto-reconnect is enabled and not already connecting
+        if (this.autoReconnectEnabled && !this.isConnecting && !this.reconnectTimeoutId) {
+          logger.info("[ACCESSIBILITY_SERVICE] Health check triggering reconnection...");
+          void this.connectWebSocket(new NoOpPerformanceTracker()).then(connected => {
+            if (connected) {
+              logger.info("[ACCESSIBILITY_SERVICE] Health check reconnection successful");
+            } else {
+              logger.warn("[ACCESSIBILITY_SERVICE] Health check reconnection failed");
+            }
+          });
+        }
+      } else {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Health check passed (time since last: ${timeSinceLastCheck}ms)`);
+      }
+    }, AccessibilityServiceClient.HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  /**
+   * Stop the health check interval
+   */
+  private stopHealthCheck(): void {
+    if (this.healthCheckIntervalId !== null) {
+      logger.debug("[ACCESSIBILITY_SERVICE] Stopping health check");
+      this.timer.clearInterval(this.healthCheckIntervalId);
+      this.healthCheckIntervalId = null;
     }
   }
 
@@ -2184,6 +2265,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
     try {
       logger.info("[ACCESSIBILITY_SERVICE] Requesting hierarchy sync via WebSocket");
 
+      // Ensure WebSocket connection is established before attempting request
+      await this.ensureConnected(perf);
+
       // Try WebSocket request first (faster path)
       const sentViaWebSocket = await perf.track("sendWsRequest", async () => {
         return this.sendHierarchyRequest(disableAllFiltering);
@@ -2234,6 +2318,18 @@ export class AccessibilityServiceClient implements AccessibilityService {
    */
   async close(): Promise<void> {
     try {
+      // Disable auto-reconnect before closing
+      this.autoReconnectEnabled = false;
+
+      // Clear any pending reconnection timeout
+      if (this.reconnectTimeoutId !== null) {
+        this.timer.clearTimeout(this.reconnectTimeoutId);
+        this.reconnectTimeoutId = null;
+      }
+
+      // Stop health check
+      this.stopHealthCheck();
+
       if (this.ws) {
         logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
         this.ws.close();

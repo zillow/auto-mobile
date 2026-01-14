@@ -877,7 +877,7 @@
   },
   {
     "name": "highlight",
-    "description": "Draw a visual highlight (box or circle) on the device screen for debugging.",
+    "description": "Draw a visual highlight around a UI element on the device screen for debugging.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1156,7 +1156,81 @@
               "additionalProperties": false
             }
           ],
-          "description": "Highlight shape definition"
+          "description": "Optional highlight shape definition"
+        },
+        "selector": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Element text"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Element ID"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"
+        },
+        "container": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "elementId": {
+                  "type": "string",
+                  "description": "Container resource ID"
+                }
+              },
+              "required": [
+                "elementId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Container text"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          ],
+          "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
+        },
+        "containerOf": {
+          "type": "boolean",
+          "description": "Whether to highlight the container of the selected element"
+        },
+        "selectionStrategy": {
+          "type": "string",
+          "enum": [
+            "first",
+            "random"
+          ],
+          "description": "Element selection strategy when multiple matches are found (default: first)"
         },
         "sessionUuid": {
           "type": "string",
@@ -1172,8 +1246,7 @@
         }
       },
       "required": [
-        "platform",
-        "shape"
+        "platform"
       ],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
@@ -3074,7 +3147,7 @@
               "properties": {
                 "text": {
                   "type": "string",
-                  "description": "Text to tap"
+                  "description": "Element text"
                 }
               },
               "required": [
@@ -3087,7 +3160,7 @@
               "properties": {
                 "id": {
                   "type": "string",
-                  "description": "Element ID to tap"
+                  "description": "Element ID"
                 }
               },
               "required": [

@@ -17,10 +17,13 @@ import dev.jasonpearson.automobile.accessibilityservice.models.HighlightShape
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightStyle
 import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 import dev.jasonpearson.automobile.accessibilityservice.models.SmoothingAlgorithm
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.random.Random
 
 data class HighlightOperationResult(
     val success: Boolean,
@@ -30,16 +33,23 @@ data class HighlightOperationResult(
 class OverlayDrawer(
     private var overlayManager: OverlayManager? = null,
     private val screenDimensionsProvider: (() -> ScreenDimensions?)? = null,
-    private val systemInsetsProvider: (() -> Int)? = null,
     private val colorParser: (String) -> Int = { Color.parseColor(it) },
 ) {
 
     companion object {
         private const val TAG = "OverlayDrawer"
         private const val DEFAULT_STROKE_COLOR = "#FF0000"
-        private const val DEFAULT_STROKE_WIDTH = 4f
+        private const val DEFAULT_STROKE_WIDTH = 8f
         private const val DEFAULT_PATH_STROKE_WIDTH = 8f
         private const val DEFAULT_PATH_TENSION = 0.5f
+        private const val ELLIPSE_SEGMENT_COUNT = 160
+        private const val ELLIPSE_JITTER_RATIO = 0.035f
+        private const val ELLIPSE_JITTER_FREQ_X = 2.3f
+        private const val ELLIPSE_JITTER_FREQ_Y = 3.7f
+        private const val ELLIPSE_START_ANGLE = -90f
+        private const val ELLIPSE_START_ANGLE_JITTER = 8f
+        private const val ELLIPSE_MIN_WIDTH_FACTOR = 0.75f
+        private const val ELLIPSE_MAX_WIDTH_FACTOR = 2.0f
         private const val PATH_MIN_SAMPLE_DISTANCE = 3f
         private const val PATH_MAX_SEGMENTS = 240f
         private const val PATH_TAPER_FRACTION = 0.12f
@@ -128,54 +138,77 @@ class OverlayDrawer(
         val snapshot = synchronized(lock) { highlights.values.toList() }
         snapshot.forEach { renderState ->
             when (renderState.shapeType) {
-                ShapeType.BOX -> drawBox(canvas, renderState)
-                ShapeType.CIRCLE -> drawCircle(canvas, renderState)
+                ShapeType.BOX,
+                ShapeType.CIRCLE -> drawEllipse(canvas, renderState)
                 ShapeType.PATH -> drawPath(canvas, renderState)
             }
         }
     }
 
-    private fun drawBox(canvas: Canvas, renderState: HighlightRenderState) {
+    private fun drawEllipse(canvas: Canvas, renderState: HighlightRenderState) {
         val rect = renderState.rect ?: return
-        renderState.strokePaint?.let {
-            applyStrokeAlpha(renderState, it)
-            canvas.drawRect(rect, it)
-        }
-    }
+        val paint = renderState.strokePaint ?: return
 
-    private fun drawCircle(canvas: Canvas, renderState: HighlightRenderState) {
-        val rect = renderState.rect ?: return
-        renderState.strokePaint?.let { paint ->
+        val segments = renderState.ellipseSegments
+        if (segments.isNullOrEmpty()) {
             applyStrokeAlpha(renderState, paint)
-
-            // Hand-drawn effect: leave a small gap (10 degrees) and draw with progress
-            val maxSweepAngle = 350f // 360 - 10 degrees gap
-            val sweepAngle = maxSweepAngle * renderState.drawProgress
-
-            // Start angle slightly offset for variation (-90 degrees = top of circle)
-            val startAngle = -90f + 5f // Start slightly offset from top
-
-            if (sweepAngle > 0f) {
-                canvas.drawArc(rect, startAngle, sweepAngle, false, paint)
-            }
+            canvas.drawOval(rect, paint)
+            return
         }
+
+        val progress = renderState.drawProgress.coerceIn(0f, 1f)
+        val totalSegments = segments.size
+        val exactCount = progress * totalSegments
+        val fullSegments = exactCount.toInt().coerceIn(0, totalSegments)
+        val partialProgress = exactCount - fullSegments.toFloat()
+
+        val originalWidth = paint.strokeWidth
+        val originalAlpha = paint.alpha
+
+        for (index in 0 until fullSegments) {
+            val segment = segments[index]
+            paint.strokeWidth = segment.strokeWidth
+            applyStaggeredFadeAlpha(renderState, paint, index, totalSegments)
+            canvas.drawArc(segment.oval, segment.startAngle, segment.sweepAngle, false, paint)
+        }
+        if (partialProgress > 0f && fullSegments < totalSegments) {
+            val segment = segments[fullSegments]
+            paint.strokeWidth = segment.strokeWidth
+            applyStaggeredFadeAlpha(renderState, paint, fullSegments, totalSegments)
+            canvas.drawArc(
+                segment.oval,
+                segment.startAngle,
+                segment.sweepAngle * partialProgress,
+                false,
+                paint
+            )
+        }
+
+        paint.strokeWidth = originalWidth
+        paint.alpha = originalAlpha
     }
 
     private fun drawPath(canvas: Canvas, renderState: HighlightRenderState) {
         val strokePaint = renderState.strokePaint ?: return
-        applyStrokeAlpha(renderState, strokePaint)
         val segments = renderState.pathSegments
         if (segments.isNullOrEmpty()) {
+            applyStrokeAlpha(renderState, strokePaint)
             renderState.path?.let { canvas.drawPath(it, strokePaint) }
             return
         }
 
         val originalWidth = strokePaint.strokeWidth
-        segments.forEach { segment ->
+        val originalAlpha = strokePaint.alpha
+        val totalSegments = segments.size
+
+        segments.forEachIndexed { index, segment ->
             strokePaint.strokeWidth = segment.strokeWidth
+            applyStaggeredFadeAlpha(renderState, strokePaint, index, totalSegments)
             canvas.drawLine(segment.startX, segment.startY, segment.endX, segment.endY, strokePaint)
         }
+
         strokePaint.strokeWidth = originalWidth
+        strokePaint.alpha = originalAlpha
     }
 
     private fun updateHighlightAlpha(id: String, alpha: Float) {
@@ -196,6 +229,42 @@ class OverlayDrawer(
         if (paint.alpha != targetAlpha) {
             paint.alpha = targetAlpha
         }
+    }
+
+    private fun applyStaggeredFadeAlpha(
+        renderState: HighlightRenderState,
+        paint: Paint,
+        segmentIndex: Int,
+        totalSegments: Int
+    ) {
+        val globalAlpha = renderState.alpha
+
+        // If fully visible (alpha = 1.0) or drawing phase, use full alpha
+        if (globalAlpha >= 1f || renderState.drawProgress < 1f) {
+            val targetAlpha = (renderState.baseAlpha * globalAlpha).roundToInt().coerceIn(0, 255)
+            paint.alpha = targetAlpha
+            return
+        }
+
+        // During fade-out, stagger the fade for each segment
+        // Earlier segments (lower index) start fading first
+        val segmentFraction = if (totalSegments > 1) {
+            segmentIndex.toFloat() / (totalSegments - 1).toFloat()
+        } else {
+            0f
+        }
+
+        // Stagger the fade: segment 0 starts immediately, last segment starts after delay
+        // With 200ms total and 95% stagger, last segment has 10ms to fade
+        val staggerAmount = 0.95f // 95% of fade time is staggered
+        val fadeProgress = 1f - globalAlpha // 0.0 at start, 1.0 at end
+        val segmentFadeStart = segmentFraction * staggerAmount
+        val segmentFadeProgress = ((fadeProgress - segmentFadeStart) / (1f - staggerAmount))
+            .coerceIn(0f, 1f)
+        val segmentAlpha = 1f - segmentFadeProgress
+
+        val targetAlpha = (renderState.baseAlpha * segmentAlpha).roundToInt().coerceIn(0, 255)
+        paint.alpha = targetAlpha
     }
 
     private fun ensureOverlayVisible(): String? {
@@ -252,6 +321,8 @@ class OverlayDrawer(
             return HighlightRenderResult(error = rectResult.error ?: "Invalid highlight bounds")
         }
 
+        val baseStrokeWidth = paintResult.strokePaint?.strokeWidth ?: DEFAULT_STROKE_WIDTH
+        val ellipseSegments = buildEllipseSegments(rect, baseStrokeWidth)
         val baseAlpha = paintResult.strokePaint?.alpha ?: 255
         return HighlightRenderResult(
             state =
@@ -260,10 +331,11 @@ class OverlayDrawer(
                     rect = rect,
                     path = null,
                     pathSegments = null,
+                    ellipseSegments = ellipseSegments,
                     shapeType = shapeType,
                     strokePaint = paintResult.strokePaint,
                     baseAlpha = baseAlpha,
-                    alpha = 0f,
+                    alpha = 1f,
                     drawProgress = 0f,
                 )
         )
@@ -284,8 +356,7 @@ class OverlayDrawer(
         }
         val scaleX = scaleResult.scaleX ?: 1f
         val scaleY = scaleResult.scaleY ?: 1f
-        val yOffset = systemInsetsProvider?.invoke() ?: 0
-        val pathPoints = points.toPointFList(scaleX, scaleY, yOffset)
+        val pathPoints = points.toPointFList(scaleX, scaleY)
         if (pathPoints.any { !it.x.isFinite() || !it.y.isFinite() }) {
             return HighlightRenderResult(error = "Path points must be finite numbers")
         }
@@ -308,10 +379,11 @@ class OverlayDrawer(
                     rect = null,
                     path = path,
                     pathSegments = pathSegments,
+                    ellipseSegments = null,
                     shapeType = ShapeType.PATH,
                     strokePaint = paintResult.strokePaint,
                     baseAlpha = baseAlpha,
-                    alpha = 0f,
+                    alpha = 1f,
                     drawProgress = 0f,
                 )
         )
@@ -327,7 +399,12 @@ class OverlayDrawer(
             return HighlightPaintResult(error = "strokeWidth must be greater than 0")
         }
 
-        val strokeColor = effectiveStyle?.strokeColor ?: DEFAULT_STROKE_COLOR
+        val strokeColor =
+            if (shapeType == ShapeType.PATH) {
+                effectiveStyle?.strokeColor ?: DEFAULT_STROKE_COLOR
+            } else {
+                DEFAULT_STROKE_COLOR
+            }
         val parsedStrokeColor =
             parseColor(strokeColor)
                 ?: return HighlightPaintResult(error = "Invalid strokeColor: $strokeColor")
@@ -341,7 +418,11 @@ class OverlayDrawer(
                 strokeJoin = resolveStrokeJoin(effectiveStyle, shapeType)
             }
 
-        val dashPattern = effectiveStyle?.dashPattern
+        val dashPattern = if (shapeType == ShapeType.PATH) {
+            effectiveStyle?.dashPattern
+        } else {
+            null
+        }
         if (dashPattern != null) {
             if (dashPattern.isEmpty() || dashPattern.any { it <= 0f }) {
                 return HighlightPaintResult(
@@ -373,7 +454,7 @@ class OverlayDrawer(
     }
 
     private fun resolveStrokeCap(style: HighlightStyle?, shapeType: ShapeType): Paint.Cap {
-        val fallback = if (shapeType == ShapeType.PATH) Paint.Cap.ROUND else Paint.Cap.BUTT
+        val fallback = Paint.Cap.ROUND
         return when (style?.capStyle) {
             HighlightLineCap.BUTT -> Paint.Cap.BUTT
             HighlightLineCap.ROUND -> Paint.Cap.ROUND
@@ -383,13 +464,70 @@ class OverlayDrawer(
     }
 
     private fun resolveStrokeJoin(style: HighlightStyle?, shapeType: ShapeType): Paint.Join {
-        val fallback = if (shapeType == ShapeType.PATH) Paint.Join.ROUND else Paint.Join.MITER
+        val fallback = Paint.Join.ROUND
         return when (style?.joinStyle) {
             HighlightLineJoin.BEVEL -> Paint.Join.BEVEL
             HighlightLineJoin.MITER -> Paint.Join.MITER
             HighlightLineJoin.ROUND -> Paint.Join.ROUND
             null -> fallback
         }
+    }
+
+    private fun buildEllipseSegments(rect: RectF, baseStrokeWidth: Float): List<EllipseSegment> {
+        val segmentCount = ELLIPSE_SEGMENT_COUNT.coerceAtLeast(100)
+        if (segmentCount <= 0) {
+            return emptyList()
+        }
+
+        val centerX = rect.centerX()
+        val centerY = rect.centerY()
+        val radiusX = rect.width() / 2f
+        val radiusY = rect.height() / 2f
+        if (!radiusX.isFinite() || !radiusY.isFinite() || radiusX <= 0f || radiusY <= 0f) {
+            return emptyList()
+        }
+
+        val sweep = 360f / segmentCount.toFloat()
+        val random = Random(System.nanoTime())
+        val phaseX = random.nextDouble() * Math.PI * 2.0
+        val phaseY = random.nextDouble() * Math.PI * 2.0
+        val startOffset =
+            ELLIPSE_START_ANGLE + ((random.nextFloat() - 0.5f) * ELLIPSE_START_ANGLE_JITTER)
+
+        val segments = ArrayList<EllipseSegment>(segmentCount)
+        for (index in 0 until segmentCount) {
+            val startAngle = startOffset + (index * sweep)
+            val midAngle = startAngle + (sweep / 2f)
+            val angleRad = Math.toRadians(midAngle.toDouble())
+            val jitterX = 1f + (ELLIPSE_JITTER_RATIO *
+                sin(angleRad * ELLIPSE_JITTER_FREQ_X + phaseX).toFloat())
+            val jitterY = 1f + (ELLIPSE_JITTER_RATIO *
+                sin(angleRad * ELLIPSE_JITTER_FREQ_Y + phaseY).toFloat())
+            val oval =
+                RectF(
+                    centerX - (radiusX * jitterX),
+                    centerY - (radiusY * jitterY),
+                    centerX + (radiusX * jitterX),
+                    centerY + (radiusY * jitterY),
+                )
+            val widthFactor = resolveEllipseWidthFactor(angleRad)
+            segments.add(
+                EllipseSegment(
+                    oval = oval,
+                    startAngle = startAngle,
+                    sweepAngle = sweep,
+                    strokeWidth = baseStrokeWidth * widthFactor,
+                )
+            )
+        }
+
+        return segments
+    }
+
+    private fun resolveEllipseWidthFactor(angleRad: Double): Float {
+        val variation = abs(sin(angleRad)).toFloat()
+        return ELLIPSE_MIN_WIDTH_FACTOR +
+            (ELLIPSE_MAX_WIDTH_FACTOR - ELLIPSE_MIN_WIDTH_FACTOR) * variation
     }
 
     private fun buildPathSegments(path: Path, baseStrokeWidth: Float): List<PathSegment> {
@@ -513,6 +651,7 @@ class OverlayDrawer(
         val rect: RectF?,
         val path: Path?,
         val pathSegments: List<PathSegment>?,
+        val ellipseSegments: List<EllipseSegment>?,
         val shapeType: ShapeType,
         val strokePaint: Paint?,
         val baseAlpha: Int,
@@ -533,6 +672,13 @@ class OverlayDrawer(
         val strokeWidth: Float,
     )
 
+    private data class EllipseSegment(
+        val oval: RectF,
+        val startAngle: Float,
+        val sweepAngle: Float,
+        val strokeWidth: Float,
+    )
+
     private fun resolveRect(bounds: HighlightBounds): HighlightRectResult {
         val scale = resolveScale(bounds)
         if (scale.error != null) {
@@ -540,12 +686,11 @@ class OverlayDrawer(
         }
         val scaleX = scale.scaleX ?: 1f
         val scaleY = scale.scaleY ?: 1f
-        val yOffset = systemInsetsProvider?.invoke() ?: 0
-        return HighlightRectResult(rect = bounds.toRectF(scaleX, scaleY, yOffset))
+        return HighlightRectResult(rect = bounds.toRectF(scaleX, scaleY))
     }
 
-    private fun List<HighlightPoint>.toPointFList(scaleX: Float, scaleY: Float, yOffset: Int = 0): List<PointF> {
-        return map { point -> PointF(point.x * scaleX, (point.y - yOffset) * scaleY) }
+    private fun List<HighlightPoint>.toPointFList(scaleX: Float, scaleY: Float): List<PointF> {
+        return map { point -> PointF(point.x * scaleX, point.y * scaleY) }
     }
 
     private fun resolveScale(bounds: HighlightBounds): HighlightScaleResult {

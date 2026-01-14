@@ -18,9 +18,9 @@ internal class HighlightAnimator(
     private val interpolator: TimeInterpolator = DEFAULT_INTERPOLATOR,
 ) {
   companion object {
-    const val DEFAULT_FADE_IN_DURATION_MS = 1000L
-    const val DEFAULT_DISPLAY_DURATION_MS = 2000L
-    const val DEFAULT_FADE_OUT_DURATION_MS = 3000L
+    const val DEFAULT_FADE_IN_DURATION_MS = 500L
+    const val DEFAULT_DISPLAY_DURATION_MS = 500L
+    const val DEFAULT_FADE_OUT_DURATION_MS = 200L
     private val DEFAULT_INTERPOLATOR: TimeInterpolator = AccelerateDecelerateInterpolator()
   }
 
@@ -46,11 +46,12 @@ internal class HighlightAnimator(
             val progress = animatorUpdate.animatedValue as? Float ?: return@addUpdateListener
 
             when {
-              // Fade-in phase: alpha and draw progress both go 0->1
+              // Draw phase: alpha stays at 1, draw progress goes 0->1 with easing
               progress <= fadeInEnd -> {
-                val phase = progress / fadeInEnd
-                onAlphaUpdate(highlightId, phase.coerceIn(0f, 1f))
-                onDrawProgressUpdate(highlightId, phase.coerceIn(0f, 1f))
+                val linearPhase = progress / fadeInEnd
+                val easedPhase = interpolator.getInterpolation(linearPhase)
+                onAlphaUpdate(highlightId, 1f)
+                onDrawProgressUpdate(highlightId, easedPhase.coerceIn(0f, 1f))
               }
               // Display phase: stay at full alpha and full draw
               progress <= displayEnd -> {
