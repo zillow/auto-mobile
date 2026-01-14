@@ -5,6 +5,7 @@ import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 // Helper function to create mock ObserveResult
 let hierarchyCounter = 0;
@@ -21,6 +22,7 @@ describe("BiometricAuth", () => {
   let fakeObserveScreen: FakeObserveScreen;
   let fakeWindow: FakeWindow;
   let fakeAwaitIdle: FakeAwaitIdle;
+  let fakeTimer: FakeTimer;
   let device: BootedDevice;
 
   beforeEach(() => {
@@ -29,6 +31,7 @@ describe("BiometricAuth", () => {
     fakeObserveScreen = new FakeObserveScreen();
     fakeWindow = new FakeWindow();
     fakeAwaitIdle = new FakeAwaitIdle();
+    fakeTimer = new FakeTimer();
 
     // Create a mock device
     device = {
@@ -45,7 +48,7 @@ describe("BiometricAuth", () => {
     fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "1", stderr: "" });
     fakeAdb.setCommandResponse("emu help", { stdout: "finger - fingerprint commands\nhelp - show this help", stderr: "" });
 
-    biometricAuth = new BiometricAuth(device, fakeAdb);
+    biometricAuth = new BiometricAuth(device, fakeAdb, null, fakeTimer);
 
     // Replace the internal managers with our fakes
     (biometricAuth as any).observeScreen = fakeObserveScreen;

@@ -8,6 +8,7 @@ import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("DragAndDrop", () => {
   const device: BootedDevice = {
@@ -22,6 +23,7 @@ describe("DragAndDrop", () => {
   let fakeWindow: FakeWindow;
   let fakeA11yService: FakeAccessibilityService;
   let fakeAdb: FakeAdbExecutor;
+  let fakeTimer: FakeTimer;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
   let managerSpy: ReturnType<typeof spyOn> | null = null;
 
@@ -63,6 +65,7 @@ describe("DragAndDrop", () => {
     fakeWindow = new FakeWindow();
     fakeA11yService = new FakeAccessibilityService();
     fakeAdb = new FakeAdbExecutor();
+    fakeTimer = new FakeTimer();
 
     fakeObserveScreen.setObserveResult(() => createObserveResult());
     fakeWindow.setCachedActiveWindow(null);
@@ -73,7 +76,7 @@ describe("DragAndDrop", () => {
     } as any);
     getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue(fakeA11yService as any);
 
-    dragAndDrop = new DragAndDrop(device);
+    dragAndDrop = new DragAndDrop(device, null, null, fakeTimer);
     (dragAndDrop as any).observeScreen = fakeObserveScreen;
     (dragAndDrop as any).awaitIdle = fakeAwaitIdle;
     (dragAndDrop as any).window = fakeWindow;

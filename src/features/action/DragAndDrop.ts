@@ -12,6 +12,9 @@ import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClien
 import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
+import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
+import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 const PRESS_DURATION_MIN_MS = 600;
 const PRESS_DURATION_MAX_MS = 3000;
@@ -27,8 +30,13 @@ export class DragAndDrop extends BaseVisualChange {
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
 
-  constructor(device: BootedDevice) {
-    super(device);
+  constructor(
+    device: BootedDevice,
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null,
+    timer: Timer = defaultTimer
+  ) {
+    super(device, adb, axe, timer);
     this.elementUtils = new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
   }
@@ -102,7 +110,7 @@ export class DragAndDrop extends BaseVisualChange {
             signal
           );
 
-          await new Promise(resolve => setTimeout(resolve, DROP_DURATION_MS));
+          await this.timer.sleep(DROP_DURATION_MS);
 
           const distance = Math.hypot(targetPoint.x - sourcePoint.x, targetPoint.y - sourcePoint.y);
 
