@@ -1,9 +1,51 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import { ObserveScreen } from "../../../src/features/observe/ObserveScreen";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { z } from "zod";
+import { ScreenshotJobTracker } from "../../../src/utils/ScreenshotJobTracker";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
+import { BootedDevice } from "../../../src/models/DeviceInfo";
+import { FakeTimer } from "../../fakes/FakeTimer";
+import { OPERATION_CANCELLED_MESSAGE } from "../../../src/utils/constants";
+
+const resolveWithFakeTimer = async <T>(
+  promise: Promise<T>,
+  timer: FakeTimer,
+  stepMs: number = 10
+): Promise<T> => {
+  let settled = false;
+  let result: T | undefined;
+  let error: unknown;
+
+  promise
+    .then(value => {
+      settled = true;
+      result = value;
+    })
+    .catch(caught => {
+      settled = true;
+      error = caught;
+    });
+
+  let steps = 0;
+  while (!settled) {
+    if (timer.getPendingTimeoutCount() > 0 || timer.getPendingIntervalCount() > 0 || timer.getPendingSleepCount() > 0) {
+      timer.advanceTime(stepMs);
+    }
+    await new Promise(resolve => setImmediate(resolve));
+    steps += 1;
+    if (steps > 2000) {
+      throw new Error("FakeTimer pump exceeded max steps");
+    }
+  }
+
+  if (error) {
+    throw error;
+  }
+  return result as T;
+};
 
 describe("MCP Resources Read", () => {
   let fixture: McpTestFixture;
@@ -24,6 +66,11 @@ describe("MCP Resources Read", () => {
 
     fixture = new McpTestFixture();
     await fixture.setup();
+  });
+
+  afterEach(() => {
+    ObserveScreen.clearCache();
+    ScreenshotJobTracker.resetTimer();
   });
 
   afterAll(async () => {
@@ -113,6 +160,71 @@ describe("MCP Resources Read", () => {
       expect(content.blob).toBeDefined();
       expect(content.blob!.length).toBeGreaterThan(0);
     }
+  });
+
+  test("reading latest screenshot waits for pending capture when none cached", async function() {
+    const { client } = fixture.getContext();
+    const fakeTimer = new FakeTimer();
+    fakeTimer.setManualMode();
+    ScreenshotJobTracker.setTimer(fakeTimer);
+
+    const mockDevice: BootedDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    const observeScreen = new ObserveScreen(mockDevice, new FakeAdbExecutor());
+    await observeScreen.cacheObserveResult(observeScreen.createBaseResult());
+
+    (ObserveScreen as any).latestScreenshotPath = null;
+    (ObserveScreen as any).latestScreenshotError = null;
+    (ObserveScreen as any).latestScreenshotTimestamp = null;
+
+    const screenshotDir = path.join("/tmp/auto-mobile", "screenshots");
+    await fs.mkdir(screenshotDir, { recursive: true });
+    const screenshotPath = path.join(screenshotDir, `screenshot_${Date.now()}.png`);
+    await fs.writeFile(screenshotPath, Buffer.from("fake screenshot data"));
+
+    ScreenshotJobTracker.startJob(mockDevice.deviceId, async signal => {
+      return new Promise(resolve => {
+        const timeoutId = fakeTimer.setTimeout(() => {
+          (ObserveScreen as any).latestScreenshotPath = screenshotPath;
+          (ObserveScreen as any).latestScreenshotError = null;
+          (ObserveScreen as any).latestScreenshotTimestamp = Date.now();
+          resolve({ success: true, path: screenshotPath });
+        }, 25);
+
+        signal.addEventListener("abort", () => {
+          fakeTimer.clearTimeout(timeoutId);
+          resolve({ success: false, error: OPERATION_CANCELLED_MESSAGE });
+        }, { once: true });
+      });
+    });
+
+    const readResourceResponseSchema = z.object({
+      contents: z.array(z.object({
+        uri: z.string(),
+        mimeType: z.string().optional(),
+        text: z.string().optional(),
+        blob: z.string().optional()
+      }))
+    });
+
+    const resultPromise = client.request({
+      method: "resources/read",
+      params: {
+        uri: "automobile:observation/latest/screenshot"
+      }
+    }, readResourceResponseSchema);
+    const result = await resolveWithFakeTimer(resultPromise, fakeTimer, 25);
+
+    const content = result.contents[0];
+    expect(content.uri).toBe("automobile:observation/latest/screenshot");
+    expect(content.mimeType).toBe("image/png");
+    expect(content.blob).toBeDefined();
+    expect(content.blob!.length).toBeGreaterThan(0);
+
+    await fs.unlink(screenshotPath);
   });
 
   test("reading non-existent resource should throw error", async function() {

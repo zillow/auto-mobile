@@ -2,6 +2,7 @@ import { logger } from "../../utils/logger";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { BootedDevice, ExecResult, ObserveResult } from "../../models";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
+import { ScreenshotResult } from "../../models/ScreenshotResult";
 import { GetScreenSize } from "./GetScreenSize";
 import { GetSystemInsets } from "./GetSystemInsets";
 import { ViewHierarchy } from "./ViewHierarchy";
@@ -27,6 +28,8 @@ import { RecompositionTracker } from "../performance/RecompositionTracker";
 import { PredictiveUIState } from "./PredictiveUIState";
 import { accessibilityDetector } from "../../utils/AccessibilityDetector";
 import { FeatureFlagService } from "../featureFlags/FeatureFlagService";
+import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
+import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 
 /**
  * Interface for cached observe result
@@ -109,6 +112,7 @@ export class ObserveScreen {
     ObserveScreen.latestScreenshotPath = null;
     ObserveScreen.latestScreenshotError = null;
     ObserveScreen.latestScreenshotTimestamp = null;
+    ScreenshotJobTracker.clear();
   }
 
   constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null, webdriver: WebDriverAgent | null = null) {
@@ -155,6 +159,37 @@ export class ObserveScreen {
     ObserveScreen.latestScreenshotPath = path ?? null;
     ObserveScreen.latestScreenshotError = error ?? null;
     ObserveScreen.latestScreenshotTimestamp = Date.now();
+  }
+
+  private async handleScreenshotResult(
+    screenshotResult: ScreenshotResult,
+    options: { ignoreCancel?: boolean } = {}
+  ): Promise<void> {
+    if (!screenshotResult.success) {
+      const errorMessage = screenshotResult.error || "Failed to capture screenshot";
+      if (options.ignoreCancel && errorMessage.includes(OPERATION_CANCELLED_MESSAGE)) {
+        logger.debug("[OBSERVE] Screenshot capture cancelled");
+        return;
+      }
+      ObserveScreen.updateLatestScreenshotCache(undefined, errorMessage);
+      logger.warn(`[OBSERVE] Screenshot capture failed: ${errorMessage}`);
+      return;
+    }
+
+    if (!screenshotResult.path) {
+      ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture returned no file path");
+      logger.warn("[OBSERVE] Screenshot capture succeeded but no file path was returned");
+      return;
+    }
+
+    const exists = await fs.pathExists(screenshotResult.path);
+    if (!exists) {
+      ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot file missing after capture");
+      logger.warn(`[OBSERVE] Screenshot capture reported success but file missing: ${screenshotResult.path}`);
+      return;
+    }
+
+    ObserveScreen.updateLatestScreenshotCache(screenshotResult.path);
   }
 
   /**
@@ -466,36 +501,74 @@ export class ObserveScreen {
     }
 
     try {
-      const screenshotResult = await perf.track("screenshot", () =>
-        this.screenshotUtil.execute({ format: "png" }, signal)
-      );
-
-      if (!screenshotResult.success) {
-        const errorMessage = screenshotResult.error || "Failed to capture screenshot";
-        ObserveScreen.updateLatestScreenshotCache(undefined, errorMessage);
-        logger.warn(`[OBSERVE] Screenshot capture failed: ${errorMessage}`);
-        return;
-      }
-
-      if (!screenshotResult.path) {
-        ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture returned no file path");
-        logger.warn("[OBSERVE] Screenshot capture succeeded but no file path was returned");
-        return;
-      }
-
-      const exists = await fs.pathExists(screenshotResult.path);
-      if (!exists) {
-        ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot file missing after capture");
-        logger.warn(`[OBSERVE] Screenshot capture reported success but file missing: ${screenshotResult.path}`);
-        return;
-      }
-
-      ObserveScreen.updateLatestScreenshotCache(screenshotResult.path);
+      await perf.track("screenshot", async () => {
+        const { promise } = this.screenshotUtil.startTrackedCapture(
+          { format: "png" },
+          {
+            parentSignal: signal,
+            onComplete: async completion => {
+              if (!completion.isLatest) {
+                return;
+              }
+              if (completion.aborted) {
+                logger.debug("[OBSERVE] Screenshot capture cancelled");
+                return;
+              }
+              try {
+                await this.handleScreenshotResult(completion.result, { ignoreCancel: true });
+              } catch (err) {
+                logger.warn(`[OBSERVE] Failed to finalize screenshot capture: ${err}`);
+              }
+            }
+          }
+        );
+        await promise;
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes(OPERATION_CANCELLED_MESSAGE)) {
+        logger.debug("[OBSERVE] Screenshot capture cancelled");
+        return;
+      }
       ObserveScreen.updateLatestScreenshotCache(undefined, errorMessage);
       logger.warn(`[OBSERVE] Screenshot capture failed: ${errorMessage}`);
     }
+  }
+
+  private startObservationScreenshot(
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    signal?: AbortSignal
+  ): void {
+    if (this.device.platform === "ios") {
+      ObserveScreen.updateLatestScreenshotCache(undefined, "Screenshot capture not supported on iOS");
+      return;
+    }
+
+    perf.startOperation("screenshot");
+    const { promise } = this.screenshotUtil.startTrackedCapture(
+      { format: "png" },
+      {
+        parentSignal: signal,
+        onComplete: async completion => {
+          if (!completion.isLatest) {
+            return;
+          }
+          if (completion.aborted) {
+            logger.debug("[OBSERVE] Screenshot capture cancelled");
+            return;
+          }
+          try {
+            await this.handleScreenshotResult(completion.result, { ignoreCancel: true });
+          } catch (err) {
+            logger.warn(`[OBSERVE] Failed to finalize screenshot capture: ${err}`);
+          }
+        }
+      }
+    );
+
+    promise.finally(() => {
+      perf.endOperation("screenshot");
+    });
   }
 
   /**
@@ -1031,7 +1104,11 @@ export class ObserveScreen {
       await this.collectAllData(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
 
       // Capture screenshot for latest observation resource
-      await this.captureObservationScreenshot(perf, signal);
+      if (serverConfig.getAccessibilityAuditConfig()) {
+        await this.captureObservationScreenshot(perf, signal);
+      } else {
+        this.startObservationScreenshot(perf, signal);
+      }
 
       // Attach recomposition metrics if enabled
       await RecompositionTracker.getInstance().processObservation(result, this.device);
@@ -1092,6 +1169,7 @@ export class ObserveScreen {
     } catch (err) {
       logger.error("Critical error in observe command:", err);
       const errorMessage = err instanceof Error ? err.message : String(err);
+      ScreenshotJobTracker.cancelJob(this.device.deviceId);
       ObserveScreen.updateLatestScreenshotCache(undefined, `Observation failed: ${errorMessage}`);
       return {
         updatedAt: new Date().toISOString(),
