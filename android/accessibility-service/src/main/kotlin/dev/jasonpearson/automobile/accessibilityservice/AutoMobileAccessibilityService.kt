@@ -206,7 +206,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
           val packageName = intent.data?.schemeSpecificPart ?: return
           val uid = intent.getIntExtra(Intent.EXTRA_UID, -1)
-          val userId = if (uid >= 0) android.os.UserHandle.getUserId(uid) else 0
+          val userId = if (uid >= 0) uid else 0
           val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
           // EXTRA_REMOVED_FOR_ALL_USERS may not be available in all SDK versions, use string literal
           val removedForAllUsers = intent.getBooleanExtra("android.intent.extra.REMOVED_FOR_ALL_USERS", false)
