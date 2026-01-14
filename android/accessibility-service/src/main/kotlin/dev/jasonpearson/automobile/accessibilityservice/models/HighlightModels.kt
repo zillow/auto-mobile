@@ -80,9 +80,3 @@ data class HighlightShape(
     val points: List<HighlightPoint>? = null,
     val style: HighlightStyle? = null,
 )
-
-@Serializable
-data class HighlightEntry(
-    val id: String,
-    val shape: HighlightShape,
-)

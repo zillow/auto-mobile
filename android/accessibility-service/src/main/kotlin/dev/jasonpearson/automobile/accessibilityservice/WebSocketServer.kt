@@ -142,9 +142,6 @@ class WebSocketServer(
     private val onAddHighlight:
         ((requestId: String?, highlightId: String?, shape: HighlightShape?) -> Unit)? =
         null,
-    private val onRemoveHighlight: ((requestId: String?, highlightId: String?) -> Unit)? = null,
-    private val onClearHighlights: ((requestId: String?) -> Unit)? = null,
-    private val onListHighlights: ((requestId: String?) -> Unit)? = null,
 ) {
   companion object {
     private const val TAG = "WebSocketServer"
@@ -551,18 +548,6 @@ class WebSocketServer(
         "add_highlight" -> {
           Log.d(TAG, "Received add_highlight request (requestId: ${request.requestId})")
           onAddHighlight?.invoke(request.requestId, request.id, request.shape)
-        }
-        "remove_highlight" -> {
-          Log.d(TAG, "Received remove_highlight request (requestId: ${request.requestId})")
-          onRemoveHighlight?.invoke(request.requestId, request.id)
-        }
-        "clear_highlights" -> {
-          Log.d(TAG, "Received clear_highlights request (requestId: ${request.requestId})")
-          onClearHighlights?.invoke(request.requestId)
-        }
-        "list_highlights" -> {
-          Log.d(TAG, "Received list_highlights request (requestId: ${request.requestId})")
-          onListHighlights?.invoke(request.requestId)
         }
         else -> {
           Log.d(TAG, "Unknown message type: ${request.type}")

@@ -28,7 +28,6 @@ export class FakeAccessibilityService implements AccessibilityService {
   private performanceTiming: AndroidPerfTiming[] | null = null;
   private isConnectedState: boolean = true;
   private hasCachedHierarchyState: boolean = false;
-  private highlights: Map<string, HighlightShape> = new Map();
 
   // Failure modes
   private failureMap: Map<string, Error> = new Map();
@@ -265,7 +264,6 @@ export class FakeAccessibilityService implements AccessibilityService {
     this.imeActionHistory = [];
     this.screenshotRequestCount = 0;
     this.hierarchyRequestCount = 0;
-    this.highlights.clear();
   }
 
   // Helper method to apply operation delay
@@ -553,58 +551,8 @@ export class FakeAccessibilityService implements AccessibilityService {
   ): Promise<HighlightOperationResult> {
     await this.applyDelay("addHighlight");
     this.checkFailure("addHighlight");
-    this.highlights.set(id, shape);
     return {
-      success: true,
-      highlights: Array.from(this.highlights.entries()).map(([highlightId, highlightShape]) => ({
-        id: highlightId,
-        shape: highlightShape
-      }))
-    };
-  }
-
-  async requestRemoveHighlight(
-    id: string,
-    timeoutMs: number = 5000,
-    perf?: PerformanceTracker
-  ): Promise<HighlightOperationResult> {
-    await this.applyDelay("removeHighlight");
-    this.checkFailure("removeHighlight");
-    this.highlights.delete(id);
-    return {
-      success: true,
-      highlights: Array.from(this.highlights.entries()).map(([highlightId, highlightShape]) => ({
-        id: highlightId,
-        shape: highlightShape
-      }))
-    };
-  }
-
-  async requestClearHighlights(
-    timeoutMs: number = 5000,
-    perf?: PerformanceTracker
-  ): Promise<HighlightOperationResult> {
-    await this.applyDelay("clearHighlights");
-    this.checkFailure("clearHighlights");
-    this.highlights.clear();
-    return {
-      success: true,
-      highlights: []
-    };
-  }
-
-  async requestListHighlights(
-    timeoutMs: number = 5000,
-    perf?: PerformanceTracker
-  ): Promise<HighlightOperationResult> {
-    await this.applyDelay("listHighlights");
-    this.checkFailure("listHighlights");
-    return {
-      success: true,
-      highlights: Array.from(this.highlights.entries()).map(([highlightId, highlightShape]) => ({
-        id: highlightId,
-        shape: highlightShape
-      }))
+      success: true
     };
   }
 

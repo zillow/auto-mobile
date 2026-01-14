@@ -50,9 +50,12 @@ Example config payload:
     - `platform`: `android` or `ios`.
     - `deviceId`/`sessionUuid`/`device`: optional device targeting. If omitted, the action applies to all devices on the platform.
     - `recordingId`: optional (stop only).
+    - `highlights`: optional list of highlight entries (Android only) to show during recording. Each entry includes optional `description`, `shape`, and optional `timing` (`startTimeMs`).
     - Optional overrides for `targetBitrateKbps`, `fps`, `resolution`, `qualityPreset`, `format`,
       `maxDuration` (seconds, default 30, max 300), and `outputName`.
   - Returns: per-device recording metadata and any evictions.
+
+Recording metadata now includes `highlights` entries with appearance/disappearance timestamps in seconds (millisecond precision).
 
 ## MCP Resources
 

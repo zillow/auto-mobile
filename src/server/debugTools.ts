@@ -46,11 +46,9 @@ export interface BugReportArgs {
   saveToFile?: boolean;
   saveDir?: string;
   highlights?: Array<{
-    id: string;
-    description: string;
+    description?: string;
     shape: HighlightShape;
   }>;
-  autoRemoveHighlights?: boolean;
   includeHighlightsInScreenshot?: boolean;
 }
 
@@ -86,11 +84,9 @@ export const bugReportSchema = addDeviceTargetingToSchema(z.object({
   saveToFile: z.boolean().optional().describe("Whether to save full report to a file (default: false)"),
   saveDir: z.string().optional().describe("Directory to save report to"),
   highlights: z.array(z.object({
-    id: z.string().min(1).describe("Unique highlight id"),
-    description: z.string().min(1).describe("Description of the highlight"),
+    description: z.string().min(1).optional().describe("Description of the highlight"),
     shape: highlightShapeSchema
   })).optional().describe("Highlights to add during report generation"),
-  autoRemoveHighlights: z.boolean().optional().describe("Whether to remove highlights added for this report (default: true)"),
   includeHighlightsInScreenshot: z.boolean().optional().describe("Whether screenshot should include highlight overlays (default: true)")
 }));
 
@@ -151,7 +147,6 @@ export function registerDebugTools() {
         saveToFile: args.saveToFile,
         saveDir: args.saveDir,
         highlights: args.highlights,
-        autoRemoveHighlights: args.autoRemoveHighlights,
         includeHighlightsInScreenshot: args.includeHighlightsInScreenshot
       });
       return createJSONToolResponse(result);

@@ -13,7 +13,6 @@ export interface BugReportHighlightNearbyElement {
 }
 
 export interface BugReportHighlightEntry {
-  id: string;
   description?: string;
   shape: HighlightShape;
   nearbyElements?: BugReportHighlightNearbyElement[];

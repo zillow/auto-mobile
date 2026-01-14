@@ -25,7 +25,6 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ElementBounds
-import dev.jasonpearson.automobile.accessibilityservice.models.HighlightEntry
 import dev.jasonpearson.automobile.accessibilityservice.models.HighlightShape
 import dev.jasonpearson.automobile.accessibilityservice.models.InteractionElement
 import dev.jasonpearson.automobile.accessibilityservice.models.InteractionEvent
@@ -445,7 +444,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onGetTraversalOrder = { requestId -> handleGetTraversalOrder(requestId) },
               onAddHighlight = { requestId, highlightId, shape ->
                 handleAddHighlight(requestId, highlightId, shape)
-              },
+              }
           )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -3428,7 +3427,6 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
     try {
       val errorJson = jsonCompact.encodeToString<String?>(error)
-
       webSocketServer.broadcastWithPerf { perfTiming ->
         buildString {
           append("""{"type":"highlight_response","timestamp":${System.currentTimeMillis()}""")

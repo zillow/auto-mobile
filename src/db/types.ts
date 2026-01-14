@@ -384,6 +384,7 @@ export interface VideoRecordingsTable {
   ended_at: string | null;
   last_accessed_at: string;
   config_json: string;
+  highlights_json: string | null;
 }
 
 export interface VideoRecordingConfigsTable {

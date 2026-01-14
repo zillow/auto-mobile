@@ -12,7 +12,6 @@ import {
   CurrentFocusResult,
   TraversalOrderResult,
   Element,
-  HighlightEntry,
   HighlightOperationResult,
   HighlightShape
 } from "../../models";
@@ -1485,7 +1484,6 @@ export class AccessibilityServiceClient implements AccessibilityService {
         resolve({
           success: highlightMessage.success ?? false,
           error: highlightMessage.error,
-          highlights: Array.isArray(highlightMessage.highlights) ? highlightMessage.highlights : [],
           requestId: highlightMessage.requestId,
           timestamp: highlightMessage.timestamp
         });
@@ -4002,7 +4000,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
   private async requestHighlightOperation(
     type: "add_highlight",
-    payload: { id?: string; shape?: HighlightShape },
+    payload: { id: string; shape: HighlightShape },
     timeoutMs: number,
     perf: PerformanceTracker
   ): Promise<HighlightOperationResult> {
@@ -4014,8 +4012,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
         logger.warn("[ACCESSIBILITY_SERVICE] Failed to establish WebSocket connection for highlight operation");
         return {
           success: false,
-          error: "Failed to connect to accessibility service",
-          highlights: []
+          error: "Failed to connect to accessibility service"
         };
       }
 
@@ -4031,8 +4028,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
             this.pendingHighlightRequestId = null;
             resolve({
               success: false,
-              error: `Highlight request timeout after ${timeoutMs}ms`,
-              highlights: []
+              error: `Highlight request timeout after ${timeoutMs}ms`
             });
           }
         }, timeoutMs);
@@ -4074,8 +4070,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
       logger.warn(`[ACCESSIBILITY_SERVICE] Highlight ${type} request failed after ${duration}ms: ${error}`);
       return {
         success: false,
-        error: `${error}`,
-        highlights: []
+        error: `${error}`
       };
     }
   }

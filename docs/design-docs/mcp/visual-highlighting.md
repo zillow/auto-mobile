@@ -6,22 +6,20 @@ Expose visual highlight overlays (box or circle) as an MCP tool for debugging UI
 
 - `highlight`
   - Params:
-    - `action`: `add` | `remove` | `clear` | `list`
-    - `highlightId`: required for `add` and `remove`
-    - `shape`: required for `add`
+    - `shape`: required highlight shape definition
+    - Optional `description`
     - `platform`: `android` | `ios`
     - Optional device targeting: `deviceId`, `device`, `sessionUuid`
     - Optional `timeoutMs` override
-  - Returns: success flag, optional highlightId, list of highlights, and error message.
+  - Returns: success flag and optional error message.
   - iOS: returns an unsupported error (Android only for now).
+  - Highlights auto-remove after their animation completes.
 
 ## Examples
 
 ### Highlight element during bug report
 ```javascript
 await highlight({
-  action: "add",
-  highlightId: "problem-element",
   shape: {
     type: "box",
     bounds: { x: 100, y: 200, width: 300, height: 150 },
@@ -38,7 +36,6 @@ await bugReport({
   includeScreenshot: true,
   highlights: [
     {
-      id: "problem-area",
       description: "Expected button location",
       shape: {
         type: "box",
@@ -47,16 +44,13 @@ await bugReport({
       }
     }
   ],
-  includeHighlightsInScreenshot: true,
-  autoRemoveHighlights: true
+  includeHighlightsInScreenshot: true
 });
 ```
 
 ### Multiple highlights for comparison
 ```javascript
 await highlight({
-  action: "add",
-  highlightId: "expected",
   shape: {
     type: "circle",
     bounds: { x: 200, y: 300, width: 50, height: 50 },
@@ -66,8 +60,6 @@ await highlight({
 });
 
 await highlight({
-  action: "add",
-  highlightId: "actual",
   shape: {
     type: "circle",
     bounds: { x: 210, y: 310, width: 50, height: 50 },
@@ -77,30 +69,11 @@ await highlight({
 });
 ```
 
-### Clear after video recording
-```javascript
-await videoRecording({ action: "start", platform: "android" });
-await highlight({ action: "add", highlightId: "focus", shape: {
-  type: "box",
-  bounds: { x: 80, y: 160, width: 260, height: 120 }
-}, platform: "android" });
-// ... perform actions ...
-await videoRecording({ action: "stop", platform: "android" });
-await highlight({ action: "clear", platform: "android" });
-```
-
-### List current highlights
-```javascript
-const result = await highlight({ action: "list", platform: "android" });
-```
-
 ## Response Format
 
 ```typescript
 {
   success: boolean;
-  highlightId?: string;
-  highlights?: Array<{ id: string; shape: HighlightShape }>;
   error?: string;
 }
 ```
