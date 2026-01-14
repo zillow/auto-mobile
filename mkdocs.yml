@@ -116,24 +116,25 @@ nav:
             - 'Accessibility Service': design-docs/plat/android/accessibility-service.md
             - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
             - 'JUnitRunner': design-docs/plat/android/junitrunner.md
+            - 'Multi-device': design-docs/plat/android/multi-device.md
             - 'IDE Plugin':
               - 'Overview': design-docs/plat/android/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/android/ide-plugin/test-recording.md
               - 'Navigation Graph Render': design-docs/plat/android/ide-plugin/navigation-graph.md
               - 'Control Feature Flags': design-docs/plat/android/ide-plugin/feature-flags.md
             - 'Work Profiles': design-docs/plat/android/work-profiles.md
-            - 'Feature Ideas':
-              - 'Overview': design-docs/plat/android/feature-ideas.md
+            - 'Device Tools':
               - 'takeScreenshot fallback': design-docs/plat/android/take-screenshot.md
               - 'Biometrics stubbing': design-docs/plat/android/biometrics.md
-              - 'Network state control': design-docs/plat/android/network-state.md
-              - 'Accessibility testing': design-docs/plat/android/accessibility-testing.md
               - 'Notification triggering': design-docs/plat/android/notifications.md
               - 'System tray lookFor': design-docs/plat/android/system-tray-lookfor.md
+              - 'Clipboard tool': design-docs/plat/android/clipboard.md
+            - 'Feature Ideas':
+              - 'Overview': design-docs/plat/android/feature-ideas.md
+              - 'Network state control': design-docs/plat/android/network-state.md
+              - 'Accessibility testing': design-docs/plat/android/accessibility-testing.md
               - 'executePlan assertions': design-docs/plat/android/executeplan-assertions.md
               - 'TalkBack simulation': design-docs/plat/android/talkback.md
-              - 'Multi-device': design-docs/plat/android/multi-device.md
-              - 'Clipboard tool': design-docs/plat/android/clipboard.md
           - 'iOS':
             - 'Overview': design-docs/plat/ios/index.md
             - 'Accessibility Bridge': design-docs/plat/ios/accessibility-service.md
