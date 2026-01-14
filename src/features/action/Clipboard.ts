@@ -85,12 +85,33 @@ export class Clipboard {
 
       if (a11yResult.success) {
         logger.info(`[Clipboard] ${action} via accessibility service: ${a11yResult.totalTimeMs}ms`);
-        return {
+        const a11yClipboardResult: ClipboardResult = {
           success: true,
           action,
           text: a11yResult.text,
           method: "a11y"
         };
+
+        // A11y clipboard reads can be restricted; try ADB when get returns empty.
+        if (action !== "get" || (a11yResult.text?.length ?? 0) > 0) {
+          return a11yClipboardResult;
+        }
+
+        logger.warn("[Clipboard] Accessibility service returned empty clipboard; trying ADB fallback");
+        try {
+          const adbResult = await this.executeAdbClipboard(action, text);
+          if (adbResult.success && (adbResult.text?.length ?? 0) > 0) {
+            logger.info("[Clipboard] Retrieved clipboard via ADB fallback after empty a11y result");
+            return adbResult;
+          }
+          if (!adbResult.success) {
+            logger.warn(`[Clipboard] ADB fallback for clipboard get failed: ${adbResult.error}`);
+          }
+        } catch (error) {
+          logger.warn(`[Clipboard] ADB fallback error: ${error}`);
+        }
+
+        return a11yClipboardResult;
       }
 
       logger.warn(`[Clipboard] Accessibility service ${action} failed: ${a11yResult.error}`);
