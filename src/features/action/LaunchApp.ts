@@ -460,7 +460,7 @@ export class LaunchApp extends BaseVisualChange {
           changeExpected: false,
           perf,
           packageName,
-          skipPreviousObserve: didTerminateOrClear,
+          skipPreviousObserve: true,
           skipUiStability: skipUiStability ?? false
         }
       );
@@ -504,7 +504,7 @@ export class LaunchApp extends BaseVisualChange {
       {
         changeExpected: false,
         perf,
-        skipPreviousObserve: didTerminateOrClear,
+        skipPreviousObserve: true,
         skipUiStability: skipUiStability ?? false,
         packageName,
         observationTimestampProvider: () => observationTimestampMs
