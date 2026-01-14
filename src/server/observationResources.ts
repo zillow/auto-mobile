@@ -2,6 +2,7 @@ import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { logger } from "../utils/logger";
 import { stringifyToolResponse } from "../utils/toolUtils";
+import { ScreenshotJobTracker } from "../utils/ScreenshotJobTracker";
 import * as fs from "fs/promises";
 
 // Resource URIs
@@ -77,7 +78,15 @@ async function getLatestScreenshot(): Promise<ResourceContent> {
       };
     }
 
-    const screenshotPath = await getLatestScreenshotPath();
+    let screenshotPath = await getLatestScreenshotPath();
+
+    if (!screenshotPath) {
+      const pendingDeviceId = ScreenshotJobTracker.getMostRecentPendingDeviceId();
+      if (pendingDeviceId) {
+        await ScreenshotJobTracker.waitForCompletion(pendingDeviceId, 3000);
+        screenshotPath = await getLatestScreenshotPath();
+      }
+    }
 
     if (!screenshotPath) {
       const screenshotError = ObserveScreen.getRecentCachedScreenshotError();

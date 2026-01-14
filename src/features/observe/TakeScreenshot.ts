@@ -6,6 +6,8 @@ import { logger } from "../../utils/logger";
 import { ScreenshotResult } from "../../models/ScreenshotResult";
 import { Image } from "../../utils/image-utils";
 import { BootedDevice } from "../../models";
+import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
+import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 
 export interface ScreenshotOptions {
   format?: "png" | "webp";
@@ -114,6 +116,9 @@ export class TakeScreenshot {
     logger.info(`[SCREENSHOT] *** Starting screenshot capture with startTime: ${startTime}, format: ${options.format} ***`);
 
     try {
+      if (signal?.aborted) {
+        return { success: false, error: OPERATION_CANCELLED_MESSAGE };
+      }
       // Generate unique filename with startTime
       const finalPath = this.generateScreenshotPath(startTime, options);
 
@@ -132,6 +137,20 @@ export class TakeScreenshot {
         error: `Failed to take screenshot: ${errorMessage}`
       };
     }
+  }
+
+  /**
+   * Start a tracked screenshot capture that can be awaited or cancelled later.
+   */
+  startTrackedCapture(
+    options: ScreenshotOptions = { format: "png" },
+    trackerOptions: ScreenshotJobOptions = {}
+  ): ScreenshotJobHandle {
+    return ScreenshotJobTracker.startJob(
+      this.device.deviceId,
+      signal => this.execute(options, signal),
+      trackerOptions
+    );
   }
 
   /**
