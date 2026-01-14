@@ -660,7 +660,7 @@ export class TapOnElement extends BaseVisualChange {
           }
 
           const isTalkBackEnabled = this.device.platform === "android"
-            ? await this.accessibilityDetector.isAccessibilityEnabled(this.device.id, this.adb)
+            ? (await this.accessibilityDetector.detectMethod(this.device.id, this.adb)) === "talkback"
             : false;
           const { element: tapElement, usedParent } = this.resolveTapTargetElement(
             element,
@@ -809,10 +809,10 @@ export class TapOnElement extends BaseVisualChange {
     options?: TapOnElementOptions,
     isTalkBackEnabled?: boolean
   ): Promise<void> {
-    // Check if TalkBack is enabled
+    // Check if TalkBack is enabled (not just any accessibility service)
     const talkBackEnabled = typeof isTalkBackEnabled === "boolean"
       ? isTalkBackEnabled
-      : await this.accessibilityDetector.isAccessibilityEnabled(this.device.id, this.adb);
+      : (await this.accessibilityDetector.detectMethod(this.device.id, this.adb)) === "talkback";
 
     const resourceId = element?.["resource-id"];
 
