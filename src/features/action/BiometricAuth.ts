@@ -4,6 +4,7 @@ import { BootedDevice, BiometricAuthResult } from "../../models";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { logger } from "../../utils/logger";
+import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
 export interface BiometricAuthOptions {
   action: "match" | "fail" | "cancel";
@@ -12,8 +13,13 @@ export interface BiometricAuthOptions {
 }
 
 export class BiometricAuth extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(
+    device: BootedDevice,
+    adb: AdbClient | null = null,
+    axe: AxeClient | null = null,
+    timer: Timer = defaultTimer
+  ) {
+    super(device, adb, axe, timer);
     this.device = device;
   }
 
@@ -152,7 +158,7 @@ export class BiometricAuth extends BaseVisualChange {
       }
 
       // Wait a brief moment for the touch to register
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await this.timer.sleep(100);
 
       // Release the fingerprint sensor
       const removeResult = await this.adb.executeCommand(`emu finger remove ${fingerprintId}`);
