@@ -132,6 +132,11 @@ export function registerDeviceTools() {
       const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
       await deviceUtils.killDevice(args.device);
 
+      // Clear installed apps cache for this device session
+      const { InstalledAppsRepository } = await import("../db/installedAppsRepository");
+      const repo = new InstalledAppsRepository();
+      await repo.clearDeviceSession(args.device.deviceId);
+
       // Notify that booted device resources have changed
       await notifyBootedDeviceResourcesUpdated();
       await syncInstalledAppResources();

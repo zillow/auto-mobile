@@ -21,6 +21,9 @@ export interface InstalledAppsStore {
   removeInstalledAppForDevice(deviceId: string, packageName: string): Promise<void>;
   markDeviceStale(deviceId: string): Promise<void>;
   touchDevice(deviceId: string, timestampMs: number): Promise<void>;
+  clearDeviceSession(deviceId: string): Promise<void>;
+  clearOldDaemonSessions(currentDaemonSessionId: string): Promise<void>;
+  setSessionTracking(daemonSessionId: string, deviceId: string, deviceSessionStart: number): Promise<void>;
 }
 
 export class InstalledAppsRepository implements InstalledAppsStore {
@@ -149,6 +152,40 @@ export class InstalledAppsRepository implements InstalledAppsStore {
       .updateTable("installed_apps")
       .set({ last_verified_at: timestampMs })
       .where("device_id", "=", deviceId)
+      .execute();
+  }
+
+  async clearDeviceSession(deviceId: string): Promise<void> {
+    const db = await this.getDb();
+    await db
+      .deleteFrom("installed_apps")
+      .where("device_id", "=", deviceId)
+      .execute();
+  }
+
+  async clearOldDaemonSessions(currentDaemonSessionId: string): Promise<void> {
+    const db = await this.getDb();
+    await db
+      .deleteFrom("installed_apps")
+      .where("daemon_session_id", "is not", null)
+      .where("daemon_session_id", "!=", currentDaemonSessionId)
+      .execute();
+  }
+
+  async setSessionTracking(
+    daemonSessionId: string,
+    deviceId: string,
+    deviceSessionStart: number
+  ): Promise<void> {
+    const db = await this.getDb();
+    await db
+      .updateTable("installed_apps")
+      .set({
+        daemon_session_id: daemonSessionId,
+        device_session_start: deviceSessionStart
+      })
+      .where("device_id", "=", deviceId)
+      .where("daemon_session_id", "is", null)
       .execute();
   }
 }

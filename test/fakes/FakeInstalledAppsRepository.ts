@@ -54,7 +54,9 @@ export class FakeInstalledAppsRepository implements InstalledAppsStore {
       package_name: packageName,
       is_system: isSystem ? 1 : 0,
       installed_at: timestampMs,
-      last_verified_at: timestampMs
+      last_verified_at: timestampMs,
+      daemon_session_id: null,
+      device_session_start: null
     });
   }
 
@@ -82,6 +84,30 @@ export class FakeInstalledAppsRepository implements InstalledAppsStore {
     for (const row of this.rows) {
       if (row.device_id === deviceId) {
         row.last_verified_at = timestampMs;
+      }
+    }
+  }
+
+  async clearDeviceSession(deviceId: string): Promise<void> {
+    this.rows = this.rows.filter(row => row.device_id !== deviceId);
+  }
+
+  async clearOldDaemonSessions(currentDaemonSessionId: string): Promise<void> {
+    this.rows = this.rows.filter(row =>
+      row.daemon_session_id === null ||
+      row.daemon_session_id === currentDaemonSessionId
+    );
+  }
+
+  async setSessionTracking(
+    daemonSessionId: string,
+    deviceId: string,
+    deviceSessionStart: number
+  ): Promise<void> {
+    for (const row of this.rows) {
+      if (row.device_id === deviceId && row.daemon_session_id === null) {
+        row.daemon_session_id = daemonSessionId;
+        row.device_session_start = deviceSessionStart;
       }
     }
   }

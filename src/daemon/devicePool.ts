@@ -4,6 +4,8 @@ import { ActionableError } from "../models";
 import { Mutex } from "async-mutex";
 import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
+import type { InstalledAppsStore } from "../db/installedAppsRepository";
+import { InstalledAppsRepository } from "../db/installedAppsRepository";
 
 /**
  * Pooled Device Status
@@ -38,11 +40,14 @@ export class DevicePool {
   private static instanceCounter = 0;
   private readonly instanceId: number;
   private devices: Map<string, PooledDevice> = new Map();
+  private deviceSessionStarts: Map<string, number> = new Map();
   private sessionManager: SessionManager;
   private assignmentMutex = new Mutex();
   private timer: Timer;
   private lastUsedAtMarker = 0;
   private lastReleasedDeviceId: string | null = null;
+  private daemonSessionId: string;
+  private installedAppsRepository: InstalledAppsStore;
 
   // Max consecutive errors before marking device as failed
   private readonly MAX_DEVICE_ERRORS = 5;
@@ -51,11 +56,18 @@ export class DevicePool {
   private readonly DEVICE_WAIT_TIMEOUT_MS = 60000; // 60 seconds max wait
   private readonly DEVICE_WAIT_INTERVAL_MS = 1000; // Check every 1 second
 
-  constructor(sessionManager: SessionManager, timer: Timer = defaultTimer) {
+  constructor(
+    sessionManager: SessionManager,
+    daemonSessionId: string,
+    timer: Timer = defaultTimer,
+    installedAppsRepository?: InstalledAppsStore
+  ) {
     this.instanceId = ++DevicePool.instanceCounter;
     logger.info(`[DEVICE-POOL-DEBUG] Creating DevicePool instance #${this.instanceId}`);
     this.sessionManager = sessionManager;
+    this.daemonSessionId = daemonSessionId;
     this.timer = timer;
+    this.installedAppsRepository = installedAppsRepository ?? new InstalledAppsRepository();
   }
 
   /**
@@ -76,6 +88,8 @@ export class DevicePool {
         assignmentCount: 0,
         errorCount: 0,
       });
+      this.deviceSessionStarts.set(deviceId, now);
+      await this.setDeviceSessionTracking(deviceId, now);
     }
 
     logger.info(`Device pool initialized with ${deviceIds.length} devices`);
@@ -118,6 +132,8 @@ export class DevicePool {
             assignmentCount: 0,
             errorCount: 0,
           });
+          this.deviceSessionStarts.set(device.deviceId, now);
+          await this.setDeviceSessionTracking(device.deviceId, now);
           addedCount++;
           logger.info(`Added device ${device.deviceId} to pool during refresh`);
         }
@@ -146,20 +162,23 @@ export class DevicePool {
   /**
    * Add a new device to the pool
    */
-  addDevice(deviceId: string): void {
+  async addDevice(deviceId: string): Promise<void> {
     if (this.devices.has(deviceId)) {
       logger.warn(`Device ${deviceId} already in pool`);
       return;
     }
 
+    const now = this.seedLastUsedAt(this.timer.now());
     this.devices.set(deviceId, {
       id: deviceId,
       sessionId: null,
       status: "idle",
-      lastUsedAt: this.seedLastUsedAt(this.timer.now()),
+      lastUsedAt: now,
       assignmentCount: 0,
       errorCount: 0,
     });
+    this.deviceSessionStarts.set(deviceId, now);
+    await this.setDeviceSessionTracking(deviceId, now);
 
     logger.info(`Added device ${deviceId} to pool`);
   }
@@ -167,7 +186,7 @@ export class DevicePool {
   /**
    * Remove device from pool
    */
-  removeDevice(deviceId: string): void {
+  async removeDevice(deviceId: string): Promise<void> {
     const device = this.devices.get(deviceId);
     if (!device) {
       return;
@@ -179,7 +198,9 @@ export class DevicePool {
     }
 
     this.devices.delete(deviceId);
-    logger.info(`Removed device ${deviceId} from pool`);
+    this.deviceSessionStarts.delete(deviceId);
+    await this.clearDeviceSessionCache(deviceId);
+    logger.info(`Removed device ${deviceId} from pool and cleared cached data`);
   }
 
   /**
@@ -679,5 +700,28 @@ export class DevicePool {
 
     lines.push("=== End Report ===\n");
     return lines.join("\n");
+  }
+
+  /**
+   * Set session tracking for a device in the installed apps cache
+   */
+  private async setDeviceSessionTracking(deviceId: string, sessionStart: number): Promise<void> {
+    try {
+      await this.installedAppsRepository.setSessionTracking(this.daemonSessionId, deviceId, sessionStart);
+    } catch (error) {
+      logger.warn(`Failed to set session tracking for device ${deviceId}: ${error}`);
+    }
+  }
+
+  /**
+   * Clear installed apps cache for a device session
+   */
+  private async clearDeviceSessionCache(deviceId: string): Promise<void> {
+    try {
+      await this.installedAppsRepository.clearDeviceSession(deviceId);
+      logger.info(`[DevicePool] Cleared installed apps cache for device ${deviceId}`);
+    } catch (error) {
+      logger.warn(`Failed to clear device session cache for ${deviceId}: ${error}`);
+    }
   }
 }
