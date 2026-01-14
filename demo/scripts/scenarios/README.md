@@ -89,3 +89,5 @@ Calls an AutoMobile MCP tool silently in the background.
 ## Available Scenarios
 
 - **clock-app** - Set a 6:30 AM alarm in the Clock app
+- **slack-status** - Set Slack status to "Out sick" with expiration date (January 17th)
+- **youtube-search** - Search for a video on YouTube mobile web and open it
