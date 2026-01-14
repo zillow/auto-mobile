@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { ToolRegistry } from "../../src/server/toolRegistry";
 import type { RegisteredTool } from "../../src/server/toolRegistry";
 
@@ -607,19 +607,7 @@ describe("Tool Registration Validation (Integration Tests)", () => {
     plan: () => import("../../src/server/planTools"),
   };
 
-  let validator: ToolRegistrationValidator;
-  let fakeRegistry: FakeToolRegistry;
-
-  beforeEach(() => {
-    fakeRegistry = new FakeToolRegistry();
-    const realFs = {
-      readFile: async (path: string) => {
-        const fs = await import("fs/promises");
-        return fs.readFile(path, "utf-8");
-      }
-    };
-    validator = new ToolRegistrationValidator(fakeRegistry, realFs);
-  });
+  // Integration tests verify actual code structure without needing the validator
 
   test("should verify critical tools from issue #745 exist in actual code", async () => {
     const interactionTools = await actualModules.interaction();
