@@ -71,56 +71,20 @@ call_mcp_tool "swipeOn" --direction "up" --speed "fast" --container '{"elementId
 replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - swipeOn (MCP)${RESET}${GRAY} (direction: \"up\", speed: \"fast\")${RESET}"
 add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Scrolled up - 16ms median frame time (60 FPS)${RESET}"
 
-# Step 7: Tap detail item
-echo ""
-add_line "●${GRAY} Testing transition to detail screen…${RESET}"
-echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_54_action\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --id "performance_item_54_action" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_54_action\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Navigated to Product 54 detail - 20ms frame time, 553ms total${RESET}"
-
-# Step 8: Back to list
-echo ""
-add_line "●${GRAY} Returning to list…${RESET}"
-echo ""
-add_line "${BOLD}● auto-mobile - pressButton (MCP)${RESET}${GRAY} (button: \"back\")${RESET}"
-call_mcp_tool "pressButton" --button "back" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - pressButton (MCP)${RESET}${GRAY} (button: \"back\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Back to list${RESET}"
-
-# Step 9: Tap another item
-echo ""
-add_line "●${GRAY} Testing another transition…${RESET}"
-echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_23_action\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --id "performance_item_23_action" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_23_action\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Navigated to Product 23 detail${RESET}"
-
-# Step 10: Back again
-echo ""
-add_line "●${GRAY} Returning to list…${RESET}"
-echo ""
-add_line "${BOLD}● auto-mobile - pressButton (MCP)${RESET}${GRAY} (button: \"back\")${RESET}"
-call_mcp_tool "pressButton" --button "back" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - pressButton (MCP)${RESET}${GRAY} (button: \"back\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Back to list${RESET}"
-
 # Step 11: Scroll and tap another item
 echo ""
 add_line "●${GRAY} Scrolling to find Product 87…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - swipeOn (MCP)${RESET}${GRAY} (direction: \"up\", speed: \"normal\", lookFor.text: \"Product 87\")${RESET}"
-call_mcp_tool "swipeOn" --direction "up" --speed "normal" --lookFor '{"text":"Product 87"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - swipeOn (MCP)${RESET}${GRAY} (direction: \"up\", speed: \"normal\", lookFor.text: \"Product 87\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Found Product 87${RESET}"
+add_line "${BOLD}● auto-mobile - swipeOn (MCP)${RESET}${GRAY} (direction: \"up\", speed: \"normal\", lookFor.text: \"Product 80\")${RESET}"
+call_mcp_tool "swipeOn" --direction "up" --speed "normal" --lookFor '{"text":"Product 80"}' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - swipeOn (MCP)${RESET}${GRAY} (direction: \"up\", speed: \"normal\", lookFor.text: \"Product 80\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Found Product 80${RESET}"
 
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_87_action\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --id "performance_item_87_action" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_87_action\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Navigated to Product 87 detail${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_80_action\")${RESET}"
+call_mcp_tool "tapOn" --action "tap" --selector '{"id": "performance_item_80_action"}' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_80_action\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Navigated to Product 80 detail${RESET}"
 
 # Step 12: Terminate app
 echo ""

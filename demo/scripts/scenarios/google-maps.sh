@@ -59,7 +59,7 @@ echo ""
 add_line "●${GRAY} Searching for New York City…${RESET}"
 echo ""
 add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Search here\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --text "Search here" --platform "android"
+call_mcp_tool "tapOn" --action "tap" --selector '{"text": "Search here"}' --platform "android"
 replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Search here\")${RESET}"
 add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Search activated${RESET}"
 
