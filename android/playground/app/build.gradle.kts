@@ -5,6 +5,13 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+// Signing configuration: reads from environment variables (CI) or gradle.properties (local)
+// Paths are resolved relative to project root using rootProject.file()
+val releaseStoreFilePath: String? = System.getenv("RELEASE_KEYSTORE_PATH") ?: findProperty("RELEASE_KEYSTORE_PATH") as String?
+val releaseStorePassword: String? = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
+val releaseKeyAlias: String? = System.getenv("RELEASE_KEY_ALIAS") ?: findProperty("RELEASE_KEY_ALIAS") as String?
+val releaseKeyPassword: String? = System.getenv("RELEASE_KEY_PASSWORD") ?: findProperty("RELEASE_KEY_PASSWORD") as String?
+
 android {
   namespace = "dev.jasonpearson.automobile.playground"
   compileSdk = libs.versions.build.android.compileSdk.get().toInt()
@@ -21,11 +28,14 @@ android {
   }
 
   signingConfigs {
-    getByName("debug") {
-      storeFile = file("../../keystore/debug.keystore")
-      storePassword = "android"
-      keyAlias = "androiddebugkey"
-      keyPassword = "android"
+    create("release") {
+      storeFile = releaseStoreFilePath?.let { path ->
+        val file = File(path)
+        if (file.isAbsolute) file else rootProject.file(path)
+      }
+      storePassword = releaseStorePassword
+      keyAlias = releaseKeyAlias
+      keyPassword = releaseKeyPassword
     }
   }
 
@@ -33,9 +43,10 @@ android {
     release {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      signingConfig = signingConfigs.getByName("debug")
+      signingConfig = signingConfigs.getByName("release")
     }
   }
   compileOptions {

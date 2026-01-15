@@ -49,6 +49,22 @@ inputs:
     description: "Optional suffix to add to file names"
     required: "true"
     default: ""
+  release-keystore-base64:
+    description: "Base64 encoded release keystore for signing"
+    required: false
+    default: ""
+  release-keystore-password:
+    description: "Password for the release keystore"
+    required: false
+    default: ""
+  release-key-alias:
+    description: "Key alias in the release keystore"
+    required: false
+    default: ""
+  release-key-password:
+    description: "Password for the key in the release keystore"
+    required: false
+    default: ""
 
 outputs:
   gradle-home-project-cache-hit:
@@ -191,6 +207,18 @@ runs:
           ~/.android
           ~/.config
         key: v4-${{ runner.os }}-android-sdk
+
+    - name: "Setup Release Keystore"
+      if: ${{ inputs.release-keystore-base64 != '' }}
+      shell: ${{ inputs.shell }}
+      working-directory: ${{ inputs.gradle-project-directory }}
+      run: |
+        mkdir -p keystore
+        echo "${{ inputs.release-keystore-base64 }}" | base64 -d > keystore/release.keystore
+        echo "RELEASE_KEYSTORE_PATH=keystore/release.keystore" >> $GITHUB_ENV
+        echo "RELEASE_KEYSTORE_PASSWORD=${{ inputs.release-keystore-password }}" >> $GITHUB_ENV
+        echo "RELEASE_KEY_ALIAS=${{ inputs.release-key-alias }}" >> $GITHUB_ENV
+        echo "RELEASE_KEY_PASSWORD=${{ inputs.release-key-password }}" >> $GITHUB_ENV
 
     - name: "Run Tasks via Gradle"
       shell: ${{ inputs.shell }}

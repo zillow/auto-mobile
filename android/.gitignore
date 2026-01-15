@@ -55,6 +55,5 @@ local.properties
 
 /roadmap
 
-# Exclude private keystores, but include the shared debug keystore
+# Exclude all keystores - signing credentials are provided via environment variables
 /keystore/*
-!/keystore/debug.keystore
