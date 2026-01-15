@@ -70,7 +70,8 @@ describe("DeviceSessionManager", () => {
     AndroidAccessibilityServiceManager.getInstance = () => accessibilityManager as any;
     AccessibilityServiceClient.getInstance = () =>
       ({
-        isConnected: () => false
+        isConnected: () => false,
+        waitForConnection: () => Promise.resolve(true)
       } as any);
 
     const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
@@ -89,7 +90,8 @@ describe("DeviceSessionManager", () => {
     AndroidAccessibilityServiceManager.getInstance = () => accessibilityManager as any;
     AccessibilityServiceClient.getInstance = () =>
       ({
-        isConnected: () => false
+        isConnected: () => false,
+        waitForConnection: () => Promise.resolve(true)
       } as any);
 
     const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
@@ -107,7 +109,8 @@ describe("DeviceSessionManager", () => {
     AndroidAccessibilityServiceManager.getInstance = () => accessibilityManager as any;
     AccessibilityServiceClient.getInstance = () =>
       ({
-        isConnected: () => false
+        isConnected: () => false,
+        waitForConnection: () => Promise.resolve(true)
       } as any);
 
     const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
@@ -123,7 +126,9 @@ describe("DeviceSessionManager", () => {
     AndroidAccessibilityServiceManager.getInstance = () => accessibilityManager as any;
     AccessibilityServiceClient.getInstance = () =>
       ({
-        isConnected: () => false
+        isConnected: () => false,
+        waitForConnection: () => Promise.resolve(true),
+        verifyServiceReady: () => Promise.resolve(true)
       } as any);
 
     const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
@@ -132,23 +137,44 @@ describe("DeviceSessionManager", () => {
     expect(accessibilityManager.wasMethodCalled("setup")).toBe(true);
   });
 
-  test("should verify compatibility when accessibility is already enabled", async () => {
+  test("should skip setup when accessibility is already enabled and WebSocket connects", async () => {
     const accessibilityManager = new FakeAccessibilityServiceManager();
     accessibilityManager.setInstalled(true);
     accessibilityManager.setEnabled(true);
     AndroidAccessibilityServiceManager.getInstance = () => accessibilityManager as any;
     AccessibilityServiceClient.getInstance = () =>
       ({
-        isConnected: () => false
+        isConnected: () => false,
+        waitForConnection: () => Promise.resolve(true)
       } as any);
 
     const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
     await manager.ensureDeviceReady("android", "device-1");
 
+    // When installed, enabled, and WebSocket connects - service is working, no need for setup
+    expect(accessibilityManager.wasMethodCalled("setup")).toBe(false);
+  });
+
+  test("should run setup when accessibility cache is stale (WebSocket fails)", async () => {
+    const accessibilityManager = new FakeAccessibilityServiceManager();
+    accessibilityManager.setInstalled(true);
+    accessibilityManager.setEnabled(true);
+    AndroidAccessibilityServiceManager.getInstance = () => accessibilityManager as any;
+    AccessibilityServiceClient.getInstance = () =>
+      ({
+        isConnected: () => false,
+        waitForConnection: () => Promise.resolve(false)  // WebSocket fails - cache is stale
+      } as any);
+
+    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    await manager.ensureDeviceReady("android", "device-1");
+
+    // Cache was stale (claimed installed but WebSocket failed), so setup should run
+    expect(accessibilityManager.wasMethodCalled("resetSetupState")).toBe(true);
     expect(accessibilityManager.wasMethodCalled("setup")).toBe(true);
   });
 
-  test("should skip accessibility checks when websocket is connected", async () => {
+  test("should skip accessibility checks when websocket is connected and service is responsive", async () => {
     let managerTouched = false;
     AndroidAccessibilityServiceManager.getInstance = () => {
       managerTouched = true;
@@ -161,12 +187,32 @@ describe("DeviceSessionManager", () => {
     };
     AccessibilityServiceClient.getInstance = () =>
       ({
-        isConnected: () => true
+        isConnected: () => true,
+        verifyServiceReady: () => Promise.resolve(true)
       } as any);
 
     const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
     await manager.ensureDeviceReady("android", "device-1");
 
     expect(managerTouched).toBe(false);
+  });
+
+  test("should fall through to normal flow when websocket connected but service not responsive", async () => {
+    const accessibilityManager = new FakeAccessibilityServiceManager();
+    accessibilityManager.setInstalled(true);
+    accessibilityManager.setEnabled(true);
+    AndroidAccessibilityServiceManager.getInstance = () => accessibilityManager as any;
+    AccessibilityServiceClient.getInstance = () =>
+      ({
+        isConnected: () => true,
+        verifyServiceReady: () => Promise.resolve(false),  // Service not responsive
+        waitForConnection: () => Promise.resolve(true)
+      } as any);
+
+    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    await manager.ensureDeviceReady("android", "device-1");
+
+    // Should have fallen through and checked status since service wasn't responsive
+    expect(accessibilityManager.wasMethodCalled("isInstalled")).toBe(true);
   });
 });

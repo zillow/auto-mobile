@@ -6,6 +6,41 @@ import { NavigationGraphManager } from "../features/navigation/NavigationGraphMa
 import { ActionableError, BootedDevice } from "../models";
 import { logger } from "../utils/logger";
 import { KeepScreenAwakeManager, KEEP_SCREEN_AWAKE_STATE_KEY, KeepScreenAwakeState } from "../utils/KeepScreenAwakeManager";
+import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { createPerformanceTracker, type TimingData } from "../utils/PerformanceTracker";
+
+/**
+ * Storage for accessibility service setup timing.
+ * Keyed by deviceId, consumed once when observe reads it.
+ */
+const pendingSetupTimings = new Map<string, TimingData>();
+
+/**
+ * Store setup timing for a device.
+ * Called after accessibility service setup completes.
+ */
+export function storeSetupTiming(deviceId: string, timing: TimingData): void {
+  pendingSetupTimings.set(deviceId, timing);
+  logger.info(`[ToolExecutionContext] Stored setup timing for deviceId=${deviceId}`);
+}
+
+/**
+ * Get and consume the setup timing for a device.
+ * Returns the timing data if present and clears it from storage.
+ */
+export function consumeSetupTiming(deviceId: string): TimingData | null {
+  const timing = pendingSetupTimings.get(deviceId);
+  const availableKeys = Array.from(pendingSetupTimings.keys());
+  if (timing) {
+    pendingSetupTimings.delete(deviceId);
+    logger.info(`[ToolExecutionContext] Consumed setup timing for deviceId=${deviceId}`);
+    return timing;
+  }
+  if (availableKeys.length > 0) {
+    logger.warn(`[ToolExecutionContext] No setup timing for deviceId=${deviceId}, available keys: ${availableKeys.join(", ")}`);
+  }
+  return null;
+}
 
 /**
  * Tool Execution Context
@@ -76,12 +111,36 @@ async function ensureAccessibilityServiceReady(deviceId: string, sessionId: stri
     deviceId
   };
   logger.info(`[ToolExecutionContext] Ensuring accessibility service is ready for session ${sessionId}`);
+
+  // Always track setup timing (it's one-time per session and valuable for debugging)
+  const perf = createPerformanceTracker(true);
+  perf.serial("ensureAccessibilityServiceReady");
+
   const serviceManager = AndroidAccessibilityServiceManager.getInstance(device);
-  const setupResult = await serviceManager.setup();
+  const setupResult = await serviceManager.setup(false, perf);
+
   if (!setupResult.success) {
+    perf.end();
+    const timings = perf.getTimings();
+    if (timings) {
+      logger.info(`[ToolExecutionContext] Accessibility service setup failed`, { perfTiming: JSON.stringify(timings, null, 2) });
+    }
     throw new ActionableError(
       `Failed to setup accessibility service for session ${sessionId}: ${setupResult.error || setupResult.message}`
     );
+  }
+
+  // Wait for WebSocket connection to be ready after setup
+  const accessibilityClient = AccessibilityServiceClient.getInstance(deviceId);
+  const connected = await perf.track("waitForConnection", () => accessibilityClient.waitForConnection());
+
+  perf.end();
+  const timings = perf.getTimings();
+  if (timings) {
+    storeSetupTiming(deviceId, timings);
+    logger.info(`[ToolExecutionContext] Accessibility service ready for session ${sessionId}`, { connected });
+  } else {
+    logger.warn(`[ToolExecutionContext] No timing data captured for setup (deviceId=${deviceId})`);
   }
 }
 

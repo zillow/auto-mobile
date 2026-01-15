@@ -13,18 +13,27 @@ import crypto from "crypto";
 import http from "http";
 import https from "https";
 import os from "os";
+import { accessibilityDetector } from "./AccessibilityDetector";
+import type { AccessibilityDetector } from "./interfaces/AccessibilityDetector";
+import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
 
 const execAsync = promisify(exec);
+
+/**
+ * Result of accessibility service setup
+ */
+export interface AccessibilitySetupResult {
+  success: boolean;
+  message: string;
+  error?: string;
+  perfTiming?: ReturnType<PerformanceTracker["getTimings"]>;
+}
 
 /**
  * Interface for accessibility service management
  */
 export interface AccessibilityServiceManager {
-  setup(force?: boolean): Promise<{
-    success: boolean;
-    message: string;
-    error?: string;
-  }>;
+  setup(force?: boolean, perf?: PerformanceTracker): Promise<AccessibilitySetupResult>;
   isInstalled(): Promise<boolean>;
   isEnabled(): Promise<boolean>;
   isAvailable(): Promise<boolean>;
@@ -88,6 +97,12 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   private attemptedAutomatedSetup: boolean = false;
   private static instances: Map<string, AndroidAccessibilityServiceManager> = new Map();
   private static expectedChecksumOverride: string | null = null;
+  private static accessibilityDetectorOverride: AccessibilityDetector | null = null;
+
+  // Static prefetch state for APK download optimization
+  private static prefetchPromise: Promise<string | null> | null = null;
+  private static prefetchedApkPath: string | null = null;
+  private static prefetchError: Error | null = null;
 
   private constructor(device: BootedDevice, adb: AdbClient) {
     // home should either be process.env.HOME or bash resolution of home for current user
@@ -116,8 +131,274 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     AndroidAccessibilityServiceManager.instances.clear();
   }
 
+  /**
+   * Prefetch the accessibility service APK asynchronously.
+   * Call this at server startup to warm the cache before first device connection.
+   * This is a no-op if prefetch is already in progress or completed.
+   */
+  public static prefetchApk(): void {
+    // Skip if already prefetching or prefetched
+    if (AndroidAccessibilityServiceManager.prefetchPromise !== null) {
+      logger.info("[ACCESSIBILITY_SERVICE] APK prefetch already initiated, skipping");
+      return;
+    }
+
+    // Skip if there's an override path (local APK)
+    const overridePath = process.env.AUTOMOBILE_ACCESSIBILITY_APK_PATH?.trim();
+    if (overridePath && overridePath.length > 0) {
+      logger.info("[ACCESSIBILITY_SERVICE] Using local APK override, skipping prefetch");
+      return;
+    }
+
+    logger.info("[ACCESSIBILITY_SERVICE] Starting APK prefetch");
+    const startTime = Date.now();
+
+    AndroidAccessibilityServiceManager.prefetchPromise = AndroidAccessibilityServiceManager.doPrefetch()
+      .then(apkPath => {
+        const duration = Date.now() - startTime;
+        if (apkPath) {
+          AndroidAccessibilityServiceManager.prefetchedApkPath = apkPath;
+          logger.info(`[ACCESSIBILITY_SERVICE] APK prefetch completed in ${duration}ms`, { path: apkPath });
+        }
+        return apkPath;
+      })
+      .catch(error => {
+        const duration = Date.now() - startTime;
+        AndroidAccessibilityServiceManager.prefetchError = error instanceof Error ? error : new Error(String(error));
+        logger.warn(`[ACCESSIBILITY_SERVICE] APK prefetch failed after ${duration}ms`, {
+          error: AndroidAccessibilityServiceManager.prefetchError.message
+        });
+        return null;
+      });
+  }
+
+  /**
+   * Internal prefetch implementation
+   */
+  private static async doPrefetch(): Promise<string | null> {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "auto-mobile-prefetch-"));
+    const apkPath = path.join(tempDir, "accessibility-service.apk");
+
+    // Download the APK
+    logger.info("[ACCESSIBILITY_SERVICE] Prefetch: downloading APK", { url: APK_URL, destination: apkPath });
+    await AndroidAccessibilityServiceManager.downloadApkFromUrlStatic(APK_URL, apkPath);
+
+    // Verify the file exists and has reasonable size
+    const stats = await fs.stat(apkPath);
+    if (stats.size < 10000) {
+      throw new Error(`Prefetched APK is too small (${stats.size} bytes), likely invalid`);
+    }
+
+    // Verify APK integrity
+    AndroidAccessibilityServiceManager.verifyApkIntegrityStatic(apkPath);
+
+    // Verify checksum if provided
+    const expectedChecksum = AndroidAccessibilityServiceManager.expectedChecksumOverride ?? APK_SHA256_CHECKSUM;
+    if (expectedChecksum.length > 0) {
+      const actualChecksum = await AndroidAccessibilityServiceManager.computeFileSha256Static(apkPath);
+      if (actualChecksum.toLowerCase() !== expectedChecksum.toLowerCase()) {
+        // Clean up invalid file
+        await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+        throw new Error(`APK checksum verification failed. Expected: ${expectedChecksum}, Got: ${actualChecksum}`);
+      }
+      logger.info("[ACCESSIBILITY_SERVICE] Prefetch: checksum verified", { checksum: actualChecksum });
+    }
+
+    logger.info("[ACCESSIBILITY_SERVICE] Prefetch: APK ready", { path: apkPath, size: stats.size });
+    return apkPath;
+  }
+
+  /**
+   * Get the prefetched APK path, waiting for prefetch to complete if in progress.
+   * Returns null if prefetch failed or was not initiated.
+   */
+  public static async getPrefetchedApkPath(): Promise<string | null> {
+    if (AndroidAccessibilityServiceManager.prefetchPromise === null) {
+      return null;
+    }
+
+    try {
+      await AndroidAccessibilityServiceManager.prefetchPromise;
+      return AndroidAccessibilityServiceManager.prefetchedApkPath;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Consume the prefetched APK path by copying it to a new location.
+   * This allows multiple devices to use the prefetched APK.
+   * Returns null if no prefetched APK is available.
+   */
+  public static async consumePrefetchedApk(destinationPath: string): Promise<boolean> {
+    const prefetchedPath = await AndroidAccessibilityServiceManager.getPrefetchedApkPath();
+    if (!prefetchedPath) {
+      return false;
+    }
+
+    try {
+      // Ensure destination directory exists
+      await fs.mkdir(path.dirname(destinationPath), { recursive: true });
+      await fs.copyFile(prefetchedPath, destinationPath);
+      logger.info("[ACCESSIBILITY_SERVICE] Copied prefetched APK", {
+        source: prefetchedPath,
+        destination: destinationPath
+      });
+      return true;
+    } catch (error) {
+      logger.warn("[ACCESSIBILITY_SERVICE] Failed to copy prefetched APK", {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Clean up the prefetched APK file
+   */
+  public static async cleanupPrefetchedApk(): Promise<void> {
+    if (AndroidAccessibilityServiceManager.prefetchedApkPath) {
+      try {
+        const tempDir = path.dirname(AndroidAccessibilityServiceManager.prefetchedApkPath);
+        await fs.rm(tempDir, { recursive: true, force: true });
+        logger.info("[ACCESSIBILITY_SERVICE] Cleaned up prefetched APK", { path: tempDir });
+      } catch (error) {
+        logger.warn("[ACCESSIBILITY_SERVICE] Failed to clean up prefetched APK", {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+      AndroidAccessibilityServiceManager.prefetchedApkPath = null;
+    }
+    AndroidAccessibilityServiceManager.prefetchPromise = null;
+    AndroidAccessibilityServiceManager.prefetchError = null;
+  }
+
+  /**
+   * Static download helper for prefetch (no device/adb context)
+   */
+  private static async downloadApkFromUrlStatic(url: string, destination: string): Promise<void> {
+    // Try curl first, then wget, then Node HTTP
+    try {
+      await execAsync(`curl --fail --location --retry 3 --retry-delay 1 --silent --show-error -o "${destination}" "${url}"`);
+      return;
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException & { stderr?: string };
+      const combinedMessage = `${err.message ?? ""} ${err.stderr ?? ""}`.toLowerCase();
+      const isUnavailable = err.code === "ENOENT" ||
+        combinedMessage.includes("command not found") ||
+        combinedMessage.includes("not recognized");
+      if (!isUnavailable) {
+        throw error;
+      }
+    }
+
+    try {
+      await execAsync(`wget --tries=3 --timeout=30 -O "${destination}" "${url}"`);
+      return;
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException & { stderr?: string };
+      const combinedMessage = `${err.message ?? ""} ${err.stderr ?? ""}`.toLowerCase();
+      const isUnavailable = err.code === "ENOENT" ||
+        combinedMessage.includes("command not found") ||
+        combinedMessage.includes("not recognized");
+      if (!isUnavailable) {
+        throw error;
+      }
+    }
+
+    // Node HTTP fallback
+    await AndroidAccessibilityServiceManager.downloadWithNodeHttpStatic(url, destination, 0);
+  }
+
+  /**
+   * Static Node HTTP download for prefetch
+   */
+  private static async downloadWithNodeHttpStatic(url: string, destination: string, redirectCount: number): Promise<void> {
+    if (redirectCount > 5) {
+      throw new Error(`Too many redirects while downloading ${url}`);
+    }
+
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+
+    await new Promise<void>((resolve, reject) => {
+      const transport = url.startsWith("https:") ? https : http;
+      const request = transport.get(
+        url,
+        { headers: { "User-Agent": "auto-mobile" } },
+        response => {
+          const statusCode = response.statusCode ?? 0;
+          if (statusCode >= 300 && statusCode < 400 && response.headers.location) {
+            response.resume();
+            const redirectedUrl = new URL(response.headers.location, url).toString();
+            void AndroidAccessibilityServiceManager.downloadWithNodeHttpStatic(redirectedUrl, destination, redirectCount + 1)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+
+          if (statusCode !== 200) {
+            response.resume();
+            reject(new Error(`Download failed with status ${statusCode} from ${url}`));
+            return;
+          }
+
+          const fileStream = createWriteStream(destination);
+          response.pipe(fileStream);
+          fileStream.on("finish", () => fileStream.close(() => resolve()));
+          fileStream.on("error", err => {
+            fileStream.close();
+            reject(err);
+          });
+        }
+      );
+
+      request.setTimeout(30000, () => {
+        request.destroy(new Error(`Download request timed out for ${url}`));
+      });
+      request.on("error", reject);
+    });
+  }
+
+  /**
+   * Static APK integrity verification for prefetch
+   */
+  private static verifyApkIntegrityStatic(apkPath: string): void {
+    try {
+      const zip = new AdmZip(apkPath);
+      const entries = zip.getEntries();
+      const hasManifest = entries.some(entry => entry.entryName === "AndroidManifest.xml");
+      if (!hasManifest) {
+        throw new Error("AndroidManifest.xml missing");
+      }
+    } catch (error) {
+      throw new Error(`APK integrity check failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Static SHA256 computation for prefetch
+   */
+  private static async computeFileSha256Static(apkPath: string): Promise<string> {
+    const hash = crypto.createHash("sha256");
+    await new Promise<void>((resolve, reject) => {
+      const stream = createReadStream(apkPath);
+      stream.on("data", chunk => hash.update(chunk));
+      stream.on("error", reject);
+      stream.on("end", () => resolve());
+    });
+    return hash.digest("hex");
+  }
+
   public static setExpectedChecksumForTesting(checksum: string | null): void {
     AndroidAccessibilityServiceManager.expectedChecksumOverride = checksum;
+  }
+
+  public static setAccessibilityDetectorForTesting(detector: AccessibilityDetector | null): void {
+    AndroidAccessibilityServiceManager.accessibilityDetectorOverride = detector;
+  }
+
+  private getAccessibilityDetector(): AccessibilityDetector {
+    return AndroidAccessibilityServiceManager.accessibilityDetectorOverride || accessibilityDetector;
   }
 
   /**
@@ -129,6 +410,17 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
     this.cachedEnabled = null;
     this.cachedToggleCapabilities = null;
     logger.info("[ACCESSIBILITY_SERVICE] Cleared all availability caches");
+  }
+
+  /**
+   * Reset the setup state to allow a fresh setup attempt.
+   * Call this when observe detects accessibilityState.enabled: false
+   * to force a full re-setup on the next attempt.
+   */
+  public resetSetupState(): void {
+    this.attemptedAutomatedSetup = false;
+    this.clearAvailabilityCache();
+    logger.info("[ACCESSIBILITY_SERVICE] Reset setup state - next setup will be a full attempt");
   }
 
   private async execShell(command: string): Promise<{ stdout: string; stderr: string }> {
@@ -454,8 +746,14 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         }
         await fs.copyFile(overridePath, apkPath);
       } else {
-        logger.info("Downloading APK", { url: AndroidAccessibilityServiceManager.APK_URL, destination: apkPath });
-        await this.downloadApkFromUrl(AndroidAccessibilityServiceManager.APK_URL, apkPath);
+        // Try to use prefetched APK first (already downloaded and validated at server startup)
+        const usedPrefetch = await AndroidAccessibilityServiceManager.consumePrefetchedApk(apkPath);
+        if (usedPrefetch) {
+          logger.info("Using prefetched accessibility service APK", { path: apkPath });
+        } else {
+          logger.info("Downloading APK", { url: AndroidAccessibilityServiceManager.APK_URL, destination: apkPath });
+          await this.downloadApkFromUrl(AndroidAccessibilityServiceManager.APK_URL, apkPath);
+        }
       }
 
       // Verify the file exists and has reasonable size (should be > 10KB)
@@ -690,6 +988,8 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
 
       // Clear cache after enabling
       this.clearAvailabilityCache();
+      // Also invalidate the accessibility detector cache so observe reports correct state
+      this.getAccessibilityDetector().invalidateCache(this.device.deviceId);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       const errorLower = errorMsg.toLowerCase();
@@ -816,72 +1116,86 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
   /**
    * Complete setup process for Accessibility Service
    */
-  async setup(force: boolean = false): Promise<{
-    success: boolean;
-    message: string;
-    error?: string;
-  }> {
+  async setup(force: boolean = false, perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<AccessibilitySetupResult> {
+    perf.serial("a11yServiceSetup");
     let apkPath: string | null = null;
+
     if (this.attemptedAutomatedSetup) {
       try {
-        const [installed, enabled] = await Promise.all([
-          this.isInstalled(),
-          this.isEnabled()
-        ]);
+        const [installed, enabled] = await perf.track("recheckStatus", async () => {
+          return Promise.all([
+            this.isInstalled(),
+            this.isEnabled()
+          ]);
+        });
         if (installed && enabled) {
+          perf.end();
           return {
             success: true,
             message: "Accessibility Service was already installed and has been activated",
+            perfTiming: perf.getTimings(),
           };
         }
       } catch (error) {
         logger.warn(`[ACCESSIBILITY_SERVICE] Failed to re-check service status: ${error}`);
       }
+      perf.end();
       return {
         success: false,
         message: "Setup already attempted",
+        perfTiming: perf.getTimings(),
       };
     }
 
     try {
-      const compatibilityResult = await this.ensureCompatibleVersion();
+      const compatibilityResult = await perf.track("ensureCompatibleVersion", () => this.ensureCompatibleVersion());
       if (compatibilityResult.status === "failed") {
+        perf.end();
         return {
           success: false,
           message: "Failed to ensure compatible Accessibility Service version",
-          error: compatibilityResult.error || compatibilityResult.upgradeError || compatibilityResult.reinstallError
+          error: compatibilityResult.error || compatibilityResult.upgradeError || compatibilityResult.reinstallError,
+          perfTiming: perf.getTimings(),
         };
       }
       if (compatibilityResult.status === "upgraded" || compatibilityResult.status === "reinstalled") {
+        perf.end();
         return {
           success: true,
           message: "Accessibility Service upgraded to a compatible version",
+          perfTiming: perf.getTimings(),
         };
       }
 
       // Check if already installed and setup (unless force is true)
-      if (!force && await this.isInstalled() && await this.isEnabled()) {
+      const isAlreadyInstalled = await perf.track("checkInstalled", () => this.isInstalled());
+      const isAlreadyEnabled = await perf.track("checkEnabled", () => this.isEnabled());
+      if (!force && isAlreadyInstalled && isAlreadyEnabled) {
+        perf.end();
         return {
           success: true,
           message: "Accessibility Service was already installed and has been activated",
+          perfTiming: perf.getTimings(),
         };
       }
 
       this.attemptedAutomatedSetup = true;
       // Download APK if not installed or force is true
-      if (force || !await this.isInstalled()) {
-        apkPath = await this.downloadApk();
-        await this.install(apkPath);
+      if (force || !isAlreadyInstalled) {
+        apkPath = await perf.track("downloadApk", () => this.downloadApk());
+        await perf.track("installApk", () => this.install(apkPath!));
       }
 
       // Enable if not enabled
-      if (!await this.isEnabled()) {
-        await this.enable();
+      if (!isAlreadyEnabled) {
+        await perf.track("enableService", () => this.enable());
       }
 
+      perf.end();
       return {
         success: true,
         message: "Accessibility Service installed and activated successfully",
+        perfTiming: perf.getTimings(),
       };
 
     } catch (error) {
@@ -904,10 +1218,12 @@ export class AndroidAccessibilityServiceManager implements AccessibilityServiceM
         message = "Failed to setup Accessibility Service due to APK installation error";
       }
 
+      perf.end();
       return {
         success: false,
         message,
-        error: errorMsg
+        error: errorMsg,
+        perfTiming: perf.getTimings(),
       };
     } finally {
       // Clean up APK file if it was downloaded

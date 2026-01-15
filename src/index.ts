@@ -19,6 +19,7 @@ import type { FeatureFlagKey } from "./features/featureFlags/FeatureFlagDefiniti
 import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig";
 import type { VideoRecordingConfigInput } from "./models";
 import { startupBenchmark } from "./utils/startupBenchmark";
+import { AndroidAccessibilityServiceManager } from "./utils/AccessibilityServiceManager";
 
 startupBenchmark.mark("processEntry");
 
@@ -89,6 +90,7 @@ function parseArgs(): {
   daemonMode: boolean;
   daemonCommand?: string;
   daemonArgs: string[];
+  skipAccessibilityDownload: boolean;
   } {
   const args = process.argv.slice(2);
 
@@ -134,6 +136,7 @@ function parseArgs(): {
   let a11yUseBaseline = false;
   const predictiveUi = args.includes("--predictive") || args.includes("--predictive-ui");
   const rawElementSearch = args.includes("--raw-element-search");
+  const skipAccessibilityDownload = args.includes("--skip-accessibility-download");
   let planExecutionLockScope: PlanExecutionLockScope = "session";
   const videoRecordingDefaults: VideoRecordingConfigInput = {};
 
@@ -333,6 +336,7 @@ function parseArgs(): {
     daemonMode,
     daemonCommand,
     daemonArgs,
+    skipAccessibilityDownload,
   };
 }
 
@@ -565,6 +569,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
+    await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
 
     server.close(() => {
       logger.info("Streamable HTTP server shut down");
@@ -690,6 +695,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
+    await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
 
     server.close(() => {
       logger.info("SSE server shut down");
@@ -707,6 +713,7 @@ process.on("SIGINT", async () => {
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
   await stopDeviceSnapshotSocketServer();
+  await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
   logger.close();
   process.exit(0);
 });
@@ -716,6 +723,7 @@ process.on("SIGTERM", async () => {
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
   await stopDeviceSnapshotSocketServer();
+  await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
   logger.close();
   process.exit(0);
 });
@@ -755,10 +763,19 @@ async function main() {
       daemonMode,
       daemonCommand,
       daemonArgs,
+      skipAccessibilityDownload,
     } = parseArgs();
 
     serverConfig.setPlanExecutionLockScope(planExecutionLockScope);
     serverConfig.setVideoRecordingDefaults(videoRecordingDefaults);
+    serverConfig.setSkipAccessibilityDownload(skipAccessibilityDownload);
+    if (skipAccessibilityDownload) {
+      logger.info("Accessibility APK download disabled (--skip-accessibility-download)");
+    } else {
+      // Start prefetching the accessibility service APK in the background
+      // This runs asynchronously and will be ready when first device connects
+      AndroidAccessibilityServiceManager.prefetchApk();
+    }
 
     const featureFlagService = FeatureFlagService.getInstance();
     await featureFlagService.initialize();

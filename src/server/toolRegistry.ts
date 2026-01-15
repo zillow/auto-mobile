@@ -193,7 +193,7 @@ class ToolRegistryClass {
         device = await this.deviceSessionManager.ensureDeviceReady(
           platform,
           providedDeviceId,
-          { skipAccessibilityDownload: name === "observe" }
+          { skipAccessibilityDownload: serverConfig.isSkipAccessibilityDownloadEnabled() }
         );
         logger.info(`[ToolRegistry] ${name}: Using device ${device.deviceId}`);
       } else {

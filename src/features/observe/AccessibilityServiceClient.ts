@@ -25,6 +25,8 @@ import { HierarchyNavigationDetector } from "../navigation/HierarchyNavigationDe
 import { throwIfAborted } from "../../utils/toolUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
+import { PortManager } from "../../utils/PortManager";
+import { RequestManager } from "../../utils/RequestManager";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -638,6 +640,27 @@ export interface AccessibilityService {
   isConnected(): boolean;
 
   /**
+   * Wait for WebSocket connection to be established with retries.
+   * Useful after enabling/installing the accessibility service when
+   * the service needs time to start accepting connections.
+   * @param maxAttempts - Maximum number of connection attempts (default: 10)
+   * @param delayMs - Delay between attempts in milliseconds (default: 300)
+   * @returns Promise resolving to true if connected, false if all attempts failed
+   */
+  waitForConnection(maxAttempts?: number, delayMs?: number): Promise<boolean>;
+
+  /**
+   * Verify the accessibility service is ready to respond to requests.
+   * This goes beyond just checking WebSocket connectivity - it actually
+   * attempts to get a hierarchy response to ensure the service is fully initialized.
+   * @param maxAttempts - Maximum number of verification attempts (default: 5)
+   * @param delayMs - Delay between attempts in milliseconds (default: 500)
+   * @param timeoutMs - Timeout for each hierarchy request (default: 3000)
+   * @returns Promise resolving to true if service is ready, false otherwise
+   */
+  verifyServiceReady(maxAttempts?: number, delayMs?: number, timeoutMs?: number): Promise<boolean>;
+
+  /**
    * Check if there is cached hierarchy data available
    * @returns true if hierarchy data exists in cache, false otherwise
    */
@@ -665,9 +688,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private device: BootedDevice;
   private adb: AdbClient;
   private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
-  private static readonly WEBSOCKET_PORT = 8765;
-  private static readonly WEBSOCKET_URL = `ws://localhost:${AccessibilityServiceClient.WEBSOCKET_PORT}/ws`;
   private static readonly DEVICE_CERT_DIR = "/sdcard/Download/automobile/ca_certs";
+
+  // Per-instance port allocation for multi-device support
+  private localPort: number;
 
   // Singleton instances per device
   private static instances: Map<string, AccessibilityServiceClient> = new Map();
@@ -695,15 +719,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private static readonly HEALTH_CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
   private lastHealthCheckTime: number = 0;
 
-  // Screenshot handling
-  private pendingScreenshotResolve: ((result: ScreenshotResult) => void) | null = null;
-  private pendingScreenshotRequestId: string | null = null;
+  // Screenshot, swipe, and tap_coordinates now use RequestManager
+  // (pending fields removed - RequestManager handles request/response tracking)
 
-  // Swipe handling
-  private pendingSwipeResolve: ((result: A11ySwipeResult) => void) | null = null;
-  private pendingSwipeRequestId: string | null = null;
-  private pendingTapCoordinatesResolve: ((result: A11yTapCoordinatesResult) => void) | null = null;
-  private pendingTapCoordinatesRequestId: string | null = null;
+  // Drag handling (not yet migrated to RequestManager)
   private pendingDragResolve: ((result: A11yDragResult) => void) | null = null;
   private pendingDragRequestId: string | null = null;
 
@@ -764,6 +783,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Timer for testing
   private timer: Timer;
 
+  // Request manager for unified request/response handling with timeouts
+  private requestManager: RequestManager;
+
   // Hierarchy navigation detector for view hierarchy-based navigation
   private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
   // Track apps that emit SDK navigation events so we can avoid overriding screen names
@@ -787,7 +809,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
     this.adb = adb;
     this.webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
     this.timer = timer || defaultTimer;
+    this.requestManager = new RequestManager(this.timer);
     this.installedAppsRepository = installedAppsRepository ?? null;
+    // Allocate a unique local port for this device (supports multiple emulators)
+    this.localPort = PortManager.allocate(device.deviceId);
     AndroidAccessibilityServiceManager.getInstance(device, adb);
   }
 
@@ -817,7 +842,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
       instance.close().catch(() => {});
     }
     AccessibilityServiceClient.instances.clear();
-    logger.info("[ACCESSIBILITY_SERVICE] Reset all singleton instances");
+    // Also reset port allocations to ensure clean state
+    PortManager.reset();
+    logger.info("[ACCESSIBILITY_SERVICE] Reset all singleton instances and port allocations");
   }
 
   /**
@@ -870,10 +897,84 @@ export class AccessibilityServiceClient implements AccessibilityService {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
+  public async waitForConnection(
+    maxAttempts: number = 10,
+    delayMs: number = 300
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      // Reset connection attempts counter to allow fresh connection attempts
+      this.connectionAttempts = 0;
+
+      const connected = await this.ensureConnected();
+      if (connected) {
+        logger.info(`[ACCESSIBILITY_SERVICE] WebSocket connected after ${attempt} attempt(s) (${(attempt - 1) * delayMs}ms)`);
+        return true;
+      }
+
+      if (attempt < maxAttempts) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Connection attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms`);
+        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
+      }
+    }
+
+    logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket not ready after ${maxAttempts} attempts (${maxAttempts * delayMs}ms)`);
+    return false;
+  }
+
   public async ensureConnected(
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<boolean> {
     return this.connectWebSocket(perf);
+  }
+
+  /**
+   * Verify the accessibility service is ready to respond to requests.
+   * This goes beyond just checking WebSocket connectivity - it actually
+   * attempts to get a hierarchy response to ensure the service is fully initialized.
+   *
+   * Call this after enabling/installing the service to ensure it's truly ready
+   * before proceeding with observe operations.
+   *
+   * @param maxAttempts - Maximum number of verification attempts (default: 5)
+   * @param delayMs - Delay between attempts in milliseconds (default: 500)
+   * @param timeoutMs - Timeout for each hierarchy request (default: 3000)
+   * @returns Promise resolving to true if service is ready, false otherwise
+   */
+  public async verifyServiceReady(
+    maxAttempts: number = 5,
+    delayMs: number = 500,
+    timeoutMs: number = 3000
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        logger.info(`[ACCESSIBILITY_SERVICE] Verifying service ready (attempt ${attempt}/${maxAttempts})`);
+
+        // Try to get a hierarchy response - this verifies the service can actually respond
+        const result = await this.requestHierarchySync(
+          new NoOpPerformanceTracker(),
+          false,
+          undefined,
+          timeoutMs
+        );
+
+        if (result && result.hierarchy) {
+          logger.info(`[ACCESSIBILITY_SERVICE] Service verified ready after ${attempt} attempt(s)`);
+          return true;
+        }
+
+        logger.debug(`[ACCESSIBILITY_SERVICE] Verification attempt ${attempt} returned no hierarchy`);
+      } catch (error) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Verification attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      if (attempt < maxAttempts) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Waiting ${delayMs}ms before next verification attempt`);
+        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
+      }
+    }
+
+    logger.warn(`[ACCESSIBILITY_SERVICE] Service not ready after ${maxAttempts} verification attempts`);
+    return false;
   }
 
   public onInteraction(listener: (event: InteractionEvent) => void): () => void {
@@ -980,22 +1081,22 @@ export class AccessibilityServiceClient implements AccessibilityService {
     }
 
     try {
-      logger.info(`[ACCESSIBILITY_SERVICE] Setting up port forwarding for WebSocket: localhost:${AccessibilityServiceClient.WEBSOCKET_PORT} → device:${AccessibilityServiceClient.WEBSOCKET_PORT}`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Setting up port forwarding for WebSocket: localhost:${this.localPort} → device:${PortManager.DEVICE_PORT} (device: ${this.device.deviceId})`);
 
-      // Clear any existing forwarding for this port
+      // Clear any existing forwarding for this local port
       await perf.track("clearPortForward", () =>
-        this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+        this.adb.executeCommand(`forward --remove tcp:${this.localPort}`).catch(() => {
           // Ignore errors if no forwarding exists
         })
       );
 
-      // Setup new forwarding
+      // Setup new forwarding: local port (unique per device) → device port (always 8765)
       await perf.track("setupPortForward", () =>
-        this.adb.executeCommand(`forward tcp:${AccessibilityServiceClient.WEBSOCKET_PORT} tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`)
+        this.adb.executeCommand(`forward tcp:${this.localPort} tcp:${PortManager.DEVICE_PORT}`)
       );
 
       this.portForwardingSetup = true;
-      logger.info("[ACCESSIBILITY_SERVICE] Port forwarding setup complete");
+      logger.info(`[ACCESSIBILITY_SERVICE] Port forwarding setup complete (localhost:${this.localPort})`);
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to setup port forwarding: ${error}`);
       throw error;
@@ -1061,10 +1162,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // Ensure port forwarding is setup
       await perf.track("portForwarding", () => this.setupPortForwarding(perf));
 
-      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${AccessibilityServiceClient.WEBSOCKET_URL} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts})`);
+      const wsUrl = `ws://localhost:${this.localPort}/ws`;
+      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${wsUrl} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}, device: ${this.device.deviceId})`);
 
       return await perf.track("wsConnect", () => new Promise<boolean>((resolve, reject) => {
-        const ws = this.webSocketFactory(AccessibilityServiceClient.WEBSOCKET_URL);
+        const ws = this.webSocketFactory(wsUrl);
         const connectionTimeout = this.timer.setTimeout(() => {
           ws.close();
           // Reset port forwarding flag so next attempt will re-setup the forward
@@ -1228,15 +1330,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle screenshot response
-      if (message.type === "screenshot" && this.pendingScreenshotResolve) {
+      if (message.type === "screenshot" && message.requestId) {
         logger.debug(`[ACCESSIBILITY_SERVICE] Received screenshot (requestId: ${message.requestId}, format: ${message.format})`);
-        const resolve = this.pendingScreenshotResolve;
-        this.pendingScreenshotResolve = null;
-        this.pendingScreenshotRequestId = null;
 
         // Extract data from the message - it may be nested under 'data' key or directly on message
         const base64Data = (message as any).data as string;
-        resolve({
+        this.requestManager.resolve<ScreenshotResult>(message.requestId, {
           success: true,
           data: base64Data,
           format: message.format || "jpeg",
@@ -1245,19 +1344,16 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle screenshot error
-      if (message.type === "screenshot_error" && this.pendingScreenshotResolve) {
+      if (message.type === "screenshot_error" && message.requestId) {
         logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot error (requestId: ${message.requestId}): ${message.error}`);
-        const resolve = this.pendingScreenshotResolve;
-        this.pendingScreenshotResolve = null;
-        this.pendingScreenshotRequestId = null;
-        resolve({
+        this.requestManager.resolve<ScreenshotResult>(message.requestId, {
           success: false,
           error: message.error || "Unknown error"
         });
       }
 
       // Handle swipe result
-      if (message.type === "swipe_result" && this.pendingSwipeResolve) {
+      if (message.type === "swipe_result") {
         const swipeMessage = message as any;
         const perfTiming = swipeMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Swipe result (requestId: ${swipeMessage.requestId}, success: ${swipeMessage.success}, totalTimeMs: ${swipeMessage.totalTimeMs}, gestureTimeMs: ${swipeMessage.gestureTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
@@ -1265,33 +1361,31 @@ export class AccessibilityServiceClient implements AccessibilityService {
         // NOTE: Do not invalidate cache on swipe - swipe is not guaranteed to change the hierarchy
         // (e.g., scrolling at end of list produces no change)
 
-        const resolve = this.pendingSwipeResolve;
-        this.pendingSwipeResolve = null;
-        this.pendingSwipeRequestId = null;
-        resolve({
-          success: swipeMessage.success,
-          totalTimeMs: swipeMessage.totalTimeMs,
-          gestureTimeMs: swipeMessage.gestureTimeMs,
-          error: swipeMessage.error,
-          perfTiming
-        });
+        if (swipeMessage.requestId) {
+          this.requestManager.resolve<A11ySwipeResult>(swipeMessage.requestId, {
+            success: swipeMessage.success,
+            totalTimeMs: swipeMessage.totalTimeMs,
+            gestureTimeMs: swipeMessage.gestureTimeMs,
+            error: swipeMessage.error,
+            perfTiming
+          });
+        }
       }
 
       // Handle tap coordinates result
-      if (message.type === "tap_coordinates_result" && this.pendingTapCoordinatesResolve) {
+      if (message.type === "tap_coordinates_result") {
         const tapMessage = message as any;
         const perfTiming = tapMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.info(`[ACCESSIBILITY_SERVICE] Tap coordinates result (requestId: ${tapMessage.requestId}, success: ${tapMessage.success}, totalTimeMs: ${tapMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingTapCoordinatesResolve;
-        this.pendingTapCoordinatesResolve = null;
-        this.pendingTapCoordinatesRequestId = null;
-        resolve({
-          success: tapMessage.success,
-          totalTimeMs: tapMessage.totalTimeMs,
-          error: tapMessage.error,
-          perfTiming
-        });
+        if (tapMessage.requestId) {
+          this.requestManager.resolve<A11yTapCoordinatesResult>(tapMessage.requestId, {
+            success: tapMessage.success,
+            totalTimeMs: tapMessage.totalTimeMs,
+            error: tapMessage.error,
+            perfTiming
+          });
+        }
       }
 
       // Handle drag result
@@ -2352,6 +2446,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // Stop health check
       this.stopHealthCheck();
 
+      // Cancel all pending requests
+      this.requestManager.cancelAll(new Error("WebSocket connection closed"));
+
       if (this.ws) {
         logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
         this.ws.close();
@@ -2364,13 +2461,16 @@ export class AccessibilityServiceClient implements AccessibilityService {
         this.hierarchyNavigationDetector = null;
       }
 
-      // Optionally remove port forwarding
+      // Remove port forwarding for this device
       if (this.portForwardingSetup) {
-        await this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+        await this.adb.executeCommand(`forward --remove tcp:${this.localPort}`).catch(() => {
           // Ignore errors
         });
         this.portForwardingSetup = false;
       }
+
+      // Release the port allocation
+      PortManager.release(this.device.deviceId);
 
       this.recompositionTrackingConfigured = false;
     } catch (error) {
@@ -2401,26 +2501,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      // Send screenshot request
-      const requestId = `screenshot_${Date.now()}_${generateSecureId()}`;
-      this.pendingScreenshotRequestId = requestId;
+      // Generate request ID and register with RequestManager
+      const requestId = this.requestManager.generateId("screenshot");
 
-      // Create promise that will be resolved when we receive the screenshot
-      const screenshotPromise = new Promise<ScreenshotResult>(resolve => {
-        this.pendingScreenshotResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingScreenshotResolve === resolve) {
-            this.pendingScreenshotResolve = null;
-            this.pendingScreenshotRequestId = null;
-            resolve({
-              success: false,
-              error: `Screenshot timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const screenshotPromise = this.requestManager.register<ScreenshotResult>(
+        requestId,
+        "screenshot",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          error: `Screenshot timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -2489,27 +2582,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      // Send swipe request
-      const requestId = `swipe_${Date.now()}_${generateSecureId()}`;
-      this.pendingSwipeRequestId = requestId;
+      // Generate request ID and register with RequestManager
+      const requestId = this.requestManager.generateId("swipe");
 
-      // Create promise that will be resolved when we receive the swipe result
-      const swipePromise = new Promise<A11ySwipeResult>(resolve => {
-        this.pendingSwipeResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingSwipeResolve === resolve) {
-            this.pendingSwipeResolve = null;
-            this.pendingSwipeRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Swipe timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const swipePromise = this.requestManager.register<A11ySwipeResult>(
+        requestId,
+        "swipe",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Swipe timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -2583,27 +2669,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      // Send tap coordinates request
-      const requestId = `tap_coordinates_${Date.now()}_${generateSecureId()}`;
-      this.pendingTapCoordinatesRequestId = requestId;
+      // Generate request ID and register with RequestManager
+      const requestId = this.requestManager.generateId("tap_coordinates");
 
-      // Create promise that will be resolved when we receive the tap result
-      const tapPromise = new Promise<A11yTapCoordinatesResult>(resolve => {
-        this.pendingTapCoordinatesResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingTapCoordinatesResolve === resolve) {
-            this.pendingTapCoordinatesResolve = null;
-            this.pendingTapCoordinatesRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Tap coordinates timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const tapPromise = this.requestManager.register<A11yTapCoordinatesResult>(
+        requestId,
+        "tap_coordinates",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Tap coordinates timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
