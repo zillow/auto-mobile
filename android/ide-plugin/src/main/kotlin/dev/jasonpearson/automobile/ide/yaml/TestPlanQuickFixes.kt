@@ -148,7 +148,7 @@ object TestPlanQuickFixFactory {
     private val VALID_TOOLS = setOf(
         "launchApp", "terminateApp", "installApp",
         "tapOn", "swipeOn", "pinchOn", "dragAndDrop",
-        "inputText", "clearText", "selectAllText", "imeAction",
+        "inputText", "clearText", "selectAllText", "imeAction", "keyboard",
         "pressButton", "pressKey", "homeScreen", "recentApps", "openLink", "navigateTo",
         "observe", "rawViewHierarchy",
         "listDevices", "startDevice", "killDevice", "setActiveDevice",

@@ -1415,6 +1415,50 @@
     }
   },
   {
+    "name": "keyboard",
+    "description": "Open, close, or detect the on-screen keyboard",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "open",
+            "close",
+            "detect"
+          ],
+          "description": "Keyboard action"
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        },
+        "sessionUuid": {
+          "type": "string",
+          "description": "Session UUID for device targeting"
+        },
+        "keepScreenAwake": {
+          "type": "boolean",
+          "description": "Keep physical Android devices awake during the session (default: true)"
+        },
+        "device": {
+          "type": "string",
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+        }
+      },
+      "required": [
+        "action",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
     "name": "killDevice",
     "description": "Kill device",
     "inputSchema": {

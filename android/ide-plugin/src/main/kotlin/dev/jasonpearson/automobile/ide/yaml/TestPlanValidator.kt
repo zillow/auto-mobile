@@ -51,7 +51,7 @@ object TestPlanValidator {
         // UI interactions
         "tapOn", "swipeOn", "pinchOn", "dragAndDrop",
         // Input
-        "inputText", "clearText", "selectAllText", "imeAction",
+        "inputText", "clearText", "selectAllText", "imeAction", "keyboard",
         // Navigation
         "pressButton", "pressKey", "homeScreen", "recentApps", "openLink", "navigateTo",
         // Observation

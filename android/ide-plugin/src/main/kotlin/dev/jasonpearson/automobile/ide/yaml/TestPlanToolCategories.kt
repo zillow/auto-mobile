@@ -18,6 +18,7 @@ object TestPlanToolCategories {
             "clearText",
             "selectAllText",
             "imeAction",
+            "keyboard",
             "clipboard"
         ),
         "Navigation" to setOf(

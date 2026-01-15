@@ -10,6 +10,7 @@ import dev.jasonpearson.automobile.accessibilityservice.models.ScreenDimensions
 import dev.jasonpearson.automobile.accessibilityservice.models.TraversalOrderResult
 import dev.jasonpearson.automobile.accessibilityservice.models.UIElementInfo
 import dev.jasonpearson.automobile.accessibilityservice.models.ViewHierarchy
+import dev.jasonpearson.automobile.accessibilityservice.models.WindowInfo
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.serialization.builtins.ListSerializer
@@ -181,6 +182,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     var notificationPermissionDetected: Boolean? = null
     var activeWindowLayer = 0
     var activeWindowKey: Int? = null
+    val windowInfos = mutableListOf<WindowInfo>()
 
     // Extract from each window
     for (window in windows) {
@@ -202,6 +204,18 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY -> "magnification_overlay"
               else -> "unknown_${window.type}"
             }
+
+        val windowBounds = Rect()
+        window.getBoundsInScreen(windowBounds)
+        windowInfos.add(
+            WindowInfo(
+                id = window.id,
+                type = window.type,
+                isActive = window.isActive,
+                isFocused = window.isFocused,
+                bounds = ElementBounds(windowBounds),
+            )
+        )
 
         val element =
             extractNodeInfo(
@@ -345,6 +359,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     return ViewHierarchy(
         packageName = mainPackageName,
         hierarchy = unifiedHierarchy,
+        windows = windowInfos.takeIf { it.isNotEmpty() },
         intentChooserDetected = intentChooserDetected,
         notificationPermissionDetected = notificationPermissionDetected,
         accessibilityFocusedElement = accessibilityFocusedElement,
