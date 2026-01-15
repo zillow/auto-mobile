@@ -1137,7 +1137,9 @@ export const waitForNotificationMatch = async (
   const observeScreen = observeScreenFactory(device);
   const deadlineMs = timer.now() + awaitTimeoutMs;
   const remainingMs = Math.max(0, deadlineMs - timer.now());
-  let { observation, minTimestamp } = await ensureSystemTrayOpen(device, remainingMs, progress);
+  const result = await ensureSystemTrayOpen(device, remainingMs, progress);
+  let observation = result.observation;
+  const minTimestamp = result.minTimestamp;
   if (!observation) {
     observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
   }
