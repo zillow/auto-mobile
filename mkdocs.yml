@@ -80,19 +80,15 @@ nav:
   - 'Using AutoMobile':
       - 'UX Exploration': using/ux-exploration.md
       - 'Reproducing Bugs': using/reproducting-bugs.md
-      - 'UI Auditing Prereqs': using/ui-auditing-prereqs.md
-      - 'Device State Snapshots': features/snapshots.md
+      - 'UI Tests': using/ui-tests.md
+      - 'Test Plan Validation': using/test-plan-validation.md
       - 'Performance Analysis':
           - 'Startup': using/perf-analysis/startup.md
           - 'Screen Transition': using/perf-analysis/screen-transition.md
           - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
-          - 'Memory Profiling': using/perf-analysis/memory-profiling.md
       - 'Accessibility':
           - 'Contrast': using/a11y/contrast.md
           - 'Tap Targets': using/a11y/tap-targets.md
-      - 'UI Tests': using/ui-tests.md
-      - 'Validation':
-          - 'YAML Test Plans': validation/yaml-test-plans.md
   - 'Design Docs':
       - 'Overview': design-docs/index.md
       - 'MCP':
@@ -108,6 +104,7 @@ nav:
           - 'Visual Highlighting': design-docs/mcp/visual-highlighting.md
           - 'TalkBack/VoiceOver': design-docs/mcp/talkback-voiceover.md
           - 'Critical Section': design-docs/mcp/critical-section.md
+          - 'Device State Snapshots': design-docs/mcp/snapshots.md
           - 'Resources': design-docs/mcp/resources.md
           - 'Context Thresholds': design-docs/mcp/context-thresholds.md
       - 'Platform Specific':
@@ -149,7 +146,6 @@ nav:
   - 'Contributing':
       - 'How': contributing/index.md
       - 'Local Development': contributing/local-development.md
-      - 'Dead Code Detection': contributing/dead-code-detection.md
       - 'Docker Hub Publishing': docker-hub-setup.md
       - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md
