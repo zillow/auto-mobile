@@ -223,9 +223,24 @@ export class TapOnElement extends BaseVisualChange {
           signal,
           effectiveTimeoutMs
         );
-        const rawHierarchy = syncResult
+        let rawHierarchy = syncResult
           ? this.accessibilityService.convertToViewHierarchyResult(syncResult.hierarchy)
           : null;
+
+        // Check if accessibility service hierarchy is incomplete and merge with uiautomator
+        if (rawHierarchy?.accessibilityServiceIncomplete) {
+          logger.debug("[TAP_ON_ELEMENT] Accessibility service returned incomplete hierarchy, fetching uiautomator fallback");
+          try {
+            const uiautomatorHierarchy = await this.viewHierarchy.getUiAutomatorHierarchy(
+              signal,
+              !serverConfig.isRawElementSearchEnabled()
+            );
+            rawHierarchy = this.viewHierarchy.mergeHierarchies(rawHierarchy, uiautomatorHierarchy);
+          } catch (fallbackErr) {
+            logger.warn(`[TAP_ON_ELEMENT] Failed to get uiautomator fallback: ${fallbackErr}`);
+          }
+        }
+
         return rawHierarchy
           ? this.prepareViewHierarchyForResponse(rawHierarchy, screenSize)
           : null;

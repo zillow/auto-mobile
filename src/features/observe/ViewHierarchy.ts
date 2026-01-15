@@ -12,7 +12,7 @@ import { ElementUtils } from "../utility/ElementUtils";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { ScreenshotUtils } from "../../utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
-import { ViewHierarchyQueryOptions } from "../../models";
+import { ViewHierarchyQueryOptions, HierarchySource } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
 import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
@@ -390,6 +390,97 @@ export class ViewHierarchy {
   }
 
   /**
+   * Merge accessibility service hierarchy with uiautomator hierarchy.
+   * When accessibility service returns incomplete data (e.g., active window has null root),
+   * we supplement it with uiautomator data.
+   *
+   * @param accessibilityHierarchy - Hierarchy from accessibility service
+   * @param uiautomatorHierarchy - Hierarchy from uiautomator
+   * @returns Merged hierarchy with combined root nodes
+   */
+  mergeHierarchies(
+    accessibilityHierarchy: ViewHierarchyResult,
+    uiautomatorHierarchy: ViewHierarchyResult
+  ): ViewHierarchyResult {
+    const a11yNode = accessibilityHierarchy.hierarchy?.node;
+    const uiautomatorNode = uiautomatorHierarchy.hierarchy?.node;
+
+    // If one is missing, use the other
+    if (!a11yNode && !uiautomatorNode) {
+      return {
+        ...accessibilityHierarchy,
+        hierarchy: { error: "No hierarchy data available from either source" },
+        sources: ["accessibility-service", "uiautomator"]
+      };
+    }
+
+    if (!a11yNode) {
+      return {
+        ...uiautomatorHierarchy,
+        // Preserve metadata from accessibility service
+        "packageName": accessibilityHierarchy.packageName || uiautomatorHierarchy.packageName,
+        "windows": accessibilityHierarchy.windows,
+        "intentChooserDetected": accessibilityHierarchy.intentChooserDetected,
+        "notificationPermissionDetected": accessibilityHierarchy.notificationPermissionDetected,
+        "accessibility-focused-element": accessibilityHierarchy["accessibility-focused-element"],
+        "accessibilityServiceIncomplete": true,
+        "sources": ["accessibility-service", "uiautomator"]
+      };
+    }
+
+    if (!uiautomatorNode) {
+      return {
+        ...accessibilityHierarchy,
+        sources: ["accessibility-service", "uiautomator"]
+      };
+    }
+
+    // Both have data - combine root nodes under a wrapper
+    // This creates a unified hierarchy that contains both data sources
+    const combinedNodes: any[] = [];
+
+    // Add accessibility service nodes
+    if (Array.isArray(a11yNode)) {
+      combinedNodes.push(...a11yNode);
+    } else {
+      combinedNodes.push(a11yNode);
+    }
+
+    // Add uiautomator nodes
+    if (Array.isArray(uiautomatorNode)) {
+      combinedNodes.push(...uiautomatorNode);
+    } else {
+      combinedNodes.push(uiautomatorNode);
+    }
+
+    logger.debug(`[VIEW_HIERARCHY] Merged hierarchies: ${combinedNodes.length} root nodes from both sources`);
+
+    return {
+      ...accessibilityHierarchy,
+      hierarchy: {
+        node: combinedNodes.length === 1 ? combinedNodes[0] : combinedNodes
+      },
+      accessibilityServiceIncomplete: true,
+      sources: ["accessibility-service", "uiautomator"]
+    };
+  }
+
+  /**
+   * Get uiautomator hierarchy for fallback/merge scenarios.
+   * This is a public method that can be used by other components.
+   */
+  async getUiAutomatorHierarchy(
+    signal?: AbortSignal,
+    filter: boolean = true
+  ): Promise<ViewHierarchyResult> {
+    const result = await this._getViewHierarchyWithoutCache(signal, filter);
+    return {
+      ...result,
+      sources: ["uiautomator"] as HierarchySource[]
+    };
+  }
+
+  /**
    * Retrieve the view hierarchy of the current screen
    * @param queryOptions - Optional query options for targeted element retrieval
    * @param perf - Performance tracker for timing data
@@ -421,6 +512,24 @@ export class ViewHierarchy {
         signal
       );
       if (accessibilityHierarchy) {
+        // Check if accessibility service hierarchy is incomplete
+        if (accessibilityHierarchy.accessibilityServiceIncomplete) {
+          logger.info("[VIEW_HIERARCHY] Accessibility service returned incomplete hierarchy, fetching uiautomator fallback");
+          try {
+            const uiautomatorHierarchy = await perf.track("uiautomatorFallback", () =>
+              this._getViewHierarchyWithoutCache(signal, !useRawElementSearch)
+            );
+            const mergedHierarchy = this.mergeHierarchies(accessibilityHierarchy, uiautomatorHierarchy);
+            perf.end();
+            const accessibilityDuration = Date.now() - startTime;
+            logger.info(`[VIEW_HIERARCHY] Retrieved merged hierarchy (a11y + uiautomator) in ${accessibilityDuration}ms`);
+            return this.prepareHierarchyForResponse(mergedHierarchy);
+          } catch (fallbackErr) {
+            logger.warn(`[VIEW_HIERARCHY] Failed to get uiautomator fallback: ${fallbackErr}`);
+            // Fall through to return incomplete accessibility hierarchy
+          }
+        }
+
         perf.end();
         const accessibilityDuration = Date.now() - startTime;
         logger.debug(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${accessibilityDuration}ms`);

@@ -18,5 +18,6 @@ data class ViewHierarchy(
     val notificationPermissionDetected: Boolean? = null,
     @SerialName("accessibility-focused-element")
     val accessibilityFocusedElement: UIElementInfo? = null, // Element with TalkBack cursor
+    val accessibilityServiceIncomplete: Boolean? = null,
     val error: String? = null, // For error cases like locked screen
 )

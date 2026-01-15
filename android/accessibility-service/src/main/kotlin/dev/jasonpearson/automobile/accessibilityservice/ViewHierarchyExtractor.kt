@@ -184,10 +184,24 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     var activeWindowKey: Int? = null
     val windowInfos = mutableListOf<WindowInfo>()
 
+    // Track whether the accessibility service hierarchy is incomplete
+    // This happens when active windows have null roots or only system UI is accessible
+    var activeWindowHasNullRoot = false
+    var hasApplicationWindow = false
+
     // Extract from each window
     for (window in windows) {
       try {
-        val rootNode = window.root ?: continue
+        val rootNode = window.root
+        if (rootNode == null) {
+          if (window.isActive) {
+            Log.w(TAG, "[HIERARCHY-DEBUG] Active window ${window.id} has null root node - accessibility service incomplete")
+            activeWindowHasNullRoot = true
+          } else {
+            Log.d(TAG, "[HIERARCHY-DEBUG] Window ${window.id} has null root node, skipping")
+          }
+          continue
+        }
         val windowLayer = window.layer
         if (window.isActive) {
           activeWindowLayer = windowLayer
@@ -204,6 +218,12 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
               AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY -> "magnification_overlay"
               else -> "unknown_${window.type}"
             }
+
+        // Track if we successfully extract from any application window
+        // Only TYPE_APPLICATION counts - IME, overlays, and system windows don't represent app content
+        if (window.type == AccessibilityWindowInfo.TYPE_APPLICATION) {
+          hasApplicationWindow = true
+        }
 
         val windowBounds = Rect()
         window.getBoundsInScreen(windowBounds)
@@ -343,8 +363,11 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     }
 
     if (windowEntries.isEmpty()) {
-      Log.w(TAG, "No visible windows available after filtering")
-      return ViewHierarchy(error = "No visible windows available")
+      Log.w(TAG, "[HIERARCHY-DEBUG] No visible windows available after filtering - marking as incomplete for fallback")
+      return ViewHierarchy(
+          error = "No visible windows available",
+          accessibilityServiceIncomplete = true,
+      )
     }
 
     val sortedWindowRoots =
@@ -356,6 +379,15 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
     val accessibilityFocusedElement =
         unifiedHierarchy?.let { findAccessibilityFocusedElement(it) }
 
+    // Determine if the accessibility service hierarchy is incomplete
+    // This happens when:
+    // 1. An active window has a null root (app restricts accessibility access)
+    // 2. Only system UI windows were successfully extracted (no app windows accessible)
+    val accessibilityServiceIncomplete = activeWindowHasNullRoot || !hasApplicationWindow
+    if (accessibilityServiceIncomplete) {
+      Log.w(TAG, "[HIERARCHY-DEBUG] Accessibility service incomplete: activeWindowHasNullRoot=$activeWindowHasNullRoot, hasApplicationWindow=$hasApplicationWindow")
+    }
+
     return ViewHierarchy(
         packageName = mainPackageName,
         hierarchy = unifiedHierarchy,
@@ -363,6 +395,7 @@ class ViewHierarchyExtractor(private val recompositionStore: RecompositionStore?
         intentChooserDetected = intentChooserDetected,
         notificationPermissionDetected = notificationPermissionDetected,
         accessibilityFocusedElement = accessibilityFocusedElement,
+        accessibilityServiceIncomplete = if (accessibilityServiceIncomplete) true else null,
     )
   }
 
