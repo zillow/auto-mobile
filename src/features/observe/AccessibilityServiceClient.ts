@@ -25,6 +25,7 @@ import { HierarchyNavigationDetector } from "../navigation/HierarchyNavigationDe
 import { throwIfAborted } from "../../utils/toolUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
+import { PortManager } from "../../utils/PortManager";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -678,9 +679,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private device: BootedDevice;
   private adb: AdbClient;
   private static readonly PACKAGE_NAME = "dev.jasonpearson.automobile.accessibilityservice";
-  private static readonly WEBSOCKET_PORT = 8765;
-  private static readonly WEBSOCKET_URL = `ws://localhost:${AccessibilityServiceClient.WEBSOCKET_PORT}/ws`;
   private static readonly DEVICE_CERT_DIR = "/sdcard/Download/automobile/ca_certs";
+
+  // Per-instance port allocation for multi-device support
+  private localPort: number;
 
   // Singleton instances per device
   private static instances: Map<string, AccessibilityServiceClient> = new Map();
@@ -801,6 +803,8 @@ export class AccessibilityServiceClient implements AccessibilityService {
     this.webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
     this.timer = timer || defaultTimer;
     this.installedAppsRepository = installedAppsRepository ?? null;
+    // Allocate a unique local port for this device (supports multiple emulators)
+    this.localPort = PortManager.allocate(device.deviceId);
     AndroidAccessibilityServiceManager.getInstance(device, adb);
   }
 
@@ -830,7 +834,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
       instance.close().catch(() => {});
     }
     AccessibilityServiceClient.instances.clear();
-    logger.info("[ACCESSIBILITY_SERVICE] Reset all singleton instances");
+    // Also reset port allocations to ensure clean state
+    PortManager.reset();
+    logger.info("[ACCESSIBILITY_SERVICE] Reset all singleton instances and port allocations");
   }
 
   /**
@@ -1067,22 +1073,22 @@ export class AccessibilityServiceClient implements AccessibilityService {
     }
 
     try {
-      logger.info(`[ACCESSIBILITY_SERVICE] Setting up port forwarding for WebSocket: localhost:${AccessibilityServiceClient.WEBSOCKET_PORT} → device:${AccessibilityServiceClient.WEBSOCKET_PORT}`);
+      logger.info(`[ACCESSIBILITY_SERVICE] Setting up port forwarding for WebSocket: localhost:${this.localPort} → device:${PortManager.DEVICE_PORT} (device: ${this.device.deviceId})`);
 
-      // Clear any existing forwarding for this port
+      // Clear any existing forwarding for this local port
       await perf.track("clearPortForward", () =>
-        this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+        this.adb.executeCommand(`forward --remove tcp:${this.localPort}`).catch(() => {
           // Ignore errors if no forwarding exists
         })
       );
 
-      // Setup new forwarding
+      // Setup new forwarding: local port (unique per device) → device port (always 8765)
       await perf.track("setupPortForward", () =>
-        this.adb.executeCommand(`forward tcp:${AccessibilityServiceClient.WEBSOCKET_PORT} tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`)
+        this.adb.executeCommand(`forward tcp:${this.localPort} tcp:${PortManager.DEVICE_PORT}`)
       );
 
       this.portForwardingSetup = true;
-      logger.info("[ACCESSIBILITY_SERVICE] Port forwarding setup complete");
+      logger.info(`[ACCESSIBILITY_SERVICE] Port forwarding setup complete (localhost:${this.localPort})`);
     } catch (error) {
       logger.warn(`[ACCESSIBILITY_SERVICE] Failed to setup port forwarding: ${error}`);
       throw error;
@@ -1148,10 +1154,11 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // Ensure port forwarding is setup
       await perf.track("portForwarding", () => this.setupPortForwarding(perf));
 
-      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${AccessibilityServiceClient.WEBSOCKET_URL} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts})`);
+      const wsUrl = `ws://localhost:${this.localPort}/ws`;
+      logger.info(`[ACCESSIBILITY_SERVICE] Connecting to WebSocket at ${wsUrl} (attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}, device: ${this.device.deviceId})`);
 
       return await perf.track("wsConnect", () => new Promise<boolean>((resolve, reject) => {
-        const ws = this.webSocketFactory(AccessibilityServiceClient.WEBSOCKET_URL);
+        const ws = this.webSocketFactory(wsUrl);
         const connectionTimeout = this.timer.setTimeout(() => {
           ws.close();
           // Reset port forwarding flag so next attempt will re-setup the forward
@@ -2441,13 +2448,16 @@ export class AccessibilityServiceClient implements AccessibilityService {
         this.hierarchyNavigationDetector = null;
       }
 
-      // Optionally remove port forwarding
+      // Remove port forwarding for this device
       if (this.portForwardingSetup) {
-        await this.adb.executeCommand(`forward --remove tcp:${AccessibilityServiceClient.WEBSOCKET_PORT}`).catch(() => {
+        await this.adb.executeCommand(`forward --remove tcp:${this.localPort}`).catch(() => {
           // Ignore errors
         });
         this.portForwardingSetup = false;
       }
+
+      // Release the port allocation
+      PortManager.release(this.device.deviceId);
 
       this.recompositionTrackingConfigured = false;
     } catch (error) {

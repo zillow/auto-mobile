@@ -349,8 +349,19 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
       const accessibilityClient = AccessibilityServiceClient.getInstance(device);
       if (accessibilityClient.isConnected()) {
-        logger.info(`[DeviceSessionManager] Accessibility service websocket connected for ${deviceId}, skipping accessibility checks`);
-        return;
+        // WebSocket appears connected, but verify service is actually responsive
+        // This catches cases where service crashed but socket wasn't properly closed
+        logger.info(`[DeviceSessionManager] WebSocket connected for ${deviceId}, verifying service is responsive`);
+        const isReady = await perf.track("verifyConnectedService", () =>
+          accessibilityClient.verifyServiceReady(2, 200, 2000)
+        );
+        if (isReady) {
+          logger.info(`[DeviceSessionManager] Accessibility service verified responsive for ${deviceId}`);
+          perf.end();
+          return;
+        }
+        // Service not responsive despite connected socket - fall through to normal flow
+        logger.warn(`[DeviceSessionManager] WebSocket connected but service not responsive for ${deviceId}, checking status`);
       }
 
       const manager = AndroidAccessibilityServiceManager.getInstance(device);
