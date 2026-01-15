@@ -17,8 +17,6 @@ AutoMobile collects frame rendering metrics during scroll interactions:
 
 ## Example Usage
 
-Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
-
 Example prompt:
 
 ```

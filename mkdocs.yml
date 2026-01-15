@@ -93,23 +93,36 @@ nav:
       - 'Overview': design-docs/index.md
       - 'MCP':
           - 'Overview': design-docs/mcp/index.md
-          - 'Actions': design-docs/mcp/actions.md
-          - 'Observation': design-docs/mcp/observation.md
+          - 'Tools': design-docs/mcp/tools.md
+          - 'Observe':
+             - 'Overview': design-docs/mcp/observe/index.md
+             - 'Video Recording': design-docs/mcp/observe/video-recording.md
+             - 'Vision Fallback': design-docs/mcp/observe/vision-fallback.md
+             - 'Visual Highlighting': design-docs/mcp/observe/visual-highlighting.md
           - 'Interaction Loop': design-docs/mcp/interaction-loop.md
-          - 'Daemon': design-docs/mcp/daemon.md
-          - 'Navigation Graph': design-docs/mcp/navigation-graph.md
+          - 'Daemon':
+             - 'Overview': design-docs/mcp/daemon/index.md
+             - 'Critical Section': design-docs/mcp/daemon/critical-section.md
+          - 'Navigation Graph':
+             - 'Overview': design-docs/mcp/nav/index.md
+             - 'Graph Structure': design-docs/mcp/nav/graph-structure.md
+             - 'Fingerprinting': design-docs/mcp/nav/fingerprinting.md
+             - 'Performance': design-docs/mcp/nav/performance.md
+             - 'Explore': design-docs/mcp/nav/explore.md
           - 'Feature Flags': design-docs/mcp/feature-flags.md
-          - 'Migrations': design-docs/mcp/migrations.md
-          - 'Video Recording': design-docs/mcp/video-recording.md
-          - 'Visual Highlighting': design-docs/mcp/visual-highlighting.md
-          - 'TalkBack/VoiceOver': design-docs/mcp/talkback-voiceover.md
-          - 'Critical Section': design-docs/mcp/critical-section.md
-          - 'Device State Snapshots': design-docs/mcp/snapshots.md
+          - 'Storage':
+             - 'Overview': design-docs/mcp/storage/index.md
+             - 'Migrations': design-docs/mcp/storage/migrations.md
+             - 'Device State Snapshots': design-docs/mcp/storage/snapshots.md
+          - 'Accessibility':
+             - 'Overview': design-docs/mcp/a11y/index.md
+             - 'TalkBack/VoiceOver': design-docs/mcp/a11y/talkback-voiceover.md
           - 'Resources': design-docs/mcp/resources.md
           - 'Context Thresholds': design-docs/mcp/context-thresholds.md
       - 'Platform Specific':
           - 'Android':
             - 'Overview': design-docs/plat/android/index.md
+            - 'Observe': design-docs/plat/android/observe.md
             - 'Accessibility Service': design-docs/plat/android/accessibility-service.md
             - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
             - 'JUnitRunner': design-docs/plat/android/junitrunner.md

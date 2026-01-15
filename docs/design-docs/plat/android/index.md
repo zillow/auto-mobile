@@ -43,8 +43,8 @@ graph TB
 
 #### MCP Server
 
-automobile:modelcontextprotocol.io/introduction))
-server. It has [observation](../../mcp/observation.md) built into its [interaction loop](../../mcp/interaction-loop.md)
+The [MCP server](../../mcp/index.md) implements the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
+It has [observation](../../mcp/observe/index.md) built into its [interaction loop](../../mcp/interaction-loop.md)
 that is fast. This is supported with UI stability checks (gfxinfo-based on Android) to determine idling. Together, that
 allows for accurate and precise exploration that gets better as more capabilities and heuristics are added.
 

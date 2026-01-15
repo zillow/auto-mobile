@@ -4,22 +4,6 @@
 
 The MCP context threshold system enforces limits on the token count of tool definitions, resources, and resource templates to prevent context bloat and ensure the MCP server remains efficient.
 
-## Architecture
-
-### Components
-
-```mermaid
-flowchart LR
-    A["Context Estimation<br/>scripts/estimate-context-usage.ts<br/>Estimates token usage for tools/resources<br/>Uses js-tiktoken (cl100k_base)<br/>Provides per-item breakdown<br/>bun run estimate-context"] --> B["Threshold Benchmark<br/>scripts/benchmark-context-thresholds.ts<br/>Reuses estimation logic<br/>Compares usage vs thresholds<br/>Human-readable + JSON outputs<br/>bun run benchmark-context"];
-    C["Threshold Configuration<br/>scripts/context-thresholds.json<br/>Versioned JSON limits<br/>Manual headroom for growth<br/>Categories: tools/resources/resourceTemplates/total"] --> B;
-    B --> D["CI Enforcement<br/>.github/workflows/context-thresholds.yml<br/>Runs on PRs + main pushes<br/>Artifacts retained 90 days<br/>Posts PR comments<br/>Fails when thresholds exceeded"];
-    classDef logic fill:#525FE1,stroke-width:0px,color:white;
-    classDef result stroke-width:0px;
-    class A,B,C,D logic;
-```
-
-## Usage
-
 ### Local Development
 
 ```bash
@@ -160,9 +144,6 @@ flowchart LR
 
 ### PR Comment Format
 
-```markdown
-## MCP Context Threshold Benchmark
-
 | Category | Actual | Threshold | Usage | Status |
 |----------|--------|-----------|-------|--------|
 | Tools | 10,382 | 14,000 | 74% | ✅ |
@@ -170,10 +151,6 @@ flowchart LR
 | Resource Templates | 1,412 | 2,000 | 71% | ✅ |
 | **Total** | **12,225** | **17,000** | **72%** | ✅ |
 
-**Overall Status:** ✅ PASSED
-
-_Generated at 2026-01-13T02:54:55.664Z_
-```
 
 ## Updating Thresholds
 
@@ -238,5 +215,5 @@ Potential improvements to consider:
 ## Related Documentation
 
 - [MCP Resources](resources.md) - Resource system design
-- [System Design](system-design.md) - Overall MCP architecture
+- [MCP Server](index.md) - Overall MCP architecture
 - [Validation Guide](../../ai/validation.md) - Development validation workflows

@@ -4,22 +4,15 @@ Write and run automated UI tests using AutoMobile.
 
 ## Overview
 
-| Method | Description |
-|--------|-------------|
-| AI-generated | Ask agent to create tests from natural language |
-| YAML plans | Record interactions → generate executable plans |
-| JUnitRunner | Kotlin/Java tests with AI self-healing |
+## Example Prompts
 
-## YAML Test Plans
-
-Record interactions and generate executable test plans:
-
-```mermaid
-flowchart LR
-    Record["Record Interactions"] --> Generate["Generate YAML"]
-    Generate --> Execute["Execute Plan"]
-    Execute --> CI["Run in CI"]
-```
+| Goal | Prompt |
+|------|--------|
+| Exploratory | "Explore <<feature>> so we can create tests for it" |
+| Regression | "Given <<regression steps to reproduce>>, lets run an exploration that would reproduce it and verify the bug is no longer possible." |
+| Built to spec | "Attempt to verify the <<product spec>>> given the current app version installed." |
+| Navigraph Graph | "Build a [navigation graph](../design-docs/mcp/nav/index.md) and then describe it as a mermaid diagram" |
+| Break it | "Attempt to execute UX interactions that might expose bugs in <<feature>>" |
 
 ### Example Plan
 
@@ -37,9 +30,9 @@ steps:
       - text: "user@example.com"
 ```
 
-Plans support assertions, conditional steps, and wait conditions.
+Plans support conditional steps which have internal assertions and wait conditions.
 
-See [Test Recording](../design-docs/plat/android/ide-plugin/test-recording.md) for the complete workflow.
+See [Test Recording](../design-docs/plat/android/ide-plugin/test-recording.md) for the current workflow on Android.
 
 ## AI-Generated Tests
 

@@ -216,5 +216,5 @@ Planned improvements:
 
 ## See Also
 
-- [MCP Actions](actions.md) - Tool implementation details
-- [Feature Flags](feature-flags.md) - Runtime configuration
+- [MCP Actions](../tools.md) - Tool implementation details
+- [Feature Flags](../feature-flags.md) - Runtime configuration

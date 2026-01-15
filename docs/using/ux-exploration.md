@@ -2,15 +2,6 @@
 
 Use AI agents to interactively explore your app and discover UI flows.
 
-## What the Agent Can Do
-
-- Navigate autonomously through screens
-- Discover UI flows and interaction patterns
-- Build a [navigation graph](../design-docs/mcp/navigation-graph.md) of screen transitions
-- Identify potential UX issues
-- Analyze information hierarchy
-- Compare UX for consistency across screens or components observed
-
 ## Example Prompts
 
 | Goal | Prompt |
@@ -18,6 +9,7 @@ Use AI agents to interactively explore your app and discover UI flows.
 | General exploration | "Explore the main features and identify key user flows" |
 | Specific screen | "Find all the ways to reach the settings screen" |
 | Flow analysis | "Explore the onboarding flow and report any confusing steps" |
+| Navigraph Graph | "Build a [navigation graph](../design-docs/mcp/nav/index.md) and then describe it as a mermaid diagram" |
 | Element discovery | "Identify all screens that contain text input fields" |
 
 ## Best Practices

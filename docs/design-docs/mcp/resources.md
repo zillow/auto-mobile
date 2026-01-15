@@ -22,7 +22,7 @@ Returns the current navigation graph showing:
 - Screen transitions and triggers
 - UI elements that cause navigation
 
-See [Navigation Graph](navigation-graph.md) for details.
+See [Navigation Graph](nav/index.md) for details.
 
 ### Booted Devices
 
@@ -70,7 +70,7 @@ Returns historical test execution data:
 - Device information
 - Supports query parameters for filtering and sorting (e.g., lookbackDays, limit, minSamples, orderBy, sessionUuid).
 
-See [Daemon](daemon.md) for test timing aggregation.
+See [Daemon](daemon/index.md) for test timing aggregation.
 
 ### Performance Results
 

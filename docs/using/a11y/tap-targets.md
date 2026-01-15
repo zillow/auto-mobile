@@ -21,8 +21,6 @@ AutoMobile can audit:
 
 ## Using AutoMobile
 
-Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
-
 Example prompt:
 
 ```

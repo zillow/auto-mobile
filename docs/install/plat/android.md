@@ -1,7 +1,7 @@
 # Android Setup
 
 !!! tip "First time?"
-    Start with the [interactive installer](../install/overview.md#interactive-installer) to automatically setup.
+    Start with the [interactive installer](../overview.md#interactive-installer).
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ Quick example:
 
 ### What's next
 
-Learn [how to use AutoMobile for Android](using/ux-exploration.md)
+Learn [how to use AutoMobile for Android](../../using/ux-exploration.md)
 
 ## Troubleshooting
 

@@ -1,50 +1,30 @@
 # AutoMobile
 
-AutoMobile is a set of tools for mobile automation. You can use it for UI testing, development workflow
-assistant, performance inspection tool, or accessibility audit.
+AutoMobile is a suite of mobile automation tools that can integrate into your AI agent of choice. It can be an assistant to enable individuals or empower teams to deliver better experiences. It does all of this with the [design principals](design-docs/#design-principles) that high quality, performant, and accessible workflows are necessary to creating good software.
 
-Android is the primary supported platform today; iOS support is on the roadmap.
+## Get Started
 
-**How do I get started?**
+1. [Install AutoMobile](install/overview.md)
+2. Try some use cases:
 
-- [Installation](install/overview.md) - Install AutoMobile in your environment or IDE
-- [Android first run](install/overview.md#android-first-run) - Verify a device, launch your app, and capture a concrete exploration result
+	- [Explore app ux](using/ux-exploration.md), [create UI tests](using/ui-tests.md), and easily create [bug reports]() with built-in [video recording](design-docs/mcp/observe/video-recording.md) and [visual highlights](design-docs/mcp/observe/visual-highlighting.md).
+	- Measure [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [screen transitions](using/perf-analysis/screen-transition.md).
+	- Audit accessibility compliance with [contrast ratios](using/a11y/contrast.md) & [tap targets](using/a11y/tap-targets.md).
+    - (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
+    - Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and (coming soon) XCTestRunner for iOS.
 
-### What can I use this to do?
+## Resources
 
-- [Explore your app interactively](using/ux-exploration.md) - Discover UI flows and issues with an AI agent
-- [Create reproducible UI tests](using/ui-tests.md) - Automate UI flows in CI/CD
-- [Measure startup performance](using/perf-analysis/startup.md) - Track time to first frame and interactivity
-- [Measure scroll framerate](using/perf-analysis/scroll-framerate.md) - Detect jank and dropped frames
-- [Measure screen transitions](using/perf-analysis/screen-transition.md) - Evaluate navigation latency and smoothness
-- [Audit contrast ratios](using/a11y/contrast.md) - Validate WCAG contrast compliance
-- [Audit tap target sizes](using/a11y/tap-targets.md) - Verify touch target size and spacing
-
-### How does AutoMobile work?
-
-All of the [design docs](design-docs/index.md) are included in the repository.
-
-**Additional Resources**
-
-- [FAQ](faq.md) - Frequently asked questions
-- [Why build this?](origin.md) - Motivation and origin story
-- [Contributing](contributing/overview.md) - If you're looking to contribute to the project
+- [Design Docs](design-docs/index.md) - Architecture and implementation details
+- [FAQ](faq.md) - Common questions
+- [Contributing](contributing/overview.md) - How to contribute
 
 ## License
 
-```text
+```
 Copyright 2025 Zillow, Inc.
 Copyright 2025-2026 Jason Pearson
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-   https://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Licensed under the Apache License, Version 2.0
+https://www.apache.org/licenses/LICENSE-2.0
 ```

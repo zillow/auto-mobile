@@ -1,50 +1,100 @@
-# Features - MCP Server
+# MCP Server
 
-AutoMobile's MCP makes its various [actions](actions.md) available as tool calls, exposes device state through
-[resources](resources.md), and automatically performs [observations](observation.md) within an
-[interaction loop](interaction-loop.md). This is a simple overview diagram, for more detail see the
-[full MCP server system design](system-design.md).
+The MCP server exposes AutoMobile's capabilities as tool calls, resources, and real-time observations.
+
+AutoMobile's MCP makes its various [actions](tools.md) available as tool calls and automatically performs
+[observations](observe/index.md) within an [interaction loop](interaction-loop.md).
 
 ```mermaid
-stateDiagram-v2
-  Agent: Agent
-  RequestHandler: Request Handler
-  DeviceSessionManager: Device Session Manager
-  InteractionLoop: Interaction Loop
+flowchart TB
+    subgraph Clients
+        Agent["🤖 AI Agent"]
+        IDE["💻 IDE Plugin"]
+        CLI["⌨️ CLI"]
+    end
 
-  Agent --> RequestHandler
-  RequestHandler --> Agent
-  RequestHandler --> DeviceSessionManager
-  InteractionLoop --> RequestHandler: 🖼️ Processed Results
-  DeviceSessionManager --> InteractionLoop: 📱
+    subgraph MCP["MCP Server"]
+        Transport["Transport Layer<br/>(STDIO / HTTP)"]
+        Registry["Tool & Resource<br/>Registry"]
+
+        subgraph Features["Feature Composition"]
+            Actions["Actions<br/>(tap, swipe, input)"]
+            Observe["Observation<br/>(hierarchy, screenshot)"]
+            AppMgmt["App Management<br/>(launch, terminate)"]
+            DeviceMgmt["Device Management<br/>(list, start, kill)"]
+        end
+    end
+
+    subgraph External["External Interfaces"]
+        WS["📡 WebSocket<br/>Clients"]
+        Socket["🔌 Unix Socket<br/>Commands"]
+        CLITools["🛠️ CLI Tools<br/>(adb, xcrun)"]
+    end
+
+    subgraph Devices["Devices"]
+        Android["📱 Android"]
+        iOS["📱 iOS"]
+    end
+
+    Agent --> Transport
+    IDE --> Transport
+    CLI --> Transport
+    Transport --> Registry
+    Registry --> Features
+
+    Actions --> WS
+    Observe --> WS
+    AppMgmt --> CLITools
+    DeviceMgmt --> CLITools
+    DeviceMgmt --> Socket
+
+    WS --> Android
+    WS --> iOS
+    CLITools --> Android
+    CLITools --> iOS
+
+    classDef client fill:#FF3300,stroke-width:0px,color:white;
+    classDef mcp fill:#525FE1,stroke-width:0px,color:white;
+    classDef external fill:#00AA55,stroke-width:0px,color:white;
+    classDef device fill:#666666,stroke-width:0px,color:white;
+
+    class Agent,IDE,CLI client;
+    class Transport,Registry,Actions,Observe,AppMgmt,DeviceMgmt mcp;
+    class WS,Socket,CLITools external;
+    class Android,iOS device;
 ```
 
-## Additional features
+## Core Capabilities
 
-- [Video recording](video-recording.md) for low-overhead capture and CI artifacts.
-- [Database migrations](migrations.md) for MCP server persistence.
+| Area | Documentation |
+|------|---------------|
+| **Actions** | [Tool calls](tools.md) for taps, swipes, input, app management |
+| **Observation** | [Real-time UI capture](observe/index.md) with view hierarchy |
+| **Interaction Loop** | [Observe-act-observe](interaction-loop.md) cycle with idle detection |
+| **Resources** | [Device state](resources.md) exposed via MCP resources |
 
-## Configuration
+## Additional Features
 
-AutoMobile MCP defaults to STDIO mode (good for workstations and CI automation). Streamable HTTP is available for
-clients that need HTTP transports and to support hot reloading local development.
+| Feature | Description |
+|---------|-------------|
+| [Video Recording](observe/video-recording.md) | Low-overhead capture for CI artifacts |
+| [Visual Highlighting](observe/visual-highlighting.md) | Debug overlays for element targeting |
+| [Navigation Graph](nav/index.md) | Automatic screen flow mapping |
+| [Feature Flags](feature-flags.md) | Runtime configuration |
+| [Migrations](storage/migrations.md) | Database schema management |
 
-```shell
+## Quick Start
+
+```bash
 npx -y @kaeawc/auto-mobile@latest
 ```
 
-If you have a private npm registry you can instead do the following
-
-```shell
-npx --registry https://your.awesome.private.registry.net/path/to/npm/proxy -y @kaeawc/auto-mobile@latest
-```
-
-A lot of MCP clients configure MCP servers through JSON, this sample will work with most
+For MCP client configuration:
 
 ```json
 {
   "mcpServers": {
-    "AutoMobile": {
+    "auto-mobile": {
       "command": "npx",
       "args": ["-y", "@kaeawc/auto-mobile@latest"]
     }
@@ -52,5 +102,11 @@ A lot of MCP clients configure MCP servers through JSON, this sample will work w
 }
 ```
 
-Configuration is provided via CLI flags and environment variables, and runtime feature flags can be toggled through MCP
-tools when needed.
+## Transport Modes
+
+| Mode | Use Case |
+|------|----------|
+| **STDIO** (default) | Workstations, CI automation |
+| **Streamable HTTP** | Hot reload development, HTTP-only clients |
+
+See [installation](../../install/overview.md) for detailed configuration options.

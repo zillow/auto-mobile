@@ -38,4 +38,4 @@ Extension or a standard file open action.
 ## See also
 
 - [Xcode integration](overview.md)
-- [MCP plan execution](../../../mcp/actions.md)
+- [MCP plan execution](../../../mcp/tools.md)
