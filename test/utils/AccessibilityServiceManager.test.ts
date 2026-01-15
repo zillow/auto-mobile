@@ -9,6 +9,7 @@ import crypto from "crypto";
 import os from "os";
 import AdmZip from "adm-zip";
 import { FakeTimer } from "../fakes/FakeTimer";
+import { FakeAccessibilityDetector } from "../fakes/FakeAccessibilityDetector";
 
 describe("AccessibilityServiceManager", function() {
   let accessibilityServiceClient: AndroidAccessibilityServiceManager;
@@ -56,6 +57,7 @@ describe("AccessibilityServiceManager", function() {
 
   afterEach(function() {
     AndroidAccessibilityServiceManager.setExpectedChecksumForTesting(null);
+    AndroidAccessibilityServiceManager.setAccessibilityDetectorForTesting(null);
     if (originalApkPathEnv === undefined) {
       delete process.env.AUTOMOBILE_ACCESSIBILITY_APK_PATH;
     } else {
@@ -897,6 +899,106 @@ describe("AccessibilityServiceManager", function() {
       await accessibilityServiceClient.enableViaSettings();
 
       expect(fakeAdb.wasCommandExecuted(`shell settings put secure enabled_accessibility_services "${expectedServices}"`)).toBe(true);
+    });
+
+    test("should invalidate accessibility detector cache after enabling service", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const fakeDetector = new FakeAccessibilityDetector();
+      AndroidAccessibilityServiceManager.setAccessibilityDetectorForTesting(fakeDetector);
+
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: "null",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${serviceComponent}"`, {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      // Verify cache is empty before
+      expect(fakeDetector.getInvalidatedDevices()).toEqual([]);
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      // Verify cache was invalidated for our device
+      expect(fakeDetector.getInvalidatedDevices()).toEqual(["test-device"]);
+    });
+
+    test("should invalidate accessibility detector cache with correct device ID when appending to existing services", async function() {
+      const existingServices = "com.example.other/com.example.other.Service";
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const expectedServices = `${existingServices}:${serviceComponent}`;
+      const fakeDetector = new FakeAccessibilityDetector();
+      AndroidAccessibilityServiceManager.setAccessibilityDetectorForTesting(fakeDetector);
+
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: existingServices,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse(`shell settings put secure enabled_accessibility_services "${expectedServices}"`, {
+        stdout: "",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      // Verify cache was invalidated for our device
+      expect(fakeDetector.getInvalidatedDevices()).toEqual(["test-device"]);
+    });
+
+    test("should invalidate accessibility detector cache even when service already enabled", async function() {
+      const serviceComponent = `${AndroidAccessibilityServiceManager.PACKAGE}/${AndroidAccessibilityServiceManager.PACKAGE}.AutoMobileAccessibilityService`;
+      const fakeDetector = new FakeAccessibilityDetector();
+      AndroidAccessibilityServiceManager.setAccessibilityDetectorForTesting(fakeDetector);
+
+      // Mock emulator detection
+      fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", {
+        stdout: "1",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell getprop ro.build.version.sdk", {
+        stdout: "29",
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings get secure enabled_accessibility_services", {
+        stdout: serviceComponent,
+        stderr: ""
+      });
+      fakeAdb.setCommandResponse("shell settings put secure accessibility_enabled 1", {
+        stdout: "",
+        stderr: ""
+      });
+
+      await accessibilityServiceClient.enableViaSettings();
+
+      // Verify cache was still invalidated (even though service was already in list)
+      expect(fakeDetector.getInvalidatedDevices()).toEqual(["test-device"]);
     });
   });
 

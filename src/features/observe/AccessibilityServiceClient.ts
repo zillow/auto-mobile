@@ -630,6 +630,27 @@ export interface AccessibilityService {
   isConnected(): boolean;
 
   /**
+   * Wait for WebSocket connection to be established with retries.
+   * Useful after enabling/installing the accessibility service when
+   * the service needs time to start accepting connections.
+   * @param maxAttempts - Maximum number of connection attempts (default: 10)
+   * @param delayMs - Delay between attempts in milliseconds (default: 300)
+   * @returns Promise resolving to true if connected, false if all attempts failed
+   */
+  waitForConnection(maxAttempts?: number, delayMs?: number): Promise<boolean>;
+
+  /**
+   * Verify the accessibility service is ready to respond to requests.
+   * This goes beyond just checking WebSocket connectivity - it actually
+   * attempts to get a hierarchy response to ensure the service is fully initialized.
+   * @param maxAttempts - Maximum number of verification attempts (default: 5)
+   * @param delayMs - Delay between attempts in milliseconds (default: 500)
+   * @param timeoutMs - Timeout for each hierarchy request (default: 3000)
+   * @returns Promise resolving to true if service is ready, false otherwise
+   */
+  verifyServiceReady(maxAttempts?: number, delayMs?: number, timeoutMs?: number): Promise<boolean>;
+
+  /**
    * Check if there is cached hierarchy data available
    * @returns true if hierarchy data exists in cache, false otherwise
    */
@@ -862,10 +883,84 @@ export class AccessibilityServiceClient implements AccessibilityService {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
+  public async waitForConnection(
+    maxAttempts: number = 10,
+    delayMs: number = 300
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      // Reset connection attempts counter to allow fresh connection attempts
+      this.connectionAttempts = 0;
+
+      const connected = await this.ensureConnected();
+      if (connected) {
+        logger.info(`[ACCESSIBILITY_SERVICE] WebSocket connected after ${attempt} attempt(s) (${(attempt - 1) * delayMs}ms)`);
+        return true;
+      }
+
+      if (attempt < maxAttempts) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Connection attempt ${attempt}/${maxAttempts} failed, retrying in ${delayMs}ms`);
+        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
+      }
+    }
+
+    logger.warn(`[ACCESSIBILITY_SERVICE] WebSocket not ready after ${maxAttempts} attempts (${maxAttempts * delayMs}ms)`);
+    return false;
+  }
+
   public async ensureConnected(
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<boolean> {
     return this.connectWebSocket(perf);
+  }
+
+  /**
+   * Verify the accessibility service is ready to respond to requests.
+   * This goes beyond just checking WebSocket connectivity - it actually
+   * attempts to get a hierarchy response to ensure the service is fully initialized.
+   *
+   * Call this after enabling/installing the service to ensure it's truly ready
+   * before proceeding with observe operations.
+   *
+   * @param maxAttempts - Maximum number of verification attempts (default: 5)
+   * @param delayMs - Delay between attempts in milliseconds (default: 500)
+   * @param timeoutMs - Timeout for each hierarchy request (default: 3000)
+   * @returns Promise resolving to true if service is ready, false otherwise
+   */
+  public async verifyServiceReady(
+    maxAttempts: number = 5,
+    delayMs: number = 500,
+    timeoutMs: number = 3000
+  ): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        logger.info(`[ACCESSIBILITY_SERVICE] Verifying service ready (attempt ${attempt}/${maxAttempts})`);
+
+        // Try to get a hierarchy response - this verifies the service can actually respond
+        const result = await this.requestHierarchySync(
+          new NoOpPerformanceTracker(),
+          false,
+          undefined,
+          timeoutMs
+        );
+
+        if (result && result.hierarchy) {
+          logger.info(`[ACCESSIBILITY_SERVICE] Service verified ready after ${attempt} attempt(s)`);
+          return true;
+        }
+
+        logger.debug(`[ACCESSIBILITY_SERVICE] Verification attempt ${attempt} returned no hierarchy`);
+      } catch (error) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Verification attempt ${attempt} failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      if (attempt < maxAttempts) {
+        logger.debug(`[ACCESSIBILITY_SERVICE] Waiting ${delayMs}ms before next verification attempt`);
+        await new Promise(resolve => this.timer.setTimeout(resolve, delayMs));
+      }
+    }
+
+    logger.warn(`[ACCESSIBILITY_SERVICE] Service not ready after ${maxAttempts} verification attempts`);
+    return false;
   }
 
   public onInteraction(listener: (event: InteractionEvent) => void): () => void {

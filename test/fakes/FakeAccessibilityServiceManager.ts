@@ -192,6 +192,11 @@ export class FakeAccessibilityServiceManager implements AccessibilityServiceMana
     this.executedOperations.push("clearAvailabilityCache");
   }
 
+  resetSetupState(): void {
+    this.executedOperations.push("resetSetupState");
+    this.clearAvailabilityCache();
+  }
+
   async downloadApk(): Promise<string> {
     this.executedOperations.push("downloadApk");
 

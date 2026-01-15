@@ -9,6 +9,8 @@ import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorCl
 import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { createPerformanceTracker } from "./PerformanceTracker";
+import { storeSetupTiming } from "../server/ToolExecutionContext";
 
 /**
  * Interface for device session management
@@ -334,6 +336,11 @@ export class DeviceSessionManager implements DeviceSessionManager {
       );
     }
 
+    // Always track setup timing (one-time per session, valuable for debugging)
+    const perf = createPerformanceTracker(true);
+    perf.serial("ensureAccessibilityService");
+    let didSetup = false;
+
     try {
       const skipAccessibilityDownload = options?.skipAccessibilityDownload ?? options?.skipAccessibilitySetup;
       if (options?.skipAccessibilitySetup !== undefined) {
@@ -357,18 +364,30 @@ export class DeviceSessionManager implements DeviceSessionManager {
         logger.warn(`[DeviceSessionManager] ${errorMessage} Device: ${deviceId}`);
         throw new ActionableError(errorMessage);
       };
-      const [isInstalled, isEnabled] = await Promise.all([
+
+      const [isInstalled, isEnabled] = await perf.track("checkStatus", () => Promise.all([
         manager.isInstalled(),
         manager.isEnabled()
-      ]);
+      ]));
+
+      let needsSetup = false;
 
       if (isInstalled && isEnabled) {
-        logger.info(`[DeviceSessionManager] Accessibility service already enabled for ${deviceId}`);
-        if (skipAccessibilityDownload) {
-          await verifyCompatibilityWhenSkipping();
-          return;
+        logger.info(`[DeviceSessionManager] Accessibility service already enabled for ${deviceId}, verifying WebSocket connection`);
+        // Verify the service is actually working by checking WebSocket connection
+        const connected = await perf.track("verifyConnection", () => accessibilityClient.waitForConnection(3, 200));
+        if (connected) {
+          if (skipAccessibilityDownload) {
+            await verifyCompatibilityWhenSkipping();
+            return;
+          }
+          logger.info(`[DeviceSessionManager] Accessibility service enabled and connected for ${deviceId}, verifying version compatibility`);
+        } else {
+          // Service claims to be installed but WebSocket won't connect - cache is stale
+          logger.warn(`[DeviceSessionManager] Accessibility service cache stale for ${deviceId} - marked as installed/enabled but WebSocket failed. Resetting setup state and forcing reinstall.`);
+          manager.resetSetupState();
+          needsSetup = true;
         }
-        logger.info(`[DeviceSessionManager] Accessibility service enabled for ${deviceId}, verifying version compatibility`);
       }
 
       if (!isInstalled && skipAccessibilityDownload) {
@@ -376,36 +395,70 @@ export class DeviceSessionManager implements DeviceSessionManager {
         return;
       }
 
-      if (isInstalled && !isEnabled) {
+      if (isInstalled && !isEnabled && !needsSetup) {
         logger.info(`[DeviceSessionManager] Accessibility service installed but not enabled for ${deviceId}, enabling now`);
         try {
-          await manager.enable();
-          if (skipAccessibilityDownload) {
-            await verifyCompatibilityWhenSkipping();
-            return;
+          await perf.track("enableService", () => manager.enable());
+          didSetup = true;
+          // Wait for WebSocket to be ready after enabling
+          logger.info(`[DeviceSessionManager] Waiting for accessibility WebSocket connection for ${deviceId}`);
+          const enableConnected = await perf.track("waitForConnection", () => accessibilityClient.waitForConnection());
+          if (!enableConnected) {
+            logger.warn(`[DeviceSessionManager] WebSocket connection failed after enabling for ${deviceId}, will attempt full setup`);
+            manager.resetSetupState();
+            needsSetup = true;
+          } else {
+            if (skipAccessibilityDownload) {
+              await verifyCompatibilityWhenSkipping();
+              return;
+            }
+            logger.info(`[DeviceSessionManager] Accessibility service enabled for ${deviceId}, verifying version compatibility`);
           }
-          logger.info(`[DeviceSessionManager] Accessibility service enabled for ${deviceId}, verifying version compatibility`);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           logger.warn(`[DeviceSessionManager] Failed to enable accessibility service: ${errorMessage}`);
           if (skipAccessibilityDownload) {
             return;
           }
+          needsSetup = true;
         }
       }
 
-      if (skipAccessibilityDownload) {
+      if (skipAccessibilityDownload && !needsSetup) {
         logger.info(`[DeviceSessionManager] Skipping accessibility service download/install for ${deviceId}`);
         return;
       }
 
-      await manager.setup();
+      if (needsSetup || !isInstalled) {
+        await manager.setup(false, perf);
+        didSetup = true;
+        // Wait for WebSocket to be ready after setup (install + enable)
+        logger.info(`[DeviceSessionManager] Waiting for accessibility WebSocket connection after setup for ${deviceId}`);
+        const connected = await perf.track("waitForConnection", () => accessibilityClient.waitForConnection());
+        if (connected) {
+          // Verify service is actually ready to respond (not just WebSocket connected)
+          logger.info(`[DeviceSessionManager] Verifying accessibility service is responsive for ${deviceId}`);
+          const ready = await perf.track("verifyServiceReady", () => accessibilityClient.verifyServiceReady(5, 500, 3000));
+          if (!ready) {
+            logger.warn(`[DeviceSessionManager] Accessibility service not responsive after setup for ${deviceId}, observe may fall back to UIAutomator`);
+          }
+        }
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`[DeviceSessionManager] Failed to setup accessibility service: ${errorMessage}`);
       // Rethrow ActionableErrors to preserve their specific error messages
       if (error instanceof ActionableError) {
         throw error;
+      }
+    } finally {
+      perf.end();
+      // Store timing if we actually did setup work
+      if (didSetup) {
+        const timings = perf.getTimings();
+        if (timings) {
+          storeSetupTiming(deviceId, timings);
+        }
       }
     }
   }

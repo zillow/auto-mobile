@@ -20,6 +20,7 @@ class ServerConfig {
   private _planExecutionLockScope: PlanExecutionLockScope = "session";
   private _videoRecordingDefaults: VideoRecordingConfigInput = {};
   private _deviceSnapshotDefaults: DeviceSnapshotConfigInput = {};
+  private _skipAccessibilityDownload: boolean = false;
 
   private constructor() {}
 
@@ -104,6 +105,14 @@ class ServerConfig {
 
   getDeviceSnapshotDefaults(): DeviceSnapshotConfigInput {
     return { ...this._deviceSnapshotDefaults };
+  }
+
+  setSkipAccessibilityDownload(skip: boolean): void {
+    this._skipAccessibilityDownload = skip;
+  }
+
+  isSkipAccessibilityDownloadEnabled(): boolean {
+    return this._skipAccessibilityDownload;
   }
 }
 

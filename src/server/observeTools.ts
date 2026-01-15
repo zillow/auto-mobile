@@ -12,6 +12,9 @@ import { IdentifyInteractions, IdentifyInteractionsOptions } from "../features/o
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { ElementUtils } from "../features/utility/ElementUtils";
 import { defaultTimer } from "../utils/SystemTimer";
+import { consumeSetupTiming } from "./ToolExecutionContext";
+import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
+import { logger } from "../utils/logger";
 import {
   accessibilityStateSchema,
   activeWindowSchema,
@@ -225,12 +228,35 @@ export function registerObserveTools() {
         ? waitOutcome.observation
         : await observeScreen.execute(undefined, createGlobalPerformanceTracker(), true, 0, signal);
 
+      // Include setup timing if this is the first observe after accessibility service setup
+      const setupTiming = consumeSetupTiming(device.deviceId);
+      if (setupTiming && result.perfTiming) {
+        // Prepend setup timing to the observe timing
+        result.perfTiming = [setupTiming, ...result.perfTiming];
+      } else if (setupTiming) {
+        result.perfTiming = [setupTiming];
+      }
+
       // Record back stack information in navigation graph if available
       if (result.backStack && result.activeWindow?.appId) {
         const navGraph = NavigationGraphManager.getInstance();
         // Only record if we have a current app and screen
         if (navGraph.getCurrentAppId() === result.activeWindow.appId && navGraph.getCurrentScreen()) {
           navGraph.recordBackStack(result.backStack);
+        }
+      }
+
+      // If accessibility service reports as disabled, reset setup state to force reinstall on next attempt
+      // This handles cases where the service was uninstalled externally
+      if (device.platform === "android" && result.accessibilityState?.enabled === false) {
+        logger.warn("[observe] Accessibility service not enabled, resetting setup state for next attempt");
+        try {
+          const manager = AndroidAccessibilityServiceManager.getInstance(device);
+          manager.resetSetupState();
+        } catch (error) {
+          logger.warn("[observe] Failed to reset accessibility setup state", {
+            error: error instanceof Error ? error.message : String(error)
+          });
         }
       }
 
