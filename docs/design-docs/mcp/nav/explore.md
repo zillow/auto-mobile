@@ -1,3 +1,4 @@
+# Explore
 
 ## Exploration Modes
 

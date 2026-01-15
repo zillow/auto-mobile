@@ -1,4 +1,4 @@
-# Test Execution - XCTest Runner
+# XCTest Runner
 
 The iOS test execution layer mirrors the Android JUnitRunner by providing a structured
 way to execute AutoMobile plans within XCTest and collect timing data for optimization.

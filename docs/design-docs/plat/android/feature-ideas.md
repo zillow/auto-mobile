@@ -1,4 +1,4 @@
-# Android Feature Ideas (Draft)
+# Overview
 
 This page summarizes Android-specific MCP feature ideas and links to the
 per-feature design notes.

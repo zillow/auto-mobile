@@ -1,4 +1,4 @@
-# TalkBack/VoiceOver MCP Tool Adaptation Design
+# TalkBack/VoiceOver
 
 ## Overview
 

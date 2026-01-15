@@ -1,4 +1,4 @@
-# Features - MCP Server - Video Recording
+# Video Recording
 
 Optional screen recording for debugging, performance analysis, and CI artifacts. Recording is off by default
 and optimized for low overhead with a low-quality default preset.

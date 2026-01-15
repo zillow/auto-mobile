@@ -1,4 +1,4 @@
-# MCP Resources
+# Resources
 
 AutoMobile exposes resources through the Model Context Protocol for AI agents to access.
 

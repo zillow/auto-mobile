@@ -1,6 +1,8 @@
-# Reproducing Bugs with AutoMobile
+# Reproducing Bugs
 
 Use AutoMobile to systematically reproduce bugs and create reproducible test cases.
+
+![Bug reproduction demo](../img/bug-repro.gif)
 
 - Capture exact steps to reproduce bugs
 - Generate test cases from bug reports

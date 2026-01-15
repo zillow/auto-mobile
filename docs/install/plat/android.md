@@ -1,4 +1,4 @@
-# Android Setup
+# Android
 
 !!! tip "First time?"
     Start with the [interactive installer](../overview.md#interactive-installer).

@@ -1,4 +1,4 @@
-# executePlan assertions and await
+# executePlan assertions
 
 ## Goal
 

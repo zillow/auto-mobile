@@ -1,4 +1,4 @@
-# TalkBack simulation / enablement
+# TalkBack simulation
 
 ## Goal
 

@@ -1,4 +1,4 @@
-# Extended accessibility testing
+# Accessibility testing
 
 ## Goal
 

@@ -2,6 +2,10 @@
 
 Use AI agents to interactively explore your app and discover UI flows.
 
+![UX exploration demo - Google Maps](../img/google-maps.gif)
+![UX exploration demo - Clock app](../img/clock-app.gif)
+![UX exploration demo - Camera Gallery](../img/camera-gallery.gif)
+
 ## Example Prompts
 
 | Goal | Prompt |

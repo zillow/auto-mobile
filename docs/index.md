@@ -1,6 +1,8 @@
-# AutoMobile
+# Overview
 
 AutoMobile is a suite of mobile automation tools that can integrate into your AI agent of choice. It can be an assistant to enable individuals or empower teams to deliver better experiences. It does all of this with the [design principals](design-docs/#design-principles) that high quality, performant, and accessible workflows are necessary to creating good software.
+
+![AutoMobile YouTube search demo](img/youtube-search.gif)
 
 ## Get Started
 
@@ -12,6 +14,8 @@ AutoMobile is a suite of mobile automation tools that can integrate into your AI
 	- Audit accessibility compliance with [contrast ratios](using/a11y/contrast.md) & [tap targets](using/a11y/tap-targets.md).
     - (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
     - Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and (coming soon) XCTestRunner for iOS.
+
+![AutoMobile](../img/auto-mobile-party.gif)
 
 ## Resources
 

@@ -1,4 +1,4 @@
-# MCP Daemon
+# Overview
 
 Background daemon service for device pooling and parallel test execution.
 

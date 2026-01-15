@@ -1,4 +1,6 @@
-# Features - MCP Server - Interaction Loop
+# Interaction Loop
+
+![Interaction loop demo - setting an alarm](../../img/clock-app-demo.gif)
 
 This interaction loop is supported by comprehensive [observation](observe/index.md) of UI state and UI stability checks
 (Android uses `dumpsys gfxinfo`-based idle detection) before and after action execution. Together, that allows for

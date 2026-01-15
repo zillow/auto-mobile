@@ -1,4 +1,4 @@
-# AXe Automation Layer
+# AXe Automation
 
 The AXe automation layer coordinates touch injection and MCP tool execution for iOS.
 It connects to the native iOS automation server for observations and uses
