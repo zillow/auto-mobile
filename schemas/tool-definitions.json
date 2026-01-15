@@ -1538,6 +1538,16 @@
     }
   },
   {
+    "name": "listApps",
+    "description": "Guide for listing apps via MCP resources",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": true,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
     "name": "listDeviceImages",
     "description": "List device images",
     "inputSchema": {
@@ -1555,6 +1565,25 @@
       "required": [
         "platform"
       ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "listDevices",
+    "description": "List devices (resource guidance)",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Platform"
+        }
+      },
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
