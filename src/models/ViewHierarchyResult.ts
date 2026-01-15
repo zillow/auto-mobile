@@ -2,6 +2,11 @@ import { ElementBounds } from "./ElementBounds";
 import { RecompositionMetrics, RecompositionNodeInfo } from "./Recomposition";
 
 /**
+ * Hierarchy data sources that contributed to the result
+ */
+export type HierarchySource = "accessibility-service" | "uiautomator";
+
+/**
  * Represents the ViewHierarchy dump result from a device.
  */
 export interface ViewHierarchyResult {
@@ -18,6 +23,16 @@ export interface ViewHierarchyResult {
   notificationPermissionDetected?: boolean;
   /** Element with TalkBack/accessibility cursor (Android only) */
   "accessibility-focused-element"?: ViewHierarchyNode;
+  /**
+   * True when the accessibility service couldn't fully extract the hierarchy.
+   * This indicates that uiautomator fallback may have been used.
+   */
+  accessibilityServiceIncomplete?: boolean;
+  /**
+   * Sources that contributed to this hierarchy result.
+   * When both sources are present, the hierarchy was merged from accessibility service + uiautomator.
+   */
+  sources?: HierarchySource[];
 }
 
 export interface Hierarchy {

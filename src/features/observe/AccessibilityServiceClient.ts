@@ -80,6 +80,14 @@ export interface AccessibilityHierarchy {
   windows?: ViewHierarchyWindowInfo[];
   intentChooserDetected?: boolean;
   notificationPermissionDetected?: boolean;
+  /** Element with TalkBack cursor */
+  "accessibility-focused-element"?: AccessibilityNode;
+  /**
+   * True when the accessibility service couldn't fully extract the hierarchy.
+   * This happens when the active window has a null root (app restricts accessibility)
+   * or only system UI windows were accessible.
+   */
+  accessibilityServiceIncomplete?: boolean;
   error?: string;
 }
 
@@ -1909,19 +1917,29 @@ export class AccessibilityServiceClient implements AccessibilityService {
           packageName: resolvedPackageName,
           windows: accessibilityHierarchy.windows,
           intentChooserDetected: accessibilityHierarchy.intentChooserDetected,
-          notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected
+          notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected,
+          accessibilityServiceIncomplete: accessibilityHierarchy.accessibilityServiceIncomplete,
+          sources: ["accessibility-service"]
         } as ViewHierarchyResult;
       }
 
       // Convert the accessibility node format to match the existing XML-based format
       const convertedHierarchy = this.convertAccessibilityNode(hierarchyToConvert);
 
+      // Convert accessibility-focused element if present
+      const accessibilityFocusedElement = accessibilityHierarchy["accessibility-focused-element"]
+        ? this.convertAccessibilityNode(accessibilityHierarchy["accessibility-focused-element"])
+        : undefined;
+
       const result: ViewHierarchyResult = {
-        hierarchy: convertedHierarchy,
-        packageName: resolvedPackageName,
-        windows: accessibilityHierarchy.windows,
-        intentChooserDetected: accessibilityHierarchy.intentChooserDetected,
-        notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected
+        "hierarchy": convertedHierarchy,
+        "packageName": resolvedPackageName,
+        "windows": accessibilityHierarchy.windows,
+        "intentChooserDetected": accessibilityHierarchy.intentChooserDetected,
+        "notificationPermissionDetected": accessibilityHierarchy.notificationPermissionDetected,
+        "accessibility-focused-element": accessibilityFocusedElement,
+        "accessibilityServiceIncomplete": accessibilityHierarchy.accessibilityServiceIncomplete,
+        "sources": ["accessibility-service"]
       };
 
       const duration = Date.now() - startTime;
