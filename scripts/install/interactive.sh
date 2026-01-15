@@ -13,13 +13,36 @@ if [[ -f "${PROJECT_ROOT}/package.json" && -d "${PROJECT_ROOT}/android" ]]; then
     IS_REPO=true
 fi
 
+# ============================================================================
+# New CLI Options and Global State
+# ============================================================================
+DRY_RUN=false
+DRY_RUN_LOG=()
+NON_INTERACTIVE=false
+PRESET=""
+CONFIGURE_MCP_CLIENTS=false
+
+# Gum bundling configuration
+GUM_VERSION="0.15.2"
+GUM_INSTALL_DIR="${HOME}/.automobile/bin"
+GUM_BINARY="${GUM_INSTALL_DIR}/gum"
+GUM_VERSION_FILE="${GUM_INSTALL_DIR}/.gum-version"
+
+# Config backup directory
+BACKUP_DIR="${HOME}/.automobile/backups"
+BACKUP_TIMESTAMP=""
+
+# MCP client detection (parallel arrays for bash 3.x compatibility)
+# Format: "client_name|config_path|format|scope"
+MCP_CLIENT_LIST=()
+SELECTED_MCP_CLIENTS=()
+
+# ============================================================================
+# Original Global State
+# ============================================================================
 INSTALL_BUN=false
 BUN_INSTALLED=false
-INSTALL_ANDROID_SDK=false
 ANDROID_SDK_DETECTED=false
-ANDROID_SDK_ROOT_SELECTED=""
-INSTALL_ANDROID_PLATFORM_TOOLS=false
-INSTALL_ACCESSIBILITY_SERVICE=false
 INSTALL_IDE_PLUGIN=false
 IDE_PLUGIN_METHOD=""
 IDE_PLUGIN_ZIP_URL=""
@@ -31,6 +54,172 @@ AUTO_MOBILE_CMD=()
 
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# ============================================================================
+# CLI Argument Parsing
+# ============================================================================
+show_help() {
+    cat << 'EOF'
+AutoMobile Interactive Installer
+
+Usage: ./interactive.sh [OPTIONS]
+
+Options:
+  --dry-run           Show what would happen without making changes
+  --preset NAME       Use preset configuration (minimal, development)
+  --non-interactive   Skip interactive prompts, use defaults
+  -h, --help          Show this help message
+
+Presets:
+  minimal      - CLI + MCP client configuration only
+  development  - Full setup with debug flags and IDE plugin (if available)
+
+Examples:
+  ./interactive.sh --dry-run
+  ./interactive.sh --preset development
+  ./interactive.sh --preset development --non-interactive
+
+EOF
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            --preset)
+                if [[ -z "${2:-}" ]]; then
+                    plain_error "Missing value for --preset"
+                    exit 1
+                fi
+                PRESET="$2"
+                shift 2
+                ;;
+            --non-interactive|-y)
+                NON_INTERACTIVE=true
+                shift
+                ;;
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            *)
+                plain_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+
+    # Validate preset if provided
+    if [[ -n "${PRESET}" ]]; then
+        case "${PRESET}" in
+            minimal|development)
+                ;;
+            *)
+                plain_error "Unknown preset: ${PRESET}. Valid options: minimal, development"
+                exit 1
+                ;;
+        esac
+    fi
+}
+
+# ============================================================================
+# Dry-Run Wrapper Functions
+# ============================================================================
+# Execute a command or log it in dry-run mode
+execute() {
+    local description="$1"
+    shift
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        DRY_RUN_LOG+=("[DRY-RUN] ${description}")
+        if command_exists gum; then
+            gum log --level info "[DRY-RUN] Would: ${description}"
+        else
+            printf '[DRY-RUN] Would: %s\n' "${description}"
+        fi
+        return 0
+    fi
+
+    "$@"
+}
+
+# Execute with spinner or log in dry-run mode
+execute_spinner() {
+    local title="$1"
+    shift
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        DRY_RUN_LOG+=("[DRY-RUN] ${title}")
+        if command_exists gum; then
+            gum log --level info "[DRY-RUN] Would: ${title}"
+        else
+            printf '[DRY-RUN] Would: %s\n' "${title}"
+        fi
+        return 0
+    fi
+
+    run_spinner "${title}" "$@"
+}
+
+# Write file or show content in dry-run mode
+write_file() {
+    local path="$1"
+    local content="$2"
+    local description="${3:-Write to ${path}}"
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        DRY_RUN_LOG+=("[DRY-RUN] ${description}")
+        if command_exists gum; then
+            gum log --level info "[DRY-RUN] Would write to: ${path}"
+            gum style --border rounded --padding "0 1" --margin "0 2" "${content}"
+        else
+            printf '[DRY-RUN] Would write to: %s\n' "${path}"
+            printf '%s\n' "${content}"
+        fi
+        return 0
+    fi
+
+    # Create parent directory if needed
+    local parent_dir
+    parent_dir=$(dirname "${path}")
+    if [[ ! -d "${parent_dir}" ]]; then
+        mkdir -p "${parent_dir}"
+    fi
+
+    printf '%s\n' "${content}" > "${path}"
+}
+
+# Print dry-run summary at the end
+print_dry_run_summary() {
+    if [[ "${DRY_RUN}" != "true" ]]; then
+        return 0
+    fi
+
+    if [[ ${#DRY_RUN_LOG[@]} -eq 0 ]]; then
+        log_info "Dry-run complete. No actions would be taken."
+        return 0
+    fi
+
+    echo ""
+    gum style --bold --foreground 214 "Dry-Run Summary"
+    gum style --faint "The following actions would be performed:"
+    echo ""
+
+    local i=1
+    for action in "${DRY_RUN_LOG[@]}"; do
+        # Strip [DRY-RUN] prefix for cleaner output
+        local clean_action="${action#\[DRY-RUN\] }"
+        printf '  %d. %s\n' "${i}" "${clean_action}"
+        ((i++))
+    done
+
+    echo ""
+    gum style --foreground 214 "Run without --dry-run to execute these actions."
 }
 
 plain_info() {
@@ -120,7 +309,24 @@ fetch_gum_version() {
     echo "${version}"
 }
 
-install_gum_manual() {
+# Check if bundled gum is installed and current version
+is_bundled_gum_current() {
+    if [[ ! -x "${GUM_BINARY}" ]]; then
+        return 1
+    fi
+
+    if [[ ! -f "${GUM_VERSION_FILE}" ]]; then
+        return 1
+    fi
+
+    local installed_version
+    installed_version=$(cat "${GUM_VERSION_FILE}" 2>/dev/null || echo "")
+
+    [[ "${installed_version}" == "${GUM_VERSION}" ]]
+}
+
+# Install gum to ~/.automobile/bin (bundled approach)
+install_bundled_gum() {
     local os="$1"
     local arch="$2"
     local os_label=""
@@ -157,11 +363,9 @@ install_gum_manual() {
         return 1
     fi
 
-    local version
-    version=$(fetch_gum_version)
-    local download_url="https://github.com/charmbracelet/gum/releases/download/v${version}/gum_${version}_${os_label}_${arch_label}.tar.gz"
+    local download_url="https://github.com/charmbracelet/gum/releases/download/v${GUM_VERSION}/gum_${GUM_VERSION}_${os_label}_${arch_label}.tar.gz"
 
-    plain_info "Downloading gum ${version}..."
+    plain_info "Downloading gum ${GUM_VERSION} to ${GUM_INSTALL_DIR}..."
 
     local temp_dir
     temp_dir=$(mktemp -d)
@@ -175,20 +379,24 @@ install_gum_manual() {
 
     tar -xzf "${archive_path}" -C "${temp_dir}"
 
-    local install_dir="${HOME}/.local/bin"
-    mkdir -p "${install_dir}"
-    mv "${temp_dir}/gum" "${install_dir}/gum"
-    chmod +x "${install_dir}/gum"
+    mkdir -p "${GUM_INSTALL_DIR}"
+    mv "${temp_dir}/gum" "${GUM_BINARY}"
+    chmod +x "${GUM_BINARY}"
+    echo "${GUM_VERSION}" > "${GUM_VERSION_FILE}"
     rm -rf "${temp_dir}"
 
-    if [[ ":${PATH}:" != *":${install_dir}:"* ]]; then
-        export PATH="${install_dir}:${PATH}"
-        plain_warn "Added ${install_dir} to PATH for this session."
-        plain_warn "Add this line to your shell profile to persist:"
-        plain_warn "export PATH=\"\$PATH:${install_dir}\""
+    if [[ ":${PATH}:" != *":${GUM_INSTALL_DIR}:"* ]]; then
+        export PATH="${GUM_INSTALL_DIR}:${PATH}"
     fi
 
-    plain_info "gum installed to ${install_dir}"
+    plain_info "gum ${GUM_VERSION} installed to ${GUM_INSTALL_DIR}"
+}
+
+# Legacy function for backward compatibility - now redirects to bundled install
+install_gum_manual() {
+    local os="$1"
+    local arch="$2"
+    install_bundled_gum "${os}" "${arch}"
 }
 
 install_gum() {
@@ -218,21 +426,56 @@ install_gum() {
 }
 
 ensure_gum() {
+    # 1. Check bundled gum first (preferred)
+    if is_bundled_gum_current; then
+        export PATH="${GUM_INSTALL_DIR}:${PATH}"
+        return 0
+    fi
+
+    # 2. Check system gum
     if command_exists gum; then
         return 0
     fi
 
+    # 3. Check ~/.local/bin (previous install location)
+    if [[ -x "${HOME}/.local/bin/gum" ]]; then
+        export PATH="${HOME}/.local/bin:${PATH}"
+        return 0
+    fi
+
+    # 4. Need to install - prompt user
     plain_warn "gum is required for the interactive installer."
-    if ! prompt_confirm_plain "Install gum now?"; then
-        plain_error "gum is required to continue."
-        exit 1
+
+    local os
+    os=$(detect_os)
+    local arch
+    arch=$(detect_arch)
+
+    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        # In non-interactive mode, just install bundled gum
+        plain_info "Installing bundled gum ${GUM_VERSION}..."
+        if ! install_bundled_gum "${os}" "${arch}"; then
+            plain_error "gum installation failed."
+            exit 1
+        fi
+    else
+        if ! prompt_confirm_plain "Install gum ${GUM_VERSION} to ${GUM_INSTALL_DIR}?"; then
+            plain_error "gum is required to continue."
+            exit 1
+        fi
+
+        # Try bundled install first
+        if ! install_bundled_gum "${os}" "${arch}"; then
+            # Fall back to system package manager
+            plain_warn "Bundled install failed, trying system package manager..."
+            if ! install_gum; then
+                plain_error "gum installation failed."
+                exit 1
+            fi
+        fi
     fi
 
-    if ! install_gum; then
-        plain_error "gum installation failed."
-        exit 1
-    fi
-
+    # Verify gum is now available
     if ! command_exists gum; then
         plain_error "gum is still not available on PATH."
         exit 1
@@ -362,81 +605,646 @@ run_download_with_progress() {
     run_with_progress "${title}" "$@"
 }
 
-play_logo_animation() {
-    local -a logo_lines=(
-        "    _________"
-        " __/  _   _ \\__"
-        "/__ / \\_/ \\__\\"
-        "\\__\\__/ \\__/__/"
-        "   O       O"
-    )
-    local offset=0
-    local direction=1
-    local frames=40
-    local delay=0.05
-    local max_offset=12
-    local logo_width=0
-    local term_cols=80
-    local color_start=""
-    local color_reset=""
+# Simple animation for narrow terminals or fallback
+play_car_animation_simple() {
+    local car="🚗"
+    local parked="🚘"
+    # Car drives right to left (matches emoji direction)
+    local simple_frames=("      ${car}" "     ${car} " "    ${car}  " "   ${car}   " "  ${car}    " " ${car}     " "${car}      ")
+    local delay=0.08
 
+    if [[ ! -t 1 ]]; then
+        echo "${parked} AutoMobile"
+        return 0
+    fi
+
+    tput civis 2>/dev/null || true
+
+    for frame in "${simple_frames[@]}"; do
+        printf "\r  %s" "${frame}"
+        sleep "${delay}"
+    done
+
+    printf "\r  %s AutoMobile          \n" "${parked}"
+    tput cnorm 2>/dev/null || true
+}
+
+# Full car animation with dust trail
+play_car_animation() {
+    local car="🚗"
+    local parked="🚘"
+    local dust="💨"
+    local trail_chars=("·" "." " " " ")
+    local frame_count=50
+    local delay=0.025
+    local term_cols=80
+    local car_width=2  # Emoji display width
+
+    # Check terminal capabilities
     if ! command_exists tput || [[ ! -t 1 ]]; then
-        printf "%s\n" "${logo_lines[@]}"
+        echo "  ${parked} AutoMobile"
         return 0
     fi
 
     term_cols=$(tput cols 2>/dev/null || echo 80)
-    for line in "${logo_lines[@]}"; do
-        if (( ${#line} > logo_width )); then
-            logo_width=${#line}
-        fi
-    done
 
-    local available=$((term_cols - logo_width - 1))
-    if (( available < 0 )); then
-        available=0
+    # Calculate animation parameters
+    local text="AutoMobile "
+    local text_len=${#text}
+    local start_pos=$((term_cols - car_width - 4))
+    local end_pos=$((text_len + 2))
+
+    if (( start_pos < 30 )); then
+        # Terminal too narrow, use simple animation
+        play_car_animation_simple
+        return 0
     fi
-    if (( available < max_offset )); then
-        max_offset=${available}
-    fi
 
-    color_start=$(tput setaf 1 2>/dev/null || true)
-    color_reset=$(tput sgr0 2>/dev/null || true)
+    # Hide cursor
+    tput civis 2>/dev/null || true
 
-    tput civis || true
+    # Animation loop - car moves right to left (matches emoji direction)
+    for ((frame = 0; frame <= frame_count; frame++)); do
+        # Calculate position (right to left)
+        local pos=$((start_pos - (start_pos - end_pos) * frame / frame_count))
 
-    for ((i = 0; i < frames; i++)); do
-        for line in "${logo_lines[@]}"; do
-            printf "\033[2K%*s%s%s%s\n" "${offset}" "" "${color_start}" "${line}" "${color_reset}"
+        # Build dust trail (appears to the right of car, fading)
+        local trail=""
+        local trail_len=6
+        for ((d = 1; d <= trail_len; d++)); do
+            local trail_pos=$((pos + car_width + d * 2))
+            if (( trail_pos < term_cols - 2 )); then
+                local char_idx=$(( (d - 1) % ${#trail_chars[@]} ))
+                if (( d == 1 )); then
+                    trail="${dust}${trail_chars[char_idx]}"
+                else
+                    trail="${trail}${trail_chars[char_idx]}"
+                fi
+            fi
         done
-        tput cuu "${#logo_lines[@]}" || true
 
-        if (( offset <= 0 )); then
-            direction=1
-        elif (( offset >= max_offset )); then
-            direction=-1
+        # Clear line and draw
+        printf "\r\033[2K"
+
+        # Print leading spaces, then car, then trail
+        if (( pos > 0 )); then
+            printf "%*s" "${pos}" ""
+        fi
+        printf "%s" "${car}"
+        if [[ -n "${trail}" ]]; then
+            printf "%s" "${trail}"
         fi
 
-        offset=$((offset + direction))
         sleep "${delay}"
     done
 
-    tput cud "${#logo_lines[@]}" || true
-    tput cnorm || true
-    printf "\n"
+    # Final frame with "AutoMobile" text and parked car
+    printf "\r\033[2K"
+    printf "  %s %s\n" "${text}" "${parked}"
+
+    # Show cursor
+    tput cnorm 2>/dev/null || true
+}
+
+# Main animation dispatcher
+play_logo_animation() {
+    local term_cols=80
+
+    if command_exists tput && [[ -t 1 ]]; then
+        term_cols=$(tput cols 2>/dev/null || echo 80)
+    fi
+
+    if (( term_cols >= 50 )); then
+        play_car_animation
+    else
+        play_car_animation_simple
+    fi
+}
+
+# ============================================================================
+# MCP Client Detection and Configuration
+# ============================================================================
+
+# Add a client to the detection list
+# Format: "client_name|config_path|format|scope"
+add_mcp_client() {
+    local name="$1"
+    local path="$2"
+    local format="$3"
+    local scope="$4"
+    MCP_CLIENT_LIST+=("${name}|${path}|${format}|${scope}")
+}
+
+# Detect all installed MCP clients
+detect_mcp_clients() {
+    local os
+    os=$(detect_os)
+
+    MCP_CLIENT_LIST=()
+
+    # Claude Code - uses ~/.claude.json for global, .mcp.json for project
+    if [[ -d "${HOME}/.claude" ]]; then
+        add_mcp_client "Claude Code (Global)" "${HOME}/.claude.json" "json" "global"
+    fi
+    # Always offer project-local option if in a directory
+    if [[ -d "${PROJECT_ROOT}" ]]; then
+        add_mcp_client "Claude Code (Project)" "${PROJECT_ROOT}/.mcp.json" "json" "local"
+    fi
+
+    # Claude Desktop - platform-specific
+    local claude_desktop_config=""
+    if [[ "${os}" == "macos" ]]; then
+        claude_desktop_config="${HOME}/Library/Application Support/Claude/claude_desktop_config.json"
+        if [[ -d "${HOME}/Library/Application Support/Claude" ]] || [[ -f "${claude_desktop_config}" ]]; then
+            add_mcp_client "Claude Desktop" "${claude_desktop_config}" "json" "global"
+        fi
+    elif [[ "${os}" == "linux" ]]; then
+        claude_desktop_config="${HOME}/.config/Claude/claude_desktop_config.json"
+        if [[ -d "${HOME}/.config/Claude" ]] || [[ -f "${claude_desktop_config}" ]]; then
+            add_mcp_client "Claude Desktop" "${claude_desktop_config}" "json" "global"
+        fi
+    fi
+
+    # Cursor - ~/.cursor/mcp.json for global, .cursor/mcp.json for project
+    if [[ -d "${HOME}/.cursor" ]]; then
+        add_mcp_client "Cursor (Global)" "${HOME}/.cursor/mcp.json" "json" "global"
+    fi
+    if [[ -d "${PROJECT_ROOT}" ]]; then
+        add_mcp_client "Cursor (Project)" "${PROJECT_ROOT}/.cursor/mcp.json" "json" "local"
+    fi
+
+    # Windsurf (Codeium) - ~/.codeium/windsurf/mcp_config.json
+    if [[ -d "${HOME}/.codeium/windsurf" ]] || [[ -d "${HOME}/.codeium" ]]; then
+        add_mcp_client "Windsurf" "${HOME}/.codeium/windsurf/mcp_config.json" "json" "global"
+    fi
+
+    # VS Code - check for VS Code installation
+    local vscode_installed=false
+    if command_exists code; then
+        vscode_installed=true
+    elif [[ "${os}" == "macos" && -d "/Applications/Visual Studio Code.app" ]]; then
+        vscode_installed=true
+    elif [[ "${os}" == "linux" && -d "${HOME}/.vscode" ]]; then
+        vscode_installed=true
+    fi
+
+    if [[ "${vscode_installed}" == "true" ]]; then
+        if [[ -d "${PROJECT_ROOT}" ]]; then
+            add_mcp_client "VS Code (Project)" "${PROJECT_ROOT}/.vscode/mcp.json" "json" "local"
+        fi
+    fi
+
+    # Codex (OpenAI) - ~/.codex/config.json
+    if [[ -d "${HOME}/.codex" ]]; then
+        add_mcp_client "Codex" "${HOME}/.codex/config.json" "json" "global"
+    fi
+
+    # Firebender - ~/.firebender/firebender.json for global, firebender.json for project
+    if [[ -d "${HOME}/.firebender" ]]; then
+        add_mcp_client "Firebender (Global)" "${HOME}/.firebender/firebender.json" "json" "global"
+    fi
+    if [[ -d "${PROJECT_ROOT}" ]]; then
+        add_mcp_client "Firebender (Project)" "${PROJECT_ROOT}/firebender.json" "json" "local"
+    fi
+
+    # Goose - ~/.config/goose/config.yaml (YAML format!)
+    if [[ -d "${HOME}/.config/goose" ]]; then
+        add_mcp_client "Goose" "${HOME}/.config/goose/config.yaml" "yaml" "global"
+    fi
+}
+
+# Get list of detected client names for display
+get_detected_client_names() {
+    for entry in "${MCP_CLIENT_LIST[@]}"; do
+        echo "${entry}" | cut -d'|' -f1
+    done | sort
+}
+
+# Find client entry by name
+find_client_entry() {
+    local name="$1"
+    for entry in "${MCP_CLIENT_LIST[@]}"; do
+        local entry_name
+        entry_name=$(echo "${entry}" | cut -d'|' -f1)
+        if [[ "${entry_name}" == "${name}" ]]; then
+            echo "${entry}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Get config path for a client
+get_client_config_path() {
+    local client="$1"
+    local entry
+    entry=$(find_client_entry "${client}")
+    if [[ -n "${entry}" ]]; then
+        echo "${entry}" | cut -d'|' -f2
+    fi
+}
+
+# Get config format for a client (json or yaml)
+get_client_config_format() {
+    local client="$1"
+    local entry
+    entry=$(find_client_entry "${client}")
+    if [[ -n "${entry}" ]]; then
+        echo "${entry}" | cut -d'|' -f3
+    fi
+}
+
+# Get config scope for a client (global or local)
+get_client_config_scope() {
+    local client="$1"
+    local entry
+    entry=$(find_client_entry "${client}")
+    if [[ -n "${entry}" ]]; then
+        echo "${entry}" | cut -d'|' -f4
+    fi
+}
+
+# Interactive MCP client selection
+select_mcp_clients() {
+    detect_mcp_clients
+
+    local available_clients
+    available_clients=$(get_detected_client_names)
+
+    if [[ -z "${available_clients}" ]]; then
+        log_warn "No MCP clients detected. Manual configuration may be required."
+        return 1
+    fi
+
+    gum style --bold "Detected MCP Clients:"
+    echo ""
+
+    # Show what's detected with their config paths
+    while IFS= read -r client; do
+        local path
+        path=$(get_client_config_path "${client}")
+        local scope
+        scope=$(get_client_config_scope "${client}")
+        local exists_marker=""
+        if [[ -f "${path}" ]]; then
+            exists_marker=" (config exists)"
+        fi
+        gum style --faint "  ${client}: ${path}${exists_marker}"
+    done <<< "${available_clients}"
+
+    echo ""
+    gum style --italic --faint "Use arrow keys to navigate, space to select/deselect, enter to confirm"
+    echo ""
+
+    # Multi-select with gum choose
+    local selected
+    selected=$(echo "${available_clients}" | gum choose --no-limit --header "Select clients to configure:")
+
+    if [[ -z "${selected}" ]]; then
+        log_info "No clients selected. Skipping MCP configuration."
+        return 1
+    fi
+
+    # Store selected clients
+    SELECTED_MCP_CLIENTS=()
+    while IFS= read -r client; do
+        if [[ -n "${client}" ]]; then
+            SELECTED_MCP_CLIENTS+=("${client}")
+        fi
+    done <<< "${selected}"
+
+    if [[ ${#SELECTED_MCP_CLIENTS[@]} -eq 0 ]]; then
+        log_info "No clients selected. Skipping MCP configuration."
+        return 1
+    fi
+
+    return 0
+}
+
+# ============================================================================
+# JSON/YAML Configuration Management
+# ============================================================================
+
+# Validate JSON file
+validate_json() {
+    local file="$1"
+
+    if [[ ! -f "${file}" ]]; then
+        return 1
+    fi
+
+    if command_exists python3; then
+        python3 -c "import json; json.load(open('${file}'))" 2>/dev/null
+        return $?
+    elif command_exists jq; then
+        jq empty "${file}" 2>/dev/null
+        return $?
+    fi
+
+    return 1
+}
+
+# Read existing mcpServers from a JSON config or return empty object
+get_existing_mcp_servers() {
+    local config_file="$1"
+
+    if [[ ! -f "${config_file}" ]]; then
+        echo "{}"
+        return 0
+    fi
+
+    if ! validate_json "${config_file}"; then
+        echo "{}"
+        return 1
+    fi
+
+    if command_exists python3; then
+        python3 -c '
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    print(json.dumps(data.get("mcpServers", {})))
+except Exception:
+    print("{}")
+' "${config_file}"
+    elif command_exists jq; then
+        jq -r '.mcpServers // {}' "${config_file}" 2>/dev/null || echo "{}"
+    else
+        echo "{}"
+    fi
+}
+
+# Create backup of config file
+backup_config() {
+    local config_file="$1"
+
+    if [[ ! -f "${config_file}" ]]; then
+        return 0
+    fi
+
+    if [[ -z "${BACKUP_TIMESTAMP}" ]]; then
+        BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    fi
+
+    execute "Create backup directory" mkdir -p "${BACKUP_DIR}"
+
+    local backup_name
+    backup_name=$(basename "${config_file}")
+    local backup_path="${BACKUP_DIR}/${backup_name}.${BACKUP_TIMESTAMP}"
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        DRY_RUN_LOG+=("[DRY-RUN] Backup ${config_file} to ${backup_path}")
+        log_info "[DRY-RUN] Would backup ${config_file} to ${backup_path}"
+    else
+        cp "${config_file}" "${backup_path}"
+        log_info "Backed up to ${backup_path}"
+    fi
+}
+
+# Merge auto-mobile config into existing JSON config
+merge_mcp_config() {
+    local config_file="$1"
+    local auto_mobile_config="$2"  # JSON string for auto-mobile server
+
+    # Handle case where file doesn't exist
+    if [[ ! -f "${config_file}" ]]; then
+        echo "{\"mcpServers\":{\"auto-mobile\":${auto_mobile_config}}}"
+        return 0
+    fi
+
+    # Handle invalid JSON
+    if ! validate_json "${config_file}"; then
+        log_warn "Invalid JSON in ${config_file}, will create fresh config"
+        echo "{\"mcpServers\":{\"auto-mobile\":${auto_mobile_config}}}"
+        return 0
+    fi
+
+    if command_exists python3; then
+        python3 -c '
+import json, sys
+
+config_file = sys.argv[1]
+new_auto_mobile = json.loads(sys.argv[2])
+
+try:
+    with open(config_file) as f:
+        existing = json.load(f)
+except Exception:
+    existing = {}
+
+# Ensure mcpServers exists
+if "mcpServers" not in existing:
+    existing["mcpServers"] = {}
+
+# Check if auto-mobile already exists
+if "auto-mobile" in existing["mcpServers"]:
+    print("WARNING:auto-mobile already configured, will be updated", file=sys.stderr)
+
+# Merge (overwrites existing auto-mobile)
+existing["mcpServers"]["auto-mobile"] = new_auto_mobile
+
+print(json.dumps(existing, indent=2))
+' "${config_file}" "${auto_mobile_config}"
+    elif command_exists jq; then
+        jq --argjson new "${auto_mobile_config}" '.mcpServers["auto-mobile"] = $new' "${config_file}"
+    else
+        log_error "Neither python3 nor jq available for JSON manipulation"
+        return 1
+    fi
+}
+
+# Show diff between old and new config
+show_config_diff() {
+    local old_content="$1"
+    local new_content="$2"
+    local config_path="$3"
+
+    if [[ -z "${old_content}" ]] || [[ "${old_content}" == "{}" ]]; then
+        gum style --bold "New configuration for ${config_path}:"
+        echo "${new_content}" | gum format --type code
+        return 0
+    fi
+
+    if command_exists diff; then
+        local temp_old temp_new
+        temp_old=$(mktemp)
+        temp_new=$(mktemp)
+
+        echo "${old_content}" > "${temp_old}"
+        echo "${new_content}" > "${temp_new}"
+
+        local diff_output
+        diff_output=$(diff -u "${temp_old}" "${temp_new}" 2>/dev/null || true)
+
+        rm -f "${temp_old}" "${temp_new}"
+
+        if [[ -n "${diff_output}" ]]; then
+            gum style --bold "Configuration changes for ${config_path}:"
+            echo "${diff_output}" | head -50 | gum format --type code
+        else
+            gum style --faint "No changes needed for ${config_path}"
+        fi
+    else
+        gum style --bold "New configuration:"
+        echo "${new_content}" | gum format --type code
+    fi
+}
+
+# Generate auto-mobile MCP server config based on preset
+generate_auto_mobile_config() {
+    local preset="${1:-minimal}"
+    local android_home="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+
+    case "${preset}" in
+        minimal)
+            cat << 'EOF'
+{"command":"npx","args":["-y","@kaeawc/auto-mobile@latest"]}
+EOF
+            ;;
+        development)
+            if [[ -n "${android_home}" ]]; then
+                cat << EOF
+{"command":"npx","args":["-y","@kaeawc/auto-mobile@latest","--debug","--debug-perf"],"env":{"ANDROID_HOME":"${android_home}"}}
+EOF
+            else
+                cat << 'EOF'
+{"command":"npx","args":["-y","@kaeawc/auto-mobile@latest","--debug","--debug-perf"]}
+EOF
+            fi
+            ;;
+        ci)
+            cat << 'EOF'
+{"command":"npx","args":["-y","@kaeawc/auto-mobile@latest","--transport","sse","--port","9000"]}
+EOF
+            ;;
+        *)
+            # Default to minimal
+            cat << 'EOF'
+{"command":"npx","args":["-y","@kaeawc/auto-mobile@latest"]}
+EOF
+            ;;
+    esac
+}
+
+# Update a single MCP client's configuration
+update_mcp_client_config() {
+    local client_name="$1"
+    local config_path="$2"
+    local auto_mobile_config="$3"
+
+    log_info "Configuring ${client_name}..."
+
+    # Read existing config
+    local existing_content=""
+    if [[ -f "${config_path}" ]]; then
+        existing_content=$(cat "${config_path}" 2>/dev/null || echo "")
+    fi
+
+    # Generate merged config
+    local new_content
+    if ! new_content=$(merge_mcp_config "${config_path}" "${auto_mobile_config}"); then
+        log_error "Failed to generate config for ${client_name}"
+        return 1
+    fi
+
+    # Show diff
+    show_config_diff "${existing_content}" "${new_content}" "${config_path}"
+    echo ""
+
+    # In non-interactive mode, just apply
+    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        backup_config "${config_path}"
+        write_file "${config_path}" "${new_content}" "Configure ${client_name}"
+        log_info "${client_name} configured successfully"
+        return 0
+    fi
+
+    # Confirm with user
+    if [[ -n "${existing_content}" ]]; then
+        if ! gum confirm "Apply changes to ${config_path}?"; then
+            log_info "Skipping ${client_name} configuration"
+            return 0
+        fi
+    else
+        if ! gum confirm "Create ${config_path}?"; then
+            log_info "Skipping ${client_name} configuration"
+            return 0
+        fi
+    fi
+
+    # Backup and write
+    backup_config "${config_path}"
+    write_file "${config_path}" "${new_content}" "Configure ${client_name}"
+
+    log_info "${client_name} configured successfully"
+}
+
+# Configure all selected MCP clients
+configure_selected_mcp_clients() {
+    if [[ ${#SELECTED_MCP_CLIENTS[@]} -eq 0 ]]; then
+        log_info "No MCP clients selected for configuration"
+        return 0
+    fi
+
+    # Determine which preset config to use
+    local config_preset="${PRESET:-minimal}"
+    if [[ -z "${PRESET}" ]] && [[ "${NON_INTERACTIVE}" != "true" ]]; then
+        # Ask user which preset to use for MCP config
+        local preset_choice
+        preset_choice=$(gum choose \
+            "Minimal (basic setup)" \
+            "Development (debug flags enabled)" \
+            "CI (SSE transport, port 9000)" \
+            --header "Select configuration preset for MCP servers:")
+
+        case "${preset_choice}" in
+            "Minimal"*)
+                config_preset="minimal"
+                ;;
+            "Development"*)
+                config_preset="development"
+                ;;
+            "CI"*)
+                config_preset="ci"
+                ;;
+        esac
+    fi
+
+    local auto_mobile_config
+    auto_mobile_config=$(generate_auto_mobile_config "${config_preset}")
+
+    gum style --bold "Using ${config_preset} preset configuration"
+    echo ""
+
+    for client in "${SELECTED_MCP_CLIENTS[@]}"; do
+        local config_path
+        config_path=$(get_client_config_path "${client}")
+        local format
+        format=$(get_client_config_format "${client}")
+
+        if [[ "${format}" == "yaml" ]]; then
+            log_warn "YAML configuration for ${client} is not yet supported. Skipping."
+            log_info "Manual configuration required for: ${config_path}"
+            continue
+        fi
+
+        update_mcp_client_config "${client}" "${config_path}" "${auto_mobile_config}"
+        echo ""
+    done
 }
 
 resolve_ide_plugin_url() {
     local url=""
 
     if command_exists curl; then
-        url=$(curl -fsSL "https://api.github.com/repos/kaeawc/auto-mobile/releases/latest" \
+        url=$(curl -fsSL "https://api.github.com/repos/kaeawc/auto-mobile/releases/latest" 2>/dev/null \
             | sed -nE 's/.*"browser_download_url": "([^"]*auto-mobile-ide-plugin[^"]*\.zip)".*/\1/p' \
-            | head -n 1)
+            | head -n 1 || true)
     elif command_exists wget; then
-        url=$(wget -qO- "https://api.github.com/repos/kaeawc/auto-mobile/releases/latest" \
+        url=$(wget -qO- "https://api.github.com/repos/kaeawc/auto-mobile/releases/latest" 2>/dev/null \
             | sed -nE 's/.*"browser_download_url": "([^"]*auto-mobile-ide-plugin[^"]*\.zip)".*/\1/p' \
-            | head -n 1)
+            | head -n 1 || true)
     fi
 
     echo "${url}"
@@ -664,83 +1472,6 @@ install_auto_mobile_cli() {
     return 1
 }
 
-install_accessibility_service() {
-    if ! command_exists adb; then
-        log_error "adb is required to install the Accessibility Service."
-        return 1
-    fi
-
-    local device_id="${ACCESSIBILITY_DEVICE_ID}"
-    if [[ -z "${device_id}" || "${device_id}" == "auto" ]]; then
-        device_id=$(choose_adb_device || true)
-    fi
-
-    if [[ -z "${device_id}" ]]; then
-        log_warn "No connected Android devices detected. Skipping Accessibility Service install."
-        return 1
-    fi
-
-    local temp_dir
-    temp_dir=$(mktemp -d)
-    local apk_path="${temp_dir}/accessibility-service.apk"
-
-    if command_exists curl; then
-        if ! run_download_with_progress "Downloading Accessibility Service APK" \
-            curl -fsSL "${ACCESSIBILITY_APK_URL}" -o "${apk_path}"; then
-            log_error "Failed to download Accessibility Service APK."
-            rm -rf "${temp_dir}"
-            return 1
-        fi
-    elif command_exists wget; then
-        if ! run_download_with_progress "Downloading Accessibility Service APK" \
-            wget -qO "${apk_path}" "${ACCESSIBILITY_APK_URL}"; then
-            log_error "Failed to download Accessibility Service APK."
-            rm -rf "${temp_dir}"
-            return 1
-        fi
-    else
-        log_error "curl or wget is required to download the Accessibility Service APK."
-        rm -rf "${temp_dir}"
-        return 1
-    fi
-
-    local expected_checksum
-    expected_checksum=$(resolve_accessibility_checksum)
-    if [[ -n "${expected_checksum}" ]]; then
-        local actual_checksum
-        actual_checksum=$(sha256_file "${apk_path}" || true)
-        if [[ -z "${actual_checksum}" ]]; then
-            log_warn "Checksum tools not available; skipping APK verification."
-        elif [[ "${expected_checksum}" != "${actual_checksum}" ]]; then
-            log_error "APK checksum mismatch. Expected ${expected_checksum}, got ${actual_checksum}."
-            rm -rf "${temp_dir}"
-            return 1
-        else
-            log_info "Accessibility Service APK checksum verified."
-        fi
-    else
-        log_warn "No expected checksum available; skipping APK verification."
-    fi
-
-    if ! run_with_progress "Installing Accessibility Service APK" \
-        adb -s "${device_id}" install -r "${apk_path}"; then
-        log_error "Failed to install Accessibility Service APK."
-        rm -rf "${temp_dir}"
-        return 1
-    fi
-
-    if [[ "${OPEN_ACCESSIBILITY_SETTINGS}" == "true" ]]; then
-        run_spinner "Opening Accessibility Settings" \
-            adb -s "${device_id}" shell am start -a android.settings.ACCESSIBILITY_SETTINGS
-        log_info "Enable AutoMobile Accessibility Service on the device to finish setup."
-    else
-        log_info "Enable AutoMobile Accessibility Service in device settings to finish setup."
-    fi
-
-    rm -rf "${temp_dir}"
-    return 0
-}
-
 install_ide_plugin() {
     if [[ -z "${IDE_PLUGIN_DIR}" ]]; then
         log_error "IDE plugin directory not set. Skipping IDE plugin install."
@@ -863,17 +1594,12 @@ handle_bun_setup() {
     return 1
 }
 
-handle_android_sdk_setup() {
+check_android_sdk() {
     if [[ "${ANDROID_SDK_DETECTED}" == "true" ]]; then
         return 0
     fi
-
-    if [[ "${INSTALL_ANDROID_SDK}" == "true" ]]; then
-        install_android_cmdline_tools
-        return 0
-    fi
-
-    log_warn "Android SDK is required for device support. See docs/install/plat/android.md."
+    log_warn "Android SDK not detected. Install Android Studio or SDK manually for device support."
+    log_warn "See https://developer.android.com/studio for installation instructions."
     return 1
 }
 
@@ -884,52 +1610,19 @@ collect_choices() {
         fi
     fi
 
+    # Check if IDE plugin is available in latest release
     if [[ "${platform_choice}" == "Android" || "${platform_choice}" == "Both" ]]; then
-        if [[ "${ANDROID_SDK_DETECTED}" == "false" ]]; then
-            if gum confirm "Android SDK not detected. Download command line tools?"; then
-                INSTALL_ANDROID_SDK=true
-                ANDROID_SDK_ROOT_SELECTED=$(choose_android_sdk_root)
-                if gum confirm "Install Android platform-tools (adb) after command line tools? (accepts SDK licenses)"; then
-                    INSTALL_ANDROID_PLATFORM_TOOLS=true
-                fi
-            fi
-        fi
-
-        if gum confirm "Install AutoMobile Accessibility Service (latest release) on a connected device?"; then
-            INSTALL_ACCESSIBILITY_SERVICE=true
-            ACCESSIBILITY_DEVICE_ID=$(choose_adb_device || true)
-            if [[ -z "${ACCESSIBILITY_DEVICE_ID}" ]]; then
-                ACCESSIBILITY_DEVICE_ID="auto"
-                log_warn "No connected devices detected yet. Will attempt install on the first device found."
-            fi
-            if gum confirm "Open Accessibility Settings after install?"; then
-                OPEN_ACCESSIBILITY_SETTINGS=true
-            fi
-        fi
-
-        if gum confirm "Install AutoMobile IntelliJ/Android Studio plugin?"; then
-            INSTALL_IDE_PLUGIN=true
-            if [[ "${IS_REPO}" == "true" ]]; then
-                local method
-                method=$(gum choose "Build from source (Gradle)" "Download latest release (zip)")
-                if [[ "${method}" == "Build from source (Gradle)" ]]; then
-                    IDE_PLUGIN_METHOD="source"
-                else
-                    IDE_PLUGIN_METHOD="release"
-                fi
-            else
+        local ide_plugin_url
+        ide_plugin_url=$(resolve_ide_plugin_url || true)
+        if [[ -n "${ide_plugin_url}" ]]; then
+            if gum confirm "Install AutoMobile IntelliJ/Android Studio plugin?"; then
+                INSTALL_IDE_PLUGIN=true
                 IDE_PLUGIN_METHOD="release"
-            fi
+                IDE_PLUGIN_ZIP_URL="${ide_plugin_url}"
 
-            IDE_PLUGIN_DIR=$(detect_ide_plugins_dir || true)
-            if [[ -z "${IDE_PLUGIN_DIR}" ]]; then
-                IDE_PLUGIN_DIR=$(gum input --prompt "IDE plugins directory: " --value "")
-            fi
-
-            if [[ "${IDE_PLUGIN_METHOD}" == "release" ]]; then
-                IDE_PLUGIN_ZIP_URL=$(resolve_ide_plugin_url || true)
-                if [[ -z "${IDE_PLUGIN_ZIP_URL}" ]]; then
-                    IDE_PLUGIN_ZIP_URL=$(gum input --prompt "IDE plugin zip URL: " --value "")
+                IDE_PLUGIN_DIR=$(detect_ide_plugins_dir || true)
+                if [[ -z "${IDE_PLUGIN_DIR}" ]]; then
+                    IDE_PLUGIN_DIR=$(gum input --prompt "IDE plugins directory: " --value "")
                 fi
             fi
         fi
@@ -963,24 +1656,6 @@ resolve_android_sdk_root() {
     else
         echo "${HOME}/Android/Sdk"
     fi
-}
-
-choose_android_sdk_root() {
-    if [[ -n "${ANDROID_SDK_ROOT_SELECTED}" ]]; then
-        echo "${ANDROID_SDK_ROOT_SELECTED}"
-        return 0
-    fi
-
-    local default_root
-    default_root=$(resolve_android_sdk_root)
-    local selected_root
-    selected_root=$(gum input --prompt "Android SDK location: " --value "${default_root}")
-
-    if [[ -z "${selected_root}" ]]; then
-        selected_root="${default_root}"
-    fi
-
-    echo "${selected_root}"
 }
 
 install_bun() {
@@ -1027,117 +1702,91 @@ install_bun() {
     rm -rf "${temp_dir}"
 }
 
-install_android_platform_tools() {
-    local sdk_root="$1"
-    local sdkmanager="${sdk_root}/cmdline-tools/latest/bin/sdkmanager"
-    local log_path
-    log_path=$(mktemp)
+# ============================================================================
+# Preset System
+# ============================================================================
 
-    if [[ ! -x "${sdkmanager}" ]]; then
-        log_error "sdkmanager not found at ${sdkmanager}"
-        rm -f "${log_path}"
-        return 1
-    fi
+# Apply a preset configuration
+apply_preset() {
+    local preset_name="$1"
 
-    if ! command_exists java; then
-        log_warn "Java is required to run sdkmanager. Install a JDK and retry."
-        rm -f "${log_path}"
-        return 1
-    fi
-
-    if ! run_with_progress "Installing Android platform-tools (adb)" \
-        bash -c "yes | \"${sdkmanager}\" --sdk_root=\"${sdk_root}\" \"platform-tools\" >\"${log_path}\" 2>&1"; then
-        log_error "Failed to install platform-tools. Logs: ${log_path}"
-        return 1
-    fi
-
-    log_info "Android platform-tools installed."
-    rm -f "${log_path}"
-}
-
-install_android_cmdline_tools() {
-    local sdk_root="${ANDROID_SDK_ROOT_SELECTED}"
-
-    if [[ -z "${sdk_root}" ]]; then
-        log_error "Android SDK location is required. Re-run and select a path."
-        return 1
-    fi
-
-    if ! spin_check "Checking unzip" "command -v unzip >/dev/null 2>&1"; then
-        log_error "unzip is required to extract Android command line tools."
-        return 1
-    fi
-
-    local os
-    os=$(detect_os)
-    local download_url=""
-
-    case "${os}" in
-        macos)
-            download_url="https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip"
+    case "${preset_name}" in
+        minimal)
+            INSTALL_BUN=false
+            INSTALL_IDE_PLUGIN=false
+            INSTALL_AUTOMOBILE_CLI=true
+            START_DAEMON=false
+            CONFIGURE_MCP_CLIENTS=true
             ;;
-        linux)
-            download_url="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+        development)
+            INSTALL_BUN=true
+            # IDE plugin only installed if available in release
+            local ide_url
+            ide_url=$(resolve_ide_plugin_url || true)
+            if [[ -n "${ide_url}" ]]; then
+                INSTALL_IDE_PLUGIN=true
+                IDE_PLUGIN_METHOD="release"
+                IDE_PLUGIN_ZIP_URL="${ide_url}"
+                IDE_PLUGIN_DIR=$(detect_ide_plugins_dir || true)
+            else
+                INSTALL_IDE_PLUGIN=false
+            fi
+            INSTALL_AUTOMOBILE_CLI=true
+            START_DAEMON=true
+            CONFIGURE_MCP_CLIENTS=true
             ;;
         *)
-            log_error "Android SDK download is only supported on macOS and Linux."
+            log_error "Unknown preset: ${preset_name}"
             return 1
             ;;
     esac
 
-    local temp_dir
-    temp_dir=$(mktemp -d)
-    local zip_path="${temp_dir}/commandlinetools.zip"
+    log_info "Applied ${preset_name} preset"
+}
 
-    if command_exists curl; then
-        if ! run_download_with_progress "Downloading Android command line tools" \
-            curl -fsSL "${download_url}" -o "${zip_path}"; then
-            log_error "Failed to download Android command line tools."
-            rm -rf "${temp_dir}"
+# Interactive preset selection
+select_preset() {
+    local choice
+    choice=$(gum choose \
+        "Minimal (CLI + MCP config only)" \
+        "Development (Full setup with debug flags)" \
+        "Custom (Choose components individually)" \
+        --header "Select installation preset:")
+
+    case "${choice}" in
+        "Minimal"*)
+            apply_preset "minimal"
+            return 0
+            ;;
+        "Development"*)
+            apply_preset "development"
+            return 0
+            ;;
+        "Custom"*)
+            # Fall through to interactive selection
+            CONFIGURE_MCP_CLIENTS=true
             return 1
-        fi
-    elif command_exists wget; then
-        if ! run_download_with_progress "Downloading Android command line tools" \
-            wget -qO "${zip_path}" "${download_url}"; then
-            log_error "Failed to download Android command line tools."
-            rm -rf "${temp_dir}"
-            return 1
-        fi
-    else
-        log_error "curl or wget is required to download Android command line tools."
-        rm -rf "${temp_dir}"
-        return 1
-    fi
+            ;;
+    esac
 
-    if ! run_spinner "Extracting command line tools" unzip -q "${zip_path}" -d "${temp_dir}"; then
-        log_error "Failed to extract command line tools."
-        rm -rf "${temp_dir}"
-        return 1
-    fi
-
-    mkdir -p "${sdk_root}/cmdline-tools"
-    rm -rf "${sdk_root}/cmdline-tools/latest"
-    mv "${temp_dir}/cmdline-tools" "${sdk_root}/cmdline-tools/latest"
-    rm -rf "${temp_dir}"
-
-    export ANDROID_SDK_ROOT="${sdk_root}"
-    export ANDROID_HOME="${sdk_root}"
-
-    log_info "Android command line tools installed to ${sdk_root}"
-    log_info "Add ANDROID_SDK_ROOT=${sdk_root} to your shell config for future sessions."
-
-    if [[ "${INSTALL_ANDROID_PLATFORM_TOOLS}" == "true" ]]; then
-        install_android_platform_tools "${sdk_root}"
-    else
-        log_warn "Run sdkmanager later to install platform-tools: ${sdk_root}/cmdline-tools/latest/bin/sdkmanager \"platform-tools\""
-    fi
+    return 1
 }
 
 main() {
+    # Parse command line arguments first (before gum is available)
+    parse_args "$@"
+
     ensure_gum
 
     gum style --bold "AutoMobile Interactive Installer"
     play_logo_animation
+
+    # Show dry-run indicator
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        echo ""
+        gum style --foreground 214 --bold "DRY-RUN MODE: No changes will be made"
+        echo ""
+    fi
 
     local os
     os=$(detect_os)
@@ -1148,33 +1797,94 @@ main() {
 
     log_info "Starting setup from ${PROJECT_ROOT}"
 
-    platform_choice=$(gum choose "Android" "iOS" "Both" "Skip platform setup")
-
-    if spin_check "Checking Bun" "command -v bun >/dev/null 2>&1"; then
-        BUN_INSTALLED=true
+    # Handle preset mode
+    if [[ -n "${PRESET}" ]]; then
+        apply_preset "${PRESET}"
+    elif [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        # Default to minimal in non-interactive mode without preset
+        apply_preset "minimal"
     else
-        BUN_INSTALLED=false
+        # Interactive mode - offer preset selection
+        if ! select_preset; then
+            # User chose "Custom" - continue to interactive selection
+            :
+        fi
     fi
 
-    if [[ "${platform_choice}" == "Android" || "${platform_choice}" == "Both" ]]; then
+    # Only do interactive platform/component selection if not using a preset
+    if [[ -z "${PRESET}" ]] && [[ "${NON_INTERACTIVE}" != "true" ]] && [[ "${CONFIGURE_MCP_CLIENTS}" != "true" || "${INSTALL_BUN}" != "true" ]]; then
+        platform_choice=$(gum choose "Android" "iOS" "Both" "Skip platform setup")
+
+        if spin_check "Checking Bun" "command -v bun >/dev/null 2>&1"; then
+            BUN_INSTALLED=true
+        else
+            BUN_INSTALLED=false
+        fi
+
+        if [[ "${platform_choice}" == "Android" || "${platform_choice}" == "Both" ]]; then
+            local adb_check="command -v adb >/dev/null 2>&1 || [[ -x \"${ANDROID_HOME:-}/platform-tools/adb\" ]] || [[ -x \"${ANDROID_SDK_ROOT:-}/platform-tools/adb\" ]] || [[ -x \"${HOME}/Library/Android/sdk/platform-tools/adb\" ]] || [[ -x \"${HOME}/Android/Sdk/platform-tools/adb\" ]]"
+            if spin_check "Checking Android SDK (adb)" "${adb_check}"; then
+                ANDROID_SDK_DETECTED=true
+            else
+                ANDROID_SDK_DETECTED=false
+            fi
+        fi
+
+        collect_choices
+    else
+        # Check current state for preset mode
+        if spin_check "Checking Bun" "command -v bun >/dev/null 2>&1"; then
+            BUN_INSTALLED=true
+        else
+            BUN_INSTALLED=false
+        fi
+
         local adb_check="command -v adb >/dev/null 2>&1 || [[ -x \"${ANDROID_HOME:-}/platform-tools/adb\" ]] || [[ -x \"${ANDROID_SDK_ROOT:-}/platform-tools/adb\" ]] || [[ -x \"${HOME}/Library/Android/sdk/platform-tools/adb\" ]] || [[ -x \"${HOME}/Android/Sdk/platform-tools/adb\" ]]"
         if spin_check "Checking Android SDK (adb)" "${adb_check}"; then
             ANDROID_SDK_DETECTED=true
         else
             ANDROID_SDK_DETECTED=false
         fi
+
+        # Set platform_choice based on IDE plugin installation
+        if [[ "${INSTALL_IDE_PLUGIN}" == "true" ]]; then
+            platform_choice="Android"
+        else
+            platform_choice="Skip platform setup"
+        fi
     fi
 
-    collect_choices
+    # MCP Client Configuration (new feature!)
+    if [[ "${CONFIGURE_MCP_CLIENTS}" == "true" ]]; then
+        echo ""
+        gum style --bold "MCP Client Configuration"
+        echo ""
 
+        if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+            # In non-interactive mode, auto-detect and configure Claude Code
+            detect_mcp_clients
+            local claude_code_entry
+            claude_code_entry=$(find_client_entry "Claude Code (Global)" 2>/dev/null || echo "")
+            if [[ -n "${claude_code_entry}" ]]; then
+                SELECTED_MCP_CLIENTS=("Claude Code (Global)")
+                configure_selected_mcp_clients
+            else
+                log_info "No MCP clients auto-detected in non-interactive mode"
+            fi
+        else
+            if select_mcp_clients; then
+                configure_selected_mcp_clients
+            fi
+        fi
+    fi
+
+    # Bun setup
     handle_bun_setup
 
+    # Platform-specific setup
     case "${platform_choice}" in
         Android)
-            handle_android_sdk_setup
-            if [[ "${INSTALL_ACCESSIBILITY_SERVICE}" == "true" ]]; then
-                install_accessibility_service
-            fi
+            check_android_sdk
             if [[ "${INSTALL_IDE_PLUGIN}" == "true" ]]; then
                 install_ide_plugin
             fi
@@ -1183,10 +1893,7 @@ main() {
             log_warn "iOS support is not available yet. See docs/design-docs/plat/ios/index.md."
             ;;
         Both)
-            handle_android_sdk_setup
-            if [[ "${INSTALL_ACCESSIBILITY_SERVICE}" == "true" ]]; then
-                install_accessibility_service
-            fi
+            check_android_sdk
             if [[ "${INSTALL_IDE_PLUGIN}" == "true" ]]; then
                 install_ide_plugin
             fi
@@ -1197,15 +1904,22 @@ main() {
             ;;
     esac
 
+    # CLI installation
     if [[ "${INSTALL_AUTOMOBILE_CLI}" == "true" ]]; then
         install_auto_mobile_cli
     fi
 
+    # Daemon startup
     if [[ "${START_DAEMON}" == "true" ]]; then
         start_mcp_daemon
     fi
 
-    log_info "Setup complete. Review docs/install/overview.md for MCP configuration examples."
+    # Print dry-run summary if applicable
+    print_dry_run_summary
+
+    if [[ "${DRY_RUN}" != "true" ]]; then
+        log_info "Setup complete. Review docs/install/overview.md for MCP configuration examples."
+    fi
 }
 
 main "$@"
