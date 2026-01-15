@@ -523,7 +523,7 @@ run_mcp_server() {
 
   AUTOMOBILE_STARTUP_BENCHMARK=1 \
   AUTOMOBILE_STARTUP_BENCHMARK_LABEL="mcp-server-$mode" \
-  bun run src/index.ts --startup-benchmark \
+  bun run dist/src/index.js --startup-benchmark \
     <"$stdin_fifo" >"$stdout_fifo" 2>"$stderr_fifo" &
   local server_pid=$!
 
@@ -695,7 +695,7 @@ run_daemon() {
   AUTOMOBILE_DAEMON_PID_FILE_PATH="$pid_path" \
   AUTOMOBILE_STARTUP_BENCHMARK=1 \
   AUTOMOBILE_STARTUP_BENCHMARK_LABEL="daemon-$mode" \
-  bun run src/index.ts --daemon-mode --startup-benchmark --port "$port" \
+  bun run dist/src/index.js --daemon-mode --startup-benchmark --port "$port" \
     >/dev/null 2>"$stderr_fifo" &
   local daemon_pid=$!
   local spawn_ms
