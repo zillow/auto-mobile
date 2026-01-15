@@ -1,11 +1,6 @@
 # Features - MCP Server - Observation
 
-Each observation captures a snapshot of the current state of a device's screen and UI. When executed, it
-collects multiple data points in parallel to minimize observation latency. These operations are incredibly platform
-specific and will likely require a different ordering of steps per platform. All of this is to drive the
-[interaction loop](interaction-loop.md).
-
-## Android
+## UIAutomator Fallback
 
 - `dumpsys window` is fetched (with a short-lived memory/disk cache) and used to compute rotation and system insets.
 - Screen size is computed from `wm size` plus rotation, with its own memory/disk cache.

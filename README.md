@@ -12,7 +12,7 @@ This is a fork of the original source at https://github.com/zillow/auto-mobile
 
 ## How it works
 
-- 🔧 **[Powerful MCP Server](docs/features/mcp-server/index.md)**: Comprehensive [actions](docs/features/mcp-server/actions.md) through MCP tool calls with fast [observations](docs/features/mcp-server/observation.md) to drive the [interaction loop](docs/features/mcp-server/interaction-loop.md)
+- 🔧 **[Powerful MCP Server](docs/features/mcp-server/index.md)**: Comprehensive [actions](docs/features/mcp-server/tools.md) through MCP tool calls with fast [observations](docs/features/mcp-server/observation.md) to drive the [interaction loop](docs/features/mcp-server/interaction-loop.md)
 - 🧪 **[Test Execution](docs/features/test-execution/index.md)**: Run tests locally or on CI without extra infrastructure
 - ⚡ **[UI Performance Audit](docs/features/ui-performance-audit.md)**: Automated detection of jank, poor FPS, and rendering issues during automation
 

@@ -68,4 +68,4 @@ underlying system tooling differs.
 ## See also
 
 - [MCP server](../../mcp/index.md)
-- [MCP actions](../../mcp/actions.md)
+- [MCP actions](../../mcp/tools.md)

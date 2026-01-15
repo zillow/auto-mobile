@@ -7,7 +7,6 @@ Feature flags allow:
 
 - **Experimental Features** - Enable/disable features in development
 - **Performance Tuning** - Toggle performance monitoring and debugging
-- **A/B Testing** - Test different automation strategies
 - **Safe Rollouts** - Gradual feature deployment
 
 ## Available Flags
@@ -93,4 +92,4 @@ setFeatureFlag("ui-perf-mode", true, {
 
 Feature flags are stored in memory and can be persisted to configuration files for permanent settings.
 
-See [MCP Actions](actions.md) for flag management tools.
+See [MCP Actions](tools.md) for flag management tools.

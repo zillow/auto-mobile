@@ -1,109 +1,67 @@
 # Frequently Asked Questions
 
-## General Questions
+#### What can I use this for?
 
-### Do I need root access on my device?
+- [Explore app ux](using/ux-exploration.md), [create UI tests](using/ui-tests.md), and easily create [bug reports]() with built-in [video recording](design-docs/mcp/observe/video-recording.md) and [visual highlights](design-docs/mcp/observe/visual-highlighting.md).
+- Measure [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [screen transitions](using/perf-analysis/screen-transition.md).
+- Audit accessibility compliance with [contrast ratios](using/a11y/contrast.md) & [tap targets](using/a11y/tap-targets.md).
+- (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
+- Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and (coming soon) XCTestRunner for iOS.
 
-No, core AutoMobile automation works within standard `adb` permissions and does not require device root access, making it
-suitable for both physical devices and emulators. Some advanced operations (like CA certificate management or certain
-secure settings on physical devices) require provisioning the AutoMobile accessibility service as a device owner. If you
-can access it over `adb`, core features work.
+#### Why another MCP? Aren't they all worthless?
 
-AutoMobile detects existing Android SDK/ADB installs via environment variables and common locations, but it does not
-install the SDK or command line tools for you.
+MCP is currently the best way to give AI agents **deterministic tools**. Most MCPs just provide simple data access as API wrappers. There is no simple API to wrap to truly conduct mobile device automation as of 2026 and it does not appear that anyone else is creating one.
 
-### Which AI clients are supported?
+#### Won't this bloat my context window a lot?
 
-See [installation](install/overview.md) docs.
+As for context bloat there are MCP benchmarks we run on every change that keep context usage as low as possible while delivering value. Most MCPs take up 50-100k tokens just being loaded into memory. AutoMobile keeps all of its tools, resources, and templates around 12k. We're committed to keeping this usage low and finding new ways to reduce it.
 
-### What are the system requirements?
+#### Is my AI agent supported?
 
-- Bun 1.3.5+ (required by the package engines field)
-- Android SDK + platform tools (ADB)
-- At least one Android device or emulator
+Any MCP tool-compatible client. See [installation](install/overview.md) for configuration examples. The project does make use of MCP resources because they have significant advantages and adoption across AI agents, please file an issue if this is not supported in your workflow.
 
-Physical devices do need USB debugging enabled for AutoMobile to function with them.
+#### Do I need root access?
 
-### How do I enable USB debugging?
+No. Core automation works with standard `adb` permissions on emulators and physical devices. Some advanced features are emulator-only and are called out as such.
 
-**No, this cannot be automated with AutoMobile** - USB debugging requires manual user interaction on the device for security reasons. You must enable it manually:
+#### After installation how do I get it to look at a device?
 
-1. Go to Settings > About Phone
-2. Tap "Build Number" 7 times to enable Developer Options
-3. Go to Settings > Developer Options
-4. Enable "USB Debugging"
-5. Connect your device and accept the debugging prompt
+If you have already connected an Android or iOS device to your computer AutoMobile will automatically detect and assume it should run automation on it. Otherwise it looks for installed system images and provides tools to start one of them.
 
-Once enabled, the USB debugging authorization is remembered for your computer, so you only need to do this once per device.
+#### What happens if I have more than one device?
 
-### How is the Accessibility Service enabled?
+Yes. AutoMobile supports multiple connected devices with automatic selection for CI/parallel testing. For consistent device selection, use `setActiveDevice` or connect only one device.
 
-AutoMobile **automatically enables** the accessibility service using ADB settings commands. This is fast, reliable, and requires no manual interaction.
+#### Does it affect app performance?
 
-The process:
-- Works automatically on emulators and properly configured devices
-- Completes in milliseconds
-- Preserves other enabled accessibility services
-- Detects device capabilities and provides clear error messages if unsupported
+No. Almost all functionality works without adding the Android AutoMobile SDK to your app. That library currently provides better navigation graph alignment and Compose recomposition count data and is only meant to be run in internal variants.
 
-On standard physical devices without root or device owner status, settings-based toggling may not be supported due to Android security restrictions. AutoMobile will detect this and provide guidance.
+#### Where is data stored?
 
-See the [Accessibility Service documentation](design-docs/plat/android/accessibility-service.md) for technical details.
+| Location | Contents |
+|----------|----------|
+| `/tmp/auto-mobile/` | Logs, caches (host machine) |
+| `~/.auto-mobile/sqlite.db` | Navigation graph, tool history, test records, performance records |
 
-### Can I use multiple devices simultaneously?
+Logs rotate at 10MB. Observe caches expire after a short TTL.
 
-AutoMobile supports multiple connected devices, but if you're using it as an MCP with an agent it's going to automatically
-assign operations based on its internal heuristics - this is to support the CI automation use case where multiple emulators 
-are being driven from a single CI job with parallel test execution. If you want consistency in which device it selects
-just keep one connected.
+#### My app crashed while using AutoMobile
 
-### Does this cost anything?
+Assuming you haven't tried out the platform specific SDK integration, that's your app. If AutoMobile can cause a crash, so can a user.
 
-Its an open source project, but that doesn't mean the AI model or emulator providers are free. Any way you look at it,
-mobile UI testing has a cost. I am pretty sure this will end up reducing costs by running more efficient tests faster.
-Looking forward to proving that with data.
+#### What data is collected?
 
-### Does it affect app performance?
-
-No, almost all functionality is provided without including the AutoMobile SDK.
-
-### How much device storage is used?
-
-AutoMobile stores logs and caches on the host machine (not on the device), primarily under `/tmp/auto-mobile`.
-Log files rotate at 10MB, observe caches expire after a short TTL, and screenshot caching uses an in-memory LRU.
-Disk cache cleanup for observe results is not automatic yet.
-
-We also store the internal navigation graph, tool call history, and other data within a sqlite database at `~/.auto-mobile/sqlite.db`
-
-### Tool calls are failing
-
-Check MCP server logs at `/tmp/auto-mobile/logs/server.log`. If the server was able to start it should have written logs.
-
-### Gestures not working properly?
-
-Assuming you've already tried looking at MCP tool call output:
-1. Turn on "Show Taps" and "Show Pointer" to visually watch the gestures that AutoMobile is attempting.
-2. Record a video via `scrcpy` and file an issue.
-
-### App crashes during testing?
-
-That's your app implementation. If AutoMobile can cause it to crash, a user can too.
+View hierarchy and screenshots for the foreground app, stored locally. Vision fallback (if enabled) sends screenshots to your configured model provider. No built-in analytics.
 
 ### How do I report bugs or request features?
 
 - [File issues on the GitHub repository](https://github.com/kaeawc/auto-mobile/issues)
 - Include device information, logs, and reproduction steps. For bonus points include an AutoMobile plan. It would be best
-  if reproductions could point at publicly available apps that have been released. I've done my testing against 
+  if reproductions could point at publicly available apps that have been released. I've done my testing against
   Zillow, Slack, Google Keep, YouTube Music, Bluesky, Google Calendar, and more.
 - Feature requests are welcomed as are contributions. Please file an issue before starting a contribution.
 
-### What data is collected?
-
-AutoMobile collects view hierarchy and screenshot data for the foreground app to power observation and interaction. By
-default this data stays on the host machine, but if you enable vision fallback it will send screenshots and prompts to
-the configured model provider. There are no built-in analytics.
-
-### What do we do with androidTest now?
+#### What about existing `androidTest` code?
 
 [`rm -rf`](https://www.github.com/kaeawc/auto-mobile/blob/main/scripts/delete_androidTest.sh)
 
@@ -120,3 +78,8 @@ a dry run and tells you exactly what it would delete. Only do this after you've 
 ✅ Cleanup complete!
 🔍 You may want to review changes before committing
 ```
+
+## Getting Help
+
+- **Issues**: [GitHub Issues](https://github.com/kaeawc/auto-mobile/issues)
+- **Include**: Device info, logs, reproduction steps, AutoMobile plan if possible

@@ -5,6 +5,7 @@ AutoMobile includes comprehensive YAML validation for test plans to catch syntax
 ## Overview
 
 All test plan YAML files are validated against a JSON schema that defines:
+
 - Required fields (name, steps)
 - Allowed tool names
 - Step structure and parameters
@@ -17,6 +18,7 @@ All test plan YAML files are validated against a JSON schema that defines:
 All YAML files must be syntactically valid and parseable by the YAML parser. Parse errors include line and column numbers to help locate issues.
 
 **YAML Features Supported:**
+
 - ✅ YAML anchors (`&anchor-name`)
 - ✅ Anchor references (`*anchor-name`)
 - ✅ Merge keys (`<<: *anchor`)
@@ -24,9 +26,11 @@ All YAML files must be syntactically valid and parseable by the YAML parser. Par
 
 ### 2. Schema Validation
 Test plans must conform to the AutoMobile test plan schema:
+
 - `schemas/test-plan.schema.json` - JSON Schema Draft 7 format
 
 The schema validates:
+
 - Required fields (`name`, `steps`)
 - Field types (strings, arrays, objects, etc.)
 - Array constraints (minItems, uniqueItems)
@@ -40,11 +44,13 @@ The schema validates:
 Validation happens automatically in two places:
 
 **Daemon-backed MCP Server (`executePlan` tool, daemon mode only):**
+
 - Validates YAML before parsing
 - Runs in TypeScript using AJV (Another JSON Schema Validator)
 - Reports errors with line/column numbers when possible
 
 **Kotlin JUnit Runner (`AutoMobilePlanExecutor`):**
+
 - Validates YAML after parameter substitution but before sending to daemon
 - Runs in Kotlin using networknt json-schema-validator
 - Reports errors with line/column numbers when possible
@@ -151,6 +157,7 @@ steps:
 ### Supported Tools
 
 The schema validates the following tool names:
+
 - `observe`
 - `tapOn`
 - `swipeOn`
@@ -275,6 +282,7 @@ Add to your workspace settings (`.vscode/settings.json`):
 ```
 
 This enables:
+
 - Autocomplete for test plan fields
 - Inline validation errors
 - Hover documentation
@@ -382,6 +390,7 @@ root: YAML parsing failed: bad indentation of a mapping entry at line 10, column
 ```
 
 This is a syntax error in your YAML. Common causes:
+
 - Incorrect indentation (use 2 spaces, not tabs)
 - Missing colons after keys
 - Unquoted strings with special characters
@@ -400,7 +409,7 @@ Planned improvements for YAML validation:
 
 ## Related Documentation
 
-- [ExecutePlan Assertions Design](../design-docs/plat/android/executeplan-assertions.md) - Design doc for assertion expectations
-- [MCP Migrations](../design-docs/mcp/migrations.md) - Migration system design
-- [UI Tests Guide](../using/ui-tests.md) - Guide for using AutoMobile for UI testing
-- [JSON Schema](../../schemas/test-plan.schema.json) - Full schema definition
+- [ExecutePlan Assertions Design](../plat/android/executeplan-assertions.md) - Design doc for assertion expectations
+- [MCP Migrations](storage/migrations.md) - Migration system design
+- [UI Tests Guide](../../using/ui-tests.md) - Guide for using AutoMobile for UI testing
+- [JSON Schema](../../../schemas/test-plan.schema.json) - Full schema definition

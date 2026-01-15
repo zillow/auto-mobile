@@ -2,8 +2,7 @@
 
 #### Observe
 
-In cases where the agent needs to determine what to do next, the [observe](observation.md) capability is exposed as the
-`observe` tool.
+Almost all other tool calls have built-in observation via the [interaction loop](interaction-loop.md), but we also have a standalone [observe](observe/index.md) tool that specifically performs just that action to get the AI agent up to speed.
 
 #### Interactions
 
@@ -12,32 +11,6 @@ In cases where the agent needs to determine what to do next, the [observe](obser
 - ↔️ `dragAndDrop` for element-to-element moves.
 - 🔍 `pinchOn` for zoom in/out gestures.
 - 📳 `shake` for accelerometer simulation.
-
-#### tapOn Response Metadata
-
-Successful `tapOn` calls include `selectedElement` metadata describing which match was chosen.
-
-```json
-{
-  "success": true,
-  "action": "tap",
-  "selectedElement": {
-    "text": "Sarah's Channel",
-    "resourceId": "com.example:id/channel_item",
-    "bounds": {
-      "left": 50,
-      "top": 200,
-      "right": 350,
-      "bottom": 280,
-      "centerX": 200,
-      "centerY": 240
-    },
-    "indexInMatches": 3,
-    "totalMatches": 10,
-    "selectionStrategy": "random"
-  }
-}
-```
 
 #### App Management
 
@@ -64,7 +37,7 @@ Successful `tapOn` calls include `selectedElement` metadata describing which mat
 #### Navigation & Exploration
 
 - 🗺️ `navigateTo` navigates to a specific screen using learned paths from the navigation graph.
-- 🔍 `explore` automatically explores the app and builds the navigation graph by intelligently selecting and interacting with UI elements.
+- 🔍 [`explore`](nav/explore.md) automatically explores the app and builds the navigation graph by intelligently selecting and interacting with UI elements.
 - 📊 `getNavigationGraph` retrieves the current navigation graph for debugging and analysis.
 
 #### Advanced Device Management

@@ -44,5 +44,5 @@ resources.
 
 ## See also
 
-- [Navigation Graph](../../../mcp/navigation-graph.md)
+- [Navigation Graph](../../../mcp/nav/index.md)
 - [IDE Plugin Overview](overview.md)

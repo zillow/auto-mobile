@@ -40,5 +40,5 @@ execution is enabled and report results after each run.
 
 ## See also
 
-- [MCP test timings](../../mcp/daemon.md)
+- [MCP test timings](../../mcp/daemon/index.md)
 - [iOS automation server](accessibility-service.md)

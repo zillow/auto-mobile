@@ -10,8 +10,6 @@ Screen transitions should be smooth and responsive. Janky transitions hurt user 
 
 ## Example Usage
 
-Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
-
 Example prompt:
 
 ```

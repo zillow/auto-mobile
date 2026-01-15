@@ -14,8 +14,6 @@ App startup performance affects user experience and app store ratings. AutoMobil
 
 ## Example Workflow
 
-Prerequisites: [UI auditing prerequisites](../ui-auditing-prereqs.md).
-
 Example prompt:
 
 ```

@@ -57,4 +57,4 @@ Server to client response:
 ## See also
 
 - [AXe automation](axe-automation.md)
-- [MCP actions](../../mcp/actions.md)
+- [MCP actions](../../mcp/tools.md)
