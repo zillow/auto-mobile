@@ -81,7 +81,6 @@ nav:
       - 'UX Exploration': using/ux-exploration.md
       - 'Reproducing Bugs': using/reproducting-bugs.md
       - 'UI Tests': using/ui-tests.md
-      - 'Test Plan Validation': using/test-plan-validation.md
       - 'Performance Analysis':
           - 'Startup': using/perf-analysis/startup.md
           - 'Screen Transition': using/perf-analysis/screen-transition.md
@@ -119,6 +118,7 @@ nav:
              - 'TalkBack/VoiceOver': design-docs/mcp/a11y/talkback-voiceover.md
           - 'Resources': design-docs/mcp/resources.md
           - 'Context Thresholds': design-docs/mcp/context-thresholds.md
+          - 'Test Plan Validation': design-docs/mcp/test-plan-validation.md
       - 'Platform Specific':
           - 'Android':
             - 'Overview': design-docs/plat/android/index.md
