@@ -17,13 +17,13 @@ AutoMobile is a suite of mobile automation tools that can integrate into your AI
     - (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
     - Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and (coming soon) XCTestRunner for iOS.
 
-![AutoMobile](../img/auto-mobile-party.gif)
-
 ## Resources
 
 - [Design Docs](design-docs/index.md) - Architecture and implementation details
 - [FAQ](faq.md) - Common questions
 - [Contributing](contributing/overview.md) - How to contribute
+
+![AutoMobile](img/auto-mobile-party.gif)
 
 ## License
 
