@@ -184,6 +184,10 @@ jobs:
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
   # Test isolation issue resolved in #107 and #109
   # Re-enabled in #110
@@ -211,6 +215,10 @@ jobs:
           working-directory: './android/'
           accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
           gradle-home-directory: "~/.gradle/${{ github.job }}"
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Upload Test Results"
         if: always()
@@ -250,6 +258,10 @@ jobs:
           working-directory: './android/'
           accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
           gradle-home-directory: "~/.gradle/${{ github.job }}"
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Upload Test Results"
         if: always()
@@ -282,6 +294,10 @@ jobs:
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
   build-junit-runner-library:
     name: "Build JUnitRunner Library"
@@ -302,6 +318,10 @@ jobs:
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Store AAR"
         uses: actions/upload-artifact@v4.4.0
@@ -329,6 +349,10 @@ jobs:
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Store Accessibility Service APK"
         uses: actions/upload-artifact@v4.4.0
@@ -355,6 +379,10 @@ jobs:
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Store Sample APK"
         uses: actions/upload-artifact@v4.4.0
@@ -440,6 +468,10 @@ jobs:
           gradle-home-directory: "~/.gradle/${{ github.job }}"
           reuse-configuration-cache: true
           gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: "Skip snapshot publish (non-snapshot version)"
         if: ${{ !endsWith(steps.junit-runner-version.outputs.version, '-SNAPSHOT') }}

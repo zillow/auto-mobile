@@ -35,6 +35,22 @@ inputs:
     description: "The directory to use for Gradle User Home"
     default: ""
     required: "false"
+  release-keystore-base64:
+    description: "Base64 encoded release keystore for signing"
+    required: false
+    default: ""
+  release-keystore-password:
+    description: "Password for the release keystore"
+    required: false
+    default: ""
+  release-key-alias:
+    description: "Key alias in the release keystore"
+    required: false
+    default: ""
+  release-key-password:
+    description: "Password for the key in the release keystore"
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -122,6 +138,18 @@ runs:
           ls -la "$ANDROID_AVD_HOME" 2>/dev/null || echo "ANDROID_AVD_HOME not found"
           echo ""
           echo "Generated AVD snapshot for caching."
+
+    - name: Setup Release Keystore
+      if: ${{ inputs.release-keystore-base64 != '' }}
+      shell: ${{ inputs.shell }}
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        mkdir -p keystore
+        echo "${{ inputs.release-keystore-base64 }}" | base64 -d > keystore/release.keystore
+        echo "RELEASE_KEYSTORE_PATH=keystore/release.keystore" >> $GITHUB_ENV
+        echo "RELEASE_KEYSTORE_PASSWORD=${{ inputs.release-keystore-password }}" >> $GITHUB_ENV
+        echo "RELEASE_KEY_ALIAS=${{ inputs.release-key-alias }}" >> $GITHUB_ENV
+        echo "RELEASE_KEY_PASSWORD=${{ inputs.release-key-password }}" >> $GITHUB_ENV
 
     - name: Run Emulator
       uses: reactivecircus/android-emulator-runner@v2.35.0
