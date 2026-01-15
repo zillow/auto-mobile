@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Slack Status Demo - Set status to "Out sick" until January 17th
+# Slack Status Demo - Set status to "🔥 I'm awesome"
 
 # Source shared functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,98 +9,89 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../claude-code-simulation.sh"
 
 # Show header
-show_header "Set my Slack status to Out sick until January 17th"
+show_header "Set my Slack status to :fire: I'm awesome"
 
 # Show thinking animation
 show_thinking
 
 # AI response start
-add_line "I'll help you set your Slack status to \"Out sick\" and configure it to clear on January 17th."
+add_line "I'll help you set your Slack status to \"🔥 I'm awesome\"."
 
 # Step 1: Launch Slack
 echo ""
 add_line "●${GRAY} Opening Slack…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - launchApp (MCP)${RESET}${GRAY} (appId: \"com.Slack\")${RESET}"
-call_mcp_tool "launchApp" --appId "com.Slack" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - launchApp (MCP)${RESET}${GRAY} (appId: \"com.Slack\")${RESET}"
+add_line "${BOLD}● auto-mobile - launchApp (MCP)${RESET}${GRAY} (appId: \"com.Slack.internal.debug\", coldBoot: true)${RESET}"
+call_mcp_tool "launchApp" --appId "com.Slack.internal.debug" --coldBoot true --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - launchApp (MCP)${RESET}${GRAY} (appId: \"com.Slack.internal.debug\", coldBoot: true)${RESET}"
 add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Slack launched${RESET}"
 
-# Step 2: Navigate to profile/status screen
-# Note: This assumes we can get to the status screen from the current position
-# In practice, you may need to tap on the profile or "You" tab first
+# Step 2: Navigate to profile/You screen
+# Note: Profile avatar shows "Online" or "Away" depending on user status - try both
 echo ""
-add_line "●${GRAY} Navigating to status settings…${RESET}"
+add_line "●${GRAY} Opening profile screen…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - observe (MCP)${RESET}${GRAY} (platform: \"android\")${RESET}"
-call_mcp_tool "observe" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - observe (MCP)${RESET}${GRAY} (platform: \"android\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Located status screen${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", profile avatar)${RESET}"
+call_mcp_tool "tapOn" --action "tap" --selector '{"text": "Online"}' --platform "android"
+call_mcp_tool "tapOn" --action "tap" --selector '{"text": "Away"}' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", profile avatar)${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Profile screen opened${RESET}"
 
-# Step 3: Select "Out sick" status
+# Step 3: Navigate to status screen
 echo ""
-add_line "●${GRAY} Selecting \"Out sick\" status…${RESET}"
+add_line "●${GRAY} Opening status settings…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Out sick\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --selector '{"text": "Out sick"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Out sick\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Status selected${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Update your status\")${RESET}"
+call_mcp_tool "tapOn" --action "tap" --selector '{"text": "Update your status"}' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Update your status\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Status screen opened${RESET}"
 
-# Step 4: Open expiration options
+# Step 4: Open emoji picker
 echo ""
-add_line "●${GRAY} Opening expiration options…${RESET}"
+add_line "●${GRAY} Opening emoji picker…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"com.Slack:id/expiration_view\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --selector '{"id": "com.Slack:id/expiration_view"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"com.Slack:id/expiration_view\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Expiration options opened${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"com.Slack.internal.debug:id/status_emoji_picker_btn\")${RESET}"
+call_mcp_tool "tapOn" --action "tap" --selector '{"id": "com.Slack.internal.debug:id/status_emoji_picker_btn"}' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"com.Slack.internal.debug:id/status_emoji_picker_btn\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Emoji picker opened${RESET}"
 
-# Step 5: Choose date and time
+# Step 5: Select fire emoji
 echo ""
-add_line "●${GRAY} Selecting custom date option…${RESET}"
+add_line "●${GRAY} Selecting fire emoji…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Choose date and time\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --selector '{"text": "Choose date and time"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"Choose date and time\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Custom date option selected${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"fire\")${RESET}"
+call_mcp_tool "tapOn" --action "tap" --selector '{"text": "fire"}' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"fire\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Fire emoji selected${RESET}"
 
-# Step 6: Open date picker
+# Step 6: Focus on status text field
 echo ""
-add_line "●${GRAY} Opening date picker…${RESET}"
+add_line "●${GRAY} Focusing on status text field…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"com.Slack:id/expiration_date_selector\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --selector '{"id": "com.Slack:id/expiration_date_selector"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"com.Slack:id/expiration_date_selector\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Date picker opened${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"set_status_field\")${RESET}"
+call_mcp_tool "tapOn" --action "tap" --selector '{"id": "com.Slack.internal.debug:id/set_status_field"}' --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"set_status_field\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Text field focused${RESET}"
 
-# Step 7: Select January 17th
+# Step 7: Enter status text
 echo ""
-add_line "●${GRAY} Selecting January 17th…${RESET}"
+add_line "●${GRAY} Entering status text…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"17\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --selector '{"text": "17"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"17\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Date selected${RESET}"
+add_line "${BOLD}● auto-mobile - inputText (MCP)${RESET}${GRAY} (text: \"I'm awesome\")${RESET}"
+call_mcp_tool "inputText" --text "I'm awesome" --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - inputText (MCP)${RESET}${GRAY} (text: \"I'm awesome\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Status text entered${RESET}"
 
-# Step 8: Confirm date selection
+# Step 8: Close keyboard
 echo ""
-add_line "●${GRAY} Confirming date…${RESET}"
+add_line "●${GRAY} Closing keyboard…${RESET}"
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"OK\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --selector '{"text": "OK"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", text: \"OK\")${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Date confirmed${RESET}"
+add_line "${BOLD}● auto-mobile - keyboard (MCP)${RESET}${GRAY} (action: \"close\")${RESET}"
+call_mcp_tool "keyboard" --action "close" --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - keyboard (MCP)${RESET}${GRAY} (action: \"close\")${RESET}"
+add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Keyboard closed${RESET}"
 
-# Step 9: Go back to status screen
-echo ""
-add_line "●${GRAY} Returning to status screen…${RESET}"
-echo ""
-add_line "${BOLD}● Bash${RESET}${GRAY} (adb shell input tap 74 255)${RESET}"
-call_mcp_tool "pressButton" --button "back" --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} Bash${RESET}${GRAY} (adb shell input tap 74 255)${RESET}"
-add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Back to status screen${RESET}"
-
-# Step 10: Save status
+# Step 9: Save status
 echo ""
 add_line "●${GRAY} Saving status…${RESET}"
 echo ""
@@ -112,10 +103,9 @@ add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Status saved${RESET}"
 # Summary
 add_line ""
 add_line "Successfully set Slack status:"
-add_line "  • ${GREEN}Status: 🤒 Out sick${RESET}"
-add_line "  • ${GREEN}Expiration: Saturday, January 17th at 1:30 AM${RESET}"
-add_line "  • ${GREEN}Multi-step form navigation with date picker${RESET}"
-add_line "  • ${GREEN}Automatic status clearing on specified date${RESET}"
+add_line "  • ${GREEN}Status: 🔥 I'm awesome${RESET}"
+add_line "  • ${GREEN}Emoji selected via Slack's emoji picker${RESET}"
+add_line "  • ${GREEN}Custom text entered${RESET}"
 
 # Show footer
 show_footer
