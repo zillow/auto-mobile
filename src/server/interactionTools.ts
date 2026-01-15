@@ -15,7 +15,15 @@ import { HomeScreen } from "../features/action/HomeScreen";
 import { Rotate } from "../features/action/Rotate";
 import { OpenURL } from "../features/action/OpenURL";
 import { Clipboard } from "../features/action/Clipboard";
-import { ActionableError, BootedDevice, Element, ElementSelectionStrategy, ViewHierarchyResult } from "../models";
+import {
+  ActionableError,
+  BootedDevice,
+  Element,
+  ElementSelectionStrategy,
+  ExecResult,
+  ObserveResult,
+  ViewHierarchyResult
+} from "../models";
 import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { createJSONToolResponse } from "../utils/toolUtils";
@@ -25,6 +33,7 @@ import { RecompositionTracker } from "../features/performance/RecompositionTrack
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { ElementUtils } from "../features/utility/ElementUtils";
 import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
+import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import {
   elementContainerSchema,
   elementSelectionStrategySchema,
@@ -461,6 +470,59 @@ export const clipboardSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
+export interface SystemTrayObserver {
+  execute(
+    queryOptions?: unknown,
+    perf?: unknown,
+    skipWaitForFresh?: boolean,
+    minTimestamp?: number,
+    signal?: AbortSignal
+  ): Promise<ObserveResult>;
+}
+
+export interface SystemTrayAdb {
+  executeCommand(
+    command: string,
+    timeoutMs?: number,
+    maxBuffer?: number,
+    noRetry?: boolean,
+    signal?: AbortSignal
+  ): Promise<ExecResult>;
+  getDeviceTimestampMs(): Promise<number>;
+}
+
+export interface SystemTrayDependencies {
+  observeScreenFactory: (device: BootedDevice) => SystemTrayObserver;
+  adbFactory: (device: BootedDevice) => SystemTrayAdb;
+  timer: Timer;
+}
+
+let systemTrayDependencies: SystemTrayDependencies | null = null;
+
+const getSystemTrayDependencies = (): SystemTrayDependencies => {
+  if (!systemTrayDependencies) {
+    systemTrayDependencies = {
+      observeScreenFactory: device => new ObserveScreen(device),
+      adbFactory: device => new AdbClient(device),
+      timer: defaultTimer
+    };
+  }
+  return systemTrayDependencies;
+};
+
+export const setSystemTrayDependencies = (overrides: Partial<SystemTrayDependencies>): void => {
+  const current = getSystemTrayDependencies();
+  systemTrayDependencies = {
+    observeScreenFactory: overrides.observeScreenFactory ?? current.observeScreenFactory,
+    adbFactory: overrides.adbFactory ?? current.adbFactory,
+    timer: overrides.timer ?? current.timer
+  };
+};
+
+export const resetSystemTrayDependencies = (): void => {
+  systemTrayDependencies = null;
+};
+
 const SYSTEM_TRAY_PACKAGE = "com.android.systemui";
 const SYSTEM_TRAY_RESOURCE_ID_HINTS = [
   "notification_panel",
@@ -632,10 +694,33 @@ interface SystemTrayElementMatch {
   element: Element;
 }
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => getSystemTrayDependencies().timer.sleep(ms);
 
 const resolveSystemTrayAwaitTimeout = (awaitTimeout?: number): number => {
   return awaitTimeout ?? DEFAULT_SYSTEM_TRAY_AWAIT_TIMEOUT_MS;
+};
+
+const resolveSystemTrayObservationTimestamp = async (device: BootedDevice): Promise<number> => {
+  const { adbFactory, timer } = getSystemTrayDependencies();
+  if (device.platform !== "android") {
+    return timer.now();
+  }
+  const adb = adbFactory(device);
+  return adb.getDeviceTimestampMs();
+};
+
+const expandSystemTray = async (device: BootedDevice): Promise<void> => {
+  if (device.platform !== "android") {
+    return;
+  }
+
+  try {
+    const { adbFactory } = getSystemTrayDependencies();
+    const adb = adbFactory(device);
+    await adb.executeCommand("shell cmd statusbar expand-notifications");
+  } catch (error) {
+    throw new ActionableError(`Failed to expand system tray: ${error}`);
+  }
 };
 
 const parseAppLabelFromDumpsys = (stdout: string): string | null => {
@@ -676,7 +761,8 @@ const resolveAppLabel = async (device: BootedDevice, appId: string): Promise<str
   }
 
   try {
-    const adb = new AdbClient(device);
+    const { adbFactory } = getSystemTrayDependencies();
+    const adb = adbFactory(device);
     const result = await adb.executeCommand(`shell dumpsys package ${appId}`, undefined, undefined, true);
     return parseAppLabelFromDumpsys(result.stdout);
   } catch (error) {
@@ -1206,65 +1292,110 @@ const findBestNotificationMatch = (
   return selectBestNotificationMatch(matches);
 };
 
+const waitForSystemTrayOpen = async (
+  observeScreen: SystemTrayObserver,
+  minTimestamp: number,
+  awaitTimeoutMs: number
+): Promise<ObserveResult> => {
+  const { timer } = getSystemTrayDependencies();
+  const startTime = timer.now();
+  let observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
+
+  while (timer.now() - startTime < awaitTimeoutMs) {
+    if (isSystemTrayOpen(observation.viewHierarchy)) {
+      return observation;
+    }
+    await sleep(SYSTEM_TRAY_POLL_INTERVAL_MS);
+    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
+  }
+
+  return observation;
+};
+
 const ensureSystemTrayOpen = async (
   device: BootedDevice,
-  progress?: ProgressCallback
-): Promise<{ observation?: import("../models").ObserveResult; opened: boolean; skipped: boolean }> => {
-  let observation: import("../models").ObserveResult | undefined;
+  awaitTimeoutMs: number = DEFAULT_SYSTEM_TRAY_AWAIT_TIMEOUT_MS,
+  _progress?: ProgressCallback
+): Promise<{
+  observation?: ObserveResult;
+  opened: boolean;
+  skipped: boolean;
+  minTimestamp: number;
+}> => {
+  const { observeScreenFactory } = getSystemTrayDependencies();
+  const observeScreen = observeScreenFactory(device);
+  let observation: ObserveResult | undefined;
+  let minTimestamp = 0;
 
   if (device.platform === "android") {
-    const observeScreen = new ObserveScreen(device);
-    observation = await observeScreen.execute();
+    minTimestamp = await resolveSystemTrayObservationTimestamp(device);
+    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
     if (isSystemTrayOpen(observation.viewHierarchy)) {
-      return { observation, opened: false, skipped: true };
+      return { observation, opened: false, skipped: true, minTimestamp };
     }
   }
 
-  const swipeOn = new SwipeOn(device);
+  await expandSystemTray(device);
+  if (device.platform === "android") {
+    minTimestamp = await resolveSystemTrayObservationTimestamp(device);
+  }
 
-  const options: import("../models").SwipeOnOptions = {
-    direction: "down",
-    includeSystemInsets: true,
-    duration: 100
-  };
+  if (device.platform !== "android") {
+    return {
+      observation,
+      opened: true,
+      skipped: false,
+      minTimestamp
+    };
+  }
 
-  const result = await swipeOn.execute(options, progress);
+  const awaitedObservation = await waitForSystemTrayOpen(
+    observeScreen,
+    minTimestamp,
+    awaitTimeoutMs
+  );
+
   return {
-    observation: result.observation ?? observation,
+    observation: awaitedObservation ?? observation,
     opened: true,
-    skipped: false
+    skipped: false,
+    minTimestamp
   };
 };
 
-const waitForNotificationMatch = async (
+export const waitForNotificationMatch = async (
   device: BootedDevice,
   criteria: SystemTrayNotificationArgs,
   appMatchTexts: string[],
   awaitTimeoutMs: number,
   progress?: ProgressCallback
-): Promise<{ observation: import("../models").ObserveResult; match: SystemTrayNotificationMatch | null }> => {
-  const observeScreen = new ObserveScreen(device);
-  let { observation } = await ensureSystemTrayOpen(device, progress);
+): Promise<{ observation: ObserveResult; match: SystemTrayNotificationMatch | null }> => {
+  const { observeScreenFactory, timer } = getSystemTrayDependencies();
+  const observeScreen = observeScreenFactory(device);
+  const deadlineMs = timer.now() + awaitTimeoutMs;
+  const remainingMs = Math.max(0, deadlineMs - timer.now());
+  const result = await ensureSystemTrayOpen(device, remainingMs, progress);
+  let observation = result.observation;
+  const minTimestamp = result.minTimestamp;
   if (!observation) {
-    observation = await observeScreen.execute();
+    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
   }
 
-  const startTime = Date.now();
   while (true) {
+    if (timer.now() >= deadlineMs) {
+      return { observation, match: null };
+    }
+
     const viewHierarchy = observation.viewHierarchy;
-    if (viewHierarchy) {
+    if (viewHierarchy && isSystemTrayOpen(viewHierarchy)) {
       const match = findBestNotificationMatch(viewHierarchy, criteria, appMatchTexts);
       if (match) {
         return { observation, match };
       }
     }
 
-    if (Date.now() - startTime >= awaitTimeoutMs) {
-      return { observation, match: null };
-    }
-
     await sleep(SYSTEM_TRAY_POLL_INTERVAL_MS);
-    observation = await observeScreen.execute();
+    observation = await observeScreen.execute(undefined, undefined, false, minTimestamp);
   }
 };
 
@@ -1338,14 +1469,16 @@ const resolveNotificationSwipeElement = (
 const tapElementWithAdb = async (device: BootedDevice, element: Element): Promise<void> => {
   const elementUtils = new ElementUtils();
   const center = elementUtils.getElementCenter(element);
-  const adb = new AdbClient(device);
+  const { adbFactory } = getSystemTrayDependencies();
+  const adb = adbFactory(device);
   await adb.executeCommand(`shell input tap ${center.x} ${center.y}`);
 };
 
 const swipeElementWithAdb = async (device: BootedDevice, element: Element): Promise<void> => {
   const elementUtils = new ElementUtils();
   const { startX, startY, endX, endY } = elementUtils.getSwipeWithinBounds("left", element.bounds);
-  const adb = new AdbClient(device);
+  const { adbFactory } = getSystemTrayDependencies();
+  const adb = adbFactory(device);
   await adb.executeCommand(
     `shell input swipe ${Math.floor(startX)} ${Math.floor(startY)} ${Math.floor(endX)} ${Math.floor(endY)} ${SYSTEM_TRAY_NOTIFICATION_SWIPE_DURATION_MS}`
   );
@@ -1469,8 +1602,10 @@ export function registerInteractionTools() {
         });
       }
 
+      const awaitTimeoutMs = resolveSystemTrayAwaitTimeout(args.awaitTimeout);
+
       if (args.action === "open") {
-        const result = await ensureSystemTrayOpen(device, progress);
+        const result = await ensureSystemTrayOpen(device, awaitTimeoutMs, progress);
         return createJSONToolResponse({
           message: result.skipped
             ? "System tray already open; no swipe needed"
@@ -1482,7 +1617,6 @@ export function registerInteractionTools() {
       }
 
       const notification = args.notification ?? {};
-      const awaitTimeoutMs = resolveSystemTrayAwaitTimeout(args.awaitTimeout);
       let appLabel: string | null = null;
       let appMatchTexts: string[] = [];
 
@@ -1537,7 +1671,8 @@ export function registerInteractionTools() {
         }
 
         await tapElementWithAdb(device, tapMatch.element);
-        const observeScreen = new ObserveScreen(device);
+        const { observeScreenFactory } = getSystemTrayDependencies();
+        const observeScreen = observeScreenFactory(device);
         const nextObservation = await observeScreen.execute();
 
         return createJSONToolResponse({
@@ -1573,7 +1708,8 @@ export function registerInteractionTools() {
         }
 
         await swipeElementWithAdb(device, swipeElement);
-        const observeScreen = new ObserveScreen(device);
+        const { observeScreenFactory } = getSystemTrayDependencies();
+        const observeScreen = observeScreenFactory(device);
         const nextObservation = await observeScreen.execute();
 
         return createJSONToolResponse({
@@ -1594,11 +1730,12 @@ export function registerInteractionTools() {
           appMatchTexts = [appId];
         }
 
-        const observeScreen = new ObserveScreen(device);
-        const startTime = Date.now();
+        const { observeScreenFactory, timer } = getSystemTrayDependencies();
+        const observeScreen = observeScreenFactory(device);
+        const startTime = timer.now();
         let clearedCount = 0;
         let lastMatchText: string | undefined;
-        let lastObservation = (await ensureSystemTrayOpen(device, progress)).observation;
+        let lastObservation = (await ensureSystemTrayOpen(device, awaitTimeoutMs, progress)).observation;
 
         if (!lastObservation) {
           lastObservation = await observeScreen.execute();
@@ -1611,7 +1748,7 @@ export function registerInteractionTools() {
             : null;
 
           if (!match) {
-            if (clearedCount > 0 || Date.now() - startTime >= awaitTimeoutMs) {
+            if (clearedCount > 0 || timer.now() - startTime >= awaitTimeoutMs) {
               break;
             }
             await sleep(SYSTEM_TRAY_POLL_INTERVAL_MS);
