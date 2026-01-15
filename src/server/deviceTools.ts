@@ -3,12 +3,17 @@ import { ToolRegistry, ProgressCallback } from "./toolRegistry";
 import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
-import { notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
+import { BOOTED_DEVICE_RESOURCE_URIS, notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
+import { DEVICE_IMAGE_RESOURCE_URIS } from "./deviceImageResources";
 import { syncInstalledAppResources } from "./appResources";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
+});
+
+export const listDevicesSchema = z.object({
+  platform: z.enum(["android", "ios"]).optional().describe("Platform")
 });
 
 export const startDeviceSchema = z.object({
@@ -42,6 +47,10 @@ export interface KillDeviceArgs {
 
 export interface ListDeviceImagesArgs {
   platform: SomePlatform;
+}
+
+export interface ListDevicesArgs {
+  platform?: "android" | "ios";
 }
 
 export interface DeviceToolsDependencies {
@@ -87,6 +96,35 @@ export function registerDeviceTools() {
     } catch (error) {
       throw new ActionableError(`Failed to list ${args.platform} AVDs: ${error}`);
     }
+  };
+
+  const listDevicesHandler = async (args: ListDevicesArgs) => {
+    if (args.platform) {
+      const bootedResource = `${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}/${args.platform}`;
+      const imagesResource = `${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}/${args.platform}`;
+
+      return createJSONToolResponse({
+        message: `To list ${args.platform} devices, query the MCP resources '${bootedResource}' for running devices or '${imagesResource}' for available device images. For all devices, use '${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}' or '${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}'. Templates are also available: '${BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE}' and '${DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE}'.`,
+        resources: [
+          bootedResource,
+          imagesResource,
+          BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED,
+          DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES,
+          BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE,
+          DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE
+        ]
+      });
+    }
+
+    return createJSONToolResponse({
+      message: `To list devices, query the MCP resources '${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}' for running devices or '${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}' for available device images. For platform-specific queries, use '${BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE}' or '${DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE}'.`,
+      resources: [
+        BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED,
+        DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES,
+        BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE,
+        DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE
+      ]
+    });
   };
 
   // Start emulator handler
@@ -158,6 +196,13 @@ export function registerDeviceTools() {
     "List device images",
     listDeviceImagesSchema,
     listDeviceImagesHandler
+  );
+
+  ToolRegistry.register(
+    "listDevices",
+    "List devices (resource guidance)",
+    listDevicesSchema,
+    listDevicesHandler
   );
 
   ToolRegistry.register(
