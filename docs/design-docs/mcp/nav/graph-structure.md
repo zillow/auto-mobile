@@ -1,3 +1,4 @@
+# Graph Structure
 
 The navigation graph captures:
 

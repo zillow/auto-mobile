@@ -1,4 +1,4 @@
-# MCP Context Thresholds
+# Context Thresholds
 
 ## Overview
 

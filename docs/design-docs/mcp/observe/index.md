@@ -1,4 +1,4 @@
-# Features - MCP Server - Observation
+# Overview
 
 Each observation captures a snapshot of the current state of a device's screen and UI. When executed, it
 collects multiple data points in parallel to minimize observation latency. These operations are incredibly platform

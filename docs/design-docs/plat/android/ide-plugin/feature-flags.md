@@ -1,4 +1,4 @@
-# Intellij IDE Plugin - Feature Flags
+# Control Feature Flags
 
 ## Goal
 

@@ -1,4 +1,4 @@
-# Managed App Configuration (MDM)
+# Managed App Configuration
 
 MDM-managed devices can deliver Managed App Configuration values to apps. These
 settings are surfaced through `UserDefaults` under `com.apple.configuration.managed`.

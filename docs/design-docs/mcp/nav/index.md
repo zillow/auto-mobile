@@ -1,4 +1,4 @@
-# Navigation Graph
+# Overview
 
 As AutoMobile explores an app it automatically maps what it observes into a [navigation graph](graph-structure.md).
 

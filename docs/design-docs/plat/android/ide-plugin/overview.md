@@ -1,4 +1,4 @@
-# Android IDE Plugin
+# Overview
 
 The AutoMobile IntelliJ/Android Studio plugin attaches to a running MCP server to render navigation data and
 manage development workflows. It supports MCP over HTTP (streamable) and STDIO, and falls back to the

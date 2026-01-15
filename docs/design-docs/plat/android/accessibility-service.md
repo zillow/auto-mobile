@@ -1,4 +1,4 @@
-# Android Accessibility Service
+# Accessibility Service
 
 The Android Accessibility Service provides real-time access to view hierarchy data and user interface
 elements without requiring device rooting or special permissions beyond accessibility service enablement.

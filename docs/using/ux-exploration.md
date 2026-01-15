@@ -3,6 +3,8 @@
 Use AI agents to interactively explore your app and discover UI flows.
 
 ![Exploring Google Maps](../img/google-maps.gif)
+![Setting an alarm in the Clock app](../img/clock-app.gif)
+![Taking a photo and viewing the gallery](../img/camera-gallery.gif)
 
 ## Example Prompts
 

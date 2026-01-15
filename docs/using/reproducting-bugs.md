@@ -1,4 +1,4 @@
-# Reproducing Bugs with AutoMobile
+# Reproducing Bugs
 
 Use AutoMobile to systematically reproduce bugs and create reproducible test cases.
 

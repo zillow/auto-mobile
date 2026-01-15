@@ -1,4 +1,4 @@
-# Managed Apple IDs and Device Profiles
+# Managed Apple IDs
 
 Managed Apple IDs and configuration profiles are common in enterprise deployments.
 They can impose restrictions that affect app installation, network access, and

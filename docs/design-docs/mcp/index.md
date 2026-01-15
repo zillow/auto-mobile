@@ -1,4 +1,4 @@
-# MCP Server
+# Overview
 
 The MCP server exposes AutoMobile's capabilities as tool calls, resources, and real-time observations.
 

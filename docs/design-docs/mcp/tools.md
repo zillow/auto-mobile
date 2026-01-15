@@ -1,4 +1,4 @@
-# Features - MCP Server - Actions
+# Tools
 
 #### Observe
 

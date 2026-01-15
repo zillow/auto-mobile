@@ -1,4 +1,4 @@
-# AutoMobile
+# Overview
 
 AutoMobile is a suite of mobile automation tools that can integrate into your AI agent of choice. It can be an assistant to enable individuals or empower teams to deliver better experiences. It does all of this with the [design principals](design-docs/#design-principles) that high quality, performant, and accessible workflows are necessary to creating good software.
 
@@ -22,6 +22,8 @@ AutoMobile is a suite of mobile automation tools that can integrate into your AI
 - [Design Docs](design-docs/index.md) - Architecture and implementation details
 - [FAQ](faq.md) - Common questions
 - [Contributing](contributing/overview.md) - How to contribute
+
+![AutoMobile](img/auto-mobile-party.gif)
 
 ## License
 

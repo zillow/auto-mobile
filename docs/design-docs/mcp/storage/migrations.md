@@ -1,4 +1,4 @@
-# Database Migrations
+# Migrations
 
 AutoMobile uses SQLite migrations to keep the MCP server schema up to date across releases.
 Migrations run on server startup and are managed with Kysely's `Migrator` + `FileMigrationProvider`.

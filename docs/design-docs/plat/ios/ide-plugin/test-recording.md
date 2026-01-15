@@ -1,4 +1,4 @@
-# Test Recording (Xcode)
+# Test Recording
 
 The AutoMobile Xcode companion app can record interactions on an iOS simulator and
 generate executable YAML plans. This mirrors the Android IDE plugin recording workflow

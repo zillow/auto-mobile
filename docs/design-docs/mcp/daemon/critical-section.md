@@ -1,4 +1,4 @@
-# Critical Section Tool
+# Critical Section
 
 ## Overview
 

@@ -1,4 +1,4 @@
-# Device State Snapshot & Restore
+# Device State Snapshots
 
 ## Overview
 

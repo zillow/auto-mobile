@@ -1,4 +1,4 @@
-# Installation
+# Overview
 
 AutoMobile runs as an MCP server, connecting AI agents to Android devices for automation.
 

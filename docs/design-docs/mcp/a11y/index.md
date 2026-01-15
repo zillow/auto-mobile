@@ -1,4 +1,4 @@
-# Accessibility Testing
+# Overview
 
 AutoMobile supports accessibility testing by detecting and adapting to screen readers like TalkBack (Android) and VoiceOver (iOS).
 
