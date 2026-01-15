@@ -612,6 +612,8 @@ interface SystemTrayMatchResult {
   };
 }
 
+type SystemTrayMatchKey = keyof SystemTrayMatchResult["matches"];
+
 interface SystemTrayNotificationCandidate {
   node: any;
   depth: number;
@@ -745,6 +747,223 @@ const collectNotificationCandidates = (viewHierarchy: ViewHierarchyResult): Syst
   };
 
   const rootNodes = getHierarchyRoots(viewHierarchy);
+  for (const rootNode of rootNodes) {
+    visit(rootNode, 0);
+  }
+
+  return candidates;
+};
+
+type NormalizedSearchText = { text: string; normalized: string };
+
+const buildNormalizedSearchText = (text?: string): NormalizedSearchText | null => {
+  if (typeof text !== "string") {
+    return null;
+  }
+
+  return { text, normalized: text.toLowerCase() };
+};
+
+const buildNormalizedSearchTexts = (texts: string[]): NormalizedSearchText[] => {
+  return texts
+    .map(text => text.trim())
+    .filter(Boolean)
+    .map(text => ({ text, normalized: text.toLowerCase() }));
+};
+
+const extractNodeTextCandidates = (node: any): string[] => {
+  const props = getNodeProperties(node);
+  if (!props) {
+    return [];
+  }
+
+  const candidates = [
+    props.text,
+    props["content-desc"],
+    props["ios-accessibility-label"]
+  ];
+
+  return candidates.filter((value): value is string => typeof value === "string" && value.length > 0);
+};
+
+const resolveMatchForSearchText = (
+  nodeTextCandidatesLower: string[],
+  searchText: NormalizedSearchText
+): SystemTrayTextMatch | null => {
+  if (nodeTextCandidatesLower.some(text => text === searchText.normalized)) {
+    return { text: searchText.text, matchType: "exact" };
+  }
+
+  if (nodeTextCandidatesLower.some(text => text.includes(searchText.normalized))) {
+    return { text: searchText.text, matchType: "partial" };
+  }
+
+  return null;
+};
+
+const resolveMatchForSearchTexts = (
+  nodeTextCandidatesLower: string[],
+  searchTexts: NormalizedSearchText[]
+): SystemTrayTextMatch | null => {
+  for (const searchText of searchTexts) {
+    if (nodeTextCandidatesLower.some(text => text === searchText.normalized)) {
+      return { text: searchText.text, matchType: "exact" };
+    }
+  }
+
+  for (const searchText of searchTexts) {
+    if (nodeTextCandidatesLower.some(text => text.includes(searchText.normalized))) {
+      return { text: searchText.text, matchType: "partial" };
+    }
+  }
+
+  return null;
+};
+
+const mergeTextMatch = (
+  currentMatch: SystemTrayTextMatch | undefined,
+  nextMatch: SystemTrayTextMatch | undefined
+): SystemTrayTextMatch | undefined => {
+  if (!nextMatch) {
+    return currentMatch;
+  }
+  if (!currentMatch) {
+    return nextMatch;
+  }
+  if (currentMatch.matchType === "exact") {
+    return currentMatch;
+  }
+  if (nextMatch.matchType === "exact") {
+    return nextMatch;
+  }
+  return currentMatch;
+};
+
+const mergeMatchMaps = (
+  base: SystemTrayMatchResult["matches"],
+  incoming: SystemTrayMatchResult["matches"]
+): SystemTrayMatchResult["matches"] => {
+  for (const [key, value] of Object.entries(incoming) as [SystemTrayMatchKey, SystemTrayTextMatch][]) {
+    base[key] = mergeTextMatch(base[key], value);
+  }
+  return base;
+};
+
+const collectCompositeNotificationCandidates = (
+  viewHierarchy: ViewHierarchyResult,
+  criteria: SystemTrayNotificationArgs,
+  appMatchTexts: string[]
+): SystemTrayNotificationCandidate[] => {
+  const rootNodes = getHierarchyRoots(viewHierarchy);
+  if (rootNodes.length === 0) {
+    return [];
+  }
+
+  const titleText = buildNormalizedSearchText(criteria.title);
+  const bodyText = buildNormalizedSearchText(criteria.body);
+  const actionText = buildNormalizedSearchText(criteria.tapActionLabel);
+  const appSearchTexts = criteria.appId
+    ? buildNormalizedSearchTexts(appMatchTexts.length > 0 ? appMatchTexts : [criteria.appId])
+    : [];
+
+  const requiredKeys: SystemTrayMatchKey[] = [];
+  if (titleText) {
+    requiredKeys.push("title");
+  }
+  if (bodyText) {
+    requiredKeys.push("body");
+  }
+  if (actionText) {
+    requiredKeys.push("action");
+  }
+  if (criteria.appId) {
+    requiredKeys.push("app");
+  }
+
+  if (requiredKeys.length === 0) {
+    return [];
+  }
+
+  const candidates: SystemTrayNotificationCandidate[] = [];
+  const elementUtils = new ElementUtils();
+
+  const resolveNodeMatches = (node: any): SystemTrayMatchResult["matches"] => {
+    const nodeTextCandidates = extractNodeTextCandidates(node);
+    if (nodeTextCandidates.length === 0) {
+      return {};
+    }
+
+    const nodeTextCandidatesLower = nodeTextCandidates.map(text => text.toLowerCase());
+    const matches: SystemTrayMatchResult["matches"] = {};
+
+    if (titleText) {
+      const match = resolveMatchForSearchText(nodeTextCandidatesLower, titleText);
+      if (match) {
+        matches.title = match;
+      }
+    }
+
+    if (bodyText) {
+      const match = resolveMatchForSearchText(nodeTextCandidatesLower, bodyText);
+      if (match) {
+        matches.body = match;
+      }
+    }
+
+    if (actionText) {
+      const match = resolveMatchForSearchText(nodeTextCandidatesLower, actionText);
+      if (match) {
+        matches.action = match;
+      }
+    }
+
+    if (appSearchTexts.length > 0) {
+      const match = resolveMatchForSearchTexts(nodeTextCandidatesLower, appSearchTexts);
+      if (match) {
+        matches.app = match;
+      }
+    }
+
+    return matches;
+  };
+
+  const visit = (
+    node: any,
+    depth: number
+  ): { matches: SystemTrayMatchResult["matches"]; hasAll: boolean } => {
+    if (!node) {
+      return { matches: {}, hasAll: false };
+    }
+
+    let combinedMatches = resolveNodeMatches(node);
+    let childHasAll = false;
+
+    const children = node.node;
+    if (Array.isArray(children)) {
+      for (const child of children) {
+        const childResult = visit(child, depth + 1);
+        combinedMatches = mergeMatchMaps(combinedMatches, childResult.matches);
+        if (childResult.hasAll) {
+          childHasAll = true;
+        }
+      }
+    } else if (children && typeof children === "object") {
+      const childResult = visit(children, depth + 1);
+      combinedMatches = mergeMatchMaps(combinedMatches, childResult.matches);
+      if (childResult.hasAll) {
+        childHasAll = true;
+      }
+    }
+
+    const hasAll = requiredKeys.every(key => Boolean(combinedMatches[key]));
+    if (hasAll && !childHasAll) {
+      const element = elementUtils.parseNodeBounds(node) ?? undefined;
+      candidates.push({ node, depth, element });
+    }
+
+    return { matches: combinedMatches, hasAll };
+  };
+
   for (const rootNode of rootNodes) {
     visit(rootNode, 0);
   }
@@ -942,22 +1161,40 @@ const findNotificationMatches = (
   const elementUtils = new ElementUtils();
   const candidates = collectNotificationCandidates(viewHierarchy);
   const criteriaCount = getNotificationCriteriaCount(criteria);
-  const fallbackCandidates = criteriaCount <= 1
-    ? getHierarchyRoots(viewHierarchy).map(node => ({
-      node,
-      depth: 0,
-      element: elementUtils.parseNodeBounds(node) ?? undefined
-    }))
-    : [];
-  const searchCandidates = candidates.length > 0 ? candidates : fallbackCandidates;
+  const matchCandidates = (candidateList: SystemTrayNotificationCandidate[]): SystemTrayNotificationMatch[] => {
+    return candidateList
+      .map(candidate => {
+        const subHierarchy = createSubHierarchy(candidate.node);
+        const match = buildNotificationMatch(subHierarchy, criteria, appMatchTexts);
+        return { candidate, match, subHierarchy };
+      })
+      .filter(entry => entry.match.matched);
+  };
 
-  return searchCandidates
-    .map(candidate => {
-      const subHierarchy = createSubHierarchy(candidate.node);
-      const match = buildNotificationMatch(subHierarchy, criteria, appMatchTexts);
-      return { candidate, match, subHierarchy };
-    })
-    .filter(entry => entry.match.matched);
+  let matches = matchCandidates(candidates);
+  if (matches.length > 0) {
+    return matches;
+  }
+
+  let fallbackCandidates: SystemTrayNotificationCandidate[] = [];
+  if (criteriaCount <= 1) {
+    if (candidates.length === 0) {
+      fallbackCandidates = getHierarchyRoots(viewHierarchy).map(node => ({
+        node,
+        depth: 0,
+        element: elementUtils.parseNodeBounds(node) ?? undefined
+      }));
+    }
+  } else {
+    fallbackCandidates = collectCompositeNotificationCandidates(viewHierarchy, criteria, appMatchTexts);
+  }
+
+  if (fallbackCandidates.length === 0) {
+    return matches;
+  }
+
+  matches = matchCandidates(fallbackCandidates);
+  return matches;
 };
 
 const findBestNotificationMatch = (
