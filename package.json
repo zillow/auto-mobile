@@ -21,6 +21,7 @@
     "benchmark-context": "bun scripts/benchmark-context-thresholds.ts",
     "benchmark-tools": "bun scripts/benchmark-mcp-tools.ts",
     "benchmark-startup": "bash scripts/benchmark-startup.sh",
+    "benchmark-npm-unpacked-size": "bun scripts/benchmark-npm-unpacked-size.ts",
     "profile:memory": "node --expose-gc --inspect --import tsx scripts/detect-memory-leaks.ts --mode=profile",
     "profile:heap": "node --expose-gc --heap-prof --import tsx scripts/stress-test.ts",
     "validate:yaml": "bun scripts/validate-yaml.ts",
