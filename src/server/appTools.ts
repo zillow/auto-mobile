@@ -4,10 +4,41 @@ import { ActionableError, BootedDevice } from "../models";
 import { LaunchApp } from "../features/action/LaunchApp";
 import { TerminateApp } from "../features/action/TerminateApp";
 import { InstallApp } from "../features/action/InstallApp";
-import { createJSONToolResponse } from "../utils/toolUtils";
+import { createJSONToolResponse, DefaultToolResponseFormatter, ToolResponseFormatter } from "../utils/toolUtils";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
-import { invalidateInstalledAppsCache, notifyInstalledAppResourceUpdated } from "./appResources";
+import {
+  APPS_RESOURCE_URIS,
+  APP_RESOURCE_TEMPLATES,
+  invalidateInstalledAppsCache,
+  notifyInstalledAppResourceUpdated
+} from "./appResources";
 import { logger } from "../utils/logger";
+
+export interface ListAppsToolDependencies {
+  toolResponseFormatter: ToolResponseFormatter;
+}
+
+let listAppsToolDependencies: ListAppsToolDependencies | null = null;
+
+function getListAppsToolDependencies(): ListAppsToolDependencies {
+  if (!listAppsToolDependencies) {
+    listAppsToolDependencies = {
+      toolResponseFormatter: new DefaultToolResponseFormatter()
+    };
+  }
+  return listAppsToolDependencies;
+}
+
+export function setListAppsToolDependencies(deps: Partial<ListAppsToolDependencies>): void {
+  const currentDeps = getListAppsToolDependencies();
+  listAppsToolDependencies = {
+    toolResponseFormatter: deps.toolResponseFormatter ?? currentDeps.toolResponseFormatter
+  };
+}
+
+export function resetListAppsToolDependencies(): void {
+  listAppsToolDependencies = null;
+}
 
 // Schema definitions
 export const packageNameSchema = addDeviceTargetingToSchema(z.object({
@@ -23,6 +54,8 @@ export const launchAppSchema = addDeviceTargetingToSchema(z.object({
 export const installAppSchema = addDeviceTargetingToSchema(z.object({
   apkPath: z.string().describe("APK file path"),
 }));
+
+export const listAppsSchema = z.object({}).passthrough();
 
 // Export interfaces for type safety
 export interface AppActionArgs {
@@ -42,6 +75,18 @@ export interface InstallAppArgs {
 // Register tools
 export function registerAppTools(
 ) {
+  const listAppsHandler = async () => {
+    const { toolResponseFormatter } = getListAppsToolDependencies();
+    return toolResponseFormatter.createJSONToolResponse({
+      message: "To list apps, query the MCP resource 'automobile:apps' with appropriate filters. " +
+        "For device-specific apps, use 'automobile:devices/{deviceId}/apps'.",
+      resources: [
+        APPS_RESOURCE_URIS.BASE,
+        APP_RESOURCE_TEMPLATES.DEVICE_APPS
+      ]
+    });
+  };
+
   // Launch app handler
   const launchAppHandler = async (device: BootedDevice, args: LaunchAppActionArgs) => {
     try {
@@ -142,5 +187,12 @@ export function registerAppTools(
     "Install APK file",
     installAppSchema,
     installAppHandler
+  );
+
+  ToolRegistry.register(
+    "listApps",
+    "Guide for listing apps via MCP resources",
+    listAppsSchema,
+    listAppsHandler
   );
 }

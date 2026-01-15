@@ -25,7 +25,7 @@ describe("MCP Tools Registry", () => {
     // Should include app management tools (MCP app lifecycle)
     expect(toolNames).toContain("launchApp");
     expect(toolNames).toContain("terminateApp");
-    expect(toolNames).not.toContain("listApps");
+    expect(toolNames).toContain("listApps");
 
   });
 
@@ -71,7 +71,7 @@ describe("MCP Tools Registry", () => {
       interaction: ["tapOn", "sendText", "pressButton", "swipeOn"],
 
       // App management tools (lifecycle management)
-      app: ["launchApp", "terminateApp", "installApp"],
+      app: ["launchApp", "terminateApp", "installApp", "listApps"],
 
       // Utility tools (device state and configuration)
       utility: ["changeOrientation", "setActiveDevice", "openUrl", "exitDialog", "demoMode"],
