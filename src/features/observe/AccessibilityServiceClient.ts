@@ -26,6 +26,7 @@ import { throwIfAborted } from "../../utils/toolUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
 import { PortManager } from "../../utils/PortManager";
+import { RequestManager } from "../../utils/RequestManager";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -710,15 +711,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   private static readonly HEALTH_CHECK_INTERVAL_MS = 30000; // Check every 30 seconds
   private lastHealthCheckTime: number = 0;
 
-  // Screenshot handling
-  private pendingScreenshotResolve: ((result: ScreenshotResult) => void) | null = null;
-  private pendingScreenshotRequestId: string | null = null;
+  // Screenshot, swipe, and tap_coordinates now use RequestManager
+  // (pending fields removed - RequestManager handles request/response tracking)
 
-  // Swipe handling
-  private pendingSwipeResolve: ((result: A11ySwipeResult) => void) | null = null;
-  private pendingSwipeRequestId: string | null = null;
-  private pendingTapCoordinatesResolve: ((result: A11yTapCoordinatesResult) => void) | null = null;
-  private pendingTapCoordinatesRequestId: string | null = null;
+  // Drag handling (not yet migrated to RequestManager)
   private pendingDragResolve: ((result: A11yDragResult) => void) | null = null;
   private pendingDragRequestId: string | null = null;
 
@@ -779,6 +775,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Timer for testing
   private timer: Timer;
 
+  // Request manager for unified request/response handling with timeouts
+  private requestManager: RequestManager;
+
   // Hierarchy navigation detector for view hierarchy-based navigation
   private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
   // Track apps that emit SDK navigation events so we can avoid overriding screen names
@@ -802,6 +801,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
     this.adb = adb;
     this.webSocketFactory = webSocketFactory || ((url: string) => new WebSocket(url));
     this.timer = timer || defaultTimer;
+    this.requestManager = new RequestManager(this.timer);
     this.installedAppsRepository = installedAppsRepository ?? null;
     // Allocate a unique local port for this device (supports multiple emulators)
     this.localPort = PortManager.allocate(device.deviceId);
@@ -1322,15 +1322,12 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle screenshot response
-      if (message.type === "screenshot" && this.pendingScreenshotResolve) {
+      if (message.type === "screenshot" && message.requestId) {
         logger.debug(`[ACCESSIBILITY_SERVICE] Received screenshot (requestId: ${message.requestId}, format: ${message.format})`);
-        const resolve = this.pendingScreenshotResolve;
-        this.pendingScreenshotResolve = null;
-        this.pendingScreenshotRequestId = null;
 
         // Extract data from the message - it may be nested under 'data' key or directly on message
         const base64Data = (message as any).data as string;
-        resolve({
+        this.requestManager.resolve<ScreenshotResult>(message.requestId, {
           success: true,
           data: base64Data,
           format: message.format || "jpeg",
@@ -1339,19 +1336,16 @@ export class AccessibilityServiceClient implements AccessibilityService {
       }
 
       // Handle screenshot error
-      if (message.type === "screenshot_error" && this.pendingScreenshotResolve) {
+      if (message.type === "screenshot_error" && message.requestId) {
         logger.warn(`[ACCESSIBILITY_SERVICE] Screenshot error (requestId: ${message.requestId}): ${message.error}`);
-        const resolve = this.pendingScreenshotResolve;
-        this.pendingScreenshotResolve = null;
-        this.pendingScreenshotRequestId = null;
-        resolve({
+        this.requestManager.resolve<ScreenshotResult>(message.requestId, {
           success: false,
           error: message.error || "Unknown error"
         });
       }
 
       // Handle swipe result
-      if (message.type === "swipe_result" && this.pendingSwipeResolve) {
+      if (message.type === "swipe_result") {
         const swipeMessage = message as any;
         const perfTiming = swipeMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.debug(`[ACCESSIBILITY_SERVICE] Swipe result (requestId: ${swipeMessage.requestId}, success: ${swipeMessage.success}, totalTimeMs: ${swipeMessage.totalTimeMs}, gestureTimeMs: ${swipeMessage.gestureTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
@@ -1359,33 +1353,31 @@ export class AccessibilityServiceClient implements AccessibilityService {
         // NOTE: Do not invalidate cache on swipe - swipe is not guaranteed to change the hierarchy
         // (e.g., scrolling at end of list produces no change)
 
-        const resolve = this.pendingSwipeResolve;
-        this.pendingSwipeResolve = null;
-        this.pendingSwipeRequestId = null;
-        resolve({
-          success: swipeMessage.success,
-          totalTimeMs: swipeMessage.totalTimeMs,
-          gestureTimeMs: swipeMessage.gestureTimeMs,
-          error: swipeMessage.error,
-          perfTiming
-        });
+        if (swipeMessage.requestId) {
+          this.requestManager.resolve<A11ySwipeResult>(swipeMessage.requestId, {
+            success: swipeMessage.success,
+            totalTimeMs: swipeMessage.totalTimeMs,
+            gestureTimeMs: swipeMessage.gestureTimeMs,
+            error: swipeMessage.error,
+            perfTiming
+          });
+        }
       }
 
       // Handle tap coordinates result
-      if (message.type === "tap_coordinates_result" && this.pendingTapCoordinatesResolve) {
+      if (message.type === "tap_coordinates_result") {
         const tapMessage = message as any;
         const perfTiming = tapMessage.perfTiming as AndroidPerfTiming[] | undefined;
         logger.info(`[ACCESSIBILITY_SERVICE] Tap coordinates result (requestId: ${tapMessage.requestId}, success: ${tapMessage.success}, totalTimeMs: ${tapMessage.totalTimeMs}, perfTiming: ${perfTiming ? "present" : "absent"})`);
 
-        const resolve = this.pendingTapCoordinatesResolve;
-        this.pendingTapCoordinatesResolve = null;
-        this.pendingTapCoordinatesRequestId = null;
-        resolve({
-          success: tapMessage.success,
-          totalTimeMs: tapMessage.totalTimeMs,
-          error: tapMessage.error,
-          perfTiming
-        });
+        if (tapMessage.requestId) {
+          this.requestManager.resolve<A11yTapCoordinatesResult>(tapMessage.requestId, {
+            success: tapMessage.success,
+            totalTimeMs: tapMessage.totalTimeMs,
+            error: tapMessage.error,
+            perfTiming
+          });
+        }
       }
 
       // Handle drag result
@@ -2436,6 +2428,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
       // Stop health check
       this.stopHealthCheck();
 
+      // Cancel all pending requests
+      this.requestManager.cancelAll(new Error("WebSocket connection closed"));
+
       if (this.ws) {
         logger.info("[ACCESSIBILITY_SERVICE] Closing WebSocket connection");
         this.ws.close();
@@ -2488,26 +2483,19 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      // Send screenshot request
-      const requestId = `screenshot_${Date.now()}_${generateSecureId()}`;
-      this.pendingScreenshotRequestId = requestId;
+      // Generate request ID and register with RequestManager
+      const requestId = this.requestManager.generateId("screenshot");
 
-      // Create promise that will be resolved when we receive the screenshot
-      const screenshotPromise = new Promise<ScreenshotResult>(resolve => {
-        this.pendingScreenshotResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingScreenshotResolve === resolve) {
-            this.pendingScreenshotResolve = null;
-            this.pendingScreenshotRequestId = null;
-            resolve({
-              success: false,
-              error: `Screenshot timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const screenshotPromise = this.requestManager.register<ScreenshotResult>(
+        requestId,
+        "screenshot",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          error: `Screenshot timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -2576,27 +2564,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      // Send swipe request
-      const requestId = `swipe_${Date.now()}_${generateSecureId()}`;
-      this.pendingSwipeRequestId = requestId;
+      // Generate request ID and register with RequestManager
+      const requestId = this.requestManager.generateId("swipe");
 
-      // Create promise that will be resolved when we receive the swipe result
-      const swipePromise = new Promise<A11ySwipeResult>(resolve => {
-        this.pendingSwipeResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingSwipeResolve === resolve) {
-            this.pendingSwipeResolve = null;
-            this.pendingSwipeRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Swipe timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const swipePromise = this.requestManager.register<A11ySwipeResult>(
+        requestId,
+        "swipe",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Swipe timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
@@ -2670,27 +2651,20 @@ export class AccessibilityServiceClient implements AccessibilityService {
         };
       }
 
-      // Send tap coordinates request
-      const requestId = `tap_coordinates_${Date.now()}_${generateSecureId()}`;
-      this.pendingTapCoordinatesRequestId = requestId;
+      // Generate request ID and register with RequestManager
+      const requestId = this.requestManager.generateId("tap_coordinates");
 
-      // Create promise that will be resolved when we receive the tap result
-      const tapPromise = new Promise<A11yTapCoordinatesResult>(resolve => {
-        this.pendingTapCoordinatesResolve = resolve;
-
-        // Set up timeout
-        this.timer.setTimeout(() => {
-          if (this.pendingTapCoordinatesResolve === resolve) {
-            this.pendingTapCoordinatesResolve = null;
-            this.pendingTapCoordinatesRequestId = null;
-            resolve({
-              success: false,
-              totalTimeMs: Date.now() - startTime,
-              error: `Tap coordinates timeout after ${timeoutMs}ms`
-            });
-          }
-        }, timeoutMs);
-      });
+      // Register request with automatic timeout handling
+      const tapPromise = this.requestManager.register<A11yTapCoordinatesResult>(
+        requestId,
+        "tap_coordinates",
+        timeoutMs,
+        (_id, _type, timeout) => ({
+          success: false,
+          totalTimeMs: Date.now() - startTime,
+          error: `Tap coordinates timeout after ${timeout}ms`
+        })
+      );
 
       // Send the request
       await perf.track("sendRequest", async () => {
