@@ -80,16 +80,26 @@ describe("listDevices tool", () => {
     expect(response.content?.[0]?.type).toBe("text");
     const payload = JSON.parse(response.content?.[0]?.text ?? "{}");
 
+    // Verify resources include all platform-specific URIs
     expect(payload.resources).toEqual([
       "automobile:devices/booted",
+      "automobile:devices/booted/android",
+      "automobile:devices/booted/ios",
       "automobile:devices/images",
-      "automobile:devices/booted/{platform}",
-      "automobile:devices/images/{platform}"
+      "automobile:devices/images/android",
+      "automobile:devices/images/ios"
     ]);
+
+    // Verify the message contains workflow guidance
+    expect(payload.message).toContain("RUNNING DEVICES");
+    expect(payload.message).toContain("AVAILABLE DEVICE IMAGES");
+    expect(payload.message).toContain("WORKFLOW");
     expect(payload.message).toContain("automobile:devices/booted");
     expect(payload.message).toContain("automobile:devices/images");
-    expect(payload.message).toContain("automobile:devices/booted/{platform}");
-    expect(payload.message).toContain("automobile:devices/images/{platform}");
+
+    // Verify note about URI prefix
+    expect(payload.note).toContain("automobile:");
+    expect(payload.note).toContain("android://devices");
 
     expect(fakeDeviceUtils.getExecutedOperations()).toHaveLength(0);
   });
@@ -106,18 +116,20 @@ describe("listDevices tool", () => {
     expect(response.content?.[0]?.type).toBe("text");
     const payload = JSON.parse(response.content?.[0]?.text ?? "{}");
 
+    // Same resources regardless of platform filter (guidance tool shows all options)
     expect(payload.resources).toEqual([
-      "automobile:devices/booted/android",
-      "automobile:devices/images/android",
       "automobile:devices/booted",
+      "automobile:devices/booted/android",
+      "automobile:devices/booted/ios",
       "automobile:devices/images",
-      "automobile:devices/booted/{platform}",
-      "automobile:devices/images/{platform}"
+      "automobile:devices/images/android",
+      "automobile:devices/images/ios"
     ]);
+
+    // Message should include platform filter indicator
+    expect(payload.message).toContain("android only");
     expect(payload.message).toContain("automobile:devices/booted/android");
     expect(payload.message).toContain("automobile:devices/images/android");
-    expect(payload.message).toContain("automobile:devices/booted/{platform}");
-    expect(payload.message).toContain("automobile:devices/images/{platform}");
 
     expect(fakeDeviceUtils.getExecutedOperations()).toHaveLength(0);
   });

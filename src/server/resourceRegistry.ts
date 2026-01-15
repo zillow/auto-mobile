@@ -165,6 +165,19 @@ class ResourceRegistryClass {
     server.server.setRequestHandler(ReadResourceRequestSchema, async request => {
       const { uri } = request.params;
 
+      // Check for common incorrect URI schemes and provide helpful error messages
+      const schemeMatch = uri.match(/^([a-z][a-z0-9+.-]*):\/?\/?/i);
+      if (schemeMatch) {
+        const scheme = schemeMatch[1].toLowerCase();
+        if (scheme !== "automobile") {
+          const suggestedUri = uri.replace(/^[a-z][a-z0-9+.-]*:\/?\/?/i, "automobile:");
+          throw new Error(
+            `Unknown URI scheme '${scheme}://'. AutoMobile resources use the 'automobile:' prefix. ` +
+            `Try: ${suggestedUri}`
+          );
+        }
+      }
+
       // First, try to find an exact match resource
       const resource = this.getResource(uri);
       if (resource) {
@@ -183,7 +196,17 @@ class ResourceRegistryClass {
         };
       }
 
-      throw new Error(`Resource not found: ${uri}`);
+      // Provide helpful error message with available resource patterns
+      throw new Error(
+        `Resource not found: ${uri}\n\n` +
+        `Available resource patterns:\n` +
+        `  - automobile:devices/booted - List all booted devices\n` +
+        `  - automobile:devices/booted/{platform} - List devices by platform (android|ios)\n` +
+        `  - automobile:devices/{deviceId}/apps - List apps for a device\n` +
+        `  - automobile:apps?deviceId={deviceId} - Query apps with filters\n` +
+        `  - automobile:observation/latest - Latest screen observation\n\n` +
+        `Use the listApps tool for detailed guidance on listing apps.`
+      );
     });
 
     // Set handler for listing resource templates

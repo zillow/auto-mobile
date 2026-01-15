@@ -99,31 +99,31 @@ export function registerDeviceTools() {
   };
 
   const listDevicesHandler = async (args: ListDevicesArgs) => {
-    if (args.platform) {
-      const bootedResource = `${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}/${args.platform}`;
-      const imagesResource = `${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}/${args.platform}`;
-
-      return createJSONToolResponse({
-        message: `To list ${args.platform} devices, query the MCP resources '${bootedResource}' for running devices or '${imagesResource}' for available device images. For all devices, use '${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}' or '${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}'. Templates are also available: '${BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE}' and '${DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE}'.`,
-        resources: [
-          bootedResource,
-          imagesResource,
-          BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED,
-          DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES,
-          BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE,
-          DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE
-        ]
-      });
-    }
+    const platformFilter = args.platform ? ` (${args.platform} only)` : "";
 
     return createJSONToolResponse({
-      message: `To list devices, query the MCP resources '${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}' for running devices or '${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}' for available device images. For platform-specific queries, use '${BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE}' or '${DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE}'.`,
+      message: `To list devices${platformFilter}, use these MCP resources:\n\n` +
+        "RUNNING DEVICES (booted/active):\n" +
+        `  - automobile:devices/booted - All running devices\n` +
+        `  - automobile:devices/booted/android - Android devices only\n` +
+        `  - automobile:devices/booted/ios - iOS simulators only\n\n` +
+        "AVAILABLE DEVICE IMAGES (can be started):\n" +
+        `  - automobile:devices/images - All available images\n` +
+        `  - automobile:devices/images/android - Android AVDs\n` +
+        `  - automobile:devices/images/ios - iOS simulator runtimes\n\n` +
+        "WORKFLOW:\n" +
+        "  1. Read 'automobile:devices/booted' to see running devices and get deviceId\n" +
+        "  2. Use deviceId with other resources (e.g., automobile:devices/{deviceId}/apps)\n" +
+        "  3. To start a new device, read 'automobile:devices/images' then use startDevice tool",
       resources: [
         BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED,
+        `${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}/android`,
+        `${BOOTED_DEVICE_RESOURCE_URIS.ALL_BOOTED}/ios`,
         DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES,
-        BOOTED_DEVICE_RESOURCE_URIS.PLATFORM_TEMPLATE,
-        DEVICE_IMAGE_RESOURCE_URIS.PLATFORM_TEMPLATE
-      ]
+        `${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}/android`,
+        `${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}/ios`
+      ],
+      note: "All resource URIs use the 'automobile:' prefix. URIs like 'android://devices' are not supported."
     });
   };
 
