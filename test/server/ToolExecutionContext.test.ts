@@ -5,20 +5,16 @@ import { createToolExecutionContext } from "../../src/server/ToolExecutionContex
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
-import { createSuccessWebSocketFactory } from "../fakes/FakeWebSocket";
-import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("ToolExecutionContext", () => {
   let sessionManager: SessionManager;
   let devicePool: DevicePool;
   let fakeAppsRepo: FakeInstalledAppsRepository;
-  let fakeTimer: FakeTimer;
   let originalGetInstance: typeof AndroidAccessibilityServiceManager.getInstance;
   let originalClientGetInstance: typeof AccessibilityServiceClient.getInstance;
   const sessionOptions = { keepScreenAwake: false };
 
   beforeEach(async () => {
-    fakeTimer = new FakeTimer();
     sessionManager = new SessionManager();
     fakeAppsRepo = new FakeInstalledAppsRepository();
     devicePool = new DevicePool(sessionManager, "test-daemon-session-id", undefined, fakeAppsRepo);
