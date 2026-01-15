@@ -5,7 +5,7 @@
  * Replaces the previous tsc-based build process
  */
 
-import { cpSync, existsSync, mkdirSync, rmSync } from "fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { spawnSync } from "child_process";
 
@@ -24,7 +24,7 @@ const result = await Bun.build({
   target: "bun",
   format: "esm",
   sourcemap: "external",
-  minify: false,
+  minify: true,
   splitting: false,
 });
 
@@ -37,6 +37,38 @@ if (!result.success) {
 }
 
 console.log(`✓ Built ${result.outputs.length} files`);
+
+const sourcemapPath = join(import.meta.dir, "dist", "src", "index.js.map");
+if (existsSync(sourcemapPath)) {
+  try {
+    const includeDependencySources = process.env.AUTOMOBILE_SOURCEMAP_INCLUDE_DEPS === "true";
+    const rawMap = readFileSync(sourcemapPath, "utf8");
+    const map = JSON.parse(rawMap);
+    let trimmedCount = 0;
+
+    if (!includeDependencySources && Array.isArray(map.sources) && Array.isArray(map.sourcesContent)) {
+      map.sourcesContent = map.sourcesContent.map((content: string | null, index: number) => {
+        const source = String(map.sources[index] ?? "");
+        if (source.includes("node_modules") || source.includes("__bun")) {
+          if (content) {
+            trimmedCount += 1;
+          }
+          return null;
+        }
+        return content;
+      });
+    }
+
+    writeFileSync(sourcemapPath, JSON.stringify(map));
+    if (includeDependencySources) {
+      console.log("✓ Minified sourcemap");
+    } else {
+      console.log(`✓ Minified sourcemap (trimmed ${trimmedCount} dependency sources)`);
+    }
+  } catch (error) {
+    console.warn("Failed to optimize sourcemap:", error);
+  }
+}
 
 // Copy migrations for runtime usage (FileMigrationProvider reads from disk)
 const migrationsSource = join(import.meta.dir, "src", "db", "migrations");
