@@ -48,6 +48,7 @@ jobs:
             const docPatterns = [
               /\.md$/,                    // **/*.md
               /^docs\//,                  // docs/**
+              /^docs\/.*\.(gif|png|webp)$/i, // docs/**/*.{gif,png,webp}
               /^mkdocs\.yml$/,            // mkdocs.yml
               /^\.lychee\.toml$/          // .lychee.toml
             ];

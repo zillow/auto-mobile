@@ -2,6 +2,8 @@
 
 Use AI agents to interactively explore your app and discover UI flows.
 
+![Exploring Google Maps](../img/google-maps.gif)
+
 ## Example Prompts
 
 | Goal | Prompt |

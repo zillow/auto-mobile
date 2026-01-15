@@ -39,6 +39,7 @@ jobs:
         id: create_pr
         uses: peter-evans/create-pull-request@v6
         with:
+          token: ${{ secrets.AUTO_MOBILE_PR_TOKEN }}
           base: main
           branch: "chore/bump-versions-${{ inputs.version }}"
           delete-branch: true
