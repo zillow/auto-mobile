@@ -103,6 +103,27 @@ bun run benchmark-startup --threshold 1.3
 - Device discovery scenarios run only when `adb` is available and at least one device is connected.
 - The benchmark will run `adb kill-server` when measuring cold ADB startup impact.
 
+## NPM Unpacked Size Benchmark
+
+Measure and enforce the NPM unpacked size threshold for the root package:
+
+```bash
+bun run benchmark-npm-unpacked-size --output reports/npm-unpacked-size.json
+```
+
+**Options:**
+```bash
+# Use custom threshold configuration
+bun run benchmark-npm-unpacked-size --config path/to/thresholds.json
+
+# Output JSON report to file
+bun run benchmark-npm-unpacked-size --output reports/npm-unpacked-size.json
+```
+
+**Notes:**
+- Runs `prepublishOnly` before packing to match the published package contents.
+- Requires a prior `bun run build` so `dist/` is present.
+
 ## Other Scripts
 
 ### Build Scripts
@@ -132,6 +153,7 @@ The following scripts are invoked by GitHub Actions workflows:
 
 - `benchmark-context-thresholds.ts` - Runs in `.github/workflows/context-thresholds.yml`
 - `benchmark-startup.sh` - Runs in `.github/workflows/pull_request.yml`
+- `benchmark-npm-unpacked-size.ts` - Runs in `.github/workflows/pull_request.yml`
 - `validate_*.sh` - Various validation workflows in `.github/workflows/pull_request.yml`
 
 See workflow files for integration details.

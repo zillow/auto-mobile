@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "thresholds": {
+    "unpackedBytes": 31457280
+  },
+  "metadata": {
+    "generatedAt": "2025-01-01",
+    "description": "NPM unpacked size cap for the root package"
+  }
+}

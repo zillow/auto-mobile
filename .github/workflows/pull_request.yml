@@ -979,13 +979,58 @@ jobs:
           echo "::notice::MCP startup benchmark passed - no regressions"
 
   # =============================================================================
+  # NPM Unpacked Size Benchmark
+  # =============================================================================
+
+  benchmark-npm-unpacked-size:
+    name: "Benchmark NPM Unpacked Size"
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Run NPM Unpacked Size Benchmark"
+        id: benchmark
+        run: |
+          # Create reports directory
+          mkdir -p reports
+
+          # Run benchmark and capture exit code
+          bun run benchmark-npm-unpacked-size --output reports/npm-unpacked-size.json || echo "FAILED=true" >> $GITHUB_ENV
+
+          # Always preserve the report file even if benchmark failed
+          exit 0
+
+      - name: "Upload Benchmark Report"
+        uses: actions/upload-artifact@v4.4.0
+        if: always()
+        with:
+          name: npm-unpacked-size-report
+          path: reports/npm-unpacked-size.json
+          retention-days: 90
+
+      - name: "Check Benchmark Result"
+        if: always()
+        run: |
+          if [ "$FAILED" = "true" ]; then
+            echo "::error::NPM unpacked size benchmark failed - threshold exceeded"
+            cat reports/npm-unpacked-size.json
+            exit 1
+          fi
+          echo "::notice::NPM unpacked size benchmark passed - within threshold"
+
+  # =============================================================================
   # Consolidated MCP Benchmark Comment
   # =============================================================================
 
   post-benchmark-results:
     name: "Post Consolidated Benchmark Results"
     runs-on: ubuntu-latest
-    needs: [benchmark-context-thresholds, benchmark-tool-throughput, benchmark-startup]
+    needs: [benchmark-context-thresholds, benchmark-tool-throughput, benchmark-startup, benchmark-npm-unpacked-size]
     if: always()
     steps:
       - name: "Download Context Benchmark Report"
@@ -1009,6 +1054,13 @@ jobs:
           path: reports
         continue-on-error: true
 
+      - name: "Download NPM Unpacked Size Benchmark Report"
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-unpacked-size-report
+          path: reports
+        continue-on-error: true
+
       - name: "Post Consolidated Comment"
         uses: actions/github-script@v7
         with:
@@ -1018,6 +1070,7 @@ jobs:
             const contextPath = 'reports/context-benchmark.json';
             const toolPath = 'reports/tool-benchmark.json';
             const startupPath = 'reports/startup-benchmark.json';
+            const npmPath = 'reports/npm-unpacked-size.json';
 
             const readReport = (reportPath, label) => {
               if (!fs.existsSync(reportPath)) {
@@ -1035,8 +1088,9 @@ jobs:
             const contextReport = readReport(contextPath, 'Context Thresholds');
             const toolReport = readReport(toolPath, 'Tool Call Throughput');
             const startupReport = readReport(startupPath, 'Startup Performance');
+            const npmReport = readReport(npmPath, 'NPM Unpacked Size');
 
-            if (!contextReport.report && !toolReport.report && !startupReport.report) {
+            if (!contextReport.report && !toolReport.report && !startupReport.report && !npmReport.report) {
               console.log('No benchmark reports found. Skipping PR comment.');
               return;
             }
@@ -1064,6 +1118,7 @@ jobs:
             trackStatus('Context Thresholds', contextReport.report);
             trackStatus('Tool Call Throughput', toolReport.report);
             trackStatus('Startup', startupReport.report);
+            trackStatus('NPM Unpacked Size', npmReport.report);
 
             let overallStatus = '⚠️ PARTIAL';
             if (!hasFailures && !hasMissing) {
@@ -1268,6 +1323,41 @@ jobs:
               body += `**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}\n`;
               if (report.timestamp) {
                 body += `\n_Generated at ${report.timestamp}_`;
+              }
+              body += '\n\n';
+            }
+
+            if (npmReport.report) {
+              const report = npmReport.report;
+              const formatBytes = value => (typeof value === 'number' ? `${(value / (1024 * 1024)).toFixed(1)}MB` : 'n/a');
+              const result = report.results?.unpackedSize;
+              const actual = result && typeof result.actual === 'number' ? formatBytes(result.actual) : 'n/a';
+              const threshold = result && typeof result.threshold === 'number' ? formatBytes(result.threshold) : 'n/a';
+              const usage = result && typeof result.usage === 'number' ? `${result.usage}%` : 'n/a';
+              const status = result ? (result.passed ? '✅' : '❌') : '⚠️';
+              const packageName = report.package?.name ?? 'unknown';
+              const packageVersion = report.package?.version ?? 'unknown';
+              const tarballSize = typeof report.package?.tarballBytes === 'number'
+                ? formatBytes(report.package.tarballBytes)
+                : 'n/a';
+
+              body += '### NPM Unpacked Size\n\n';
+              body += '| Metric | Actual | Threshold | Usage | Status |\n';
+              body += '|--------|--------|-----------|-------|--------|\n';
+              body += `| Unpacked Size | ${actual} | ${threshold} | ${usage} | ${status} |\n`;
+              body += `\n**Package:** ${packageName}@${packageVersion}\n`;
+              body += `**Tarball Size:** ${tarballSize}\n`;
+
+              if (Array.isArray(report.violations) && report.violations.length > 0) {
+                body += '\n#### ⚠️ Size Violations\n\n';
+                for (const violation of report.violations) {
+                  body += `- ${violation}\n`;
+                }
+              }
+
+              body += `\n**Overall Status:** ${report.passed ? '✅ PASSED' : '❌ FAILED'}`;
+              if (report.timestamp) {
+                body += `\n\n_Generated at ${report.timestamp}_`;
               }
               body += '\n\n';
             }
