@@ -1,4 +1,4 @@
-# Multi-device and critical sections
+# Multi-device
 
 ## Status
 

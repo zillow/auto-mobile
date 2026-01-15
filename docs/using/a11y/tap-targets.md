@@ -1,4 +1,4 @@
-# Tap Target Size Accessibility
+# Tap Targets
 
 Ensure interactive elements meet minimum size requirements for accessibility.
 

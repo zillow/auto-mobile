@@ -1,4 +1,4 @@
-# iOS Platform Integration
+# Overview
 
 AutoMobile iOS automation uses a hybrid architecture: a native iOS automation server for
 observations and an [AXe](https://github.com/cameroncooke/AXe)-backed control layer for

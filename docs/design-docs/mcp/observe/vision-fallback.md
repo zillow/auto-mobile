@@ -1,4 +1,4 @@
-# Vision Fallback for Element Detection
+# Vision Fallback
 
 Vision fallback uses Claude's vision API to help locate UI elements when traditional element finding methods fail.
 

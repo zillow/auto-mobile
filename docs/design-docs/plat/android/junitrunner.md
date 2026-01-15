@@ -1,4 +1,4 @@
-# Test Execution - JUnitRunner
+# JUnitRunner
 
 ## Installation
 

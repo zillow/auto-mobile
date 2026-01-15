@@ -1,4 +1,4 @@
-# Storage & Persistence
+# Overview
 
 AutoMobile persists state across sessions using SQLite for metadata and the filesystem for larger payloads.
 

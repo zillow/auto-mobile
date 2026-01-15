@@ -1,4 +1,4 @@
-# Biometrics stubbing (Android)
+# Biometrics stubbing
 
 ## Goal
 

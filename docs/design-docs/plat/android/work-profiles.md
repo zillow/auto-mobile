@@ -1,4 +1,4 @@
-# Android Work Profile Testing
+# Work Profiles
 
 This guide explains how to set up and test Android work profiles with AutoMobile.
 

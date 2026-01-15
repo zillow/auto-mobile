@@ -1,4 +1,4 @@
-# Contrast Ratio Accessibility
+# Contrast
 
 Ensure your app meets WCAG contrast ratio requirements for text and UI elements.
 

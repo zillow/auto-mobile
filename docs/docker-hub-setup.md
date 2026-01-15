@@ -1,4 +1,4 @@
-# Docker Hub Publishing Setup
+# Docker Hub Publishing
 
 This guide explains how to set up automated Docker image publishing to Docker Hub from GitHub Actions.
 

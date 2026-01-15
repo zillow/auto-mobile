@@ -1,4 +1,4 @@
-# Features - MCP Server - Visual Highlighting
+# Visual Highlighting
 
 Expose visual highlight overlays (box or circle) as an MCP tool for debugging UI layout and state.
 

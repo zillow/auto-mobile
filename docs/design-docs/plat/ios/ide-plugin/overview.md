@@ -1,4 +1,4 @@
-# Xcode Integration
+# Overview
 
 Xcode does not support the rich plugin APIs available in Android Studio. The closest
 parity is a companion macOS app plus an Xcode Source Editor Extension (XcodeKit).

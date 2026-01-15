@@ -1,4 +1,4 @@
-# YAML Test Plan Validation
+# Test Plan Validation
 
 AutoMobile includes comprehensive YAML validation for test plans to catch syntax errors and schema violations early in the development process.
 

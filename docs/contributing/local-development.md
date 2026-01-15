@@ -1,4 +1,4 @@
-# Running from Source
+# Local Development
 
 Whether you want to contribute to AutoMobile or just want to run the MCP directly from source, this guide will set you
 up for the development environment maintainers use.

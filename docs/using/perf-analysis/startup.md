@@ -1,7 +1,8 @@
-# App Startup Performance
+# Startup
 
 Measure and optimize how quickly your app launches and becomes interactive.
 
+![App startup via deep link demo](../../img/deeplink-startup.gif)
 
 App startup performance affects user experience and app store ratings. AutoMobile helps measure startup through UI observation and idle detection.
 

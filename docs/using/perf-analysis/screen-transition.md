@@ -1,4 +1,4 @@
-# Screen Transition Performance
+# Screen Transition
 
 Screen transitions should be smooth and responsive. Janky transitions hurt user experience and make your app feel slow.
 

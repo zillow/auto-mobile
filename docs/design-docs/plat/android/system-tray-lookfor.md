@@ -1,4 +1,4 @@
-# System tray lookFor (notifications)
+# System tray lookFor
 
 ## Goal
 

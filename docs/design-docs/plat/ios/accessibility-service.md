@@ -1,4 +1,4 @@
-# iOS Automation Server (Accessibility Bridge)
+# Accessibility Bridge
 
 The iOS automation server is a native iOS app that exposes the accessibility tree and element
 queries over a WebSocket connection. It is the iOS counterpart to the Android accessibility

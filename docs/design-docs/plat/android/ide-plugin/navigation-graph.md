@@ -1,4 +1,4 @@
-# Intellij IDE Plugin - Navigation Graph Render
+# Navigation Graph Render
 
 ## Goal
 
