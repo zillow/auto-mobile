@@ -80,12 +80,23 @@ describe("listApps tool", () => {
     expect(fakeToolUtils.getJSONResponseCount()).toBe(1);
     const payload = fakeToolUtils.getLastJSONResponse();
     expect(payload).toEqual({
-      message: "To list apps, query the MCP resource 'automobile:apps' with appropriate filters. " +
-        "For device-specific apps, use 'automobile:devices/{deviceId}/apps'.",
+      message: "To list installed apps, follow this workflow:\n\n" +
+        "1. Get available devices:\n" +
+        "   Read resource: automobile:devices/booted\n\n" +
+        "2. List apps for a specific device (using deviceId from step 1):\n" +
+        "   Read resource: automobile:devices/{deviceId}/apps\n" +
+        "   Or query format: automobile:apps?deviceId={deviceId}\n\n" +
+        "Optional query filters:\n" +
+        "  - type=user|system (default: user)\n" +
+        "  - search=<term> (filter by package name)\n" +
+        "  - profile=<userId> (filter by user profile)\n\n" +
+        "Example: automobile:apps?deviceId=emulator-5554&type=system&search=google",
       resources: [
-        APPS_RESOURCE_URIS.BASE,
-        APP_RESOURCE_TEMPLATES.DEVICE_APPS
-      ]
+        "automobile:devices/booted",
+        APP_RESOURCE_TEMPLATES.DEVICE_APPS,
+        APPS_RESOURCE_URIS.BASE + "?deviceId={deviceId}"
+      ],
+      note: "All resource URIs use the 'automobile:' prefix. URIs like 'android://apps' are not supported."
     });
 
     const content = result.content?.[0];
