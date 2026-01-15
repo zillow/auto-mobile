@@ -86,7 +86,7 @@ SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
 # Install Bun - all-in-one JavaScript runtime and package manager
 # Check for updates: https://github.com/oven-sh/bun/releases
-ENV BUN_VERSION=1.3.5
+ENV BUN_VERSION=1.3.6
 RUN curl -fsSL "https://bun.sh/install" | bash -s "bun-v${BUN_VERSION}" \
     && mv /root/.bun/bin/bun /usr/local/bin/bun \
     && chmod +x /usr/local/bin/bun
@@ -191,7 +191,7 @@ RUN apk --no-cache add \
 SHELL ["/bin/bash", "-exo", "pipefail", "-c"]
 
 # Install Bun in runtime stage
-ENV BUN_VERSION=1.3.5
+ENV BUN_VERSION=1.3.6
 RUN curl -fsSL "https://bun.sh/install" | bash -s "bun-v${BUN_VERSION}" \
     && mv /root/.bun/bin/bun /usr/local/bin/bun \
     && chmod +x /usr/local/bin/bun
