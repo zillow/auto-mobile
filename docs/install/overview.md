@@ -1,45 +1,22 @@
-# AI Agent Setup
+# Installation
 
-AutoMobile runs as an MCP (Model Context Protocol) server in STDIO mode. Configure your AI agent to connect to AutoMobile using the example below.
+AutoMobile runs as an MCP server, connecting AI agents to Android devices for automation.
 
-### Prerequisites
+## Interactive Installer (MacOS)
 
-- Bun 1.3.5 or later
-
-## Interactive Installer (macOS/Linux)
-
-Prefer a guided setup? Run the interactive installer (Bash + Gum) to check dependencies, install Gum/Bun if missing,
-optionally download Android command line tools, install the Accessibility Service APK, install the IDE plugin, and start
-the MCP daemon, all while showing an animated AutoMobile logo during setup.
-
-From a cloned repo:
-
-```bash
-./scripts/install/interactive.sh
-```
-
-Or run it directly:
-
-```bash
+``` bash title="One-line install (click to copy)"
 curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/install/interactive.sh | bash
 ```
 
-## Quick Setup
+## Manual Setup
 
-```json
-{
-  "mcpServers": {
-    "auto-mobile": {
-      "command": "npx",
-      "args": ["-y", "@kaeawc/auto-mobile@latest"]
-    }
-  }
-}
-```
+Prerequisites:
 
-## Advanced Configuration
+- **Bun 1.3.5+** (or Node.js for npx)
+- **Android SDK** with platform-tools (ADB)
+- **Connected device** (emulator or physical with USB debugging)
 
-If you need to point at a specific Android SDK path, set `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) in the MCP server env:
+Add to your MCP client configuration:
 
 ```json
 {
@@ -48,14 +25,16 @@ If you need to point at a specific Android SDK path, set `ANDROID_HOME` (or `AND
       "command": "npx",
       "args": ["-y", "@kaeawc/auto-mobile@latest"],
       "env": {
-        "ANDROID_HOME": "/path/to/android/sdk"
+          "ANDROID_HOME": "/path/to/android/sdk"
+        }
       }
     }
   }
 }
 ```
+The installer checks dependencies, optionally downloads Android tools, installs the Accessibility Service APK, and configures the MCP daemon.
 
-If you have a private npm registry for proxying public npm:
+## Private npm Registry
 
 ```json
 {
@@ -65,7 +44,7 @@ If you have a private npm registry for proxying public npm:
       "args": [
         "-y",
         "--registry",
-        "https://your.awesome.private.registry.net/path/to/npm/proxy",
+        "https://your.registry.net/npm",
         "@kaeawc/auto-mobile@latest"
       ]
     }
@@ -73,44 +52,9 @@ If you have a private npm registry for proxying public npm:
 }
 ```
 
-## Platform Setup
+## Specific Platform Setup
 
-- Android: [Android setup](plat/android.md)
-- iOS: unsupported at the moment, but the [design doc](../design-docs/plat/ios/index.md) outlines plans.
-
-## Android first run
-
-Use this short path once the MCP server is running, a device is connected, the Accessibility Service is enabled, and your
-app is installed on the device.
-
-1. **Verify device connectivity**
-   Claude Code prompt: "Use AutoMobile to list connected Android devices and confirm one is ready."
-2. **List installed apps**
-   Claude Code prompt: "List installed apps and show package names so I can pick the target package."
-3. **Launch the target app**
-   Claude Code prompt: "Launch package `com.example.app` and confirm it is in the foreground."
-4. **Run a short exploration**
-   Claude Code prompt: "Explore this app for about 10 interactions, avoid destructive actions, and stay in the main flow."
-5. **Capture a concrete result**
-   Claude Code prompt: "Summarize the screens discovered and the actions that navigate between them (a mini navigation graph)."
-
-You should end with a device ID, a package name, and a short navigation summary you can save or share.
-
-## Decision guide (Android)
-
-If your goal is interactive AI-driven automation, the MCP server plus an agent is enough. The rest are optional based on
-what you want to do:
-
-- **IntelliJ IDE Plugin** - Toggle feature flags, record tests, visualize the navigation graph, and inspect app
-  performance while coding.
-- **JUnitRunner** - Test framework dependency (not the SDK library) to run AutoMobile tests from JUnit/Gradle or CI with
-  device pooling, timing ordering, and optional AI self-healing (requires model provider keys).
-- **Android SDK library** - Add app-side instrumentation like recomposition tracking.
-
-For Android UI automation, you must enable the [Accessibility Service](../design-docs/plat/android/accessibility-service.md)
-on test devices so AutoMobile can access the view hierarchy.
-
-For a comparison table and scenarios, see the [Android decision guide](plat/android.md#decision-guide).
+[Android](plat/android.md) | [iOS](plat/ios.md)
 
 ### AI Agent & Model Providers
 

@@ -1,52 +1,29 @@
-# UX Exploration with AutoMobile
+# UX Exploration
 
-Use AutoMobile with AI agents to interactively explore and understand your app's user experience.
+Use AI agents to interactively explore your app and discover UI flows.
 
-## First run (Android)
+## What the Agent Can Do
 
-If this is your first time using AutoMobile, start with the [Android first run](../install/overview.md#android-first-run)
-quickstart. It verifies device connectivity, launches your app, runs a short exploration, and produces a concrete
-navigation summary.
-
-AutoMobile's exploration capabilities allow AI agents to:
-
-- Navigate through your app autonomously
+- Navigate autonomously through screens
 - Discover UI flows and interaction patterns
+- Build a [navigation graph](../design-docs/mcp/navigation-graph.md) of screen transitions
 - Identify potential UX issues
-- Build a navigation graph of your app's screens
+- Analyze information hierarchy
+- Compare UX for consistency across screens or components observed
 
-## Basic Exploration
+## Example Prompts
 
-Ask your AI agent to explore your app:
-
-```
-Explore the main features of this app and identify the key user flows
-```
-
-The agent will:
-1. Launch your app
-2. Navigate through different screens
-3. Interact with UI elements
-4. Report findings and observations
-
-## Navigation Graph
-
-AutoMobile builds a navigation graph as it explores, tracking:
-
-- Screen transitions
-- User actions that trigger navigation
-- UI elements that lead to each screen
-
-See [Navigation Graph](../design-docs/mcp/navigation-graph.md) for technical details.
+| Goal | Prompt |
+|------|--------|
+| General exploration | "Explore the main features and identify key user flows" |
+| Specific screen | "Find all the ways to reach the settings screen" |
+| Flow analysis | "Explore the onboarding flow and report any confusing steps" |
+| Element discovery | "Identify all screens that contain text input fields" |
 
 ## Best Practices
 
-- **Start with clear objectives**: Tell the agent what you're looking for
-- **Set boundaries**: Specify areas to avoid (e.g., "don't submit forms")
-- **Review findings**: The agent will report UX insights and potential issues
-
-## Example Scenarios
-
-- "Find all the ways to reach the settings screen"
-- "Explore the onboarding flow and report any confusing steps"
-- "Identify all screens that contain text input fields"
+| Practice | Why |
+|----------|-----|
+| Set clear objectives | Helps agent focus on what matters |
+| Define boundaries | "Don't submit forms" prevents unwanted actions |
+| Request specific outputs | "Build a navigation summary" gives concrete results |
