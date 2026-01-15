@@ -55,7 +55,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.AUTO_MOBILE_PR_TOKEN }}
         run: |
-          BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+          BASE_BRANCH="${{ github.event.repository.default_branch }}"
           BRANCH="chore/update-changelog-${{ steps.tag.outputs.current_tag }}"
 
           GH_LOGIN=$(gh api user -q '.login')
