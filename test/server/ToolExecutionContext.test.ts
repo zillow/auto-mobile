@@ -3,25 +3,37 @@ import { SessionManager } from "../../src/daemon/sessionManager";
 import { DevicePool } from "../../src/daemon/devicePool";
 import { createToolExecutionContext } from "../../src/server/ToolExecutionContext";
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
+import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
+import { createSuccessWebSocketFactory } from "../fakes/FakeWebSocket";
+import { FakeTimer } from "../fakes/FakeTimer";
 
 describe("ToolExecutionContext", () => {
   let sessionManager: SessionManager;
   let devicePool: DevicePool;
   let fakeAppsRepo: FakeInstalledAppsRepository;
+  let fakeTimer: FakeTimer;
   let originalGetInstance: typeof AndroidAccessibilityServiceManager.getInstance;
+  let originalClientGetInstance: typeof AccessibilityServiceClient.getInstance;
   const sessionOptions = { keepScreenAwake: false };
 
   beforeEach(async () => {
+    fakeTimer = new FakeTimer();
     sessionManager = new SessionManager();
     fakeAppsRepo = new FakeInstalledAppsRepository();
     devicePool = new DevicePool(sessionManager, "test-daemon-session-id", undefined, fakeAppsRepo);
     await devicePool.initializeWithDevices(["device-1"]);
     originalGetInstance = AndroidAccessibilityServiceManager.getInstance;
+    originalClientGetInstance = AccessibilityServiceClient.getInstance;
+
+    // Reset AccessibilityServiceClient instances for clean test state
+    AccessibilityServiceClient.resetInstances();
   });
 
   afterEach(() => {
     AndroidAccessibilityServiceManager.getInstance = originalGetInstance;
+    AccessibilityServiceClient.getInstance = originalClientGetInstance;
+    AccessibilityServiceClient.resetInstances();
   });
 
   test("should run accessibility setup when creating a new session", async () => {
@@ -33,6 +45,12 @@ describe("ToolExecutionContext", () => {
           return { success: true, message: "ok" };
         }
       } as any);
+
+    // Mock AccessibilityServiceClient to use fake WebSocket (no real connection)
+    AccessibilityServiceClient.getInstance = ((deviceId: string) => ({
+      waitForConnection: async () => true,
+      close: async () => {}
+    })) as any;
 
     const context = await createToolExecutionContext("session-1", sessionManager, devicePool, sessionOptions);
 
