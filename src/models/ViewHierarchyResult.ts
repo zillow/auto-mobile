@@ -10,6 +10,8 @@ export interface ViewHierarchyResult {
   updatedAt?: number;
   /** Package name of the foreground app (from accessibility service) */
   packageName?: string;
+  /** Optional window metadata from the accessibility service */
+  windows?: ViewHierarchyWindowInfo[];
   /** Whether an intent chooser dialog was detected (from accessibility service) */
   intentChooserDetected?: boolean;
   /** Whether a notification permission dialog was detected (from accessibility service) */
@@ -21,6 +23,17 @@ export interface ViewHierarchyResult {
 export interface Hierarchy {
   error?: string;
   node?: ViewHierarchyNode;
+}
+
+export interface ViewHierarchyWindowInfo {
+  id?: number;
+  type?: number;
+  isActive?: boolean;
+  isFocused?: boolean;
+  bounds?: ElementBounds;
+  windowLayer?: number;
+  packageName?: string;
+  hierarchy?: ViewHierarchyNode;
 }
 
 // Define types for the view hierarchy structure

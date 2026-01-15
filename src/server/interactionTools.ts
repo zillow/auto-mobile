@@ -15,6 +15,7 @@ import { HomeScreen } from "../features/action/HomeScreen";
 import { Rotate } from "../features/action/Rotate";
 import { OpenURL } from "../features/action/OpenURL";
 import { Clipboard } from "../features/action/Clipboard";
+import { Keyboard } from "../features/action/Keyboard";
 import {
   ActionableError,
   BootedDevice,
@@ -170,6 +171,11 @@ export interface ImeActionArgs {
   platform: Platform;
 }
 
+export interface KeyboardArgs {
+  action: "open" | "close" | "detect";
+  platform: Platform;
+}
+
 export interface RecentAppsArgs {
   platform: Platform;
 }
@@ -189,6 +195,11 @@ export interface ClipboardArgs {
 export const shakeSchema = addDeviceTargetingToSchema(z.object({
   duration: z.number().optional().describe("Shake duration in ms (default: 1000)"),
   intensity: z.number().optional().describe("Shake acceleration intensity (default: 100)"),
+  platform: z.enum(["android", "ios"]).describe("Platform")
+}));
+
+export const keyboardSchema = addDeviceTargetingToSchema(z.object({
+  action: z.enum(["open", "close", "detect"]).describe("Keyboard action"),
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
@@ -1977,6 +1988,18 @@ export function registerInteractionTools() {
     }
   };
 
+  // Keyboard handler
+  const keyboardHandler = async (device: BootedDevice, args: KeyboardArgs) => {
+    try {
+      const keyboard = new Keyboard(device);
+      const result = await keyboard.execute(args.action);
+
+      return createJSONToolResponse(result);
+    } catch (error) {
+      throw new ActionableError(`Failed to execute keyboard ${args.action}: ${error}`);
+    }
+  };
+
   // Recent Apps handler
   const recentAppsHandler = async (device: BootedDevice, args: RecentAppsArgs, progress?: ProgressCallback) => {
     try {
@@ -2171,6 +2194,14 @@ export function registerInteractionTools() {
     imeActionSchema,
     imeActionHandler,
     true // Supports progress notifications
+  );
+
+  ToolRegistry.registerDeviceAware(
+    "keyboard",
+    "Open, close, or detect the on-screen keyboard",
+    keyboardSchema,
+    keyboardHandler,
+    false // Does not support progress notifications
   );
 
   ToolRegistry.registerDeviceAware(

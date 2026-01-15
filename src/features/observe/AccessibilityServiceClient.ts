@@ -9,6 +9,7 @@ import {
   BootedDevice,
   RecompositionNodeInfo,
   ViewHierarchyResult,
+  ViewHierarchyWindowInfo,
   CurrentFocusResult,
   TraversalOrderResult,
   Element,
@@ -76,6 +77,7 @@ export interface AccessibilityHierarchy {
   updatedAt: number;
   packageName: string;
   hierarchy: AccessibilityNode;
+  windows?: ViewHierarchyWindowInfo[];
   intentChooserDetected?: boolean;
   notificationPermissionDetected?: boolean;
   error?: string;
@@ -1905,6 +1907,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
             error: errorMessage
           },
           packageName: resolvedPackageName,
+          windows: accessibilityHierarchy.windows,
           intentChooserDetected: accessibilityHierarchy.intentChooserDetected,
           notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected
         } as ViewHierarchyResult;
@@ -1916,6 +1919,7 @@ export class AccessibilityServiceClient implements AccessibilityService {
       const result: ViewHierarchyResult = {
         hierarchy: convertedHierarchy,
         packageName: resolvedPackageName,
+        windows: accessibilityHierarchy.windows,
         intentChooserDetected: accessibilityHierarchy.intentChooserDetected,
         notificationPermissionDetected: accessibilityHierarchy.notificationPermissionDetected
       };

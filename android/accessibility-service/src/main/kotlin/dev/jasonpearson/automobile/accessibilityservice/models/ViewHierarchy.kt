@@ -13,6 +13,7 @@ data class ViewHierarchy(
     val packageName: String? = null,
     val hierarchy: UIElementInfo? = null,
     val windowInfo: WindowInfo? = null,
+    val windows: List<WindowInfo>? = null,
     val intentChooserDetected: Boolean? = null,
     val notificationPermissionDetected: Boolean? = null,
     @SerialName("accessibility-focused-element")

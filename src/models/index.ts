@@ -33,6 +33,7 @@ export * from "./ImeActionResult";
 export * from "./InstalledApp";
 export * from "./InstallAppResult";
 export * from "./IntentChooserResult";
+export * from "./KeyboardResult";
 export * from "./LaunchAppResult";
 export * from "./LongPressResult";
 export * from "./LocalizationSettingsResult";
