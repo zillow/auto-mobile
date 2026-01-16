@@ -32,6 +32,18 @@ Add to your MCP client configuration:
   }
 }
 ```
+
+For Codex, add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.auto-mobile]
+command = "npx"
+args = ["-y", "@kaeawc/auto-mobile@latest"]
+
+[mcp_servers.auto-mobile.env]
+ANDROID_HOME = "/path/to/android/sdk"
+```
+
 The installer checks dependencies, optionally downloads Android tools, installs the Accessibility Service APK, and configures the MCP daemon.
 
 ## Private npm Registry
@@ -62,6 +74,7 @@ Any MCP-compatible client can use AutoMobile. Configuration guides for specific 
 
 - [Claude Desktop](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector)
 - [Claude Code](https://code.claude.com/docs/en/mcp#option-3:-add-a-local-stdio-server)
+- [Codex](https://developers.openai.com/codex/mcp/)
 - [Cursor](https://cursor.com/docs/context/mcp#using-mcpjson)
 - [Firebender](https://docs.firebender.com/context/mcp/overview#stdio-server-configuration)
 - [Goose](https://block.github.io/goose/docs/getting-started/using-extensions#mcp-servers)
