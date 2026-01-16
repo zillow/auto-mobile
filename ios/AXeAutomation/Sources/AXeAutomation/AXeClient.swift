@@ -31,16 +31,18 @@ public class AXeClient {
     /// Taps on an element by its accessibility identifier
     public func tap(elementId: String) async throws {
         let element = try await wsClient.findElement(byId: elementId)
-        guard let bounds = element["bounds"] as? [String: CGFloat],
-              let x = bounds["x"],
-              let y = bounds["y"],
-              let width = bounds["width"],
-              let height = bounds["height"] else {
+
+        // JSON deserialization returns NSNumber/Double, not CGFloat
+        guard let bounds = element["bounds"] as? [String: Any],
+              let x = (bounds["x"] as? NSNumber)?.doubleValue,
+              let y = (bounds["y"] as? NSNumber)?.doubleValue,
+              let width = (bounds["width"] as? NSNumber)?.doubleValue,
+              let height = (bounds["height"] as? NSNumber)?.doubleValue else {
             throw AXeError.invalidBounds
         }
 
-        let centerX = x + (width / 2)
-        let centerY = y + (height / 2)
+        let centerX = CGFloat(x + (width / 2))
+        let centerY = CGFloat(y + (height / 2))
 
         try injectTouch(at: CGPoint(x: centerX, y: centerY))
     }

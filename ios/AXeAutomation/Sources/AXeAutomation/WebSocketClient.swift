@@ -9,11 +9,15 @@ public class WebSocketClient {
         case sendFailed
         case receiveFailed
         case invalidResponse
+        case messageTooLarge
     }
 
     private let host: String
     private let port: Int
     private var connection: NWConnection?
+
+    /// Maximum message size (16MB) to prevent memory exhaustion
+    private static let maxMessageSize: UInt32 = 16 * 1024 * 1024
 
     public init(host: String, port: Int) {
         self.host = host
@@ -52,36 +56,80 @@ public class WebSocketClient {
     }
 
     /// Sends a command and receives the response
+    /// Uses 4-byte length prefix framing to handle message fragmentation
     public func sendCommand(_ command: [String: Any]) async throws -> [String: Any] {
         guard let connection = connection else {
             throw ClientError.connectionFailed
         }
 
-        let data = try JSONSerialization.data(withJSONObject: command)
+        let jsonData = try JSONSerialization.data(withJSONObject: command)
 
-        return try await withCheckedThrowingContinuation { continuation in
-            connection.send(content: data, completion: .contentProcessed { error in
+        // Create length-prefixed message (4-byte big-endian length + payload)
+        var length = UInt32(jsonData.count).bigEndian
+        var framedData = Data(bytes: &length, count: 4)
+        framedData.append(jsonData)
+
+        // Send the framed message
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            connection.send(content: framedData, completion: .contentProcessed { error in
                 if let error = error {
                     continuation.resume(throwing: error)
-                    return
+                } else {
+                    continuation.resume()
                 }
+            })
+        }
 
-                connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
+        // Receive the response with length-prefix framing
+        let responseData = try await receiveFramedMessage(connection: connection)
+
+        guard let response = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] else {
+            throw ClientError.invalidResponse
+        }
+
+        return response
+    }
+
+    /// Receives a complete length-prefixed message, handling TCP fragmentation
+    private func receiveFramedMessage(connection: NWConnection) async throws -> Data {
+        // First, read the 4-byte length prefix
+        let lengthData = try await receiveExactly(connection: connection, count: 4)
+        let length = lengthData.withUnsafeBytes { $0.load(as: UInt32.self).bigEndian }
+
+        guard length <= Self.maxMessageSize else {
+            throw ClientError.messageTooLarge
+        }
+
+        // Then read the message payload
+        return try await receiveExactly(connection: connection, count: Int(length))
+    }
+
+    /// Receives exactly the specified number of bytes, accumulating fragments as needed
+    private func receiveExactly(connection: NWConnection, count: Int) async throws -> Data {
+        var accumulated = Data()
+        accumulated.reserveCapacity(count)
+
+        while accumulated.count < count {
+            let remaining = count - accumulated.count
+            let chunk = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+                connection.receive(minimumIncompleteLength: 1, maximumLength: remaining) { data, _, _, error in
                     if let error = error {
                         continuation.resume(throwing: error)
                         return
                     }
 
-                    guard let data = data,
-                          let response = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                        continuation.resume(throwing: ClientError.invalidResponse)
+                    guard let data = data, !data.isEmpty else {
+                        continuation.resume(throwing: ClientError.receiveFailed)
                         return
                     }
 
-                    continuation.resume(returning: response)
+                    continuation.resume(returning: data)
                 }
-            })
+            }
+            accumulated.append(chunk)
         }
+
+        return accumulated
     }
 
     /// Gets the view hierarchy from the iOS app
