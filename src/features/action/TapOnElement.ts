@@ -960,11 +960,12 @@ export class TapOnElement extends BaseVisualChange {
       try {
         logger.debug(`[TapOnElement] Attempting focus navigation to element with resourceId: ${resourceId}`);
 
-        // Build selector from element
+        // Build selector from element (include bounds for disambiguation in list views)
         const targetSelector = {
           resourceId,
           text: element.text as string | undefined,
-          contentDesc: element["content-desc"] as string | undefined
+          contentDesc: element["content-desc"] as string | undefined,
+          bounds: element.bounds
         };
 
         // Get traversal order and current focus

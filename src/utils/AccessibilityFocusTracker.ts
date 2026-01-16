@@ -35,6 +35,16 @@ interface TraversalOrderCache {
 }
 
 /**
+ * Bounds for element matching
+ */
+export interface SelectorBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
  * Options for selector matching
  */
 export interface ElementSelector {
@@ -49,6 +59,9 @@ export interface ElementSelector {
 
   /** Match by test tag */
   testTag?: string;
+
+  /** Match by bounds (for disambiguation when multiple elements match) */
+  bounds?: SelectorBounds;
 }
 
 /**
@@ -218,6 +231,18 @@ export class AccessibilityFocusTracker {
       return null;
     }
 
+    // If bounds are provided and there are multiple matches, prefer exact bounds match
+    if (target.bounds && matches.length > 1) {
+      const boundsMatch = matches.find(({ element }) => this.boundsMatch(element, target.bounds!));
+      if (boundsMatch) {
+        logger.debug(
+          `[ACCESSIBILITY_FOCUS_TRACKER] Found bounds match at index ${boundsMatch.index} ` +
+          `(${matches.length} total matches)`
+        );
+        return boundsMatch.index;
+      }
+    }
+
     // If multiple matches, prefer the first visible one
     const visibleMatch = matches.find(({ element }) => this.isVisible(element));
     if (visibleMatch) {
@@ -311,5 +336,21 @@ export class AccessibilityFocusTracker {
     const height = element.bounds.bottom - element.bounds.top;
 
     return width > 0 && height > 0;
+  }
+
+  /**
+   * Check if element bounds match the selector bounds exactly
+   */
+  private boundsMatch(element: Element, bounds: SelectorBounds): boolean {
+    if (!element.bounds) {
+      return false;
+    }
+
+    return (
+      element.bounds.left === bounds.left &&
+      element.bounds.top === bounds.top &&
+      element.bounds.right === bounds.right &&
+      element.bounds.bottom === bounds.bottom
+    );
   }
 }
