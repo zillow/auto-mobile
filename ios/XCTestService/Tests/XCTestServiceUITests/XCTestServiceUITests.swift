@@ -1,5 +1,6 @@
 import XCTest
-import XCTestService
+// Note: XCTestService sources are compiled directly into this target (not imported as framework)
+// This gives XCTest access for XCUIApplication support
 
 /// XCUITest runner that starts the XCTestService WebSocket server
 /// Similar to Appium's WebDriverAgent, but matching Android AccessibilityService protocol
