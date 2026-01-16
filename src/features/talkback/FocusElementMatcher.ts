@@ -31,6 +31,15 @@ export class FocusElementMatcher {
       return null;
     }
 
+    // If bounds are provided in selector and there are multiple matches,
+    // prefer the element with matching bounds (for disambiguation in lists)
+    if (selector.bounds && matches.length > 1) {
+      const boundsMatch = matches.find(({ element }) => this.boundsMatch(element, selector.bounds!));
+      if (boundsMatch) {
+        return boundsMatch.index;
+      }
+    }
+
     const visibleMatch = matches.find(({ element }) => this.isVisible(element));
     return (visibleMatch ?? matches[0]).index;
   }
@@ -163,5 +172,18 @@ export class FocusElementMatcher {
     const height = element.bounds.bottom - element.bounds.top;
 
     return width > 0 && height > 0;
+  }
+
+  private boundsMatch(element: Element, bounds: { left: number; top: number; right: number; bottom: number }): boolean {
+    if (!element.bounds) {
+      return false;
+    }
+
+    return (
+      element.bounds.left === bounds.left &&
+      element.bounds.top === bounds.top &&
+      element.bounds.right === bounds.right &&
+      element.bounds.bottom === bounds.bottom
+    );
   }
 }
