@@ -74,16 +74,7 @@ public class AutoMobileTestObserver: NSObject, XCTestObservation {
 
     /// Exports timing data to JSON
     public func exportTimingData(to path: String) throws {
-        let jsonData = try JSONEncoder().encode(timingData.map { timing in
-            [
-                "testName": timing.testName,
-                "duration": timing.duration,
-                "startTime": ISO8601DateFormatter().string(from: timing.startTime),
-                "endTime": ISO8601DateFormatter().string(from: timing.endTime),
-                "passed": timing.passed
-            ] as [String: Any]
-        })
-
+        let jsonData = try JSONEncoder().encode(timingData)
         try jsonData.write(to: URL(fileURLWithPath: path))
     }
 

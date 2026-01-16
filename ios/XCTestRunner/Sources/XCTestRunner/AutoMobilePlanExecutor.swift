@@ -68,7 +68,7 @@ public class AutoMobilePlanExecutor {
             throw ExecutorError.planNotFound
         }
 
-        let planData = try Data(contentsOf: planURL)
+        _ = try Data(contentsOf: planURL)
         // TODO: Parse YAML using Yams or similar library
         // For now, return a mock plan
         return AutoMobilePlan(steps: [], assertions: [])
