@@ -69,13 +69,22 @@ print_warning() {
 }
 
 # Retry function with exponential backoff for transient failures
-# Detects known transient error patterns (403, timeout, connection issues)
+# Detects known transient error patterns:
+# - Network/HTTP errors: 403, timeout, connection issues
+# - Emulator/ADB errors: device offline, device not found, adb server killed (#808)
 retry_with_backoff() {
   local max_attempts="${RETRY_MAX_ATTEMPTS:-3}"
   local initial_delay="${RETRY_INITIAL_DELAY:-10}"
   local delay=$initial_delay
   local attempt=1
   local exit_code=0
+
+  # Transient error patterns that warrant retry
+  # Network/HTTP errors
+  local network_errors="status code 403|Forbidden|Could not resolve|timeout|Connection refused|Connection reset|ETIMEDOUT|ECONNRESET|503 Service Unavailable|502 Bad Gateway"
+  # Emulator/ADB infrastructure errors (#808)
+  local emulator_errors="device offline|device not found|adb server|AdbHostServer|emulator: ERROR|waiting for device|cannot connect to daemon"
+  local transient_pattern="($network_errors|$emulator_errors)"
 
   while [ "$attempt" -le "$max_attempts" ]; do
     echo ""
@@ -96,7 +105,7 @@ retry_with_backoff() {
     fi
 
     # Check if this is a transient/retryable error
-    if echo "$output" | grep -qE "(status code 403|Forbidden|Could not resolve|timeout|Connection refused|Connection reset|ETIMEDOUT|ECONNRESET|503 Service Unavailable|502 Bad Gateway)"; then
+    if echo "$output" | grep -qiE "$transient_pattern"; then
       if [ "$attempt" -lt "$max_attempts" ]; then
         print_warning "Transient error detected (attempt $attempt/$max_attempts)"
         echo "Retrying in ${delay}s with exponential backoff..."
@@ -313,10 +322,14 @@ echo ""
 echo "Retry configuration:"
 echo "  Max attempts: ${RETRY_MAX_ATTEMPTS:-3}"
 echo "  Initial delay: ${RETRY_INITIAL_DELAY:-10}s (doubles on each retry)"
-echo "  Retryable errors: 403, timeout, connection issues"
+echo "  Retryable errors:"
+echo "    - Network: 403, timeout, connection refused/reset"
+echo "    - Emulator: device offline, device not found, adb server issues"
 echo ""
 
-# Use retry_with_backoff to handle transient CI failures (Maven 403, network issues)
+# Use retry_with_backoff to handle transient CI failures:
+# - Network issues: Maven 403, DNS failures, connection timeouts
+# - Emulator issues: device offline, device not found, adb server problems (#808)
 # The function will retry up to 3 times with exponential backoff for known transient errors
 # but will fail immediately for actual test failures or code issues
 retry_with_backoff eval "$TEST_SCRIPT"
