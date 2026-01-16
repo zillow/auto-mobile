@@ -16,7 +16,6 @@ import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { PerformanceTracker, NoOpPerformanceTracker, processTimingData } from "../../utils/PerformanceTracker";
 import { PerformanceAudit } from "../performance/PerformanceAudit";
 import { ThresholdManager } from "../performance/ThresholdManager";
@@ -54,7 +53,6 @@ export class ObserveScreen {
   private backStack: GetBackStack;
   private adb: AdbClient;
   private axe: AxeClient;
-  private webdriver: WebDriverAgent;
   private predictiveUIState: PredictiveUIState;
 
   // Static cache for observe results
@@ -116,11 +114,10 @@ export class ObserveScreen {
     ScreenshotJobTracker.clear();
   }
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null, webdriver: WebDriverAgent | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
     this.axe = axe || new AxeClient(device);
-    this.webdriver = webdriver || new WebDriverAgent(device);
     this.screenSize = new GetScreenSize(device, this.adb);
     this.systemInsets = new GetSystemInsets(device, this.adb);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);

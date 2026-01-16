@@ -16,8 +16,8 @@ import { ElementParser } from "../utility/ElementParser";
 import { DefaultElementSelector } from "../utility/DefaultElementSelector";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
@@ -39,7 +39,6 @@ type SearchUntilStats = NonNullable<TapOnElementResult["searchUntil"]>;
  * Command to tap on UI element containing specified text
  */
 export class TapOnElement extends BaseVisualChange {
-  private webdriver: WebDriverAgent;
   private elementUtils: ElementUtils;
   private elementParser: ElementParser;
   private accessibilityService: AccessibilityServiceClient;
@@ -56,7 +55,6 @@ export class TapOnElement extends BaseVisualChange {
     device: BootedDevice,
     adb: AdbClient | null = null,
     axe: AxeClient | null = null,
-    webdriver: WebDriverAgent | null = null,
     visionConfig?: VisionFallbackConfig,
     selectionStateTracker?: SelectionStateTracker,
     accessibilityDetector?: AccessibilityDetector,
@@ -67,7 +65,6 @@ export class TapOnElement extends BaseVisualChange {
     this.elementUtils = new ElementUtils();
     this.elementParser = new ElementParser();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
-    this.webdriver = webdriver || new WebDriverAgent(device);
     this.visionConfig = visionConfig || DEFAULT_VISION_CONFIG;
     this.viewHierarchy = new ViewHierarchy(device, this.adb);
     this.selectionStateTracker = selectionStateTracker ?? new SelectionStateTracker({
@@ -247,7 +244,8 @@ export class TapOnElement extends BaseVisualChange {
       }
       case "ios":
       {
-        const rawHierarchy = await this.webdriver.getViewHierarchy(this.device);
+        const xcTestClient = XCTestServiceClient.getInstance(this.device);
+        const rawHierarchy = await xcTestClient.getAccessibilityHierarchy();
         return rawHierarchy
           ? this.prepareViewHierarchyForResponse(rawHierarchy, screenSize)
           : null;
@@ -978,7 +976,8 @@ export class TapOnElement extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific tap operations
+   * Execute iOS-specific tap operations using XCTestService
+   * Falls back to axe command line tool if XCTestService fails
    * @param action - The tap action to perform
    * @param x - X coordinate
    * @param y - Y coordinate
@@ -990,13 +989,56 @@ export class TapOnElement extends BaseVisualChange {
     y: number,
     durationMs: number
   ): Promise<void> {
+    // Use short duration (50ms) for tap/doubleTap, full duration for longPress
+    const tapDuration = action === "longPress" ? durationMs : 50;
+
+    try {
+      const client = XCTestServiceClient.getInstance(this.device);
+
+      if (action === "doubleTap") {
+        // Double tap - perform two taps
+        const firstResult = await client.requestTapCoordinates(x, y, tapDuration);
+        if (!firstResult.success) {
+          logger.warn(`[TapOnElement] First XCTestService tap failed (${firstResult.error}), falling back to axe`);
+          await this.executeiOSTapWithAxe(action, x, y, durationMs);
+          return;
+        }
+
+        await this.timer.sleep(200);
+
+        const secondResult = await client.requestTapCoordinates(x, y, tapDuration);
+        if (!secondResult.success) {
+          logger.warn(`[TapOnElement] Second XCTestService tap failed (${secondResult.error}), falling back to axe`);
+          await this.executeiOSTapWithAxe(action, x, y, durationMs);
+        }
+      } else {
+        // Single tap or long press
+        const result = await client.requestTapCoordinates(x, y, tapDuration);
+        if (!result.success) {
+          logger.warn(`[TapOnElement] XCTestService tap failed (${result.error}), falling back to axe`);
+          await this.executeiOSTapWithAxe(action, x, y, durationMs);
+        }
+      }
+    } catch (error) {
+      logger.warn(`[TapOnElement] XCTestService tap exception: ${error}, falling back to axe`);
+      await this.executeiOSTapWithAxe(action, x, y, durationMs);
+    }
+  }
+
+  /**
+   * Execute iOS tap using axe command line tool (fallback)
+   */
+  private async executeiOSTapWithAxe(
+    action: string,
+    x: number,
+    y: number,
+    durationMs: number
+  ): Promise<void> {
     if (action === "tap") {
       await this.axe.tap(x, y);
     } else if (action === "longPress") {
-      // iOS long press is implemented as a tap with longer duration
       await this.axe.tap(x, y, durationMs);
     } else if (action === "doubleTap") {
-      // iOS double tap - perform two quick taps
       await this.axe.tap(x, y);
       await this.timer.sleep(200);
       await this.axe.tap(x, y);

@@ -102,13 +102,13 @@ adb shell dumpsys accessibility | grep -A 20 "enabled services"
 VoiceOver state detection on iOS:
 
 ```swift
-// iOS implementation via XCTest/WebDriverAgent
+// iOS implementation via XCTestService
 let isVoiceOverRunning = UIAccessibility.isVoiceOverRunning
 ```
 
 **Characteristics**:
 - Fast: Native iOS API
-- Requires: XCTest/WDA integration
+- Requires: XCTestService integration
 - Updates: Observe `UIAccessibilityVoiceOverStatusDidChangeNotification`
 
 ### Detection Strategy

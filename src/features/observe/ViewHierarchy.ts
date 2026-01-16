@@ -14,7 +14,7 @@ import { ScreenshotUtils } from "../../utils/screenshot/ScreenshotUtils";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ViewHierarchyQueryOptions, HierarchySource } from "../../models";
 import { AccessibilityServiceClient } from "./AccessibilityServiceClient";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
+import { XCTestServiceClient } from "./XCTestServiceClient";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
@@ -32,7 +32,6 @@ interface ElementBounds {
 export class ViewHierarchy {
   private device: BootedDevice;
   private readonly adb: AdbClient;
-  private readonly webdriver: WebDriverAgent;
   private takeScreenshot: TakeScreenshot;
   private elementUtils: ElementUtils;
   private accessibilityServiceClient: AccessibilityServiceClient;
@@ -46,20 +45,17 @@ export class ViewHierarchy {
    * Create a ViewHierarchy instance
    * @param device - Optional device
    * @param adb - Optional AdbClient instance for testing
-   * @param webdriver - Optional IdbPython instance for testing
    * @param takeScreenshot - Optional TakeScreenshot instance for testing
    * @param accessibilityServiceClient - Optional AccessibilityServiceClient instance for testing
    */
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    webdriver: WebDriverAgent | null = null,
     takeScreenshot: TakeScreenshot | null = null,
     accessibilityServiceClient: AccessibilityServiceClient | null = null,
   ) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
-    this.webdriver = webdriver || new WebDriverAgent(device);
     this.takeScreenshot = takeScreenshot || new TakeScreenshot(device, this.adb);
     this.elementUtils = new ElementUtils();
     this.accessibilityServiceClient = accessibilityServiceClient || AccessibilityServiceClient.getInstance(device, this.adb);
@@ -378,14 +374,23 @@ export class ViewHierarchy {
 
     perf.serial("ios_viewHierarchy");
 
-    const viewHierarchy = await perf.track("webdriver", () =>
-      this.webdriver.getViewHierarchy(this.device)
-    );
+    const xcTestClient = XCTestServiceClient.getInstance(this.device);
+    const viewHierarchy = await perf.track("xcTestService", async () => {
+      const result = await xcTestClient.getAccessibilityHierarchy();
+      if (!result) {
+        return {
+          hierarchy: {
+            error: "Failed to retrieve iOS view hierarchy from XCTestService"
+          }
+        } as unknown as ViewHierarchyResult;
+      }
+      return result;
+    });
 
     perf.end();
 
     const duration = Date.now() - startTime;
-    logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from accessibility service in ${duration}ms`);
+    logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from XCTestService in ${duration}ms`);
     return viewHierarchy;
   }
 

@@ -5,10 +5,12 @@ import { SimCtlClient } from "./ios-cmdline-tools/SimCtlClient";
 import { Window } from "../features/observe/Window";
 import { logger } from "./logger";
 import { AndroidAccessibilityServiceManager } from "./AccessibilityServiceManager";
+import { IOSXCTestServiceManager } from "./XCTestServiceManager";
 import { AndroidEmulatorClient } from "./android-cmdline-tools/AndroidEmulatorClient";
 import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
+import { XCTestServiceClient } from "../features/observe/XCTestServiceClient";
 import { createPerformanceTracker } from "./PerformanceTracker";
 import { storeSetupTiming } from "../server/ToolExecutionContext";
 
@@ -56,7 +58,7 @@ export interface DeviceSessionManager {
   /**
    * Verify an iOS device is connected and ready
    */
-  verifyIosDevice(deviceId: string): Promise<void>;
+  verifyIosDevice(deviceId: string, options?: DeviceReadyOptions): Promise<void>;
 
   /**
    * Find an available device or start an emulator for the specified platform
@@ -71,7 +73,7 @@ export interface DeviceSessionManager {
   /**
    * Find an available iOS device or start a simulator
    */
-  findOrStartIosDevice(): Promise<BootedDevice>;
+  findOrStartIosDevice(options?: DeviceReadyOptions): Promise<BootedDevice>;
 }
 
 export interface DeviceReadyOptions {
@@ -289,7 +291,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     if (platform === "android") {
       await this.verifyAndroidDevice(deviceId, options);
     } else {
-      await this.verifyIosDevice(deviceId);
+      await this.verifyIosDevice(deviceId, options);
     }
   }
 
@@ -477,7 +479,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
   /**
    * Verify an iOS device is connected and ready
    */
-  public async verifyIosDevice(deviceId: string): Promise<void> {
+  public async verifyIosDevice(deviceId: string, options?: DeviceReadyOptions): Promise<void> {
     if (!this.simctl) {
       throw new ActionableError("iOS simulator tools not available");
     }
@@ -499,6 +501,107 @@ export class DeviceSessionManager implements DeviceSessionManager {
     if (deviceInfo.state !== "Booted") {
       logger.info(`iOS simulator ${deviceId} is not booted (state: ${deviceInfo.state})`);
       // Note: We could auto-boot here if desired, but keeping consistent with current behavior
+      return;
+    }
+
+    // Create a device object for the XCTestService clients
+    const device: BootedDevice = {
+      deviceId,
+      name: deviceInfo.name,
+      platform: "ios"
+    };
+
+    // Always track setup timing (one-time per session, valuable for debugging)
+    const perf = createPerformanceTracker(true);
+    perf.serial("ensureXCTestService");
+    let didSetup = false;
+
+    try {
+      const skipXCTestServiceSetup = options?.skipAccessibilityDownload ?? options?.skipAccessibilitySetup;
+
+      const xcTestClient = XCTestServiceClient.getInstance(device);
+
+      // Check if WebSocket is already connected
+      if (xcTestClient.isConnected()) {
+        // WebSocket appears connected, verify service is actually responsive
+        logger.info(`[DeviceSessionManager] XCTestService WebSocket connected for ${deviceId}, verifying service is responsive`);
+        const isReady = await perf.track("verifyConnectedService", () =>
+          xcTestClient.verifyServiceReady(2, 200, 2000)
+        );
+        if (isReady) {
+          logger.info(`[DeviceSessionManager] XCTestService verified responsive for ${deviceId}`);
+          perf.end();
+          return;
+        }
+        // Service not responsive despite connected socket - fall through to normal flow
+        logger.warn(`[DeviceSessionManager] WebSocket connected but XCTestService not responsive for ${deviceId}, checking status`);
+      }
+
+      const manager = IOSXCTestServiceManager.getInstance(device);
+
+      // Check current status
+      const isRunning = await perf.track("checkRunning", () => manager.isRunning());
+
+      if (isRunning) {
+        logger.info(`[DeviceSessionManager] XCTestService already running for ${deviceId}, verifying WebSocket connection`);
+        // Service is running, try to connect WebSocket
+        const connected = await perf.track("verifyConnection", () => xcTestClient.waitForConnection(3, 200));
+        if (connected) {
+          logger.info(`[DeviceSessionManager] XCTestService running and WebSocket connected for ${deviceId}`);
+          perf.end();
+          return;
+        }
+        // WebSocket won't connect despite service running - may need restart
+        logger.warn(`[DeviceSessionManager] XCTestService running but WebSocket failed for ${deviceId}, will attempt restart`);
+        manager.resetSetupState();
+      }
+
+      if (skipXCTestServiceSetup) {
+        logger.info(`[DeviceSessionManager] Skipping XCTestService setup for ${deviceId}`);
+        perf.end();
+        return;
+      }
+
+      // Setup the service (will start if not running)
+      logger.info(`[DeviceSessionManager] Setting up XCTestService for ${deviceId}`);
+      const setupResult = await manager.setup(false, perf);
+      didSetup = true;
+
+      if (!setupResult.success) {
+        logger.warn(`[DeviceSessionManager] XCTestService setup failed for ${deviceId}: ${setupResult.error}`);
+        // Don't throw - allow observe to fall back to other methods
+        perf.end();
+        return;
+      }
+
+      // Wait for WebSocket connection after setup
+      logger.info(`[DeviceSessionManager] Waiting for XCTestService WebSocket connection after setup for ${deviceId}`);
+      const connected = await perf.track("waitForConnection", () => xcTestClient.waitForConnection());
+      if (connected) {
+        // Verify service is actually ready to respond (not just WebSocket connected)
+        logger.info(`[DeviceSessionManager] Verifying XCTestService is responsive for ${deviceId}`);
+        const ready = await perf.track("verifyServiceReady", () => xcTestClient.verifyServiceReady(5, 500, 3000));
+        if (!ready) {
+          logger.warn(`[DeviceSessionManager] XCTestService not responsive after setup for ${deviceId}`);
+        } else {
+          logger.info(`[DeviceSessionManager] XCTestService setup complete and verified for ${deviceId}`);
+        }
+      } else {
+        logger.warn(`[DeviceSessionManager] WebSocket connection failed after XCTestService setup for ${deviceId}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`[DeviceSessionManager] Failed to setup XCTestService: ${errorMessage}`);
+      // Don't throw - allow observe to fall back to other methods
+    } finally {
+      perf.end();
+      // Store timing if we actually did setup work
+      if (didSetup) {
+        const timings = perf.getTimings();
+        if (timings) {
+          storeSetupTiming(deviceId, timings);
+        }
+      }
     }
   }
 
@@ -509,7 +612,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     if (platform === "android") {
       return await this.findOrStartAndroidDevice(options);
     } else {
-      return await this.findOrStartIosDevice();
+      return await this.findOrStartIosDevice(options);
     }
   }
 
@@ -557,7 +660,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
   /**
    * Find an available iOS device or start a simulator
    */
-  public async findOrStartIosDevice(): Promise<BootedDevice> {
+  public async findOrStartIosDevice(options?: DeviceReadyOptions): Promise<BootedDevice> {
     if (!this.simctl) {
       throw new ActionableError("iOS simulator tools not available");
     }
@@ -575,7 +678,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     if (bootedDevices.length > 0) {
       // Use the first booted device
       const device = bootedDevices[0];
-      await this.verifyIosDevice(device.deviceId!);
+      await this.verifyIosDevice(device.deviceId!, options);
       return device;
     }
 
@@ -585,7 +688,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     logger.info(`Booting iOS simulator ${device}...`);
 
     const bootedDevice = await this.simctl!.bootSimulator(deviceId);
-    await this.verifyIosDevice(deviceId);
+    await this.verifyIosDevice(deviceId, options);
     return bootedDevice;
   }
 }

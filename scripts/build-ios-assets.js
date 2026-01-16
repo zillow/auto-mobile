@@ -4,28 +4,30 @@ const fs = require('fs-extra');
 const path = require('path');
 
 async function copyIOSAssets() {
-  const sourceWDADir = path.join(__dirname, '..', 'ios', 'WebDriverAgent');
-  const destWDADir = path.join(__dirname, '..', 'dist', 'ios', 'WebDriverAgent');
+  const sourceXCTestDir = path.join(__dirname, '..', 'ios', 'XCTestService');
+  const destXCTestDir = path.join(__dirname, '..', 'dist', 'ios', 'XCTestService');
 
   try {
-    console.log('Copying WebDriverAgent project to dist directory...');
+    console.log('Copying XCTestService project to dist directory...');
 
     // Ensure the destination directory exists
-    await fs.ensureDir(path.dirname(destWDADir));
+    await fs.ensureDir(path.dirname(destXCTestDir));
 
-    // Copy the entire WebDriverAgent directory
-    await fs.copy(sourceWDADir, destWDADir, {
+    // Copy the entire XCTestService directory
+    await fs.copy(sourceXCTestDir, destXCTestDir, {
       filter: (src) => {
         // Skip node_modules and other unnecessary directories
         return !src.includes('node_modules') &&
           !src.includes('.git') &&
-          !src.includes('scratch');
+          !src.includes('scratch') &&
+          !src.includes('.build') &&
+          !src.includes('DerivedData');
       }
     });
 
-    console.log('WebDriverAgent project copied successfully to dist/ios/WebDriverAgent');
+    console.log('XCTestService project copied successfully to dist/ios/XCTestService');
   } catch (error) {
-    console.error('Failed to copy WebDriverAgent project:', error);
+    console.error('Failed to copy XCTestService project:', error);
     process.exit(1);
   }
 }

@@ -47,20 +47,35 @@ public class ElementLocator: ElementLocating {
 
         let bundleId = Bundle.main.bundleIdentifier
 
-        // Build hierarchy from root
-        let rootElement = buildElementInfo(from: app, depth: 0, maxDepth: 50)
+        // Use snapshot() for fast hierarchy extraction - single IPC call captures everything
+        print("[ElementLocator] Taking snapshot of view hierarchy...")
+        let startTime = Date()
 
-        // Get window info
+        // snapshot() captures all element data in ONE IPC call (fast!)
+        // vs accessing properties individually which is extremely slow
+        let snapshot = try app.snapshot()
+
+        let snapshotTime = Date().timeIntervalSince(startTime) * 1000
+        print("[ElementLocator] Snapshot captured in \(Int(snapshotTime))ms")
+
+        // Build hierarchy from snapshot (no more IPC calls - all data is local)
+        let rootElement = buildElementInfoFromSnapshot(snapshot, depth: 0, maxDepth: 30)
+
+        let totalTime = Date().timeIntervalSince(startTime) * 1000
+        print("[ElementLocator] View hierarchy extraction complete in \(Int(totalTime))ms")
+
+        // Get window info from snapshot
+        let frame = snapshot.frame
         let windowInfo = WindowInfo(
             id: 0,
             type: 1, // Application window
             isActive: true,
             isFocused: true,
             bounds: ElementBounds(
-                left: Int(app.frame.origin.x),
-                top: Int(app.frame.origin.y),
-                right: Int(app.frame.origin.x + app.frame.width),
-                bottom: Int(app.frame.origin.y + app.frame.height)
+                left: Int(frame.origin.x),
+                top: Int(frame.origin.y),
+                right: Int(frame.origin.x + frame.width),
+                bottom: Int(frame.origin.y + frame.height)
             )
         )
 
@@ -72,8 +87,9 @@ public class ElementLocator: ElementLocating {
         )
     }
 
-    private func buildElementInfo(from element: XCUIElement, depth: Int, maxDepth: Int) -> UIElementInfo {
-        let frame = element.frame
+    /// Build element info from XCUIElementSnapshot - all data is already captured, no IPC calls
+    private func buildElementInfoFromSnapshot(_ snapshot: XCUIElementSnapshot, depth: Int, maxDepth: Int) -> UIElementInfo {
+        let frame = snapshot.frame
         let bounds = ElementBounds(
             left: Int(frame.origin.x),
             top: Int(frame.origin.y),
@@ -81,66 +97,72 @@ public class ElementLocator: ElementLocating {
             bottom: Int(frame.origin.y + frame.height)
         )
 
-        // Cache element by identifier if available
-        let identifier = element.identifier
-        if !identifier.isEmpty {
-            elementCache[identifier] = element
-        }
+        // Get identifier
+        let identifier = snapshot.identifier
 
-        // Get children
+        // Get children from snapshot (already captured - fast!)
         var childNodes: [UIElementInfo]? = nil
         if depth < maxDepth {
-            let children = element.children(matching: .any)
-            if children.count > 0 {
-                childNodes = []
-                for i in 0..<children.count {
-                    let child = children.element(boundBy: i)
-                    if child.exists {
-                        childNodes?.append(buildElementInfo(from: child, depth: depth + 1, maxDepth: maxDepth))
-                    }
+            let children = snapshot.children
+            if !children.isEmpty {
+                childNodes = children.map { child in
+                    buildElementInfoFromSnapshot(child, depth: depth + 1, maxDepth: maxDepth)
                 }
             }
         }
 
         // Map element type to className
-        let className = mapElementType(element.elementType)
+        let className = mapElementType(snapshot.elementType)
 
-        // Get actions
+        // Get actions based on element state
         var actions: [String] = []
-        if element.isEnabled {
+        if snapshot.isEnabled {
             actions.append("click")
-            if element.elementType == .textField || element.elementType == .textView || element.elementType == .secureTextField {
+            if snapshot.elementType == .textField || snapshot.elementType == .textView || snapshot.elementType == .secureTextField {
                 actions.append("set_text")
                 actions.append("clear_text")
             }
         }
 
+        // Note: isHittable is NOT available on XCUIElementSnapshot (only on XCUIElement)
+        // and is expensive to compute. We approximate clickable based on isEnabled.
+        // This matches WebDriverAgent's approach for performance.
+        let isClickable = snapshot.isEnabled
+
         return UIElementInfo(
-            text: element.label.isEmpty ? nil : element.label,
+            text: snapshot.label.isEmpty ? nil : snapshot.label,
             textSize: nil,
-            contentDesc: element.label.isEmpty ? nil : element.label,
+            contentDesc: snapshot.label.isEmpty ? nil : snapshot.label,
             resourceId: identifier.isEmpty ? nil : identifier,
             className: className,
             bounds: bounds,
-            clickable: element.isHittable ? "true" : "false",
-            enabled: element.isEnabled ? "true" : "false",
+            clickable: isClickable ? "true" : "false",
+            enabled: snapshot.isEnabled ? "true" : "false",
             focusable: "true",
-            focused: "false",
+            focused: snapshot.hasFocus ? "true" : "false",
             accessibilityFocused: nil,
-            scrollable: isScrollable(element) ? "true" : "false",
-            password: element.elementType == .secureTextField ? "true" : "false",
-            checkable: isCheckable(element) ? "true" : "false",
-            checked: element.isSelected ? "true" : "false",
-            selected: element.isSelected ? "true" : "false",
-            longClickable: element.isHittable ? "true" : "false",
+            scrollable: isScrollableType(snapshot.elementType) ? "true" : "false",
+            password: snapshot.elementType == .secureTextField ? "true" : "false",
+            checkable: isCheckableType(snapshot.elementType) ? "true" : "false",
+            checked: snapshot.isSelected ? "true" : "false",
+            selected: snapshot.isSelected ? "true" : "false",
+            longClickable: isClickable ? "true" : "false",
             testTag: identifier.isEmpty ? nil : identifier,
-            role: mapRole(element.elementType),
+            role: mapRole(snapshot.elementType),
             stateDescription: nil,
             errorMessage: nil,
-            hintText: element.placeholderValue,
+            hintText: snapshot.placeholderValue,
             actions: actions.isEmpty ? nil : actions,
             node: childNodes
         )
+    }
+
+    /// Legacy slow method - keeping for reference but not used
+    private func buildElementInfo(from element: XCUIElement, depth: Int, maxDepth: Int) -> UIElementInfo {
+        // This method accesses element properties individually which is SLOW
+        // Each property access is an IPC call to the accessibility service
+        // Use buildElementInfoFromSnapshot instead
+        fatalError("Use buildElementInfoFromSnapshot instead - this method is too slow")
     }
 
     private func mapElementType(_ type: XCUIElement.ElementType) -> String {
@@ -198,8 +220,8 @@ public class ElementLocator: ElementLocating {
         }
     }
 
-    private func isScrollable(_ element: XCUIElement) -> Bool {
-        switch element.elementType {
+    private func isScrollableType(_ type: XCUIElement.ElementType) -> Bool {
+        switch type {
         case .scrollView, .table, .collectionView, .webView, .textView:
             return true
         default:
@@ -207,8 +229,8 @@ public class ElementLocator: ElementLocating {
         }
     }
 
-    private func isCheckable(_ element: XCUIElement) -> Bool {
-        switch element.elementType {
+    private func isCheckableType(_ type: XCUIElement.ElementType) -> Bool {
+        switch type {
         case .switch, .checkBox, .radioButton:
             return true
         default:

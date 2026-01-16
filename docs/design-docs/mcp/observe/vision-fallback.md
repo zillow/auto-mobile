@@ -40,7 +40,6 @@ const tapTool = new TapOnElement(
   device,
   adb,
   axe,
-  webdriver,
   {
     enabled: true,              // Enable vision fallback
     provider: 'claude',         // Only Claude supported currently
