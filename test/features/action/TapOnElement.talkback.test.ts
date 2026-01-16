@@ -235,27 +235,58 @@ describe("TapOnElement TalkBack mode detection", () => {
 
   describe("executeAndroidTapWithAccessibility doubleTap behavior", () => {
     let mockAccessibilityService: any;
+    let mockFocusNavigationExecutor: any;
+    let mockFocusPathCalculator: any;
 
     beforeEach(() => {
       executeAndroidTapWithAccessibility.mockRestore();
 
       mockAccessibilityService = {
-        requestTapCoordinates: async () => ({ success: true, totalTimeMs: 1 })
+        requestTapCoordinates: async () => ({ success: true, totalTimeMs: 1 }),
+        requestTraversalOrder: async () => ({
+          elements: [
+            { "resource-id": "test:id/button", "bounds": { left: 0, top: 0, right: 100, bottom: 100 } }
+          ],
+          focusedIndex: 0
+        }),
+        requestCurrentFocus: async () => ({
+          focusedElement: { "resource-id": "test:id/other", "bounds": { left: 0, top: 0, right: 50, bottom: 50 } }
+        }),
+        requestAction: async () => ({ success: true, totalTimeMs: 1 })
+      };
+
+      mockFocusPathCalculator = {
+        calculatePath: () => ({
+          currentFocusIndex: 0,
+          targetFocusIndex: 0,
+          swipeCount: 0,
+          direction: "forward" as const,
+          intermediateCheckpoints: []
+        })
+      };
+
+      mockFocusNavigationExecutor = {
+        navigateToElement: async () => true
       };
 
       (tapOnElement as any).accessibilityService = mockAccessibilityService;
+      (tapOnElement as any).focusPathCalculator = mockFocusPathCalculator;
+      (tapOnElement as any).focusNavigationExecutor = mockFocusNavigationExecutor;
     });
 
-    test("issues two accessibility taps with a delay", async () => {
+    test("uses focus navigation for tap action", async () => {
+      const navigateToElement = spyOn(mockFocusNavigationExecutor, "navigateToElement")
+        .mockResolvedValue(true);
       const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
         .mockResolvedValue({ success: true, totalTimeMs: 1 });
 
       const element = {
-        "resource-id": "test:id/button"
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
       } as any;
 
       await (tapOnElement as any).executeAndroidTapWithAccessibility(
-        "doubleTap",
+        "tap",
         50,
         50,
         element,
@@ -264,21 +295,20 @@ describe("TapOnElement TalkBack mode detection", () => {
         undefined
       );
 
-      expect(requestTapCoordinates).toHaveBeenCalledTimes(2);
-      expect(requestTapCoordinates.mock.calls).toEqual([
-        [50, 50, 50],
-        [50, 50, 50]
-      ]);
-      expect(fakeTimer.wasSleepCalled(200)).toBe(true);
+      expect(navigateToElement).toHaveBeenCalledTimes(1);
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(2); // Double-tap to activate
       expect(executeAndroidTapWithCoordinates).not.toHaveBeenCalled();
     });
 
-    test("falls back to coordinate double tap if the first accessibility tap fails", async () => {
+    test("uses focus navigation for doubleTap action", async () => {
+      const navigateToElement = spyOn(mockFocusNavigationExecutor, "navigateToElement")
+        .mockResolvedValue(true);
       const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
-        .mockResolvedValueOnce({ success: false, totalTimeMs: 1, error: "nope" });
+        .mockResolvedValue({ success: true, totalTimeMs: 1 });
 
       const element = {
-        "resource-id": "test:id/button"
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
       } as any;
 
       await (tapOnElement as any).executeAndroidTapWithAccessibility(
@@ -291,29 +321,49 @@ describe("TapOnElement TalkBack mode detection", () => {
         undefined
       );
 
-      expect(requestTapCoordinates).toHaveBeenCalledTimes(1);
-      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledTimes(1);
-      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledWith(
-        "doubleTap",
-        50,
-        50,
-        500,
-        element,
-        undefined
-      );
+      expect(navigateToElement).toHaveBeenCalledTimes(1);
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(2); // Double-tap to activate
+      expect(executeAndroidTapWithCoordinates).not.toHaveBeenCalled();
     });
 
-    test("falls back to a single coordinate tap if the second accessibility tap fails", async () => {
+    test("skips focus navigation for longPress and uses coordinate-based tap", async () => {
+      const navigateToElement = spyOn(mockFocusNavigationExecutor, "navigateToElement");
       const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
-        .mockResolvedValueOnce({ success: true, totalTimeMs: 1 })
-        .mockResolvedValueOnce({ success: false, totalTimeMs: 1, error: "nope" });
+        .mockResolvedValue({ success: true, totalTimeMs: 1 });
 
       const element = {
-        "resource-id": "test:id/button"
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
       } as any;
 
       await (tapOnElement as any).executeAndroidTapWithAccessibility(
-        "doubleTap",
+        "longPress",
+        50,
+        50,
+        element,
+        1000,
+        {},
+        undefined
+      );
+
+      expect(navigateToElement).not.toHaveBeenCalled();
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(1);
+      expect(requestTapCoordinates).toHaveBeenCalledWith(50, 50, 1000); // Full duration for long press
+    });
+
+    test("falls back to coordinate tap if focus navigation fails", async () => {
+      const navigateToElement = spyOn(mockFocusNavigationExecutor, "navigateToElement")
+        .mockRejectedValue(new Error("Navigation failed"));
+      const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
+        .mockResolvedValue({ success: true, totalTimeMs: 1 });
+
+      const element = {
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
+      } as any;
+
+      await (tapOnElement as any).executeAndroidTapWithAccessibility(
+        "tap",
         50,
         50,
         element,
@@ -322,16 +372,66 @@ describe("TapOnElement TalkBack mode detection", () => {
         undefined
       );
 
-      expect(requestTapCoordinates).toHaveBeenCalledTimes(2);
-      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledTimes(1);
-      expect(executeAndroidTapWithCoordinates).toHaveBeenCalledWith(
-        "doubleTap",
+      expect(navigateToElement).toHaveBeenCalledTimes(1);
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(1); // Fallback coordinate tap
+      expect(requestTapCoordinates).toHaveBeenCalledWith(50, 50, 50); // Short duration for tap
+    });
+
+    test("uses ACTION_CLICK fallback if double-tap activation fails", async () => {
+      const navigateToElement = spyOn(mockFocusNavigationExecutor, "navigateToElement")
+        .mockResolvedValue(true);
+      const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
+        .mockResolvedValueOnce({ success: false, totalTimeMs: 1, error: "tap failed" });
+      const requestAction = spyOn(mockAccessibilityService, "requestAction")
+        .mockResolvedValue({ success: true, totalTimeMs: 1 });
+
+      const element = {
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
+      } as any;
+
+      await (tapOnElement as any).executeAndroidTapWithAccessibility(
+        "tap",
         50,
         50,
-        500,
         element,
+        500,
+        {},
         undefined
       );
+
+      expect(navigateToElement).toHaveBeenCalledTimes(1);
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(1);
+      expect(requestAction).toHaveBeenCalledTimes(1);
+      expect(requestAction).toHaveBeenCalledWith("click", "test:id/button");
+    });
+
+    test("falls back to coordinate-based tap if both navigation and activation fail", async () => {
+      const navigateToElement = spyOn(mockFocusNavigationExecutor, "navigateToElement")
+        .mockResolvedValue(true);
+      const requestTapCoordinates = spyOn(mockAccessibilityService, "requestTapCoordinates")
+        .mockResolvedValueOnce({ success: false, totalTimeMs: 1, error: "tap failed" });
+      const requestAction = spyOn(mockAccessibilityService, "requestAction")
+        .mockResolvedValue({ success: false, totalTimeMs: 1, error: "click failed" });
+
+      const element = {
+        "resource-id": "test:id/button",
+        "bounds": { left: 0, top: 0, right: 100, bottom: 100 }
+      } as any;
+
+      await (tapOnElement as any).executeAndroidTapWithAccessibility(
+        "tap",
+        50,
+        50,
+        element,
+        500,
+        {},
+        undefined
+      );
+
+      expect(navigateToElement).toHaveBeenCalledTimes(1);
+      expect(requestTapCoordinates).toHaveBeenCalledTimes(2); // One during activation attempt, one during fallback
+      expect(requestAction).toHaveBeenCalledTimes(1);
     });
   });
 

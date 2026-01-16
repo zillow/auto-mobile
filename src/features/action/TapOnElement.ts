@@ -32,6 +32,9 @@ import { NodeCryptoService } from "../../utils/crypto";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
+import { FocusNavigationExecutor } from "../talkback/FocusNavigationExecutor";
+import { FocusPathCalculator } from "../talkback/FocusPathCalculator";
+import { FocusElementMatcher } from "../talkback/FocusElementMatcher";
 
 type SearchUntilStats = NonNullable<TapOnElementResult["searchUntil"]>;
 
@@ -48,6 +51,9 @@ export class TapOnElement extends BaseVisualChange {
   private accessibilityDetector: AccessibilityDetector;
   private elementSelector: ElementSelector;
   private viewHierarchy: ViewHierarchy;
+  private focusNavigationExecutor: FocusNavigationExecutor;
+  private focusPathCalculator: FocusPathCalculator;
+  private focusElementMatcher: FocusElementMatcher;
   private static readonly SEARCH_UNTIL_DEFAULT_MS = 500;
   private static readonly SEARCH_UNTIL_MIN_MS = 100;
   private static readonly SEARCH_UNTIL_MAX_MS = 12000;
@@ -61,7 +67,10 @@ export class TapOnElement extends BaseVisualChange {
     selectionStateTracker?: SelectionStateTracker,
     accessibilityDetector?: AccessibilityDetector,
     timer?: Timer,
-    elementSelector?: ElementSelector
+    elementSelector?: ElementSelector,
+    focusNavigationExecutor?: FocusNavigationExecutor,
+    focusPathCalculator?: FocusPathCalculator,
+    focusElementMatcher?: FocusElementMatcher
   ) {
     super(device, adb, axe, timer);
     this.elementUtils = new ElementUtils();
@@ -75,6 +84,13 @@ export class TapOnElement extends BaseVisualChange {
     });
     this.accessibilityDetector = accessibilityDetector || defaultAccessibilityDetector;
     this.elementSelector = elementSelector ?? new DefaultElementSelector();
+    this.focusElementMatcher = focusElementMatcher ?? new FocusElementMatcher();
+    this.focusPathCalculator = focusPathCalculator ?? new FocusPathCalculator(this.focusElementMatcher);
+    this.focusNavigationExecutor = focusNavigationExecutor ?? new FocusNavigationExecutor({
+      matcher: this.focusElementMatcher,
+      pathCalculator: this.focusPathCalculator,
+      timer: this.timer
+    });
   }
 
   /**
@@ -920,7 +936,7 @@ export class TapOnElement extends BaseVisualChange {
 
   /**
    * Execute tap using AccessibilityService actions (TalkBack mode)
-   * Falls back to coordinate-based tapping if accessibility action fails
+   * Uses focus navigation when TalkBack is enabled, falls back to coordinate-based tapping if navigation fails
    */
   private async executeAndroidTapWithAccessibility(
     action: string,
@@ -938,8 +954,129 @@ export class TapOnElement extends BaseVisualChange {
       return;
     }
 
-    // Use coordinate-based taps via accessibility service dispatchGesture.
-    // This is faster than ADB and precise (uses exact coordinates, not resource-id lookup).
+    // Try focus navigation for tap and doubleTap actions
+    // Long press still uses coordinate-based approach as it's more reliable
+    if (action === "tap" || action === "doubleTap") {
+      try {
+        logger.debug(`[TapOnElement] Attempting focus navigation to element with resourceId: ${resourceId}`);
+
+        // Build selector from element
+        const targetSelector = {
+          resourceId,
+          text: element.text as string | undefined,
+          contentDesc: element["content-desc"] as string | undefined
+        };
+
+        // Get traversal order and current focus
+        const traversalResult = await this.accessibilityService.requestTraversalOrder();
+        if (traversalResult.error || !traversalResult.elements) {
+          throw new Error(`Failed to get traversal order: ${traversalResult.error}`);
+        }
+
+        const orderedElements = traversalResult.elements;
+        let currentFocus: Element | null = null;
+
+        // Try to get current focus from traversal result first
+        if (traversalResult.focusedIndex !== null && traversalResult.focusedIndex !== undefined) {
+          currentFocus = orderedElements[traversalResult.focusedIndex] ?? null;
+        }
+
+        // If not available, request current focus separately
+        if (!currentFocus) {
+          const focusResult = await this.accessibilityService.requestCurrentFocus();
+          if (!focusResult.error && focusResult.focusedElement) {
+            currentFocus = focusResult.focusedElement;
+          }
+        }
+
+        // Calculate navigation path
+        const navigationPath = this.focusPathCalculator.calculatePath(
+          currentFocus,
+          targetSelector,
+          orderedElements,
+          5 // verification interval
+        );
+
+        if (!navigationPath) {
+          throw new Error("Could not calculate navigation path to target element");
+        }
+
+        logger.debug(
+          `[TapOnElement] Calculated path: ${navigationPath.swipeCount} swipes ${navigationPath.direction}`
+        );
+
+        // Navigate to element
+        const navigationSuccess = await this.focusNavigationExecutor.navigateToElement(
+          this.device.id,
+          targetSelector,
+          navigationPath,
+          {
+            maxSwipes: 100,
+            verificationInterval: 5,
+            swipeDelay: 100
+          }
+        );
+
+        if (!navigationSuccess) {
+          throw new Error("Focus navigation did not reach target element");
+        }
+
+        logger.info(`[TapOnElement] Focus navigation successful, activating element`);
+
+        // Activate the focused element with double-tap gesture
+        // In TalkBack mode, a double-tap anywhere activates the focused element
+        const tapDuration = 50;
+        const screenCenterX = Math.round(x); // Use element center for gesture
+        const screenCenterY = Math.round(y);
+
+        // Perform double-tap to activate
+        const firstTap = await this.accessibilityService.requestTapCoordinates(
+          screenCenterX,
+          screenCenterY,
+          tapDuration
+        );
+
+        if (!firstTap.success) {
+          // If double-tap fails, try ACTION_CLICK on the resource-id
+          logger.warn(`[TapOnElement] Double-tap activation failed, trying ACTION_CLICK fallback`);
+          const clickResult = await this.accessibilityService.requestAction("click", resourceId);
+          if (!clickResult.success) {
+            throw new Error(`Activation failed: double-tap and ACTION_CLICK both failed`);
+          }
+          return;
+        }
+
+        await this.timer.sleep(200);
+
+        const secondTap = await this.accessibilityService.requestTapCoordinates(
+          screenCenterX,
+          screenCenterY,
+          tapDuration
+        );
+
+        if (!secondTap.success) {
+          // If second tap fails, try ACTION_CLICK as fallback
+          logger.warn(`[TapOnElement] Second tap failed, trying ACTION_CLICK fallback`);
+          const clickResult = await this.accessibilityService.requestAction("click", resourceId);
+          if (!clickResult.success) {
+            throw new Error(`Activation failed: second tap and ACTION_CLICK both failed`);
+          }
+        }
+
+        logger.info(`[TapOnElement] Element activated successfully via focus navigation`);
+        return;
+
+      } catch (error) {
+        logger.warn(
+          `[TapOnElement] Focus navigation failed (${error instanceof Error ? error.message : String(error)}), ` +
+          `falling back to coordinate-based tap at (${x}, ${y})`
+        );
+        // Fall through to coordinate-based fallback
+      }
+    }
+
+    // Fallback to coordinate-based taps via accessibility service dispatchGesture
+    // This is faster than ADB and precise (uses exact coordinates, not resource-id lookup)
     // Use short duration (50ms) for tap/doubleTap to avoid being interpreted as long press
     const tapDuration = action === "longPress" ? durationMs : 50;
 
