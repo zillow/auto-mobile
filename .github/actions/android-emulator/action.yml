@@ -151,7 +151,11 @@ runs:
         echo "RELEASE_KEY_ALIAS=${{ inputs.release-key-alias }}" >> $GITHUB_ENV
         echo "RELEASE_KEY_PASSWORD=${{ inputs.release-key-password }}" >> $GITHUB_ENV
 
-    - name: Run Emulator
+    # Run emulator with automatic retry for infrastructure flakiness (#808)
+    # Handles: adb device offline, device not found, adb server killed, emulator boot failures
+    - name: Run Emulator (Attempt 1)
+      id: emulator-attempt-1
+      continue-on-error: true
       uses: reactivecircus/android-emulator-runner@v2.35.0
       with:
         api-level: ${{ inputs.api_level }}
@@ -162,3 +166,32 @@ runs:
         force-avd-creation: false
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: false
+
+    - name: Run Emulator (Retry)
+      id: emulator-attempt-2
+      if: steps.emulator-attempt-1.outcome == 'failure'
+      uses: reactivecircus/android-emulator-runner@v2.35.0
+      with:
+        api-level: ${{ inputs.api_level }}
+        arch: ${{ inputs.arch }}
+        target: ${{ inputs.target }}
+        script: ../scripts/android/run-emulator-tests.sh "${{ inputs.accessibility-apk-path }}" "${{ inputs.script }}"
+        working-directory: ${{ inputs.working-directory }}
+        force-avd-creation: false
+        emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+        disable-animations: false
+
+    - name: Verify Emulator Tests Passed
+      if: always()
+      shell: ${{ inputs.shell }}
+      run: |
+        if [[ "${{ steps.emulator-attempt-1.outcome }}" == "success" ]]; then
+          echo "✓ Emulator tests passed on first attempt"
+          exit 0
+        elif [[ "${{ steps.emulator-attempt-2.outcome }}" == "success" ]]; then
+          echo "✓ Emulator tests passed on retry (infrastructure flakiness detected)"
+          exit 0
+        else
+          echo "✗ Emulator tests failed after retry"
+          exit 1
+        fi
