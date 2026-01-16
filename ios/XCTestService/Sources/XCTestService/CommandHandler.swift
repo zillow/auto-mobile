@@ -4,14 +4,33 @@ import XCTest
 #endif
 
 /// Handles WebSocket commands matching Android AccessibilityService protocol
-public class CommandHandler {
+public class CommandHandler: CommandHandling {
 
-    private let elementLocator: ElementLocator
-    private let gesturePerformer: GesturePerformer
+    private let elementLocator: ElementLocating
+    private let gesturePerformer: GesturePerforming
+    private let perfProvider: PerfProvider
 
-    public init(elementLocator: ElementLocator, gesturePerformer: GesturePerformer) {
+    public init(
+        elementLocator: ElementLocating,
+        gesturePerformer: GesturePerforming,
+        perfProvider: PerfProvider = PerfProvider.instance
+    ) {
         self.elementLocator = elementLocator
         self.gesturePerformer = gesturePerformer
+        self.perfProvider = perfProvider
+    }
+
+    /// Factory for testing - allows injecting fakes
+    public static func createForTesting(
+        elementLocator: ElementLocating,
+        gesturePerformer: GesturePerforming,
+        perfProvider: PerfProvider
+    ) -> CommandHandler {
+        return CommandHandler(
+            elementLocator: elementLocator,
+            gesturePerformer: gesturePerformer,
+            perfProvider: perfProvider
+        )
     }
 
     /// Handle an incoming request and return a response
@@ -93,21 +112,24 @@ public class CommandHandler {
     // MARK: - View Hierarchy
 
     private func handleRequestHierarchy(_ request: WebSocketRequest, startTime: Date) throws -> HierarchyUpdateResponse {
-        let extractionStart = Date()
-        let hierarchy = try elementLocator.getViewHierarchy()
-        let extractionMs = Int64(Date().timeIntervalSince(extractionStart) * 1000)
+        perfProvider.serial("handleRequestHierarchy")
+        defer { perfProvider.end() }
 
-        let serializationStart = Date()
-        let serializationMs = Int64(Date().timeIntervalSince(serializationStart) * 1000)
+        let hierarchy = perfProvider.track("extraction") {
+            try? elementLocator.getViewHierarchy()
+        }
+
+        guard let hierarchy = hierarchy else {
+            throw CommandError.executionFailed("Failed to get view hierarchy")
+        }
+
+        // Get accumulated timing for this operation
+        let perfTimings = perfProvider.flush()
 
         return HierarchyUpdateResponse(
             requestId: request.requestId,
             data: hierarchy,
-            perfTiming: PerfTiming(
-                extractionMs: extractionMs,
-                serializationMs: serializationMs,
-                totalMs: totalTimeMs(from: startTime)
-            )
+            perfTiming: perfTimings?.first
         )
     }
 

@@ -4,7 +4,7 @@ import XCTest
 #endif
 
 /// Performs gestures and interactions using XCUITest APIs
-public class GesturePerformer {
+public class GesturePerformer: GesturePerforming {
 
     public enum GestureError: LocalizedError {
         case noApplication

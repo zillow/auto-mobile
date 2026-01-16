@@ -5,7 +5,7 @@ import UIKit
 #endif
 
 /// Locates elements using XCUITest APIs and returns Android-compatible format
-public class ElementLocator {
+public class ElementLocator: ElementLocating {
 
     public enum LocatorError: LocalizedError {
         case noApplication
@@ -218,7 +218,7 @@ public class ElementLocator {
 
     // MARK: - Element Finding
 
-    public func findElement(byResourceId resourceId: String) -> XCUIElement? {
+    public func findElement(byResourceId resourceId: String) -> Any? {
         if let cached = elementCache[resourceId] {
             return cached
         }
@@ -232,7 +232,7 @@ public class ElementLocator {
         return nil
     }
 
-    public func findElement(byText text: String) -> XCUIElement? {
+    public func findElement(byText text: String) -> Any? {
         guard let app = application else { return nil }
         let element = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", text)).firstMatch
         return element.exists ? element : nil

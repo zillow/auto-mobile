@@ -3,7 +3,7 @@ import Network
 
 /// WebSocket server for XCTestService
 /// Implements RFC 6455 WebSocket protocol over TCP
-public class WebSocketServer {
+public class WebSocketServer: WebSocketServing {
 
     public enum ServerError: Error {
         case alreadyRunning

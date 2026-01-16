@@ -30,6 +30,9 @@ public class XCTestService {
     }
 
     #if canImport(XCTest) && os(iOS)
+    /// Default bundle ID to use when none is specified (iOS Settings app)
+    public static let defaultBundleId = "com.apple.Preferences"
+
     /// Sets the application under test
     public func setApplication(_ app: XCUIApplication) {
         self.application = app
@@ -40,16 +43,12 @@ public class XCTestService {
     /// Launches the target application and starts the service
     public func start(bundleId: String? = nil) throws {
         // Launch or connect to target app
-        if let bundleId = bundleId {
-            let app = XCUIApplication(bundleIdentifier: bundleId)
-            app.launch()
-            setApplication(app)
-        } else if application == nil {
-            // Default to the test host application
-            let app = XCUIApplication()
-            app.launch()
-            setApplication(app)
-        }
+        // Use provided bundleId, or default to Settings app (avoids XCUIApplication() crash in SPM tests)
+        let targetBundleId = bundleId ?? Self.defaultBundleId
+        let app = XCUIApplication(bundleIdentifier: targetBundleId)
+        app.launch()
+        setApplication(app)
+        print("[XCTestService] Launched app: \(targetBundleId)")
 
         // Start the server
         try server.start()
