@@ -90,7 +90,9 @@ EOF
 # Files that should be excluded from validation (internal/AI docs not meant for publishing)
 get_excluded_files() {
     cat <<EOF
-ai/validation.md
+ai/structure.md
+ai/platforms.md
+ai/mcp-tools.md
 ai/vision-fallback-design.md
 ai/vision-model-research.md
 origin.md

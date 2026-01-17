@@ -216,4 +216,4 @@ Potential improvements to consider:
 
 - [MCP Resources](resources.md) - Resource system design
 - [MCP Server](index.md) - Overall MCP architecture
-- [Validation Guide](../../ai/validation.md) - Development validation workflows
+- [Validation Commands](../../../CLAUDE.md) - Development validation workflows
