@@ -190,14 +190,8 @@ export interface SimCtl {
 }
 
 // Enhance the standard execAsync result to implement the ExecResult interface
-type CommandParts = {
-  file: string;
-  args: string[];
-};
-
-const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
+const execAsync = async (file: string, args: string[], maxBuffer?: number): Promise<ExecResult> => {
   const options = maxBuffer ? { maxBuffer } : undefined;
-  const { file, args } = splitCommand(command);
   const result = await promisify(execFile)(file, args, options);
 
   // Add the required string methods
@@ -218,7 +212,7 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
   return enhancedResult;
 };
 
-function splitCommand(command: string): CommandParts {
+function splitCommandArgs(command: string): string[] {
   const trimmed = command.trim();
   if (!trimmed) {
     throw new Error("Command cannot be empty");
@@ -266,12 +260,7 @@ function splitCommand(command: string): CommandParts {
     args.push(current);
   }
 
-  const [file, ...rest] = args;
-  if (!file) {
-    throw new Error("Command cannot be empty");
-  }
-
-  return { file, args: rest };
+  return args;
 }
 
 /**
@@ -288,7 +277,7 @@ export interface SimulatorList {
 
 export class SimCtlClient implements SimCtl {
   device: BootedDevice | null;
-  execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
+  execAsync: (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
 
   // Static cache for device list
   private static deviceListCache: { devices: DeviceInfo[], timestamp: number } | null = null;
@@ -301,7 +290,7 @@ export class SimCtlClient implements SimCtl {
    */
   constructor(
     device: BootedDevice | null = null,
-    execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null
+    execAsyncFn: ((file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>) | null = null
   ) {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;
@@ -328,6 +317,7 @@ export class SimCtlClient implements SimCtl {
     }
 
     const fullCommand = `xcrun simctl ${command}`;
+    const args = ["simctl", ...splitCommandArgs(command)];
     const startTime = Date.now();
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
@@ -344,7 +334,7 @@ export class SimCtlClient implements SimCtl {
       });
 
       try {
-        const result = await Promise.race([this.execAsync(fullCommand), timeoutPromise]);
+        const result = await Promise.race([this.execAsync("xcrun", args), timeoutPromise]);
         const duration = Date.now() - startTime;
         logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
         return result;
@@ -359,7 +349,7 @@ export class SimCtlClient implements SimCtl {
 
     // No timeout specified
     try {
-      const result = await this.execAsync(fullCommand);
+      const result = await this.execAsync("xcrun", args);
       const duration = Date.now() - startTime;
       logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
       return result;
