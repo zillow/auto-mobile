@@ -31,7 +31,7 @@ docs/contributing/index.md
 
 /.cache
 .mcp.local.json
-.automobile-hot-reload.pid
+*.pid
 # IntelliJ Platform Gradle plugin artifacts
 android/ide-plugin/.intellijPlatform/
 .lycheecache
