@@ -1,4 +1,4 @@
-import { ChildProcess, exec } from "child_process";
+import { ChildProcess, execFile } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
 import { ExecResult, ActionableError, DeviceInfo, BootedDevice, ScreenSize } from "../../models";
@@ -190,9 +190,15 @@ export interface SimCtl {
 }
 
 // Enhance the standard execAsync result to implement the ExecResult interface
+type CommandParts = {
+  file: string;
+  args: string[];
+};
+
 const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
   const options = maxBuffer ? { maxBuffer } : undefined;
-  const result = await promisify(exec)(command, options);
+  const { file, args } = splitCommand(command);
+  const result = await promisify(execFile)(file, args, options);
 
   // Add the required string methods
   const enhancedResult: ExecResult = {
@@ -211,6 +217,62 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
 
   return enhancedResult;
 };
+
+function splitCommand(command: string): CommandParts {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    throw new Error("Command cannot be empty");
+  }
+
+  const args: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+
+    if (char === "\\" && i + 1 < trimmed.length) {
+      current += trimmed[i + 1];
+      i++;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (current.length > 0) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.length > 0) {
+    args.push(current);
+  }
+
+  const [file, ...rest] = args;
+  if (!file) {
+    throw new Error("Command cannot be empty");
+  }
+
+  return { file, args: rest };
+}
 
 /**
  * This file provides an interface to interact with iOS simulators using simctl.

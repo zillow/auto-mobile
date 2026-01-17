@@ -17,6 +17,8 @@ import {
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { applyAppearanceToDevice } from "../utils/deviceAppearance";
 import { triggerAppearanceSync } from "../utils/appearance/AppearanceSyncScheduler";
+import { DaemonState } from "./daemonState";
+import type { AppearanceMode, BootedDevice } from "../models";
 
 const DEFAULT_SOCKET_PATH = path.join(
   os.homedir(),
@@ -145,7 +147,7 @@ export class AppearanceSocketServer {
             throw new Error("set_appearance_sync requires enabled boolean");
           }
           const config = await updateAppearanceConfig({ syncWithHost: enabled });
-          const appliedMode = await this.applyToCurrentDevice(config);
+          const appliedMode = await this.applyToTargets(config);
           await triggerAppearanceSync();
           return {
             id: request.id,
@@ -167,7 +169,7 @@ export class AppearanceSocketServer {
             defaultMode: normalizedMode,
             syncWithHost: normalizedMode === "auto",
           });
-          const appliedMode = await this.applyToCurrentDevice(config, normalizedMode);
+          const appliedMode = await this.applyToTargets(config, normalizedMode);
           await triggerAppearanceSync();
           return {
             id: request.id,
@@ -192,21 +194,52 @@ export class AppearanceSocketServer {
     }
   }
 
-  private async applyToCurrentDevice(
+  private async applyToTargets(
     config: Awaited<ReturnType<typeof getAppearanceConfig>>,
     explicitMode?: string
-  ): Promise<"light" | "dark" | null> {
-    const device = DeviceSessionManager.getInstance().getCurrentDevice();
-    if (!device) {
+  ): Promise<AppearanceMode | null> {
+    const mode = explicitMode && explicitMode !== "auto"
+      ? (explicitMode as AppearanceMode)
+      : await resolveAppearanceMode(config);
+
+    const targets = this.getTargets();
+    if (targets.length === 0) {
       return null;
     }
 
-    const mode = explicitMode && explicitMode !== "auto"
-      ? (explicitMode as "light" | "dark")
-      : await resolveAppearanceMode(config);
+    for (const device of targets) {
+      try {
+        await applyAppearanceToDevice(device, mode);
+      } catch (error) {
+        logger.warn(`[Appearance] Failed to apply appearance to ${device.deviceId}: ${error}`);
+      }
+    }
 
-    await applyAppearanceToDevice(device, mode);
     return mode;
+  }
+
+  private getTargets(): BootedDevice[] {
+    const daemonState = DaemonState.getInstance();
+    const targets = new Map<string, BootedDevice>();
+
+    if (daemonState.isInitialized()) {
+      const pool = daemonState.getDevicePool();
+      const pooledDevices = pool.getAllDevices();
+      for (const device of pooledDevices) {
+        targets.set(device.id, {
+          deviceId: device.id,
+          name: device.id,
+          platform: "android",
+        });
+      }
+    }
+
+    const current = DeviceSessionManager.getInstance().getCurrentDevice();
+    if (current) {
+      targets.set(current.deviceId, current);
+    }
+
+    return Array.from(targets.values());
   }
 }
 
