@@ -179,6 +179,48 @@ bun run dev:android -- --update-checksum
 The script exports `AUTOMOBILE_ACCESSIBILITY_APK_PATH` for the MCP server so it uses the local APK.
 For stdio clients that need hot reload, prefer the streamable HTTP config in the next section.
 
+## iOS XCTestService Dev Loop
+
+For rapid XCTestService iteration, use the iOS hot-reload script. It rebuilds XCTestService
+on changes, restarts the long-running XCUITest server, and optionally starts the MCP dev server.
+
+### Streamlined Workflow (Recommended)
+
+```shell
+# Start everything: hot-reload, MCP server, configure .mcp.json, prompt for IDE
+bun run dev:ios:hot-reload
+
+# Target a specific booted simulator
+bun run dev:ios:hot-reload -- --device <simulator-udid>
+
+# Skip the Claude/Codex prompt
+bun run dev:ios:hot-reload -- --skip-ai
+```
+
+This script:
+1. Kills any previous hot-reload processes
+2. Updates `.mcp.json` to use the local HTTP endpoint
+3. Starts the MCP dev server in the background
+4. Builds XCTestService and starts the XCUITest runner
+5. Watches for XCTestService source changes and restarts on rebuild
+6. Prompts to launch Claude Code or Codex (auto-installs gum if missing)
+
+**Simulator handling:**
+- Requires a booted simulator (no auto-boot)
+- If no simulator is booted, the script waits until one is available
+
+Logs are written to `scratch/ios-hot-reload.log` and `scratch/mcp-server.log`.
+
+### Manual Dev Loop
+
+```shell
+# Build + watch + MCP hot reload (no AI prompt)
+bun run dev:ios
+
+# Build once and exit
+bun run dev:ios -- --once
+```
+
 ## MCP Client Configuration
 
 The setup script automatically creates `.mcp.local.json` with the correct configuration.

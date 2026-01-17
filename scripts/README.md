@@ -138,6 +138,11 @@ bun run benchmark-npm-unpacked-size --output reports/npm-unpacked-size.json
   - `--once` - Build/install once and exit
   - `--update-checksum` - Update release.ts with APK checksum
   - Shared functions in `local-dev/lib/` (common.sh, adb.sh, apk.sh)
+- `local-dev/ios-hot-reload.sh` - Unified iOS development workflow with XCTestService hot-reload, MCP server, and AI assistant integration
+  - `--skip-ai` - Run without AI prompt (used by `bun run dev:ios`)
+  - `--once` - Build once and exit
+  - `--device <udid>` - Target a specific booted simulator
+  - Shared functions in `local-dev/lib/` (common.sh, deps.sh, xctestservice.sh)
 
 ### Tool Definition Scripts
 
