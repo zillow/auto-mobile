@@ -44,6 +44,7 @@ export class RestoreSnapshotIos {
       );
     }
 
+    await this.validateSnapshotCompatibility(manifest);
     await this.restoreAppData(snapshotName, manifest);
 
     logger.info(`[iOS] Snapshot '${snapshotName}' restored successfully`);
@@ -100,8 +101,21 @@ export class RestoreSnapshotIos {
       return;
     }
 
+    const installedBundles = await this.getInstalledBundleIds();
+    if (installedBundles.size > 0) {
+      const missingBundles = bundleIds.filter(bundleId => !installedBundles.has(bundleId));
+      if (missingBundles.length > 0) {
+        throw new ActionableError(
+          `App(s) not installed on simulator: ${missingBundles.join(", ")}. Please reinstall and retry restore.`
+        );
+      }
+    } else {
+      logger.warn("[iOS] Unable to verify installed apps; proceeding with restore");
+    }
+
     for (const bundleId of bundleIds) {
       try {
+        await this.terminateAppIfRunning(bundleId);
         const containerPath = await this.getAppContainerPath(bundleId);
         if (!containerPath) {
           continue;
@@ -120,6 +134,93 @@ export class RestoreSnapshotIos {
       } catch (error) {
         logger.warn(`[iOS] Failed to restore app data for ${bundleId}: ${error}`);
       }
+    }
+  }
+
+  private async validateSnapshotCompatibility(manifest: DeviceSnapshotManifest): Promise<void> {
+    if (!manifest.osVersion) {
+      logger.warn("[iOS] Snapshot OS version missing; skipping compatibility check");
+      return;
+    }
+
+    const deviceOsVersion = await this.getDeviceOsVersion();
+    if (!deviceOsVersion) {
+      logger.warn("[iOS] Unable to read simulator OS version; skipping compatibility check");
+      return;
+    }
+
+    const snapshotVersion = this.parseOsVersion(manifest.osVersion);
+    const targetVersion = this.parseOsVersion(deviceOsVersion);
+
+    if (!snapshotVersion || !targetVersion) {
+      logger.warn("[iOS] Unable to parse OS versions for compatibility check; proceeding");
+      return;
+    }
+
+    if (snapshotVersion.major !== targetVersion.major) {
+      throw new ActionableError(
+        `Snapshot iOS version '${manifest.osVersion}' is incompatible with simulator iOS '${deviceOsVersion}'. ` +
+        `Please restore on an iOS ${snapshotVersion.major}.x simulator.`
+      );
+    }
+  }
+
+  private async getDeviceOsVersion(): Promise<string | undefined> {
+    try {
+      const deviceInfo = await this.simctl.getDeviceInfo(this.device.deviceId);
+      if (!deviceInfo) {
+        return undefined;
+      }
+
+      let osVersion: string | undefined = deviceInfo.os_version;
+      if (!osVersion && deviceInfo.runtime) {
+        const runtimes = await this.simctl.getRuntimes();
+        const runtime = runtimes.find(entry => entry.identifier === deviceInfo.runtime);
+        osVersion = runtime?.version || runtime?.name;
+      }
+
+      return osVersion;
+    } catch (error) {
+      logger.warn(`[iOS] Failed to read simulator OS version: ${error}`);
+      return undefined;
+    }
+  }
+
+  private parseOsVersion(version: string): { major: number; minor?: number } | null {
+    const runtimeMatch = version.match(/iOS[-\s_]?(\d+)(?:[.\-_](\d+))?/i);
+    const match = runtimeMatch ?? version.match(/(\d+)(?:\.(\d+))?/);
+    if (!match) {
+      return null;
+    }
+
+    const major = Number(match[1]);
+    if (!Number.isFinite(major)) {
+      return null;
+    }
+
+    const minorValue = match[2];
+    const minor = minorValue !== undefined ? Number(minorValue) : undefined;
+    return Number.isFinite(minor) || minor === undefined ? { major, minor } : { major };
+  }
+
+  private async getInstalledBundleIds(): Promise<Set<string>> {
+    try {
+      const apps = await this.simctl.listApps(this.device.deviceId);
+      const bundleIds = apps
+        .map((app: any) => app.bundleId || app.CFBundleIdentifier)
+        .filter((value: string | undefined) => typeof value === "string" && value.length > 0);
+      return new Set(bundleIds);
+    } catch (error) {
+      logger.warn(`[iOS] Failed to list installed apps: ${error}`);
+      return new Set();
+    }
+  }
+
+  private async terminateAppIfRunning(bundleId: string): Promise<void> {
+    try {
+      await this.simctl.terminateApp(bundleId, this.device.deviceId);
+    } catch (error) {
+      logger.warn(`[iOS] Failed to terminate ${bundleId} before restore: ${error}`);
     }
   }
 
