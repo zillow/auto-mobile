@@ -28,3 +28,52 @@ updates:
       - "android"
     commit-message:
       prefix: "chore(deps)"
+  # iOS Swift Package Manager dependencies
+  - package-ecosystem: "swift"
+    directory: "/ios/XCTestService"
+    schedule:
+      interval: "daily"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ios"
+    commit-message:
+      prefix: "chore(deps)"
+  - package-ecosystem: "swift"
+    directory: "/ios/XCTestRunner"
+    schedule:
+      interval: "daily"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ios"
+    commit-message:
+      prefix: "chore(deps)"
+  - package-ecosystem: "swift"
+    directory: "/ios/XcodeCompanion"
+    schedule:
+      interval: "daily"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ios"
+    commit-message:
+      prefix: "chore(deps)"
+  - package-ecosystem: "swift"
+    directory: "/ios/XcodeExtension"
+    schedule:
+      interval: "daily"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ios"
+    commit-message:
+      prefix: "chore(deps)"
