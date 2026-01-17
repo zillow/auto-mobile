@@ -141,30 +141,30 @@ report="${scratch_dir}/report.md"
     if [[ -f "$outdir/run.log" ]]; then
       echo "- run log:"
       echo ""
-      echo "```"
+      printf '%s\n' '```'
       cat "$outdir/run.log"
-      echo "```"
+      printf '%s\n' '```'
     else
       echo "- run log: (not available)"
     fi
     echo "- dumpsys window windows key lines:"
     echo ""
-    echo "```"
+    printf '%s\n' '```'
     if [[ -f "$outdir/dumpsys-window-windows.txt" ]]; then
       rg -n "imeControlTarget|imeInputTarget|imeLayeringTarget|mActivityRecord=|ty=BASE_APPLICATION|mViewVisibility=|isOnScreen=true|isVisible=true|mCurrentFocus|mFocusedApp" "$outdir/dumpsys-window-windows.txt" | head -n 120
     else
       echo "(missing)"
     fi
-    echo "```"
+    printf '%s\n' '```'
     echo "- dumpsys activity activities key lines:"
     echo ""
-    echo "```"
+    printf '%s\n' '```'
     if [[ -f "$outdir/dumpsys-activity-activities.txt" ]]; then
       rg -n "mResumedActivity|mFocusedActivity|topResumedActivity" "$outdir/dumpsys-activity-activities.txt" | head -n 80
     else
       echo "(missing)"
     fi
-    echo "```"
+    printf '%s\n' '```'
     echo ""
   done
 } > "$report"
