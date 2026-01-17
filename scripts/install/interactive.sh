@@ -1086,12 +1086,17 @@ if "[mcp_servers.auto-mobile]" in existing:
     result = []
     skip = False
     for line in lines:
-        # Start skipping when we hit auto-mobile section
-        if line.strip().startswith("[mcp_servers.auto-mobile]"):
+        stripped = line.strip()
+        # Start skipping when we hit the exact auto-mobile section header
+        if stripped == "[mcp_servers.auto-mobile]":
             skip = True
             continue
-        # Stop skipping when we hit another section
-        if skip and line.strip().startswith("[") and not line.strip().startswith("[mcp_servers.auto-mobile"):
+        # Continue skipping auto-mobile subsections (e.g. [mcp_servers.auto-mobile.env])
+        if skip and stripped.startswith("[mcp_servers.auto-mobile."):
+            continue
+        # Stop skipping when we hit any other section header
+        # This correctly preserves [mcp_servers.auto-mobile-dev] etc.
+        if skip and stripped.startswith("["):
             skip = False
         if not skip:
             result.append(line)
