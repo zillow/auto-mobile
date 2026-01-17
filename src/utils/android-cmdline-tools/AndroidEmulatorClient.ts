@@ -3,6 +3,7 @@ import { promisify } from "util";
 import { logger } from "../logger";
 import { BootedDevice, DeviceInfo, ExecResult, ActionableError } from "../../models";
 import { AdbClient } from "./AdbClient";
+import { AdbExecutor } from "./interfaces/AdbExecutor";
 import { arch } from "os";
 import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
 
@@ -843,7 +844,9 @@ export class AndroidEmulatorClient implements AndroidEmulator {
       if (foundDeviceId) {
         pollingActive = false;
         logger.info(`Emulator '${avdName}' is ready! Device ID: ${foundDeviceId}`);
-        return { name: avdName, platform: "android", deviceId: foundDeviceId } as BootedDevice;
+        const bootedDevice = { name: avdName, platform: "android", deviceId: foundDeviceId } as BootedDevice;
+        await this.wakeAndUnlock(bootedDevice);
+        return bootedDevice;
       }
 
       // Check less frequently in main loop since background polling is doing the work
@@ -856,10 +859,48 @@ export class AndroidEmulatorClient implements AndroidEmulator {
 
     if (foundDeviceId) {
       logger.info(`Emulator '${avdName}' is ready! Device ID: ${foundDeviceId}`);
-      return { name: avdName, platform: "android", deviceId: foundDeviceId } as BootedDevice;
+      const bootedDevice = { name: avdName, platform: "android", deviceId: foundDeviceId } as BootedDevice;
+      await this.wakeAndUnlock(bootedDevice);
+      return bootedDevice;
     }
 
     throw new ActionableError(`Emulator '${avdName}' failed to become ready within ${timeoutMs}ms`);
+  }
+
+  /**
+   * Wake up the emulator and dismiss the lock screen after boot.
+   * This ensures the device is immediately usable for automation.
+   * @param device - The booted device to wake and unlock
+   * @param adb - Optional AdbExecutor for testing (defaults to new AdbClient)
+   */
+  private async wakeAndUnlock(device: BootedDevice, adb?: AdbExecutor): Promise<void> {
+    const executor = adb ?? new AdbClient(device);
+
+    try {
+      // Check wakefulness state
+      const wakefulness = await executor.getWakefulness();
+      logger.info(`[WakeAndUnlock] Device wakefulness state: ${wakefulness}`);
+
+      if (wakefulness !== "Awake") {
+        // Send KEYCODE_WAKEUP to wake the device
+        logger.info("[WakeAndUnlock] Device not awake, sending KEYCODE_WAKEUP");
+        await executor.executeCommand("shell input keyevent KEYCODE_WAKEUP");
+
+        // Small delay to allow the screen to turn on
+        await this.sleep(500);
+      }
+
+      // Dismiss the lock screen / keyguard
+      logger.info("[WakeAndUnlock] Dismissing keyguard");
+      await executor.executeCommand("shell wm dismiss-keyguard");
+
+      // Verify the device is now awake
+      const finalWakefulness = await executor.getWakefulness();
+      logger.info(`[WakeAndUnlock] Final wakefulness state: ${finalWakefulness}`);
+    } catch (error) {
+      // Log but don't fail - the device is still ready, just might need manual interaction
+      logger.warn(`[WakeAndUnlock] Failed to wake/unlock device: ${error}`);
+    }
   }
 
   /**
