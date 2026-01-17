@@ -61,9 +61,14 @@ function flattenZodIssues(issues: ZodIssue[]): ZodIssue[] {
   const flattened: ZodIssue[] = [];
 
   const visit = (issue: ZodIssue) => {
-    if (issue.code === "invalid_union") {
-      issue.unionErrors.forEach(unionError => {
-        unionError.issues.forEach(visit);
+    if (issue.code === "invalid_union" && issue.errors.length) {
+      issue.errors.forEach(unionIssues => {
+        unionIssues.forEach(unionIssue => {
+          const normalizedIssue = issue.path.length
+            ? { ...unionIssue, path: [...issue.path, ...unionIssue.path] }
+            : unionIssue;
+          visit(normalizedIssue as ZodIssue);
+        });
       });
       return;
     }

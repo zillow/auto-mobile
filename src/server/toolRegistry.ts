@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { toJSONSchema } from "zod";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { ActionableError, BootedDevice, SomePlatform } from "../models";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
@@ -397,8 +397,8 @@ class ToolRegistryClass {
     return this.getAllTools().map(tool => ({
       name: tool.name,
       description: tool.description,
-      inputSchema: zodToJsonSchema(tool.schema),
-      ...(tool.outputSchema ? { outputSchema: zodToJsonSchema(tool.outputSchema) } : {})
+      inputSchema: toJSONSchema(tool.schema),
+      ...(tool.outputSchema ? { outputSchema: toJSONSchema(tool.outputSchema) } : {})
     }));
   }
 

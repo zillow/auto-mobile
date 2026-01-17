@@ -3,6 +3,7 @@
     "name": "biometricAuth",
     "description": "Simulate biometric authentication (fingerprint) on Android emulators. Trigger match/fail/cancel actions for testing biometric prompts.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -15,42 +16,42 @@
           "description": "Biometric action: 'match' triggers successful authentication, 'fail' simulates non-matching biometric, 'cancel' cancels the prompt"
         },
         "modality": {
+          "description": "Biometric modality (default: 'any'). Currently only 'fingerprint' is reliably supported on Android emulators. 'face' is not consistently supported.",
           "type": "string",
           "enum": [
             "any",
             "fingerprint",
             "face"
-          ],
-          "description": "Biometric modality (default: 'any'). Currently only 'fingerprint' is reliably supported on Android emulators. 'face' is not consistently supported."
+          ]
         },
         "fingerprintId": {
-          "type": "number",
-          "description": "Fingerprint ID to simulate (default: 1 for 'match', 2 for 'fail'). Use enrolled ID (typically 1) for match, non-enrolled ID (typically 2) for fail."
+          "description": "Fingerprint ID to simulate (default: 1 for 'match', 2 for 'fail'). Use enrolled ID (typically 1) for match, non-enrolled ID (typically 2) for fail.",
+          "type": "number"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "changeLocalization",
     "description": "Change locale, time zone, text direction, and time format",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -62,55 +63,55 @@
           "description": "Platform"
         },
         "locale": {
+          "description": "Locale tag (e.g., ar-SA, ja-JP)",
           "type": "string",
-          "minLength": 1,
-          "description": "Locale tag (e.g., ar-SA, ja-JP)"
+          "minLength": 1
         },
         "timeZone": {
+          "description": "Zone ID (e.g., America/Los_Angeles)",
           "type": "string",
-          "minLength": 1,
-          "description": "Zone ID (e.g., America/Los_Angeles)"
+          "minLength": 1
         },
         "textDirection": {
+          "description": "Text direction",
           "type": "string",
           "enum": [
             "ltr",
             "rtl"
-          ],
-          "description": "Text direction"
+          ]
         },
         "timeFormat": {
+          "description": "Time format",
           "type": "string",
           "enum": [
             "12",
             "24"
-          ],
-          "description": "Time format"
+          ]
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "clearText",
     "description": "Clear text from focused input",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -122,29 +123,29 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "clipboard",
     "description": "Clipboard operations (copy/paste/clear/get)",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -158,8 +159,8 @@
           "description": "Clipboard action: copy=set clipboard, paste=paste into focused field, clear=clear clipboard, get=get clipboard content"
         },
         "text": {
-          "type": "string",
-          "description": "Text to copy (required for 'copy' action)"
+          "description": "Text to copy (required for 'copy' action)",
+          "type": "string"
         },
         "platform": {
           "type": "string",
@@ -170,30 +171,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "criticalSection",
     "description": "Coordinate multiple devices at a synchronization barrier and execute steps serially. All devices must reach the critical section before any can proceed. Steps execute one device at a time in the order they acquire the lock.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "lock": {
@@ -201,6 +202,7 @@
           "description": "Global lock identifier. All devices using the same lock name will wait for each other at this barrier."
         },
         "steps": {
+          "minItems": 1,
           "type": "array",
           "items": {
             "type": "object",
@@ -211,12 +213,15 @@
               },
               "params": {
                 "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
                 "additionalProperties": {},
                 "description": "Tool-specific parameters"
               },
               "label": {
-                "type": "string",
-                "description": "Optional human-readable label"
+                "description": "Optional human-readable label",
+                "type": "string"
               }
             },
             "required": [
@@ -225,18 +230,19 @@
             ],
             "additionalProperties": false
           },
-          "minItems": 1,
           "description": "Steps to execute serially within the critical section. Each step should target a specific device using the 'device' parameter."
         },
         "deviceCount": {
           "type": "integer",
           "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
           "description": "Number of devices expected to reach this critical section. All devices must arrive before any can proceed."
         },
         "timeout": {
+          "description": "Timeout in milliseconds for waiting at the barrier (default: 30000ms)",
           "type": "integer",
           "exclusiveMinimum": 0,
-          "description": "Timeout in milliseconds for waiting at the barrier (default: 30000ms)"
+          "maximum": 9007199254740991
         }
       },
       "required": [
@@ -244,14 +250,14 @@
         "steps",
         "deviceCount"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "demoMode",
     "description": "Enable or disable demo mode for screenshots and screen recordings",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -263,26 +269,27 @@
           "description": "Demo mode action"
         },
         "time": {
-          "type": "string",
-          "description": "Time in HHMM (e.g., 1000)"
+          "description": "Time in HHMM (e.g., 1000)",
+          "type": "string"
         },
         "batteryLevel": {
+          "description": "Battery % (0-100)",
           "type": "number",
           "minimum": 0,
-          "maximum": 100,
-          "description": "Battery % (0-100)"
+          "maximum": 100
         },
         "batteryPlugged": {
-          "type": "boolean",
-          "description": "Charging status"
+          "description": "Charging status",
+          "type": "boolean"
         },
         "wifiLevel": {
+          "description": "WiFi strength (0-4)",
           "type": "number",
           "minimum": 0,
-          "maximum": 4,
-          "description": "WiFi strength (0-4)"
+          "maximum": 4
         },
         "mobileDataType": {
+          "description": "Data type",
           "type": "string",
           "enum": [
             "4g",
@@ -291,18 +298,17 @@
             "3g",
             "edge",
             "none"
-          ],
-          "description": "Data type"
+          ]
         },
         "mobileSignalLevel": {
+          "description": "Signal strength (0-4)",
           "type": "number",
           "minimum": 0,
-          "maximum": 4,
-          "description": "Signal strength (0-4)"
+          "maximum": 4
         },
         "hideNotifications": {
-          "type": "boolean",
-          "description": "Hide notifications"
+          "description": "Hide notifications",
+          "type": "boolean"
         },
         "platform": {
           "type": "string",
@@ -313,30 +319,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "deviceSnapshot",
     "description": "Capture or restore a device snapshot for the active device.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -348,88 +354,88 @@
           "description": "Action to perform"
         },
         "snapshotName": {
-          "type": "string",
-          "description": "Name for the snapshot"
+          "description": "Name for the snapshot",
+          "type": "string"
         },
         "includeAppData": {
-          "type": "boolean",
-          "description": "Include app data directories in snapshot"
+          "description": "Include app data directories in snapshot",
+          "type": "boolean"
         },
         "includeSettings": {
-          "type": "boolean",
-          "description": "Include system settings in snapshot"
+          "description": "Include system settings in snapshot",
+          "type": "boolean"
         },
         "useVmSnapshot": {
-          "type": "boolean",
-          "description": "Use emulator VM snapshot if available (faster, emulator only)"
+          "description": "Use emulator VM snapshot if available (faster, emulator only)",
+          "type": "boolean"
         },
         "strictBackupMode": {
-          "type": "boolean",
-          "description": "If true, fail entire snapshot if app data backup fails or times out"
+          "description": "If true, fail entire snapshot if app data backup fails or times out",
+          "type": "boolean"
         },
         "backupTimeoutMs": {
-          "type": "number",
-          "description": "Timeout in milliseconds for adb backup user confirmation"
+          "description": "Timeout in milliseconds for adb backup user confirmation",
+          "type": "number"
         },
         "userApps": {
+          "description": "Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)",
           "type": "string",
           "enum": [
             "current",
             "all"
-          ],
-          "description": "Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)"
+          ]
         },
         "vmSnapshotTimeoutMs": {
-          "type": "number",
-          "description": "Timeout in milliseconds for emulator VM snapshot commands"
+          "description": "Timeout in milliseconds for emulator VM snapshot commands",
+          "type": "number"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "doctor",
     "description": "Run diagnostic checks to verify AutoMobile setup and environment configuration",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "android": {
-          "type": "boolean",
-          "description": "Run Android-specific checks only"
+          "description": "Run Android-specific checks only",
+          "type": "boolean"
         },
         "ios": {
-          "type": "boolean",
-          "description": "Run iOS-specific checks only"
+          "description": "Run iOS-specific checks only",
+          "type": "boolean"
         },
         "installCmdlineTools": {
-          "type": "boolean",
-          "description": "Automatically download and install Android SDK Command-line Tools to ANDROID_HOME if missing"
+          "description": "Automatically download and install Android SDK Command-line Tools to ANDROID_HOME if missing",
+          "type": "boolean"
         }
       },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "dragAndDrop",
     "description": "Drag and drop element",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "source": {
@@ -495,22 +501,22 @@
           "description": "Target element"
         },
         "pressDurationMs": {
+          "description": "Press duration ms (min: 600, max: 3000, default: 600)",
           "type": "number",
           "minimum": 600,
-          "maximum": 3000,
-          "description": "Press duration ms (min: 600, max: 3000, default: 600)"
+          "maximum": 3000
         },
         "dragDurationMs": {
+          "description": "Drag duration ms (min: 300, max: 1000, default: 300)",
           "type": "number",
           "minimum": 300,
-          "maximum": 1000,
-          "description": "Drag duration ms (min: 300, max: 1000, default: 300)"
+          "maximum": 1000
         },
         "holdDurationMs": {
+          "description": "Hold duration ms (min: 100, max: 3000, default: 100)",
           "type": "number",
           "minimum": 100,
-          "maximum": 3000,
-          "description": "Hold duration ms (min: 100, max: 3000, default: 100)"
+          "maximum": 3000
         },
         "platform": {
           "type": "string",
@@ -521,16 +527,16 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
@@ -538,14 +544,14 @@
         "target",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "executePlan",
     "description": "Execute a series of tool calls from a YAML plan content. Stops execution if any step fails (success: false). Optionally can resume execution from a specific step index.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "planContent": {
@@ -553,9 +559,9 @@
           "description": "YAML plan content"
         },
         "startStep": {
-          "type": "number",
           "default": 0,
-          "description": "Start step index (0-based, default: 0)"
+          "description": "Start step index (0-based, default: 0)",
+          "type": "number"
         },
         "platform": {
           "type": "string",
@@ -566,43 +572,44 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for parallel execution"
+          "description": "Session UUID for parallel execution",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "deviceId": {
-          "type": "string",
-          "description": "Device ID"
+          "description": "Device ID",
+          "type": "string"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         },
         "devices": {
+          "description": "Device labels for multi-device plans",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "Device labels for multi-device plans"
+          }
         },
         "deviceAllocationTimeoutMs": {
-          "type": "number",
           "default": 300000,
-          "description": "Timeout in milliseconds for allocating all devices (default: 300000 = 5 minutes)"
+          "description": "Timeout in milliseconds for allocating all devices (default: 300000 = 5 minutes)",
+          "type": "number"
         },
         "abortStrategy": {
+          "default": "immediate",
+          "description": "Abort strategy: immediate (default) or finish-current-step",
           "type": "string",
           "enum": [
             "immediate",
             "finish-current-step"
-          ],
-          "default": "immediate",
-          "description": "Abort strategy: immediate (default) or finish-current-step"
+          ]
         },
         "testMetadata": {
+          "description": "Test metadata for timing history",
           "type": "object",
           "properties": {
             "testClass": {
@@ -619,7 +626,8 @@
             },
             "targetSdk": {
               "type": "integer",
-              "exclusiveMinimum": 0
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
             },
             "jdkVersion": {
               "type": "string"
@@ -638,42 +646,50 @@
             "testClass",
             "testMethod"
           ],
-          "additionalProperties": false,
-          "description": "Test metadata for timing history"
+          "additionalProperties": false
         },
         "cleanupAppId": {
-          "type": "string",
-          "description": "App ID to terminate after execution"
+          "description": "App ID to terminate after execution",
+          "type": "string"
         },
         "cleanupClearAppData": {
-          "type": "boolean",
-          "description": "Clear app data on cleanup"
+          "description": "Clear app data on cleanup",
+          "type": "boolean"
         }
       },
       "required": [
         "planContent",
-        "platform"
+        "startStep",
+        "platform",
+        "deviceAllocationTimeoutMs",
+        "abortStrategy"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     },
     "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "success": {
           "type": "boolean"
         },
         "executedSteps": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "totalSteps": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "failedStep": {
           "type": "object",
           "properties": {
             "stepIndex": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "tool": {
               "type": "string"
@@ -704,6 +720,9 @@
         },
         "deviceMapping": {
           "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
           "additionalProperties": {
             "type": "string"
           }
@@ -712,7 +731,9 @@
           "type": "object",
           "properties": {
             "executionTimeMs": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "steps": {
               "type": "array",
@@ -731,7 +752,9 @@
                     ]
                   },
                   "durationMs": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   "details": {}
                 },
@@ -768,87 +791,90 @@
         "executedSteps",
         "totalSteps"
       ],
-      "additionalProperties": true,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": {}
     }
   },
   {
     "name": "explore",
     "description": "Automatically explore app to build navigation graph",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "maxInteractions": {
-          "type": "number",
-          "description": "Max interactions (default: 50)"
+          "description": "Max interactions (default: 50)",
+          "type": "number"
         },
         "timeoutMs": {
-          "type": "number",
-          "description": "Timeout ms (default: 300000)"
+          "description": "Timeout ms (default: 300000)",
+          "type": "number"
         },
         "strategy": {
+          "description": "Strategy (default: weighted)",
           "type": "string",
           "enum": [
             "breadth-first",
             "depth-first",
             "weighted"
-          ],
-          "description": "Strategy (default: weighted)"
+          ]
         },
         "resetToHome": {
-          "type": "boolean",
-          "description": "Reset to home periodically (default: false)"
+          "description": "Reset to home periodically (default: false)",
+          "type": "boolean"
         },
         "resetInterval": {
-          "type": "number",
-          "description": "Reset interval (default: 15)"
+          "description": "Reset interval (default: 15)",
+          "type": "number"
         },
         "mode": {
+          "description": "Mode (default: hybrid)",
           "type": "string",
           "enum": [
             "discover",
             "validate",
             "hybrid"
-          ],
-          "description": "Mode (default: hybrid)"
+          ]
         },
         "packageName": {
-          "type": "string",
-          "description": "Package to limit exploration"
+          "description": "Package to limit exploration",
+          "type": "string"
         },
         "dryRun": {
-          "type": "boolean",
-          "description": "Dry run (no interactions)"
+          "description": "Dry run (no interactions)",
+          "type": "boolean"
         },
         "platform": {
+          "default": "android",
           "type": "string",
           "enum": [
             "android",
             "ios"
-          ],
-          "default": "android"
+          ]
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "required": [
+        "platform"
+      ],
+      "additionalProperties": false
     }
   },
   {
     "name": "getDeepLinks",
     "description": "Query deep links for app",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "appId": {
@@ -856,29 +882,29 @@
           "description": "App package ID"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "appId"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "highlight",
     "description": "Draw a visual highlight around a UI element on the device screen for debugging.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -890,20 +916,22 @@
           "description": "Target platform"
         },
         "deviceId": {
-          "type": "string",
-          "description": "Optional device ID override"
+          "description": "Optional device ID override",
+          "type": "string"
         },
         "timeoutMs": {
+          "description": "Highlight request timeout ms (default: 5000)",
           "type": "integer",
           "exclusiveMinimum": 0,
-          "description": "Highlight request timeout ms (default: 5000)"
+          "maximum": 9007199254740991
         },
         "description": {
-          "type": "string",
-          "description": "Optional description of the highlight"
+          "description": "Optional description of the highlight",
+          "type": "string"
         },
         "shape": {
-          "anyOf": [
+          "description": "Optional highlight shape definition",
+          "oneOf": [
             {
               "type": "object",
               "properties": {
@@ -915,24 +943,31 @@
                   "type": "object",
                   "properties": {
                     "x": {
-                      "type": "integer"
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "y": {
-                      "type": "integer"
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "width": {
                       "type": "integer",
-                      "exclusiveMinimum": 0
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "height": {
                       "type": "integer",
-                      "exclusiveMinimum": 0
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "sourceWidth": {
                       "anyOf": [
                         {
                           "type": "integer",
-                          "exclusiveMinimum": 0
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
                         },
                         {
                           "type": "null"
@@ -943,7 +978,8 @@
                       "anyOf": [
                         {
                           "type": "integer",
-                          "exclusiveMinimum": 0
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
                         },
                         {
                           "type": "null"
@@ -989,12 +1025,12 @@
                         "dashPattern": {
                           "anyOf": [
                             {
+                              "minItems": 1,
                               "type": "array",
                               "items": {
                                 "type": "number",
                                 "exclusiveMinimum": 0
-                              },
-                              "minItems": 1
+                              }
                             },
                             {
                               "type": "null"
@@ -1082,12 +1118,163 @@
                   "const": "circle"
                 },
                 "bounds": {
-                  "$ref": "#/properties/shape/anyOf/0/properties/bounds"
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "y": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "width": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "height": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "sourceWidth": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sourceHeight": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "x",
+                    "y",
+                    "width",
+                    "height"
+                  ],
+                  "additionalProperties": false
                 },
                 "style": {
                   "anyOf": [
                     {
-                      "$ref": "#/properties/shape/anyOf/0/properties/style/anyOf/0"
+                      "type": "object",
+                      "properties": {
+                        "strokeColor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "strokeWidth": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "dashPattern": {
+                          "anyOf": [
+                            {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "exclusiveMinimum": 0
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "smoothing": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "catmull-rom",
+                                "bezier",
+                                "douglas-peucker"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tension": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "capStyle": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "butt",
+                                "round",
+                                "square"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "joinStyle": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "miter",
+                                "round",
+                                "bevel"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -1109,6 +1296,7 @@
                   "const": "path"
                 },
                 "points": {
+                  "minItems": 2,
                   "type": "array",
                   "items": {
                     "type": "object",
@@ -1125,13 +1313,65 @@
                       "y"
                     ],
                     "additionalProperties": false
-                  },
-                  "minItems": 2
+                  }
                 },
                 "bounds": {
                   "anyOf": [
                     {
-                      "$ref": "#/properties/shape/anyOf/0/properties/bounds"
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "y": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "width": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "height": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sourceWidth": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "sourceHeight": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "width",
+                        "height"
+                      ],
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -1141,7 +1381,105 @@
                 "style": {
                   "anyOf": [
                     {
-                      "$ref": "#/properties/shape/anyOf/0/properties/style/anyOf/0"
+                      "type": "object",
+                      "properties": {
+                        "strokeColor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "strokeWidth": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "dashPattern": {
+                          "anyOf": [
+                            {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "number",
+                                "exclusiveMinimum": 0
+                              }
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "smoothing": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "catmull-rom",
+                                "bezier",
+                                "douglas-peucker"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "tension": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0,
+                              "maximum": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "capStyle": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "butt",
+                                "round",
+                                "square"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "joinStyle": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "miter",
+                                "round",
+                                "bevel"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     {
                       "type": "null"
@@ -1155,10 +1493,10 @@
               ],
               "additionalProperties": false
             }
-          ],
-          "description": "Optional highlight shape definition"
+          ]
         },
         "selector": {
+          "description": "Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }",
           "anyOf": [
             {
               "type": "object",
@@ -1186,10 +1524,10 @@
               ],
               "additionalProperties": false
             }
-          ],
-          "description": "Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"
+          ]
         },
         "container": {
+          "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }.",
           "anyOf": [
             {
               "type": "object",
@@ -1217,45 +1555,44 @@
               ],
               "additionalProperties": false
             }
-          ],
-          "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
+          ]
         },
         "containerOf": {
-          "type": "boolean",
-          "description": "Whether to highlight the container of the selected element"
+          "description": "Whether to highlight the container of the selected element",
+          "type": "boolean"
         },
         "selectionStrategy": {
+          "description": "Element selection strategy when multiple matches are found (default: first)",
           "type": "string",
           "enum": [
             "first",
             "random"
-          ],
-          "description": "Element selection strategy when multiple matches are found (default: first)"
+          ]
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "homeScreen",
     "description": "Go to home screen",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -1267,29 +1604,29 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "imeAction",
     "description": "Perform IME action",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -1313,30 +1650,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "inputText",
     "description": "Input text",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "text": {
@@ -1344,6 +1681,7 @@
           "description": "Text to input"
         },
         "imeAction": {
+          "description": "IME action after input",
           "type": "string",
           "enum": [
             "done",
@@ -1352,8 +1690,7 @@
             "send",
             "go",
             "previous"
-          ],
-          "description": "IME action after input"
+          ]
         },
         "platform": {
           "type": "string",
@@ -1364,30 +1701,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "text",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "installApp",
     "description": "Install APK file",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "apkPath": {
@@ -1395,29 +1732,29 @@
           "description": "APK file path"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "apkPath"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "keyboard",
     "description": "Open, close, or detect the on-screen keyboard",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -1438,30 +1775,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "killDevice",
     "description": "Kill device",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "device": {
@@ -1495,14 +1832,14 @@
       "required": [
         "device"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "launchApp",
     "description": "Launch app by package name",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "appId": {
@@ -1510,47 +1847,47 @@
           "description": "App package ID"
         },
         "clearAppData": {
-          "type": "boolean",
-          "description": "Clear app data before launch (default false)"
+          "description": "Clear app data before launch (default false)",
+          "type": "boolean"
         },
         "coldBoot": {
-          "type": "boolean",
-          "description": "Cold boot app (default false)"
+          "description": "Cold boot app (default false)",
+          "type": "boolean"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "appId"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "listApps",
     "description": "Guide for listing apps via MCP resources",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {},
-      "additionalProperties": true,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": {}
     }
   },
   {
     "name": "listDeviceImages",
     "description": "List device images",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -1565,33 +1902,33 @@
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "listDevices",
     "description": "List devices (resource guidance)",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
+          "description": "Platform",
           "type": "string",
           "enum": [
             "android",
             "ios"
-          ],
-          "description": "Platform"
+          ]
         }
       },
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "navigateTo",
     "description": "Navigate to screen using navigation graph",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "targetScreen": {
@@ -1599,37 +1936,38 @@
           "description": "Target screen name"
         },
         "platform": {
+          "default": "android",
           "type": "string",
           "enum": [
             "android",
             "ios"
-          ],
-          "default": "android"
+          ]
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
-        "targetScreen"
+        "targetScreen",
+        "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "observe",
     "description": "Get screen view hierarchy",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -1641,70 +1979,78 @@
           "description": "Platform"
         },
         "waitFor": {
+          "description": "Wait for element to appear before returning observation",
           "type": "object",
           "properties": {
             "element": {
               "type": "object",
               "properties": {
                 "id": {
-                  "type": "string",
-                  "description": "Element ID to wait for"
+                  "description": "Element ID to wait for",
+                  "type": "string"
                 },
                 "text": {
-                  "type": "string",
-                  "description": "Element text to wait for"
+                  "description": "Element text to wait for",
+                  "type": "string"
                 }
               },
               "additionalProperties": false,
               "description": "Element to wait for"
             },
             "timeout": {
-              "type": "number",
-              "description": "Wait timeout ms (default: 5000)"
+              "description": "Wait timeout ms (default: 5000)",
+              "type": "number"
             }
           },
           "required": [
             "element"
           ],
-          "additionalProperties": false,
-          "description": "Wait for element to appear before returning observation"
+          "additionalProperties": false
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     },
     "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "updatedAt": {
-          "type": [
-            "string",
-            "number"
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            }
           ]
         },
         "screenSize": {
           "type": "object",
           "properties": {
             "width": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "height": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -1717,16 +2063,24 @@
           "type": "object",
           "properties": {
             "top": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "right": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "bottom": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "left": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -1738,7 +2092,9 @@
           "additionalProperties": false
         },
         "rotation": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "viewHierarchy": {},
         "activeWindow": {
@@ -1751,13 +2107,15 @@
               "type": "string"
             },
             "layoutSeqSum": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "type": {
               "type": "string"
             }
           },
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "elements": {
           "type": "object",
@@ -1771,22 +2129,34 @@
                     "type": "object",
                     "properties": {
                       "left": {
-                        "type": "integer"
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       "top": {
-                        "type": "integer"
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       "right": {
-                        "type": "integer"
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       "bottom": {
-                        "type": "integer"
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       "centerX": {
-                        "type": "integer"
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       },
                       "centerY": {
-                        "type": "integer"
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
                       }
                     },
                     "required": [
@@ -1843,19 +2213,199 @@
                 "required": [
                   "bounds"
                 ],
-                "additionalProperties": true
+                "additionalProperties": {}
               }
             },
             "scrollable": {
               "type": "array",
               "items": {
-                "$ref": "#/properties/elements/properties/clickable/items"
+                "type": "object",
+                "properties": {
+                  "bounds": {
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "top": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "right": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "bottom": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerX": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerY": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "top",
+                      "right",
+                      "bottom"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "resource-id": {
+                    "type": "string"
+                  },
+                  "content-desc": {
+                    "type": "string"
+                  },
+                  "class": {
+                    "type": "string"
+                  },
+                  "package": {
+                    "type": "string"
+                  },
+                  "checkable": {
+                    "type": "boolean"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "focusable": {
+                    "type": "boolean"
+                  },
+                  "focused": {
+                    "type": "boolean"
+                  },
+                  "accessibility-focused": {
+                    "type": "boolean"
+                  },
+                  "scrollable": {
+                    "type": "boolean"
+                  },
+                  "selected": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "bounds"
+                ],
+                "additionalProperties": {}
               }
             },
             "text": {
               "type": "array",
               "items": {
-                "$ref": "#/properties/elements/properties/clickable/items"
+                "type": "object",
+                "properties": {
+                  "bounds": {
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "top": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "right": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "bottom": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerX": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerY": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "top",
+                      "right",
+                      "bottom"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "resource-id": {
+                    "type": "string"
+                  },
+                  "content-desc": {
+                    "type": "string"
+                  },
+                  "class": {
+                    "type": "string"
+                  },
+                  "package": {
+                    "type": "string"
+                  },
+                  "checkable": {
+                    "type": "boolean"
+                  },
+                  "checked": {
+                    "type": "boolean"
+                  },
+                  "clickable": {
+                    "type": "boolean"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "focusable": {
+                    "type": "boolean"
+                  },
+                  "focused": {
+                    "type": "boolean"
+                  },
+                  "accessibility-focused": {
+                    "type": "boolean"
+                  },
+                  "scrollable": {
+                    "type": "boolean"
+                  },
+                  "selected": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "bounds"
+                ],
+                "additionalProperties": {}
               }
             }
           },
@@ -1881,13 +2431,56 @@
                 "type": "string"
               },
               "bounds": {
-                "$ref": "#/properties/elements/properties/clickable/items/properties/bounds"
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "top": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "right": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "bottom": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "centerX": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "centerY": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "left",
+                  "top",
+                  "right",
+                  "bottom"
+                ],
+                "additionalProperties": false
               },
               "indexInMatches": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
               },
               "totalMatches": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
               },
               "selectionStrategy": {
                 "type": "string"
@@ -1916,14 +2509,194 @@
                 "additionalProperties": false
               }
             },
-            "additionalProperties": true
+            "additionalProperties": {}
           }
         },
         "focusedElement": {
-          "$ref": "#/properties/elements/properties/clickable/items"
+          "type": "object",
+          "properties": {
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "top": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "right": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "bottom": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerX": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerY": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "left",
+                "top",
+                "right",
+                "bottom"
+              ],
+              "additionalProperties": false
+            },
+            "text": {
+              "type": "string"
+            },
+            "resource-id": {
+              "type": "string"
+            },
+            "content-desc": {
+              "type": "string"
+            },
+            "class": {
+              "type": "string"
+            },
+            "package": {
+              "type": "string"
+            },
+            "checkable": {
+              "type": "boolean"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focusable": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "accessibility-focused": {
+              "type": "boolean"
+            },
+            "scrollable": {
+              "type": "boolean"
+            },
+            "selected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bounds"
+          ],
+          "additionalProperties": {}
         },
         "accessibilityFocusedElement": {
-          "$ref": "#/properties/elements/properties/clickable/items"
+          "type": "object",
+          "properties": {
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "top": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "right": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "bottom": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerX": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerY": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "left",
+                "top",
+                "right",
+                "bottom"
+              ],
+              "additionalProperties": false
+            },
+            "text": {
+              "type": "string"
+            },
+            "resource-id": {
+              "type": "string"
+            },
+            "content-desc": {
+              "type": "string"
+            },
+            "class": {
+              "type": "string"
+            },
+            "package": {
+              "type": "string"
+            },
+            "checkable": {
+              "type": "boolean"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focusable": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "accessibility-focused": {
+              "type": "boolean"
+            },
+            "scrollable": {
+              "type": "boolean"
+            },
+            "selected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bounds"
+          ],
+          "additionalProperties": {}
         },
         "intentChooserDetected": {
           "type": "boolean"
@@ -1940,17 +2713,111 @@
           ]
         },
         "userId": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "backStack": {},
         "error": {
           "type": "string"
         },
         "awaitedElement": {
-          "$ref": "#/properties/elements/properties/clickable/items"
+          "type": "object",
+          "properties": {
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "top": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "right": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "bottom": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerX": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerY": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "left",
+                "top",
+                "right",
+                "bottom"
+              ],
+              "additionalProperties": false
+            },
+            "text": {
+              "type": "string"
+            },
+            "resource-id": {
+              "type": "string"
+            },
+            "content-desc": {
+              "type": "string"
+            },
+            "class": {
+              "type": "string"
+            },
+            "package": {
+              "type": "string"
+            },
+            "checkable": {
+              "type": "boolean"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "clickable": {
+              "type": "boolean"
+            },
+            "enabled": {
+              "type": "boolean"
+            },
+            "focusable": {
+              "type": "boolean"
+            },
+            "focused": {
+              "type": "boolean"
+            },
+            "accessibility-focused": {
+              "type": "boolean"
+            },
+            "scrollable": {
+              "type": "boolean"
+            },
+            "selected": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "bounds"
+          ],
+          "additionalProperties": {}
         },
         "awaitDuration": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "awaitTimeout": {
           "type": "boolean"
@@ -1961,7 +2828,8 @@
         },
         "gfxMetrics": {},
         "displayedTimeMetrics": {
-          "type": "array"
+          "type": "array",
+          "items": {}
         },
         "performanceAudit": {},
         "accessibilityAudit": {},
@@ -1969,16 +2837,22 @@
           "type": "object",
           "properties": {
             "requestedAfter": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "actualTimestamp": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "isFresh": {
               "type": "boolean"
             },
             "staleDurationMs": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "warning": {
               "type": "string"
@@ -1987,7 +2861,7 @@
           "required": [
             "isFresh"
           ],
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "recompositionSummary": {},
         "predictions": {
@@ -2044,7 +2918,7 @@
                         "additionalProperties": false
                       }
                     },
-                    "additionalProperties": true
+                    "additionalProperties": {}
                   },
                   "predictedScreen": {
                     "type": "string"
@@ -2065,7 +2939,7 @@
                   "predictedScreen",
                   "confidence"
                 ],
-                "additionalProperties": true
+                "additionalProperties": {}
               }
             },
             "interactableElements": {
@@ -2102,7 +2976,7 @@
                     "additionalProperties": false
                   }
                 },
-                "additionalProperties": true
+                "additionalProperties": {}
               }
             }
           },
@@ -2110,7 +2984,7 @@
             "likelyActions",
             "interactableElements"
           ],
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "accessibilityState": {
           "type": "object",
@@ -2130,7 +3004,7 @@
             "enabled",
             "service"
           ],
-          "additionalProperties": true
+          "additionalProperties": {}
         }
       },
       "required": [
@@ -2138,14 +3012,14 @@
         "screenSize",
         "systemInsets"
       ],
-      "additionalProperties": true,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": {}
     }
   },
   {
     "name": "openLink",
     "description": "Open URL in browser",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "url": {
@@ -2161,30 +3035,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "url",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "pinchOn",
     "description": "Pinch to zoom",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "direction": {
@@ -2196,30 +3070,31 @@
           "description": "Pinch direction (in=zoom out, out=zoom in)"
         },
         "distanceStart": {
-          "type": "number",
-          "description": "Start distance px"
+          "description": "Start distance px",
+          "type": "number"
         },
         "distanceEnd": {
-          "type": "number",
-          "description": "End distance px"
+          "description": "End distance px",
+          "type": "number"
         },
         "scale": {
-          "type": "number",
-          "description": "Scale multiplier"
+          "description": "Scale multiplier",
+          "type": "number"
         },
         "duration": {
-          "type": "number",
-          "description": "Duration ms (default: 300)"
+          "description": "Duration ms (default: 300)",
+          "type": "number"
         },
         "rotationDegrees": {
-          "type": "number",
-          "description": "Rotation degrees (+ = clockwise)"
+          "description": "Rotation degrees (+ = clockwise)",
+          "type": "number"
         },
         "includeSystemInsets": {
-          "type": "boolean",
-          "description": "Include system bars (default false)"
+          "description": "Include system bars (default false)",
+          "type": "boolean"
         },
         "container": {
+          "description": "Container to pinch within",
           "anyOf": [
             {
               "type": "object",
@@ -2247,12 +3122,11 @@
               ],
               "additionalProperties": false
             }
-          ],
-          "description": "Container to pinch within"
+          ]
         },
         "autoTarget": {
-          "type": "boolean",
-          "description": "Auto-target surface (default true)"
+          "description": "Auto-target surface (default true)",
+          "type": "boolean"
         },
         "platform": {
           "type": "string",
@@ -2263,30 +3137,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "direction",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "postNotification",
     "description": "Post a notification from the app-under-test when AutoMobile SDK hooks are installed.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "title": {
@@ -2300,18 +3174,19 @@
           "description": "Notification body"
         },
         "imageType": {
+          "description": "Notification image type (default: normal)",
           "type": "string",
           "enum": [
             "normal",
             "bigPicture"
-          ],
-          "description": "Notification image type (default: normal)"
+          ]
         },
         "imagePath": {
-          "type": "string",
-          "description": "Host image file path to push to /sdcard/Download/automobile when imageType is bigPicture"
+          "description": "Host image file path to push to /sdcard/Download/automobile when imageType is bigPicture",
+          "type": "string"
         },
         "actions": {
+          "description": "Action buttons to include",
           "type": "array",
           "items": {
             "type": "object",
@@ -2332,12 +3207,11 @@
               "actionId"
             ],
             "additionalProperties": false
-          },
-          "description": "Action buttons to include"
+          }
         },
         "channelId": {
-          "type": "string",
-          "description": "Notification channel ID (Android only)"
+          "description": "Notification channel ID (Android only)",
+          "type": "string"
         },
         "platform": {
           "type": "string",
@@ -2348,16 +3222,16 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
@@ -2365,14 +3239,14 @@
         "body",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "pressButton",
     "description": "Press hardware button",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "button": {
@@ -2397,30 +3271,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "button",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "pressKey",
     "description": "Press hardware key",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "key": {
@@ -2445,30 +3319,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "key",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "recentApps",
     "description": "Open recent apps",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -2480,29 +3354,29 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "rotate",
     "description": "Rotate device orientation",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "orientation": {
@@ -2522,30 +3396,30 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "orientation",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "selectAllText",
     "description": "Select all text in focused input",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "platform": {
@@ -2557,29 +3431,29 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "setActiveDevice",
     "description": "Set active device",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "deviceId": {
@@ -2595,35 +3469,35 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         }
       },
       "required": [
         "deviceId",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "shake",
     "description": "Shake device",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "duration": {
-          "type": "number",
-          "description": "Shake duration in ms (default: 1000)"
+          "description": "Shake duration in ms (default: 1000)",
+          "type": "number"
         },
         "intensity": {
-          "type": "number",
-          "description": "Shake acceleration intensity (default: 100)"
+          "description": "Shake acceleration intensity (default: 100)",
+          "type": "number"
         },
         "platform": {
           "type": "string",
@@ -2634,29 +3508,29 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "startDevice",
     "description": "Start device",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "device": {
@@ -2675,16 +3549,16 @@
               "description": "Platform"
             },
             "deviceId": {
-              "type": "string",
-              "description": "Device ID"
+              "description": "Device ID",
+              "type": "string"
             },
             "isRunning": {
-              "type": "boolean",
-              "description": "Running status"
+              "description": "Running status",
+              "type": "boolean"
             },
             "source": {
-              "type": "string",
-              "description": "Source (local/remote)"
+              "description": "Source (local/remote)",
+              "type": "string"
             }
           },
           "required": [
@@ -2695,45 +3569,45 @@
           "description": "Device to start"
         },
         "timeoutMs": {
-          "type": "number",
-          "description": "Readiness timeout ms"
+          "description": "Readiness timeout ms",
+          "type": "number"
         }
       },
       "required": [
         "device"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "swipeOn",
     "description": "Swipe/scroll on screen or elements",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "includeSystemInsets": {
-          "type": "boolean",
-          "description": "Include system bars (default false)"
+          "description": "Include system bars (default false)",
+          "type": "boolean"
         },
         "container": {
+          "description": "Container to swipe within (elementId or text). REQUIRED for lists. Omit for full-screen swipes.",
           "type": "object",
           "properties": {
             "elementId": {
-              "type": "string",
-              "description": "Container resource ID"
+              "description": "Container resource ID",
+              "type": "string"
             },
             "text": {
-              "type": "string",
-              "description": "Container text"
+              "description": "Container text",
+              "type": "string"
             }
           },
-          "additionalProperties": false,
-          "description": "Container to swipe within (elementId or text). REQUIRED for lists. Omit for full-screen swipes."
+          "additionalProperties": false
         },
         "autoTarget": {
-          "type": "boolean",
-          "description": "Auto-target scrollable container (default true)"
+          "description": "Auto-target scrollable container (default true)",
+          "type": "boolean"
         },
         "direction": {
           "type": "string",
@@ -2746,14 +3620,15 @@
           "description": "Finger movement direction. up=finger up/reveals above, down=finger down/reveals below, left/right=finger left/right"
         },
         "gestureType": {
+          "description": "swipeFingerTowardsDirection=finger moves in direction (default), scrollTowardsDirection=content scrolls in direction",
           "type": "string",
           "enum": [
             "swipeFingerTowardsDirection",
             "scrollTowardsDirection"
-          ],
-          "description": "swipeFingerTowardsDirection=finger moves in direction (default), scrollTowardsDirection=content scrolls in direction"
+          ]
         },
         "lookFor": {
+          "description": "Swipe until we find a match",
           "anyOf": [
             {
               "type": "object",
@@ -2781,31 +3656,30 @@
               ],
               "additionalProperties": false
             }
-          ],
-          "description": "Swipe until we find a match"
+          ]
         },
         "boomerang": {
-          "type": "boolean",
-          "description": "Return to the starting point after swiping (default false)"
+          "description": "Return to the starting point after swiping (default false)",
+          "type": "boolean"
         },
         "apexPause": {
+          "description": "Pause at the furthest point in ms (default 100)",
           "type": "number",
-          "minimum": 0,
-          "description": "Pause at the furthest point in ms (default 100)"
+          "minimum": 0
         },
         "returnSpeed": {
+          "description": "Return speed multiplier (default 1.0)",
           "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Return speed multiplier (default 1.0)"
+          "exclusiveMinimum": 0
         },
         "speed": {
+          "description": "Scroll speed",
           "type": "string",
           "enum": [
             "slow",
             "normal",
             "fast"
-          ],
-          "description": "Scroll speed"
+          ]
         },
         "platform": {
           "type": "string",
@@ -2816,26 +3690,26 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "direction",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     },
     "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "success": {
@@ -2865,7 +3739,7 @@
                 "type": "string"
               }
             },
-            "additionalProperties": true
+            "additionalProperties": {}
           }
         },
         "targetType": {
@@ -2882,22 +3756,34 @@
               "type": "object",
               "properties": {
                 "left": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "top": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "right": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "bottom": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "centerX": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "centerY": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
@@ -2954,22 +3840,32 @@
           "required": [
             "bounds"
           ],
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "x1": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "y1": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "x2": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "y2": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "duration": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "easing": {
           "type": "string",
@@ -2987,10 +3883,14 @@
           "type": "boolean"
         },
         "scrollIterations": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "elapsedMs": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "hierarchyChanged": {
           "type": "boolean"
@@ -3013,13 +3913,56 @@
                     "type": "string"
                   },
                   "bounds": {
-                    "$ref": "#/properties/element/properties/bounds"
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "top": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "right": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "bottom": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerX": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerY": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "top",
+                      "right",
+                      "bottom"
+                    ],
+                    "additionalProperties": false
                   },
                   "indexInMatches": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   "totalMatches": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   "selectionStrategy": {
                     "type": "string"
@@ -3048,14 +3991,194 @@
                     "additionalProperties": false
                   }
                 },
-                "additionalProperties": true
+                "additionalProperties": {}
               }
             },
             "focusedElement": {
-              "$ref": "#/properties/element"
+              "type": "object",
+              "properties": {
+                "bounds": {
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "top": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "right": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "bottom": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerX": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerY": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "left",
+                    "top",
+                    "right",
+                    "bottom"
+                  ],
+                  "additionalProperties": false
+                },
+                "text": {
+                  "type": "string"
+                },
+                "resource-id": {
+                  "type": "string"
+                },
+                "content-desc": {
+                  "type": "string"
+                },
+                "class": {
+                  "type": "string"
+                },
+                "package": {
+                  "type": "string"
+                },
+                "checkable": {
+                  "type": "boolean"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "clickable": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "focusable": {
+                  "type": "boolean"
+                },
+                "focused": {
+                  "type": "boolean"
+                },
+                "accessibility-focused": {
+                  "type": "boolean"
+                },
+                "scrollable": {
+                  "type": "boolean"
+                },
+                "selected": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "bounds"
+              ],
+              "additionalProperties": {}
             },
             "accessibilityFocusedElement": {
-              "$ref": "#/properties/element"
+              "type": "object",
+              "properties": {
+                "bounds": {
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "top": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "right": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "bottom": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerX": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerY": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "left",
+                    "top",
+                    "right",
+                    "bottom"
+                  ],
+                  "additionalProperties": false
+                },
+                "text": {
+                  "type": "string"
+                },
+                "resource-id": {
+                  "type": "string"
+                },
+                "content-desc": {
+                  "type": "string"
+                },
+                "class": {
+                  "type": "string"
+                },
+                "package": {
+                  "type": "string"
+                },
+                "checkable": {
+                  "type": "boolean"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "clickable": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "focusable": {
+                  "type": "boolean"
+                },
+                "focused": {
+                  "type": "boolean"
+                },
+                "accessibility-focused": {
+                  "type": "boolean"
+                },
+                "scrollable": {
+                  "type": "boolean"
+                },
+                "selected": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "bounds"
+              ],
+              "additionalProperties": {}
             },
             "activeWindow": {
               "type": "object",
@@ -3067,22 +4190,28 @@
                   "type": "string"
                 },
                 "layoutSeqSum": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "type": {
                   "type": "string"
                 }
               },
-              "additionalProperties": true
+              "additionalProperties": {}
             }
           },
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "a11yTotalTimeMs": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "a11yGestureTimeMs": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
         },
         "fallbackReason": {
           "type": "string"
@@ -3098,14 +4227,14 @@
         "y2",
         "duration"
       ],
-      "additionalProperties": true,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": {}
     }
   },
   {
     "name": "systemTray",
     "description": "System tray actions for notifications (open/find/tap/dismiss/clearAll)",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -3120,32 +4249,33 @@
           "description": "System tray action"
         },
         "notification": {
+          "description": "Notification match criteria",
           "type": "object",
           "properties": {
             "title": {
-              "type": "string",
-              "description": "Notification title (case-insensitive, partial match)"
+              "description": "Notification title (case-insensitive, partial match)",
+              "type": "string"
             },
             "body": {
-              "type": "string",
-              "description": "Notification body (case-insensitive, partial match)"
+              "description": "Notification body (case-insensitive, partial match)",
+              "type": "string"
             },
             "appId": {
-              "type": "string",
-              "description": "Notification app package ID (Android only)"
+              "description": "Notification app package ID (Android only)",
+              "type": "string"
             },
             "tapActionLabel": {
-              "type": "string",
-              "description": "Notification action button label to tap (tap only)"
+              "description": "Notification action button label to tap (tap only)",
+              "type": "string"
             }
           },
-          "additionalProperties": false,
-          "description": "Notification match criteria"
+          "additionalProperties": false
         },
         "awaitTimeout": {
+          "description": "Wait timeout ms (default: 5000)",
           "type": "integer",
           "minimum": 0,
-          "description": "Wait timeout ms (default: 5000)"
+          "maximum": 9007199254740991
         },
         "platform": {
           "type": "string",
@@ -3156,33 +4286,34 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "tapOn",
     "description": "Tap UI elements by text or ID (returns selectedElement metadata)",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "container": {
+          "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }.",
           "anyOf": [
             {
               "type": "object",
@@ -3210,8 +4341,7 @@
               ],
               "additionalProperties": false
             }
-          ],
-          "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
+          ]
         },
         "selector": {
           "anyOf": [
@@ -3255,29 +4385,29 @@
           "description": "Action type"
         },
         "selectionStrategy": {
+          "description": "Element selection strategy when multiple matches are found (default: first)",
           "type": "string",
           "enum": [
             "first",
             "random"
-          ],
-          "description": "Element selection strategy when multiple matches are found (default: first)"
+          ]
         },
         "duration": {
-          "type": "number",
-          "description": "Long press duration (ms)"
+          "description": "Long press duration (ms)",
+          "type": "number"
         },
         "searchUntil": {
+          "description": "Poll for element before tapping",
           "type": "object",
           "properties": {
             "duration": {
+              "description": "Polling duration (ms, default: 500)",
               "type": "number",
               "minimum": 100,
-              "maximum": 12000,
-              "description": "Polling duration (ms, default: 500)"
+              "maximum": 12000
             }
           },
-          "additionalProperties": false,
-          "description": "Poll for element before tapping"
+          "additionalProperties": false
         },
         "platform": {
           "type": "string",
@@ -3288,16 +4418,16 @@
           "description": "Platform"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
@@ -3305,10 +4435,10 @@
         "action",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     },
     "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "success": {
@@ -3333,22 +4463,34 @@
               "type": "object",
               "properties": {
                 "left": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "top": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "right": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "bottom": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "centerX": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "centerY": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 }
               },
               "required": [
@@ -3405,7 +4547,7 @@
           "required": [
             "bounds"
           ],
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "observation": {
           "type": "object",
@@ -3425,13 +4567,56 @@
                     "type": "string"
                   },
                   "bounds": {
-                    "$ref": "#/properties/element/properties/bounds"
+                    "type": "object",
+                    "properties": {
+                      "left": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "top": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "right": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "bottom": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerX": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "centerY": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "left",
+                      "top",
+                      "right",
+                      "bottom"
+                    ],
+                    "additionalProperties": false
                   },
                   "indexInMatches": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   "totalMatches": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   },
                   "selectionStrategy": {
                     "type": "string"
@@ -3460,14 +4645,194 @@
                     "additionalProperties": false
                   }
                 },
-                "additionalProperties": true
+                "additionalProperties": {}
               }
             },
             "focusedElement": {
-              "$ref": "#/properties/element"
+              "type": "object",
+              "properties": {
+                "bounds": {
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "top": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "right": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "bottom": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerX": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerY": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "left",
+                    "top",
+                    "right",
+                    "bottom"
+                  ],
+                  "additionalProperties": false
+                },
+                "text": {
+                  "type": "string"
+                },
+                "resource-id": {
+                  "type": "string"
+                },
+                "content-desc": {
+                  "type": "string"
+                },
+                "class": {
+                  "type": "string"
+                },
+                "package": {
+                  "type": "string"
+                },
+                "checkable": {
+                  "type": "boolean"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "clickable": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "focusable": {
+                  "type": "boolean"
+                },
+                "focused": {
+                  "type": "boolean"
+                },
+                "accessibility-focused": {
+                  "type": "boolean"
+                },
+                "scrollable": {
+                  "type": "boolean"
+                },
+                "selected": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "bounds"
+              ],
+              "additionalProperties": {}
             },
             "accessibilityFocusedElement": {
-              "$ref": "#/properties/element"
+              "type": "object",
+              "properties": {
+                "bounds": {
+                  "type": "object",
+                  "properties": {
+                    "left": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "top": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "right": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "bottom": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerX": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "centerY": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "left",
+                    "top",
+                    "right",
+                    "bottom"
+                  ],
+                  "additionalProperties": false
+                },
+                "text": {
+                  "type": "string"
+                },
+                "resource-id": {
+                  "type": "string"
+                },
+                "content-desc": {
+                  "type": "string"
+                },
+                "class": {
+                  "type": "string"
+                },
+                "package": {
+                  "type": "string"
+                },
+                "checkable": {
+                  "type": "boolean"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "clickable": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "focusable": {
+                  "type": "boolean"
+                },
+                "focused": {
+                  "type": "boolean"
+                },
+                "accessibility-focused": {
+                  "type": "boolean"
+                },
+                "scrollable": {
+                  "type": "boolean"
+                },
+                "selected": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "bounds"
+              ],
+              "additionalProperties": {}
             },
             "activeWindow": {
               "type": "object",
@@ -3479,24 +4844,206 @@
                   "type": "string"
                 },
                 "layoutSeqSum": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
                 },
                 "type": {
                   "type": "string"
                 }
               },
-              "additionalProperties": true
+              "additionalProperties": {}
             }
           },
-          "additionalProperties": true
+          "additionalProperties": {}
         },
         "selectedElement": {
-          "$ref": "#/properties/observation/properties/selectedElements/items"
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "resourceId": {
+              "type": "string"
+            },
+            "contentDesc": {
+              "type": "string"
+            },
+            "bounds": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "top": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "right": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "bottom": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerX": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "centerY": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "left",
+                "top",
+                "right",
+                "bottom"
+              ],
+              "additionalProperties": false
+            },
+            "indexInMatches": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "totalMatches": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "selectionStrategy": {
+              "type": "string"
+            },
+            "selectedState": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "accessibility",
+                    "visual"
+                  ]
+                },
+                "confidence": {
+                  "type": "number"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "method",
+                "confidence"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": {}
         },
         "selectedElements": {
           "type": "array",
           "items": {
-            "$ref": "#/properties/observation/properties/selectedElements/items"
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "resourceId": {
+                "type": "string"
+              },
+              "contentDesc": {
+                "type": "string"
+              },
+              "bounds": {
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "top": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "right": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "bottom": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "centerX": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "centerY": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "left",
+                  "top",
+                  "right",
+                  "bottom"
+                ],
+                "additionalProperties": false
+              },
+              "indexInMatches": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "totalMatches": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "selectionStrategy": {
+                "type": "string"
+              },
+              "selectedState": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "accessibility",
+                      "visual"
+                    ]
+                  },
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "method",
+                  "confidence"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": {}
           }
         },
         "error": {
@@ -3515,13 +5062,19 @@
           "type": "object",
           "properties": {
             "durationMs": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "requestCount": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             },
             "changeCount": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
             }
           },
           "additionalProperties": false
@@ -3532,14 +5085,14 @@
         "success",
         "action"
       ],
-      "additionalProperties": true,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": {}
     }
   },
   {
     "name": "terminateApp",
     "description": "Terminate app by package name",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "appId": {
@@ -3547,29 +5100,29 @@
           "description": "App package ID"
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "appId"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   },
   {
     "name": "videoRecording",
     "description": "Start or stop a low-overhead video recording for the active device.",
     "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
         "action": {
@@ -3589,48 +5142,53 @@
           "description": "Target platform"
         },
         "deviceId": {
-          "type": "string",
-          "description": "Optional device ID override"
+          "description": "Optional device ID override",
+          "type": "string"
         },
         "recordingId": {
-          "type": "string",
-          "description": "Recording ID to stop"
+          "description": "Recording ID to stop",
+          "type": "string"
         },
         "qualityPreset": {
+          "description": "Recording quality preset",
           "type": "string",
           "enum": [
             "low",
             "medium",
             "high"
-          ],
-          "description": "Recording quality preset"
+          ]
         },
         "targetBitrateKbps": {
+          "description": "Target bitrate in Kbps",
           "type": "integer",
           "exclusiveMinimum": 0,
-          "description": "Target bitrate in Kbps"
+          "maximum": 9007199254740991
         },
         "maxThroughputMbps": {
+          "description": "Max throughput in Mbps",
           "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Max throughput in Mbps"
+          "exclusiveMinimum": 0
         },
         "fps": {
+          "description": "Frames per second",
           "type": "integer",
           "exclusiveMinimum": 0,
-          "description": "Frames per second"
+          "maximum": 9007199254740991
         },
         "resolution": {
+          "description": "Override capture resolution",
           "type": "object",
           "properties": {
             "width": {
               "type": "integer",
               "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
               "description": "Override resolution width in pixels"
             },
             "height": {
               "type": "integer",
               "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
               "description": "Override resolution height in pixels"
             }
           },
@@ -3638,37 +5196,37 @@
             "width",
             "height"
           ],
-          "additionalProperties": false,
-          "description": "Override capture resolution"
+          "additionalProperties": false
         },
         "format": {
+          "description": "Video format",
           "type": "string",
           "enum": [
             "mp4"
-          ],
-          "description": "Video format"
+          ]
         },
         "maxDuration": {
+          "description": "Max seconds to record video for (default 30, max 300)",
           "type": "integer",
           "exclusiveMinimum": 0,
-          "maximum": 300,
-          "description": "Max seconds to record video for (default 30, max 300)"
+          "maximum": 300
         },
         "outputName": {
-          "type": "string",
-          "description": "Optional label to identify the recording"
+          "description": "Optional label to identify the recording",
+          "type": "string"
         },
         "highlights": {
+          "description": "Optional highlights to show during recording",
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
               "description": {
-                "type": "string",
-                "description": "Description of the highlight"
+                "description": "Description of the highlight",
+                "type": "string"
               },
               "shape": {
-                "anyOf": [
+                "oneOf": [
                   {
                     "type": "object",
                     "properties": {
@@ -3680,24 +5238,31 @@
                         "type": "object",
                         "properties": {
                           "x": {
-                            "type": "integer"
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
                           },
                           "y": {
-                            "type": "integer"
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
                           },
                           "width": {
                             "type": "integer",
-                            "exclusiveMinimum": 0
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "height": {
                             "type": "integer",
-                            "exclusiveMinimum": 0
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
                           },
                           "sourceWidth": {
                             "anyOf": [
                               {
                                 "type": "integer",
-                                "exclusiveMinimum": 0
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
                               },
                               {
                                 "type": "null"
@@ -3708,7 +5273,8 @@
                             "anyOf": [
                               {
                                 "type": "integer",
-                                "exclusiveMinimum": 0
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
                               },
                               {
                                 "type": "null"
@@ -3754,12 +5320,12 @@
                               "dashPattern": {
                                 "anyOf": [
                                   {
+                                    "minItems": 1,
                                     "type": "array",
                                     "items": {
                                       "type": "number",
                                       "exclusiveMinimum": 0
-                                    },
-                                    "minItems": 1
+                                    }
                                   },
                                   {
                                     "type": "null"
@@ -3847,12 +5413,163 @@
                         "const": "circle"
                       },
                       "bounds": {
-                        "$ref": "#/properties/highlights/items/properties/shape/anyOf/0/properties/bounds"
+                        "type": "object",
+                        "properties": {
+                          "x": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "y": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "width": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sourceWidth": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "sourceHeight": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "x",
+                          "y",
+                          "width",
+                          "height"
+                        ],
+                        "additionalProperties": false
                       },
                       "style": {
                         "anyOf": [
                           {
-                            "$ref": "#/properties/highlights/items/properties/shape/anyOf/0/properties/style/anyOf/0"
+                            "type": "object",
+                            "properties": {
+                              "strokeColor": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "strokeWidth": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "dashPattern": {
+                                "anyOf": [
+                                  {
+                                    "minItems": 1,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "smoothing": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "none",
+                                      "catmull-rom",
+                                      "bezier",
+                                      "douglas-peucker"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "tension": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "capStyle": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "butt",
+                                      "round",
+                                      "square"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "joinStyle": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "miter",
+                                      "round",
+                                      "bevel"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
                           },
                           {
                             "type": "null"
@@ -3874,6 +5591,7 @@
                         "const": "path"
                       },
                       "points": {
+                        "minItems": 2,
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -3890,13 +5608,65 @@
                             "y"
                           ],
                           "additionalProperties": false
-                        },
-                        "minItems": 2
+                        }
                       },
                       "bounds": {
                         "anyOf": [
                           {
-                            "$ref": "#/properties/highlights/items/properties/shape/anyOf/0/properties/bounds"
+                            "type": "object",
+                            "properties": {
+                              "x": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "y": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "sourceWidth": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "sourceHeight": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "y",
+                              "width",
+                              "height"
+                            ],
+                            "additionalProperties": false
                           },
                           {
                             "type": "null"
@@ -3906,7 +5676,105 @@
                       "style": {
                         "anyOf": [
                           {
-                            "$ref": "#/properties/highlights/items/properties/shape/anyOf/0/properties/style/anyOf/0"
+                            "type": "object",
+                            "properties": {
+                              "strokeColor": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "strokeWidth": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "dashPattern": {
+                                "anyOf": [
+                                  {
+                                    "minItems": 1,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number",
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "smoothing": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "none",
+                                      "catmull-rom",
+                                      "bezier",
+                                      "douglas-peucker"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "tension": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "capStyle": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "butt",
+                                      "round",
+                                      "square"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "joinStyle": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "miter",
+                                      "round",
+                                      "bevel"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
                           },
                           {
                             "type": "null"
@@ -3924,44 +5792,43 @@
                 "description": "Highlight shape definition"
               },
               "timing": {
+                "description": "Optional highlight timing",
                 "type": "object",
                 "properties": {
                   "startTimeMs": {
+                    "description": "Start time in ms",
                     "type": "integer",
                     "minimum": 0,
-                    "description": "Start time in ms"
+                    "maximum": 9007199254740991
                   }
                 },
-                "additionalProperties": false,
-                "description": "Optional highlight timing"
+                "additionalProperties": false
               }
             },
             "required": [
               "shape"
             ],
             "additionalProperties": false
-          },
-          "description": "Optional highlights to show during recording"
+          }
         },
         "sessionUuid": {
-          "type": "string",
-          "description": "Session UUID for device targeting"
+          "description": "Session UUID for device targeting",
+          "type": "string"
         },
         "keepScreenAwake": {
-          "type": "boolean",
-          "description": "Keep physical Android devices awake during the session (default: true)"
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
         },
         "device": {
-          "type": "string",
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")"
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
       },
       "required": [
         "action",
         "platform"
       ],
-      "additionalProperties": false,
-      "$schema": "http://json-schema.org/draft-07/schema#"
+      "additionalProperties": false
     }
   }
 ]
