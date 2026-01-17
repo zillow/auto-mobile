@@ -105,10 +105,7 @@ export function registerAppTools(
       const result = await launchApp.execute(
         args.appId,
         args.clearAppData ?? false,
-        args.coldBoot ?? false,
-        undefined, // activityName
-        "single", // foregroundCheckMode
-        undefined // userId
+        args.coldBoot ?? false
       );
 
       return createJSONToolResponse({

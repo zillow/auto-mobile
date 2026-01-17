@@ -13,8 +13,6 @@ import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetri
 import { serverConfig } from "../../utils/ServerConfig";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 
-export type ForegroundCheckMode = "parallel" | "single";
-
 export interface TargetUserDetector {
   detectTargetUserId(packageName: string, userId?: number): Promise<number>;
 }
@@ -180,15 +178,14 @@ export class LaunchApp extends BaseVisualChange {
    * @param clearAppData - Whether clear app data before launch
    * @param coldBoot - Whether to cold boot the app or resume if already running
    * @param activityName - Optional activity name to launch (Android only)
-   * @param foregroundCheckMode - Experimental: strategy for checking if app is in foreground
    * @param userId - Optional Android user ID (auto-detected if not provided)
+   * @param skipUiStability - Whether to skip UI stability checks
    */
   async execute(
     packageName: string,
     clearAppData: boolean,
     coldBoot: boolean,
     activityName?: string,
-    foregroundCheckMode: ForegroundCheckMode = "single",
     userId?: number,
     skipUiStability?: boolean
   ): Promise<LaunchAppResult> {
@@ -197,7 +194,7 @@ export class LaunchApp extends BaseVisualChange {
       case "ios":
         return this.executeiOS(packageName, clearAppData, coldBoot);
       case "android":
-        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName, foregroundCheckMode, userId, skipUiStability);
+        return this.executeAndroid(packageName, clearAppData, coldBoot, activityName, userId, skipUiStability);
       default:
         throw new ActionableError(`Unsupported platform: ${this.device.platform}`);
     }
@@ -339,15 +336,14 @@ export class LaunchApp extends BaseVisualChange {
    * @param clearAppData - Whether clear app data before launch
    * @param coldBoot - Whether to cold boot the app or resume if already running
    * @param activityName - Optional activity name to launch
-   * @param foregroundCheckMode - Strategy for checking if app is in foreground
    * @param userId - Optional Android user ID (auto-detected if not provided)
+   * @param skipUiStability - Whether to skip UI stability checks
    */
   private async executeAndroid(
     packageName: string,
     clearAppData: boolean,
     coldBoot: boolean,
     activityName?: string,
-    foregroundCheckMode: ForegroundCheckMode = "single",
     userId?: number,
     skipUiStability?: boolean
   ): Promise<LaunchAppResult> {
@@ -490,7 +486,6 @@ export class LaunchApp extends BaseVisualChange {
         await this.waitForAppForeground(
           packageName,
           targetUserId,
-          foregroundCheckMode,
           foregroundWaitTimeoutMs,
           foregroundPollIntervalMs,
           perf
@@ -533,7 +528,6 @@ export class LaunchApp extends BaseVisualChange {
   private async waitForAppForeground(
     packageName: string,
     userId: number,
-    mode: ForegroundCheckMode,
     timeoutMs: number,
     pollIntervalMs: number,
     perf?: PerformanceTracker
@@ -544,7 +538,7 @@ export class LaunchApp extends BaseVisualChange {
       logger.info(`[LaunchApp] Waiting for ${packageName} to reach foreground (timeout: ${timeoutMs}ms)`);
 
       while (true) {
-        const isForeground = await this.checkAppForeground(packageName, mode, perf, userId);
+        const isForeground = await this.checkAppForeground(packageName, perf, userId);
         if (isForeground) {
           logger.info(`[LaunchApp] App ${packageName} reached foreground after ${this.timer.now() - startTime}ms`);
           return true;
@@ -571,16 +565,14 @@ export class LaunchApp extends BaseVisualChange {
   /**
    * Check if app is in foreground
    * @param packageName - Package name to check
-   * @param mode - Check strategy: 'single' (default) or 'parallel'
    * @param perf - Optional performance tracker
    */
   private async checkAppForeground(
     packageName: string,
-    mode: ForegroundCheckMode = "single",
     perf?: PerformanceTracker,
     userId?: number
   ): Promise<boolean> {
-    logger.info(`[LaunchApp] Checking if app is in foreground (mode: ${mode})`);
+    logger.info("[LaunchApp] Checking if app is in foreground");
 
     const foregroundApp = perf
       ? await perf.track("foregroundApp", () => this.adb.getForegroundApp())
@@ -596,74 +588,30 @@ export class LaunchApp extends BaseVisualChange {
       }
     }
 
-    switch (mode) {
-      case "parallel":
-        return this.checkForegroundParallel(packageName, perf);
-      case "single":
-      default:
-        return this.checkForegroundSingle(packageName, perf);
-    }
+    return this.checkForegroundDumpsys(packageName, perf);
   }
 
   /**
-   * Parallel foreground check - runs all 3 dumpsys commands in parallel (kept for future use)
+   * Foreground check using a single dumpsys call.
    */
-  private async checkForegroundParallel(packageName: string, perf?: PerformanceTracker): Promise<boolean> {
-    try {
-      // Note: Window check uses mCurrentFocus (not "Window #") to avoid false positives from background windows
-      const foregroundChecks = [
-        `shell dumpsys activity activities | grep "mResumedActivity" | grep "${packageName}"`,
-        `shell dumpsys activity | grep "ResumedActivity.*${packageName}"`,
-        `shell dumpsys window | grep "mCurrentFocus" | grep "${packageName}"`
-      ];
-
-      logger.info(`[LaunchApp] Running ${foregroundChecks.length} foreground checks in parallel`);
-
-      const checkPromises = foregroundChecks.map(async (cmd, i) => {
-        try {
-          const checkResult = perf
-            ? await perf.track(`parallelCheck_${i + 1}`, () => this.adb.executeCommand(cmd))
-            : await this.adb.executeCommand(cmd);
-          const output = (checkResult && checkResult.stdout ? checkResult.stdout : "").trim();
-          logger.info(`[LaunchApp] Parallel check ${i + 1} output: "${output}" (${output.length} chars)`);
-          return output.length > 0;
-        } catch (error) {
-          logger.warn(`[LaunchApp] Parallel check ${i + 1} failed:`, error);
-          return false;
-        }
-      });
-
-      const results = await Promise.all(checkPromises);
-      const isForeground = results.some(result => result);
-      logger.info(`[LaunchApp] Final foreground status (parallel): ${isForeground}`);
-      return isForeground;
-    } catch (outerError) {
-      logger.warn(`[LaunchApp] Parallel foreground check failed:`, outerError);
-      return false;
-    }
-  }
-
-  /**
-   * Single dumpsys foreground check - uses one comprehensive dumpsys call
-   */
-  private async checkForegroundSingle(packageName: string, perf?: PerformanceTracker): Promise<boolean> {
+  private async checkForegroundDumpsys(packageName: string, perf?: PerformanceTracker): Promise<boolean> {
     try {
       // Use a single dumpsys activity activities call and parse the output
       const cmd = `shell dumpsys activity activities | grep -E "(mResumedActivity|mFocusedActivity|topResumedActivity)" | head -5`;
-      logger.info(`[LaunchApp] Single dumpsys check: ${cmd}`);
+      logger.info(`[LaunchApp] Dumpsys check: ${cmd}`);
 
       const checkResult = perf
-        ? await perf.track("singleCheck", () => this.adb.executeCommand(cmd))
+        ? await perf.track("dumpsysCheck", () => this.adb.executeCommand(cmd))
         : await this.adb.executeCommand(cmd);
 
       const output = (checkResult && checkResult.stdout ? checkResult.stdout : "").trim();
-      logger.info(`[LaunchApp] Single check output: "${output}" (${output.length} chars)`);
+      logger.info(`[LaunchApp] Dumpsys check output: "${output}" (${output.length} chars)`);
 
       const isForeground = output.includes(packageName);
-      logger.info(`[LaunchApp] Final foreground status (single): ${isForeground}`);
+      logger.info(`[LaunchApp] Final foreground status (dumpsys): ${isForeground}`);
       return isForeground;
     } catch (error) {
-      logger.warn(`[LaunchApp] Single foreground check failed:`, error);
+      logger.warn(`[LaunchApp] Dumpsys foreground check failed:`, error);
       return false;
     }
   }
