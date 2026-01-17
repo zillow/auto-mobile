@@ -794,9 +794,9 @@ detect_mcp_clients() {
         fi
     fi
 
-    # Codex (OpenAI) - ~/.codex/config.json
+    # Codex (OpenAI) - ~/.codex/config.toml (TOML format!)
     if [[ -d "${HOME}/.codex" ]]; then
-        add_mcp_client "Codex" "${HOME}/.codex/config.json" "json" "global"
+        add_mcp_client "Codex" "${HOME}/.codex/config.toml" "toml" "global"
     fi
 
     # Firebender - ~/.firebender/firebender.json for global, firebender.json for project
@@ -1054,6 +1054,66 @@ print(json.dumps(existing, indent=2))
     fi
 }
 
+# Merge auto-mobile config into existing TOML config (for Codex)
+merge_toml_config() {
+    local config_file="$1"
+    local auto_mobile_toml="$2"  # TOML string for auto-mobile server
+
+    # Handle case where file doesn't exist
+    if [[ ! -f "${config_file}" ]]; then
+        echo "${auto_mobile_toml}"
+        return 0
+    fi
+
+    if command_exists python3; then
+        python3 -c '
+import sys
+
+config_file = sys.argv[1]
+new_toml = sys.argv[2]
+
+try:
+    with open(config_file) as f:
+        existing = f.read()
+except Exception:
+    existing = ""
+
+# Check if auto-mobile already configured
+if "[mcp_servers.auto-mobile]" in existing:
+    print("WARNING:auto-mobile already configured in TOML, will be updated", file=sys.stderr)
+    # Remove existing auto-mobile section (lines from [mcp_servers.auto-mobile] until next section or EOF)
+    lines = existing.split("\n")
+    result = []
+    skip = False
+    for line in lines:
+        stripped = line.strip()
+        # Start skipping when we hit the exact auto-mobile section header
+        if stripped == "[mcp_servers.auto-mobile]":
+            skip = True
+            continue
+        # Continue skipping auto-mobile subsections (e.g. [mcp_servers.auto-mobile.env])
+        if skip and stripped.startswith("[mcp_servers.auto-mobile."):
+            continue
+        # Stop skipping when we hit any other section header
+        # This correctly preserves [mcp_servers.auto-mobile-dev] etc.
+        if skip and stripped.startswith("["):
+            skip = False
+        if not skip:
+            result.append(line)
+    existing = "\n".join(result).strip()
+
+# Append new config
+if existing:
+    print(existing + "\n\n" + new_toml)
+else:
+    print(new_toml)
+' "${config_file}" "${auto_mobile_toml}"
+    else
+        log_error "python3 required for TOML manipulation"
+        return 1
+    fi
+}
+
 # Show diff between old and new config
 show_config_diff() {
     local old_content="$1"
@@ -1127,11 +1187,61 @@ EOF
     esac
 }
 
+# Generate auto-mobile MCP server config in TOML format (for Codex)
+generate_auto_mobile_config_toml() {
+    local preset="${1:-minimal}"
+    local android_home="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+
+    case "${preset}" in
+        minimal)
+            cat << 'EOF'
+[mcp_servers.auto-mobile]
+command = "npx"
+args = ["-y", "@kaeawc/auto-mobile@latest"]
+EOF
+            ;;
+        development)
+            if [[ -n "${android_home}" ]]; then
+                cat << EOF
+[mcp_servers.auto-mobile]
+command = "npx"
+args = ["-y", "@kaeawc/auto-mobile@latest", "--debug", "--debug-perf"]
+
+[mcp_servers.auto-mobile.env]
+ANDROID_HOME = "${android_home}"
+EOF
+            else
+                cat << 'EOF'
+[mcp_servers.auto-mobile]
+command = "npx"
+args = ["-y", "@kaeawc/auto-mobile@latest", "--debug", "--debug-perf"]
+EOF
+            fi
+            ;;
+        ci)
+            cat << 'EOF'
+[mcp_servers.auto-mobile]
+command = "npx"
+args = ["-y", "@kaeawc/auto-mobile@latest", "--transport", "sse", "--port", "9000"]
+EOF
+            ;;
+        *)
+            # Default to minimal
+            cat << 'EOF'
+[mcp_servers.auto-mobile]
+command = "npx"
+args = ["-y", "@kaeawc/auto-mobile@latest"]
+EOF
+            ;;
+    esac
+}
+
 # Update a single MCP client's configuration
 update_mcp_client_config() {
     local client_name="$1"
     local config_path="$2"
     local auto_mobile_config="$3"
+    local format="${4:-json}"
 
     log_info "Configuring ${client_name}..."
 
@@ -1141,11 +1251,18 @@ update_mcp_client_config() {
         existing_content=$(cat "${config_path}" 2>/dev/null || echo "")
     fi
 
-    # Generate merged config
+    # Generate merged config based on format
     local new_content
-    if ! new_content=$(merge_mcp_config "${config_path}" "${auto_mobile_config}"); then
-        log_error "Failed to generate config for ${client_name}"
-        return 1
+    if [[ "${format}" == "toml" ]]; then
+        if ! new_content=$(merge_toml_config "${config_path}" "${auto_mobile_config}"); then
+            log_error "Failed to generate TOML config for ${client_name}"
+            return 1
+        fi
+    else
+        if ! new_content=$(merge_mcp_config "${config_path}" "${auto_mobile_config}"); then
+            log_error "Failed to generate config for ${client_name}"
+            return 1
+        fi
     fi
 
     # Show diff
@@ -1211,8 +1328,10 @@ configure_selected_mcp_clients() {
         esac
     fi
 
-    local auto_mobile_config
-    auto_mobile_config=$(generate_auto_mobile_config "${config_preset}")
+    local auto_mobile_config_json
+    auto_mobile_config_json=$(generate_auto_mobile_config "${config_preset}")
+    local auto_mobile_config_toml
+    auto_mobile_config_toml=$(generate_auto_mobile_config_toml "${config_preset}")
 
     gum style --bold "Using ${config_preset} preset configuration"
     echo ""
@@ -1229,7 +1348,11 @@ configure_selected_mcp_clients() {
             continue
         fi
 
-        update_mcp_client_config "${client}" "${config_path}" "${auto_mobile_config}"
+        if [[ "${format}" == "toml" ]]; then
+            update_mcp_client_config "${client}" "${config_path}" "${auto_mobile_config_toml}" "toml"
+        else
+            update_mcp_client_config "${client}" "${config_path}" "${auto_mobile_config_json}" "json"
+        fi
         echo ""
     done
 }
