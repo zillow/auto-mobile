@@ -113,7 +113,6 @@ get_touched_files() {
 
 # Determine which files to process
 declare -a files_to_process
-errors=""
 
 if [[ -n "$ONLY_CHANGED_SINCE_SHA" ]]; then
     echo -e "${YELLOW}Processing files changed since SHA: $ONLY_CHANGED_SINCE_SHA${NC}"

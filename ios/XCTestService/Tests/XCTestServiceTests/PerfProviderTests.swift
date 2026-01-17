@@ -1,6 +1,13 @@
 import XCTest
 @testable import XCTestService
 
+/// Simple reference wrapper for use in test closures to avoid Swift concurrency warnings
+/// about mutation of captured variables.
+private final class Box<T>: @unchecked Sendable {
+    var value: T
+    init(_ value: T) { self.value = value }
+}
+
 final class PerfProviderTests: XCTestCase {
     var fakeTimeProvider: FakeTimeProvider!
     var perfProvider: PerfProvider!
@@ -267,28 +274,28 @@ final class FakeTimerTests: XCTestCase {
     func testManualModeAdvance() {
         let timer = FakeTimer(mode: .manual, initialTime: 0)
 
-        var callbackFired = false
+        let callbackFired = Box(false)
         timer.schedule(after: 50) {
-            callbackFired = true
+            callbackFired.value = true
         }
 
-        XCTAssertFalse(callbackFired)
+        XCTAssertFalse(callbackFired.value)
 
         timer.advance(by: 50)
-        XCTAssertTrue(callbackFired)
+        XCTAssertTrue(callbackFired.value)
     }
 
     func testScheduleMultipleCallbacks() {
         let timer = FakeTimer(mode: .instant, initialTime: 0)
 
-        var order: [Int] = []
-        timer.schedule(after: 30) { order.append(2) }
-        timer.schedule(after: 10) { order.append(1) }
-        timer.schedule(after: 50) { order.append(3) }
+        let order = Box<[Int]>([])
+        timer.schedule(after: 30) { order.value.append(2) }
+        timer.schedule(after: 10) { order.value.append(1) }
+        timer.schedule(after: 50) { order.value.append(3) }
 
         // In instant mode, callbacks fire immediately when scheduled
         // They fire in schedule order, not target time order
-        XCTAssertEqual(order, [2, 1, 3])
+        XCTAssertEqual(order.value, [2, 1, 3])
     }
 
     func testReset() {

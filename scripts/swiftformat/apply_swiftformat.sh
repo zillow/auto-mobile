@@ -96,7 +96,6 @@ get_touched_files() {
 
 # Determine which files to process
 declare -a files_to_process
-errors=""
 
 if [[ "${ONLY_TOUCHED_FILES}" == "true" ]]; then
     echo -e "${YELLOW}Processing only touched/staged files${NC}"

@@ -66,7 +66,6 @@ fi
 
 # Build each project
 for xcodeproj in ${XCODEPROJ_DIRS}; do
-    PROJECT_DIR=$(dirname "${xcodeproj}")
     PROJECT_NAME=$(basename "${xcodeproj}" .xcodeproj)
 
     echo -e "  Building ${PROJECT_NAME}..."

@@ -63,14 +63,16 @@ print_info "Xcode version: ${XCODE_VERSION}"
 # First try to find a booted one, then fall back to any available iPhone simulator
 find_simulator() {
     # Look for a booted iPhone simulator
-    local booted_sim=$(xcrun simctl list devices booted 2>/dev/null | grep -E "iPhone.*Booted" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+    local booted_sim
+    booted_sim=$(xcrun simctl list devices booted 2>/dev/null | grep -E "iPhone.*Booted" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
     if [ -n "${booted_sim}" ]; then
         echo "${booted_sim}"
         return
     fi
 
     # No booted simulator - look for any available iPhone simulator
-    local available_sim=$(xcrun simctl list devices available 2>/dev/null | grep -E "iPhone 16[^e]" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
+    local available_sim
+    available_sim=$(xcrun simctl list devices available 2>/dev/null | grep -E "iPhone 16[^e]" | head -1 | sed -E 's/.*\(([A-F0-9-]+)\).*/\1/')
     if [ -n "${available_sim}" ]; then
         echo "${available_sim}"
         return
@@ -108,7 +110,6 @@ fi
 
 # Test each project
 for xcodeproj in ${XCODEPROJ_DIRS}; do
-    PROJECT_DIR=$(dirname "${xcodeproj}")
     PROJECT_NAME=$(basename "${xcodeproj}" .xcodeproj)
 
     echo -e "  Testing ${PROJECT_NAME}..."

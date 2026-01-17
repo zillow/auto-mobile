@@ -99,7 +99,7 @@ echo ""
 echo -e "  ${BLUE}Available schemes:${NC}"
 if [ -d "${XCTEST_SERVICE_DIR}/XCTestService.xcodeproj" ]; then
     cd "${XCTEST_SERVICE_DIR}"
-    xcodebuild -list -json 2>/dev/null | grep -A 20 '"schemes"' | grep '"' | sed 's/[",]//g' | while read scheme; do
+    xcodebuild -list -json 2>/dev/null | grep -A 20 '"schemes"' | grep '"' | sed 's/[",]//g' | while read -r scheme; do
         echo "    - $scheme"
     done
     cd - > /dev/null
@@ -234,7 +234,7 @@ fi
 
 # Check if port is in use
 if command -v lsof &> /dev/null; then
-    PORT_PROCESS=$(lsof -i :${PORT} -t 2>/dev/null || echo "")
+    PORT_PROCESS=$(lsof -i :"${PORT}" -t 2>/dev/null || echo "")
     if [ -n "$PORT_PROCESS" ]; then
         print_info "Port ${PORT} is in use by PID: ${PORT_PROCESS}"
     else

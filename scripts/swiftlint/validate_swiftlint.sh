@@ -144,14 +144,12 @@ printf '%s\n' "${files_to_process[@]}" > "$temp_file"
 
 # Run swiftlint on each file and collect output
 lint_output=""
-lint_exit_code=0
 warning_count=0
 error_count=0
 
 while IFS= read -r file; do
     if [[ -f "$file" ]]; then
         file_output=$($swiftlint_cmd "$file" 2>&1)
-        file_exit_code=$?
 
         if [[ -n "$file_output" ]]; then
             lint_output="${lint_output}${file_output}\n"
@@ -163,9 +161,6 @@ while IFS= read -r file; do
             ((error_count += file_errors))
         fi
 
-        if [[ $file_exit_code -ne 0 ]]; then
-            lint_exit_code=1
-        fi
     fi
 done < "$temp_file"
 
