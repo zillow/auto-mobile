@@ -26,7 +26,9 @@ jobs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       sha256_only: ${{ steps.check-sha256.outputs.sha256_only }}
       ide_plugin_changed: ${{ steps.filter-ide-plugin.outputs.ide_plugin }}
+      android_changed: ${{ steps.filter-android.outputs.android }}
       ios_changed: ${{ steps.filter-ios.outputs.ios }}
+      android_should_run: ${{ steps.android_should_run.outputs.should_run }}
       ios_should_run: ${{ steps.ios_should_run.outputs.should_run }}
     steps:
       - name: "Git Checkout"
@@ -121,6 +123,18 @@ jobs:
             ide_plugin:
               - 'android/ide-plugin/**'
 
+      - name: "Check for Android-related changes"
+        id: filter-android
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            android:
+              - 'android/**'
+              - 'src/**'
+              - '.github/workflows/android*.yml'
+              - 'package.json'
+              - 'bun.lockb'
+
       - name: "Check for iOS-related changes"
         id: filter-ios
         uses: dorny/paths-filter@v3
@@ -148,6 +162,15 @@ jobs:
               - 'package-lock.json'
               - 'package.json'
               - 'tsconfig.json'
+
+      - name: "Decide if Android jobs should run"
+        id: android_should_run
+        run: |
+          if [[ "${{ steps.filter-android.outputs.android }}" == "true" && "${{ steps.filter.outputs.docs_only }}" != "true" && "${{ steps.check-sha256.outputs.sha256_only }}" != "true" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: "Decide if iOS jobs should run"
         id: ios_should_run
@@ -537,14 +560,14 @@ jobs:
         run: ./scripts/ios/xcode-build.sh
 
   # =============================================================================
-  # Android Build and Test Jobs (Skip for docs-only changes)
+  # Android Build and Test Jobs (Android-related changes only)
   # =============================================================================
 
   junit-runner-unit-tests:
     name: "Run JUnit Runner Unit Tests"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true'
     defaults:
       run:
         working-directory: android
@@ -581,7 +604,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [detect-changes, build-android-accessibility-service]
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -632,7 +655,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [detect-changes, build-android-accessibility-service]
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -675,7 +698,7 @@ jobs:
     name: "Run Accessibility Service Unit Tests"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true'
     defaults:
       run:
         working-directory: android
@@ -699,7 +722,7 @@ jobs:
     name: "Build JUnitRunner Library"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true'
     defaults:
       run:
         working-directory: android
@@ -731,7 +754,7 @@ jobs:
     name: "Build Accessibility Service"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true'
     defaults:
       run:
         working-directory: android
@@ -761,7 +784,7 @@ jobs:
     name: "Build Playground App"
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true'
     defaults:
       run:
         working-directory: android
