@@ -383,6 +383,13 @@
           "type": "number",
           "description": "Timeout in milliseconds for emulator VM snapshot commands"
         },
+        "appBundleIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "iOS-only: bundle IDs to include in app data snapshots (omit to skip app data capture)"
+        },
         "sessionUuid": {
           "type": "string",
           "description": "Session UUID for device targeting"

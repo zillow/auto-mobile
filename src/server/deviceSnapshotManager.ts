@@ -4,13 +4,15 @@ import * as path from "path";
 import { ActionableError, BootedDevice, DeviceSnapshotConfig, DeviceSnapshotConfigInput, DeviceSnapshotManifest } from "../models";
 import { DeviceSnapshotRepository, type DeviceSnapshotRecord } from "../db/deviceSnapshotRepository";
 import { DeviceSnapshotConfigRepository } from "../db/deviceSnapshotConfigRepository";
-import { DeviceSnapshotStore } from "../utils/DeviceSnapshotStore";
+import { DeviceSnapshotStore, type SnapshotPathOptions } from "../utils/DeviceSnapshotStore";
 import { parseDeviceSnapshotConfig } from "../features/snapshot";
 import { serverConfig } from "../utils/ServerConfig";
 import { ResourceRegistry } from "./resourceRegistry";
 import { DEVICE_SNAPSHOT_RESOURCE_URIS } from "./deviceSnapshotResourceUris";
 import { CaptureSnapshot, type CaptureSnapshotArgs, type CaptureSnapshotResult } from "../features/action/CaptureSnapshot";
 import { RestoreSnapshot, type RestoreSnapshotArgs, type RestoreSnapshotResult } from "../features/action/RestoreSnapshot";
+import { CaptureSnapshotIos } from "../features/action/CaptureSnapshotIos";
+import { RestoreSnapshotIos } from "../features/action/RestoreSnapshotIos";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import { logger } from "../utils/logger";
 
@@ -23,6 +25,7 @@ export interface DeviceSnapshotCaptureArgs {
   backupTimeoutMs?: number;
   userApps?: "current" | "all";
   vmSnapshotTimeoutMs?: number;
+  appBundleIds?: string[];
 }
 
 export interface DeviceSnapshotRestoreArgs {
@@ -71,6 +74,15 @@ export interface DeviceSnapshotManagerDependencies {
 let moduleDependencies: DeviceSnapshotManagerDependencies | null = null;
 const LEGACY_MANIFEST_FILENAME = "manifest.json";
 
+function getSnapshotPathOptions(
+  context: Pick<BootedDevice, "platform" | "deviceId">
+): SnapshotPathOptions | undefined {
+  if (context.platform === "ios") {
+    return { platform: "ios", deviceId: context.deviceId };
+  }
+  return undefined;
+}
+
 async function getDeviceSnapshotDependencies(): Promise<DeviceSnapshotManagerDependencies> {
   if (!moduleDependencies) {
     moduleDependencies = {
@@ -79,10 +91,18 @@ async function getDeviceSnapshotDependencies(): Promise<DeviceSnapshotManagerDep
       snapshotStore: new DeviceSnapshotStore(),
       timer: defaultTimer,
       now: () => new Date(),
-      createCaptureAction: (device, timer, store) =>
-        new CaptureSnapshot(device, undefined, undefined, timer, store),
-      createRestoreAction: (device, timer, store) =>
-        new RestoreSnapshot(device, undefined, undefined, timer, store),
+      createCaptureAction: (device, timer, store) => {
+        if (device.platform === "ios") {
+          return new CaptureSnapshotIos(device, undefined, store);
+        }
+        return new CaptureSnapshot(device, undefined, undefined, timer, store);
+      },
+      createRestoreAction: (device, timer, store) => {
+        if (device.platform === "ios") {
+          return new RestoreSnapshotIos(device, undefined, store);
+        }
+        return new RestoreSnapshot(device, undefined, undefined, timer, store);
+      },
     };
   }
 
@@ -175,7 +195,10 @@ function isLegacyManifest(value: unknown): value is DeviceSnapshotManifest {
     && typeof manifest.deviceId === "string"
     && typeof manifest.deviceName === "string"
     && (manifest.platform === "android" || manifest.platform === "ios")
-    && (manifest.snapshotType === "adb" || manifest.snapshotType === "vm")
+    && (manifest.snapshotType === "adb"
+      || manifest.snapshotType === "vm"
+      || manifest.snapshotType === "simctl"
+      || manifest.snapshotType === "app_data")
     && typeof manifest.includeAppData === "boolean"
     && typeof manifest.includeSettings === "boolean";
 }
@@ -336,7 +359,8 @@ async function notifySnapshotResources(): Promise<void> {
 async function ensureSnapshotAvailable(
   snapshotName: string,
   snapshotStore: DeviceSnapshotStore,
-  snapshotRepository: DeviceSnapshotRepository
+  snapshotRepository: DeviceSnapshotRepository,
+  pathOptions?: SnapshotPathOptions
 ): Promise<void> {
   const existing = await snapshotRepository.getSnapshot(snapshotName);
   if (existing) {
@@ -345,19 +369,20 @@ async function ensureSnapshotAvailable(
     );
   }
 
-  if (await snapshotStore.snapshotDirectoryExists(snapshotName)) {
+  if (await snapshotStore.snapshotDirectoryExists(snapshotName, pathOptions)) {
     throw new ActionableError(
       `Snapshot '${snapshotName}' already exists on disk. Please choose a different name.`
     );
   }
 }
 
-async function deleteDeviceSnapshot(
-  snapshotName: string
+async function deleteDeviceSnapshotRecord(
+  record: DeviceSnapshotRecord
 ): Promise<boolean> {
   const { snapshotRepository, snapshotStore } = await getDeviceSnapshotDependencies();
-  await snapshotStore.deleteSnapshotData(snapshotName);
-  const deleted = await snapshotRepository.deleteSnapshot(snapshotName);
+  const pathOptions = getSnapshotPathOptions(record);
+  await snapshotStore.deleteSnapshotData(record.snapshotName, pathOptions);
+  const deleted = await snapshotRepository.deleteSnapshot(record.snapshotName);
   return deleted;
 }
 
@@ -391,7 +416,7 @@ export async function enforceDeviceSnapshotArchiveLimit(
     }
 
     try {
-      const deleted = await deleteDeviceSnapshot(snapshot.snapshotName);
+      const deleted = await deleteDeviceSnapshotRecord(snapshot);
       if (deleted) {
         evictedSnapshotNames.push(snapshot.snapshotName);
         currentSizeBytes -= snapshot.sizeBytes;
@@ -461,8 +486,9 @@ export async function captureDeviceSnapshot(
 
   const baseConfig = await getDeviceSnapshotConfig();
   const snapshotName = args.snapshotName ?? snapshotStore.generateSnapshotName(device.name);
+  const pathOptions = getSnapshotPathOptions(device);
 
-  await ensureSnapshotAvailable(snapshotName, snapshotStore, snapshotRepository);
+  await ensureSnapshotAvailable(snapshotName, snapshotStore, snapshotRepository, pathOptions);
 
   const mergedConfig: DeviceSnapshotConfig = {
     ...baseConfig,
@@ -485,9 +511,10 @@ export async function captureDeviceSnapshot(
     backupTimeoutMs: mergedConfig.backupTimeoutMs,
     userApps: mergedConfig.userApps,
     vmSnapshotTimeoutMs: mergedConfig.vmSnapshotTimeoutMs,
+    appBundleIds: args.appBundleIds,
   });
 
-  const sizeBytes = await snapshotStore.getSnapshotSizeBytes(snapshotName);
+  const sizeBytes = await snapshotStore.getSnapshotSizeBytes(snapshotName, pathOptions);
   const timestamp = result.manifest.timestamp;
 
   await snapshotRepository.insertSnapshot({

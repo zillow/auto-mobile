@@ -2,12 +2,13 @@
 
 ## Overview
 
-The snapshot feature provides deterministic device state management for mobile testing. It allows you to capture the complete state of an Android device or emulator and restore it later, enabling reproducible test environments and efficient parallel testing.
+The snapshot feature provides deterministic device state management for mobile testing. It supports Android device/emulator snapshots and iOS simulator app container backups to enable reproducible test environments and efficient parallel testing.
 
 ## Features
 
 - **VM Snapshots for Emulators**: Instant snapshot/restore using Android emulator's built-in snapshot feature
 - **ADB-based Snapshots**: Portable snapshots for both emulators and physical devices
+- **iOS App Container Backups**: Portable app-scoped snapshots for iOS simulators
 - **Auto-generated Naming**: Automatic timestamp-based snapshot names with optional custom naming
 - **Comprehensive State Capture**: Includes app data, system settings, package list, and foreground app state
 - **Host-based Storage**: Snapshots stored in `~/.automobile/snapshots/` for fast access and easy management
@@ -28,6 +29,7 @@ Capture or restore device snapshots.
 - `strictBackupMode` (capture only): If true, fail entire snapshot if app data backup fails or times out
 - `backupTimeoutMs` (capture only): Timeout in milliseconds for adb backup user confirmation
 - `userApps` (capture only): Which apps to backup - `"current"` (foreground app only) or `"all"` (all user-installed apps)
+- `appBundleIds` (capture only): iOS bundle IDs to include in app container backups
 - `sessionUuid` (optional): Session UUID for multi-device targeting
 - `device` (optional): Device label for multi-device control
 
@@ -171,6 +173,22 @@ Device snapshot defaults can be read or updated via the Unix socket at `~/.auto-
   - Only restores apps that were successfully backed up
 - Relaunches foreground app
 
+### iOS App Container Backups (Current)
+
+**Pros:**
+- Portable between dev machines
+- Captures only the target app's container for focused reproduction
+
+**Cons:**
+- Does not include system settings, keychain, or other app state
+- Requires explicit bundle IDs for the target app(s)
+
+**Technical Details:**
+- Uses `xcrun simctl get_app_container <udid> <bundleId> data`
+- Copies `Documents/`, `Library/`, and `tmp/` for each bundle ID
+- Snapshot type is `app_data`
+- Simulator-wide `simctl snapshot` is intentionally not used for portability
+
 ## Storage Location
 
 Snapshot payloads are stored in `~/.automobile/snapshots/` (ADB snapshots), and metadata is tracked in SQLite at `~/.auto-mobile/auto-mobile.db`:
@@ -187,6 +205,20 @@ Snapshot payloads are stored in `~/.automobile/snapshots/` (ADB snapshots), and 
 ```
 
 VM snapshots themselves are stored in the emulator AVD directory and persist across emulator restarts. Automatic cleanup removes AutoMobile metadata and host snapshot payloads, but does not delete the emulator's VM snapshot.
+
+iOS app container backups are stored per simulator device ID:
+
+```
+~/.automobile/snapshots/ios/
+└── <device-udid>/
+    └── <snapshot-name>/
+        ├── metadata.json
+        └── app-data/
+            └── <bundle-id>/
+                ├── Documents/
+                ├── Library/
+                └── tmp/
+```
 
 ## Use Cases
 
@@ -322,11 +354,12 @@ await deviceSnapshot({
 
 ## Limitations
 
-- **Android Only**: Currently only supports Android devices
+- **Android + iOS Simulator Only**: iOS snapshots are app container backups for simulators
 - **App Data Backup**: Requires user confirmation on device for each backup/restore operation
 - **VM Snapshots**: Only available for emulators, not physical devices
 - **Storage Space**: Snapshots can be large (especially VM snapshots), manage storage accordingly
 - **Backup Scope**: By default, only current app is backed up (set `userApps: "all"` for all apps)
+- **iOS Simulator Snapshot**: `simctl snapshot` is intentionally not used; app container backups are the current choice
 
 ## Performance
 
@@ -334,6 +367,7 @@ await deviceSnapshot({
 - **VM Snapshot Restore**: ~3-8 seconds (includes emulator stabilization)
 - **ADB Snapshot Capture**: ~10-30 seconds (depends on number of apps and settings)
 - **ADB Snapshot Restore**: ~15-45 seconds (depends on number of apps to clear)
+- **iOS App Container Backup**: Varies with app data size
 
 ## Best Practices
 
