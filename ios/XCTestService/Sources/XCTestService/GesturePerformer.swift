@@ -27,9 +27,9 @@ public class GesturePerformer: GesturePerforming {
 
     #if canImport(XCTest) && os(iOS)
         private weak var application: XCUIApplication?
-        private let elementLocator: ElementLocator
+        private let elementLocator: ElementLocating
 
-        public init(application: XCUIApplication? = nil, elementLocator: ElementLocator) {
+        public init(application: XCUIApplication? = nil, elementLocator: ElementLocating) {
             self.application = application
             self.elementLocator = elementLocator
         }
@@ -296,9 +296,9 @@ public class GesturePerformer: GesturePerforming {
 
     #else
         // Non-iOS stub implementation
-        private let elementLocator: ElementLocator
+        private let elementLocator: ElementLocating
 
-        public init(elementLocator: ElementLocator) {
+        public init(elementLocator: ElementLocating) {
             self.elementLocator = elementLocator
         }
 
