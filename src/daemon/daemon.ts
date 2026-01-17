@@ -25,8 +25,10 @@ import { startupBenchmark } from "../utils/startupBenchmark";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./testRecordingSocketServer";
 import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./deviceSnapshotSocketServer";
+import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./appearanceSocketServer";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
+import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "../utils/appearance/AppearanceSyncScheduler";
 
 /**
  * Main daemon process
@@ -111,6 +113,8 @@ export class Daemon {
     await startVideoRecordingSocketServer();
     await startTestRecordingSocketServer();
     await startDeviceSnapshotSocketServer();
+    await startAppearanceSocketServer();
+    startAppearanceSyncScheduler();
 
     // Write PID file
     await this.writePidFile();
@@ -664,6 +668,8 @@ export class Daemon {
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
+    await stopAppearanceSocketServer();
+    stopAppearanceSyncScheduler();
 
     // Close all active HTTP sessions
     for (const [sessionId, streamableTransport] of this.transports) {

@@ -394,6 +394,13 @@ export interface VideoRecordingConfigsTable {
   created_at: Generated<string>;
 }
 
+export interface AppearanceConfigsTable {
+  key: string;
+  config_json: string;
+  updated_at: string;
+  created_at: Generated<string>;
+}
+
 // Main database interface - add new tables here
 export interface Database {
   device_configs: DeviceConfigTable;
@@ -422,6 +429,7 @@ export interface Database {
   device_snapshot_configs: DeviceSnapshotConfigsTable;
   video_recordings: VideoRecordingsTable;
   video_recording_configs: VideoRecordingConfigsTable;
+  appearance_configs: AppearanceConfigsTable;
   test_coverage_sessions: TestCoverageSessionsTable;
   test_node_coverage: TestNodeCoverageTable;
   test_edge_coverage: TestEdgeCoverageTable;
@@ -521,6 +529,10 @@ export type VideoRecordingUpdate = Updateable<VideoRecordingsTable>;
 export type VideoRecordingConfig = Selectable<VideoRecordingConfigsTable>;
 export type NewVideoRecordingConfig = Insertable<VideoRecordingConfigsTable>;
 export type VideoRecordingConfigUpdate = Updateable<VideoRecordingConfigsTable>;
+
+export type AppearanceConfig = Selectable<AppearanceConfigsTable>;
+export type NewAppearanceConfig = Insertable<AppearanceConfigsTable>;
+export type AppearanceConfigUpdate = Updateable<AppearanceConfigsTable>;
 export type TestExecution = Selectable<TestExecutionsTable>;
 export type NewTestExecution = Insertable<TestExecutionsTable>;
 export type TestExecutionUpdate = Updateable<TestExecutionsTable>;

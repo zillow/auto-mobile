@@ -73,4 +73,8 @@ export type {
   VideoRecordingConfig,
   NewVideoRecordingConfig,
   VideoRecordingConfigUpdate,
+  AppearanceConfigsTable,
+  AppearanceConfig,
+  NewAppearanceConfig,
+  AppearanceConfigUpdate,
 } from "./types";

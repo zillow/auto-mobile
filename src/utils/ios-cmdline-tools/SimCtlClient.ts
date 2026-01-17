@@ -180,6 +180,13 @@ export interface SimCtl {
    * @returns Promise with screen dimensions
    */
   getScreenSize(deviceId?: string): Promise<ScreenSize>;
+
+  /**
+   * Set the simulator appearance
+   * @param mode - Appearance mode ("light" or "dark")
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   */
+  setAppearance(mode: "light" | "dark", deviceId?: string): Promise<void>;
 }
 
 // Enhance the standard execAsync result to implement the ExecResult interface
@@ -682,6 +689,11 @@ export class SimCtlClient implements SimCtl {
     }
 
     throw new ActionableError("Unable to determine screen size from provided data.");
+  }
+
+  async setAppearance(mode: "light" | "dark", deviceId?: string): Promise<void> {
+    const targetDevice = deviceId || this.device?.deviceId || "booted";
+    await this.executeCommand(`ui ${targetDevice} appearance ${mode}`);
   }
 }
 

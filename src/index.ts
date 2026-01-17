@@ -12,6 +12,8 @@ import { startDaemon } from "./daemon/daemon";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./daemon/videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./daemon/testRecordingSocketServer";
 import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./daemon/deviceSnapshotSocketServer";
+import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./daemon/appearanceSocketServer";
+import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "./utils/appearance/AppearanceSyncScheduler";
 import { execSync } from "node:child_process";
 import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
@@ -714,6 +716,8 @@ process.on("SIGINT", async () => {
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
   await stopDeviceSnapshotSocketServer();
+  await stopAppearanceSocketServer();
+  stopAppearanceSyncScheduler();
   await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
   logger.close();
   process.exit(0);
@@ -724,6 +728,8 @@ process.on("SIGTERM", async () => {
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
   await stopDeviceSnapshotSocketServer();
+  await stopAppearanceSocketServer();
+  stopAppearanceSyncScheduler();
   await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
   logger.close();
   process.exit(0);
@@ -847,6 +853,8 @@ async function main() {
       await startVideoRecordingSocketServer();
       await startTestRecordingSocketServer();
       await startDeviceSnapshotSocketServer();
+      await startAppearanceSocketServer();
+      startAppearanceSyncScheduler();
       if (transport.type === "streamable") {
         // Run as Streamable HTTP server
         logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
