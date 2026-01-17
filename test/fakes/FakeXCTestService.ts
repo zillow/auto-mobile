@@ -1,0 +1,637 @@
+import { XCTestService } from "../../src/features/observe/XCTestServiceClient";
+import {
+  XCTestScreenshotResult,
+  XCTestDragResult,
+  XCTestPinchResult,
+  XCTestSwipeResult,
+  XCTestTapResult,
+  XCTestSetTextResult,
+  XCTestImeActionResult,
+  XCTestSelectAllResult,
+  XCTestHierarchyResponse,
+  IOSPerfTiming,
+  XCTestHierarchy
+} from "../../src/features/observe/XCTestServiceClient";
+import { ViewHierarchyResult } from "../../src/models";
+import { ViewHierarchyQueryOptions } from "../../src/models/ViewHierarchyQueryOptions";
+import { PerformanceTracker } from "../../src/utils/PerformanceTracker";
+
+/**
+ * Fake implementation of XCTestService for testing
+ * Allows configuring responses for hierarchy, screenshots, and gesture operations
+ * Tracks method calls for test assertions
+ */
+export class FakeXCTestService implements XCTestService {
+  // Configurable response data
+  private hierarchyData: XCTestHierarchy | null = null;
+  private screenshotData: string | null = null;
+  private screenshotFormat: string = "png";
+  private performanceTiming: IOSPerfTiming | null = null;
+  private isConnectedState: boolean = true;
+  private hasCachedHierarchyState: boolean = false;
+
+  // Failure modes
+  private failureMap: Map<string, Error> = new Map();
+
+  // Operation delays
+  private operationDelays: Map<string, number> = new Map();
+
+  // Call history
+  private tapHistory: Array<{
+    x: number;
+    y: number;
+    duration: number;
+  }> = [];
+
+  private swipeHistory: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    duration: number;
+  }> = [];
+
+  private dragHistory: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    pressDurationMs: number;
+    dragDurationMs: number;
+    holdDurationMs: number;
+    timeoutMs: number;
+  }> = [];
+
+  private pinchHistory: Array<{
+    centerX: number;
+    centerY: number;
+    distanceStart: number;
+    distanceEnd: number;
+    rotationDegrees: number;
+    duration?: number;
+    timeoutMs?: number;
+  }> = [];
+
+  private setTextHistory: Array<{
+    text: string;
+    resourceId?: string;
+  }> = [];
+
+  private imeActionHistory: Array<{
+    action: "done" | "next" | "search" | "send" | "go" | "previous";
+  }> = [];
+
+  private screenshotRequestCount: number = 0;
+  private hierarchyRequestCount: number = 0;
+  private dragResult: XCTestDragResult | null = null;
+  private pinchResult: XCTestPinchResult | null = null;
+  private tapResult: XCTestTapResult | null = null;
+  private swipeResult: XCTestSwipeResult | null = null;
+
+  // MARK: - Configuration Methods
+
+  /**
+   * Configure hierarchy data to be returned by getAccessibilityHierarchy
+   */
+  setHierarchyData(hierarchy: XCTestHierarchy | null): void {
+    this.hierarchyData = hierarchy;
+  }
+
+  /**
+   * Configure screenshot data to be returned by requestScreenshot
+   */
+  setScreenshotData(base64Data: string | null, format: string = "png"): void {
+    this.screenshotData = base64Data;
+    this.screenshotFormat = format;
+  }
+
+  /**
+   * Configure a failure mode for a specific operation
+   */
+  setFailureMode(operation: string, error: Error | null): void {
+    if (error === null) {
+      this.failureMap.delete(operation);
+    } else {
+      this.failureMap.set(operation, error);
+    }
+  }
+
+  /**
+   * Configure a delay for a specific operation
+   */
+  setOperationDelay(operation: string, delayMs: number): void {
+    this.operationDelays.set(operation, delayMs);
+  }
+
+  /**
+   * Set connection state
+   */
+  setConnected(connected: boolean): void {
+    this.isConnectedState = connected;
+  }
+
+  /**
+   * Set cached hierarchy state
+   */
+  setCachedHierarchy(hasCached: boolean): void {
+    this.hasCachedHierarchyState = hasCached;
+  }
+
+  /**
+   * Configure iOS-side performance timing data
+   */
+  setPerformanceTiming(perfTiming: IOSPerfTiming | null): void {
+    this.performanceTiming = perfTiming;
+  }
+
+  /**
+   * Configure tap result
+   */
+  setTapResult(result: XCTestTapResult | null): void {
+    this.tapResult = result;
+  }
+
+  /**
+   * Configure swipe result
+   */
+  setSwipeResult(result: XCTestSwipeResult | null): void {
+    this.swipeResult = result;
+  }
+
+  /**
+   * Configure drag result
+   */
+  setDragResult(result: XCTestDragResult | null): void {
+    this.dragResult = result;
+  }
+
+  /**
+   * Configure pinch result
+   */
+  setPinchResult(result: XCTestPinchResult | null): void {
+    this.pinchResult = result;
+  }
+
+  // MARK: - Assertion Methods
+
+  /**
+   * Get the history of tap requests
+   */
+  getTapHistory(): Array<{ x: number; y: number; duration: number }> {
+    return [...this.tapHistory];
+  }
+
+  /**
+   * Get the history of swipe requests
+   */
+  getSwipeHistory(): Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    duration: number;
+  }> {
+    return [...this.swipeHistory];
+  }
+
+  /**
+   * Get the history of drag requests
+   */
+  getDragHistory(): Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    pressDurationMs: number;
+    dragDurationMs: number;
+    holdDurationMs: number;
+    timeoutMs: number;
+  }> {
+    return [...this.dragHistory];
+  }
+
+  /**
+   * Get the history of pinch requests
+   */
+  getPinchHistory(): Array<{
+    centerX: number;
+    centerY: number;
+    distanceStart: number;
+    distanceEnd: number;
+    rotationDegrees: number;
+    duration?: number;
+    timeoutMs?: number;
+  }> {
+    return [...this.pinchHistory];
+  }
+
+  /**
+   * Get the history of text input requests
+   */
+  getTextInputHistory(): Array<{ text: string; resourceId?: string }> {
+    return [...this.setTextHistory];
+  }
+
+  /**
+   * Get the history of IME action requests
+   */
+  getImeActionHistory(): Array<{
+    action: "done" | "next" | "search" | "send" | "go" | "previous";
+  }> {
+    return [...this.imeActionHistory];
+  }
+
+  /**
+   * Check if a specific IME action was called
+   */
+  wasImeActionCalled(action: "done" | "next" | "search" | "send" | "go" | "previous"): boolean {
+    return this.imeActionHistory.some(entry => entry.action === action);
+  }
+
+  /**
+   * Get the number of screenshot requests made
+   */
+  getScreenshotRequestCount(): number {
+    return this.screenshotRequestCount;
+  }
+
+  /**
+   * Get the number of hierarchy requests made
+   */
+  getHierarchyRequestCount(): number {
+    return this.hierarchyRequestCount;
+  }
+
+  /**
+   * Clear all call history
+   */
+  clearHistory(): void {
+    this.tapHistory = [];
+    this.swipeHistory = [];
+    this.dragHistory = [];
+    this.pinchHistory = [];
+    this.setTextHistory = [];
+    this.imeActionHistory = [];
+    this.screenshotRequestCount = 0;
+    this.hierarchyRequestCount = 0;
+  }
+
+  // MARK: - Private Helpers
+
+  private async applyDelay(operation: string): Promise<void> {
+    const delay = this.operationDelays.get(operation);
+    if (delay && delay > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  private checkFailure(operation: string): void {
+    const error = this.failureMap.get(operation);
+    if (error) {
+      throw error;
+    }
+  }
+
+  // MARK: - XCTestService Implementation
+
+  async getAccessibilityHierarchy(
+    queryOptions?: ViewHierarchyQueryOptions,
+    perf?: PerformanceTracker,
+    skipWaitForFresh?: boolean,
+    minTimestamp?: number,
+    disableAllFiltering?: boolean
+  ): Promise<ViewHierarchyResult | null> {
+    this.hierarchyRequestCount++;
+    await this.applyDelay("getHierarchy");
+    this.checkFailure("getHierarchy");
+
+    if (!this.hierarchyData) {
+      return null;
+    }
+
+    return this.convertToViewHierarchyResult(this.hierarchyData);
+  }
+
+  async getLatestHierarchy(
+    waitForFresh: boolean = false,
+    timeout: number = 100,
+    perf?: PerformanceTracker,
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
+  ): Promise<XCTestHierarchyResponse> {
+    this.hierarchyRequestCount++;
+    await this.applyDelay("getLatestHierarchy");
+    this.checkFailure("getLatestHierarchy");
+
+    if (!this.hierarchyData) {
+      return {
+        hierarchy: null,
+        fresh: false
+      };
+    }
+
+    return {
+      hierarchy: this.hierarchyData,
+      fresh: true,
+      updatedAt: this.hierarchyData.updatedAt,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestHierarchySync(
+    perf?: PerformanceTracker,
+    disableAllFiltering?: boolean,
+    signal?: AbortSignal,
+    timeoutMs?: number
+  ): Promise<{ hierarchy: XCTestHierarchy; perfTiming?: IOSPerfTiming } | null> {
+    this.hierarchyRequestCount++;
+    await this.applyDelay("requestHierarchySync");
+    this.checkFailure("requestHierarchySync");
+
+    if (!this.hierarchyData) {
+      return null;
+    }
+
+    return {
+      hierarchy: this.hierarchyData,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  convertToViewHierarchyResult(hierarchy: XCTestHierarchy): ViewHierarchyResult {
+    return {
+      hierarchy: {
+        node: {
+          $: {
+            text: "Fake Hierarchy"
+          }
+        }
+      },
+      packageName: hierarchy.packageName,
+      updatedAt: hierarchy.updatedAt
+    };
+  }
+
+  async requestTapCoordinates(
+    x: number,
+    y: number,
+    duration: number = 0,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestTapResult> {
+    await this.applyDelay("tap");
+    this.checkFailure("tap");
+
+    this.tapHistory.push({ x, y, duration });
+
+    if (this.tapResult) {
+      return {
+        ...this.tapResult,
+        perfTiming: this.tapResult.perfTiming ?? this.performanceTiming ?? undefined
+      };
+    }
+
+    return {
+      success: true,
+      totalTimeMs: 50,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestSwipe(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    duration: number = 300,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestSwipeResult> {
+    await this.applyDelay("swipe");
+    this.checkFailure("swipe");
+
+    this.swipeHistory.push({ x1, y1, x2, y2, duration });
+
+    if (this.swipeResult) {
+      return {
+        ...this.swipeResult,
+        perfTiming: this.swipeResult.perfTiming ?? this.performanceTiming ?? undefined
+      };
+    }
+
+    return {
+      success: true,
+      totalTimeMs: duration,
+      gestureTimeMs: duration,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestDrag(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    pressDurationMs: number,
+    dragDurationMs: number,
+    holdDurationMs: number,
+    timeoutMs: number
+  ): Promise<XCTestDragResult> {
+    await this.applyDelay("drag");
+    this.checkFailure("drag");
+
+    this.dragHistory.push({
+      x1,
+      y1,
+      x2,
+      y2,
+      pressDurationMs,
+      dragDurationMs,
+      holdDurationMs,
+      timeoutMs
+    });
+
+    if (this.dragResult) {
+      return {
+        ...this.dragResult,
+        perfTiming: this.dragResult.perfTiming ?? this.performanceTiming ?? undefined
+      };
+    }
+
+    return {
+      success: true,
+      totalTimeMs: pressDurationMs + dragDurationMs + holdDurationMs,
+      gestureTimeMs: dragDurationMs,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestPinch(
+    centerX: number,
+    centerY: number,
+    distanceStart: number,
+    distanceEnd: number,
+    rotationDegrees: number,
+    duration?: number,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<XCTestPinchResult> {
+    await this.applyDelay("pinch");
+    this.checkFailure("pinch");
+
+    this.pinchHistory.push({
+      centerX,
+      centerY,
+      distanceStart,
+      distanceEnd,
+      rotationDegrees,
+      duration,
+      timeoutMs
+    });
+
+    if (this.pinchResult) {
+      return {
+        ...this.pinchResult,
+        perfTiming: this.pinchResult.perfTiming ?? this.performanceTiming ?? undefined
+      };
+    }
+
+    const resolvedDuration = duration ?? 300;
+
+    return {
+      success: true,
+      totalTimeMs: resolvedDuration,
+      gestureTimeMs: resolvedDuration,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestSetText(
+    text: string,
+    resourceId?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestSetTextResult> {
+    await this.applyDelay("setText");
+    this.checkFailure("setText");
+
+    this.setTextHistory.push({ text, resourceId });
+
+    return {
+      success: true,
+      totalTimeMs: 100,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestClearText(
+    resourceId?: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestSetTextResult> {
+    await this.applyDelay("clearText");
+    this.checkFailure("clearText");
+
+    this.setTextHistory.push({ text: "", resourceId });
+
+    return {
+      success: true,
+      totalTimeMs: 100,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestImeAction(
+    action: "done" | "next" | "search" | "send" | "go" | "previous",
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestImeActionResult> {
+    await this.applyDelay("imeAction");
+
+    const error = this.failureMap.get("imeAction");
+    if (error) {
+      return {
+        success: false,
+        action,
+        totalTimeMs: 100,
+        error: error.message,
+        perfTiming: this.performanceTiming || undefined
+      };
+    }
+
+    this.imeActionHistory.push({ action });
+
+    return {
+      success: true,
+      action,
+      totalTimeMs: 100,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestSelectAll(
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestSelectAllResult> {
+    await this.applyDelay("selectAll");
+    this.checkFailure("selectAll");
+
+    return {
+      success: true,
+      totalTimeMs: 100,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestScreenshot(
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestScreenshotResult> {
+    this.screenshotRequestCount++;
+    await this.applyDelay("screenshot");
+    this.checkFailure("screenshot");
+
+    if (!this.screenshotData) {
+      return {
+        success: false,
+        error: "No screenshot data configured"
+      };
+    }
+
+    return {
+      success: true,
+      data: this.screenshotData,
+      format: this.screenshotFormat,
+      timestamp: Date.now()
+    };
+  }
+
+  isConnected(): boolean {
+    return this.isConnectedState;
+  }
+
+  async ensureConnected(): Promise<boolean> {
+    this.isConnectedState = true;
+    return this.isConnectedState;
+  }
+
+  async waitForConnection(maxAttempts?: number, delayMs?: number): Promise<boolean> {
+    return this.isConnectedState;
+  }
+
+  async verifyServiceReady(maxAttempts?: number, delayMs?: number, timeoutMs?: number): Promise<boolean> {
+    return this.isConnectedState;
+  }
+
+  hasCachedHierarchy(): boolean {
+    return this.hasCachedHierarchyState;
+  }
+
+  invalidateCache(): void {
+    this.hasCachedHierarchyState = false;
+  }
+
+  async close(): Promise<void> {
+    this.isConnectedState = false;
+  }
+}

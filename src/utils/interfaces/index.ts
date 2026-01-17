@@ -26,7 +26,6 @@ export { AppleSimulatorInfo, AppleSimulatorManager } from "./Simulator";
 export { FileSystem } from "../filesystem/DefaultFileSystem";
 export { ToolRegistry, RegisteredTool } from "../server/ToolRegistry";
 export { AndroidEmulator } from "./AndroidEmulator";
-export { WebDriver, WebDriverAgentOptions } from "./WebDriver";
 export {
   AndroidDetection,
   AndroidToolsLocation,

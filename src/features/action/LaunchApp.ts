@@ -5,7 +5,6 @@ import { ActionableError } from "../../models";
 import { TerminateApp } from "./TerminateApp";
 import { ClearAppData } from "./ClearAppData";
 import { logger } from "../../utils/logger";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
@@ -40,18 +39,16 @@ export class LaunchApp extends BaseVisualChange {
    * Create an LaunchApp instance
    * @param device - Optional device
    * @param adb - Optional AdbClient instance for testing
-   * @param axe - Optional AxeClient instance for testing
    * @param simctl - Optional SimCtlClient instance for testing
    * @param timer - Optional Timer instance for testing
    */
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     simctl: SimCtlClient | null = null,
     timer: Timer = defaultTimer,
     dependencies: LaunchAppDependencies = {}) {
-    super(device, adb, axe, timer);
+    super(device, adb, timer);
     this.device = device;
     this.simctl = simctl || new SimCtlClient(this.device);
     this.targetUserDetector = dependencies.targetUserDetector ?? {

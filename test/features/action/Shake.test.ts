@@ -39,7 +39,7 @@ describe("Shake", () => {
     const defaultObserveResult = createObserveResult();
     fakeObserveScreen.setObserveResult(defaultObserveResult);
 
-    shake = new Shake("test-device", fakeAdb, null, fakeTimer);
+    shake = new Shake("test-device", fakeAdb, fakeTimer);
     (shake as any).observeScreen = fakeObserveScreen;
     (shake as any).window = fakeWindow;
     (shake as any).awaitIdle = fakeAwaitIdle;
@@ -217,13 +217,13 @@ describe("Shake", () => {
 
   describe("constructor", () => {
     test("should work with null deviceId", () => {
-      const shakeInstance = new Shake("test-device", fakeAdb, null, fakeTimer);
+      const shakeInstance = new Shake("test-device", fakeAdb, fakeTimer);
       expect(shakeInstance).toBeDefined();
     });
 
     test("should work with custom AdbClient", () => {
       const customAdb = new FakeAdbExecutor();
-      const shakeInstance = new Shake("test-device", customAdb, null, fakeTimer);
+      const shakeInstance = new Shake("test-device", customAdb, fakeTimer);
       expect(shakeInstance).toBeDefined();
     });
 

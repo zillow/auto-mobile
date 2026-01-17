@@ -1,15 +1,15 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, SelectAllTextResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { logger } from "../../utils/logger";
 
 export class SelectAllText extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
   }
 
   async execute(progress?: ProgressCallback): Promise<SelectAllTextResult> {
@@ -26,10 +26,9 @@ export class SelectAllText extends BaseVisualChange {
                 this.executeAndroidSelectAll()
               );
             case "ios":
-              // iOS implementation could use similar accessibility approach
-              // For now, fall back to error
-              perf.end();
-              throw new Error("Select all not yet implemented for iOS");
+              return await perf.track("iOSSelectAll", () =>
+                this.executeiOSSelectAll()
+              );
             default:
               perf.end();
               throw new Error(`Unsupported platform: ${this.device.platform}`);
@@ -51,6 +50,27 @@ export class SelectAllText extends BaseVisualChange {
         skipUiStability: true // Skip UI stability wait - a11y service is fast
       }
     );
+  }
+
+  /**
+   * Execute iOS-specific select all using XCTestService.
+   */
+  private async executeiOSSelectAll(): Promise<SelectAllTextResult> {
+    try {
+      const client = XCTestServiceClient.getInstance(this.device);
+      const result = await client.requestSelectAll();
+
+      if (result.success) {
+        logger.info(`[SelectAllText] Select all via XCTestService`);
+        return { success: true };
+      }
+
+      logger.warn(`[SelectAllText] XCTestService selectAll failed: ${result.error}`);
+      return { success: false, error: result.error };
+    } catch (error) {
+      logger.error(`[SelectAllText] XCTestService exception: ${error}`);
+      return { success: false, error: String(error) };
+    }
   }
 
   /**

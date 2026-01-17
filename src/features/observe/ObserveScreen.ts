@@ -15,8 +15,6 @@ import fs from "fs-extra";
 import path from "path";
 import { readdirAsync, readFileAsync, statAsync, writeFileAsync } from "../../utils/io";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
 import { PerformanceTracker, NoOpPerformanceTracker, processTimingData } from "../../utils/PerformanceTracker";
 import { PerformanceAudit } from "../performance/PerformanceAudit";
 import { ThresholdManager } from "../performance/ThresholdManager";
@@ -53,8 +51,6 @@ export class ObserveScreen {
   private dumpsysWindow: GetDumpsysWindow;
   private backStack: GetBackStack;
   private adb: AdbClient;
-  private axe: AxeClient;
-  private webdriver: WebDriverAgent;
   private predictiveUIState: PredictiveUIState;
 
   // Static cache for observe results
@@ -116,11 +112,9 @@ export class ObserveScreen {
     ScreenshotJobTracker.clear();
   }
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null, webdriver: WebDriverAgent | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
-    this.axe = axe || new AxeClient(device);
-    this.webdriver = webdriver || new WebDriverAgent(device);
     this.screenSize = new GetScreenSize(device, this.adb);
     this.systemInsets = new GetSystemInsets(device, this.adb);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);
@@ -468,12 +462,22 @@ export class ObserveScreen {
 
       case "ios":
         // iOS-specific data collection logic here
-        perf.parallel("ios_collect");
+        perf.serial("ios_collect");
 
-        await Promise.all([
-          perf.track("screenSize", () => this.collectScreenSize({} as ExecResult, result)),
-          this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal),
-        ]);
+        // Collect view hierarchy (fast via XCTestService WebSocket)
+        await this.collectViewHierarchy(result, queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
+
+        // Extract screen size from root node bounds (avoids slow axe describe-ui call ~187ms)
+        // Root XCUIApplication bounds like "[0,0][402,874]" give us width=402, height=874
+        {
+          const extractedSize = this.extractScreenSizeFromHierarchy(result.viewHierarchy);
+          if (extractedSize) {
+            result.screenSize = extractedSize;
+            logger.debug(`[iOS] Extracted screen size from hierarchy: ${extractedSize.width}x${extractedSize.height}`);
+          } else {
+            logger.warn("[iOS] Failed to extract screen size from hierarchy root bounds");
+          }
+        }
 
         // Filter out completely offscreen nodes to reduce hierarchy size
         if (result.viewHierarchy && result.screenSize?.width > 0 && result.screenSize?.height > 0) {
@@ -574,6 +578,41 @@ export class ObserveScreen {
     promise.finally(() => {
       perf.endOperation("screenshot");
     });
+  }
+
+  /**
+   * Extract screen size from view hierarchy root node bounds.
+   * The root node (XCUIApplication) bounds represent the full screen dimensions.
+   * Format: "[left,top][right,bottom]" e.g., "[0,0][402,874]"
+   * @param viewHierarchy - View hierarchy result
+   * @returns Screen size or null if unable to extract
+   */
+  private extractScreenSizeFromHierarchy(viewHierarchy: ObserveResult["viewHierarchy"]): { width: number; height: number } | null {
+    const rootNode = viewHierarchy?.hierarchy?.node;
+    if (!rootNode?.$?.bounds) {
+      return null;
+    }
+
+    const boundsStr = rootNode.$.bounds;
+    const match = boundsStr.match(/\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/);
+    if (!match) {
+      return null;
+    }
+
+    const left = parseInt(match[1], 10);
+    const top = parseInt(match[2], 10);
+    const right = parseInt(match[3], 10);
+    const bottom = parseInt(match[4], 10);
+
+    // Root should start at 0,0 - width and height are right-left, bottom-top
+    const width = right - left;
+    const height = bottom - top;
+
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+
+    return null;
   }
 
   /**

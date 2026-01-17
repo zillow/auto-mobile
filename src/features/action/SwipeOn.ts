@@ -13,14 +13,13 @@ import {
   GestureOptions
 } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
-import { WebDriverAgent } from "../../utils/ios-cmdline-tools/WebDriverAgent";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { buildElementSearchDebugContext } from "../../utils/DebugContextBuilder";
 import { SwipeResult } from "../../models/SwipeResult";
 import { ObserveScreen } from "../observe/ObserveScreen";
@@ -81,7 +80,6 @@ export class SwipeOn extends BaseVisualChange {
   private executeGesture: GestureExecutor;
   private elementUtils: ElementUtils;
   private accessibilityService: AccessibilityServiceClient;
-  private webdriver: WebDriverAgent;
   private accessibilityDetector: AccessibilityDetector;
   private static readonly MAX_ATTEMPTS = 5;
   private static readonly OVERLAY_PADDING = 8;
@@ -92,15 +90,12 @@ export class SwipeOn extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
-    webdriver: WebDriverAgent | null = null,
     dependencies: SwipeOnDependencies = {}
   ) {
-    super(device, adb, axe);
+    super(device, adb);
     this.executeGesture = dependencies.executeGesture ?? new ExecuteGesture(device, adb);
     this.elementUtils = dependencies.elementUtils ?? new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
-    this.webdriver = webdriver || new WebDriverAgent(device);
     this.accessibilityDetector = dependencies.accessibilityDetector || defaultAccessibilityDetector;
     if (dependencies.observeScreen) {
       this.observeScreen = dependencies.observeScreen as unknown as ObserveScreen;
@@ -1568,7 +1563,7 @@ export class SwipeOn extends BaseVisualChange {
           );
           break;
         case "ios":
-          latestViewHierarchy = await this.webdriver.getViewHierarchy(this.device);
+          latestViewHierarchy = await XCTestServiceClient.getInstance(this.device).getAccessibilityHierarchy() ?? undefined;
           break;
         default:
           throw new ActionableError(`Unsupported platform: ${this.device.platform}`);

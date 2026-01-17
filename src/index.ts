@@ -20,6 +20,7 @@ import { serverConfig, type PlanExecutionLockScope } from "./utils/ServerConfig"
 import type { VideoRecordingConfigInput } from "./models";
 import { startupBenchmark } from "./utils/startupBenchmark";
 import { AndroidAccessibilityServiceManager } from "./utils/AccessibilityServiceManager";
+import { XCTestServiceBuilder } from "./utils/XCTestServiceBuilder";
 
 startupBenchmark.mark("processEntry");
 
@@ -775,6 +776,12 @@ async function main() {
       // Start prefetching the accessibility service APK in the background
       // This runs asynchronously and will be ready when first device connects
       AndroidAccessibilityServiceManager.prefetchApk();
+    }
+
+    // Start iOS XCTestService build prefetch (macOS only)
+    // This runs asynchronously and will be ready when first iOS device connects
+    if (process.platform === "darwin") {
+      XCTestServiceBuilder.prefetchBuild();
     }
 
     const featureFlagService = FeatureFlagService.getInstance();

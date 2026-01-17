@@ -293,18 +293,14 @@ export async function createStressHarness(): Promise<StressHarness> {
   const tapOnElement = new TapOnElement(
     device,
     fakeAdb as unknown as any,
-    null,
-    null,
-    undefined,
-    undefined,
+    undefined, // visionConfig
+    undefined, // selectionStateTracker
     fakeAccessibilityDetector
   );
 
   const swipeOn = new SwipeOn(
     device,
     fakeAdb as unknown as any,
-    null,
-    null,
     {
       executeGesture: {
         async swipe() {

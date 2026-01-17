@@ -1,0 +1,100 @@
+name: XCTestService
+options:
+  bundleIdPrefix: dev.jasonpearson.automobile
+  deploymentTarget:
+    iOS: "15.0"
+  xcodeVersion: "15.0"
+
+configFiles:
+  Debug: Configurations/Debug.xcconfig
+  Release: Configurations/Release.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+
+targets:
+  XCTestServiceApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: XCTestServiceApp
+        excludes:
+          - "*.xcassets"
+      - path: XCTestServiceApp/Assets.xcassets
+        type: folder
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.XCTestServiceApp
+        INFOPLIST_FILE: XCTestServiceApp/Info.plist
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - target: XCTestService
+        embed: true
+
+  XCTestService:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Sources/XCTestService
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.XCTestService
+        DEFINES_MODULE: YES
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+  XCTestServiceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/XCTestServiceTests
+    dependencies:
+      - target: XCTestService
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.XCTestServiceTests
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+  XCTestServiceUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/XCTestServiceUITests
+      # Include XCTestService sources directly so XCTest is available during compilation
+      - path: Sources/XCTestService
+        excludes:
+          - "Fakes.swift"  # Exclude test-only fakes
+    dependencies:
+      - target: XCTestServiceApp
+        # Note: We don't depend on XCTestService framework - sources are compiled directly into UI tests
+        # to give XCTest access for XCUIApplication
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.XCTestServiceUITests
+        TEST_TARGET_NAME: XCTestServiceApp
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  XCTestServiceApp:
+    build:
+      targets:
+        XCTestServiceApp: all
+        XCTestService: all
+        XCTestServiceTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - XCTestServiceTests
+        - XCTestServiceUITests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

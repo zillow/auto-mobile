@@ -48,7 +48,7 @@ describe("LaunchApp", () => {
     fakeWindow.setCachedActiveWindow(null);
     fakeWindow.setActiveWindow({ appId: packageName, activityName: "MainActivity", layoutSeqSum: 1 });
 
-    launchApp = new LaunchApp(device, fakeAdb as unknown as any, null, null, fakeTimer);
+    launchApp = new LaunchApp(device, fakeAdb as unknown as any, null, fakeTimer);
     (launchApp as any).awaitIdle = fakeAwaitIdle;
     (launchApp as any).observeScreen = fakeObserveScreen;
     (launchApp as any).window = fakeWindow;
@@ -104,7 +104,7 @@ describe("LaunchApp", () => {
       installedApps: []
     });
 
-    const parallelLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, null, fakeTimer, {
+    const parallelLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, fakeTimer, {
       targetUserDetector,
       installedAppsProvider
     });
@@ -143,7 +143,7 @@ describe("LaunchApp", () => {
       error: new Error("check installed failed")
     });
 
-    const parallelLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, null, fakeTimer, {
+    const parallelLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, fakeTimer, {
       targetUserDetector,
       installedAppsProvider
     });
@@ -177,7 +177,7 @@ describe("LaunchApp", () => {
       error: new Error("check installed failed")
     });
 
-    const perfLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, null, fakeTimer, {
+    const perfLaunchApp = new LaunchApp(device, fakeAdb as unknown as any, null, fakeTimer, {
       targetUserDetector,
       installedAppsProvider,
       performanceTrackerFactory: () => perfTracker

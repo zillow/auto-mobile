@@ -2,7 +2,6 @@ import { DeepLinkManager } from "../../utils/DeepLinkManager";
 import { BootedDevice, IntentChooserResult, ObserveResult } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class HandleIntentChooser extends BaseVisualChange {
@@ -12,10 +11,9 @@ export class HandleIntentChooser extends BaseVisualChange {
    * Create an TerminateApp instance
    * @param device - Optional device
    * @param adb - Optional AdbClient instance for testing
-   * @param idb - Optional IdbPython instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.device = device;
     this.deepLinkManager = new DeepLinkManager(device);
   }

@@ -2,27 +2,26 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ImeActionResult, ObserveResult } from "../../models";
 import { logger } from "../../utils/logger";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { AccessibilityService } from "../observe/interfaces/AccessibilityService";
 import { Timer } from "../../utils/interfaces/Timer";
 import { defaultTimer } from "../../utils/SystemTimer";
 
 export class ImeAction extends BaseVisualChange {
   private a11yService: AccessibilityService | null = null;
-  private timer: Timer;
+  private imeTimer: Timer;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     a11yService: AccessibilityService | null = null,
     timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe, timer);
+    super(device, adb, timer);
     this.a11yService = a11yService;
-    this.timer = timer;
+    this.imeTimer = timer;
   }
 
   async execute(
@@ -136,7 +135,7 @@ export class ImeAction extends BaseVisualChange {
 
     try {
       // Small delay to ensure any preceding text input is processed
-      await this.timer.sleep(100);
+      await this.imeTimer.sleep(100);
 
       // Execute the key event(s)
       if (keyCode.includes(" ")) {
@@ -161,15 +160,26 @@ export class ImeAction extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific IME action.
+   * Execute iOS-specific IME action using XCTestService.
    */
   private async executeiOSImeAction(
     action: "done" | "next" | "search" | "send" | "go" | "previous",
     _observeResult: ObserveResult
   ): Promise<ImeActionResult> {
-    // iOS uses existing ADB-style logic for now
-    // TODO: Implement iOS-specific IME action
-    logger.warn("[ImeAction] iOS IME action not yet implemented, using fallback");
-    return this.executeAdbImeAction(action);
+    try {
+      const client = XCTestServiceClient.getInstance(this.device);
+      const result = await client.requestImeAction(action);
+
+      if (result.success) {
+        logger.info(`[ImeAction] IME action '${action}' completed via XCTestService`);
+        return { success: true, action };
+      }
+
+      logger.warn(`[ImeAction] XCTestService IME action failed: ${result.error}`);
+      return { success: false, action, error: result.error };
+    } catch (error) {
+      logger.error(`[ImeAction] XCTestService exception: ${error}`);
+      return { success: false, action, error: String(error) };
+    }
   }
 }

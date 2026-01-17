@@ -48,7 +48,7 @@ describe("ImeAction", () => {
     });
 
     // Pass fake accessibility service and timer to constructor
-    imeAction = new ImeAction(testDevice, fakeAdb, undefined, fakeA11yService, fakeTimer);
+    imeAction = new ImeAction(testDevice, fakeAdb, fakeA11yService, fakeTimer);
 
     // Replace the internal managers with our fakes
     (imeAction as any).observeScreen = fakeObserveScreen;

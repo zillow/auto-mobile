@@ -5,7 +5,6 @@ import { Window } from "../observe/Window";
 import { logger } from "../../utils/logger";
 import { DEFAULT_FUZZY_MATCH_TOLERANCE_PERCENT } from "../../utils/constants";
 import { ActionableError, BootedDevice, GfxMetrics, ObserveResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOptions";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { NodeCryptoService } from "../../utils/crypto";
@@ -39,7 +38,6 @@ export interface ObservedChangeOptions {
 export class BaseVisualChange {
   device: BootedDevice;
   adb: AdbClient;
-  axe: AxeClient;
   awaitIdle: AwaitIdle;
   observeScreen: ObserveScreen;
   window: Window;
@@ -50,17 +48,15 @@ export class BaseVisualChange {
    * Create an BaseVisualChange instance
    * @param device - Optional device
    * @param adb - Optional AdbClient instance for testing
-   * @param axe - Optional Axe instance for testing
+   * @param timer - Optional timer for testing
    */
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     timer: Timer = defaultTimer
   ) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
-    this.axe = axe || new AxeClient(device);
     this.awaitIdle = new AwaitIdle(device, this.adb);
     this.observeScreen = new ObserveScreen(device, this.adb);
     this.window = new Window(device, this.adb);

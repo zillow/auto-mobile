@@ -3,7 +3,6 @@ import { BaseVisualChange } from "./BaseVisualChange";
 import { GestureOptions } from "../../models/GestureOptions";
 import { ExecuteGesture } from "./ExecuteGesture";
 import { BootedDevice } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 /**
@@ -12,8 +11,8 @@ import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 export class Fling extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.executeGesture = new ExecuteGesture(device, adb);
   }
 

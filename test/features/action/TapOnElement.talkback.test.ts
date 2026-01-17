@@ -25,10 +25,8 @@ describe("TapOnElement TalkBack mode detection", () => {
         id: "emulator-5554",
       } as any,
       fakeAdb as any,  // adb
-      null,
-      null,
-      undefined,
-      undefined,
+      undefined,       // visionConfig
+      undefined,       // selectionStateTracker
       fakeAccessibilityDetector,
       fakeTimer
     );

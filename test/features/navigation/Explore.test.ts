@@ -684,7 +684,7 @@ describe("Explore", () => {
     });
 
     test("should mark edges as traversed with validation results", async () => {
-      explore = new Explore(device, mockAdb, null, fakeTimer);
+      explore = new Explore(device, mockAdb, fakeTimer);
       await (explore as any).initializeGraphTraversal();
 
       const state = (explore as any).graphTraversalState;
@@ -720,7 +720,7 @@ describe("Explore", () => {
     });
 
     test("should record failed edge validation", async () => {
-      explore = new Explore(device, mockAdb, null, fakeTimer);
+      explore = new Explore(device, mockAdb, fakeTimer);
       await (explore as any).initializeGraphTraversal();
 
       const state = (explore as any).graphTraversalState;
@@ -755,7 +755,7 @@ describe("Explore", () => {
     });
 
     test("should generate edge keys correctly", async () => {
-      explore = new Explore(device, mockAdb, null, fakeTimer);
+      explore = new Explore(device, mockAdb, fakeTimer);
 
       // Create edges with same interaction
       const edge1 = {
@@ -836,7 +836,7 @@ describe("Explore", () => {
         applicationId: "com.test.app"
       });
 
-      explore = new Explore(device, mockAdb, null, fakeTimer);
+      explore = new Explore(device, mockAdb, fakeTimer);
       (explore as any).observeScreen = mockObserveScreen;
 
       await (explore as any).initializeGraphTraversal();

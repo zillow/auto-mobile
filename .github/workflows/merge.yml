@@ -164,6 +164,98 @@ jobs:
       - name: "Run Tests"
         run: bun run test
 
+  # =============================================================================
+  # iOS Build and Test Jobs
+  # =============================================================================
+
+  ios-swift-build:
+    name: "Build Swift Packages (${{ matrix.config.name }})"
+    runs-on: ${{ matrix.config.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
+          - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode ${{ matrix.config.xcode }}"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.config.xcode }}
+
+      - name: "Build Swift Packages"
+        run: ./scripts/ios/swift-build.sh
+
+  ios-swift-test:
+    name: "Test Swift Packages (${{ matrix.config.name }})"
+    runs-on: ${{ matrix.config.runner }}
+    needs: ios-swift-build
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
+          - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode ${{ matrix.config.xcode }}"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.config.xcode }}
+
+      - name: "Test Swift Packages"
+        run: ./scripts/ios/swift-test.sh
+
+  ios-xcodegen:
+    name: "Generate Xcode Projects"
+    runs-on: macos-14
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Install XcodeGen"
+        run: brew install xcodegen
+
+      - name: "Generate Xcode Projects"
+        run: ./scripts/ios/xcodegen-generate.sh
+
+  ios-xcode-build:
+    name: "Build Xcode Projects (${{ matrix.config.name }})"
+    runs-on: ${{ matrix.config.runner }}
+    needs: ios-xcodegen
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
+          - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode ${{ matrix.config.xcode }}"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.config.xcode }}
+
+      - name: "Install XcodeGen"
+        run: brew install xcodegen
+
+      - name: "Generate Xcode Projects"
+        run: ./scripts/ios/xcodegen-generate.sh
+
+      - name: "Build Xcode Projects"
+        run: ./scripts/ios/xcode-build.sh
+
+  # =============================================================================
+  # Android Build and Test Jobs
+  # =============================================================================
+
   junit-runner-unit-tests:
     name: "Run JUnit Runner Unit Tests"
     runs-on: ubuntu-latest

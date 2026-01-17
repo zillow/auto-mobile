@@ -1,0 +1,18 @@
+// XCTestService Release Configuration
+
+#include "BaseSettings.xcconfig"
+
+// =============================================================================
+// Release-specific Settings
+// =============================================================================
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ENABLE_NS_ASSERTIONS = NO
+GCC_OPTIMIZATION_LEVEL = s
+SWIFT_OPTIMIZATION_LEVEL = -O
+SWIFT_COMPILATION_MODE = wholemodule
+VALIDATE_PRODUCT = YES
+
+// =============================================================================
+// Release Hardening
+// =============================================================================
+ENABLE_HARDENED_RUNTIME = NO

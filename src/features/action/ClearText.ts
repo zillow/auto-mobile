@@ -3,16 +3,16 @@ import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ClearTextResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ObserveResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { logger } from "../../utils/logger";
 
 export class ClearText extends BaseVisualChange {
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.elementUtils = new ElementUtils();
   }
 
@@ -101,12 +101,24 @@ export class ClearText extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific clear text.
+   * Execute iOS-specific clear text using XCTestService.
    */
   private async executeiOSClearText(observeResult: ObserveResult): Promise<ClearTextResult> {
-    // iOS uses existing ADB-style clear logic for now
-    // TODO: Implement iOS-specific clear text
-    return this.executeAdbClearText(observeResult);
+    try {
+      const client = XCTestServiceClient.getInstance(this.device);
+      const result = await client.requestClearText();
+
+      if (result.success) {
+        logger.info(`[ClearText] Cleared text via XCTestService`);
+        return { success: true };
+      }
+
+      logger.warn(`[ClearText] XCTestService clear failed: ${result.error}`);
+      return { success: false, error: result.error };
+    } catch (error) {
+      logger.error(`[ClearText] XCTestService exception: ${error}`);
+      return { success: false, error: String(error) };
+    }
   }
 
   private findFocusedElementTextLength(viewHierarchy: any): number {

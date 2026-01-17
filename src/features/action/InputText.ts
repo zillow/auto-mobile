@@ -2,13 +2,13 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, SendTextResult } from "../../models";
 import { logger } from "../../utils/logger";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 
 export class InputText extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.device = device;
   }
 
@@ -113,23 +113,38 @@ export class InputText extends BaseVisualChange {
   /**
    * Execute iOS-specific text input
    * @param text - Text to input
-   * @param imeAction - Optional IME action (ignored on iOS)
+   * @param imeAction - Optional IME action
    * @returns Result with method information
    */
   private async executeiOSTextInput(
     text: string,
     imeAction?: "done" | "next" | "search" | "send" | "go" | "previous"
   ): Promise<SendTextResult & { method?: "a11y" }> {
-    // iOS uses idb's inputText method which handles Unicode natively
-    await this.axe.inputText(text);
+    const client = XCTestServiceClient.getInstance(this.device);
+    const result = await client.requestSetText(text);
 
-    // Note: iOS IME actions are handled differently and imeAction parameter is ignored
-    // The iOS keyboard handles actions through its own UI
+    if (!result.success) {
+      logger.error(`[InputText] XCTestService setText failed: ${result.error}`);
+      return {
+        success: false,
+        text,
+        error: result.error,
+        method: "a11y"
+      };
+    }
+
+    // Handle IME action if specified (XCTestService supports this)
+    if (imeAction) {
+      const imeResult = await client.requestImeAction(imeAction);
+      if (!imeResult.success) {
+        logger.warn(`[InputText] XCTestService IME action failed: ${imeResult.error}`);
+      }
+    }
 
     return {
       success: true,
       text,
-      imeAction: imeAction, // Preserved for API compatibility but not used on iOS
+      imeAction,
       method: "a11y"
     };
   }

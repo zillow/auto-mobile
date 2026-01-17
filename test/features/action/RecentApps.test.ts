@@ -37,7 +37,7 @@ describe("RecentApps", () => {
     });
 
     // Inject the fakes into the feature
-    recentApps = new RecentApps("test-device", fakeAdb, null, fakeTimer);
+    recentApps = new RecentApps("test-device", fakeAdb, fakeTimer);
     (recentApps as any).observeScreen = fakeObserveScreen;
     (recentApps as any).window = fakeWindow;
     (recentApps as any).awaitIdle = fakeAwaitIdle;
@@ -344,13 +344,13 @@ describe("RecentApps", () => {
 
   describe("constructor", () => {
     test("should work with null deviceId", () => {
-      const recentAppsInstance = new RecentApps("test-device", fakeAdb, null, fakeTimer);
+      const recentAppsInstance = new RecentApps("test-device", fakeAdb, fakeTimer);
       expect(recentAppsInstance).toBeDefined();
     });
 
     test("should work with custom AdbClient", () => {
       const customAdb = new FakeAdbExecutor();
-      const recentAppsInstance = new RecentApps("test-device", customAdb, null, fakeTimer);
+      const recentAppsInstance = new RecentApps("test-device", customAdb, fakeTimer);
       expect(recentAppsInstance).toBeDefined();
     });
   });
