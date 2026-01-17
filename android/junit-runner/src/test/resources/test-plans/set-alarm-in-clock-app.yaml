@@ -7,6 +7,13 @@ steps:
     clearAppData: true
     label: Launch Clock application with clean state
 
+  - tool: observe
+    waitFor:
+      element:
+        id: "com.google.android.deskclock:id/tab_menu_alarm"
+      timeout: 20000
+    label: Wait for Clock UI to be ready
+
   - tool: tapOn
     selector:
       id: "com.google.android.deskclock:id/tab_menu_alarm"
