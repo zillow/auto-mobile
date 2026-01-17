@@ -3,26 +3,26 @@ name: set-alarm-6-30am-demo-mode
 description: Set demo mode to 8pm and create 6:30 AM alarm in Clock app
 steps:
   - tool: launchApp
-    appId: com.google.android.deskclock
+    appId: com.android.deskclock
     clearAppData: true
     label: Launch Clock application with clean state
 
   - tool: observe
     waitFor:
       element:
-        id: "com.google.android.deskclock:id/tab_menu_alarm"
+        id: "com.android.deskclock:id/tab_menu_alarm"
       timeout: 20000
     label: Wait for Clock UI to be ready
 
   - tool: tapOn
     selector:
-      id: "com.google.android.deskclock:id/tab_menu_alarm"
+      id: "com.android.deskclock:id/tab_menu_alarm"
     label: Tap Alarm tab
     action: "tap"
 
   - tool: tapOn
     selector:
-      id: "com.google.android.deskclock:id/fab"
+      id: "com.android.deskclock:id/fab"
     label: Tap add alarm button
     action: "tap"
 
@@ -34,7 +34,7 @@ steps:
 
   - tool: tapOn
     selector:
-      id: "com.google.android.deskclock:id/material_minute_tv"
+      id: "com.android.deskclock:id/material_minute_tv"
     label: Switch to minute selection
     action: "tap"
 
@@ -51,4 +51,4 @@ steps:
     action: "tap"
 
   - tool: terminateApp
-    appId: com.google.android.deskclock
+    appId: com.android.deskclock
