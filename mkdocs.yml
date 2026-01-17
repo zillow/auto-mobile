@@ -159,6 +159,7 @@ nav:
   - 'Contributing':
       - 'How': contributing/index.md
       - 'Local Development': contributing/local-development.md
+      - 'npm Publishing': contributing/publishing.md
       - 'Docker Hub Publishing': docker-hub-setup.md
       - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md

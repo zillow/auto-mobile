@@ -35,3 +35,4 @@ Thank you for your interest in contributing to AutoMobile!
 ## Related
 
 - [Local Development](local-development.md) - Development environment setup
+- [Publishing](publishing.md) - npm package publishing guide
