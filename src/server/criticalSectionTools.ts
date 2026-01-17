@@ -8,7 +8,7 @@ import { CriticalSectionCoordinator } from "./CriticalSectionCoordinator";
 // Schema for steps inside critical section
 const planStepSchema: z.ZodType<PlanStep> = z.object({
   tool: z.string().describe("Tool name to execute"),
-  params: z.record(z.any()).describe("Tool-specific parameters"),
+  params: z.record(z.string(), z.any()).describe("Tool-specific parameters"),
   label: z.string().optional().describe("Optional human-readable label"),
 });
 

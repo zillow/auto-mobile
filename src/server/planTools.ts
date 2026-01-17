@@ -70,7 +70,7 @@ const executePlanResultSchema = z.object({
   }).optional(),
   error: z.string().optional(),
   platform: z.enum(["android", "ios"]).optional(),
-  deviceMapping: z.record(z.string()).optional(),
+  deviceMapping: z.record(z.string(), z.string()).optional(),
   debug: executePlanDebugSchema.optional()
 }).passthrough();
 
