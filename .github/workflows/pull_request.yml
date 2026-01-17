@@ -26,6 +26,8 @@ jobs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       sha256_only: ${{ steps.check-sha256.outputs.sha256_only }}
       ide_plugin_changed: ${{ steps.filter-ide-plugin.outputs.ide_plugin }}
+      ios_changed: ${{ steps.filter-ios.outputs.ios }}
+      ios_should_run: ${{ steps.ios_should_run.outputs.should_run }}
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -118,6 +120,43 @@ jobs:
           filters: |
             ide_plugin:
               - 'android/ide-plugin/**'
+
+      - name: "Check for iOS-related changes"
+        id: filter-ios
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ios:
+              - 'ios/**'
+              - 'src/**'
+              - 'scripts/**'
+              - '.github/workflows/**'
+              - '.editorconfig'
+              - '.gitignore'
+              - '.lycherc.toml'
+              - '.mcp.json'
+              - '.mcp.local.json'
+              - '.npmignore'
+              - '.swiftformat'
+              - '.swiftlint.yml'
+              - 'build.ts'
+              - 'bun.lock'
+              - 'bun.lockb'
+              - 'eslint.config.mjs'
+              - 'knip.json'
+              - 'mkdocs.yml'
+              - 'package-lock.json'
+              - 'package.json'
+              - 'tsconfig.json'
+
+      - name: "Decide if iOS jobs should run"
+        id: ios_should_run
+        run: |
+          if [[ "${{ steps.filter-ios.outputs.ios }}" == "true" && "${{ steps.filter.outputs.docs_only }}" != "true" && "${{ steps.check-sha256.outputs.sha256_only }}" != "true" ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # =============================================================================
   # Fast Validation Jobs (Always Run)
@@ -411,7 +450,7 @@ jobs:
     name: "Build Swift Packages (${{ matrix.config.name }})"
     runs-on: ${{ matrix.config.runner }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.ios_should_run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -434,7 +473,7 @@ jobs:
     name: "Test Swift Packages (${{ matrix.config.name }})"
     runs-on: ${{ matrix.config.runner }}
     needs: [detect-changes, ios-swift-build]
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.ios_should_run == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -457,7 +496,7 @@ jobs:
     name: "Generate Xcode Projects"
     runs-on: macos-14
     needs: detect-changes
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.ios_should_run == 'true'
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
@@ -472,7 +511,7 @@ jobs:
     name: "Build Xcode Projects (${{ matrix.config.name }})"
     runs-on: ${{ matrix.config.runner }}
     needs: [detect-changes, ios-xcodegen]
-    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    if: needs.detect-changes.outputs.ios_should_run == 'true'
     strategy:
       fail-fast: false
       matrix:
