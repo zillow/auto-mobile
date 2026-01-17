@@ -16,8 +16,7 @@
     {
       "filePathMatches": "*",
       "rulesPaths": [
-        "README.md",
-        "docs/ai/validation.md"
+        "CLAUDE.md"
       ]
     }
   ],
