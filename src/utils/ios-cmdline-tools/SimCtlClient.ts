@@ -326,8 +326,15 @@ export class SimCtlClient implements SimCtl {
       const simulatorData = JSON.parse(result.stdout);
       return simulatorData as SimulatorList;
     } catch (error) {
+      const stdoutSnippet = result.stdout.trim().slice(0, 300);
+      const stderrSnippet = result.stderr.trim().slice(0, 300);
       logger.error(`Failed to parse simctl device list: ${error}`);
-      throw new ActionableError(`Failed to parse iOS device list: ${(error as Error).message}`);
+      throw new ActionableError(
+        "Failed to parse iOS device list from 'xcrun simctl list devices --json'. " +
+        `${error instanceof Error ? error.message : String(error)}. ` +
+        `stdout (first 300 chars): ${stdoutSnippet || "<empty>"}. ` +
+        `stderr (first 300 chars): ${stderrSnippet || "<empty>"}.`
+      );
     }
   }
 

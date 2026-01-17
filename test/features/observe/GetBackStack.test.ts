@@ -61,6 +61,42 @@ describe("GetBackStack", function() {
     expect(result.currentActivity?.taskId).toBeGreaterThan(0);
   });
 
+  test("should parse topResumedActivity with special characters", async function() {
+    const mockDevice: BootedDevice = {
+      name: "test",
+      platform: "android",
+      deviceId: "test-device"
+    };
+
+    const stdout = `
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+  Task id #42
+  affinity=com.example.app
+  realActivity=com.example.app/.MainActivity
+  numActivities=1
+    * Hist #0: ActivityRecord{abc123 u0 com.example.app/.MainActivity t42}
+
+  topResumedActivity=ActivityRecord{def456 u0 com.example.app/.MainActivity$Inner t42}
+`;
+
+    adb = new AdbClient(
+      mockDevice,
+      async () => ({
+        stdout,
+        stderr: "",
+        toString: () => stdout,
+        trim: () => stdout.trim(),
+        includes: () => false
+      })
+    );
+    getBackStack = new GetBackStack(adb);
+
+    const result = await getBackStack.execute();
+
+    expect(result.currentActivity?.name).toBe("com.example.app.MainActivity$Inner");
+    expect(result.currentActivity?.taskId).toBe(42);
+  });
+
   test("should include timestamp", async function() {
     const result = await getBackStack.execute();
 

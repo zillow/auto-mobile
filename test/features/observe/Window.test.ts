@@ -68,6 +68,27 @@ describe("Window", () => {
       expect(result.layoutSeqSum).toBe(123);
     });
 
+    test("should handle activity names with special characters", async () => {
+      const dumpsysOutput = `
+        imeControlTarget in display# 0 Window{abc123 u0 com.example-app/com.example.app.MainActivity$Inner}
+        mLayoutSeq=321
+      `;
+
+      fakeAdb.setDefaultResponse({
+        stdout: dumpsysOutput,
+        stderr: "",
+        toString: () => dumpsysOutput,
+        trim: () => dumpsysOutput.trim(),
+        includes: (str: string) => dumpsysOutput.includes(str)
+      } as ExecResult);
+
+      const result = await window.getActive(true);
+
+      expect(result.appId).toBe("com.example-app");
+      expect(result.activityName).toBe("com.example.app.MainActivity$Inner");
+      expect(result.layoutSeqSum).toBe(321);
+    });
+
     test("should handle multiple layout sequence values", async () => {
       const dumpsysOutput = `
         imeControlTarget in display# 0 Window{12345678 u0 com.test.app/com.test.MainActivity}
