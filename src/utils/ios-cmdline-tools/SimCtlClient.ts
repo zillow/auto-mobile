@@ -555,9 +555,19 @@ export class SimCtlClient implements SimCtl {
       const result = await this.executeCommand(`listapps ${targetDevice}`);
       const appsData = JSON.parse(result.stdout);
 
-      // Convert the apps object to an array
-      const apps = Object.values(appsData);
-      return apps;
+      if (Array.isArray(appsData)) {
+        return appsData;
+      }
+
+      if (!appsData || typeof appsData !== "object") {
+        return [];
+      }
+
+      // Convert the apps object to an array, preserving bundle IDs from keys.
+      return Object.entries(appsData).map(([bundleId, appInfo]) => {
+        const record = appInfo && typeof appInfo === "object" ? appInfo : {};
+        return { ...record, bundleId };
+      });
     } catch (error) {
       logger.warn(`Failed to list iOS apps: ${error}`);
       return [];
