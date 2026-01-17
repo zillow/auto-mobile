@@ -10,8 +10,11 @@ App startup performance affects user experience and app store ratings. AutoMobil
 
 - **Time to First Frame**: How quickly the first screen renders
 - **Time to Interactive**: When the UI becomes responsive
-- **Cold Start**: Launch from terminated state
-- **Warm Start**: Launch from background state
+
+These metrics can be measured under different launch scenarios:
+
+- **Cold Start**: Launch from terminated state (no process running)
+- **Warm Start**: Launch when app is in background (process still alive)
 
 ## Example Workflow
 
@@ -30,7 +33,7 @@ The agent will:
 ## Best Practices
 
 - **Baseline First**: Measure current performance before optimizing
-- **Test Cold Starts**: Most representative of user experience
+- **Test Both Scenarios**: Cold starts matter for first-time users; warm starts may be more common for returning users
 - **Real Devices**: Emulators don't reflect real performance
 - **Consistent Conditions**: Same data state, same device, same network
 

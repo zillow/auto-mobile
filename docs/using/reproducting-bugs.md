@@ -13,7 +13,9 @@ Use AutoMobile to systematically reproduce bugs and create reproducible test cas
 
 When you receive a bug report, ask your AI agent:
 
-> Here is a bug report I'm trying to reproduce and provide specific steps for. When you encounter a defect or notice something off, highlight it, especially if it will help reproduce the bug. If reproduced take a device snapshot to make further reproduction and debugging easier. /details
+> Here is a bug report I'm trying to reproduce and provide specific steps for. When you encounter a defect or notice something off, highlight it, especially if it will help reproduce the bug. If reproduced take a device snapshot to make further reproduction and debugging easier.
+>
+> <bug-report-details-here>
 
 The agent will:
 

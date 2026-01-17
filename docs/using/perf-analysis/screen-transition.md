@@ -59,13 +59,13 @@ Target metrics:
 For detailed transition analysis, use Android's native tools:
 
 - **Perfetto**: System-wide tracing with GPU/CPU timelines
-  - See [Perfetto UI](https://ui.perfetto.dev/)
+    - See [Perfetto UI](https://ui.perfetto.dev/)
 
 - **Jetpack Compose**: Built-in composition tracing
-  - See [Compose Performance](https://developer.android.com/jetpack/compose/performance)
+    - See [Compose Performance](https://developer.android.com/jetpack/compose/performance)
 
 - **Systrace**: View rendering pipeline details
-  - See [Systrace Guide](https://developer.android.com/topic/performance/tracing/command-line)
+    - See [Systrace Guide](https://developer.android.com/topic/performance/tracing/command-line)
 
 ## Best Practices
 
