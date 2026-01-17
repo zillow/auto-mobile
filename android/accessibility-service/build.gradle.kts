@@ -11,6 +11,15 @@ val releaseStoreFilePath: String? = System.getenv("RELEASE_KEYSTORE_PATH") ?: fi
 val releaseStorePassword: String? = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
 val releaseKeyAlias: String? = System.getenv("RELEASE_KEY_ALIAS") ?: findProperty("RELEASE_KEY_ALIAS") as String?
 val releaseKeyPassword: String? = System.getenv("RELEASE_KEY_PASSWORD") ?: findProperty("RELEASE_KEY_PASSWORD") as String?
+val releaseStoreFile: File? = releaseStoreFilePath?.let { path ->
+  val file = File(path)
+  if (file.isAbsolute) file else rootProject.file(path)
+}
+val hasReleaseSigning =
+    releaseStoreFile?.exists() == true &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
 
 android {
   namespace = "dev.jasonpearson.automobile.accessibilityservice"
@@ -29,10 +38,7 @@ android {
 
   signingConfigs {
     create("release") {
-      storeFile = releaseStoreFilePath?.let { path ->
-        val file = File(path)
-        if (file.isAbsolute) file else rootProject.file(path)
-      }
+      storeFile = releaseStoreFile
       storePassword = releaseStorePassword
       keyAlias = releaseKeyAlias
       keyPassword = releaseKeyPassword
@@ -43,10 +49,20 @@ android {
     release {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig =
+          if (hasReleaseSigning) {
+            signingConfigs.getByName("release")
+          } else {
+            signingConfigs.getByName("debug")
+          }
     }
     debug {
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig =
+          if (hasReleaseSigning) {
+            signingConfigs.getByName("release")
+          } else {
+            signingConfigs.getByName("debug")
+          }
     }
   }
 
