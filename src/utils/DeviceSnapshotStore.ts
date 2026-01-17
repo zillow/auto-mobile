@@ -2,6 +2,12 @@ import { promises as fs } from "fs";
 import * as path from "path";
 import * as os from "os";
 import { logger } from "./logger";
+import type { Platform } from "../models";
+
+export interface SnapshotPathOptions {
+  platform?: Platform;
+  deviceId?: string;
+}
 
 export class DeviceSnapshotStore {
   private basePath: string;
@@ -27,29 +33,42 @@ export class DeviceSnapshotStore {
     return path.join(this.basePath, snapshotName);
   }
 
-  getSettingsPath(snapshotName: string): string {
-    return path.join(this.getSnapshotPath(snapshotName), "settings.json");
+  getSnapshotPathWithOptions(snapshotName: string, options?: SnapshotPathOptions): string {
+    if (options?.platform === "ios" && options.deviceId) {
+      return path.join(this.basePath, "ios", options.deviceId, snapshotName);
+    }
+
+    return this.getSnapshotPath(snapshotName);
   }
 
-  getAppDataPath(snapshotName: string): string {
-    return path.join(this.getSnapshotPath(snapshotName), "app_data");
+  getSettingsPath(snapshotName: string, options?: SnapshotPathOptions): string {
+    return path.join(this.getSnapshotPathWithOptions(snapshotName, options), "settings.json");
   }
 
-  getBackupFilePath(snapshotName: string): string {
-    return path.join(this.getAppDataPath(snapshotName), "backup.ab");
+  getMetadataPath(snapshotName: string, options?: SnapshotPathOptions): string {
+    return path.join(this.getSnapshotPathWithOptions(snapshotName, options), "metadata.json");
   }
 
-  async snapshotDirectoryExists(snapshotName: string): Promise<boolean> {
+  getAppDataPath(snapshotName: string, options?: SnapshotPathOptions): string {
+    const folderName = options?.platform === "ios" ? "app-data" : "app_data";
+    return path.join(this.getSnapshotPathWithOptions(snapshotName, options), folderName);
+  }
+
+  getBackupFilePath(snapshotName: string, options?: SnapshotPathOptions): string {
+    return path.join(this.getAppDataPath(snapshotName, options), "backup.ab");
+  }
+
+  async snapshotDirectoryExists(snapshotName: string, options?: SnapshotPathOptions): Promise<boolean> {
     try {
-      await fs.access(this.getSnapshotPath(snapshotName));
+      await fs.access(this.getSnapshotPathWithOptions(snapshotName, options));
       return true;
     } catch {
       return false;
     }
   }
 
-  async deleteSnapshotData(snapshotName: string): Promise<void> {
-    const snapshotPath = this.getSnapshotPath(snapshotName);
+  async deleteSnapshotData(snapshotName: string, options?: SnapshotPathOptions): Promise<void> {
+    const snapshotPath = this.getSnapshotPathWithOptions(snapshotName, options);
     try {
       await fs.rm(snapshotPath, { recursive: true, force: true });
     } catch (error) {
@@ -72,8 +91,8 @@ export class DeviceSnapshotStore {
     return `snapshot_${timestamp}`;
   }
 
-  async getSnapshotSizeBytes(snapshotName: string): Promise<number> {
-    const snapshotPath = this.getSnapshotPath(snapshotName);
+  async getSnapshotSizeBytes(snapshotName: string, options?: SnapshotPathOptions): Promise<number> {
+    const snapshotPath = this.getSnapshotPathWithOptions(snapshotName, options);
     return this.getDirectorySize(snapshotPath);
   }
 

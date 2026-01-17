@@ -1,4 +1,4 @@
-import { BootedDevice, ActionableError, DeviceSnapshotManifest } from "../../models";
+import { BootedDevice, ActionableError, DeviceSnapshotManifest, DeviceSnapshotType } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
 import {
@@ -20,7 +20,7 @@ export interface RestoreSnapshotArgs {
 }
 
 export interface RestoreSnapshotResult {
-  snapshotType: "vm" | "adb";
+  snapshotType: DeviceSnapshotType;
   restoredAt: string;
 }
 

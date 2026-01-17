@@ -44,10 +44,22 @@ describe("DeviceSnapshotStore", () => {
       .toBe(path.join(testBasePath, "test-snapshot"));
     expect(store.getSettingsPath("test-snapshot"))
       .toBe(path.join(testBasePath, "test-snapshot", "settings.json"));
+    expect(store.getMetadataPath("test-snapshot"))
+      .toBe(path.join(testBasePath, "test-snapshot", "metadata.json"));
     expect(store.getAppDataPath("test-snapshot"))
       .toBe(path.join(testBasePath, "test-snapshot", "app_data"));
     expect(store.getBackupFilePath("test-snapshot"))
       .toBe(path.join(testBasePath, "test-snapshot", "app_data", "backup.ab"));
+  });
+
+  it("should return iOS snapshot paths scoped by device", () => {
+    const options = { platform: "ios", deviceId: "SIM-UDID" };
+    expect(store.getSnapshotPathWithOptions("test-snapshot", options))
+      .toBe(path.join(testBasePath, "ios", "SIM-UDID", "test-snapshot"));
+    expect(store.getMetadataPath("test-snapshot", options))
+      .toBe(path.join(testBasePath, "ios", "SIM-UDID", "test-snapshot", "metadata.json"));
+    expect(store.getAppDataPath("test-snapshot", options))
+      .toBe(path.join(testBasePath, "ios", "SIM-UDID", "test-snapshot", "app-data"));
   });
 
   it("should detect snapshot directories", async () => {

@@ -460,10 +460,10 @@ export class SimCtlClient implements SimCtl {
       const simulatorList = await this.listSimulators();
 
       // Search for the device in all runtime versions
-      for (const runtimeDevices of Object.values(simulatorList.devices)) {
+      for (const [runtimeId, runtimeDevices] of Object.entries(simulatorList.devices)) {
         const device = runtimeDevices.find(d => d.udid === udid);
         if (device) {
-          return device;
+          return { ...device, runtime: runtimeId };
         }
       }
 

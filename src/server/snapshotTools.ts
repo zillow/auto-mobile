@@ -16,6 +16,8 @@ export const deviceSnapshotSchema = addDeviceTargetingToSchema(z.object({
   userApps: z.enum(["current", "all"]).optional()
     .describe("Which apps to backup: 'current' (foreground app only) or 'all' (all user-installed apps)"),
   vmSnapshotTimeoutMs: z.number().optional().describe("Timeout in milliseconds for emulator VM snapshot commands"),
+  appBundleIds: z.array(z.string()).optional()
+    .describe("iOS-only: bundle IDs to include in app data snapshots (omit to skip app data capture)"),
 })).superRefine((value, ctx) => {
   if (value.action === "restore" && !value.snapshotName) {
     ctx.addIssue({

@@ -1,4 +1,4 @@
-import { BootedDevice, ActionableError, DeviceSnapshotManifest } from "../../models";
+import { BootedDevice, ActionableError, DeviceSnapshotManifest, DeviceSnapshotType } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { AndroidEmulatorClient } from "../../utils/android-cmdline-tools/AndroidEmulatorClient";
 import {
@@ -21,12 +21,13 @@ export interface CaptureSnapshotArgs {
   backupTimeoutMs?: number; // Timeout in milliseconds for adb backup (default: 30000ms)
   userApps?: "current" | "all"; // Which apps to backup: "current" (foreground app only) or "all" (all user apps)
   vmSnapshotTimeoutMs?: number; // Timeout in milliseconds for emulator VM snapshot commands (default: 30000ms)
+  appBundleIds?: string[]; // iOS-only: bundle identifiers to include in app data snapshot
 }
 
 export interface CaptureSnapshotResult {
   snapshotName: string;
   timestamp: string;
-  snapshotType: "vm" | "adb";
+  snapshotType: DeviceSnapshotType;
   manifest: DeviceSnapshotManifest;
 }
 

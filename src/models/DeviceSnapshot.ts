@@ -1,4 +1,4 @@
-export type DeviceSnapshotType = "vm" | "adb";
+export type DeviceSnapshotType = "vm" | "adb" | "simctl" | "app_data";
 
 export interface DeviceSnapshotManifest {
   snapshotName: string;
@@ -6,6 +6,8 @@ export interface DeviceSnapshotManifest {
   deviceId: string;
   deviceName: string;
   platform: "android" | "ios";
+  deviceType?: string;
+  osVersion?: string;
   snapshotType: DeviceSnapshotType;
   includeAppData: boolean;
   includeSettings: boolean;
@@ -23,7 +25,7 @@ export interface DeviceSnapshotManifest {
     failedPackages?: string[];
     totalPackages?: number;
     backupTimedOut?: boolean;
-    backupMethod?: "adb_backup" | "root_pull" | "none";
+    backupMethod?: "adb_backup" | "root_pull" | "none" | "simctl_copy";
   };
 }
 
