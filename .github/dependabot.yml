@@ -15,3 +15,16 @@ updates:
     open-pull-requests-limit: 10
     # Set versioning strategy appropriate for a library/package
     versioning-strategy: "increase-if-necessary"
+  # Android Gradle dependencies
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "daily"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "android"
+    commit-message:
+      prefix: "chore(deps)"

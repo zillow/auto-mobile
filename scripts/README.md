@@ -145,6 +145,10 @@ See individual script directories for specialized validation:
 - `shellcheck/` - Shell script linting and formatting
 - `xml/` - XML validation and formatting
 
+Root-level validation scripts:
+- `validate_dependabot.sh` - Validate Dependabot config YAML
+- `validate_mkdocs_nav.sh` - Validate MkDocs nav configuration
+
 Run `scripts/<category>/validate_*.sh` for validation or `scripts/<category>/apply_*.sh` for auto-formatting.
 
 ## CI Integration
