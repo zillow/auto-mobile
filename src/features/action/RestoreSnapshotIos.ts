@@ -54,8 +54,8 @@ export class RestoreSnapshotIos {
     };
   }
 
-  private getPathOptions(): SnapshotPathOptions {
-    return { platform: "ios", deviceId: this.device.deviceId };
+  private getPathOptions(deviceId?: string): SnapshotPathOptions {
+    return { platform: "ios", deviceId: deviceId ?? this.device.deviceId };
   }
 
   private async restoreAppData(
@@ -67,11 +67,26 @@ export class RestoreSnapshotIos {
       return;
     }
 
-    const pathOptions = this.getPathOptions();
-    const appDataPath = this.store.getAppDataPath(snapshotName, pathOptions);
+    const manifestPathOptions = this.getPathOptions(manifest.deviceId);
+    let appDataPath = this.store.getAppDataPath(snapshotName, manifestPathOptions);
+
     if (!(await this.pathExists(appDataPath))) {
-      logger.warn(`[iOS] App data directory not found for snapshot '${snapshotName}'`);
-      return;
+      const fallbackPathOptions = this.getPathOptions(this.device.deviceId);
+      if (manifest.deviceId && manifest.deviceId !== this.device.deviceId) {
+        const fallbackPath = this.store.getAppDataPath(snapshotName, fallbackPathOptions);
+        if (await this.pathExists(fallbackPath)) {
+          logger.info(
+            `[iOS] App data not found for '${manifest.deviceId}', using current device path '${this.device.deviceId}'`
+          );
+          appDataPath = fallbackPath;
+        } else {
+          logger.warn(`[iOS] App data directory not found for snapshot '${snapshotName}'`);
+          return;
+        }
+      } else {
+        logger.warn(`[iOS] App data directory not found for snapshot '${snapshotName}'`);
+        return;
+      }
     }
 
     if (manifest.appDataBackup?.backupMethod === "none") {
