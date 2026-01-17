@@ -95,6 +95,7 @@ nav:
           - 'Tools': design-docs/mcp/tools.md
           - 'Observe':
              - 'Overview': design-docs/mcp/observe/index.md
+             - 'Appearance Sync': design-docs/mcp/observe/appearance.md
              - 'Video Recording': design-docs/mcp/observe/video-recording.md
              - 'Vision Fallback': design-docs/mcp/observe/vision-fallback.md
              - 'Visual Highlighting': design-docs/mcp/observe/visual-highlighting.md
