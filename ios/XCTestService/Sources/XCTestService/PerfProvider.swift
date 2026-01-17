@@ -23,7 +23,7 @@ public class FakeTimeProvider: TimeProvider {
     private let lock = NSLock()
 
     public init(initialTime: Int64 = 0) {
-        self.currentTime = initialTime
+        currentTime = initialTime
     }
 
     public func currentTimeMillis() -> Int64 {
@@ -65,11 +65,11 @@ public protocol Timer {
     func wait(milliseconds: Int64) async
 
     /// Schedule a callback after specified milliseconds
-    func schedule(after milliseconds: Int64, callback: @escaping () -> Void)
+    func schedule(after milliseconds: Int64, callback: @escaping @Sendable () -> Void)
 }
 
 /// Default implementation using real system time and delays.
-public class SystemTimer: Timer {
+public class SystemTimer: Timer, @unchecked Sendable {
     public init() {}
 
     public func now() -> Int64 {
@@ -80,7 +80,7 @@ public class SystemTimer: Timer {
         try? await Task.sleep(nanoseconds: UInt64(milliseconds) * 1_000_000)
     }
 
-    public func schedule(after milliseconds: Int64, callback: @escaping () -> Void) {
+    public func schedule(after milliseconds: Int64, callback: @escaping @Sendable () -> Void) {
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(Int(milliseconds))) {
             callback()
         }
@@ -88,22 +88,22 @@ public class SystemTimer: Timer {
 }
 
 /// Fake implementation for testing with instant or controlled time.
-public class FakeTimer: Timer {
+public class FakeTimer: Timer, @unchecked Sendable {
     public enum Mode {
-        case instant      // All waits complete immediately
-        case manual       // Waits only complete when manually advanced
+        case instant // All waits complete immediately
+        case manual // Waits only complete when manually advanced
         case delayed(Int64) // Each wait takes a fixed duration
     }
 
     private let mode: Mode
     private var currentTime: Int64
     private let lock = NSLock()
-    private var pendingCallbacks: [(time: Int64, callback: () -> Void)] = []
+    private var pendingCallbacks: [(time: Int64, callback: @Sendable () -> Void)] = []
     private var pendingWaiters: [CheckedContinuation<Void, Never>] = []
 
     public init(mode: Mode = .instant, initialTime: Int64 = 0) {
         self.mode = mode
-        self.currentTime = initialTime
+        currentTime = initialTime
     }
 
     public func now() -> Int64 {
@@ -112,30 +112,38 @@ public class FakeTimer: Timer {
         return currentTime
     }
 
+    // Helper to update time in a thread-safe manner (called from non-async contexts)
+    private func incrementTime(by milliseconds: Int64) {
+        lock.lock()
+        currentTime += milliseconds
+        lock.unlock()
+    }
+
+    // Helper to add a waiter (called from withCheckedContinuation)
+    private func addWaiter(_ continuation: CheckedContinuation<Void, Never>) {
+        lock.lock()
+        pendingWaiters.append(continuation)
+        lock.unlock()
+    }
+
     public func wait(milliseconds: Int64) async {
         switch mode {
         case .instant:
-            lock.lock()
-            currentTime += milliseconds
-            lock.unlock()
+            incrementTime(by: milliseconds)
             return
 
         case .manual:
             await withCheckedContinuation { continuation in
-                lock.lock()
-                pendingWaiters.append(continuation)
-                lock.unlock()
+                self.addWaiter(continuation)
             }
 
-        case .delayed(let delay):
+        case let .delayed(delay):
             try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
-            lock.lock()
-            currentTime += milliseconds
-            lock.unlock()
+            incrementTime(by: milliseconds)
         }
     }
 
-    public func schedule(after milliseconds: Int64, callback: @escaping () -> Void) {
+    public func schedule(after milliseconds: Int64, callback: @escaping @Sendable () -> Void) {
         lock.lock()
         let targetTime = currentTime + milliseconds
         pendingCallbacks.append((time: targetTime, callback: callback))
@@ -209,7 +217,7 @@ public class FakeTimer: Timer {
 // MARK: - Mutable Perf Entry
 
 /// Internal mutable timing entry for building up timing data.
-internal class MutablePerfEntry {
+class MutablePerfEntry {
     let name: String
     let startTime: Int64
     var endTime: Int64?
@@ -224,7 +232,8 @@ internal class MutablePerfEntry {
 
     func toTiming(timeProvider: TimeProvider) -> PerfTiming {
         let duration = (endTime ?? timeProvider.currentTimeMillis()) - startTime
-        let childTimings: [PerfTiming]? = children.isEmpty ? nil : children.map { $0.toTiming(timeProvider: timeProvider) }
+        let childTimings: [PerfTiming]? = children.isEmpty ? nil : children
+            .map { $0.toTiming(timeProvider: timeProvider) }
         return PerfTiming(name: name, durationMs: duration, children: childTimings)
     }
 }
@@ -252,10 +261,10 @@ internal class MutablePerfEntry {
 /// let timings = perf.flush()
 /// ```
 public class PerfProvider {
-
     // MARK: - Singleton
 
-    private static var _instance: PerfProvider?
+    // Using nonisolated(unsafe) because thread safety is managed manually via instanceLock
+    private nonisolated(unsafe) static var _instance: PerfProvider?
     private static let instanceLock = NSLock()
 
     public static var instance: PerfProvider {
@@ -295,7 +304,7 @@ public class PerfProvider {
     private var currentRoot: MutablePerfEntry?
 
     // Debounce tracking
-    private var debounceCount: Int = 0
+    private var debounceCount = 0
     private var lastDebounceTime: Int64?
 
     // MARK: - Init
@@ -322,7 +331,7 @@ public class PerfProvider {
         entryStack.append(entry)
 
         #if DEBUG
-        print("[PerfProvider] Started serial block: \(name)")
+            print("[PerfProvider] Started serial block: \(name)")
         #endif
     }
 
@@ -345,7 +354,7 @@ public class PerfProvider {
         entryStack.append(entry)
 
         #if DEBUG
-        print("[PerfProvider] Started independent root: \(name)")
+            print("[PerfProvider] Started independent root: \(name)")
         #endif
     }
 
@@ -365,7 +374,7 @@ public class PerfProvider {
         entryStack.append(entry)
 
         #if DEBUG
-        print("[PerfProvider] Started parallel block: \(name)")
+            print("[PerfProvider] Started parallel block: \(name)")
         #endif
     }
 
@@ -382,7 +391,7 @@ public class PerfProvider {
 
         guard let entry = entryStack.popLast() else {
             #if DEBUG
-            print("[PerfProvider] end() called with no active block")
+                print("[PerfProvider] end() called with no active block")
             #endif
             return
         }
@@ -390,11 +399,11 @@ public class PerfProvider {
         entry.endTime = now
 
         #if DEBUG
-        print("[PerfProvider] Ended block: \(entry.name) (\(now - entry.startTime)ms)")
+            print("[PerfProvider] Ended block: \(entry.name) (\(now - entry.startTime)ms)")
         #endif
 
         // If this was the root entry, move it to completed
-        if entryStack.isEmpty && currentRoot === entry {
+        if entryStack.isEmpty, currentRoot === entry {
             completedEntries.append(entry)
             currentRoot = nil
         }
@@ -436,7 +445,7 @@ public class PerfProvider {
         }
 
         #if DEBUG
-        print("[PerfProvider] Started operation: \(name)")
+            print("[PerfProvider] Started operation: \(name)")
         #endif
     }
 
@@ -450,7 +459,9 @@ public class PerfProvider {
         // Find the matching entry in the stack
         guard let entry = entryStack.last, entry.name == name else {
             #if DEBUG
-            print("[PerfProvider] endOperation(\(name)) called but current entry is \(entryStack.last?.name ?? "nil")")
+                print(
+                    "[PerfProvider] endOperation(\(name)) called but current entry is \(entryStack.last?.name ?? "nil")"
+                )
             #endif
             return
         }
@@ -459,11 +470,11 @@ public class PerfProvider {
         _ = entryStack.popLast()
 
         #if DEBUG
-        print("[PerfProvider] Ended operation: \(name) (\(now - entry.startTime)ms)")
+            print("[PerfProvider] Ended operation: \(name) (\(now - entry.startTime)ms)")
         #endif
 
         // If this was the root entry, move it to completed
-        if entryStack.isEmpty && currentRoot === entry {
+        if entryStack.isEmpty, currentRoot === entry {
             completedEntries.append(entry)
             currentRoot = nil
         }
@@ -480,7 +491,7 @@ public class PerfProvider {
         lastDebounceTime = timeProvider.currentTimeMillis()
 
         #if DEBUG
-        print("[PerfProvider] Debounce recorded (total: \(debounceCount))")
+            print("[PerfProvider] Debounce recorded (total: \(debounceCount))")
         #endif
     }
 
@@ -511,7 +522,7 @@ public class PerfProvider {
                 durationMs: 0,
                 children: [
                     PerfTiming.timing("count", durationMs: Int64(debounceCount)),
-                    PerfTiming.timing("lastTime", durationMs: lastDebounceTime ?? 0)
+                    PerfTiming.timing("lastTime", durationMs: lastDebounceTime ?? 0),
                 ]
             )
             entries.append(debounceInfo)

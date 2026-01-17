@@ -13,7 +13,6 @@ import {
   GestureOptions
 } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { ExecuteGesture } from "./ExecuteGesture";
@@ -91,10 +90,9 @@ export class SwipeOn extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     dependencies: SwipeOnDependencies = {}
   ) {
-    super(device, adb, axe);
+    super(device, adb);
     this.executeGesture = dependencies.executeGesture ?? new ExecuteGesture(device, adb);
     this.elementUtils = dependencies.elementUtils ?? new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);

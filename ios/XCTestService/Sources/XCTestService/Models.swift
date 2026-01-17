@@ -150,7 +150,9 @@ public struct WebSocketResponse: Codable {
         type: String,
         requestId: String?,
         totalTimeMs: Int64
-    ) -> WebSocketResponse {
+    )
+        -> WebSocketResponse
+    {
         WebSocketResponse(
             type: type,
             requestId: requestId,
@@ -164,7 +166,9 @@ public struct WebSocketResponse: Codable {
         requestId: String?,
         error: String,
         totalTimeMs: Int64? = nil
-    ) -> WebSocketResponse {
+    )
+        -> WebSocketResponse
+    {
         WebSocketResponse(
             type: type,
             requestId: requestId,
@@ -214,8 +218,8 @@ public struct HierarchyUpdateResponse: Codable {
         perfTiming: PerfTiming? = nil,
         error: String? = nil
     ) {
-        self.type = "hierarchy_update"
-        self.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        type = "hierarchy_update"
+        timestamp = Int64(Date().timeIntervalSince1970 * 1000)
         self.requestId = requestId
         self.data = data
         self.perfTiming = perfTiming
@@ -394,11 +398,11 @@ public struct ScreenshotResponse: Codable {
     public let timestamp: Int64
     public let requestId: String?
     public let format: String
-    public let data: String  // Base64 encoded
+    public let data: String // Base64 encoded
 
     public init(requestId: String?, data: String, format: String = "png") {
-        self.type = "screenshot"
-        self.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
+        type = "screenshot"
+        timestamp = Int64(Date().timeIntervalSince1970 * 1000)
         self.requestId = requestId
         self.format = format
         self.data = data
@@ -408,7 +412,7 @@ public struct ScreenshotResponse: Codable {
 // MARK: - Highlight Models
 
 public struct HighlightShape: Codable {
-    public let type: String  // "box" or "path"
+    public let type: String // "box" or "path"
     public let bounds: HighlightBounds?
     public let points: [HighlightPoint]?
     public let style: HighlightStyle?
@@ -496,7 +500,7 @@ public struct ConnectedEvent: Codable {
     public let id: Int
 
     public init(id: Int) {
-        self.type = "connected"
+        type = "connected"
         self.id = id
     }
 }
@@ -537,7 +541,7 @@ public enum RequestType: String {
 
 public enum ResponseType: String {
     case hierarchyUpdate = "hierarchy_update"
-    case screenshot = "screenshot"
+    case screenshot
     case screenshotError = "screenshot_error"
     case tapCoordinatesResult = "tap_coordinates_result"
     case swipeResult = "swipe_result"
@@ -551,5 +555,5 @@ public enum ResponseType: String {
     case currentFocusResult = "current_focus_result"
     case traversalOrderResult = "traversal_order_result"
     case highlightResponse = "highlight_response"
-    case connected = "connected"
+    case connected
 }

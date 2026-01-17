@@ -2,7 +2,6 @@ import SwiftUI
 
 /// Devices view for managing iOS simulators and devices
 struct DevicesView: View {
-
     @StateObject private var viewModel = DevicesViewModel()
 
     var body: some View {
@@ -119,7 +118,7 @@ class DevicesViewModel: ObservableObject {
                     name: "iPad Pro (12.9-inch)",
                     state: "Shutdown",
                     runtime: "iOS 17.0"
-                )
+                ),
             ]
             self.isLoading = false
         }

@@ -16,11 +16,9 @@ describe("TapOnElement selectionStrategy", () => {
         id: "emulator-5554",
       } as any,
       new FakeAdbClient() as any,
-      null,
-      null,
-      undefined,
-      undefined,
-      undefined,
+      undefined,       // visionConfig
+      undefined,       // selectionStateTracker
+      undefined,       // accessibilityDetector
       new FakeTimer(),
       fakeSelector
     );

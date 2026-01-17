@@ -2,7 +2,6 @@ import SwiftUI
 
 /// Settings view for configuring the companion app
 struct SettingsView: View {
-
     @AppStorage("mcpEndpoint") private var mcpEndpoint = "http://localhost:3000"
     @AppStorage("autoConnect") private var autoConnect = true
 

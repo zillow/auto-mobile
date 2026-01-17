@@ -1,7 +1,6 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, TerminateAppResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class TerminateApp extends BaseVisualChange {
@@ -10,10 +9,9 @@ export class TerminateApp extends BaseVisualChange {
    * Create an TerminateApp instance
    * @param device - Optional device
    * @param adb - Optional AdbClient instance for testing
-   * @param axe - Optional Axe instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.device = device;
   }
 

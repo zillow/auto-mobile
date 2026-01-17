@@ -5,6 +5,10 @@ options:
     iOS: "15.0"
   xcodeVersion: "15.0"
 
+configFiles:
+  Debug: Configurations/Debug.xcconfig
+  Release: Configurations/Release.xcconfig
+
 settings:
   base:
     SWIFT_VERSION: "5.0"
@@ -17,8 +21,11 @@ targets:
       - path: XCTestServiceApp
         excludes:
           - "*.xcassets"
+      - path: XCTestServiceApp/Assets.xcassets
+        type: folder
     settings:
       base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.XCTestServiceApp
         INFOPLIST_FILE: XCTestServiceApp/Info.plist
         CODE_SIGN_STYLE: Automatic
@@ -35,6 +42,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.XCTestService
         DEFINES_MODULE: YES
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+
+  XCTestServiceTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/XCTestServiceTests
+    dependencies:
+      - target: XCTestService
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.jasonpearson.automobile.XCTestServiceTests
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: YES
 
@@ -64,11 +84,13 @@ schemes:
       targets:
         XCTestServiceApp: all
         XCTestService: all
+        XCTestServiceTests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
+        - XCTestServiceTests
         - XCTestServiceUITests
     profile:
       config: Release

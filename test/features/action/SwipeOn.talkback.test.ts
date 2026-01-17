@@ -21,8 +21,6 @@ describe("SwipeOn TalkBack mode detection", () => {
         id: "emulator-5554",
       } as any,
       {} as any,  // adb
-      null,
-      null,
       {
         accessibilityDetector: fakeAccessibilityDetector,
         // Mock executeGesture to avoid actual swipe execution
@@ -261,8 +259,6 @@ describe("SwipeOn TalkBack mode detection", () => {
           platform: "ios",
           id: "test-ios-device",
         } as any,
-        null,
-        {} as any,  // axe
         null,
         {
           accessibilityDetector: fakeAccessibilityDetector,

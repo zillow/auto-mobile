@@ -2,7 +2,6 @@ import XCTest
 @testable import XCTestRunner
 
 final class XCTestRunnerTests: XCTestCase {
-
     func testAutoMobileTestCaseConfiguration() {
         let config = AutoMobileTestCase.Configuration(
             mcpEndpoint: "http://localhost:3000",

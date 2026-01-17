@@ -1,8 +1,7 @@
-import XCTest
 @testable import XcodeExtension
+import XCTest
 
 final class XcodeExtensionTests: XCTestCase {
-
     func testExtensionInitialization() {
         // Basic test to ensure the extension compiles
         XCTAssertTrue(true)

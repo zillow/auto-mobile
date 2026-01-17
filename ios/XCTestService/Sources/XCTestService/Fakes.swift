@@ -4,7 +4,6 @@ import Foundation
 
 /// Fake implementation of ElementLocating for testing
 public class FakeElementLocator: ElementLocating {
-
     // MARK: - Configurable State
 
     private var hierarchyData: ViewHierarchy?
@@ -23,7 +22,7 @@ public class FakeElementLocator: ElementLocating {
 
     /// Set the hierarchy to return
     public func setHierarchy(_ hierarchy: ViewHierarchy?) {
-        self.hierarchyData = hierarchy
+        hierarchyData = hierarchy
     }
 
     /// Set an element to be found by ID
@@ -33,7 +32,7 @@ public class FakeElementLocator: ElementLocating {
 
     /// Configure to throw an error
     public func setShouldThrow(_ error: Error?) {
-        self.shouldThrow = error
+        shouldThrow = error
     }
 
     // MARK: - Assertions
@@ -85,7 +84,6 @@ public class FakeElementLocator: ElementLocating {
 
 /// Fake implementation of GesturePerforming for testing
 public class FakeGesturePerformer: GesturePerforming {
-
     // MARK: - Configurable State
 
     private var screenshotData: Data?
@@ -150,7 +148,7 @@ public class FakeGesturePerformer: GesturePerforming {
     // MARK: - Configuration
 
     public func setScreenshotData(_ data: Data?) {
-        self.screenshotData = data
+        screenshotData = data
     }
 
     public func setFailure(for operation: String, error: Error?) {
@@ -222,9 +220,27 @@ public class FakeGesturePerformer: GesturePerforming {
         swipeHistory.append(SwipeCall(startX: startX, startY: startY, endX: endX, endY: endY, duration: duration))
     }
 
-    public func drag(startX: Double, startY: Double, endX: Double, endY: Double, pressDuration: TimeInterval, dragDuration: TimeInterval, holdDuration: TimeInterval) throws {
+    public func drag(
+        startX: Double,
+        startY: Double,
+        endX: Double,
+        endY: Double,
+        pressDuration: TimeInterval,
+        dragDuration: TimeInterval,
+        holdDuration: TimeInterval
+    )
+        throws
+    {
         try checkFailure("drag")
-        dragHistory.append(DragCall(startX: startX, startY: startY, endX: endX, endY: endY, pressDuration: pressDuration, dragDuration: dragDuration, holdDuration: holdDuration))
+        dragHistory.append(DragCall(
+            startX: startX,
+            startY: startY,
+            endX: endX,
+            endY: endY,
+            pressDuration: pressDuration,
+            dragDuration: dragDuration,
+            holdDuration: holdDuration
+        ))
     }
 
     public func pinch(centerX: Double, centerY: Double, scale: Double, duration: TimeInterval) throws {
@@ -290,7 +306,7 @@ public class FakeGesturePerformer: GesturePerforming {
         appTerminateHistory.append(bundleId)
     }
 
-    public func activateApp(bundleId: String) throws {
+    public func activateApp(bundleId _: String) throws {
         try checkFailure("activateApp")
     }
 }
@@ -299,7 +315,6 @@ public class FakeGesturePerformer: GesturePerforming {
 
 /// Fake implementation of WebSocketServing for testing
 public class FakeWebSocketServer: WebSocketServing {
-
     // MARK: - State
 
     private var running = false
@@ -317,8 +332,8 @@ public class FakeWebSocketServer: WebSocketServing {
     // MARK: - Configuration
 
     public func setShouldStartFail(_ shouldFail: Bool, error: Error? = nil) {
-        self.shouldStartFail = shouldFail
-        self.startError = error
+        shouldStartFail = shouldFail
+        startError = error
     }
 
     // MARK: - Assertions
@@ -341,7 +356,11 @@ public class FakeWebSocketServer: WebSocketServing {
         startCallCount += 1
 
         if shouldStartFail {
-            throw startError ?? NSError(domain: "FakeWebSocketServer", code: -1, userInfo: [NSLocalizedDescriptionKey: "Fake start failure"])
+            throw startError ?? NSError(
+                domain: "FakeWebSocketServer",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Fake start failure"]
+            )
         }
 
         running = true
@@ -361,7 +380,6 @@ public class FakeWebSocketServer: WebSocketServing {
 
 /// Fake implementation of PerfProvider for testing
 public class FakePerfProvider {
-
     // MARK: - State
 
     private var flushData: [PerfTiming]?
@@ -382,7 +400,7 @@ public class FakePerfProvider {
     // MARK: - Configuration
 
     public func setFlushData(_ data: [PerfTiming]?) {
-        self.flushData = data
+        flushData = data
     }
 
     // MARK: - Assertions

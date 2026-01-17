@@ -1,9 +1,8 @@
-import XCTest
 import Foundation
+import XCTest
 
 /// Base XCTestCase for executing AutoMobile YAML automation plans via MCP
 open class AutoMobileTestCase: XCTestCase {
-
     /// Configuration for the test case
     public struct Configuration {
         public let mcpEndpoint: String

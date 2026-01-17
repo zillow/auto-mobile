@@ -13,7 +13,6 @@ import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../ut
 import { throwIfAborted } from "../../utils/toolUtils";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { serverConfig } from "../../utils/ServerConfig";
@@ -38,10 +37,9 @@ export class DragAndDrop extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe, timer);
+    super(device, adb, timer);
     this.elementUtils = new ElementUtils();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
     this.viewHierarchy = new ViewHierarchy(device, this.adb);

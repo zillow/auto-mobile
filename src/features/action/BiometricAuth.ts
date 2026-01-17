@@ -1,7 +1,6 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, BiometricAuthResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { logger } from "../../utils/logger";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
@@ -16,10 +15,9 @@ export class BiometricAuth extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe, timer);
+    super(device, adb, timer);
     this.device = device;
   }
 

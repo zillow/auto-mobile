@@ -3,7 +3,6 @@ import Network
 
 /// Manages MCP connection and transport selection
 class MCPConnectionManager: ObservableObject {
-
     static let shared = MCPConnectionManager()
 
     @Published var isConnected = false

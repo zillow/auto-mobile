@@ -1,0 +1,19 @@
+// XCTestService Debug Configuration
+
+#include "BaseSettings.xcconfig"
+
+// =============================================================================
+// Debug-specific Settings
+// =============================================================================
+// Performance optimization: use 'dwarf' instead of 'dwarf-with-dsym' to skip
+// dSYM generation during debug builds (faster incremental builds)
+DEBUG_INFORMATION_FORMAT = dwarf
+ENABLE_TESTABILITY = YES
+GCC_OPTIMIZATION_LEVEL = 0
+SWIFT_OPTIMIZATION_LEVEL = -Onone
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG
+
+// =============================================================================
+// Debug Preprocessor
+// =============================================================================
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) DEBUG=1

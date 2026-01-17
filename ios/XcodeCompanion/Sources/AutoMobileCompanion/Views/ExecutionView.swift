@@ -2,7 +2,6 @@ import SwiftUI
 
 /// Execution view for running automation plans
 struct ExecutionView: View {
-
     @StateObject private var viewModel = ExecutionViewModel()
 
     var body: some View {

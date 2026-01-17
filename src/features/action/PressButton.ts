@@ -1,12 +1,11 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
-import { AxeClient, AxeButton } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class PressButton extends BaseVisualChange {
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.device = device;
   }
 
@@ -94,19 +93,12 @@ export class PressButton extends BaseVisualChange {
    * @returns Result of the button press operation
    */
   private async executeiOSButtonPress(button: string): Promise<PressButtonResult> {
-
-    const axeButton: AxeButton = "home";
     const supportedButtons = ["apple_pay", "home", "lock", "side_button", "siri"];
     if (!supportedButtons.includes(button.toLowerCase())) {
       throw new Error(`Unsupported iOS button: ${button}. Supported buttons: ${supportedButtons.join(", ")}`);
     }
 
-    await this.axe.pressButton(axeButton);
-
-    return {
-      success: true,
-      button,
-      keyCode: 0, // iOS doesn't use keycodes, using 0 as placeholder
-    };
+    // iOS button press is not yet implemented without AxeClient
+    throw new Error("iOS button press is not yet supported");
   }
 }

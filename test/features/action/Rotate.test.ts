@@ -64,7 +64,7 @@ describe("Rotate", () => {
     fakeAdb.setCommandResponse("shell settings get system accelerometer_rotation", createExecResult("1"));
 
     // Instantiate Rotate with fake ADB
-    rotate = new Rotate(mockDevice, fakeAdb, null, fakeTimer);
+    rotate = new Rotate(mockDevice, fakeAdb, fakeTimer);
 
     // Inject all fakes to avoid real device operations
     (rotate as any).awaitIdle = fakeAwaitIdle;
@@ -222,7 +222,7 @@ describe("Rotate", () => {
         deviceId: "test-device",
         source: "local"
       };
-      const rotateInstance = new Rotate(device, null, null, fakeTimer);
+      const rotateInstance = new Rotate(device, null, fakeTimer);
       expect(rotateInstance).toBeDefined();
     });
 
@@ -234,7 +234,7 @@ describe("Rotate", () => {
         source: "local"
       };
       const customAdb = new FakeAdbExecutor();
-      const rotateInstance = new Rotate(device, customAdb, null, fakeTimer);
+      const rotateInstance = new Rotate(device, customAdb, fakeTimer);
       expect(rotateInstance).toBeDefined();
     });
   });

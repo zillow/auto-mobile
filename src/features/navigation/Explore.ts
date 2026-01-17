@@ -1,7 +1,6 @@
 import { ActionableError, BootedDevice, Element, ObserveResult } from "../../models";
 import { BaseVisualChange, ProgressCallback } from "../action/BaseVisualChange";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/PerformanceTracker";
 import { logger } from "../../utils/logger";
 import { NavigationGraphManager, type NavigationEdge } from "./NavigationGraphManager";
@@ -206,10 +205,9 @@ export class Explore extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe, timer);
+    super(device, adb, timer);
     this.navigationManager = NavigationGraphManager.getInstance();
     this.exploredElements = new Map();
     this.elementParser = new ElementParser();
@@ -1298,7 +1296,7 @@ export class Explore extends BaseVisualChange {
       if (isScrollable) {
         // Perform swipe on scrollable container
         logger.info(`[Explore] Swiping on scrollable container: ${element["resource-id"] || element["class"]}`);
-        const swipeOn = new SwipeOnElement(this.device, this.adb, this.axe);
+        const swipeOn = new SwipeOnElement(this.device, this.adb);
 
         const swipeResult = await swipeOn.execute(
           element,
@@ -1314,7 +1312,7 @@ export class Explore extends BaseVisualChange {
         return swipeResult.success;
       } else {
         // Perform tap interaction
-        const tapOn = new TapOnElement(this.device, this.adb, this.axe);
+        const tapOn = new TapOnElement(this.device, this.adb);
 
         const tapResult = await tapOn.execute(
           {
@@ -1449,7 +1447,7 @@ export class Explore extends BaseVisualChange {
 
       if (allowKeywords.some(keyword => text.includes(keyword))) {
         try {
-          const tapOn = new TapOnElement(this.device, this.adb, this.axe);
+          const tapOn = new TapOnElement(this.device, this.adb);
           await tapOn.execute(
             {
               text: element.text,
@@ -1487,7 +1485,7 @@ export class Explore extends BaseVisualChange {
 
       if (dismissKeywords.some(keyword => text.includes(keyword))) {
         try {
-          const tapOn = new TapOnElement(this.device, this.adb, this.axe);
+          const tapOn = new TapOnElement(this.device, this.adb);
           await tapOn.execute(
             {
               text: element.text,

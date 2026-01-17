@@ -1,19 +1,16 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BootedDevice, ClipboardResult } from "../../models";
 import { logger } from "../../utils/logger";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 
 export class Clipboard {
   private device: BootedDevice;
   private adb: AdbClient;
-  private axe: AxeClient | null;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
-    this.axe = axe;
   }
 
   async execute(

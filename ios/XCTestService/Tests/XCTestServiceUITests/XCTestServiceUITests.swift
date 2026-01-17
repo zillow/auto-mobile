@@ -1,4 +1,5 @@
 import XCTest
+
 // Note: XCTestService sources are compiled directly into this target (not imported as framework)
 // This gives XCTest access for XCUIApplication support
 
@@ -17,7 +18,6 @@ import XCTest
 /// - XCTESTSERVICE_TIMEOUT: How long to keep server running in seconds (default: forever)
 ///
 final class XCTestServiceUITests: XCTestCase {
-
     private var service: XCTestService?
 
     override func setUpWithError() throws {
@@ -98,7 +98,8 @@ final class XCTestServiceUITests: XCTestCase {
 
     private func getPort() -> UInt16 {
         if let portString = ProcessInfo.processInfo.environment["XCTESTSERVICE_PORT"],
-           let port = UInt16(portString) {
+           let port = UInt16(portString)
+        {
             return port
         }
         return XCTestService.defaultPort
@@ -110,7 +111,8 @@ final class XCTestServiceUITests: XCTestCase {
 
     private func getTimeout() -> TimeInterval? {
         if let timeoutString = ProcessInfo.processInfo.environment["XCTESTSERVICE_TIMEOUT"],
-           let timeout = TimeInterval(timeoutString) {
+           let timeout = TimeInterval(timeoutString)
+        {
             return timeout
         }
         return nil
@@ -120,7 +122,6 @@ final class XCTestServiceUITests: XCTestCase {
 // MARK: - Quick Start Tests
 
 extension XCTestServiceUITests {
-
     /// Convenience test for quick verification (30 seconds)
     func testQuickStart() throws {
         let service = XCTestService()

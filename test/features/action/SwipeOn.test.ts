@@ -45,7 +45,7 @@ describe("SwipeOn autoTarget", () => {
   });
 
   const createSwipeOn = () => {
-    const swipeOn = new SwipeOn(device, null, null, null, {
+    const swipeOn = new SwipeOn(device, null, {
       executeGesture: fakeGesture,
       observeScreen: fakeObserveScreen,
       accessibilityDetector: fakeAccessibilityDetector
@@ -171,7 +171,7 @@ describe("SwipeOn container overlays", () => {
   });
 
   const createSwipeOn = () => {
-    const swipeOn = new SwipeOn(device, null, null, null, {
+    const swipeOn = new SwipeOn(device, null, {
       executeGesture: fakeGesture,
       observeScreen: fakeObserveScreen,
       accessibilityDetector: fakeAccessibilityDetector
@@ -567,7 +567,7 @@ describe("SwipeOn boomerang", () => {
   });
 
   const createSwipeOn = () => {
-    const swipeOn = new SwipeOn(device, null, null, null, {
+    const swipeOn = new SwipeOn(device, null, {
       executeGesture: fakeGesture,
       observeScreen: fakeObserveScreen,
       accessibilityDetector: fakeAccessibilityDetector
@@ -632,7 +632,7 @@ describe("SwipeOn lookFor validation", () => {
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
 
   const createSwipeOn = () => {
-    const swipeOn = new SwipeOn(device, null, null, null, {
+    const swipeOn = new SwipeOn(device, null, {
       executeGesture: fakeGesture,
       observeScreen: fakeObserveScreen,
       accessibilityDetector: fakeAccessibilityDetector

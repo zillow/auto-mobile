@@ -1,9 +1,8 @@
-import XCTest
 import Foundation
+import XCTest
 
 /// XCTestObservation integration for collecting timing data and test results
 public class AutoMobileTestObserver: NSObject, XCTestObservation {
-
     /// Timing data for test cases
     public struct TimingData {
         public let testName: String

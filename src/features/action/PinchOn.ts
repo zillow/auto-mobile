@@ -9,7 +9,6 @@ import {
   ViewHierarchyResult
 } from "../../models";
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { ElementUtils } from "../utility/ElementUtils";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilityServiceManager";
@@ -25,8 +24,8 @@ type PinchTarget = {
 export class PinchOn extends BaseVisualChange {
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.elementUtils = new ElementUtils();
   }
 

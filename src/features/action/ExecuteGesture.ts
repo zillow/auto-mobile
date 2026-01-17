@@ -4,7 +4,6 @@ import { FingerPath } from "../../models";
 import { GestureOptions } from "../../models";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { SwipeResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
@@ -15,8 +14,8 @@ import { logger } from "../../utils/logger";
  */
 export class ExecuteGesture extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.device = device;
   }
 
@@ -183,26 +182,7 @@ export class ExecuteGesture extends BaseVisualChange {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
     const duration = options.duration || 300;
-    const scrollMode = options.scrollMode || "xctest"; // Default to XCTestService for iOS
-
-    // Use XCTestService if requested (default for iOS)
-    if (scrollMode === "a11y" || scrollMode === "xctest") {
-      return await this.executeXCTestSwipe(x1, y1, x2, y2, duration, perf);
-    }
-
-    // Fallback to axe command line tool
-    await perf.track("axeSwipe", async () => {
-      await this.axe.swipe(x1, y1, x2, y2);
-    });
-
-    return {
-      success: true,
-      x1,
-      y1,
-      x2,
-      y2,
-      duration
-    };
+    return await this.executeXCTestSwipe(x1, y1, x2, y2, duration, perf);
   }
 
   /**
@@ -224,47 +204,14 @@ export class ExecuteGesture extends BaseVisualChange {
     duration: number,
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<SwipeResult> {
-    try {
-      const client = XCTestServiceClient.getInstance(this.device);
+    const client = XCTestServiceClient.getInstance(this.device);
 
-      const result = await perf.track("xctestSwipe", async () => {
-        return await client.requestSwipe(x1, y1, x2, y2, duration, 5000, perf);
-      });
+    const result = await perf.track("xctestSwipe", async () => {
+      return await client.requestSwipe(x1, y1, x2, y2, duration, 5000, perf);
+    });
 
-      if (result.success) {
-        logger.info(`[SWIPE] XCTestService swipe successful: deviceTotal=${result.totalTimeMs}ms, gesture=${result.gestureTimeMs}ms`);
-        return {
-          success: true,
-          x1,
-          y1,
-          x2,
-          y2,
-          duration,
-          a11yTotalTimeMs: result.totalTimeMs,
-          a11yGestureTimeMs: result.gestureTimeMs
-        };
-      } else {
-        logger.warn(`[SWIPE] XCTestService swipe failed: ${result.error}, falling back to axe`);
-        // Fall back to axe on failure
-        await perf.track("axeSwipeFallback", async () => {
-          await this.axe.swipe(x1, y1, x2, y2);
-        });
-        return {
-          success: true,
-          x1,
-          y1,
-          x2,
-          y2,
-          duration,
-          fallbackReason: result.error
-        };
-      }
-    } catch (error) {
-      logger.warn(`[SWIPE] XCTestService swipe exception: ${error}, falling back to axe`);
-      // Fall back to axe on exception
-      await perf.track("axeSwipeFallback", async () => {
-        await this.axe.swipe(x1, y1, x2, y2);
-      });
+    if (result.success) {
+      logger.info(`[SWIPE] XCTestService swipe successful: deviceTotal=${result.totalTimeMs}ms, gesture=${result.gestureTimeMs}ms`);
       return {
         success: true,
         x1,
@@ -272,7 +219,19 @@ export class ExecuteGesture extends BaseVisualChange {
         x2,
         y2,
         duration,
-        fallbackReason: `${error}`
+        a11yTotalTimeMs: result.totalTimeMs,
+        a11yGestureTimeMs: result.gestureTimeMs
+      };
+    } else {
+      logger.error(`[SWIPE] XCTestService swipe failed: ${result.error}`);
+      return {
+        success: false,
+        x1,
+        y1,
+        x2,
+        y2,
+        duration,
+        error: result.error
       };
     }
   }
@@ -345,14 +304,8 @@ export class ExecuteGesture extends BaseVisualChange {
           const start = points[0];
           const end = points[points.length - 1];
 
-          try {
-            const client = XCTestServiceClient.getInstance(this.device);
-            await client.requestSwipe(start.x, start.y, end.x, end.y, duration);
-          } catch (error) {
-            // Fall back to axe if XCTestService fails
-            logger.warn(`[GESTURE] XCTestService failed, falling back to axe: ${error}`);
-            await this.axe.swipe(start.x, start.y, end.x, end.y);
-          }
+          const client = XCTestServiceClient.getInstance(this.device);
+          await client.requestSwipe(start.x, start.y, end.x, end.y, duration);
         }
       }
     }

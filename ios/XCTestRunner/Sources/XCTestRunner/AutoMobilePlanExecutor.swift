@@ -3,7 +3,6 @@ import XCTest
 
 /// Executes AutoMobile YAML automation plans via MCP
 public class AutoMobilePlanExecutor {
-
     public enum ExecutorError: Error {
         case planNotFound
         case invalidPlan
@@ -13,7 +12,7 @@ public class AutoMobilePlanExecutor {
     }
 
     private let configuration: AutoMobileTestCase.Configuration
-    private var retryCount: Int = 0
+    private var retryCount = 0
 
     public init(configuration: AutoMobileTestCase.Configuration) {
         self.configuration = configuration
@@ -23,7 +22,7 @@ public class AutoMobilePlanExecutor {
     public func execute() throws {
         var lastError: Error?
 
-        for attempt in 0...configuration.retryCount {
+        for attempt in 0 ... configuration.retryCount {
             do {
                 try executeOnce()
                 return
@@ -146,12 +145,12 @@ public class MCPClient {
         // TODO: Implement MCP connection
     }
 
-    public func execute(_ step: PlanStep) throws -> ExecutionResult {
+    public func execute(_: PlanStep) throws -> ExecutionResult {
         // TODO: Implement MCP tool execution
         return ExecutionResult(success: true, error: nil)
     }
 
-    public func verify(_ assertion: PlanAssertion) throws -> VerificationResult {
+    public func verify(_: PlanAssertion) throws -> VerificationResult {
         // TODO: Implement assertion verification
         return VerificationResult(passed: true)
     }

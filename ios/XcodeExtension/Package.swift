@@ -4,13 +4,13 @@ import PackageDescription
 let package = Package(
     name: "XcodeExtension",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     products: [
         .library(
             name: "XcodeExtension",
             targets: ["XcodeExtension"]
-        )
+        ),
     ],
     dependencies: [
         // XcodeKit is provided by Xcode
@@ -23,6 +23,6 @@ let package = Package(
         .testTarget(
             name: "XcodeExtensionTests",
             dependencies: ["XcodeExtension"]
-        )
+        ),
     ]
 )

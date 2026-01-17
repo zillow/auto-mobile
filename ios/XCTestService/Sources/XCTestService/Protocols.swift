@@ -43,7 +43,8 @@ public protocol GesturePerforming {
         pressDuration: TimeInterval,
         dragDuration: TimeInterval,
         holdDuration: TimeInterval
-    ) throws
+    )
+        throws
 
     // MARK: - Pinch Gestures
 

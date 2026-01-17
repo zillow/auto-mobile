@@ -4,13 +4,13 @@ import PackageDescription
 let package = Package(
     name: "XcodeCompanion",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     products: [
         .executable(
             name: "AutoMobileCompanion",
             targets: ["AutoMobileCompanion"]
-        )
+        ),
     ],
     dependencies: [
         // SwiftUI and Combine are built-in
@@ -20,12 +20,12 @@ let package = Package(
             name: "AutoMobileCompanion",
             dependencies: [],
             resources: [
-                .process("Resources")
+                .process("Resources"),
             ]
         ),
         .testTarget(
             name: "AutoMobileCompanionTests",
             dependencies: ["AutoMobileCompanion"]
-        )
+        ),
     ]
 )

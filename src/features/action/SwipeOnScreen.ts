@@ -5,9 +5,9 @@ import { ExecuteGesture } from "./ExecuteGesture";
 import { SwipeResult } from "../../models";
 import { ElementUtils } from "../utility/ElementUtils";
 import { ActionableError, ObserveResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { logger } from "../../utils/logger";
 import { createGlobalPerformanceTracker, PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 
 /**
  * Executes swipe gestures on the screen, respecting system insets
@@ -16,8 +16,8 @@ export class SwipeOnScreen extends BaseVisualChange {
   private executeGesture: ExecuteGesture;
   private elementUtils: ElementUtils;
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.executeGesture = new ExecuteGesture(device, adb);
     this.elementUtils = new ElementUtils();
   }
@@ -160,16 +160,30 @@ export class SwipeOnScreen extends BaseVisualChange {
     logger.info(`[SwipeOnScreen] Bounded swipe coordinates: start=(${boundedStartX}, ${boundedStartY}), end=(${boundedEndX}, ${boundedEndY})`);
 
     try {
-      const result = await this.axe.swipe(
+      // Use XCTestServiceClient for swipe
+      const client = XCTestServiceClient.getInstance(this.device);
+      const xcResult = await client.requestSwipe(
         boundedStartX,
         boundedStartY,
         boundedEndX,
         boundedEndY
       );
-      logger.info(`[SwipeOnScreen] Swipe completed successfully: ${JSON.stringify(result)}`);
-      return result;
+
+      if (!xcResult.success) {
+        logger.error(`[SwipeOnScreen] XCTestService swipe failed: ${xcResult.error}`);
+        throw new Error(`iOS swipe failed: ${xcResult.error}`);
+      }
+
+      logger.info(`[SwipeOnScreen] XCTestService swipe completed successfully`);
+      return {
+        success: true,
+        startX: boundedStartX,
+        startY: boundedStartY,
+        endX: boundedEndX,
+        endY: boundedEndY
+      };
     } catch (error) {
-      logger.error(`[SwipeOnScreen] Swipe execution failed: ${error}`);
+      logger.error(`[SwipeOnScreen] iOS swipe failed: ${error}`);
       throw error;
     }
   }

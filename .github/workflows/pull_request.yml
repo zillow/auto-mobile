@@ -404,6 +404,100 @@ jobs:
           path: "*.heapsnapshot"
 
   # =============================================================================
+  # iOS Build and Test Jobs (Skip for docs-only changes)
+  # =============================================================================
+
+  ios-swift-build:
+    name: "Build Swift Packages (${{ matrix.config.name }})"
+    runs-on: ${{ matrix.config.runner }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
+          - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode ${{ matrix.config.xcode }}"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.config.xcode }}
+
+      - name: "Build Swift Packages"
+        run: ./scripts/ios/swift-build.sh
+
+  ios-swift-test:
+    name: "Test Swift Packages (${{ matrix.config.name }})"
+    runs-on: ${{ matrix.config.runner }}
+    needs: [detect-changes, ios-swift-build]
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
+          - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode ${{ matrix.config.xcode }}"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.config.xcode }}
+
+      - name: "Test Swift Packages"
+        run: ./scripts/ios/swift-test.sh
+
+  ios-xcodegen:
+    name: "Generate Xcode Projects"
+    runs-on: macos-14
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Install XcodeGen"
+        run: brew install xcodegen
+
+      - name: "Generate Xcode Projects"
+        run: ./scripts/ios/xcodegen-generate.sh
+
+  ios-xcode-build:
+    name: "Build Xcode Projects (${{ matrix.config.name }})"
+    runs-on: ${{ matrix.config.runner }}
+    needs: [detect-changes, ios-xcodegen]
+    if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - { name: "Xcode 15", runner: "macos-14", xcode: "15.4" }
+          - { name: "Xcode 16", runner: "macos-15", xcode: "16.2" }
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode ${{ matrix.config.xcode }}"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.config.xcode }}
+
+      - name: "Install XcodeGen"
+        run: brew install xcodegen
+
+      - name: "Generate Xcode Projects"
+        run: ./scripts/ios/xcodegen-generate.sh
+
+      - name: "Build Xcode Projects"
+        run: ./scripts/ios/xcode-build.sh
+
+  # =============================================================================
   # Android Build and Test Jobs (Skip for docs-only changes)
   # =============================================================================
 

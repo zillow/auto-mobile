@@ -2,7 +2,6 @@ import SwiftUI
 
 /// Main content view for AutoMobile Companion
 struct ContentView: View {
-
     @StateObject private var navigationState = NavigationState()
 
     var body: some View {

@@ -35,6 +35,20 @@
                ReferencedContainer = "container:XCTestService.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5C25456B69D4B3C0F5619AF4"
+               BuildableName = "XCTestServiceTests.xctest"
+               BlueprintName = "XCTestServiceTests"
+               ReferencedContainer = "container:XCTestService.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -53,6 +67,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5C25456B69D4B3C0F5619AF4"
+               BuildableName = "XCTestServiceTests.xctest"
+               BlueprintName = "XCTestServiceTests"
+               ReferencedContainer = "container:XCTestService.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
          <TestableReference
             skipped = "NO"
             parallelizable = "NO">

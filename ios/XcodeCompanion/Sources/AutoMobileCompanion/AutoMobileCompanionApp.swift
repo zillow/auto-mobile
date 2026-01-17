@@ -3,7 +3,6 @@ import SwiftUI
 /// Main application entry point for AutoMobile Xcode Companion
 @main
 struct AutoMobileCompanionApp: App {
-
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
@@ -31,15 +30,14 @@ struct AutoMobileCompanionApp: App {
 
 /// Application delegate for menu bar and lifecycle management
 class AppDelegate: NSObject, NSApplicationDelegate {
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
+    func applicationDidFinishLaunching(_: Notification) {
         print("AutoMobile Companion launched")
 
         // Initialize MCP connection
         MCPConnectionManager.shared.initialize()
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
+    func applicationWillTerminate(_: Notification) {
         print("AutoMobile Companion terminating")
 
         // Cleanup MCP connection

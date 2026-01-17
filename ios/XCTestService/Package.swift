@@ -7,13 +7,13 @@ let package = Package(
     name: "XCTestService",
     platforms: [
         .iOS(.v15),
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     products: [
         .library(
             name: "XCTestService",
             targets: ["XCTestService"]
-        )
+        ),
     ],
     targets: [
         .target(
@@ -22,9 +22,11 @@ let package = Package(
             path: "Sources/XCTestService"
         ),
         .testTarget(
-            name: "XCTestServiceUITests",
+            name: "XCTestServiceTests",
             dependencies: ["XCTestService"],
-            path: "Tests/XCTestServiceUITests"
-        )
+            path: "Tests/XCTestServiceTests"
+        ),
+        // Note: XCTestServiceUITests is excluded from SPM as it requires iOS simulator
+        // Use Xcode project (via XcodeGen) for UI tests
     ]
 )

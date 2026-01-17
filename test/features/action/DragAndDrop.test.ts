@@ -76,7 +76,7 @@ describe("DragAndDrop", () => {
     } as any);
     getInstanceSpy = spyOn(AccessibilityServiceClient, "getInstance").mockReturnValue(fakeA11yService as any);
 
-    dragAndDrop = new DragAndDrop(device, null, null, fakeTimer);
+    dragAndDrop = new DragAndDrop(device, null, fakeTimer);
     (dragAndDrop as any).observeScreen = fakeObserveScreen;
     (dragAndDrop as any).awaitIdle = fakeAwaitIdle;
     (dragAndDrop as any).window = fakeWindow;

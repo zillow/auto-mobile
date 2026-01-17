@@ -2,8 +2,10 @@ import { logger } from "./logger";
 import { BootedDevice } from "../models";
 import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
 import { Timer, defaultTimer } from "./SystemTimer";
-import { exec } from "child_process";
+import { XCTestServiceBuilder, type XCTestServiceBuildResult } from "./XCTestServiceBuilder";
+import { exec, type ChildProcess } from "child_process";
 import { promisify } from "util";
+import * as path from "path";
 
 const execAsync = promisify(exec);
 
@@ -14,6 +16,7 @@ export interface XCTestServiceSetupResult {
   success: boolean;
   message: string;
   error?: string;
+  buildResult?: XCTestServiceBuildResult;
   perfTiming?: ReturnType<PerformanceTracker["getTimings"]>;
 }
 
@@ -48,6 +51,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private readonly device: BootedDevice;
   private readonly timer: Timer;
   private readonly servicePort: number;
+  private readonly builder: XCTestServiceBuilder;
 
   // Singleton instances per device
   private static instances: Map<string, IOSXCTestServiceManager> = new Map();
@@ -63,14 +67,20 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
 
   // XCUITest process state
   private xcTestProcessId: number | null = null;
+  private xcTestProcess: ChildProcess | null = null;
+
+  // Process monitoring
+  private processMonitorInterval: ReturnType<typeof setInterval> | null = null;
+  private lastHealthCheckSuccess: boolean = false;
 
   public static readonly DEFAULT_PORT = 8765;
   public static readonly BUNDLE_ID = "dev.jasonpearson.automobile.XCTestService";
 
-  private constructor(device: BootedDevice, timer: Timer = defaultTimer) {
+  private constructor(device: BootedDevice, timer: Timer = defaultTimer, builder?: XCTestServiceBuilder) {
     this.device = device;
     this.timer = timer;
     this.servicePort = IOSXCTestServiceManager.DEFAULT_PORT;
+    this.builder = builder || XCTestServiceBuilder.getInstance();
   }
 
   /**
@@ -89,8 +99,8 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   /**
    * Create instance for testing with injected dependencies
    */
-  public static createForTesting(device: BootedDevice, timer: Timer): IOSXCTestServiceManager {
-    return new IOSXCTestServiceManager(device, timer);
+  public static createForTesting(device: BootedDevice, timer: Timer, builder?: XCTestServiceBuilder): IOSXCTestServiceManager {
+    return new IOSXCTestServiceManager(device, timer, builder);
   }
 
   /**
@@ -231,20 +241,30 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       await this.startOnDevice();
     }
 
-    // Wait for service to be ready
-    const maxAttempts = 10;
+    // Wait for HTTP health endpoint to be ready
+    // XCUITest can take 10+ seconds to fully initialize after xcodebuild starts
+    const maxAttempts = 30;
     const delayMs = 500;
 
     for (let i = 0; i < maxAttempts; i++) {
       if (await this.checkHealthEndpoint()) {
-        logger.info("[XCTestServiceManager] Service is ready");
+        logger.info("[XCTestServiceManager] HTTP health endpoint is ready");
         this.clearCaches();
+
+        // Wait additional time for WebSocket server to be ready
+        // The HTTP server can respond before WebSocket is fully initialized
+        logger.info("[XCTestServiceManager] Waiting for WebSocket server initialization");
+        await this.timer.sleep(500);
+
         return;
+      }
+      if (i > 0 && i % 10 === 0) {
+        logger.info(`[XCTestServiceManager] Still waiting for service... (attempt ${i}/${maxAttempts})`);
       }
       await this.timer.sleep(delayMs);
     }
 
-    throw new Error("XCTestService failed to start within timeout");
+    throw new Error("XCTestService failed to start within timeout (15s)");
   }
 
   /**
@@ -253,6 +273,9 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   public async stop(): Promise<void> {
     logger.info("[XCTestServiceManager] Stopping XCTestService");
 
+    // Stop process monitoring first
+    this.stopProcessMonitoring();
+
     if (this.xcTestProcessId) {
       try {
         process.kill(this.xcTestProcessId);
@@ -260,6 +283,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
         // Process may have already exited
       }
       this.xcTestProcessId = null;
+      this.xcTestProcess = null;
     }
 
     // Also try to kill any lingering xcodebuild test processes
@@ -275,6 +299,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
 
   /**
    * Complete setup process for XCTestService
+   * Includes automatic build detection and prefetch integration
    */
   public async setup(
     force: boolean = false,
@@ -314,13 +339,48 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
         };
       }
 
+      // Check if build is needed
+      const needsBuild = await perf.track("checkBuild", () => this.builder.needsRebuild());
+
+      let buildResult: XCTestServiceBuildResult | null = null;
+      if (needsBuild) {
+        // Check for prefetched result first
+        const prefetchedResult = XCTestServiceBuilder.getPrefetchedResult();
+        if (prefetchedResult && prefetchedResult.success) {
+          logger.info("[XCTestServiceManager] Using prefetched build result");
+          buildResult = prefetchedResult;
+        } else {
+          // Wait for prefetch if in progress
+          const waitedResult = await perf.track("waitForPrefetch", () => XCTestServiceBuilder.waitForPrefetch());
+          if (waitedResult && waitedResult.success) {
+            logger.info("[XCTestServiceManager] Using completed prefetch build result");
+            buildResult = waitedResult;
+          } else {
+            // Build synchronously
+            logger.info("[XCTestServiceManager] Building XCTestService");
+            buildResult = await perf.track("build", () => this.builder.build(perf));
+            if (!buildResult.success) {
+              perf.end();
+              return {
+                success: false,
+                message: buildResult.message,
+                error: buildResult.error,
+                buildResult,
+                perfTiming: perf.getTimings()
+              };
+            }
+          }
+        }
+      }
+
       // Start the service
       await perf.track("startService", () => this.start());
 
       perf.end();
       return {
         success: true,
-        message: "XCTestService started successfully",
+        message: needsBuild ? "XCTestService built and started successfully" : "XCTestService started successfully",
+        buildResult: buildResult || undefined,
         perfTiming: perf.getTimings()
       };
     } catch (error) {
@@ -347,28 +407,140 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private async startOnSimulator(): Promise<void> {
     logger.info("[XCTestServiceManager] Starting XCTestService on simulator");
 
-    // Start the XCUITest runner on the simulator
-    // This would typically be done via xcodebuild test
-    const command = [
-      "xcodebuild",
-      "test",
-      "-scheme XCTestServiceApp",
-      "-destination", `id=${this.device.deviceId}`,
-      "-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService",
-      `XCTESTSERVICE_PORT=${this.servicePort}`,
-      "2>&1"
-    ].join(" ");
+    // Try to get xctestrun path for faster test-without-building
+    const xctestrunPath = await this.builder.getXctestrunPath();
+
+    let command: string;
+    if (xctestrunPath) {
+      // Use test-without-building for faster startup
+      logger.info("[XCTestServiceManager] Using test-without-building with xctestrun file");
+      command = [
+        "xcodebuild",
+        "test-without-building",
+        `-xctestrun "${xctestrunPath}"`,
+        `-destination "id=${this.device.deviceId}"`,
+        `-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService`,
+        `XCTESTSERVICE_PORT=${this.servicePort}`,
+        "2>&1"
+      ].join(" ");
+    } else {
+      // Fall back to building from project
+      logger.info("[XCTestServiceManager] Using xcodebuild test (no xctestrun available)");
+      const projectDir = path.join(process.cwd(), "ios", "XCTestService");
+      command = [
+        `cd "${projectDir}" &&`,
+        "xcodebuild",
+        "test",
+        "-scheme XCTestServiceApp",
+        `-destination "id=${this.device.deviceId}"`,
+        "-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService",
+        `XCTESTSERVICE_PORT=${this.servicePort}`,
+        "2>&1"
+      ].join(" ");
+    }
 
     // Start in background
     const child = exec(command, error => {
       if (error) {
         logger.warn(`[XCTestServiceManager] xcodebuild test exited: ${error.message}`);
+        this.handleProcessExit();
       }
     });
 
     if (child.pid) {
       this.xcTestProcessId = child.pid;
+      this.xcTestProcess = child;
       logger.info(`[XCTestServiceManager] Started xcodebuild test with PID ${child.pid}`);
+
+      // Start process monitoring
+      this.startProcessMonitoring();
+
+      // Capture output for debugging
+      this.captureProcessOutput(child);
+    }
+  }
+
+  /**
+   * Capture process output for debugging
+   */
+  private captureProcessOutput(child: ChildProcess): void {
+    if (child.stdout) {
+      child.stdout.on("data", (data: Buffer | string) => {
+        const output = data.toString().trim();
+        if (output) {
+          logger.info(`[XCTestService stdout] ${output.slice(0, 500)}`);
+        }
+      });
+    }
+
+    if (child.stderr) {
+      child.stderr.on("data", (data: Buffer | string) => {
+        const output = data.toString().trim();
+        if (output && !output.includes("Build Succeeded")) {
+          logger.warn(`[XCTestService stderr] ${output.slice(0, 500)}`);
+        }
+      });
+    }
+  }
+
+  /**
+   * Start process health monitoring
+   */
+  private startProcessMonitoring(): void {
+    // Clear any existing monitor
+    this.stopProcessMonitoring();
+
+    // Check every 30 seconds
+    this.processMonitorInterval = setInterval(async () => {
+      try {
+        const isHealthy = await this.checkHealthEndpoint();
+        this.lastHealthCheckSuccess = isHealthy;
+
+        if (!isHealthy && this.xcTestProcessId) {
+          // Check if process is still running
+          const processRunning = await this.isProcessRunning(this.xcTestProcessId);
+          if (!processRunning) {
+            logger.warn("[XCTestServiceManager] XCTest process crashed, health endpoint not responding");
+            // Don't auto-restart here - let the next setup() call handle it
+            this.handleProcessExit();
+          }
+        }
+      } catch {
+        // Ignore monitoring errors
+      }
+    }, 30000);
+  }
+
+  /**
+   * Stop process monitoring
+   */
+  private stopProcessMonitoring(): void {
+    if (this.processMonitorInterval) {
+      clearInterval(this.processMonitorInterval);
+      this.processMonitorInterval = null;
+    }
+  }
+
+  /**
+   * Handle process exit
+   */
+  private handleProcessExit(): void {
+    this.xcTestProcessId = null;
+    this.xcTestProcess = null;
+    this.stopProcessMonitoring();
+    this.clearCaches();
+  }
+
+  /**
+   * Check if a process is still running
+   */
+  private async isProcessRunning(pid: number): Promise<boolean> {
+    try {
+      // On macOS/Linux, kill -0 checks if process exists without actually killing it
+      await execAsync(`kill -0 ${pid} 2>/dev/null`);
+      return true;
+    } catch {
+      return false;
     }
   }
 

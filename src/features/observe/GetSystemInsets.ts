@@ -2,25 +2,20 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { logger } from "../../utils/logger";
 import { BootedDevice, SystemInsets } from "../../models";
 import { ExecResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 
 export class GetSystemInsets {
   private adb: AdbClient;
-  private axe: AxeClient;
 
   /**
-   * Create a Window instance
-   * @param device - Optional device
+   * Create a GetSystemInsets instance
+   * @param device - Device to get system insets for
    * @param adb - Optional AdbClient instance for testing
-   * @param axe - Optional Axe instance for testing
    */
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null,
-    axe: AxeClient | null = null
+    adb: AdbClient | null = null
   ) {
     this.adb = adb || new AdbClient(device);
-    this.axe = axe || new AxeClient(device);
   }
 
   /**

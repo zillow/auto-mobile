@@ -1,0 +1,85 @@
+# SwiftFormat Configuration
+# https://github.com/nicklockwood/SwiftFormat
+
+# Swift version
+--swiftversion 5.0
+
+# File options
+--exclude ios/**/build,ios/**/DerivedData,ios/**/.build,ios/**/Pods,ios/**/Carthage
+
+# Format options
+
+# Indentation
+--indent 4
+--tabwidth 4
+--smarttabs enabled
+--indentcase false
+--ifdef indent
+
+# Wrapping
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--wrapconditions after-first
+--wrapreturntype if-multiline
+--wrapeffects if-multiline
+--wraptypealiases before-first
+--maxwidth 120
+--closingparen balanced
+
+# Spacing
+--operatorfunc spaced
+--nospaceoperators
+--ranges spaced
+--typeattributes prev-line
+--funcattributes prev-line
+--varattributes prev-line
+--storedvarattrs same-line
+--computedvarattrs same-line
+
+# Braces
+--allman false
+
+# Blank lines
+--trimwhitespace always
+--emptybraces no-space
+
+# Semicolons
+--semicolons inline
+
+# Import sorting
+--importgrouping alpha
+
+# Self
+--self remove
+--selfrequired
+
+# Redundancy
+--redundanttype inferred
+
+# Trailing
+--commas always
+--trailingclosures
+
+# Void
+--voidtype void
+
+# Extensions
+--extensionacl on-declarations
+
+# Marks
+--marktypes always
+--markextensions always
+--markcategories true
+
+# Type declarations
+--organizetypes class,struct,enum,actor
+--structthreshold 0
+--enumthreshold 0
+--extensionlength 0
+
+# Rules (disable rules that overlap with SwiftLint or cause issues)
+--disable blankLinesBetweenImports
+--disable sortSwitchCases
+--disable wrapSwitchCases
+--disable wrapEnumCases

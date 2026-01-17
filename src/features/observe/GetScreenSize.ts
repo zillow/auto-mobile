@@ -1,5 +1,4 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { DeviceDetection } from "../../utils/DeviceDetection";
 import { logger } from "../../utils/logger";
 import { BootedDevice, ExecResult, ScreenSize } from "../../models";
@@ -7,24 +6,22 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { XCTestServiceClient } from "./XCTestServiceClient";
 
 export class GetScreenSize {
   private adb: AdbClient;
-  private axe: AxeClient;
   private readonly device: BootedDevice;
   private static memoryCache = new Map<string, ScreenSize>();
   private static cacheDir = path.join(process.cwd(), ".cache", "screen-size");
 
   /**
-   * Create a Window instance
-   * @param device - Optional device
+   * Create a GetScreenSize instance
+   * @param device - Device to get screen size for
    * @param adb - Optional AdbClient instance for testing
-   * @param axe - Optional IdbUtils instance for testing
    */
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
-    this.axe = axe || new AxeClient(device);
   }
 
   /**
@@ -116,6 +113,38 @@ export class GetScreenSize {
 
     logger.debug(`Device rotation detected: ${rotation}`);
     return rotation;
+  }
+
+  /**
+   * Extract screen size from view hierarchy root node bounds.
+   * The root node (XCUIApplication) bounds represent the full screen dimensions.
+   * Format: "[left,top][right,bottom]" e.g., "[0,0][402,874]"
+   */
+  private extractScreenSizeFromHierarchy(viewHierarchy: { hierarchy?: { node?: { $?: { bounds?: string } } } }): ScreenSize | null {
+    const rootNode = viewHierarchy?.hierarchy?.node;
+    if (!rootNode?.$?.bounds) {
+      return null;
+    }
+
+    const boundsStr = rootNode.$.bounds;
+    const match = boundsStr.match(/\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/);
+    if (!match) {
+      return null;
+    }
+
+    const left = parseInt(match[1], 10);
+    const top = parseInt(match[2], 10);
+    const right = parseInt(match[3], 10);
+    const bottom = parseInt(match[4], 10);
+
+    const width = right - left;
+    const height = bottom - top;
+
+    if (width > 0 && height > 0) {
+      return { width, height };
+    }
+
+    return null;
   }
 
   /**
@@ -213,8 +242,25 @@ export class GetScreenSize {
       const isiOSDevice = DeviceDetection.isiOSDevice(this.device.deviceId);
 
       if (isiOSDevice) {
-        // iOS device - use axe to get screen size
-        return await perf.track("iOSGetScreenSize", () => this.axe.getScreenSize());
+        // iOS device - use XCTestServiceClient to get hierarchy and extract screen size
+        const client = XCTestServiceClient.getInstance(this.device);
+        const hierarchyResult = await perf.track("iOSHierarchy", () =>
+          client.getAccessibilityHierarchy()
+        );
+
+        if (hierarchyResult) {
+          const screenSize = this.extractScreenSizeFromHierarchy(hierarchyResult);
+          if (screenSize) {
+            // Cache the result
+            const cacheKey = this.generateCacheKey(this.device.deviceId);
+            GetScreenSize.memoryCache.set(cacheKey, screenSize);
+            this.saveToDiskCache(cacheKey, screenSize);
+            logger.debug(`[iOS] Screen size from hierarchy: ${screenSize.width}x${screenSize.height}`);
+            return screenSize;
+          }
+        }
+
+        throw new Error("Failed to get iOS screen size from XCTestServiceClient hierarchy");
       } else {
         // Android device - use adb to get screen size
         return await this.getAndroidScreenSize(dumpsysResult, perf);

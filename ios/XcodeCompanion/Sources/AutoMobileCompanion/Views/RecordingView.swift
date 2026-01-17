@@ -2,7 +2,6 @@ import SwiftUI
 
 /// Recording view for capturing automation plans
 struct RecordingView: View {
-
     @StateObject private var viewModel = RecordingViewModel()
 
     var body: some View {

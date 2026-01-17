@@ -1,11 +1,10 @@
 import Foundation
 #if canImport(XCTest) && os(iOS)
-import XCTest
+    import XCTest
 #endif
 
 /// Handles WebSocket commands matching Android AccessibilityService protocol
 public class CommandHandler: CommandHandling {
-
     private let elementLocator: ElementLocating
     private let gesturePerformer: GesturePerforming
     private let perfProvider: PerfProvider
@@ -25,7 +24,9 @@ public class CommandHandler: CommandHandling {
         elementLocator: ElementLocating,
         gesturePerformer: GesturePerforming,
         perfProvider: PerfProvider
-    ) -> CommandHandler {
+    )
+        -> CommandHandler
+    {
         return CommandHandler(
             elementLocator: elementLocator,
             gesturePerformer: gesturePerformer,
@@ -111,7 +112,12 @@ public class CommandHandler: CommandHandling {
 
     // MARK: - View Hierarchy
 
-    private func handleRequestHierarchy(_ request: WebSocketRequest, startTime: Date) throws -> HierarchyUpdateResponse {
+    private func handleRequestHierarchy(
+        _ request: WebSocketRequest,
+        startTime _: Date
+    )
+        throws -> HierarchyUpdateResponse
+    {
         perfProvider.serial("handleRequestHierarchy")
         defer { perfProvider.end() }
 
@@ -133,7 +139,7 @@ public class CommandHandler: CommandHandling {
         )
     }
 
-    private func handleRequestScreenshot(_ request: WebSocketRequest, startTime: Date) throws -> ScreenshotResponse {
+    private func handleRequestScreenshot(_ request: WebSocketRequest, startTime _: Date) throws -> ScreenshotResponse {
         let data = try gesturePerformer.getScreenshot()
         let base64 = data.base64EncodedString()
 
@@ -163,7 +169,8 @@ public class CommandHandler: CommandHandling {
 
     private func handleSwipe(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
         guard let x1 = request.x1, let y1 = request.y1,
-              let x2 = request.x2, let y2 = request.y2 else {
+              let x2 = request.x2, let y2 = request.y2
+        else {
             throw CommandError.missingParameter("x1, y1, x2, y2")
         }
 
@@ -193,7 +200,8 @@ public class CommandHandler: CommandHandling {
 
     private func handleDrag(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
         guard let x1 = request.x1, let y1 = request.y1,
-              let x2 = request.x2, let y2 = request.y2 else {
+              let x2 = request.x2, let y2 = request.y2
+        else {
             throw CommandError.missingParameter("x1, y1, x2, y2")
         }
 
@@ -218,7 +226,8 @@ public class CommandHandler: CommandHandling {
 
     private func handlePinch(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
         guard let centerX = request.centerX, let centerY = request.centerY,
-              let distanceStart = request.distanceStart, let distanceEnd = request.distanceEnd else {
+              let distanceStart = request.distanceStart, let distanceEnd = request.distanceEnd
+        else {
             throw CommandError.missingParameter("centerX, centerY, distanceStart, distanceEnd")
         }
 
@@ -393,17 +402,17 @@ public enum CommandError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .unknownCommand(let cmd):
+        case let .unknownCommand(cmd):
             return "Unknown command: \(cmd)"
-        case .missingParameter(let param):
+        case let .missingParameter(param):
             return "Missing required parameter: \(param)"
-        case .invalidParameter(let param, let value):
+        case let .invalidParameter(param, value):
             return "Invalid value '\(value)' for parameter '\(param)'"
-        case .elementNotFound(let id):
+        case let .elementNotFound(id):
             return "Element not found: \(id)"
-        case .executionFailed(let reason):
+        case let .executionFailed(reason):
             return "Command execution failed: \(reason)"
-        case .notSupported(let feature):
+        case let .notSupported(feature):
             return "Feature not supported: \(feature)"
         }
     }

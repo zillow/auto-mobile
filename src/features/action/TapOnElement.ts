@@ -17,7 +17,6 @@ import { DefaultElementSelector } from "../utility/DefaultElementSelector";
 import { logger } from "../../utils/logger";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../observe/XCTestServiceClient";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { VisionFallback, DEFAULT_VISION_CONFIG, type VisionFallbackConfig } from "../../vision/index";
 import { TakeScreenshot } from "../observe/TakeScreenshot";
@@ -54,14 +53,13 @@ export class TapOnElement extends BaseVisualChange {
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     visionConfig?: VisionFallbackConfig,
     selectionStateTracker?: SelectionStateTracker,
     accessibilityDetector?: AccessibilityDetector,
     timer?: Timer,
     elementSelector?: ElementSelector
   ) {
-    super(device, adb, axe, timer);
+    super(device, adb, timer);
     this.elementUtils = new ElementUtils();
     this.elementParser = new ElementParser();
     this.accessibilityService = AccessibilityServiceClient.getInstance(device, this.adb);
@@ -977,7 +975,6 @@ export class TapOnElement extends BaseVisualChange {
 
   /**
    * Execute iOS-specific tap operations using XCTestService
-   * Falls back to axe command line tool if XCTestService fails
    * @param action - The tap action to perform
    * @param x - X coordinate
    * @param y - Y coordinate
@@ -992,56 +989,27 @@ export class TapOnElement extends BaseVisualChange {
     // Use short duration (50ms) for tap/doubleTap, full duration for longPress
     const tapDuration = action === "longPress" ? durationMs : 50;
 
-    try {
-      const client = XCTestServiceClient.getInstance(this.device);
+    const client = XCTestServiceClient.getInstance(this.device);
 
-      if (action === "doubleTap") {
-        // Double tap - perform two taps
-        const firstResult = await client.requestTapCoordinates(x, y, tapDuration);
-        if (!firstResult.success) {
-          logger.warn(`[TapOnElement] First XCTestService tap failed (${firstResult.error}), falling back to axe`);
-          await this.executeiOSTapWithAxe(action, x, y, durationMs);
-          return;
-        }
-
-        await this.timer.sleep(200);
-
-        const secondResult = await client.requestTapCoordinates(x, y, tapDuration);
-        if (!secondResult.success) {
-          logger.warn(`[TapOnElement] Second XCTestService tap failed (${secondResult.error}), falling back to axe`);
-          await this.executeiOSTapWithAxe(action, x, y, durationMs);
-        }
-      } else {
-        // Single tap or long press
-        const result = await client.requestTapCoordinates(x, y, tapDuration);
-        if (!result.success) {
-          logger.warn(`[TapOnElement] XCTestService tap failed (${result.error}), falling back to axe`);
-          await this.executeiOSTapWithAxe(action, x, y, durationMs);
-        }
+    if (action === "doubleTap") {
+      // Double tap - perform two taps
+      const firstResult = await client.requestTapCoordinates(x, y, tapDuration);
+      if (!firstResult.success) {
+        throw new ActionableError(`XCTestService tap failed: ${firstResult.error}`);
       }
-    } catch (error) {
-      logger.warn(`[TapOnElement] XCTestService tap exception: ${error}, falling back to axe`);
-      await this.executeiOSTapWithAxe(action, x, y, durationMs);
-    }
-  }
 
-  /**
-   * Execute iOS tap using axe command line tool (fallback)
-   */
-  private async executeiOSTapWithAxe(
-    action: string,
-    x: number,
-    y: number,
-    durationMs: number
-  ): Promise<void> {
-    if (action === "tap") {
-      await this.axe.tap(x, y);
-    } else if (action === "longPress") {
-      await this.axe.tap(x, y, durationMs);
-    } else if (action === "doubleTap") {
-      await this.axe.tap(x, y);
       await this.timer.sleep(200);
-      await this.axe.tap(x, y);
+
+      const secondResult = await client.requestTapCoordinates(x, y, tapDuration);
+      if (!secondResult.success) {
+        throw new ActionableError(`XCTestService second tap failed: ${secondResult.error}`);
+      }
+    } else {
+      // Single tap or long press
+      const result = await client.requestTapCoordinates(x, y, tapDuration);
+      if (!result.success) {
+        throw new ActionableError(`XCTestService tap failed: ${result.error}`);
+      }
     }
   }
 

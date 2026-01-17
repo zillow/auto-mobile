@@ -2,22 +2,20 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, ShakeOptions, ShakeResult } from "../../models";
 import { logger } from "../../utils/logger";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer } from "../../utils/interfaces/Timer";
 import { defaultTimer } from "../../utils/SystemTimer";
 
 export class Shake extends BaseVisualChange {
-  private timer: Timer;
+  private shakeTimer: Timer;
 
   constructor(
     device: BootedDevice,
     adb: AdbClient | null = null,
-    axe: AxeClient | null = null,
     timer: Timer = defaultTimer
   ) {
-    super(device, adb, axe, timer);
-    this.timer = timer;
+    super(device, adb, timer);
+    this.shakeTimer = timer;
   }
 
   async execute(
@@ -40,7 +38,7 @@ export class Shake extends BaseVisualChange {
             logger.info(`Started shake with intensity ${intensity} for ${duration}ms`);
 
             // Wait for the specified duration
-            await this.timer.sleep(duration);
+            await this.shakeTimer.sleep(duration);
 
             // Stop the shake by resetting acceleration to 0
             await this.adb.executeCommand(`emu sensor set acceleration 0:0:0`);

@@ -48,7 +48,7 @@ describe("BiometricAuth", () => {
     fakeAdb.setCommandResponse("shell getprop ro.kernel.qemu", { stdout: "1", stderr: "" });
     fakeAdb.setCommandResponse("emu help", { stdout: "finger - fingerprint commands\nhelp - show this help", stderr: "" });
 
-    biometricAuth = new BiometricAuth(device, fakeAdb, null, fakeTimer);
+    biometricAuth = new BiometricAuth(device, fakeAdb, fakeTimer);
 
     // Replace the internal managers with our fakes
     (biometricAuth as any).observeScreen = fakeObserveScreen;

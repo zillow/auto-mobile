@@ -2,7 +2,6 @@ import SwiftUI
 
 /// Menu bar view for quick actions
 struct MenuBarView: View {
-
     var body: some View {
         VStack {
             Button("Show Companion") {

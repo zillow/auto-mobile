@@ -912,7 +912,6 @@ export class XCTestServiceClient implements XCTestService {
   ): { $: Record<string, string>; node?: Array<{ $: Record<string, string> }> } | null {
     const attrs = node.$ || {};
     const children = node.node || [];
-    const hasChildren = children.length > 0;
 
     // Process children first (recursively)
     const filteredChildren: Array<{ $: Record<string, string> }> = [];

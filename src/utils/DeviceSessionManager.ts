@@ -568,19 +568,25 @@ export class DeviceSessionManager implements DeviceSessionManager {
       didSetup = true;
 
       if (!setupResult.success) {
-        logger.warn(`[DeviceSessionManager] XCTestService setup failed for ${deviceId}: ${setupResult.error}`);
+        // Log build-specific errors if available
+        if (setupResult.buildResult && !setupResult.buildResult.success) {
+          logger.warn(`[DeviceSessionManager] XCTestService build failed for ${deviceId}: ${setupResult.buildResult.error}`);
+        } else {
+          logger.warn(`[DeviceSessionManager] XCTestService setup failed for ${deviceId}: ${setupResult.error}`);
+        }
         // Don't throw - allow observe to fall back to other methods
         perf.end();
         return;
       }
 
       // Wait for WebSocket connection after setup
+      // After fresh setup, WebSocket may need extra time to initialize
       logger.info(`[DeviceSessionManager] Waiting for XCTestService WebSocket connection after setup for ${deviceId}`);
-      const connected = await perf.track("waitForConnection", () => xcTestClient.waitForConnection());
+      const connected = await perf.track("waitForConnection", () => xcTestClient.waitForConnection(5, 1000));
       if (connected) {
         // Verify service is actually ready to respond (not just WebSocket connected)
         logger.info(`[DeviceSessionManager] Verifying XCTestService is responsive for ${deviceId}`);
-        const ready = await perf.track("verifyServiceReady", () => xcTestClient.verifyServiceReady(5, 500, 3000));
+        const ready = await perf.track("verifyServiceReady", () => xcTestClient.verifyServiceReady(5, 1000, 5000));
         if (!ready) {
           logger.warn(`[DeviceSessionManager] XCTestService not responsive after setup for ${deviceId}`);
         } else {

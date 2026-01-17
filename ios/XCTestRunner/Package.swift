@@ -5,13 +5,13 @@ let package = Package(
     name: "XCTestRunner",
     platforms: [
         .iOS(.v15),
-        .macOS(.v13)
+        .macOS(.v13),
     ],
     products: [
         .library(
             name: "XCTestRunner",
             targets: ["XCTestRunner"]
-        )
+        ),
     ],
     dependencies: [
         // YAML parsing dependency will be added here
@@ -25,6 +25,6 @@ let package = Package(
         .testTarget(
             name: "XCTestRunnerTests",
             dependencies: ["XCTestRunner"]
-        )
+        ),
     ]
 )

@@ -1,15 +1,15 @@
 import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange } from "./BaseVisualChange";
 import { BootedDevice, OpenURLResult } from "../../models";
-import { AxeClient } from "../../utils/ios-cmdline-tools/AxeClient";
+import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { logger } from "../../utils/logger";
 import { LaunchApp } from "./LaunchApp";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export class OpenURL extends BaseVisualChange {
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null, axe: AxeClient | null = null) {
-    super(device, adb, axe);
+  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+    super(device, adb);
     this.device = device;
   }
 
@@ -131,16 +131,27 @@ export class OpenURL extends BaseVisualChange {
   }
 
   /**
-   * Execute iOS-specific URL opening
+   * Execute iOS-specific URL opening using simctl
    * @param url - URL to open
    * @returns Result of the URL opening operation
    */
   private async executeiOSOpenURL(url: string): Promise<OpenURLResult> {
-    await this.axe.openUrl(url);
+    try {
+      const simctl = new SimCtlClient();
+      // Use simctl openurl command: xcrun simctl openurl <device> <url>
+      await simctl.executeCommand(`openurl ${this.device.deviceId} "${url}"`);
 
-    return {
-      success: true,
-      url
-    };
+      return {
+        success: true,
+        url
+      };
+    } catch (error) {
+      logger.error(`[OpenURL] simctl openurl failed: ${error}`);
+      return {
+        success: false,
+        url,
+        error: String(error)
+      };
+    }
   }
 }
