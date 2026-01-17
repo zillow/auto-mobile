@@ -121,6 +121,64 @@ Response:
 - `port` shows the auto-detected or configured port
 - `branch` shows the current git branch
 
+## Android AccessibilityService Dev Loop
+
+For rapid native service iteration, use the dev loop script. It rebuilds and reinstalls the
+AccessibilityService APK on changes and optionally starts the MCP server in streamable hot reload mode.
+
+### Streamlined Workflow (Recommended)
+
+The hot-reload script provides a single-command development setup:
+
+```shell
+# Start everything: hot-reload, MCP server, configure .mcp.json, prompt for IDE
+bun run dev:android:hot-reload
+
+# Target a specific device
+bun run dev:android:hot-reload -- --device emulator-5554
+
+# Skip the Claude/Codex prompt
+bun run dev:android:hot-reload -- --skip-prompt
+```
+
+This script:
+1. Kills any previous hot-reload processes
+2. Updates `.mcp.json` to use the local HTTP endpoint
+3. Starts the MCP dev server in the background
+4. Starts the APK hot-reload watcher in the background (doesn't require a device - will install when one connects)
+5. Prompts to launch Claude Code or Codex (auto-installs [gum](https://github.com/charmbracelet/gum) if missing)
+
+**Environment variables:**
+- `AI_YOLO_MODE` - If set, launches Claude with `--dangerously-skip-permissions` or Codex with `--full-auto`
+
+**Device handling:**
+- Development starts immediately even without an Android device connected
+- When a device connects, the APK is automatically installed
+- Multiple devices are supported - installs to all connected devices
+
+Logs are written to `scratch/hot-reload.log` and `scratch/mcp-server.log`.
+
+### Manual Dev Loop
+
+For more control, use the underlying dev script directly:
+
+```shell
+# Single command: build + install + watch + MCP hot reload
+bun run dev:android
+
+# Target a specific device
+bun run dev:android -- --device emulator-5554
+
+# Build/install once without starting MCP
+bun run dev:android -- --once
+
+# Update APK checksum in src/constants/release.ts
+bun run dev:android -- --update-checksum
+```
+
+The script exports `AUTOMOBILE_ACCESSIBILITY_APK_PATH` for the MCP server so it uses the local APK.
+For stdio clients that need hot reload, prefer the streamable HTTP config in the next section.
+
 ## MCP Client Configuration
 
 The setup script automatically creates `.mcp.local.json` with the correct configuration.

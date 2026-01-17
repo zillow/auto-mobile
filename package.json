@@ -17,6 +17,8 @@
     "dev:sse": "bun --watch src/index.ts --transport sse",
     "dev:streamable": "bun --watch src/index.ts --transport streamable",
     "dev:streamable:port": "bun --watch src/index.ts --transport streamable --port",
+    "dev:android": "bash scripts/local-dev/android-hot-reload.sh --skip-ai",
+    "dev:android:hot-reload": "bash scripts/local-dev/android-hot-reload.sh",
     "estimate-context": "bun scripts/estimate-context-usage.ts",
     "benchmark-context": "bun scripts/benchmark-context-thresholds.ts",
     "benchmark-tools": "bun scripts/benchmark-mcp-tools.ts",

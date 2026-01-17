@@ -131,6 +131,14 @@ bun run benchmark-npm-unpacked-size --output reports/npm-unpacked-size.json
 - `build.ts` - Compile TypeScript to JavaScript for distribution
 - `npm/transform-readme.js` - Transform README for npm package
 
+### Local Development Scripts
+
+- `local-dev/android-hot-reload.sh` - Unified Android development workflow with APK hot-reload, MCP server, and AI assistant integration
+  - `--skip-ai` - Run without AI prompt (used by `bun run dev:android`)
+  - `--once` - Build/install once and exit
+  - `--update-checksum` - Update release.ts with APK checksum
+  - Shared functions in `local-dev/lib/` (common.sh, adb.sh, apk.sh)
+
 ### Tool Definition Scripts
 
 - `update-tool-definitions.sh` - Regenerate and stage `schemas/tool-definitions.json` for IDE YAML completion
