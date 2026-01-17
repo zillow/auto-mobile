@@ -1,10 +1,12 @@
 # Overview
 
-AutoMobile is a suite of mobile automation tools that can integrate into your AI agent of choice. It can be an assistant to enable individuals or empower teams to deliver better experiences. It does all of this with the [design principals](design-docs/#design-principles) that high quality, performant, and accessible workflows are necessary to creating good software.
+AutoMobile is a suite of mobile automation tools that can integrate into your AI agent of choice. It can be an assistant to enable individuals or empower teams to deliver better experiences. It does all of this with the [design principles](design-docs/#design-principles) that high quality, performant, and accessible workflows are necessary to creating good software.
 
 ![Setting an alarm in the Clock app](img/clock-app-demo.gif)
+*Demo: An AI agent navigating to the Clock app, opening the alarm tab, and creating a new alarm.*
 
 ![Searching YouTube for a video](img/youtube-search.gif)
+*Demo: An AI agent opening YouTube, entering a search query, and browsing the results.*
 
 ## Get Started
 

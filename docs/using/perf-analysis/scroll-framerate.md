@@ -9,7 +9,7 @@ Scroll performance is critical to user experience. Janky scrolling is one of the
 AutoMobile collects frame rendering metrics during scroll interactions:
 
 - **Frame Time Percentiles**: P50, P90, P95, P99 render times in milliseconds
-- **Jank Indicators**: Missed vsync count, slow UI thread count, frame deadline misses
+- **Jank Counts**: `missedVsyncCount`, `slowUiThreadCount`, `frameDeadlineMissedCount`
 - **FPS Calculation**: Average frames per second during scrolling
 - **UI Stability**: Time until rendering stabilizes after scroll completes
 - **Frame Drops**: Total count of dropped or janky frames during interaction
@@ -25,17 +25,17 @@ Scroll through the product list and measure the framerate
 The agent will:
 1. Navigate to the list
 2. Perform scroll gestures
-3. Measure FPS using dumpsys gfxinfo
+3. Measure FPS using `dumpsys gfxinfo`
 4. Report performance metrics
 
-## Performance Metrics
+## Performance Thresholds
 
-AutoMobile tracks:
+Target metrics for smooth scrolling:
 
-- **Average FPS**: Frames per second during scrolling
-- **Frame Drops**: Number of dropped/janky frames
-- **Render Times**: P50, P90, P99 frame render times
-- **UI Idle Detection**: When UI becomes stable
+- **Average FPS**: > 55 FPS (ideally 60 FPS)
+- **Frame Time P90**: < 16ms (maintains 60 FPS)
+- **Frame Time P99**: < 20ms
+- **Jank Counts**: 0 for smooth scrolling
 
 ## Best Practices
 
