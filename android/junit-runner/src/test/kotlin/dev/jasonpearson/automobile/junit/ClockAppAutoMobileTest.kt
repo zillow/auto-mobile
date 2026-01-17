@@ -12,14 +12,22 @@ import org.junit.runner.RunWith
 class ClockAppAutoMobileTest {
 
   @Test
-  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml", aiAssistance = false)
+  @AutoMobileTest(
+      plan = "test-plans/launch-clock-app.yaml",
+      aiAssistance = false,
+      timeoutMs = 180000L,
+  )
   fun `launch clock app using annotation`() {
     // Traditional annotation-based approach
     // AI assistance disabled for this test
   }
 
   @Test
-  @AutoMobileTest(plan = "test-plans/set-alarm-in-clock-app.yaml", aiAssistance = false)
+  @AutoMobileTest(
+      plan = "test-plans/set-alarm-in-clock-app.yaml",
+      aiAssistance = false,
+      timeoutMs = 180000L,
+  )
   fun `set alarm in clock app using annotation`() {
     // Traditional annotation-based approach
     // AI assistance disabled for this test
