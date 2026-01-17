@@ -150,10 +150,12 @@ export class GetBackStack {
     for (const line of lines) {
       // Match mResumedActivity or mFocusedActivity
       // Format: "mResumedActivity: ActivityRecord{...} u0 com.example/.MainActivity t123"
-      const resumedMatch = line.match(/mResumedActivity.*u\d+\s+([^\s]+)(?:\s+t(\d+))?/);
+      const resumedMatch = line.match(
+        /(mResumedActivity|mFocusedActivity|topResumedActivity)\s*[:=].*?u\d+\s+([^\s]+)(?:\s+t(\d+))?/
+      );
       if (resumedMatch) {
-        const fullName = resumedMatch[1];
-        const taskId = resumedMatch[2] ? parseInt(resumedMatch[2], 10) : -1;
+        const fullName = resumedMatch[2];
+        const taskId = resumedMatch[3] ? parseInt(resumedMatch[3], 10) : -1;
 
         const parts = fullName.split("/");
         const packageName = parts[0];

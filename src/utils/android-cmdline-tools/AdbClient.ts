@@ -723,7 +723,7 @@ export class AdbClient implements AdbExecutor {
       //   mFocusedActivity: ActivityRecord{abc1234 u10 com.example.app/.MainActivity t123}
       //   topResumedActivity=ActivityRecord{abc1234 u0 com.example.app/.MainActivity t123}
 
-      const match = result.stdout.match(/u(\d+)\s+([a-zA-Z0-9._]+)\//);
+      const match = result.stdout.match(/u(\d+)\s+([^\s/]+)\//);
       if (match) {
         const userId = parseInt(match[1], 10);
         const packageName = match[2];

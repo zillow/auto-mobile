@@ -390,11 +390,11 @@
           "type": "number"
         },
         "appBundleIds": {
+          "description": "iOS-only: bundle IDs to include in app data snapshots (omit to skip app data capture)",
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "description": "iOS-only: bundle IDs to include in app data snapshots (omit to skip app data capture)"
+          }
         },
         "sessionUuid": {
           "description": "Session UUID for device targeting",

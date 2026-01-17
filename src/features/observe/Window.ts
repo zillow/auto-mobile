@@ -160,14 +160,18 @@ export class Window {
       let layoutSeqSum = 0;
 
       // First try to get from imeControlTarget (original approach)
-      const imeControlMatch = stdout.match(/imeControlTarget in display# 0 Window\{[^}]+\s+([\w\.]+)\/([\w\.]+)\}/);
+      const imeControlMatch = stdout.match(
+        /imeControlTarget.*?Window\{[^}]*?\s+u\d+\s+([^\s/]+)\/([^\s}]+)\}/
+      );
 
       if (imeControlMatch && imeControlMatch.length >= 3) {
         packageName = imeControlMatch[1];
         activityName = imeControlMatch[2];
       } else {
         // Handle Pop-Up Window case
-        const popupControlMatch = stdout.match(/imeControlTarget in display# 0 Window\{([a-f0-9]+) u\d+ Pop-Up Window\}/);
+        const popupControlMatch = stdout.match(
+          /imeControlTarget.*?Window\{([0-9a-f]+)\s+u\d+\s+Pop-Up Window\}/i
+        );
 
         if (popupControlMatch) {
           const hexRef = popupControlMatch[1];
@@ -177,7 +181,9 @@ export class Window {
 
           if (windowMatch) {
             // Look for mActivityRecord line within this window block
-            const activityRecordMatch = windowMatch[1].match(/mActivityRecord=ActivityRecord\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+) t\d+\}/);
+            const activityRecordMatch = windowMatch[1].match(
+              /mActivityRecord=ActivityRecord\{[^}]*?\s+u\d+\s+([^\s/]+)\/([^\s}]+)(?:\s+t\d+)?\}/
+            );
 
             if (activityRecordMatch && activityRecordMatch.length >= 3) {
               packageName = activityRecordMatch[1];
@@ -189,7 +195,9 @@ export class Window {
         // If still no match, try fallback approaches
         if (!packageName || !activityName) {
           // Fallback: Look for visible application windows (not system UI)
-          const visibleAppMatches = stdout.matchAll(/Window\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+)\}:[^}]+?mViewVisibility=0x0[^}]+?isOnScreen=true[^}]+?isVisible=true/gs);
+          const visibleAppMatches = stdout.matchAll(
+            /Window\{[^}]*?\s+u\d+\s+([^\s/]+)\/([^\s}]+)\}:[\s\S]*?mViewVisibility=0x0[\s\S]*?isOnScreen=true[\s\S]*?isVisible=true/gs
+          );
 
           for (const match of visibleAppMatches) {
             if (match[1] && match[2] && !match[1].includes("android.systemui") && !match[1].includes("nexuslauncher")) {
@@ -201,7 +209,9 @@ export class Window {
 
           // If still no match, try a broader pattern for any application window
           if (!packageName || !activityName) {
-            const anyAppMatch = stdout.match(/Window\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+)\}:[^}]+?ty=BASE_APPLICATION/);
+            const anyAppMatch = stdout.match(
+              /Window\{[^}]*?\s+u\d+\s+([^\s/]+)\/([^\s}]+)\}:[\s\S]*?ty=BASE_APPLICATION/
+            );
             if (anyAppMatch && anyAppMatch.length >= 3) {
               packageName = anyAppMatch[1];
               activityName = anyAppMatch[2];
@@ -212,7 +222,7 @@ export class Window {
         // If still no match, look for the first visible application window that's on screen
         if (!packageName || !activityName) {
           // Look for windows with isOnScreen=true and isVisible=true and ty=BASE_APPLICATION
-          const visibleAppRegex = /Window #\d+ Window\{[^}]+ u\d+ ([\w\.]+)\/([\w\.]+)\}:[\s\S]*?ty=BASE_APPLICATION[\s\S]*?isOnScreen=true[\s\S]*?isVisible=true/gs;
+          const visibleAppRegex = /Window #\d+ Window\{[^}]*?\s+u\d+\s+([^\s/]+)\/([^\s}]+)\}:[\s\S]*?ty=BASE_APPLICATION[\s\S]*?isOnScreen=true[\s\S]*?isVisible=true/gs;
           const visibleMatch = visibleAppRegex.exec(stdout);
 
           if (visibleMatch && visibleMatch.length >= 3) {
@@ -241,7 +251,14 @@ export class Window {
       // Cache the result
       this.cachedActiveWindow = result;
       await this.writeCacheToDisk(result);
-      logger.info("C[WINDOW] ached new active window information");
+      logger.info("[WINDOW] Cached new active window information");
+
+      if (!packageName || !activityName) {
+        const sample = stdout.trim().slice(0, 200);
+        logger.warn(
+          `[WINDOW] Failed to parse active window from dumpsys output. Sample: ${sample || "<empty>"}` 
+        );
+      }
 
       return result;
     } catch (err) {
