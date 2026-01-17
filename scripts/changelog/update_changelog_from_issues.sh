@@ -73,28 +73,45 @@ for line in issues_path.read_text(encoding="utf-8").splitlines():
         continue
     issues.append(json.loads(line))
 
+SECTION_ORDER = ["added", "changed", "deprecated", "removed", "fixed", "security", "other"]
+SECTION_TITLES = {
+    "added": "Added",
+    "changed": "Changed",
+    "deprecated": "Deprecated",
+    "removed": "Removed",
+    "fixed": "Fixed",
+    "security": "Security",
+    "other": "Other",
+}
+
+CATEGORY_KEYWORDS = {
+    "security": ["security"],
+    "removed": ["remove", "removed"],
+    "deprecated": ["deprecate", "deprecated"],
+    "fixed": ["bug", "fix", "fixed"],
+    "added": ["feature", "enhancement", "add", "added"],
+    "changed": ["change", "changed", "refactor", "chore", "maintenance", "internal"],
+}
+
 def classify(labels):
     lowered = [label.lower() for label in labels]
-    is_bug = any("bug" in label or "fix" in label for label in lowered)
-    is_feature = any("feature" in label or "enhancement" in label for label in lowered)
-    if is_bug:
-        return "bugs"
-    if is_feature:
-        return "features"
+    for category in ["security", "removed", "deprecated", "fixed", "added", "changed"]:
+        keywords = CATEGORY_KEYWORDS.get(category, [])
+        if any(keyword in label for label in lowered for keyword in keywords):
+            return category
     return "other"
 
 def filter_labels(labels, category):
     filtered = []
+    keywords = CATEGORY_KEYWORDS.get(category, [])
     for label in labels:
         lowered = label.lower()
-        if category == "bugs" and ("bug" in lowered or "fix" in lowered):
-            continue
-        if category == "features" and ("feature" in lowered or "enhancement" in lowered):
+        if any(keyword in lowered for keyword in keywords):
             continue
         filtered.append(label)
     return filtered
 
-sections = {"features": [], "bugs": [], "other": []}
+sections = {section: [] for section in SECTION_ORDER}
 
 for issue in issues:
     labels = [label.get("name", "") for label in issue.get("labels", [])]
@@ -109,17 +126,12 @@ for issue in issues:
 
 lines = [f"## [{current_tag}] - {date}"]
 
-if sections["features"]:
-    lines.append("### Features")
-    lines.extend(sections["features"])
-
-if sections["bugs"]:
-    lines.append("### Bug Fixes")
-    lines.extend(sections["bugs"])
-
-if sections["other"]:
-    lines.append("### Other")
-    lines.extend(sections["other"])
+for section in SECTION_ORDER:
+    items = sections[section]
+    if not items:
+        continue
+    lines.append(f"### {SECTION_TITLES[section]}")
+    lines.extend(items)
 
 if not any(sections.values()):
     lines.append("### Other")

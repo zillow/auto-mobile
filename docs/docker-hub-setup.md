@@ -6,7 +6,7 @@ This guide explains how to set up automated Docker image publishing to Docker Hu
 
 AutoMobile automatically publishes Docker images to Docker Hub in two scenarios:
 
-1. **Release Publishing**: When a new version tag (e.g., `v0.0.7`) is pushed, the `release.yml` workflow publishes versioned images
+1. **Release Publishing**: When a new version tag (e.g., `v0.0.7`) is pushed, the `release.yml` workflow publishes versioned images (tags are created by the Prepare Release workflow on merge)
 2. **Main Branch Updates**: When changes are merged to `main`, the `docker-publish.yml` workflow updates the `latest` tag
 
 ## Prerequisites
@@ -203,6 +203,7 @@ GitHub-hosted runners have preferential rate limits with Docker Hub through a pa
 ### Updating Workflows
 
 The workflows are located at:
+- `.github/workflows/prepare-release.yml` - Prepare release PRs and tags
 - `.github/workflows/release.yml` - Release publishing (with Docker)
 - `.github/workflows/docker-publish.yml` - Main branch publishing
 

@@ -21,15 +21,7 @@ Confirm the tarball only includes `dist/` (per `package.json`).
 
 ## Version bump
 
-Pick one:
-
-```sh
-npm version patch
-# or: npm version minor
-# or: npm version major
-```
-
-This updates `package.json` and creates a git tag.
+Use the GitHub Actions workflow **Prepare Release** to bump versions, update the changelog, and refresh the APK checksum. It opens a PR on `main` and auto-merges it. The merge creates the git tag that triggers the release workflow.
 
 ## Publish
 
@@ -49,6 +41,7 @@ npm publish --access public
 
 - `prepublishOnly` temporarily rewrites `README.md` via `scripts/npm/transform-readme.js`.
 - `postpublish` restores `README.md` from the backup.
+- Prepare Release updates `src/constants/release.ts` with the latest APK checksum.
 - Release workflow updates `src/constants/release.ts` using `scripts/generate-release-constants.sh` with `RELEASE_VERSION` set.
 - Release workflow uses `npm publish --provenance` with npm CLI 11.5.1+.
 
