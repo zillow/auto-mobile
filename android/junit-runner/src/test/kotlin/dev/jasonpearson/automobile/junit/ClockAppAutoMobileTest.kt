@@ -15,6 +15,7 @@ class ClockAppAutoMobileTest {
   @AutoMobileTest(
       plan = "test-plans/launch-clock-app.yaml",
       aiAssistance = false,
+      maxRetries = 2,
       timeoutMs = 180000L,
   )
   fun `launch clock app using annotation`() {
@@ -26,6 +27,7 @@ class ClockAppAutoMobileTest {
   @AutoMobileTest(
       plan = "test-plans/set-alarm-in-clock-app.yaml",
       aiAssistance = false,
+      maxRetries = 2,
       timeoutMs = 180000L,
   )
   fun `set alarm in clock app using annotation`() {

@@ -498,7 +498,9 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable, D
   private fun buildJsonParams(toolName: String, arguments: JsonObject): JsonObject {
     // Include sessionUuid in tool arguments to enable per-thread plan execution locking
     val argumentsWithSession = JsonObject(arguments.toMutableMap().apply {
-      put("sessionUuid", JsonPrimitive(sessionUuid))
+      if (!containsKey("sessionUuid")) {
+        put("sessionUuid", JsonPrimitive(sessionUuid))
+      }
     })
     return JsonObject(mapOf("name" to JsonPrimitive(toolName), "arguments" to argumentsWithSession))
   }
