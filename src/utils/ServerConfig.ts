@@ -1,7 +1,11 @@
 import type {
   AccessibilityAuditConfig,
 } from "../models/AccessibilityAudit";
-import type { VideoRecordingConfigInput, DeviceSnapshotConfigInput } from "../models";
+import type {
+  VideoRecordingConfigInput,
+  DeviceSnapshotConfigInput,
+  AppearanceConfigInput,
+} from "../models";
 
 export type PlanExecutionLockScope = "session" | "global";
 
@@ -20,6 +24,7 @@ class ServerConfig {
   private _planExecutionLockScope: PlanExecutionLockScope = "session";
   private _videoRecordingDefaults: VideoRecordingConfigInput = {};
   private _deviceSnapshotDefaults: DeviceSnapshotConfigInput = {};
+  private _appearanceDefaults: AppearanceConfigInput = {};
   private _skipAccessibilityDownload: boolean = false;
 
   private constructor() {}
@@ -105,6 +110,14 @@ class ServerConfig {
 
   getDeviceSnapshotDefaults(): DeviceSnapshotConfigInput {
     return { ...this._deviceSnapshotDefaults };
+  }
+
+  setAppearanceDefaults(defaults: AppearanceConfigInput): void {
+    this._appearanceDefaults = { ...defaults };
+  }
+
+  getAppearanceDefaults(): AppearanceConfigInput {
+    return { ...this._appearanceDefaults };
   }
 
   setSkipAccessibilityDownload(skip: boolean): void {

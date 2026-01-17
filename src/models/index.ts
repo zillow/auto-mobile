@@ -90,3 +90,4 @@ export * from "./BugReportResult";
 export * from "./VisualHighlight";
 export * from "./VideoRecording";
 export * from "./DeviceSnapshot";
+export * from "./Appearance";

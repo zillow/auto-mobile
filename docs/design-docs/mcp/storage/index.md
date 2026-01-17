@@ -43,6 +43,7 @@ flowchart TB
 |----------|-------------|
 | [Database Migrations](migrations.md) | Schema management with Kysely |
 | [Device Snapshots](snapshots.md) | Capture and restore device state |
+| [Appearance Sync](../observe/appearance.md) | Host/device appearance configuration |
 
 ## Database Schema
 

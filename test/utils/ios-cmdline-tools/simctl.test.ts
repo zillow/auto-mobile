@@ -5,7 +5,7 @@ import { BootedDevice, ExecResult } from "../../../src/models";
 describe("Simctl", function() {
   let simctl: Simctl;
   let mockDevice: BootedDevice;
-  let mockExecAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
+  let mockExecAsync: (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
 
   beforeEach(function() {
     mockDevice = {
@@ -15,7 +15,7 @@ describe("Simctl", function() {
       source: "local"
     };
 
-    mockExecAsync = async (command: string): Promise<ExecResult> => {
+    mockExecAsync = async (): Promise<ExecResult> => {
       return {
         stdout: "",
         stderr: "",
@@ -30,8 +30,8 @@ describe("Simctl", function() {
 
   describe("isAvailable", function() {
     test("should return true when simctl is available", async function() {
-      mockExecAsync = async (command: string): Promise<ExecResult> => {
-        if (command.includes("xcrun simctl --version")) {
+      mockExecAsync = async (file: string, args: string[]): Promise<ExecResult> => {
+        if (file === "xcrun" && args.join(" ") === "simctl --version") {
           return {
             stdout: "simctl version 1.0.0",
             stderr: "",
@@ -50,7 +50,7 @@ describe("Simctl", function() {
     });
 
     test("should return false when simctl is not available", async function() {
-      mockExecAsync = async (command: string): Promise<ExecResult> => {
+      mockExecAsync = async (): Promise<ExecResult> => {
         throw new Error("Command not found: xcrun");
       };
 
@@ -63,10 +63,12 @@ describe("Simctl", function() {
 
   describe("executeCommand", function() {
     test("should execute simctl commands with xcrun prefix", async function() {
-      let executedCommand = "";
-      mockExecAsync = async (command: string): Promise<ExecResult> => {
-        executedCommand = command;
-        if (command.includes("xcrun simctl --version")) {
+      let executedFile = "";
+      let executedArgs: string[] = [];
+      mockExecAsync = async (file: string, args: string[]): Promise<ExecResult> => {
+        executedFile = file;
+        executedArgs = args;
+        if (file === "xcrun" && args.join(" ") === "simctl --version") {
           return {
             stdout: "simctl version 1.0.0",
             stderr: "",
@@ -87,7 +89,8 @@ describe("Simctl", function() {
       simctl = new Simctl(mockDevice, mockExecAsync);
       await simctl.executeCommand("list devices");
 
-      expect(executedCommand).toBe("xcrun simctl list devices");
+      expect(executedFile).toBe("xcrun");
+      expect(executedArgs).toEqual(["simctl", "list", "devices"]);
     });
   });
 });

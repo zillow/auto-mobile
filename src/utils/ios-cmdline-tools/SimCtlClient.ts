@@ -1,4 +1,4 @@
-import { ChildProcess, exec } from "child_process";
+import { ChildProcess, execFile } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
 import { ExecResult, ActionableError, DeviceInfo, BootedDevice, ScreenSize } from "../../models";
@@ -180,12 +180,19 @@ export interface SimCtl {
    * @returns Promise with screen dimensions
    */
   getScreenSize(deviceId?: string): Promise<ScreenSize>;
+
+  /**
+   * Set the simulator appearance
+   * @param mode - Appearance mode ("light" or "dark")
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   */
+  setAppearance(mode: "light" | "dark", deviceId?: string): Promise<void>;
 }
 
 // Enhance the standard execAsync result to implement the ExecResult interface
-const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResult> => {
+const execAsync = async (file: string, args: string[], maxBuffer?: number): Promise<ExecResult> => {
   const options = maxBuffer ? { maxBuffer } : undefined;
-  const result = await promisify(exec)(command, options);
+  const result = await promisify(execFile)(file, args, options);
 
   // Add the required string methods
   const enhancedResult: ExecResult = {
@@ -205,6 +212,57 @@ const execAsync = async (command: string, maxBuffer?: number): Promise<ExecResul
   return enhancedResult;
 };
 
+function splitCommandArgs(command: string): string[] {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    throw new Error("Command cannot be empty");
+  }
+
+  const args: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | null = null;
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+
+    if (char === "\\" && i + 1 < trimmed.length) {
+      current += trimmed[i + 1];
+      i++;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (current.length > 0) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.length > 0) {
+    args.push(current);
+  }
+
+  return args;
+}
+
 /**
  * This file provides an interface to interact with iOS simulators using simctl.
  * It allows you to list, create, boot, and delete simulators.
@@ -219,7 +277,7 @@ export interface SimulatorList {
 
 export class SimCtlClient implements SimCtl {
   device: BootedDevice | null;
-  execAsync: (command: string, maxBuffer?: number) => Promise<ExecResult>;
+  execAsync: (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
 
   // Static cache for device list
   private static deviceListCache: { devices: DeviceInfo[], timestamp: number } | null = null;
@@ -232,7 +290,7 @@ export class SimCtlClient implements SimCtl {
    */
   constructor(
     device: BootedDevice | null = null,
-    execAsyncFn: ((command: string, maxBuffer?: number) => Promise<ExecResult>) | null = null
+    execAsyncFn: ((file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>) | null = null
   ) {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;
@@ -259,6 +317,7 @@ export class SimCtlClient implements SimCtl {
     }
 
     const fullCommand = `xcrun simctl ${command}`;
+    const args = ["simctl", ...splitCommandArgs(command)];
     const startTime = Date.now();
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
@@ -275,7 +334,7 @@ export class SimCtlClient implements SimCtl {
       });
 
       try {
-        const result = await Promise.race([this.execAsync(fullCommand), timeoutPromise]);
+        const result = await Promise.race([this.execAsync("xcrun", args), timeoutPromise]);
         const duration = Date.now() - startTime;
         logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
         return result;
@@ -290,7 +349,7 @@ export class SimCtlClient implements SimCtl {
 
     // No timeout specified
     try {
-      const result = await this.execAsync(fullCommand);
+      const result = await this.execAsync("xcrun", args);
       const duration = Date.now() - startTime;
       logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
       return result;
@@ -699,6 +758,11 @@ export class SimCtlClient implements SimCtl {
     }
 
     throw new ActionableError("Unable to determine screen size from provided data.");
+  }
+
+  async setAppearance(mode: "light" | "dark", deviceId?: string): Promise<void> {
+    const targetDevice = deviceId || this.device?.deviceId || "booted";
+    await this.executeCommand(`ui ${targetDevice} appearance ${mode}`);
   }
 }
 

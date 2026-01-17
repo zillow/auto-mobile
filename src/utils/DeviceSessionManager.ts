@@ -13,6 +13,7 @@ import { AccessibilityServiceClient } from "../features/observe/AccessibilitySer
 import { XCTestServiceClient } from "../features/observe/XCTestServiceClient";
 import { createPerformanceTracker } from "./PerformanceTracker";
 import { storeSetupTiming } from "../server/ToolExecutionContext";
+import { applyAppearanceOnConnect } from "./appearance/applyAppearanceOnConnect";
 
 /**
  * Interface for device session management
@@ -280,6 +281,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     }
 
     this.setCurrentDevice(selectedDevice, resolvedPlatform);
+    await applyAppearanceOnConnect(selectedDevice);
     logger.info(`[DeviceSessionManager] Using ${deviceSource} device: ${selectedDevice.deviceId}`);
     return selectedDevice;
   }
