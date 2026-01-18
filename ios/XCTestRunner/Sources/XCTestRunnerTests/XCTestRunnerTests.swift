@@ -201,6 +201,48 @@ final class XCTestRunnerTests: XCTestCase {
         XCTAssertEqual(mcpClient.calls.first?.arguments["platform"] as? String, "android")
     }
 
+    func testPlanDevicesPassedToExecutePlan() throws {
+        let planContent = """
+        name: Multi-device Plan
+        devices:
+          - label: ios-1
+            platform: ios
+        steps:
+          - tool: observe
+            device: ios-1
+        """
+        let planLoader = FakePlanLoader(content: planContent)
+        let mcpClient = FakeMCPClient()
+
+        mcpClient.queueResponse(success: true, executedSteps: 1, totalSteps: 1)
+
+        let config = AutoMobilePlanExecutor.Configuration(
+            transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+            planPath: "multi-device.yaml",
+            retryCount: 0,
+            timeoutSeconds: 5,
+            retryDelaySeconds: 0,
+            startStep: 0,
+            parameters: [:],
+            cleanup: nil,
+            planBundle: nil,
+            defaultPlatform: .ios
+        )
+
+        let executor = AutoMobilePlanExecutor(
+            configuration: config,
+            planLoader: planLoader,
+            mcpClient: mcpClient,
+            timer: FakeTimer(),
+            logger: NullLogger()
+        )
+
+        _ = try executor.execute(testMetadata: nil)
+
+        let devices = mcpClient.calls.first?.arguments["devices"] as? [String]
+        XCTAssertEqual(devices, ["ios-1"])
+    }
+
     func testAutoMobileTestObserver() {
         let observer = AutoMobileTestObserver.register()
         XCTAssertNotNil(observer)

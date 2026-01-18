@@ -756,6 +756,7 @@ public final class AutoMobilePlanExecutor {
             planContent: substituted,
             sessionUuid: sessionUuid,
             platform: platform,
+            deviceLabels: planMetadata.deviceLabels,
             testMetadata: testMetadata
         )
 
@@ -784,6 +785,7 @@ public final class AutoMobilePlanExecutor {
         planContent: String,
         sessionUuid: String,
         platform: PlanPlatform,
+        deviceLabels: [String],
         testMetadata: TestMetadata?
     ) -> [String: Any] {
         let base64Content = Data(planContent.utf8).base64EncodedString()
@@ -797,6 +799,10 @@ public final class AutoMobilePlanExecutor {
         if let cleanup = configuration.cleanup {
             args["cleanupAppId"] = cleanup.appId
             args["cleanupClearAppData"] = cleanup.clearAppData
+        }
+
+        if !deviceLabels.isEmpty {
+            args["devices"] = deviceLabels
         }
 
         if let metadata = testMetadata {
@@ -876,6 +882,7 @@ private final class FailingMCPClient: AutoMobileMCPClient {
 private struct PlanMetadata {
     let platform: AutoMobilePlanExecutor.PlanPlatform?
     let devicePlatforms: [String: AutoMobilePlanExecutor.PlanPlatform]
+    let deviceLabels: [String]
     let hasDevices: Bool
 }
 
@@ -884,6 +891,7 @@ private enum PlanMetadataParser {
         let lines = yamlContent.split(whereSeparator: \.isNewline).map { String($0) }
         var platform: AutoMobilePlanExecutor.PlanPlatform?
         var devicePlatforms: [String: AutoMobilePlanExecutor.PlanPlatform] = [:]
+        var deviceLabels: [String] = []
         var hasDevices = false
 
         var index = 0
@@ -929,6 +937,9 @@ private enum PlanMetadataParser {
 
                     let trimmedLine = rawLine.trimmingCharacters(in: .whitespaces)
                     if currentIndent == listIndent && trimmedLine.hasPrefix("-") {
+                        if let label = currentLabel {
+                            deviceLabels.append(label)
+                        }
                         if let label = currentLabel, let platformValue = currentPlatform {
                             devicePlatforms[label] = platformValue
                         } else if currentLabel != nil || currentPlatform != nil {
@@ -974,6 +985,9 @@ private enum PlanMetadataParser {
                     index += 1
                 }
 
+                if let label = currentLabel {
+                    deviceLabels.append(label)
+                }
                 if let label = currentLabel, let platformValue = currentPlatform {
                     devicePlatforms[label] = platformValue
                 } else if currentLabel != nil || currentPlatform != nil {
@@ -987,13 +1001,24 @@ private enum PlanMetadataParser {
             index += 1
         }
 
-        if hasDevices && devicePlatforms.isEmpty {
+        if hasDevices && deviceLabels.isEmpty {
+            throw AutoMobilePlanExecutor.ExecutorError.invalidPlan(
+                "Multi-device plans must declare at least one device."
+            )
+        }
+
+        if hasDevices && devicePlatforms.count != deviceLabels.count {
             throw AutoMobilePlanExecutor.ExecutorError.invalidPlan(
                 "Multi-device plans must declare platform for each device."
             )
         }
 
-        return PlanMetadata(platform: platform, devicePlatforms: devicePlatforms, hasDevices: hasDevices)
+        return PlanMetadata(
+            platform: platform,
+            devicePlatforms: devicePlatforms,
+            deviceLabels: deviceLabels,
+            hasDevices: hasDevices
+        )
     }
 
     private static func parsePlatform(_ value: String) throws -> AutoMobilePlanExecutor.PlanPlatform {
