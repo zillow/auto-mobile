@@ -1,58 +1,121 @@
 ---
-description: Explore an app to discover screens, features, and user flows
-allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__launchApp, mcp__auto-mobile__terminateApp, mcp__auto-mobile__tapOn, mcp__auto-mobile__swipeOn, mcp__auto-mobile__inputText, mcp__auto-mobile__clearText, mcp__auto-mobile__selectAllText, mcp__auto-mobile__pressButton, mcp__auto-mobile__pinchOn, mcp__auto-mobile__dragAndDrop, mcp__auto-mobile__homeScreen
+description: Explore and interact with mobile devices - tap, type, swipe, navigate, and more
+allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__tapOn, mcp__auto-mobile__swipeOn, mcp__auto-mobile__inputText, mcp__auto-mobile__clearText, mcp__auto-mobile__selectAllText, mcp__auto-mobile__pressButton, mcp__auto-mobile__pressKey, mcp__auto-mobile__dragAndDrop, mcp__auto-mobile__pinchOn, mcp__auto-mobile__keyboard, mcp__auto-mobile__imeAction, mcp__auto-mobile__homeScreen, mcp__auto-mobile__recentApps, mcp__auto-mobile__systemTray, mcp__auto-mobile__launchApp, mcp__auto-mobile__terminateApp, mcp__auto-mobile__openLink, mcp__auto-mobile__clipboard, mcp__auto-mobile__rotate, mcp__auto-mobile__shake, mcp__auto-mobile__deviceSnapshot
 ---
 
-Systematically explore a mobile app to understand its structure, discover screens, and map user flows.
+Explore and interact with connected mobile devices. This skill provides all the tools needed to navigate apps, perform gestures, and manipulate device state.
+
+## Observation
+
+Use `observe` to capture the current screen state:
+- View hierarchy with all elements
+- Interactive elements and their properties
+- Current app and screen/activity name
+- Screenshot of the display
+
+## Navigation
+
+### App Management
+- `launchApp`: Start an app by package/bundle ID
+- `terminateApp`: Stop a running app
+- `openLink`: Open a URL in the browser
+
+### System Navigation
+- `homeScreen`: Go to the device home screen
+- `recentApps`: Open the recent apps / app switcher
+- `pressButton`: Hardware buttons (home, back, menu, power, volume)
+
+### Notifications
+Use `systemTray` to interact with notifications:
+- `open`: Pull down the notification shade
+- `find`: Search for a specific notification
+- `tap`: Tap on a notification or its action button
+- `dismiss`: Swipe away a notification
+- `clearAll`: Clear all notifications
+
+## Tap Actions
+
+Use `tapOn` with different actions:
+- **tap**: Single tap on element
+- **doubleTap**: Double tap (zoom, select word)
+- **longPress**: Long press (context menu, drag mode)
+- **focus**: Focus input without opening keyboard
+
+Target elements by:
+- `text`: Visible text on the element
+- `id`: Accessibility ID or resource ID
+- `container`: Scope search within a parent element
+
+## Text Input
+
+- `inputText`: Type text into the focused field
+- `clearText`: Clear the current input field
+- `selectAllText`: Select all text in focused input
+- `keyboard`: Open, close, or detect keyboard state
+- `imeAction`: Trigger IME action (done, next, search, send, go)
+
+## Gestures
+
+### Scrolling & Swiping
+Use `swipeOn` with:
+- `direction`: up, down, left, right
+- `gestureType`: scroll (content), swipe (page), fling (fast)
+- `lookFor`: Keep scrolling until element found
+- `container`: Scroll within specific list/view
+
+### Advanced Gestures
+- `dragAndDrop`: Move element from source to target
+- `pinchOn`: Pinch to zoom in/out with optional rotation
+- `shake`: Shake the device
+- `rotate`: Change device orientation (portrait/landscape)
+
+## Device State
+
+- `clipboard`: Copy, paste, clear, or get clipboard content
+- `deviceSnapshot`: Capture or restore device state for testing
 
 ## Workflow
 
-1. **Setup**: Launch the target app using `launchApp`
+1. **Observe**: Check current screen state with `observe`
+2. **Navigate**: Use app/system navigation to reach target
+3. **Interact**: Perform taps, swipes, text input
+4. **Verify**: Observe again to confirm the result
 
-2. **Observe initial state**: Use `observe` to capture the starting screen
-   - Note the app package/bundle ID
-   - Identify the current screen/activity
-   - List visible interactive elements
+## Examples
 
-3. **Systematic exploration**: Navigate through the app using interaction tools
-   - `tapOn` to activate buttons, links, menu items
-   - `swipeOn` to scroll lists and discover hidden content
-   - `inputText` to fill forms and test input fields
-   - `clearText` / `selectAllText` for text manipulation
-   - `pressButton` for hardware buttons (back, home, menu)
-   - `pinchOn` for zoom interactions
-   - `dragAndDrop` for reorderable lists or drag targets
+**Launch app and tap button:**
+```
+launchApp with packageName: "com.example.app"
+observe
+tapOn with text: "Get Started"
+```
 
-4. **Document each screen**:
-   - Screen name/identifier
-   - Key UI elements and their purposes
-   - Navigation paths (how to reach this screen)
-   - Interactive elements and their behaviors
+**Check notifications:**
+```
+systemTray with action: "open"
+systemTray with action: "find", notification: {title: "New message"}
+systemTray with action: "tap"
+```
 
-5. **Map user flows**:
-   - Identify primary user journeys
-   - Note entry points and exit points
-   - Document branching paths and conditional flows
+**Fill a form:**
+```
+tapOn with text: "Email" to focus
+inputText with text: "user@example.com"
+imeAction with action: "next"
+inputText with text: "password123"
+tapOn with text: "Submit"
+```
 
-6. **Report findings**:
-   - Total screens discovered
-   - Main user flows identified
-   - Navigation patterns
-   - Screens with forms, lists, or special functionality
-   - Potential areas for deeper testing
-
-## Use Cases
-
-- **New app onboarding**: Quickly understand an unfamiliar app's structure
-- **Test planning**: Identify screens and flows that need test coverage
-- **Accessibility audit prep**: Find all screens to audit for accessibility
-- **Documentation**: Generate app navigation documentation
-- **Regression scope**: Understand what areas might be affected by changes
+**Scroll to find and tap:**
+```
+swipeOn with direction: "up", lookFor: {text: "Settings"}
+tapOn with text: "Settings"
+```
 
 ## Tips
 
-- Use `pressButton` with "back" to navigate up the hierarchy
-- Use `homeScreen` to reset and start fresh exploration paths
-- Scroll to bottom of lists to discover all items
-- Try long-press actions to find context menus
-- Check different app states (logged in vs out, empty vs populated)
+- Always `observe` first if unsure of screen state
+- Use `homeScreen` to reset to a known state
+- Use `lookFor` with swipe to auto-scroll to off-screen elements
+- Long press to reveal context menus
+- Use `container` to scope searches in complex screens

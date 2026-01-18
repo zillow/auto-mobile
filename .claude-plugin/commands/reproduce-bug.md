@@ -1,9 +1,11 @@
 ---
 description: Systematically reproduce a bug and document reproduction steps
-allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__tapOn, mcp__auto-mobile__swipeOn, mcp__auto-mobile__inputText, mcp__auto-mobile__clearText, mcp__auto-mobile__selectAllText, mcp__auto-mobile__pressButton, mcp__auto-mobile__pinchOn, mcp__auto-mobile__dragAndDrop, mcp__auto-mobile__launchApp, mcp__auto-mobile__terminateApp, mcp__auto-mobile__highlight, mcp__auto-mobile__deviceSnapshot, mcp__auto-mobile__homeScreen
+allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__highlight, mcp__auto-mobile__deviceSnapshot, mcp__auto-mobile__launchApp, mcp__auto-mobile__terminateApp
 ---
 
 Systematically reproduce a reported bug, document exact steps, and capture evidence.
+
+For UI interactions (tapping, typing, swiping, etc.), use the `/explore` command which provides all interaction tools.
 
 ## Workflow
 
@@ -18,16 +20,11 @@ Systematically reproduce a reported bug, document exact steps, and capture evide
    - Launch the app to a known starting point using `launchApp`
    - Use `observe` to verify starting screen
 
-3. **Attempt reproduction** using interaction tools:
-   - `tapOn` - tap, double-tap, long-press on elements
-   - `swipeOn` - scroll, swipe, fling gestures
-   - `inputText` - enter text into fields
-   - `clearText` / `selectAllText` - manipulate existing text
-   - `pressButton` - hardware buttons (back, home, menu)
-   - `pinchOn` - zoom in/out gestures
-   - `dragAndDrop` - drag elements between locations
+3. **Attempt reproduction**:
+   - Use `/explore` for all UI interactions
    - Use `observe` frequently to verify screen state
    - Document each action taken
+   - Note any deviations from expected behavior
 
 4. **When bug is reproduced**:
    - Use `highlight` to visually mark the defect on screen
