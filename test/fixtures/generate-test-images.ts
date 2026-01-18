@@ -125,6 +125,23 @@ const testImages: TestImage[] = [
     },
   },
   {
+    filename: "overlay-fullscreen.png",
+    width: 120,
+    height: 60,
+    textColor: 0x000000ff,
+    backgroundColor: 0x000000ff,
+    description: "Full-screen semi-transparent overlay with no opaque pixels",
+    textInset: 24,
+    render: async (image: Jimp) => {
+      const overlayColor = 0xffffff80; // 50% white overlay
+      for (let x = 0; x < image.bitmap.width; x++) {
+        for (let y = 0; y < image.bitmap.height; y++) {
+          image.setPixelColor(overlayColor, x, y);
+        }
+      }
+    },
+  },
+  {
     filename: "shadowed-text.png",
     width: 120,
     height: 60,

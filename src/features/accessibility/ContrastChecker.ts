@@ -782,12 +782,15 @@ export class ContrastChecker {
       return { r: pixel.r, g: pixel.g, b: pixel.b };
     }
 
-    const baseColor = this.findUnderlyingColor(image, x, y) ?? { r: 128, g: 128, b: 128 };
+    const baseColor = this.findUnderlyingColor(image, x, y);
+    if (!baseColor) {
+      return { r: pixel.r, g: pixel.g, b: pixel.b };
+    }
     return this.compositeColors(baseColor, pixel);
   }
 
   private findUnderlyingColor(image: Jimp, x: number, y: number): RGB | null {
-    for (let radius = 1; radius <= 6; radius++) {
+    for (let radius = 1; radius <= 12; radius++) {
       for (let dx = -radius; dx <= radius; dx++) {
         for (let dy = -radius; dy <= radius; dy++) {
           const sampleX = this.clamp(x + dx, 0, image.bitmap.width - 1);

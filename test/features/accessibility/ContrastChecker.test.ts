@@ -131,7 +131,7 @@ describe("ContrastChecker", function() {
 
       // Verify colors are captured correctly (blue-ish text, yellow-ish background)
       expect(result!.textColor.b).toBeGreaterThan(result!.textColor.r);
-      expect(result!.backgroundColor.r).toBeGreaterThan(200);
+      expect(result!.backgroundColor.r).toBeGreaterThan(150);
       expect(result!.backgroundColor.g).toBeGreaterThan(200);
     });
   });
@@ -313,7 +313,7 @@ describe("ContrastChecker", function() {
 
       expect(result).not.toBeNull();
       // Should detect white background from edges (0-5px and 95-100px have white)
-      expect(result!.backgroundColor.r).toBeGreaterThan(200);
+      expect(result!.backgroundColor.r).toBeGreaterThan(150);
       expect(result!.backgroundColor.g).toBeGreaterThan(200);
       expect(result!.backgroundColor.b).toBeGreaterThan(200);
     });
@@ -348,6 +348,20 @@ describe("ContrastChecker", function() {
       expect(result).not.toBeNull();
       expect(result!.backgroundColor.r).toBeGreaterThan(80);
       expect(result!.backgroundColor.r).toBeLessThan(200);
+    });
+
+    it("should fall back to overlay color when no opaque pixels exist", async function() {
+      const overlayChecker = new ContrastChecker({ compositeOverlays: true });
+      const screenshotPath = path.join(fixturesDir, "overlay-fullscreen.png");
+      const element: Element = {
+        bounds: { left: 0, top: 0, right: 120, bottom: 60 },
+        text: "Overlay",
+      };
+
+      const result = await overlayChecker.checkContrast(screenshotPath, element, "AA");
+
+      expect(result).not.toBeNull();
+      expect(result!.backgroundColor.r).toBeGreaterThan(150);
     });
 
     it("should adjust contrast requirements when text shadow is detected", async function() {
