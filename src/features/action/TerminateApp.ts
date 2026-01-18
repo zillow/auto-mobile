@@ -158,7 +158,7 @@ export class TerminateApp extends BaseVisualChange {
 
     const terminateLogic = async (): Promise<TerminateAppResult> => {
       const installedApps = await perf.track("checkInstalled", () => this.simctl.listApps(this.device.deviceId));
-      const wasInstalled = installedApps.some(app => app?.bundleId === bundleId);
+      const wasInstalled = installedApps.some(app => this.getBundleId(app) === bundleId);
 
       if (!wasInstalled) {
         perf.end();
@@ -216,5 +216,21 @@ export class TerminateApp extends BaseVisualChange {
     return normalized.includes("no such process")
       || normalized.includes("not running")
       || normalized.includes("found nothing to terminate");
+  }
+
+  private getBundleId(app: any): string | undefined {
+    if (!app || typeof app !== "object") {
+      return undefined;
+    }
+    if (typeof app.bundleId === "string" && app.bundleId.trim().length > 0) {
+      return app.bundleId;
+    }
+    if (typeof app.bundleIdentifier === "string" && app.bundleIdentifier.trim().length > 0) {
+      return app.bundleIdentifier;
+    }
+    if (typeof app.CFBundleIdentifier === "string" && app.CFBundleIdentifier.trim().length > 0) {
+      return app.CFBundleIdentifier;
+    }
+    return undefined;
   }
 }

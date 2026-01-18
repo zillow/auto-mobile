@@ -64,6 +64,17 @@ describe("TerminateApp (iOS)", () => {
     expect(result.wasRunning).toBe(false);
     expect(fakeSimctl.wasMethodCalled("terminateApp")).toBe(false);
   });
+
+  test("detects install when bundleIdentifier is provided", async () => {
+    fakeSimctl.setInstalledApps([{ bundleIdentifier: "com.example.app" }]);
+
+    const terminateApp = new TerminateApp(iosDevice, null, fakeSimctl, fakeTimer);
+    const result = await terminateApp.execute("com.example.app", { skipObservation: true });
+
+    expect(result.success).toBe(true);
+    expect(result.wasInstalled).toBe(true);
+    expect(fakeSimctl.wasMethodCalled("terminateApp")).toBe(true);
+  });
 });
 
 describe("TerminateApp (Android)", () => {
