@@ -13,6 +13,13 @@ const DEFAULT_ACCESSIBILITY_CONFIG: AccessibilityAuditConfig = {
   failureMode: "report",
   useBaseline: false,
   minSeverity: "warning",
+  contrast: {
+    useMultiPointSampling: true,
+    detectGradients: true,
+    compositeOverlays: false,
+    detectTextShadows: false,
+    samplingPoints: 9,
+  },
 };
 
 export class DefaultFeatureFlagApplier implements FeatureFlagApplier {
@@ -69,11 +76,44 @@ const applyAccessibilityConfig = (config?: FeatureFlagConfig | null): Accessibil
     typeof config.useBaseline === "boolean"
       ? config.useBaseline
       : DEFAULT_ACCESSIBILITY_CONFIG.useBaseline;
+  const contrast = parseContrastConfig(config.contrast);
 
   return {
     level,
     failureMode,
     minSeverity,
     useBaseline,
+    contrast,
+  };
+};
+
+const parseContrastConfig = (contrast?: unknown): AccessibilityAuditConfig["contrast"] => {
+  if (!contrast || typeof contrast !== "object") {
+    return DEFAULT_ACCESSIBILITY_CONFIG.contrast;
+  }
+
+  const config = contrast as Record<string, unknown>;
+  const samplingPoints = config.samplingPoints === 5 || config.samplingPoints === 9 || config.samplingPoints === 13
+    ? config.samplingPoints
+    : DEFAULT_ACCESSIBILITY_CONFIG.contrast?.samplingPoints;
+
+  return {
+    useMultiPointSampling:
+      typeof config.useMultiPointSampling === "boolean"
+        ? config.useMultiPointSampling
+        : DEFAULT_ACCESSIBILITY_CONFIG.contrast?.useMultiPointSampling,
+    detectGradients:
+      typeof config.detectGradients === "boolean"
+        ? config.detectGradients
+        : DEFAULT_ACCESSIBILITY_CONFIG.contrast?.detectGradients,
+    compositeOverlays:
+      typeof config.compositeOverlays === "boolean"
+        ? config.compositeOverlays
+        : DEFAULT_ACCESSIBILITY_CONFIG.contrast?.compositeOverlays,
+    detectTextShadows:
+      typeof config.detectTextShadows === "boolean"
+        ? config.detectTextShadows
+        : DEFAULT_ACCESSIBILITY_CONFIG.contrast?.detectTextShadows,
+    samplingPoints,
   };
 };

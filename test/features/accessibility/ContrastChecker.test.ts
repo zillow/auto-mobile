@@ -318,4 +318,51 @@ describe("ContrastChecker", function() {
       expect(result!.backgroundColor.b).toBeGreaterThan(200);
     });
   });
+
+  describe("Enhanced Sampling", function() {
+    it("should report worst-case contrast on gradients", async function() {
+      const screenshotPath = path.join(fixturesDir, "gradient-contrast-fail.png");
+      const element: Element = {
+        bounds: { left: 0, top: 0, right: 120, bottom: 60 },
+        text: "Gradient",
+      };
+
+      const result = await checker.checkContrast(screenshotPath, element, "AA");
+
+      expect(result).not.toBeNull();
+      expect(result!.minRatio).toBeLessThan(result!.maxRatio);
+      expect(result!.minRatio).toBeLessThan(result!.requiredRatio);
+      expect(result!.gradient?.isGradient).toBe(true);
+    });
+
+    it("should composite semi-transparent overlays when enabled", async function() {
+      const overlayChecker = new ContrastChecker({ compositeOverlays: true });
+      const screenshotPath = path.join(fixturesDir, "overlay-scrim.png");
+      const element: Element = {
+        bounds: { left: 20, top: 10, right: 100, bottom: 50 },
+        text: "Overlay",
+      };
+
+      const result = await overlayChecker.checkContrast(screenshotPath, element, "AA");
+
+      expect(result).not.toBeNull();
+      expect(result!.backgroundColor.r).toBeGreaterThan(80);
+      expect(result!.backgroundColor.r).toBeLessThan(200);
+    });
+
+    it("should adjust contrast requirements when text shadow is detected", async function() {
+      const shadowChecker = new ContrastChecker({ detectTextShadows: true });
+      const screenshotPath = path.join(fixturesDir, "shadowed-text.png");
+      const element: Element = {
+        bounds: { left: 14, top: 14, right: 106, bottom: 46 },
+        text: "Shadow",
+      };
+
+      const result = await shadowChecker.checkContrast(screenshotPath, element, "AAA");
+
+      expect(result).not.toBeNull();
+      expect(result!.shadowDetected).toBe(true);
+      expect(result!.requiredRatio).toBeLessThan(result!.baseRequiredRatio);
+    });
+  });
 });

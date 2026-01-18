@@ -61,6 +61,13 @@ export const FEATURE_FLAG_DEFINITIONS: FeatureFlagDefinition[] = [
       failureMode: "report",
       minSeverity: "warning",
       useBaseline: false,
+      contrast: {
+        useMultiPointSampling: true,
+        detectGradients: true,
+        compositeOverlays: false,
+        detectTextShadows: false,
+        samplingPoints: 9,
+      },
     },
   },
   {
