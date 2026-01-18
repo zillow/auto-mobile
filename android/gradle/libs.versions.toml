@@ -37,7 +37,7 @@ kotlinx-coroutines-test = "1.10.2"
 media3 = "1.9.0"
 
 # Library versions
-clikt = "5.0.3"
+clikt = "5.1.0"
 junit-jupiter-api = "6.0.2"
 junit-vintage-engine = "6.0.1"
 koog-agents = "0.6.0"
