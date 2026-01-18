@@ -1,0 +1,47 @@
+{
+  "name": "auto-mobile-marketplace",
+  "owner": {
+    "name": "AutoMobile Contributors",
+    "email": "jason.d.pearson@gmail.com"
+  },
+  "metadata": {
+    "description": "Official AutoMobile plugin marketplace for Claude Code - mobile device automation for Android and iOS",
+    "version": "1.0.0",
+    "pluginRoot": "./"
+  },
+  "plugins": [
+    {
+      "name": "auto-mobile",
+      "source": "./",
+      "description": "Mobile device automation for Android and iOS - control devices with natural language",
+      "version": "0.0.7",
+      "author": {
+        "name": "AutoMobile Contributors",
+        "email": "jason.d.pearson@gmail.com"
+      },
+      "homepage": "https://kaeawc.github.io/auto-mobile/",
+      "repository": "https://github.com/kaeawc/auto-mobile",
+      "license": "Apache-2.0",
+      "keywords": [
+        "mobile",
+        "android",
+        "ios",
+        "automation",
+        "testing",
+        "mcp",
+        "adb",
+        "simctl"
+      ],
+      "category": "development",
+      "tags": [
+        "mobile-testing",
+        "android",
+        "ios",
+        "automation",
+        "ui-testing",
+        "device-control"
+      ],
+      "strict": true
+    }
+  ]
+}

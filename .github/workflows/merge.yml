@@ -127,6 +127,18 @@ jobs:
         run: |
           scripts/validate_mkdocs_nav.sh
 
+  validate-claude-plugin:
+    name: "Validate Claude Plugin"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Validate Claude Plugin"
+        shell: "bash"
+        run: |
+          scripts/claude/validate_plugin.sh
+
   validate-documentation-links:
     name: "Validate Documentation Links"
     runs-on: ubuntu-latest

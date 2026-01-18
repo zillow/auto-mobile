@@ -89,6 +89,35 @@ PY
 }
 
 update_json_version "package.json" "$new_version" "$dry_run"
+update_json_version ".claude-plugin/plugin.json" "$new_version" "$dry_run"
+
+# Update marketplace.json plugin version (nested in plugins[0].version)
+update_marketplace_plugin_version() {
+  local path="$1"
+  local version="$2"
+  local dry="$3"
+  if [[ "$dry" == true ]]; then
+    return 0
+  fi
+  python3 - "$path" "$version" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+version = sys.argv[2]
+
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+
+if "plugins" in data and len(data["plugins"]) > 0:
+    data["plugins"][0]["version"] = version
+
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2)
+    handle.write("\n")
+PY
+}
+update_marketplace_plugin_version ".claude-plugin/marketplace.json" "$new_version" "$dry_run"
 
 if ! command -v rg >/dev/null 2>&1; then
   echo "ripgrep (rg) is required for fast Gradle scanning." >&2
