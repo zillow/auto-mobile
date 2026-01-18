@@ -6,6 +6,10 @@ export interface DeviceInfo {
   isRunning: boolean;
   deviceId?: string;
   source?: "local";
+  // iOS-only metadata (optional)
+  state?: string;
+  iosVersion?: string;
+  deviceType?: string;
 }
 
 export interface BootedDevice {

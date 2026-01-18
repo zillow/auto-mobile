@@ -263,6 +263,24 @@ function splitCommandArgs(command: string): string[] {
   return args;
 }
 
+function normalizeIosVersion(runtimeId: string | undefined, osVersion: string | undefined): string | undefined {
+  const trimmedOsVersion = osVersion?.trim();
+  if (trimmedOsVersion) {
+    return trimmedOsVersion;
+  }
+
+  if (!runtimeId) {
+    return undefined;
+  }
+
+  const match = runtimeId.match(/iOS[-_](\d+(?:[-_]\d+)*)/);
+  if (!match) {
+    return undefined;
+  }
+
+  return match[1].replace(/_/g, ".").replace(/-/g, ".");
+}
+
 /**
  * This file provides an interface to interact with iOS simulators using simctl.
  * It allows you to list, create, boot, and delete simulators.
@@ -463,7 +481,7 @@ export class SimCtlClient implements SimCtl {
       const devices: DeviceInfo[] = [];
 
       // Extract all devices from all runtime versions
-      for (const runtimeDevices of Object.values(simulatorList.devices)) {
+      for (const [runtimeId, runtimeDevices] of Object.entries(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable) {
             logger.debug(`Found iOS simulator: ${device.name} (${device.udid})`);
@@ -471,7 +489,10 @@ export class SimCtlClient implements SimCtl {
               name: device.name,
               platform: "ios",
               deviceId: device.udid,
-              isRunning: device.state === "Booted"
+              isRunning: device.state === "Booted",
+              state: device.state,
+              iosVersion: normalizeIosVersion(runtimeId, device.os_version),
+              deviceType: device.deviceTypeIdentifier
             } as DeviceInfo);
           }
         }

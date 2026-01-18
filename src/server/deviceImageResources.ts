@@ -23,6 +23,10 @@ export interface DeviceImageInfo {
   target?: string;
   basedOn?: string;
   error?: string;
+  // iOS simulator metadata (iOS only)
+  state?: string;
+  iosVersion?: string;
+  deviceType?: string;
 }
 
 // Resource content schema
@@ -202,7 +206,11 @@ function toDeviceImageInfo(device: DeviceInfo, avdInfo?: AvdInfo): DeviceImageIn
     path: avdInfo?.path,
     target: avdInfo?.target,
     basedOn: avdInfo?.basedOn,
-    error: avdInfo?.error
+    error: avdInfo?.error,
+    // iOS simulator metadata
+    state: device.state,
+    iosVersion: device.iosVersion,
+    deviceType: device.deviceType
   };
 }
 
@@ -324,4 +332,12 @@ export function registerDeviceImageResources(): void {
   );
 
   logger.info("[DeviceImageResources] Registered device image resources");
+}
+
+export async function notifyDeviceImageResourcesUpdated(): Promise<void> {
+  await ResourceRegistry.notifyResourcesUpdated([
+    DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES,
+    `${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}/android`,
+    `${DEVICE_IMAGE_RESOURCE_URIS.ALL_IMAGES}/ios`
+  ]);
 }
