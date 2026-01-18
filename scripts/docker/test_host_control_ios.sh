@@ -104,9 +104,7 @@ else
 fi
 
 # Check if host control daemon is already running
-daemon_running="false"
 if nc -z localhost "${HOST_CONTROL_PORT}" 2>/dev/null; then
-  daemon_running="true"
   echo -e "${GREEN}Host control daemon already running on port ${HOST_CONTROL_PORT}${NC}"
 else
   echo -e "${YELLOW}Starting host control daemon...${NC}"
