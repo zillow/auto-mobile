@@ -175,6 +175,20 @@ export interface SimCtl {
   terminateApp(bundleId: string, deviceId?: string): Promise<void>;
 
   /**
+   * Install an app on the simulator
+   * @param appPath - Path to the .app bundle
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   */
+  installApp(appPath: string, deviceId?: string): Promise<void>;
+
+  /**
+   * Uninstall an app from the simulator
+   * @param bundleId - The bundle identifier of the app to uninstall
+   * @param deviceId - Optional device ID (defaults to current device or "booted")
+   */
+  uninstallApp(bundleId: string, deviceId?: string): Promise<void>;
+
+  /**
    * Get the screen size of the simulator
    * @param deviceId - Optional device ID (defaults to current device or "booted")
    * @returns Promise with screen dimensions
@@ -713,6 +727,18 @@ export class SimCtlClient implements SimCtl {
       logger.warn(`Failed to terminate iOS app ${bundleId}: ${error}`);
       throw error;
     }
+  }
+
+  async installApp(appPath: string, deviceId?: string): Promise<void> {
+    const targetDevice = deviceId || (this.device?.deviceId) || "booted";
+    logger.debug(`Installing app ${appPath} on iOS simulator ${targetDevice}`);
+    await this.executeCommand(`install ${targetDevice} "${appPath}"`);
+  }
+
+  async uninstallApp(bundleId: string, deviceId?: string): Promise<void> {
+    const targetDevice = deviceId || (this.device?.deviceId) || "booted";
+    logger.debug(`Uninstalling app ${bundleId} from iOS simulator ${targetDevice}`);
+    await this.executeCommand(`uninstall ${targetDevice} ${bundleId}`);
   }
 
   /**

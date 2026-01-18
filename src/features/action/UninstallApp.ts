@@ -4,6 +4,7 @@ import { BootedDevice } from "../../models";
 import { ListInstalledApps } from "../observe/ListInstalledApps";
 import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { logger } from "../../utils/logger";
 
 // TODO: Create MCP tool call that exposes this functionality
 export class UninstallApp {
@@ -62,7 +63,6 @@ export class UninstallApp {
     try {
       // Check if app is installed
       const listApps = new ListInstalledApps(this.device);
-
       const installed = (await listApps.execute()).find(app => app === bundleId) !== undefined;
 
       if (!installed) {
@@ -76,10 +76,14 @@ export class UninstallApp {
 
       // Terminate app if it's running before uninstalling
       // TODO: query if the app was running
-      await this.simctl.killSimulator(this.device);
+      try {
+        await this.simctl.terminateApp(bundleId, this.device.deviceId);
+      } catch (error) {
+        logger.warn(`[UninstallApp] Failed to terminate iOS app before uninstall: ${error}`);
+      }
 
       // Uninstall the app
-      await this.simctl.killSimulator(this.device);
+      await this.simctl.uninstallApp(bundleId, this.device.deviceId);
 
       // Verify the app was uninstalled
       const isStillInstalled = (await listApps.execute()).find(app => app === bundleId) !== undefined;

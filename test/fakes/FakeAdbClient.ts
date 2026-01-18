@@ -12,6 +12,8 @@ export class FakeAdbClient {
   }> = [];
   private commandResults: Map<string, { stdout: string; stderr: string }> = new Map();
   private commandErrors: Map<string, Error> = new Map();
+  private foregroundApp: { packageName: string; userId: number } | null = null;
+  private users: Array<{ userId: number; name: string; flags?: number; running?: boolean }> = [];
 
   /**
    * Record a command execution
@@ -22,7 +24,7 @@ export class FakeAdbClient {
     maxBuffer?: number,
     noRetry?: boolean,
     signal?: AbortSignal
-  ): Promise<{ stdout: string; stderr: string }> {
+  ): Promise<{ stdout: string; stderr: string; toString: () => string; trim: () => string; includes: (search: string) => boolean }> {
     this.commandCalls.push({ command, timeoutMs, maxBuffer, noRetry, signal });
 
     const error = this.commandErrors.get(command);
@@ -32,7 +34,13 @@ export class FakeAdbClient {
 
     // Return configured result or default success
     const result = this.commandResults.get(command) || { stdout: "", stderr: "" };
-    return result;
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      toString: () => result.stdout,
+      trim: () => result.stdout.trim(),
+      includes: (search: string) => result.stdout.includes(search)
+    };
   }
 
   /**
@@ -47,6 +55,34 @@ export class FakeAdbClient {
    */
   setCommandError(command: string, error: Error): void {
     this.commandErrors.set(command, error);
+  }
+
+  /**
+   * Configure the current foreground app
+   */
+  setForegroundApp(app: { packageName: string; userId: number } | null): void {
+    this.foregroundApp = app;
+  }
+
+  /**
+   * Configure the list of users
+   */
+  setUsers(users: Array<{ userId: number; name: string; flags?: number; running?: boolean }>): void {
+    this.users = [...users];
+  }
+
+  /**
+   * Return the current foreground app
+   */
+  async getForegroundApp(): Promise<{ packageName: string; userId: number } | null> {
+    return this.foregroundApp;
+  }
+
+  /**
+   * Return the list of users
+   */
+  async listUsers(): Promise<Array<{ userId: number; name: string; flags?: number; running?: boolean }>> {
+    return [...this.users];
   }
 
   /**

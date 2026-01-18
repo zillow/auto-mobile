@@ -6,6 +6,7 @@ import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeHostCommandExecutor } from "../../fakes/FakeHostCommandExecutor";
 import { FakeAndroidBuildToolsLocator } from "../../fakes/FakeAndroidBuildToolsLocator";
 import { FakeTimer } from "../../fakes/FakeTimer";
+import { FakeSimctl } from "../../fakes/FakeSimctl";
 
 const createExecResult = (stdout: string, stderr: string = ""): ExecResult => ({
   stdout,
@@ -21,11 +22,17 @@ describe("InstallApp", () => {
     name: "Test Device",
     platform: "android"
   };
+  const iosDevice: BootedDevice = {
+    deviceId: "ios-sim-123",
+    name: "iPhone 15",
+    platform: "ios"
+  };
 
   let fakeAdb: FakeAdbExecutor;
   let fakeHost: FakeHostCommandExecutor;
   let fakeLocator: FakeAndroidBuildToolsLocator;
   let fakeTimer: FakeTimer;
+  let fakeSimctl: FakeSimctl;
 
   beforeEach(() => {
     fakeAdb = new FakeAdbExecutor();
@@ -33,6 +40,7 @@ describe("InstallApp", () => {
     fakeLocator = new FakeAndroidBuildToolsLocator();
     fakeTimer = new FakeTimer();
     fakeTimer.setManualMode();
+    fakeSimctl = new FakeSimctl();
   });
 
   test("installs using aapt2 and targets work profile user", async () => {
@@ -154,5 +162,47 @@ describe("InstallApp", () => {
 
     expect(result.success).toBe(false);
     expect(result.warning).toContain("aapt2");
+  });
+
+  test("installs iOS app via simctl and detects new bundle id", async () => {
+    class SequencedFakeSimctl extends FakeSimctl {
+      private listResponses: any[][] = [];
+
+      setListResponses(responses: any[][]): void {
+        this.listResponses = [...responses];
+      }
+
+      override async listApps(deviceId?: string): Promise<any[]> {
+        const response = this.listResponses.shift();
+        if (response) {
+          return response;
+        }
+        return super.listApps(deviceId);
+      }
+    }
+
+    const appPath = "/tmp/MyApp.app";
+    const perf = createPerformanceTracker(true, fakeTimer);
+    const sequencedSimctl = new SequencedFakeSimctl();
+    sequencedSimctl.setListResponses([
+      [{ bundleId: "com.example.old" }],
+      [{ bundleId: "com.example.old" }, { bundleId: "com.example.new" }]
+    ]);
+
+    const installApp = new InstallApp(
+      iosDevice,
+      null,
+      null,
+      null,
+      () => perf,
+      sequencedSimctl
+    );
+
+    const result = await installApp.execute(appPath);
+
+    expect(result.success).toBe(true);
+    expect(result.packageName).toBe("com.example.new");
+    expect(result.upgrade).toBe(false);
+    expect(sequencedSimctl.wasMethodCalled("installApp")).toBe(true);
   });
 });

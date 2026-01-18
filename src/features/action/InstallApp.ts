@@ -6,12 +6,15 @@ import { createGlobalPerformanceTracker, type PerformanceTracker } from "../../u
 import { DefaultHostCommandExecutor, type HostCommandExecutor } from "../../utils/HostCommandExecutor";
 import { DefaultAndroidBuildToolsLocator, type AndroidBuildToolsLocator } from "../../utils/android-cmdline-tools/AndroidBuildToolsLocator";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
+import { SimCtlClient } from "../../utils/ios-cmdline-tools/SimCtlClient";
 
 export class InstallApp {
   private adb: AdbExecutor;
   private hostExecutor: HostCommandExecutor;
   private buildToolsLocator: AndroidBuildToolsLocator;
   private createPerformanceTracker: () => PerformanceTracker;
+  private simctl: SimCtlClient;
+  private device: BootedDevice;
 
   /**
    * Create an InstallApp instance
@@ -26,12 +29,15 @@ export class InstallApp {
     adb: AdbExecutor | null = null,
     hostExecutor: HostCommandExecutor | null = null,
     buildToolsLocator: AndroidBuildToolsLocator | null = null,
-    performanceTrackerFactory: () => PerformanceTracker = createGlobalPerformanceTracker
+    performanceTrackerFactory: () => PerformanceTracker = createGlobalPerformanceTracker,
+    simctl: SimCtlClient | null = null
   ) {
+    this.device = device;
     this.adb = adb || new AdbClient(device);
     this.hostExecutor = hostExecutor || new DefaultHostCommandExecutor();
     this.buildToolsLocator = buildToolsLocator || new DefaultAndroidBuildToolsLocator();
     this.createPerformanceTracker = performanceTrackerFactory;
+    this.simctl = simctl || new SimCtlClient(device);
   }
 
   /**
@@ -49,6 +55,15 @@ export class InstallApp {
 
     if (!path.isAbsolute(apkPath)) {
       apkPath = path.resolve(process.cwd(), apkPath);
+    }
+
+    if (this.device.platform === "ios") {
+      const result = await perf.track("iOSInstall", () => this.executeiOS(apkPath, perf, signal));
+      perf.end();
+      return {
+        ...result,
+        userId: 0
+      };
     }
 
     const warnings: string[] = [];
@@ -138,6 +153,52 @@ export class InstallApp {
     };
   }
 
+  private async executeiOS(
+    appPath: string,
+    perf: PerformanceTracker,
+    signal?: AbortSignal
+  ): Promise<{ success: boolean; upgrade: boolean; packageName?: string; warning?: string }> {
+    if (signal?.aborted) {
+      throw new Error(OPERATION_CANCELLED_MESSAGE);
+    }
+
+    const beforeApps = await perf.track("listAppsBefore", () => this.simctl.listApps(this.device.deviceId));
+    const beforeBundleIds = this.extractBundleIds(beforeApps);
+
+    await perf.track("simctlInstall", () => this.simctl.installApp(appPath, this.device.deviceId));
+
+    if (signal?.aborted) {
+      throw new Error(OPERATION_CANCELLED_MESSAGE);
+    }
+
+    const afterApps = await perf.track("listAppsAfter", () => this.simctl.listApps(this.device.deviceId));
+    const afterBundleIds = this.extractBundleIds(afterApps);
+
+    const newBundles = this.diffBundles(beforeBundleIds, afterBundleIds);
+    let packageName = this.findBundleIdByPath(afterApps, appPath);
+
+    const warnings: string[] = [];
+
+    if (!packageName) {
+      if (newBundles.length === 1) {
+        packageName = newBundles[0];
+      } else if (newBundles.length > 1) {
+        warnings.push("Installed app but multiple new bundle IDs were detected; unable to determine the bundle ID reliably.");
+      } else {
+        warnings.push("Installed app but bundle ID could not be determined from simctl listapps output.");
+      }
+    }
+
+    const upgrade = packageName ? beforeBundleIds.has(packageName) : false;
+
+    return {
+      success: true,
+      upgrade,
+      packageName,
+      warning: warnings.length > 0 ? warnings.join(" ") : undefined
+    };
+  }
+
   private async extractPackageName(
     apkPath: string,
     signal?: AbortSignal
@@ -198,5 +259,65 @@ export class InstallApp {
       }
     }
     return newPackages.sort();
+  }
+
+  private extractBundleIds(apps: any[]): Set<string> {
+    const bundleIds = new Set<string>();
+    for (const app of apps) {
+      const bundleId = this.getBundleId(app);
+      if (bundleId) {
+        bundleIds.add(bundleId);
+      }
+    }
+    return bundleIds;
+  }
+
+  private diffBundles(before: Set<string>, after: Set<string>): string[] {
+    const newBundles: string[] = [];
+    for (const bundleId of after) {
+      if (!before.has(bundleId)) {
+        newBundles.push(bundleId);
+      }
+    }
+    return newBundles.sort();
+  }
+
+  private getBundleId(app: any): string | undefined {
+    if (!app || typeof app !== "object") {
+      return undefined;
+    }
+    if (typeof app.bundleId === "string" && app.bundleId.trim().length > 0) {
+      return app.bundleId;
+    }
+    if (typeof app.bundleIdentifier === "string" && app.bundleIdentifier.trim().length > 0) {
+      return app.bundleIdentifier;
+    }
+    if (typeof app.CFBundleIdentifier === "string" && app.CFBundleIdentifier.trim().length > 0) {
+      return app.CFBundleIdentifier;
+    }
+    return undefined;
+  }
+
+  private findBundleIdByPath(apps: any[], appPath: string): string | undefined {
+    const normalizedPath = path.resolve(appPath);
+    for (const app of apps) {
+      if (!app || typeof app !== "object") {
+        continue;
+      }
+      const bundleId = this.getBundleId(app);
+      if (!bundleId) {
+        continue;
+      }
+      const bundlePath = typeof app.bundlePath === "string"
+        ? app.bundlePath
+        : (typeof app.path === "string" ? app.path : undefined);
+      if (!bundlePath) {
+        continue;
+      }
+      if (path.resolve(bundlePath) === normalizedPath) {
+        return bundleId;
+      }
+    }
+    return undefined;
   }
 }
