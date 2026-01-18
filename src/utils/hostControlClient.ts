@@ -105,9 +105,12 @@ async function sendCommand<T>(method: string, params?: Record<string, unknown>):
       resolve({ success: false, error: "Command timed out" });
     }, COMMAND_TIMEOUT_MS);
 
+    // Set timeout for initial connection only
     socket.setTimeout(CONNECT_TIMEOUT_MS);
 
     socket.on("connect", () => {
+      // Clear the connect timeout - command timeout handles the rest
+      socket.setTimeout(0);
       socket.write(JSON.stringify(request) + "\n");
     });
 

@@ -4,12 +4,17 @@
  *
  * This daemon runs on the host machine and provides a simple JSON-RPC interface
  * for Docker containers to control Android SDK tools (emulator, avdmanager, etc.)
+ * and iOS simulators via simctl/xcodebuild (macOS only).
  *
  * Features:
  * - Start/stop Android emulators
  * - List available AVDs
  * - Run avdmanager commands
  * - Run sdkmanager commands
+ * - Start/stop iOS simulators (macOS only)
+ * - List available iOS simulators
+ * - Run simctl commands
+ * - Run xcodebuild commands
  *
  * Usage:
  *   node host-control-daemon.js [--port 15037] [--host 0.0.0.0]
@@ -69,8 +74,25 @@ function getAdbPath() {
   return path.join(getAndroidSdk(), "platform-tools", "adb");
 }
 
+// iOS support (macOS only)
+const IS_MACOS = os.platform() === "darwin";
+
+/**
+ * Check if Xcode command line tools are available
+ */
+async function isXcodeAvailable() {
+  if (!IS_MACOS) return false;
+  try {
+    await execFileAsync("xcrun", ["--version"], { timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Track running emulator processes
 const runningEmulators = new Map(); // avdName -> { pid, process }
+const runningSimulators = new Map(); // udid -> { name, state }
 
 // Command handlers
 const handlers = {
@@ -250,11 +272,226 @@ const handlers = {
     };
   },
 
+  // ========================================================================
+  // iOS Simulator Commands (macOS only)
+  // ========================================================================
+
+  /**
+   * List available iOS simulators
+   */
+  async "list-simulators"() {
+    if (!IS_MACOS) {
+      return { success: false, error: "iOS simulators are only available on macOS" };
+    }
+
+    try {
+      const { stdout } = await execFileAsync("xcrun", ["simctl", "list", "devices", "--json"], {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      const data = JSON.parse(stdout);
+
+      // Flatten devices from all runtimes
+      const simulators = [];
+      for (const [runtime, devices] of Object.entries(data.devices || {})) {
+        for (const device of devices) {
+          if (device.isAvailable) {
+            simulators.push({
+              udid: device.udid,
+              name: device.name,
+              state: device.state,
+              runtime: runtime,
+              deviceTypeIdentifier: device.deviceTypeIdentifier
+            });
+          }
+        }
+      }
+
+      return { success: true, simulators };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * List running (booted) iOS simulators
+   */
+  async "list-running-simulators"() {
+    if (!IS_MACOS) {
+      return { success: false, error: "iOS simulators are only available on macOS" };
+    }
+
+    try {
+      const { stdout } = await execFileAsync("xcrun", ["simctl", "list", "devices", "booted", "--json"], {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      const data = JSON.parse(stdout);
+
+      const simulators = [];
+      for (const [runtime, devices] of Object.entries(data.devices || {})) {
+        for (const device of devices) {
+          if (device.state === "Booted") {
+            simulators.push({
+              udid: device.udid,
+              name: device.name,
+              state: device.state,
+              runtime: runtime
+            });
+            // Track running simulators
+            runningSimulators.set(device.udid, { name: device.name, state: device.state });
+          }
+        }
+      }
+
+      return { success: true, simulators };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Boot an iOS simulator
+   */
+  async "boot-simulator"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "iOS simulators are only available on macOS" };
+    }
+
+    const { udid } = params;
+    if (!udid) {
+      return { success: false, error: "Missing required parameter: udid" };
+    }
+
+    try {
+      // Check if already booted
+      const listResult = await handlers["list-running-simulators"]();
+      if (listResult.success && listResult.simulators.some(s => s.udid === udid)) {
+        return { success: true, message: `Simulator ${udid} is already booted` };
+      }
+
+      await execFileAsync("xcrun", ["simctl", "boot", udid], {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+
+      // Wait for simulator to fully boot
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      return { success: true, message: `Booted simulator ${udid}` };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Shutdown an iOS simulator
+   */
+  async "shutdown-simulator"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "iOS simulators are only available on macOS" };
+    }
+
+    const { udid } = params;
+    if (!udid) {
+      return { success: false, error: "Missing required parameter: udid" };
+    }
+
+    try {
+      await execFileAsync("xcrun", ["simctl", "shutdown", udid], {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      runningSimulators.delete(udid);
+      return { success: true, message: `Shutdown simulator ${udid}` };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Run an arbitrary simctl command
+   */
+  async "simctl"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "iOS simulators are only available on macOS" };
+    }
+
+    const { args = [] } = params;
+    if (!Array.isArray(args)) {
+      return { success: false, error: "args must be an array" };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync("xcrun", ["simctl", ...args], {
+        timeout: COMMAND_TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024 // 10MB for large outputs
+      });
+      return { success: true, stdout, stderr };
+    } catch (error) {
+      return { success: false, error: error.message, stderr: error.stderr };
+    }
+  },
+
+  /**
+   * Run an xcodebuild command
+   */
+  async "xcodebuild"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "xcodebuild is only available on macOS" };
+    }
+
+    const { args = [] } = params;
+    if (!Array.isArray(args)) {
+      return { success: false, error: "args must be an array" };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync("xcodebuild", args, {
+        timeout: COMMAND_TIMEOUT_MS * 20, // xcodebuild can be very slow
+        maxBuffer: 50 * 1024 * 1024 // 50MB for large build outputs
+      });
+      return { success: true, stdout, stderr };
+    } catch (error) {
+      return { success: false, error: error.message, stderr: error.stderr };
+    }
+  },
+
+  /**
+   * Get iOS tooling info
+   */
+  async "ios-info"() {
+    if (!IS_MACOS) {
+      return { success: false, error: "iOS tooling is only available on macOS", isMacOS: false };
+    }
+
+    const info = { success: true, isMacOS: true };
+
+    try {
+      const { stdout: xcodeVersion } = await execFileAsync("xcodebuild", ["-version"], { timeout: 5000 });
+      info.xcodeVersion = xcodeVersion.trim();
+    } catch {
+      info.xcodeVersion = "Not installed";
+    }
+
+    try {
+      const { stdout: simctlVersion } = await execFileAsync("xcrun", ["simctl", "--version"], { timeout: 5000 });
+      info.simctlVersion = simctlVersion.trim();
+    } catch {
+      info.simctlVersion = "Not available";
+    }
+
+    try {
+      const { stdout: developerDir } = await execFileAsync("xcode-select", ["-p"], { timeout: 5000 });
+      info.developerDir = developerDir.trim();
+    } catch {
+      info.developerDir = "Not set";
+    }
+
+    return info;
+  },
+
   /**
    * Ping for health check
    */
   async "ping"() {
-    return { success: true, message: "pong", timestamp: Date.now() };
+    return { success: true, message: "pong", timestamp: Date.now(), isMacOS: IS_MACOS };
   }
 };
 
@@ -313,28 +550,43 @@ const server = net.createServer(socket => {
   });
 
   socket.on("error", err => {
-    console.error(`[${new Date().toISOString()}] Socket error:`, err.message);
+    // Sanitize error message to prevent log injection
+    const safeMessage = String(err && err.message || "").replace(/[\r\n]/g, "");
+    console.error(`[${new Date().toISOString()}] Socket error:`, safeMessage);
   });
 });
 
-server.listen(port, host, () => {
+server.listen(port, host, async () => {
+  const xcodeAvailable = await isXcodeAvailable();
+  const iosStatus = xcodeAvailable ? "Available" : "Not available (macOS only)";
+
   console.log(`
 ╔══════════════════════════════════════════════════════════════╗
 ║          Auto-Mobile Host Control Daemon                     ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  Listening on: ${host}:${port}
-║  SDK Root: ${getAndroidSdk()}
+║  Android SDK: ${getAndroidSdk()}
+║  iOS Tools: ${iosStatus}
 ╚══════════════════════════════════════════════════════════════╝
 
-Available commands:
+Android Commands:
   - ping              Health check
   - list-avds         List available Android Virtual Devices
   - start-emulator    Start an emulator (params: avd, headless, args)
   - stop-emulator     Stop an emulator (params: avd, deviceId)
-  - list-running      List running emulators
+  - list-running      List running Android emulators
   - avdmanager        Run avdmanager command (params: args)
   - sdkmanager        Run sdkmanager command (params: args)
-  - sdk-info          Get SDK paths and info
+  - sdk-info          Get Android SDK paths and info
+
+iOS Commands (macOS only):
+  - list-simulators        List available iOS simulators
+  - list-running-simulators List booted iOS simulators
+  - boot-simulator         Boot a simulator (params: udid)
+  - shutdown-simulator     Shutdown a simulator (params: udid)
+  - simctl                 Run simctl command (params: args)
+  - xcodebuild             Run xcodebuild command (params: args)
+  - ios-info               Get iOS tooling info
 
 Press Ctrl+C to stop.
 `);

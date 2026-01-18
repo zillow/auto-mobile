@@ -92,6 +92,8 @@ async function execAdb(args: string[], timeoutMs: number = CONNECT_TIMEOUT_MS): 
 
 /**
  * Get list of currently connected devices from ADB
+ * Only returns devices in "device" state - offline devices are not considered connected
+ * so they will be retried on the next scan
  */
 async function getConnectedDevices(): Promise<Set<string>> {
   const devices = new Set<string>();
@@ -102,7 +104,9 @@ async function getConnectedDevices(): Promise<Set<string>> {
 
     for (const line of lines) {
       const parts = line.trim().split(/\s+/);
-      if (parts.length >= 2 && (parts[1] === "device" || parts[1] === "offline")) {
+      // Only consider devices in "device" state as truly connected
+      // Offline devices will be removed from connectedDevices and retried
+      if (parts.length >= 2 && parts[1] === "device") {
         devices.add(parts[0]);
       }
     }
