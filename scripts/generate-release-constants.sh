@@ -5,8 +5,10 @@ set -euo pipefail
 constants_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/src/constants/release.ts"
 release_version="${RELEASE_VERSION:-}"
 checksum="${APK_SHA256_CHECKSUM:-}"
+xctestservice_release_version="${XCTESTSERVICE_RELEASE_VERSION:-}"
+xctestservice_checksum="${XCTESTSERVICE_SHA256_CHECKSUM:-}"
 
-if [ -z "$release_version" ] && [ -z "$checksum" ]; then
+if [ -z "$release_version" ] && [ -z "$checksum" ] && [ -z "$xctestservice_release_version" ] && [ -z "$xctestservice_checksum" ]; then
   echo "INFO: No release environment variables set - using default constants"
   exit 0
 fi
@@ -14,6 +16,12 @@ fi
 if [ -n "$checksum" ] && ! [[ "$checksum" =~ ^[a-f0-9]{64}$ ]]; then
   echo "ERROR: APK_SHA256_CHECKSUM must be a valid SHA256 hash (64 hex characters)"
   echo "   Got: ${checksum}"
+  exit 1
+fi
+
+if [ -n "$xctestservice_checksum" ] && ! [[ "$xctestservice_checksum" =~ ^[a-f0-9]{64}$ ]]; then
+  echo "ERROR: XCTESTSERVICE_SHA256_CHECKSUM must be a valid SHA256 hash (64 hex characters)"
+  echo "   Got: ${xctestservice_checksum}"
   exit 1
 fi
 
@@ -32,6 +40,16 @@ if [ -n "$checksum" ]; then
     || sed -E -i -e "s/^export const APK_SHA256_CHECKSUM: string = \".*\";/export const APK_SHA256_CHECKSUM: string = \"${checksum}\";/" "$tmp_file"
 fi
 
+if [ -n "$xctestservice_release_version" ]; then
+  sed -E -i "" -e "s/^export const XCTESTSERVICE_RELEASE_VERSION: string = \".*\";/export const XCTESTSERVICE_RELEASE_VERSION: string = \"${xctestservice_release_version}\";/" "$tmp_file" 2>/dev/null \
+    || sed -E -i -e "s/^export const XCTESTSERVICE_RELEASE_VERSION: string = \".*\";/export const XCTESTSERVICE_RELEASE_VERSION: string = \"${xctestservice_release_version}\";/" "$tmp_file"
+fi
+
+if [ -n "$xctestservice_checksum" ]; then
+  sed -E -i "" -e "s/^export const XCTESTSERVICE_SHA256_CHECKSUM: string = \".*\";/export const XCTESTSERVICE_SHA256_CHECKSUM: string = \"${xctestservice_checksum}\";/" "$tmp_file" 2>/dev/null \
+    || sed -E -i -e "s/^export const XCTESTSERVICE_SHA256_CHECKSUM: string = \".*\";/export const XCTESTSERVICE_SHA256_CHECKSUM: string = \"${xctestservice_checksum}\";/" "$tmp_file"
+fi
+
 if cmp -s "$constants_path" "$tmp_file"; then
   echo "INFO: Release constants already up to date"
   exit 0
@@ -45,6 +63,12 @@ if [ -n "$release_version" ]; then
   echo "   Version: ${release_version}"
 fi
 if [ -n "$checksum" ]; then
-  echo "   Checksum: ${checksum}"
+  echo "   APK checksum: ${checksum}"
+fi
+if [ -n "$xctestservice_release_version" ]; then
+  echo "   XCTestService version: ${xctestservice_release_version}"
+fi
+if [ -n "$xctestservice_checksum" ]; then
+  echo "   XCTestService checksum: ${xctestservice_checksum}"
 fi
 echo "   File: ${constants_path}"

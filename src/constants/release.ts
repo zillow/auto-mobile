@@ -24,16 +24,11 @@ export const APK_SHA256_CHECKSUM: string = "a80b4e0101a66c47828b958aac882abe0582
 /**
  * iOS XCTestService Release Constants
  *
- * Phase 1: Build from source (current)
- * - XCTESTSERVICE_RELEASE_VERSION = "source" means build locally
- * - No remote bundle download
- *
- * Phase 2 (Future): GitHub release hosting
- * - Set XCTESTSERVICE_RELEASE_VERSION to a version number to download pre-built bundle
- * - This requires solving code signing for distribution
+ * XCTestService is distributed via GitHub releases as a prebuilt bundle.
+ * The default "latest" version targets the most recent release.
  */
-export const XCTESTSERVICE_RELEASE_VERSION: string = "source"; // "source" = build locally, version = download
-export const XCTESTSERVICE_BUNDLE_URL: string = XCTESTSERVICE_RELEASE_VERSION === "source"
-  ? ""
-  : `https://github.com/kaeawc/auto-mobile/releases/download/v${XCTESTSERVICE_RELEASE_VERSION}/xctestservice-bundle.zip`;
-export const XCTESTSERVICE_SHA256_CHECKSUM: string = ""; // Empty = build from source
+export const XCTESTSERVICE_RELEASE_VERSION: string = "latest";
+export const XCTESTSERVICE_IPA_URL: string = XCTESTSERVICE_RELEASE_VERSION === "latest"
+  ? "https://github.com/kaeawc/auto-mobile/releases/latest/download/XCTestService.ipa"
+  : `https://github.com/kaeawc/auto-mobile/releases/download/v${XCTESTSERVICE_RELEASE_VERSION}/XCTestService.ipa`;
+export const XCTESTSERVICE_SHA256_CHECKSUM: string = ""; // Empty = skip verification (local dev only)

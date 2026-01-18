@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { XCTestServiceBuilder } from "../../src/utils/XCTestServiceBuilder";
+import { FakeXCTestServiceBundleDownloader } from "../fakes/FakeXCTestServiceBundleDownloader";
 import * as fs from "fs/promises";
 import * as path from "path";
 import os from "os";
@@ -8,6 +9,7 @@ describe("XCTestServiceBuilder", function() {
   let originalProjectRoot: string | undefined;
   let originalDerivedDataPath: string | undefined;
   let originalSkipBuild: string | undefined;
+  let originalCacheDir: string | undefined;
   let tempDir: string;
 
   beforeEach(async function() {
@@ -15,6 +17,7 @@ describe("XCTestServiceBuilder", function() {
     originalProjectRoot = process.env.AUTOMOBILE_PROJECT_ROOT;
     originalDerivedDataPath = process.env.AUTOMOBILE_XCTESTSERVICE_DERIVED_DATA;
     originalSkipBuild = process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD;
+    originalCacheDir = process.env.AUTOMOBILE_XCTESTSERVICE_CACHE_DIR;
 
     // Create temp directory for tests
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "xctestservice-builder-test-"));
@@ -41,6 +44,12 @@ describe("XCTestServiceBuilder", function() {
       delete process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD;
     } else {
       process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD = originalSkipBuild;
+    }
+
+    if (originalCacheDir === undefined) {
+      delete process.env.AUTOMOBILE_XCTESTSERVICE_CACHE_DIR;
+    } else {
+      process.env.AUTOMOBILE_XCTESTSERVICE_CACHE_DIR = originalCacheDir;
     }
 
     // Reset singleton instances
@@ -78,10 +87,12 @@ describe("XCTestServiceBuilder", function() {
       expect(config.scheme).toBe("XCTestServiceApp");
       expect(config.destination).toBe("generic/platform=iOS Simulator");
       expect(config.derivedDataPath).toBe("/tmp/automobile-xctestservice");
+      expect(config.bundleCacheDir).toBe(path.join(os.homedir(), ".automobile", "xctestservice"));
     });
 
     test("should respect environment variable overrides", function() {
       process.env.AUTOMOBILE_XCTESTSERVICE_DERIVED_DATA = "/custom/derived/data";
+      process.env.AUTOMOBILE_XCTESTSERVICE_CACHE_DIR = "/custom/cache";
 
       // Reset instances to pick up new env
       XCTestServiceBuilder.resetInstances();
@@ -90,17 +101,20 @@ describe("XCTestServiceBuilder", function() {
       const config = builder.getConfig();
 
       expect(config.derivedDataPath).toBe("/custom/derived/data");
+      expect(config.bundleCacheDir).toBe("/custom/cache");
     });
 
     test("should respect constructor config overrides", function() {
       const builder = XCTestServiceBuilder.getInstance({
         derivedDataPath: "/override/path",
         scheme: "CustomScheme",
+        bundleCacheDir: "/override/cache",
       });
       const config = builder.getConfig();
 
       expect(config.derivedDataPath).toBe("/override/path");
       expect(config.scheme).toBe("CustomScheme");
+      expect(config.bundleCacheDir).toBe("/override/cache");
     });
   });
 
@@ -139,6 +153,29 @@ describe("XCTestServiceBuilder", function() {
 
       // Should return true because build products don't exist
       expect(result).toBe(true);
+    });
+
+    test("should return false when xctestrun and metadata match", async function() {
+      const derivedDataPath = path.join(tempDir, "DerivedData");
+      const productsDir = path.join(derivedDataPath, "Build", "Products");
+      await fs.mkdir(productsDir, { recursive: true });
+      await fs.writeFile(path.join(productsDir, "XCTestServiceApp_iphonesimulator.xctestrun"), "mock");
+
+      const cacheDir = path.join(tempDir, "cache");
+      await fs.mkdir(cacheDir, { recursive: true });
+      await fs.writeFile(
+        path.join(cacheDir, "xctestservice-bundle.json"),
+        JSON.stringify({ checksum: "test-checksum", version: "latest", extractedAt: new Date().toISOString() })
+      );
+
+      XCTestServiceBuilder.setExpectedChecksumForTesting("test-checksum");
+      const builder = XCTestServiceBuilder.getInstance({
+        derivedDataPath,
+        bundleCacheDir: cacheDir
+      });
+
+      const result = await builder.needsRebuild("simulator");
+      expect(result).toBe(false);
     });
   });
 
@@ -236,25 +273,80 @@ describe("XCTestServiceBuilder", function() {
       expect(result).toBeNull();
     });
   });
-});
 
-describe("XCTestServiceBuilder build", function() {
-  // These tests would require mocking xcodebuild, so they're more like integration tests
-  // Skip on non-macOS platforms
-  const isMacOS = process.platform === "darwin";
+  describe("build", function() {
+    test("should download and extract bundle using downloader", async function() {
+      const derivedDataPath = path.join(tempDir, "DerivedData");
+      const cacheDir = path.join(tempDir, "cache");
+      const downloader = new FakeXCTestServiceBundleDownloader();
+      downloader.checksum = "expected-checksum";
 
-  test.skipIf(!isMacOS)("should detect Xcode not installed", async function() {
-    // This test would need to mock xcode-select
-    // For now, just verify the method exists and returns a result
-    const builder = XCTestServiceBuilder.getInstance({
-      projectRoot: "/nonexistent/path",
-      derivedDataPath: "/tmp/test-derived-data",
+      XCTestServiceBuilder.setExpectedChecksumForTesting("expected-checksum");
+      const builder = XCTestServiceBuilder.getInstance(
+        {
+          derivedDataPath,
+          bundleCacheDir: cacheDir
+        },
+        { downloader }
+      );
+
+      const result = await builder.build("simulator");
+
+      expect(result.success).toBe(true);
+      expect(result.xctestrunPath).toBe(path.join(derivedDataPath, "Build", "Products", "XCTestServiceApp_iphonesimulator.xctestrun"));
+      expect(downloader.downloadedUrls.length).toBe(1);
+      expect(downloader.extractedPaths[0]).toBe(derivedDataPath);
     });
 
-    const result = await builder.build();
+    test("should normalize nested bundle layouts", async function() {
+      const derivedDataPath = path.join(tempDir, "DerivedData");
+      const cacheDir = path.join(tempDir, "cache");
+      const downloader = new FakeXCTestServiceBundleDownloader();
+      downloader.checksum = "expected-checksum";
+      downloader.extractedSubdir = "NestedRoot";
 
-    // Should either succeed or fail with meaningful error
-    expect(typeof result.success).toBe("boolean");
-    expect(typeof result.message).toBe("string");
+      XCTestServiceBuilder.setExpectedChecksumForTesting("expected-checksum");
+      const builder = XCTestServiceBuilder.getInstance(
+        {
+          derivedDataPath,
+          bundleCacheDir: cacheDir
+        },
+        { downloader }
+      );
+
+      const result = await builder.build("simulator");
+      const buildProducts = await builder.getBuildProductsPath("simulator");
+
+      expect(result.success).toBe(true);
+      expect(buildProducts).toBe(path.join(derivedDataPath, "Build", "Products", "Debug-iphonesimulator"));
+    });
+
+    test("should redownload when version changes without checksum", async function() {
+      const derivedDataPath = path.join(tempDir, "DerivedData");
+      const cacheDir = path.join(tempDir, "cache");
+      await fs.mkdir(cacheDir, { recursive: true });
+
+      const existingBundle = path.join(cacheDir, "XCTestService.ipa");
+      await fs.writeFile(existingBundle, "a".repeat(12000));
+      await fs.writeFile(
+        path.join(cacheDir, "xctestservice-bundle.json"),
+        JSON.stringify({ checksum: null, version: "old", extractedAt: new Date().toISOString() })
+      );
+
+      const downloader = new FakeXCTestServiceBundleDownloader();
+      XCTestServiceBuilder.setExpectedChecksumForTesting("");
+      const builder = XCTestServiceBuilder.getInstance(
+        {
+          derivedDataPath,
+          bundleCacheDir: cacheDir
+        },
+        { downloader }
+      );
+
+      const result = await builder.build("simulator");
+
+      expect(result.success).toBe(true);
+      expect(downloader.downloadedUrls.length).toBe(1);
+    });
   });
 });
