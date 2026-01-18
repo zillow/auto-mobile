@@ -537,6 +537,38 @@ init_request=$(jq -c -n \
 send_request "${init_request}"
 read_for_id 1 >/dev/null
 
+# Run doctor diagnostics for Android
+echo -e "${GREEN}Running doctor diagnostics...${NC}"
+doctor_request=$(jq -c -n \
+  '{"jsonrpc":"2.0","id":100,"method":"tools/call","params":{"name":"doctor","arguments":{"android":true}}}')
+send_request "${doctor_request}"
+doctor_response="$(read_for_id 100)"
+
+if echo "${doctor_response}" | jq -e '.error' >/dev/null 2>&1; then
+  echo -e "${YELLOW}doctor returned error:${NC}"
+  echo "${doctor_response}" | jq -r '.error.message // .error' >&2
+else
+  doctor_payload="$(echo "${doctor_response}" | jq -r '.result.content[0].text')"
+  total_checks="$(echo "${doctor_payload}" | jq -r '.summary.total // 0')"
+  passed_checks="$(echo "${doctor_payload}" | jq -r '.summary.passed // 0')"
+  failed_checks="$(echo "${doctor_payload}" | jq -r '.summary.failed // 0')"
+  warn_checks="$(echo "${doctor_payload}" | jq -r '.summary.warnings // 0')"
+  if [[ "${failed_checks}" -gt 0 ]]; then
+    echo -e "${RED}doctor: ${passed_checks}/${total_checks} passed, ${failed_checks} failed, ${warn_checks} warnings${NC}"
+  elif [[ "${warn_checks}" -gt 0 ]]; then
+    echo -e "${YELLOW}doctor: ${passed_checks}/${total_checks} passed, ${warn_checks} warnings${NC}"
+  else
+    echo -e "${GREEN}doctor: ${passed_checks}/${total_checks} passed${NC}"
+  fi
+  # Show any failed or warning checks
+  echo "${doctor_payload}" | jq -r '
+    [.system.checks[]?, .android.checks[]?, .autoMobile.checks[]?]
+    | map(select(.status == "fail" or .status == "warn"))
+    | .[]
+    | "  - \(.name): \(.status) - \(.message // "")"
+  ' 2>/dev/null || true
+fi
+
 list_request=$(jq -c -n \
   '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"listDeviceImages","arguments":{"platform":"android"}}}')
 send_request "${list_request}"
