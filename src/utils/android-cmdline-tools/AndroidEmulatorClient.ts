@@ -6,6 +6,7 @@ import { AdbClient } from "./AdbClient";
 import { AdbExecutor } from "./interfaces/AdbExecutor";
 import { arch } from "os";
 import { detectAndroidCommandLineTools, getBestAndroidToolsLocation } from "./detection";
+import { defaultTimer, Timer } from "../SystemTimer";
 
 /**
  * Interface for Android Emulator (AVD) management
@@ -95,6 +96,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
   private execAsync: (command: string) => Promise<ExecResult>;
   private spawnFn: typeof spawn;
   private emulatorPath: string;
+  private timer: Timer;
 
   /**
    * Create an AndroidEmulatorClient instance
@@ -103,10 +105,12 @@ export class AndroidEmulatorClient implements AndroidEmulator {
    */
   constructor(
     execAsyncFn: ((command: string) => Promise<ExecResult>) | null = null,
-    spawnFn: typeof spawn | null = null
+    spawnFn: typeof spawn | null = null,
+    timer: Timer = defaultTimer
   ) {
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
+    this.timer = timer;
     // Only set a fallback emulator path here; proper detection happens lazily
     this.emulatorPath = this.getFallbackEmulatorPath();
   }
@@ -908,6 +912,6 @@ export class AndroidEmulatorClient implements AndroidEmulator {
    * @param ms - Milliseconds to sleep
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return this.timer.sleep(ms);
   }
 }

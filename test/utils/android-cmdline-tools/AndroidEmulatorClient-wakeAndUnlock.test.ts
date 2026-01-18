@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { AndroidEmulatorClient } from "../../../src/utils/android-cmdline-tools/AndroidEmulatorClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { ExecResult } from "../../../src/models";
+import { FakeTimer } from "../../fakes/FakeTimer";
 
 describe("AndroidEmulatorClient wakeAndUnlock", () => {
   let emulatorClient: AndroidEmulatorClient;
   let fakeAdb: FakeAdbExecutor;
+  let fakeTimer: FakeTimer;
 
   const createExecResult = (stdout: string, stderr: string = ""): ExecResult => ({
     stdout,
@@ -21,7 +23,8 @@ describe("AndroidEmulatorClient wakeAndUnlock", () => {
 
   beforeEach(() => {
     fakeAdb = new FakeAdbExecutor();
-    emulatorClient = new AndroidEmulatorClient(mockExecAsync, null);
+    fakeTimer = new FakeTimer();
+    emulatorClient = new AndroidEmulatorClient(mockExecAsync, null, fakeTimer);
   });
 
   test("should wake device and dismiss keyguard when device is Asleep", async () => {
