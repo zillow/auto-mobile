@@ -72,6 +72,7 @@ markdown_extensions:
 
 nav:
   - 'Overview': index.md
+  - 'Origin': origin.md
   - 'Install':
       - 'Overview': install/overview.md
       - 'Platform Specific':
@@ -127,6 +128,7 @@ nav:
             - 'Accessibility Service': design-docs/plat/android/accessibility-service.md
             - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
             - 'JUnitRunner': design-docs/plat/android/junitrunner.md
+            - 'Docker': design-docs/plat/android/docker.md
             - 'Multi-device': design-docs/plat/android/multi-device.md
             - 'IDE Plugin':
               - 'Overview': design-docs/plat/android/ide-plugin/overview.md
@@ -157,8 +159,10 @@ nav:
               - 'Overview': design-docs/plat/ios/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/ios/ide-plugin/test-recording.md
   - 'Contributing':
+      - 'Overview': contributing/overview.md
       - 'How': contributing/index.md
       - 'Local Development': contributing/local-development.md
+      - 'iOS Signing': contributing/ios-signing.md
       - 'npm Publishing': contributing/publishing.md
       - 'Docker Hub Publishing': docker-hub-setup.md
       - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions

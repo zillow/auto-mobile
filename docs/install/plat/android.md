@@ -1,7 +1,7 @@
 # Android
 
 !!! tip "First time?"
-    Start with the [interactive installer](../overview.md#interactive-installer).
+    Start with the [interactive installer](../overview.md#interactive-installer-macos).
 
 ## Prerequisites
 

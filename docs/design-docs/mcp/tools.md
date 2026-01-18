@@ -47,7 +47,7 @@ Almost all other tool calls have built-in observation via the [interaction loop]
 - ❌ `killDevice` terminates a running device.
 - 🔧 `setActiveDevice` sets the active device for subsequent operations.
 
-#### Testing & Debugging
+#### Testing & Debugging {#testing-debugging}
 
 - 🧪 `executePlan` (daemon mode only) executes a series of tool calls from a YAML plan content, stopping if any step fails.
 - 🔒 `criticalSection` (daemon mode only) coordinates multiple devices at a synchronization barrier for serialized steps.
