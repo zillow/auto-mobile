@@ -35,4 +35,5 @@ Thank you for your interest in contributing to AutoMobile!
 ## Related
 
 - [Local Development](local-development.md) - Development environment setup
+- [iOS Signing](ios-signing.md) - XCTestRunner signing setup for CI
 - [Publishing](publishing.md) - npm package publishing guide

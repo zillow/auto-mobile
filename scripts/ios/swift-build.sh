@@ -89,6 +89,18 @@ for package in "${MACOS_PACKAGES[@]}"; do
 done
 echo ""
 
+# Optional: sign macOS products with Developer ID when credentials are available.
+if [[ "${MACOS_SIGNING_ENABLED:-false}" == "true" ]]; then
+    echo -e "${BLUE}Signing macOS products for release builds...${NC}"
+    if "${SCRIPT_DIR}/sign-macos-products.sh"; then
+        print_status 0 "macOS products signed successfully"
+    else
+        print_status 1 "macOS product signing failed"
+        FAILED_PACKAGES+=("macOS product signing")
+    fi
+    echo ""
+fi
+
 # Build iOS + macOS packages (build for macOS platform on CI)
 echo -e "${BLUE}Building iOS + macOS packages...${NC}"
 for package in "${IOS_MACOS_PACKAGES[@]}"; do
@@ -125,6 +137,18 @@ for package in "${IOS_ONLY_PACKAGES[@]}"; do
     fi
 done
 echo ""
+
+# Optional: sign XCTestRunner for iOS releases when credentials are available.
+if [[ "${IOS_SIGNING_ENABLED:-false}" == "true" ]]; then
+    echo -e "${BLUE}Signing iOS frameworks for release builds...${NC}"
+    if "${SCRIPT_DIR}/sign-ios-frameworks.sh"; then
+        print_status 0 "iOS frameworks signed successfully"
+    else
+        print_status 1 "iOS framework signing failed"
+        FAILED_PACKAGES+=("iOS framework signing")
+    fi
+    echo ""
+fi
 
 # Summary
 echo -e "${CYAN}========================================${NC}"

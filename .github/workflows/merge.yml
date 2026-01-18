@@ -186,7 +186,32 @@ jobs:
         with:
           xcode-version: ${{ matrix.config.xcode }}
 
+      - name: "Install macOS Developer ID certificate"
+        if: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 != '' }}
+        env:
+          MACOS_DEVELOPER_ID_CERT_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 }}
+          MACOS_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_CERT_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+        run: ./scripts/ios/setup-macos-signing-keychain.sh
+
+      - name: "Install iOS signing certificate"
+        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: ./scripts/ios/setup-signing-keychain.sh
+
       - name: "Build Swift Packages"
+        env:
+          MACOS_SIGNING_ENABLED: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 != '' }}
+          MACOS_DEVELOPER_ID_SIGNING_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_SIGNING_IDENTITY }}
+          MACOS_DEVELOPER_ID_TEAM_ID: ${{ secrets.MACOS_DEVELOPER_ID_TEAM_ID }}
+          MACOS_SIGNING_STRICT: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 != '' }}
+          IOS_SIGNING_ENABLED: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+          IOS_SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY }}
+          IOS_SIGNING_TEAM_ID: ${{ secrets.IOS_SIGNING_TEAM_ID }}
+          IOS_SIGNING_STRICT: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
         run: ./scripts/ios/swift-build.sh
 
   ios-swift-test:
