@@ -339,6 +339,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     }
 
     this.clearCaches();
+    PortManager.release(this.device.deviceId);
     this.isStopping = false;
     logger.info("[XCTestServiceManager] Service stopped");
   }
@@ -657,10 +658,10 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
 
     await this.stopIproxyTunnel();
 
-    logger.info(`[XCTestServiceManager] Starting iproxy tunnel (localhost:${this.servicePort} -> device:${IOSXCTestServiceManager.DEFAULT_PORT})`);
+    logger.info(`[XCTestServiceManager] Starting iproxy tunnel (localhost:${this.servicePort} -> device:${this.servicePort})`);
     const child = this.processExecutor.spawn(
       "iproxy",
-      [String(this.servicePort), String(IOSXCTestServiceManager.DEFAULT_PORT), this.device.deviceId],
+      [String(this.servicePort), String(this.servicePort), this.device.deviceId],
       { stdio: ["ignore", "pipe", "pipe"] }
     );
 

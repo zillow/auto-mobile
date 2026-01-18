@@ -130,7 +130,7 @@ describe("IOSXCTestServiceManager", function() {
       expect(spawns[0].command).toBe("iproxy");
       expect(spawns[0].args).toEqual([
         String(manager.getServicePort()),
-        String(IOSXCTestServiceManager.DEFAULT_PORT),
+        String(manager.getServicePort()),
         physicalDevice.deviceId
       ]);
     });
