@@ -3,12 +3,18 @@ import { DevicePool } from "../../src/daemon/devicePool";
 import { SessionManager } from "../../src/daemon/sessionManager";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
+import { BootedDevice } from "../../src/models";
 
 describe("DevicePool", () => {
   let devicePool: DevicePool;
   let sessionManager: SessionManager;
   let fakeTimer: FakeTimer;
   let fakeAppsRepo: FakeInstalledAppsRepository;
+  const createBootedDevice = (deviceId: string): BootedDevice => ({
+    name: deviceId,
+    platform: "android",
+    deviceId
+  });
 
   beforeEach(() => {
     sessionManager = new SessionManager();
@@ -25,7 +31,7 @@ describe("DevicePool", () => {
     });
 
     test("should initialize with single device", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       expect(devicePool.getTotalDeviceCount()).toBe(1);
       expect(devicePool.getAvailableDeviceCount()).toBe(1);
       const device = devicePool.getDevice("emulator-5554");
@@ -38,7 +44,7 @@ describe("DevicePool", () => {
 
     test("should initialize with multiple devices", async () => {
       const deviceIds = ["emulator-5554", "emulator-5556", "emulator-5558"];
-      await devicePool.initializeWithDevices(deviceIds);
+      await devicePool.initializeWithDevices(deviceIds.map(createBootedDevice));
       expect(devicePool.getTotalDeviceCount()).toBe(3);
       expect(devicePool.getAvailableDeviceCount()).toBe(3);
       for (const deviceId of deviceIds) {
@@ -52,7 +58,7 @@ describe("DevicePool", () => {
 
   describe("assignDeviceToSession", () => {
     test("should assign device to session when devices available", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const deviceId = await devicePool.assignDeviceToSession("session-1");
       expect(deviceId).toBe("emulator-5554");
       const device = devicePool.getDevice("emulator-5554");
@@ -66,7 +72,7 @@ describe("DevicePool", () => {
       // Use manual mode so we can control time advancement
       fakeTimer.setManualMode();
 
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       await devicePool.assignDeviceToSession("session-1");
 
       // Start the second assignment (will wait for a device)
@@ -93,7 +99,7 @@ describe("DevicePool", () => {
       // Use manual mode so we can control time advancement
       fakeTimer.setManualMode();
 
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const device1 = await devicePool.assignDeviceToSession("session-1");
 
       // Start the second assignment (will wait for a device)
@@ -119,7 +125,7 @@ describe("DevicePool", () => {
 
     test("should assign different devices to different sessions", async () => {
       const deviceIds = ["emulator-5554", "emulator-5556"];
-      await devicePool.initializeWithDevices(deviceIds);
+      await devicePool.initializeWithDevices(deviceIds.map(createBootedDevice));
       const device1 = await devicePool.assignDeviceToSession("session-1");
       const device2 = await devicePool.assignDeviceToSession("session-2");
       expect(device1).not.toBe(device2);
@@ -127,7 +133,7 @@ describe("DevicePool", () => {
     });
 
     test("should reuse device after session release", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const device1 = await devicePool.assignDeviceToSession("session-1");
       await devicePool.releaseDevice(device1);
       const device2 = await devicePool.assignDeviceToSession("session-2");
@@ -137,7 +143,7 @@ describe("DevicePool", () => {
 
   describe("releaseDevice", () => {
     test("should release device assigned to session", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const deviceId = await devicePool.assignDeviceToSession("session-1");
       await devicePool.releaseDevice(deviceId);
       const device = devicePool.getDevice(deviceId);
@@ -147,7 +153,7 @@ describe("DevicePool", () => {
     });
 
     test("should handle release of already idle device", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const device = devicePool.getDevice("emulator-5554");
       expect(device?.status).toBe("idle");
       await devicePool.releaseDevice("emulator-5554");
@@ -162,7 +168,7 @@ describe("DevicePool", () => {
 
   describe("error tracking", () => {
     test("should record device error and increment error count", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const device = devicePool.getDevice("emulator-5554");
       expect(device?.errorCount).toBe(0);
       devicePool.recordDeviceError("emulator-5554");
@@ -171,7 +177,7 @@ describe("DevicePool", () => {
     });
 
     test("should mark device as error after max consecutive errors", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       const device = devicePool.getDevice("emulator-5554");
       // Record 5 errors to reach MAX_DEVICE_ERRORS (5)
       for (let i = 0; i < 5; i++) {
@@ -182,7 +188,7 @@ describe("DevicePool", () => {
     });
 
     test("should clear error count when device assignment succeeds", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
       devicePool.recordDeviceError("emulator-5554");
       expect(devicePool.getDevice("emulator-5554")?.errorCount).toBe(1);
       await devicePool.releaseDevice("emulator-5554");
@@ -199,7 +205,7 @@ describe("DevicePool", () => {
   describe("statistics", () => {
     test("should return correct pool statistics", async () => {
       const deviceIds = ["emulator-5554", "emulator-5556", "emulator-5558"];
-      await devicePool.initializeWithDevices(deviceIds);
+      await devicePool.initializeWithDevices(deviceIds.map(createBootedDevice));
 
       // Assign all 3 devices
       await devicePool.assignDeviceToSession("session-1");
@@ -216,7 +222,7 @@ describe("DevicePool", () => {
 
   describe("session tracking", () => {
     test("should set session tracking when device is initialized", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
 
       // Verify setSessionTracking was called
       const apps = await fakeAppsRepo.listInstalledApps("emulator-5554");
@@ -225,7 +231,7 @@ describe("DevicePool", () => {
     });
 
     test("should clear cache when device is removed", async () => {
-      await devicePool.initializeWithDevices(["emulator-5554"]);
+      await devicePool.initializeWithDevices([createBootedDevice("emulator-5554")]);
 
       // Add some fake cache data
       await fakeAppsRepo.upsertInstalledApp("emulator-5554", 0, "com.test.app", false, Date.now());
@@ -244,7 +250,7 @@ describe("DevicePool", () => {
       expect(initialApps).toEqual([]);
 
       // Add device and verify tracking works
-      await devicePool.addDevice("test-device");
+      await devicePool.addDevice(createBootedDevice("test-device"));
       const appsAfter = await fakeAppsRepo.listInstalledApps("test-device");
       expect(appsAfter).toEqual([]);
     });

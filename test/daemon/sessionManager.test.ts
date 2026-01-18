@@ -18,7 +18,7 @@ describe("SessionManager", () => {
 
   describe("createSession", () => {
     test("should create new session with assigned device", async () => {
-      const session = await sessionManager.createSession("session-1", "emulator-5554");
+      const session = await sessionManager.createSession("session-1", "emulator-5554", "android");
       expect(session.sessionId).toBe("session-1");
       expect(session.assignedDevice).toBe("emulator-5554");
       expect(session.cacheData).toEqual({});
@@ -28,8 +28,8 @@ describe("SessionManager", () => {
     });
 
     test("should return existing session if already created", async () => {
-      const session1 = await sessionManager.createSession("session-1", "emulator-5554");
-      const session2 = await sessionManager.createSession("session-1", "emulator-5556");
+      const session1 = await sessionManager.createSession("session-1", "emulator-5554", "android");
+      const session2 = await sessionManager.createSession("session-1", "emulator-5556", "android");
       expect(session1.sessionId).toBe(session2.sessionId);
       expect(session1.assignedDevice).toBe("emulator-5554");
       expect(session2.assignedDevice).toBe("emulator-5554"); // Should return original
@@ -37,7 +37,7 @@ describe("SessionManager", () => {
 
     test("should set correct expiration time for session", async () => {
       const beforeCreate = fakeTimer.now();
-      const session = await sessionManager.createSession("session-1", "emulator-5554");
+      const session = await sessionManager.createSession("session-1", "emulator-5554", "android");
       const expectedExpiry = beforeCreate + 30 * 60 * 1000; // 30 minutes
       expect(session.expiresAt).toBe(expectedExpiry);
     });
@@ -45,14 +45,14 @@ describe("SessionManager", () => {
 
   describe("getOrCreateSession", () => {
     test("should return existing session without creating new one", async () => {
-      await sessionManager.createSession("session-1", "emulator-5554");
+      await sessionManager.createSession("session-1", "emulator-5554", "android");
       const session = await sessionManager.getOrCreateSession("session-1");
       expect(session.sessionId).toBe("session-1");
       expect(sessionManager.getActiveSessionCount()).toBe(1);
     });
 
     test("should update last used time when getting session", async () => {
-      const session1 = await sessionManager.createSession("session-1", "emulator-5554");
+      const session1 = await sessionManager.createSession("session-1", "emulator-5554", "android");
       const initialLastUsed = session1.lastUsedAt;
       const initialExpiry = session1.expiresAt;
       fakeTimer.advanceTime(10);
@@ -72,7 +72,7 @@ describe("SessionManager", () => {
     });
 
     test("should return null session when expired session requested", async () => {
-      const session = await sessionManager.createSession("session-1", "emulator-5554");
+      const session = await sessionManager.createSession("session-1", "emulator-5554", "android");
       // Force expiration by setting expiresAt to past
       fakeTimer.advanceTime(2000);
       const oneSecondAgo = fakeTimer.now() - 1000;
@@ -84,7 +84,7 @@ describe("SessionManager", () => {
 
   describe("cache management", () => {
     test("should update session cache data", async () => {
-      await sessionManager.createSession("session-1", "emulator-5554");
+      await sessionManager.createSession("session-1", "emulator-5554", "android");
       sessionManager.updateSessionCache("session-1", {
         lastHierarchy: "test-hierarchy",
         lastScreenshot: "base64-data",
@@ -95,7 +95,7 @@ describe("SessionManager", () => {
     });
 
     test("should get session cache without modifying other fields", async () => {
-      await sessionManager.createSession("session-1", "emulator-5554");
+      await sessionManager.createSession("session-1", "emulator-5554", "android");
       sessionManager.updateSessionCache("session-1", {
         customData: { key: "value" },
       });
@@ -109,7 +109,7 @@ describe("SessionManager", () => {
     });
 
     test("should clear specific cache key", async () => {
-      await sessionManager.createSession("session-1", "emulator-5554");
+      await sessionManager.createSession("session-1", "emulator-5554", "android");
       sessionManager.updateSessionCache("session-1", {
         lastHierarchy: "test-hierarchy",
         lastScreenshot: "base64-data",
@@ -121,7 +121,7 @@ describe("SessionManager", () => {
     });
 
     test("should clear all cache when no key specified", async () => {
-      await sessionManager.createSession("session-1", "emulator-5554");
+      await sessionManager.createSession("session-1", "emulator-5554", "android");
       sessionManager.updateSessionCache("session-1", {
         lastHierarchy: "test-hierarchy",
         lastScreenshot: "base64-data",
@@ -135,7 +135,7 @@ describe("SessionManager", () => {
 
   describe("releaseSession", () => {
     test("should release session and return device id", async () => {
-      await sessionManager.createSession("session-1", "emulator-5554");
+      await sessionManager.createSession("session-1", "emulator-5554", "android");
       const deviceId = await sessionManager.releaseSession("session-1");
       expect(deviceId).toBe("emulator-5554");
       expect(sessionManager.getSession("session-1")).toBeNull();
@@ -149,8 +149,8 @@ describe("SessionManager", () => {
 
   describe("statistics", () => {
     test("should return correct session statistics", async () => {
-      await sessionManager.createSession("session-1", "emulator-5554");
-      await sessionManager.createSession("session-2", "emulator-5556");
+      await sessionManager.createSession("session-1", "emulator-5554", "android");
+      await sessionManager.createSession("session-2", "emulator-5556", "android");
       const stats = sessionManager.getStats();
       expect(stats.totalSessions).toBe(2);
       expect(stats.activeSessions).toBe(2);

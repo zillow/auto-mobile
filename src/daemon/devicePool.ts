@@ -1,6 +1,6 @@
 import { logger } from "../utils/logger";
 import { SessionManager } from "./sessionManager";
-import { ActionableError } from "../models";
+import { ActionableError, BootedDevice, Platform } from "../models";
 import { Mutex } from "async-mutex";
 import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
@@ -19,6 +19,8 @@ export type DeviceStatus = "idle" | "busy" | "error";
  */
 export interface PooledDevice {
   id: string;                    // Device ID (e.g., "emulator-5554")
+  name: string;                  // Device name (e.g., "Pixel 7")
+  platform: Platform;            // Device platform
   sessionId: string | null;      // Session currently using it, null if idle
   status: DeviceStatus;          // Current status
   lastUsedAt: number;            // Last usage timestamp
@@ -76,23 +78,25 @@ export class DevicePool {
    * Call this once after daemon starts to populate the device list.
    * Typically gets devices from --device-list or by querying emulator status.
    */
-  async initializeWithDevices(deviceIds: string[]): Promise<void> {
+  async initializeWithDevices(devices: BootedDevice[]): Promise<void> {
     const now = this.seedLastUsedAt(this.timer.now());
 
-    for (const deviceId of deviceIds) {
-      this.devices.set(deviceId, {
-        id: deviceId,
+    for (const device of devices) {
+      this.devices.set(device.deviceId, {
+        id: device.deviceId,
+        name: device.name,
+        platform: device.platform,
         sessionId: null,
         status: "idle",
         lastUsedAt: now,
         assignmentCount: 0,
         errorCount: 0,
       });
-      this.deviceSessionStarts.set(deviceId, now);
-      await this.setDeviceSessionTracking(deviceId, now);
+      this.deviceSessionStarts.set(device.deviceId, now);
+      await this.setDeviceSessionTracking(device.deviceId, now);
     }
 
-    logger.info(`Device pool initialized with ${deviceIds.length} devices`);
+    logger.info(`Device pool initialized with ${devices.length} devices`);
   }
 
   /**
@@ -115,7 +119,7 @@ export class DevicePool {
       logger.info(`Environment: ANDROID_HOME=${androidHome}, ANDROID_SDK_ROOT=${androidSdkRoot}`);
 
       const deviceManager = new MultiPlatformDeviceManager();
-      const bootedDevices = await deviceManager.getBootedDevices("android");
+      const bootedDevices = await deviceManager.getBootedDevices("either");
       const discoveryTime = Date.now() - startTime;
       logger.info(`Device discovery completed in ${discoveryTime}ms, found ${bootedDevices.length} devices`);
 
@@ -126,6 +130,8 @@ export class DevicePool {
         if (!this.devices.has(device.deviceId)) {
           this.devices.set(device.deviceId, {
             id: device.deviceId,
+            name: device.name,
+            platform: device.platform,
             sessionId: null,
             status: "idle",
             lastUsedAt: now,
@@ -162,25 +168,27 @@ export class DevicePool {
   /**
    * Add a new device to the pool
    */
-  async addDevice(deviceId: string): Promise<void> {
-    if (this.devices.has(deviceId)) {
-      logger.warn(`Device ${deviceId} already in pool`);
+  async addDevice(device: BootedDevice): Promise<void> {
+    if (this.devices.has(device.deviceId)) {
+      logger.warn(`Device ${device.deviceId} already in pool`);
       return;
     }
 
     const now = this.seedLastUsedAt(this.timer.now());
-    this.devices.set(deviceId, {
-      id: deviceId,
+    this.devices.set(device.deviceId, {
+      id: device.deviceId,
+      name: device.name,
+      platform: device.platform,
       sessionId: null,
       status: "idle",
       lastUsedAt: now,
       assignmentCount: 0,
       errorCount: 0,
     });
-    this.deviceSessionStarts.set(deviceId, now);
-    await this.setDeviceSessionTracking(deviceId, now);
+    this.deviceSessionStarts.set(device.deviceId, now);
+    await this.setDeviceSessionTracking(device.deviceId, now);
 
-    logger.info(`Added device ${deviceId} to pool`);
+    logger.info(`Added device ${device.deviceId} to pool`);
   }
 
   /**
@@ -216,7 +224,8 @@ export class DevicePool {
    */
   async assignMultipleDevices(
     sessionIds: string[],
-    timeoutMs: number = 300000
+    timeoutMs: number = 300000,
+    platform?: Platform
   ): Promise<Map<string, string>> {
     const startTime = this.timer.now();
     const assignments = new Map<string, string>();
@@ -229,7 +238,7 @@ export class DevicePool {
 
     // Validate we have enough devices
     await this.ensurePoolRefreshed();
-    const stats = this.getStats();
+    const stats = this.getStatsForPlatform(platform);
 
     if (stats.total < requiredCount) {
       throw new ActionableError(
@@ -240,7 +249,7 @@ export class DevicePool {
         `  Assigned: ${stats.assigned}\n` +
         `  Error: ${stats.error}\n\n` +
         `Suggestions:\n` +
-        `  - Start ${requiredCount - stats.total} more emulator(s) or connect more devices\n` +
+        `  - Start ${requiredCount - stats.total} more emulator(s) or simulators\n` +
         `  - Reduce the number of devices required in the test plan\n` +
         `  - Verify ADB is working: adb devices`
       );
@@ -260,7 +269,7 @@ export class DevicePool {
         for (const deviceId of assignments.values()) {
           await this.releaseDevice(deviceId);
         }
-        const currentStats = this.getStats();
+        const currentStats = this.getStatsForPlatform(platform);
         throw new ActionableError(
           `Timed out allocating devices after ${Math.round(elapsed / 1000)}s (${attemptCount} attempts).\n` +
           `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
@@ -281,7 +290,7 @@ export class DevicePool {
       const sessionIndex = assigned.size;
       const sessionId = sessionIds[sessionIndex];
 
-      const result = await this.tryAssignDevice(sessionId);
+      const result = await this.tryAssignDevice(sessionId, platform);
 
       if (result.success) {
         assigned.add(sessionId);
@@ -293,7 +302,7 @@ export class DevicePool {
       } else if (!result.shouldWait) {
         // No devices at all - this shouldn't happen as we checked earlier
         // but handle it gracefully
-        const currentStats = this.getStats();
+        const currentStats = this.getStatsForPlatform(platform);
         throw new ActionableError(
           `Failed to allocate devices: no devices available.\n` +
           `Required: ${requiredCount} devices, allocated: ${assigned.size}\n` +
@@ -303,9 +312,9 @@ export class DevicePool {
           `  Assigned: ${currentStats.assigned}\n` +
           `  Error: ${currentStats.error}\n\n` +
           `Suggestions:\n` +
-          `  - Start an emulator or connect a physical device\n` +
-          `  - Check device pool status: auto-mobile --cli listDevices --platform android\n` +
-          `  - Verify ADB is working: adb devices`
+          `  - Start an emulator or simulator\n` +
+          `  - Check device pool status: auto-mobile --cli listDevices\n` +
+          `  - Verify device tooling is working for the selected platform`
         );
       } else {
         // Devices busy - wait and retry
@@ -370,7 +379,7 @@ export class DevicePool {
    * When all devices are busy, waits with timeout for a device to become available.
    * This enables parallel test execution with limited devices.
    */
-  async assignDeviceToSession(sessionId: string): Promise<string> {
+  async assignDeviceToSession(sessionId: string, platform?: Platform): Promise<string> {
     logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: assignDeviceToSession called for session ${sessionId}`);
     logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Current devices.size: ${this.devices.size}`);
     logger.info(`[DEVICE-POOL-DEBUG] Instance #${this.instanceId}: Device IDs: ${Array.from(this.devices.keys()).join(", ")}`);
@@ -383,7 +392,7 @@ export class DevicePool {
 
       // Check timeout
       if (elapsed > this.DEVICE_WAIT_TIMEOUT_MS) {
-        const stats = this.getStats();
+        const stats = this.getStatsForPlatform(platform);
         throw new ActionableError(
           `Timed out waiting for device after ${Math.round(elapsed / 1000)}s (${attemptCount} attempts).\n` +
           `Session: ${sessionId}\n` +
@@ -400,7 +409,7 @@ export class DevicePool {
       }
 
       // Try to assign device (mutex ensures atomic assignment)
-      const result = await this.tryAssignDevice(sessionId);
+      const result = await this.tryAssignDevice(sessionId, platform);
 
       if (result.success) {
         if (attemptCount > 1) {
@@ -424,7 +433,7 @@ export class DevicePool {
         await this.timer.sleep(this.DEVICE_WAIT_INTERVAL_MS);
       } else {
         // No devices at all - fail immediately
-        const stats = this.getStats();
+        const stats = this.getStatsForPlatform(platform);
         throw new ActionableError(
           `No devices in pool to assign to session ${sessionId}.\n` +
           `Device pool status:\n` +
@@ -434,8 +443,8 @@ export class DevicePool {
           `  Error: ${stats.error}\n\n` +
           `Suggestions:\n` +
           `  - Start an emulator or connect a physical device\n` +
-          `  - Check device pool status: auto-mobile --cli listDevices --platform android\n` +
-          `  - Verify ADB is working: adb devices`
+          `  - Check device pool status: auto-mobile --cli listDevices\n` +
+          `  - Verify device tooling is working for the selected platform`
         );
       }
     }
@@ -446,7 +455,7 @@ export class DevicePool {
    *
    * Returns success status and whether caller should wait and retry.
    */
-  private async tryAssignDevice(sessionId: string): Promise<{
+  private async tryAssignDevice(sessionId: string, platform?: Platform): Promise<{
     success: boolean;
     deviceId?: string;
     shouldWait: boolean;
@@ -456,8 +465,11 @@ export class DevicePool {
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: devices.size = ${this.devices.size}`);
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: device IDs = ${Array.from(this.devices.keys()).join(", ")}`);
 
+      const candidates = this.getDevicesByPlatform(platform);
+      const totalDevices = candidates.length;
+
       // Find idle devices and prefer most recently released for reuse
-      const idleDevices = Array.from(this.devices.values()).filter(d => d.status === "idle");
+      const idleDevices = candidates.filter(d => d.status === "idle");
       let device: PooledDevice | undefined;
       if (idleDevices.length > 0) {
         if (this.lastReleasedDeviceId) {
@@ -480,17 +492,16 @@ export class DevicePool {
         logger.info(`[DEVICE-POOL-DEBUG] Auto-refresh added ${addedCount} devices`);
         if (addedCount > 0) {
           // Try again after refresh
-          device = Array.from(this.devices.values()).find(d => d.status === "idle");
+          device = this.getDevicesByPlatform(platform).find(d => d.status === "idle");
           logger.info(`[DEVICE-POOL-DEBUG] After refresh, found idle device = ${device?.id || "none"}`);
         }
       }
 
-      const totalDevices = this.devices.size;
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: totalDevices = ${totalDevices}`);
 
       if (!device) {
         // No idle device - check if devices exist but are busy
-        const busyDevices = Array.from(this.devices.values()).filter(
+        const busyDevices = candidates.filter(
           d => d.status === "busy"
         ).length;
 
@@ -509,7 +520,7 @@ export class DevicePool {
       device.errorCount = 0; // Reset errors on successful assignment
 
       // Create session in SessionManager
-      await this.sessionManager.createSession(sessionId, device.id);
+      await this.sessionManager.createSession(sessionId, device.id, device.platform);
 
       logger.info(`Assigned device ${device.id} to session ${sessionId}`);
 
@@ -643,6 +654,32 @@ export class DevicePool {
    */
   getAllDevices(): PooledDevice[] {
     return Array.from(this.devices.values());
+  }
+
+  private getDevicesByPlatform(platform?: Platform): PooledDevice[] {
+    if (!platform) {
+      return this.getAllDevices();
+    }
+    return Array.from(this.devices.values()).filter(device => device.platform === platform);
+  }
+
+  private getStatsForPlatform(platform?: Platform): {
+    total: number;
+    idle: number;
+    assigned: number;
+    error: number;
+  } {
+    const devices = this.getDevicesByPlatform(platform);
+    const idle = devices.filter(device => device.status === "idle").length;
+    const assigned = devices.filter(device => device.status === "busy").length;
+    const error = devices.filter(device => device.status === "error").length;
+
+    return {
+      total: devices.length,
+      idle,
+      assigned,
+      error,
+    };
   }
 
   /**

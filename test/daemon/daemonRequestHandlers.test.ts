@@ -106,7 +106,7 @@ describe("handleDaemonRequest", () => {
     const state = new FakeDaemonState(sessionManager, devicePool);
     const sessionId = "session-1";
     const deviceId = "emulator-5554";
-    const session = await sessionManager.createSession(sessionId, deviceId);
+    const session = await sessionManager.createSession(sessionId, deviceId, "android");
 
     const response = await handleDaemonRequest(
       buildRequest("daemon/sessionInfo", { sessionId }),
@@ -117,6 +117,7 @@ describe("handleDaemonRequest", () => {
     expect(response.result).toEqual({
       sessionId,
       assignedDevice: deviceId,
+      platform: "android",
       createdAt: session.createdAt,
       lastUsedAt: session.lastUsedAt,
       expiresAt: session.expiresAt,
@@ -154,7 +155,7 @@ describe("handleDaemonRequest", () => {
     const state = new FakeDaemonState(sessionManager, devicePool);
     const sessionId = "session-2";
     const deviceId = "emulator-5556";
-    await sessionManager.createSession(sessionId, deviceId);
+    await sessionManager.createSession(sessionId, deviceId, "android");
 
     const response = await handleDaemonRequest(
       buildRequest("daemon/releaseSession", { sessionId }),

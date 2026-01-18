@@ -169,22 +169,28 @@ class ToolRegistryClass {
         sessionUuid,
       });
 
+      // Extract platform from args, default to "either" for backward compatibility
+      let platform: SomePlatform = args.platform || "either";
+
       // If session UUID provided, resolve device from session
       if (shouldResolveDevice && sessionUuid && DaemonState.getInstance().isInitialized()) {
         logger.info(`[ToolRegistry] Entering session-based device assignment for ${sessionUuid}`);
         const sessionManager = DaemonState.getInstance().getSessionManager();
         const devicePool = DaemonState.getInstance().getDevicePool();
-        const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool, { keepScreenAwake });
+        const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool, {
+          keepScreenAwake,
+          platform: platform === "android" || platform === "ios" ? platform : undefined
+        });
         if (context.deviceId && !providedDeviceId) {
           providedDeviceId = context.deviceId;
           logger.info(`[ToolRegistry] Resolved device from session: ${providedDeviceId}`);
         }
+        if (platform === "either" && context.devicePlatform) {
+          platform = context.devicePlatform;
+        }
       } else if (sessionUuid) {
         logger.warn(`[ToolRegistry] SessionUuid provided but DaemonState not initialized!`);
       }
-
-      // Extract platform from args, default to "android" for backward compatibility
-      const platform: SomePlatform = args.platform || "either";
 
       let device: BootedDevice | undefined;
       if (shouldResolveDevice) {
@@ -285,7 +291,10 @@ class ToolRegistryClass {
         if (shouldResolveDevice && sessionUuid && DaemonState.getInstance().isInitialized()) {
           const sessionManager = DaemonState.getInstance().getSessionManager();
           const devicePool = DaemonState.getInstance().getDevicePool();
-          const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool, { keepScreenAwake });
+          const context = await createToolExecutionContext(sessionUuid, sessionManager, devicePool, {
+            keepScreenAwake,
+            platform: platform === "android" || platform === "ios" ? platform : undefined
+          });
 
           // Cache observation data for certain tools to reduce API calls
           if (name === "observe" && response?.viewHierarchy) {

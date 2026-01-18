@@ -671,13 +671,11 @@ export class Daemon {
   private async initializeDevicePool(): Promise<void> {
     try {
       const deviceManager = new MultiPlatformDeviceManager();
-      const bootedDevices = await deviceManager.getBootedDevices("android");
+      const bootedDevices = await deviceManager.getBootedDevices("either");
 
-      const deviceIds = bootedDevices.map(d => d.deviceId);
-
-      if (deviceIds.length > 0) {
-        await this.devicePool.initializeWithDevices(deviceIds);
-        logger.info(`Device pool initialized with ${deviceIds.length} devices: ${deviceIds.join(", ")}`);
+      if (bootedDevices.length > 0) {
+        await this.devicePool.initializeWithDevices(bootedDevices);
+        logger.info(`Device pool initialized with ${bootedDevices.length} devices: ${bootedDevices.map(device => device.deviceId).join(", ")}`);
       } else {
         logger.warn("No devices detected during daemon startup. Device pool is empty.");
         logger.warn("Start an emulator or connect a physical device before creating sessions.");

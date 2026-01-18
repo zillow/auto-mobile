@@ -1,6 +1,6 @@
 import { defaultTimer, Timer } from "../utils/SystemTimer";
 import { logger } from "../utils/logger";
-import { BootedDevice } from "../models";
+import { BootedDevice, Platform } from "../models";
 import { KeepScreenAwakeManager, KEEP_SCREEN_AWAKE_STATE_KEY, KeepScreenAwakeState } from "../utils/KeepScreenAwakeManager";
 
 /**
@@ -25,6 +25,7 @@ export interface SessionCacheData {
 export interface Session {
   sessionId: string;           // UUID provided by JUnitRunner
   assignedDevice: string;      // Device ID this session is using
+  platform: Platform;          // Device platform
   createdAt: number;           // Timestamp when session was created
   lastUsedAt: number;          // Last activity timestamp
   expiresAt: number;           // When session will expire (for cleanup)
@@ -75,7 +76,8 @@ export class SessionManager {
    */
   async createSession(
     sessionId: string,
-    assignedDevice: string
+    assignedDevice: string,
+    platform: Platform
   ): Promise<Session> {
     if (this.sessions.has(sessionId)) {
       logger.warn(`Session ${sessionId} already exists, returning existing session`);
@@ -86,6 +88,7 @@ export class SessionManager {
     const session: Session = {
       sessionId,
       assignedDevice,
+      platform,
       createdAt: now,
       lastUsedAt: now,
       expiresAt: now + this.SESSION_TIMEOUT_MS,
@@ -127,7 +130,8 @@ export class SessionManager {
    */
   async getOrCreateSession(
     sessionId: string,
-    devicePool?: import("./devicePool").DevicePool
+    devicePool?: import("./devicePool").DevicePool,
+    platform?: Platform
   ): Promise<Session> {
     const existing = this.getSession(sessionId);
     if (existing) {
@@ -148,7 +152,7 @@ export class SessionManager {
     }
 
     // DevicePool will call createSession() with assigned device
-    await devicePool.assignDeviceToSession(sessionId);
+    await devicePool.assignDeviceToSession(sessionId, platform);
 
     // Session now exists, return it
     const session = this.getSession(sessionId);
@@ -320,6 +324,9 @@ export class SessionManager {
   }
 
   private async restoreKeepScreenAwake(session: Session): Promise<void> {
+    if (session.platform !== "android") {
+      return;
+    }
     const state = session.cacheData.customData?.[KEEP_SCREEN_AWAKE_STATE_KEY] as KeepScreenAwakeState | undefined;
     if (!state || !state.applied) {
       return;
