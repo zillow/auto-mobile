@@ -10,11 +10,12 @@ import {
 } from "./deviceSnapshotSocketTypes";
 import { getDeviceSnapshotConfig, updateDeviceSnapshotConfig } from "../server/deviceSnapshotManager";
 
-const DEFAULT_SOCKET_PATH = path.join(
-  os.homedir(),
-  ".auto-mobile",
-  "device-snapshot.sock"
-);
+// Use /tmp for socket when running with external emulator (Docker container with mounted home)
+// because Unix sockets don't work on Docker Desktop's mounted volumes
+const isExternalMode = process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
+const DEFAULT_SOCKET_PATH = isExternalMode
+  ? "/tmp/auto-mobile-device-snapshot.sock"
+  : path.join(os.homedir(), ".auto-mobile", "device-snapshot.sock");
 
 export class DeviceSnapshotSocketServer {
   private server: NetServer | null = null;

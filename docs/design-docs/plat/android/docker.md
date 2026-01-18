@@ -11,7 +11,7 @@ The Docker setup provides a complete Android development environment with:
   - Platform Tools (includes ADB)
   - Build Tools 35.0.0
   - Android API 36 (compile and target SDK)
-  - Android Emulator and system images
+  - Android Emulator and system images (optional; build with ANDROID_INSTALL_EMULATOR=true)
 - **Development Tools**:
   - ripgrep - Fast code search
   - ktfmt - Kotlin code formatter
@@ -37,6 +37,11 @@ docker pull kaeawc/auto-mobile:v0.0.7
 
 ```bash
 docker build --platform=linux/amd64 -t auto-mobile:latest .
+```
+
+To include emulator/system images:
+```bash
+docker build --platform=linux/amd64 --build-arg ANDROID_INSTALL_EMULATOR=true -t auto-mobile:latest .
 ```
 
 Or using docker-compose:
@@ -133,7 +138,7 @@ docker exec -it auto-mobile adb devices
 
 ### Starting an Emulator
 
-The Docker image includes Android emulator support:
+The Docker image includes Android emulator support when built with `ANDROID_INSTALL_EMULATOR=true`:
 
 ```bash
 # List available system images
@@ -147,6 +152,45 @@ docker-compose exec auto-mobile avdmanager create avd \
 # Start the emulator (requires X11 forwarding for GUI)
 docker-compose exec auto-mobile emulator -avd test_device -no-window -no-audio
 ```
+
+For the slim image (no emulator installed), use the host emulator setup for your OS.
+
+**Linux (host SDK + emulator inside container):**
+
+```bash
+docker run --platform=linux/amd64 -it --rm \
+  --network host \
+  -e ANDROID_HOME=/opt/android-sdk \
+  -e ANDROID_SDK_ROOT=/opt/android-sdk \
+  -e AUTOMOBILE_EMULATOR_HEADLESS=true \
+  -v "$HOME/Android/Sdk:/opt/android-sdk" \
+  -v "$HOME/.android:/home/automobile/.android" \
+  -v "$HOME/.auto-mobile:/home/automobile/.auto-mobile" \
+  auto-mobile:latest
+```
+
+**macOS (host emulator, container connects via ADB):**
+
+```bash
+docker run --platform=linux/amd64 -it --rm --name auto-mobile \
+  -e ANDROID_HOME=/opt/android-sdk \
+  -e ANDROID_SDK_ROOT=/opt/android-sdk \
+  -e AUTOMOBILE_EMULATOR_EXTERNAL=true \
+  -e AUTOMOBILE_EMULATOR_HEADLESS=true \
+  -v "$HOME/.android:/home/automobile/.android" \
+  -v "$HOME/.auto-mobile:/home/automobile/.auto-mobile" \
+  auto-mobile:latest
+```
+
+Do not mount the macOS SDK into `/opt/android-sdk` (mac binaries will not run in the Linux container).
+
+Then connect ADB inside the container to the host emulator:
+```bash
+docker exec -it auto-mobile adb connect host.docker.internal:5555
+```
+
+Set `AUTOMOBILE_EMULATOR_HEADLESS=true` to start emulators without a GUI, or use
+`AUTOMOBILE_EMULATOR_ARGS` to pass extra emulator flags (space-separated).
 
 ## Development Workflow
 

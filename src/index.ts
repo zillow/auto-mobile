@@ -14,6 +14,7 @@ import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from ".
 import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./daemon/deviceSnapshotSocketServer";
 import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./daemon/appearanceSocketServer";
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "./utils/appearance/AppearanceSyncScheduler";
+import { startHostEmulatorAutoConnect, stopHostEmulatorAutoConnect } from "./utils/hostEmulatorAutoConnect";
 import { execSync } from "node:child_process";
 import { executionTracker } from "./server/executionTracker";
 import { FeatureFlagService } from "./features/featureFlags/FeatureFlagService";
@@ -570,6 +571,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
     }
     transports.clear();
 
+    await stopHostEmulatorAutoConnect();
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
@@ -697,6 +699,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
     }
     sessions.clear();
 
+    await stopHostEmulatorAutoConnect();
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
@@ -716,6 +719,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
 
 process.on("SIGINT", async () => {
   logger.info("Received SIGINT signal, shutting down");
+  await stopHostEmulatorAutoConnect();
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
   await stopDeviceSnapshotSocketServer();
@@ -728,6 +732,7 @@ process.on("SIGINT", async () => {
 
 process.on("SIGTERM", async () => {
   logger.info("Received SIGTERM signal, shutting down");
+  await stopHostEmulatorAutoConnect();
   await stopVideoRecordingSocketServer();
   await stopTestRecordingSocketServer();
   await stopDeviceSnapshotSocketServer();
@@ -853,6 +858,9 @@ async function main() {
       logger.close();
       process.exit(0);
     } else {
+      // Start host emulator auto-connect service (for Docker with external emulators)
+      await startHostEmulatorAutoConnect();
+
       await startVideoRecordingSocketServer();
       await startTestRecordingSocketServer();
       await startDeviceSnapshotSocketServer();

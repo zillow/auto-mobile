@@ -91,13 +91,15 @@ class ResourceRegistryClass {
   private extractTemplateParams(template: string, uri: string): Record<string, string> | null {
     // Convert URI template to regex pattern
     // E.g., "automobile:emulators/([^/]+)"
+    // For query params, we need to stop at '&' as well as '/'
     const paramNames: string[] = [];
     const tokenizedTemplate = template.replace(/\{(\w+)\}/g, (_, paramName) => {
       paramNames.push(paramName);
       return `__PARAM_${paramNames.length - 1}__`;
     });
     const escapedTemplate = tokenizedTemplate.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
-    const regexPattern = escapedTemplate.replace(/__PARAM_(\d+)__/g, () => "([^/]+)");
+    // Use [^/&]+ to properly handle query string parameters (stop at & delimiter)
+    const regexPattern = escapedTemplate.replace(/__PARAM_(\d+)__/g, () => "([^/&]+)");
 
     const regex = new RegExp(`^${regexPattern}$`);
     const match = uri.match(regex);
