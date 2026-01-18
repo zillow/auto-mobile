@@ -37,7 +37,7 @@ The schema validates:
 - String constraints (minLength, pattern)
 - Nested structures (expectations, metadata, critical sections)
 
-**Note:** Tool-specific parameters (e.g., `appId` for `launchApp`, `selector` for `tapOn`) are validated at runtime by individual tool handlers, not by the schema.
+**Note:** Tool-specific parameters (e.g., `appId` for `launchApp`, `id`/`text` for `tapOn`) are validated at runtime by individual tool handlers, not by the schema.
 
 ### 3. Execution-Time Validation
 
@@ -145,8 +145,7 @@ steps:
     label: Wait for home screen
 
   - tool: tapOn
-    selector:
-      testTag: login_button
+    id: login_button
     label: Tap login button
     expectations:
       - type: elementVisible
@@ -182,8 +181,7 @@ Step parameters can be specified in two ways:
 steps:
   - tool: tapOn
     params:
-      selector:
-        testTag: my_button
+      id: my_button
     label: Tap button
 ```
 
@@ -191,8 +189,7 @@ steps:
 ```yaml
 steps:
   - tool: tapOn
-    selector:
-      testTag: my_button
+    id: my_button
     label: Tap button
 ```
 

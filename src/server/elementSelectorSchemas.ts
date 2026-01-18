@@ -9,13 +9,9 @@ export const elementContainerSchema = z.union([
   }).strict()
 ]);
 
-export const elementSelectorSchema = z.union([
-  z.object({
-    text: z.string().describe("Element text")
-  }).strict(),
-  z.object({
-    id: z.string().describe("Element ID")
-  }).strict()
-]);
+export const elementIdTextSchema = z.object({
+  id: z.string().describe("Element resource ID / accessibility identifier").optional(),
+  text: z.string().describe("Element text").optional()
+}).strict();
 
 export const elementSelectionStrategySchema = z.enum(["first", "random"]);

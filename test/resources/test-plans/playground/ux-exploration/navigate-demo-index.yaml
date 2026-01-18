@@ -11,8 +11,7 @@ steps:
     label: Wait for home screen to be stable
 
   - tool: tapOn
-    selector:
-      testTag: demo_index_action
+    id: demo_index_action
     label: Tap to navigate to Demo Index
 
   - tool: observe

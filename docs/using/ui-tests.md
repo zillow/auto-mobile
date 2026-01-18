@@ -22,12 +22,10 @@ steps:
     appId: com.example.app
 
   - tool: tapOn
-    selector:
-      - text: "Login"
+    text: "Login"
 
   - tool: inputText
-    selector:
-      - text: "user@example.com"
+    text: "user@example.com"
 ```
 
 Plans support conditional steps which have internal assertions and wait conditions.

@@ -22,8 +22,8 @@ import { ElementParser } from "../features/utility/ElementParser";
 import { NoOpPerformanceTracker } from "../utils/PerformanceTracker";
 import {
   elementContainerSchema,
-  elementSelectionStrategySchema,
-  elementSelectorSchema
+  elementIdTextSchema,
+  elementSelectionStrategySchema
 } from "./elementSelectorSchemas";
 
 const UNSUPPORTED_MESSAGE = "Visual highlights are only supported on Android devices.";
@@ -34,15 +34,14 @@ const generateHighlightId = (): string => {
   return `highlight_${timestamp}_${random}`;
 };
 
-export const highlightSchema = addDeviceTargetingToSchema(z.object({
+const highlightBaseSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   deviceId: z.string().optional().describe("Optional device ID override"),
   timeoutMs: z.number().int().positive().optional().describe("Highlight request timeout ms (default: 5000)"),
   description: z.string().optional().describe("Optional description of the highlight"),
   shape: highlightShapeSchema.optional().describe("Optional highlight shape definition"),
-  selector: elementSelectorSchema.optional().describe(
-    "Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"
-  ),
+  id: elementIdTextSchema.shape.id,
+  text: elementIdTextSchema.shape.text,
   container: elementContainerSchema.optional().describe(
     "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
@@ -52,14 +51,18 @@ export const highlightSchema = addDeviceTargetingToSchema(z.object({
   selectionStrategy: elementSelectionStrategySchema.optional().describe(
     "Element selection strategy when multiple matches are found (default: first)"
   )
-})).superRefine((value, ctx) => {
+}).strict();
+
+export const highlightSchema = addDeviceTargetingToSchema(highlightBaseSchema).superRefine((value, ctx) => {
   const hasShape = Boolean(value.shape);
-  const hasSelector = Boolean(value.selector);
+  const hasId = value.id !== undefined;
+  const hasText = value.text !== undefined;
+  const hasSelector = hasId || hasText;
 
   if (hasShape === hasSelector) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "Provide either shape or selector (but not both)"
+      message: "Provide either shape or selector (id/text), but not both"
     });
   }
 
@@ -82,6 +85,13 @@ export const highlightSchema = addDeviceTargetingToSchema(z.object({
         message: "selectionStrategy can only be used with selector"
       });
     }
+  }
+
+  if (hasId && hasText) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Provide exactly one of id or text"
+    });
   }
 });
 
@@ -199,8 +209,8 @@ const resolveHighlightShapeFromSelector = async (
   device: BootedDevice,
   args: HighlightArgs
 ): Promise<HighlightShape> => {
-  if (!args.selector) {
-    throw new ActionableError("highlight requires a selector when shape is not provided.");
+  if (!args.id && !args.text) {
+    throw new ActionableError("highlight requires id or text when shape is not provided.");
   }
 
   if (device.platform !== "android") {
@@ -229,14 +239,14 @@ const resolveHighlightShapeFromSelector = async (
   }
 
   const strategy = args.selectionStrategy ?? "first";
-  const selection = "text" in args.selector
-    ? elementSelector.selectByText(viewHierarchy, args.selector.text, {
+  const selection = args.text
+    ? elementSelector.selectByText(viewHierarchy, args.text, {
       container,
       fuzzyMatch: true,
       caseSensitive: false,
       strategy
     })
-    : elementSelector.selectByResourceId(viewHierarchy, args.selector.id, {
+    : elementSelector.selectByResourceId(viewHierarchy, args.id as string, {
       container,
       partialMatch: false,
       strategy

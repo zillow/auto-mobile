@@ -1502,36 +1502,13 @@
             }
           ]
         },
-        "selector": {
-          "description": "Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }",
-          "anyOf": [
-            {
-              "type": "object",
-              "properties": {
-                "text": {
-                  "type": "string",
-                  "description": "Element text"
-                }
-              },
-              "required": [
-                "text"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Element ID"
-                }
-              },
-              "required": [
-                "id"
-              ],
-              "additionalProperties": false
-            }
-          ]
+        "id": {
+          "type": "string",
+          "description": "Element resource ID / accessibility identifier"
+        },
+        "text": {
+          "type": "string",
+          "description": "Element text"
         },
         "container": {
           "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }.",
@@ -4350,36 +4327,13 @@
             }
           ]
         },
-        "selector": {
-          "anyOf": [
-            {
-              "type": "object",
-              "properties": {
-                "text": {
-                  "type": "string",
-                  "description": "Element text"
-                }
-              },
-              "required": [
-                "text"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "description": "Element ID"
-                }
-              },
-              "required": [
-                "id"
-              ],
-              "additionalProperties": false
-            }
-          ],
-          "description": "Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"
+        "id": {
+          "type": "string",
+          "description": "Element resource ID / accessibility identifier"
+        },
+        "text": {
+          "type": "string",
+          "description": "Element text"
         },
         "action": {
           "type": "string",
@@ -4438,7 +4392,6 @@
         }
       },
       "required": [
-        "selector",
         "action",
         "platform"
       ],
