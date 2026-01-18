@@ -104,8 +104,7 @@ object HighlightingExample {
 
             steps:
               - action: "tap"
-                selector:
-                  text: "Login"
+                text: "Login"
                 description: "Tap the login button"
 
               - action: "inputText"
@@ -113,8 +112,7 @@ object HighlightingExample {
                 description: "Enter email address"
 
               - action: "tap"
-                selector:
-                  text: "Next"
+                text: "Next"
                 description: "Proceed to password"
 
               - action: "inputText"
@@ -122,8 +120,7 @@ object HighlightingExample {
                 description: "Enter password"
 
               - action: "tap"
-                selector:
-                  text: "Sign In"
+                text: "Sign In"
                 description: "Submit credentials"
 
               - action: "assertVisible"

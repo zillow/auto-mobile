@@ -37,8 +37,7 @@ import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import {
   elementContainerSchema,
-  elementSelectionStrategySchema,
-  elementSelectorSchema
+  elementSelectionStrategySchema
 } from "./elementSelectorSchemas";
 import {
   elementSchema,
@@ -96,10 +95,8 @@ export interface TapOnArgs {
     elementId?: string;
     text?: string;
   };
-  selector: {
-    text?: string;
-    id?: string;
-  };
+  id?: string;
+  text?: string;
   selectionStrategy?: ElementSelectionStrategy;
   action: "tap" | "doubleTap" | "longPress" | "focus";
   duration?: number;
@@ -203,11 +200,10 @@ export const keyboardSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }));
 
-export const tapOnSchema = addDeviceTargetingToSchema(z.object({
+const tapOnBaseSchema = z.object({
   container: elementContainerSchema.optional().describe(
     "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
-  selector: elementSelectorSchema.describe("Element selector - provide { \"text\": \"<text>\" } or { \"id\": \"<id>\" }"),
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
   selectionStrategy: elementSelectionStrategySchema.optional().describe(
     "Element selection strategy when multiple matches are found (default: first)"
@@ -217,7 +213,21 @@ export const tapOnSchema = addDeviceTargetingToSchema(z.object({
     duration: z.number().min(100).max(12000).optional().describe("Polling duration (ms, default: 500)"),
   }).optional().describe("Poll for element before tapping"),
   platform: z.enum(["android", "ios"]).describe("Platform")
-}));
+}).strict();
+
+const tapOnByIdSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    id: z.string().describe("Element resource ID / accessibility identifier")
+  }).strict()
+);
+
+const tapOnByTextSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    text: z.string().describe("Element text")
+  }).strict()
+);
+
+export const tapOnSchema = z.union([tapOnByIdSchema, tapOnByTextSchema]);
 
 const tapOnResultSchema = z.object({
   success: z.boolean(),
@@ -1503,8 +1513,8 @@ export function registerInteractionTools() {
     const tapOnTextCommand = new TapOnElement(device);
     const result = await tapOnTextCommand.execute({
       container: args.container,
-      text: args.selector.text,
-      elementId: args.selector.id,
+      text: args.text,
+      elementId: args.id,
       selectionStrategy: args.selectionStrategy,
       action: args.action,
       duration: args.duration,

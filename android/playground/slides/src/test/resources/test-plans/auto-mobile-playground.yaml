@@ -14,26 +14,22 @@ steps:
     url: "automobile:playground/discover"
 
   - tool: tapOn
-    selector:
-      text: "Tap"
+    text: "Tap"
     action: "tap"
     label: Make sure we're on the tap screen
 
   - tool: tapOn
-    selector:
-      text: "Button"
+    text: "Button"
     action: "tap"
     label: Tap basic button on Tap screen
 
   - tool: tapOn
-    selector:
-      text: "Elevated"
+    text: "Elevated"
     action: "tap"
     label: Tap elevated button on Tap screen
 
   - tool: tapOn
-    selector:
-      text: "Swipe"
+    text: "Swipe"
     action: "tap"
     label: Navigate to Swipe screen
 
@@ -44,14 +40,12 @@ steps:
     label: Perform left swipe gesture
 
   - tool: tapOn
-    selector:
-      text: "Media"
+    text: "Media"
     action: "tap"
     label: Navigate to Media screen
 
   - tool: tapOn
-    selector:
-      text: "Video"
+    text: "Video"
     action: "tap"
     label: Play AutoMobile Promo video
 
@@ -60,14 +54,12 @@ steps:
     label: Return from video player
 
   - tool: tapOn
-    selector:
-      text: "Text"
+    text: "Text"
     action: "tap"
     label: Navigate to Text screen
 
   - tool: tapOn
-    selector:
-      text: "Basic Text Field"
+    text: "Basic Text Field"
     action: "tap"
     label: Focus on basic text field
 
@@ -76,8 +68,7 @@ steps:
     label: Enter playful robot message in basic text field
 
   - tool: tapOn
-    selector:
-      text: "Email"
+    text: "Email"
     action: "tap"
     label: Focus on email field
 
@@ -85,14 +76,12 @@ steps:
     text: "robot@example.com"
 
   - tool: tapOn
-    selector:
-      text: "Chat"
+    text: "Chat"
     action: "tap"
     label: Navigate to Chat screen
 
   - tool: tapOn
-    selector:
-      text: "What do you want to say?"
+    text: "What do you want to say?"
     action: "tap"
     label: Focus on chat input field
 
@@ -101,8 +90,7 @@ steps:
     label: Enter robot circus chat message
 
   - tool: tapOn
-    selector:
-      text: "Send"
+    text: "Send"
     action: "tap"
     label: Send chat message
 
@@ -111,8 +99,7 @@ steps:
     label: Enter robot circus chat message with heart emoji
 
   - tool: tapOn
-    selector:
-      text: "Send"
+    text: "Send"
     action: "tap"
     label: Send chat message
 

@@ -15,16 +15,14 @@ steps:
     label: Wait for app startup to stabilize
 
   - tool: tapOn
-    selector:
-      testTag: demo_index_action
+    id: demo_index_action
     label: Navigate to Demo Index
 
   - tool: observe
     label: Wait for navigation to complete
 
   - tool: tapOn
-    selector:
-      testTag: demo_startup_action
+    id: demo_startup_action
     label: Navigate to Startup Demo screen
 
   - tool: observe

@@ -147,7 +147,7 @@
           }
         }
       },
-      "description": "A step can have tool-specific parameters either in a 'params' object or as top-level properties (e.g., 'selector', 'appId', 'text', 'direction', etc.)",
+      "description": "A step can have tool-specific parameters either in a 'params' object or as top-level properties (e.g., 'id', 'text', 'appId', 'direction', etc.)",
       "allOf": [
         {
           "if": {
@@ -272,8 +272,13 @@
                 "type": "string",
                 "description": "Optional highlight description"
               },
-              "selector": {
-                "$ref": "#/$defs/highlightSelector"
+              "id": {
+                "type": "string",
+                "description": "Element resource ID / accessibility identifier"
+              },
+              "text": {
+                "type": "string",
+                "description": "Element text content to match"
               },
               "container": {
                 "$ref": "#/$defs/highlightContainer"
@@ -324,7 +329,12 @@
                   },
                   {
                     "required": [
-                      "selector"
+                      "id"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "text"
                     ]
                   },
                   {
@@ -343,7 +353,19 @@
                     "properties": {
                       "params": {
                         "required": [
-                          "selector"
+                          "id"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "params"
+                    ]
+                  },
+                  {
+                    "properties": {
+                      "params": {
+                        "required": [
+                          "text"
                         ]
                       }
                     },
@@ -608,8 +630,13 @@
           "type": "string",
           "description": "Optional highlight description"
         },
-        "selector": {
-          "$ref": "#/$defs/highlightSelector"
+        "id": {
+          "type": "string",
+          "description": "Element resource ID / accessibility identifier"
+        },
+        "text": {
+          "type": "string",
+          "description": "Element text content to match"
         },
         "container": {
           "$ref": "#/$defs/highlightContainer"

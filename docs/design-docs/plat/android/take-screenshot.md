@@ -13,7 +13,7 @@ takeScreenshot({
   reason: "element-not-found",
   context: {
     action: "tapOn",
-    selector: { text: "Login" }
+    text: "Login"
   },
   preferReuse: true
 })

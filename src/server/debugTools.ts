@@ -25,7 +25,7 @@ export interface RawViewHierarchyArgs {
 export interface DebugSearchArgs {
   platform: Platform;
   text?: string;
-  resourceId?: string;
+  id?: string;
   container?: {
     elementId?: string;
     text?: string;
@@ -60,10 +60,10 @@ export const rawViewHierarchySchema = addDeviceTargetingToSchema(z.object({
     .describe("Source for hierarchy extraction: 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison")
 }));
 
-export const debugSearchSchema = addDeviceTargetingToSchema(z.object({
+const debugSearchBaseSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   text: z.string().optional().describe("Text to search for in elements"),
-  resourceId: z.string().optional().describe("Resource ID to search for"),
+  id: z.string().optional().describe("Element resource ID / accessibility identifier to search for"),
   container: z.object({
     elementId: z.string().optional().describe("Container element resource ID to restrict search within"),
     text: z.string().optional().describe("Container element text to restrict search within")
@@ -72,7 +72,18 @@ export const debugSearchSchema = addDeviceTargetingToSchema(z.object({
   caseSensitive: z.boolean().optional().describe("Whether to use case-sensitive matching (default: false)"),
   includeNearMisses: z.boolean().optional().describe("Include elements that almost matched (default: true)"),
   maxNearMisses: z.number().optional().describe("Maximum number of near-misses to include (default: 10)")
-}));
+}).strict();
+
+export const debugSearchSchema = addDeviceTargetingToSchema(debugSearchBaseSchema).superRefine((value, ctx) => {
+  const hasId = value.id !== undefined;
+  const hasText = value.text !== undefined;
+  if (hasId === hasText) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Provide exactly one of id or text"
+    });
+  }
+});
 
 export const bugReportSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
@@ -110,14 +121,14 @@ export function registerDebugTools() {
   const debugSearchHandler = async (device: BootedDevice, args: DebugSearchArgs) => {
     try {
       ensureDebugEnabled();
-      if (!args.text && !args.resourceId) {
-        throw new ActionableError("Either 'text' or 'resourceId' must be provided");
+      if (!args.text && !args.id) {
+        throw new ActionableError("Either 'text' or 'id' must be provided");
       }
 
       const debugSearch = new DebugSearch(device);
       const result = await debugSearch.execute({
         text: args.text,
-        resourceId: args.resourceId,
+        resourceId: args.id,
         container: args.container,
         fuzzyMatch: args.fuzzyMatch,
         caseSensitive: args.caseSensitive,

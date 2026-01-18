@@ -11,16 +11,14 @@ steps:
     label: Wait for home screen to be stable
 
   - tool: tapOn
-    selector:
-      testTag: demo_index_action
+    id: demo_index_action
     label: Navigate to Demo Index
 
   - tool: observe
     label: Wait for Demo Index to load
 
   - tool: tapOn
-    selector:
-      testTag: demo_perf_list_action
+    id: demo_perf_list_action
     label: Navigate to Performance List
 
   - tool: observe
@@ -31,8 +29,7 @@ steps:
           testTag: performance_item_1_action
 
   - tool: tapOn
-    selector:
-      testTag: performance_item_1_action
+    id: performance_item_1_action
     label: Tap to navigate to detail screen
 
   - tool: observe
@@ -43,8 +40,7 @@ steps:
           testTag: performance_detail_content
 
   - tool: tapOn
-    selector:
-      testTag: performance_detail_back
+    id: performance_detail_back
     label: Navigate back to list
 
   - tool: observe
@@ -55,8 +51,7 @@ steps:
           testTag: performance_list
 
   - tool: tapOn
-    selector:
-      testTag: performance_item_5_action
+    id: performance_item_5_action
     label: Navigate to different detail screen
 
   - tool: observe

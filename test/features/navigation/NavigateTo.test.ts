@@ -39,10 +39,8 @@ describe("NavigateTo", () => {
       "tapOn",
       "Fake tap tool",
       z.object({
-        selector: z.object({
-          text: z.string().optional(),
-          id: z.string().optional()
-        }).optional(),
+        id: z.string().optional(),
+        text: z.string().optional(),
         action: z.string(),
         platform: z.string()
       }),
@@ -50,7 +48,7 @@ describe("NavigateTo", () => {
         toolCallLog.push({ toolName: "tapOn", args });
 
         // Simulate navigation by recording a navigation event
-        const targetScreen = navigationMap.get(args.selector?.text);
+        const targetScreen = navigationMap.get(args.text);
         if (targetScreen) {
           await NavigationGraphManager.getInstance().recordNavigationEvent({
             destination: targetScreen,
@@ -145,7 +143,7 @@ describe("NavigateTo", () => {
       navigationMap.set("Settings", "SettingsScreen");
 
       // Record tool call before navigation (to correlate)
-      manager.recordToolCall("tapOn", { selector: { text: "Settings" }, action: "tap", platform: "android" });
+      manager.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
 
       // Record navigation: Home -> Settings
       await manager.recordNavigationEvent({
@@ -185,7 +183,7 @@ describe("NavigateTo", () => {
       // Should have attempted to execute the tool call
       expect(toolCallLog).toHaveLength(1);
       expect(toolCallLog[0].toolName).toBe("tapOn");
-      expect(toolCallLog[0].args.selector.text).toBe("Settings");
+      expect(toolCallLog[0].args.text).toBe("Settings");
     });
 
     test("should include path in successful navigation result", async () => {
@@ -195,7 +193,7 @@ describe("NavigateTo", () => {
       // Set up navigation map so fake tool triggers navigation
       navigationMap.set("Profile", "ProfileScreen");
 
-      manager.recordToolCall("tapOn", { selector: { text: "Profile" }, action: "tap", platform: "android" });
+      manager.recordToolCall("tapOn", { text: "Profile", action: "tap", platform: "android" });
       await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
@@ -241,7 +239,7 @@ describe("NavigateTo", () => {
       // Set up navigation map so fake tool triggers navigation
       navigationMap.set("Step1", "Screen2");
 
-      manager.recordToolCall("tapOn", { selector: { text: "Step1" }, action: "tap", platform: "android" });
+      manager.recordToolCall("tapOn", { text: "Step1", action: "tap", platform: "android" });
       await manager.recordNavigationEvent({
         destination: "Screen1",
         source: "TEST",
@@ -316,7 +314,7 @@ describe("NavigateTo", () => {
       navigationMap.set("Advanced", "AdvancedScreen");
 
       // Create path: Home -> Settings -> Advanced
-      manager.recordToolCall("tapOn", { selector: { text: "Settings" }, action: "tap", platform: "android" });
+      manager.recordToolCall("tapOn", { text: "Settings", action: "tap", platform: "android" });
       await manager.recordNavigationEvent({
         destination: "HomeScreen",
         source: "TEST",
@@ -334,7 +332,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 1
       });
 
-      manager.recordToolCall("tapOn", { selector: { text: "Advanced" }, action: "tap", platform: "android" });
+      manager.recordToolCall("tapOn", { text: "Advanced", action: "tap", platform: "android" });
       await manager.recordNavigationEvent({
         destination: "AdvancedScreen",
         source: "TEST",
@@ -363,8 +361,8 @@ describe("NavigateTo", () => {
 
       // Should execute two tool calls: Home -> Settings -> Advanced
       expect(toolCallLog).toHaveLength(2);
-      expect(toolCallLog[0].args.selector.text).toBe("Settings");
-      expect(toolCallLog[1].args.selector.text).toBe("Advanced");
+      expect(toolCallLog[0].args.text).toBe("Settings");
+      expect(toolCallLog[1].args.text).toBe("Advanced");
     });
   });
 });

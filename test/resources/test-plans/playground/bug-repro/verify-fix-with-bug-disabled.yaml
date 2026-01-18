@@ -11,16 +11,14 @@ steps:
     label: Wait for home screen to be stable
 
   - tool: tapOn
-    selector:
-      testTag: demo_index_action
+    id: demo_index_action
     label: Navigate to Demo Index
 
   - tool: observe
     label: Wait for Demo Index to load
 
   - tool: tapOn
-    selector:
-      testTag: demo_bug_repro_action
+    id: demo_bug_repro_action
     label: Navigate to Bug Repro Demo screen
 
   - tool: observe
@@ -34,24 +32,21 @@ steps:
     label: Verify bug toggle is initially off
 
   - tool: tapOn
-    selector:
-      testTag: bug_repro_add
+    id: bug_repro_add
     label: Tap Add Item with bug disabled
 
   - tool: observe
     label: Verify counter updates correctly
 
   - tool: tapOn
-    selector:
-      testTag: bug_repro_add
+    id: bug_repro_add
     label: Tap Add Item again
 
   - tool: observe
     label: Verify counter continues to update correctly
 
   - tool: tapOn
-    selector:
-      testTag: bug_repro_add
+    id: bug_repro_add
     label: Tap Add Item third time
 
   - tool: observe
