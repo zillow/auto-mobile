@@ -672,6 +672,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
       throw new ActionableError("iOS simulator tools not available");
     }
     const allDevices = await this.simctl.listSimulatorImages();
+    allDevices.sort((a, b) => (a.deviceId || "").localeCompare(b.deviceId || ""));
 
     if (allDevices.length === 0) {
       throw new ActionableError(
@@ -681,10 +682,12 @@ export class DeviceSessionManager implements DeviceSessionManager {
 
     // Check for already booted simulators first
     const bootedDevices = await this.simctl.getBootedSimulators();
+    bootedDevices.sort((a, b) => a.deviceId.localeCompare(b.deviceId));
 
     if (bootedDevices.length > 0) {
       // Use the first booted device
       const device = bootedDevices[0];
+      logger.info(`[DeviceSessionManager] Selected booted iOS simulator ${device.name} (${device.deviceId})`);
       await this.verifyIosDevice(device.deviceId!, options);
       return device;
     }
@@ -692,7 +695,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     // No booted devices - boot the first available simulator
     const device = allDevices[0];
     const deviceId = device.deviceId!;
-    logger.info(`Booting iOS simulator ${device}...`);
+    logger.info(`[DeviceSessionManager] Booting iOS simulator ${device.name} (${deviceId})...`);
 
     const bootedDevice = await this.simctl!.bootSimulator(deviceId);
     await this.verifyIosDevice(deviceId, options);

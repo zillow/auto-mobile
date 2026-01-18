@@ -2,7 +2,7 @@ import { logger } from "../utils/logger";
 import { SessionManager } from "./sessionManager";
 import { ActionableError, BootedDevice, Platform } from "../models";
 import { Mutex } from "async-mutex";
-import { MultiPlatformDeviceManager } from "../utils/deviceUtils";
+import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
@@ -50,6 +50,7 @@ export class DevicePool {
   private lastReleasedDeviceId: string | null = null;
   private daemonSessionId: string;
   private installedAppsRepository: InstalledAppsStore;
+  private deviceManager: PlatformDeviceManager;
 
   // Max consecutive errors before marking device as failed
   private readonly MAX_DEVICE_ERRORS = 5;
@@ -62,7 +63,8 @@ export class DevicePool {
     sessionManager: SessionManager,
     daemonSessionId: string,
     timer: Timer = defaultTimer,
-    installedAppsRepository?: InstalledAppsStore
+    installedAppsRepository?: InstalledAppsStore,
+    deviceManager?: PlatformDeviceManager
   ) {
     this.instanceId = ++DevicePool.instanceCounter;
     logger.info(`[DEVICE-POOL-DEBUG] Creating DevicePool instance #${this.instanceId}`);
@@ -70,6 +72,7 @@ export class DevicePool {
     this.daemonSessionId = daemonSessionId;
     this.timer = timer;
     this.installedAppsRepository = installedAppsRepository ?? new InstalledAppsRepository();
+    this.deviceManager = deviceManager ?? new MultiPlatformDeviceManager();
   }
 
   /**
@@ -118,8 +121,7 @@ export class DevicePool {
       const androidSdkRoot = process.env.ANDROID_SDK_ROOT || "(not set)";
       logger.info(`Environment: ANDROID_HOME=${androidHome}, ANDROID_SDK_ROOT=${androidSdkRoot}`);
 
-      const deviceManager = new MultiPlatformDeviceManager();
-      const bootedDevices = await deviceManager.getBootedDevices("either");
+      const bootedDevices = await this.deviceManager.getBootedDevices("either");
       const discoveryTime = Date.now() - startTime;
       logger.info(`Device discovery completed in ${discoveryTime}ms, found ${bootedDevices.length} devices`);
 
@@ -502,6 +504,17 @@ export class DevicePool {
 
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: totalDevices = ${totalDevices}`);
 
+      if (!device && platform === "ios") {
+        const bootedSimulator = await this.maybeBootDedicatedIosSimulator();
+        if (bootedSimulator) {
+          candidates = this.getDevicesByPlatform(platform);
+          totalDevices = candidates.length;
+          device = candidates.find(d => d.status === "idle" && d.id === bootedSimulator.deviceId)
+            ?? candidates.find(d => d.status === "idle");
+          logger.info(`[DevicePool] Added dedicated iOS simulator ${bootedSimulator.deviceId} to pool`);
+        }
+      }
+
       if (!device) {
         // No idle device - check if devices exist but are busy
         const busyDevices = candidates.filter(
@@ -534,6 +547,35 @@ export class DevicePool {
         totalDevices,
       };
     });
+  }
+
+  private async maybeBootDedicatedIosSimulator(): Promise<BootedDevice | null> {
+    try {
+      const available = await this.deviceManager.listDeviceImages("ios");
+      const candidates = available
+        .filter(device => device.deviceId)
+        .filter(device => !this.devices.has(device.deviceId!))
+        .filter(device => !device.isRunning);
+
+      if (candidates.length === 0) {
+        return null;
+      }
+
+      candidates.sort((a, b) => (a.deviceId || "").localeCompare(b.deviceId || ""));
+      const selected = candidates[0];
+
+      logger.info(
+        `[DevicePool] Booting dedicated iOS simulator ${selected.name} (${selected.deviceId})`
+      );
+
+      await this.deviceManager.startDevice(selected);
+      const booted = await this.deviceManager.waitForDeviceReady(selected);
+      await this.addDevice(booted);
+      return booted;
+    } catch (error) {
+      logger.warn(`[DevicePool] Failed to boot dedicated iOS simulator: ${error}`);
+      return null;
+    }
   }
 
   /**

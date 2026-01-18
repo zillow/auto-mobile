@@ -3,6 +3,7 @@ import { DevicePool } from "../../src/daemon/devicePool";
 import { SessionManager } from "../../src/daemon/sessionManager";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
+import { FakeDeviceUtils } from "../fakes/FakeDeviceUtils";
 import { BootedDevice } from "../../src/models";
 
 describe("DevicePool", () => {
@@ -138,6 +139,30 @@ describe("DevicePool", () => {
       await devicePool.releaseDevice(device1);
       const device2 = await devicePool.assignDeviceToSession("session-2");
       expect(device1).toBe(device2);
+    });
+
+    test("should boot a dedicated iOS simulator when pool is empty", async () => {
+      const fakeDeviceUtils = new FakeDeviceUtils();
+      fakeDeviceUtils.setDeviceImages("ios", [
+        {
+          name: "iPhone 15",
+          platform: "ios",
+          deviceId: "ios-udid-1",
+          isRunning: false
+        }
+      ]);
+
+      devicePool = new DevicePool(
+        sessionManager,
+        "test-daemon-session-id",
+        fakeTimer,
+        fakeAppsRepo,
+        fakeDeviceUtils
+      );
+
+      const deviceId = await devicePool.assignDeviceToSession("session-1", "ios");
+      expect(deviceId).toBe("ios-udid-1");
+      expect(fakeDeviceUtils.wasMethodCalled("startDevice")).toBe(true);
     });
   });
 

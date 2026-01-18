@@ -132,6 +132,10 @@ export function registerDeviceTools() {
   // Start emulator handler
   const startDeviceHandler = async (args: StartDeviceArgs, progress?: ProgressCallback) => {
     try {
+      if (args.device.platform === "ios" && !args.device.deviceId) {
+        throw new ActionableError("iOS simulator deviceId (UDID) is required to start a simulator.");
+      }
+
       const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
       const childProcess = await deviceUtils.startDevice(args.device);
 
@@ -199,7 +203,7 @@ export function registerDeviceTools() {
 
       return createJSONToolResponse({
         message: `${args.device.platform} '${args.device.name}' shutdown successfully`,
-        udid: args.device.name,
+        udid: args.device.deviceId,
         name: args.device.name,
         platform: args.device.platform
       });
