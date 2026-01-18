@@ -7,8 +7,10 @@ import { logger } from "./logger";
  */
 export class PortManager {
   private static allocatedPorts: Map<string, number> = new Map();
-  private static readonly BASE_PORT = 8765;
-  private static readonly MAX_DEVICES = 100;
+  private static readonly DEFAULT_BASE_PORT = 8765;
+  private static readonly DEFAULT_MAX_DEVICES = 100;
+  private static readonly basePort = PortManager.resolveBasePort();
+  private static readonly maxDevices = PortManager.resolveMaxDevices();
 
   /**
    * Allocate a unique local port for a device.
@@ -25,8 +27,8 @@ export class PortManager {
 
     // Find next available port
     const usedPorts = new Set(this.allocatedPorts.values());
-    for (let i = 0; i < this.MAX_DEVICES; i++) {
-      const port = this.BASE_PORT + i;
+    for (let i = 0; i < this.maxDevices; i++) {
+      const port = this.basePort + i;
       if (!usedPorts.has(port)) {
         this.allocatedPorts.set(deviceId, port);
         logger.info(`[PortManager] Allocated port ${port} for device ${deviceId}`);
@@ -36,7 +38,7 @@ export class PortManager {
 
     throw new Error(
       `No available ports for device ${deviceId}. ` +
-      `All ${this.MAX_DEVICES} ports (${this.BASE_PORT}-${this.BASE_PORT + this.MAX_DEVICES - 1}) are in use.`
+      `All ${this.maxDevices} ports (${this.basePort}-${this.basePort + this.maxDevices - 1}) are in use.`
     );
   }
 
@@ -101,11 +103,47 @@ export class PortManager {
    * The base port number (for reference/testing)
    */
   public static getBasePort(): number {
-    return this.BASE_PORT;
+    return this.basePort;
   }
 
   /**
    * The device port (port on the Android device side - always the same)
    */
   public static readonly DEVICE_PORT = 8765;
+
+  private static resolveBasePort(): number {
+    const envValue = process.env.AUTOMOBILE_PORT_RANGE_START ?? process.env.AUTO_MOBILE_PORT_RANGE_START;
+    if (!envValue) {
+      return this.DEFAULT_BASE_PORT;
+    }
+    const parsed = Number.parseInt(envValue, 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      logger.warn(`[PortManager] Invalid port range start '${envValue}', using default ${this.DEFAULT_BASE_PORT}`);
+      return this.DEFAULT_BASE_PORT;
+    }
+    return parsed;
+  }
+
+  private static resolveMaxDevices(): number {
+    const endValue = process.env.AUTOMOBILE_PORT_RANGE_END ?? process.env.AUTO_MOBILE_PORT_RANGE_END;
+    if (endValue) {
+      const parsedEnd = Number.parseInt(endValue, 10);
+      if (!Number.isNaN(parsedEnd) && parsedEnd >= this.basePort) {
+        return parsedEnd - this.basePort + 1;
+      }
+      logger.warn(`[PortManager] Invalid port range end '${endValue}', using default ${this.DEFAULT_MAX_DEVICES}`);
+      return this.DEFAULT_MAX_DEVICES;
+    }
+
+    const sizeValue = process.env.AUTOMOBILE_PORT_RANGE_SIZE ?? process.env.AUTO_MOBILE_PORT_RANGE_SIZE;
+    if (!sizeValue) {
+      return this.DEFAULT_MAX_DEVICES;
+    }
+    const parsedSize = Number.parseInt(sizeValue, 10);
+    if (Number.isNaN(parsedSize) || parsedSize <= 0) {
+      logger.warn(`[PortManager] Invalid port range size '${sizeValue}', using default ${this.DEFAULT_MAX_DEVICES}`);
+      return this.DEFAULT_MAX_DEVICES;
+    }
+    return parsedSize;
+  }
 }

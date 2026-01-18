@@ -23,6 +23,7 @@ import type { VideoRecordingConfigInput } from "./models";
 import { startupBenchmark } from "./utils/startupBenchmark";
 import { AndroidAccessibilityServiceManager } from "./utils/AccessibilityServiceManager";
 import { XCTestServiceBuilder } from "./utils/XCTestServiceBuilder";
+import { IOSXCTestServiceManager } from "./utils/XCTestServiceManager";
 
 startupBenchmark.mark("processEntry");
 
@@ -572,6 +573,7 @@ async function startStreamableServer(transport: TransportConfig, debug: boolean)
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
+    await IOSXCTestServiceManager.shutdownAll();
     await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
 
     server.close(() => {
@@ -698,6 +700,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
     await stopVideoRecordingSocketServer();
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
+    await IOSXCTestServiceManager.shutdownAll();
     await AndroidAccessibilityServiceManager.cleanupPrefetchedApk();
 
     server.close(() => {

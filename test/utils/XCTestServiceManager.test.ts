@@ -3,6 +3,10 @@ import { IOSXCTestServiceManager } from "../../src/utils/XCTestServiceManager";
 import { BootedDevice } from "../../src/models";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeXCTestServiceManager } from "../fakes/FakeXCTestServiceManager";
+import { FakeProcessExecutor } from "../fakes/FakeProcessExecutor";
+import { FakeChildProcess } from "../fakes/FakeChildProcess";
+import type { ExecResult } from "../../src/models";
+import { PortManager } from "../../src/utils/PortManager";
 
 describe("IOSXCTestServiceManager", function() {
   let testDevice: BootedDevice;
@@ -20,6 +24,7 @@ describe("IOSXCTestServiceManager", function() {
 
     // Reset singleton instances
     IOSXCTestServiceManager.resetInstances();
+    PortManager.reset();
   });
 
   describe("getInstance", function() {
@@ -92,7 +97,75 @@ describe("IOSXCTestServiceManager", function() {
       manager.resetSetupState();
     });
   });
+
+  describe("iproxy tunnel", function() {
+    let physicalDevice: BootedDevice;
+    let fakeExecutor: FakeProcessExecutor;
+
+    beforeEach(function() {
+      physicalDevice = {
+        deviceId: "00008030001E28C11E",
+        platform: "ios",
+        name: "iPhone"
+      };
+      fakeExecutor = new FakeProcessExecutor();
+      fakeExecutor.setCommandResponse("idevice_id -l", createExecResult(`${physicalDevice.deviceId}\n`, ""));
+      fakeExecutor.setCommandResponse("curl -s", createExecResult("", ""));
+    });
+
+    test("starts iproxy for physical devices with device-specific port", async function() {
+      const fakeProcess = new FakeChildProcess();
+      fakeExecutor.setNextSpawnProcess(fakeProcess);
+      const manager = IOSXCTestServiceManager.createForTestingWithDeps(
+        physicalDevice,
+        fakeTimer,
+        undefined,
+        fakeExecutor
+      );
+
+      await (manager as unknown as { startIproxyTunnel: () => Promise<void> }).startIproxyTunnel();
+
+      const spawns = fakeExecutor.getSpawnedProcesses();
+      expect(spawns.length).toBe(1);
+      expect(spawns[0].command).toBe("iproxy");
+      expect(spawns[0].args).toEqual([
+        String(manager.getServicePort()),
+        String(IOSXCTestServiceManager.DEFAULT_PORT),
+        physicalDevice.deviceId
+      ]);
+    });
+
+    test("restarts iproxy after unexpected exit", async function() {
+      fakeTimer.setManualMode();
+      const fakeProcess = new FakeChildProcess();
+      fakeExecutor.setNextSpawnProcess(fakeProcess);
+      const manager = IOSXCTestServiceManager.createForTestingWithDeps(
+        physicalDevice,
+        fakeTimer,
+        undefined,
+        fakeExecutor
+      );
+
+      await (manager as unknown as { startIproxyTunnel: () => Promise<void> }).startIproxyTunnel();
+
+      fakeProcess.emit("exit", 1, null);
+      fakeTimer.advanceTime(1000);
+      await Promise.resolve();
+
+      expect(fakeExecutor.getSpawnedProcesses().length).toBe(2);
+    });
+  });
 });
+
+function createExecResult(stdout: string, stderr: string): ExecResult {
+  return {
+    stdout,
+    stderr,
+    toString: () => stdout,
+    trim: () => stdout.trim(),
+    includes: (searchString: string) => stdout.includes(searchString)
+  };
+}
 
 describe("FakeXCTestServiceManager", function() {
   let fakeManager: FakeXCTestServiceManager;
