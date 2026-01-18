@@ -8,38 +8,32 @@ steps:
     label: Launch Clock application with clean state
 
   - tool: tapOn
-    selector:
-      id: "com.google.android.deskclock:id/tab_menu_alarm"
+    id: "com.google.android.deskclock:id/tab_menu_alarm"
     label: Tap Alarm tab
     action: "tap"
 
   - tool: tapOn
-    selector:
-      id: "com.google.android.deskclock:id/fab"
+    id: "com.google.android.deskclock:id/fab"
     label: Tap add alarm button
     action: "tap"
 
   - tool: tapOn
-    selector:
-      text: "6"
+    text: "6"
     label: Select 6 for hour
     action: "tap"
 
   - tool: tapOn
-    selector:
-      id: "com.google.android.deskclock:id/material_minute_tv"
+    id: "com.google.android.deskclock:id/material_minute_tv"
     label: Switch to minute selection
     action: "tap"
 
   - tool: tapOn
-    selector:
-      text: "30"
+    text: "30"
     label: Select 30 for minutes
     action: "tap"
 
   - tool: tapOn
-    selector:
-      text: "OK"
+    text: "OK"
     label: Confirm alarm time selection
     action: "tap"
 
