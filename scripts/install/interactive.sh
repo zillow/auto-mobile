@@ -1961,14 +1961,14 @@ ios_check_xctestservice_build() {
 run_ios_setup() {
     if [[ "$(detect_os)" != "macos" ]]; then
         log_warn "iOS setup skipped (macOS required)."
-        return 1
+        return 0
     fi
 
     ios_log_heading
 
     if ! ios_check_xcode; then
         log_warn "Skipping iOS setup because Xcode is missing."
-        return 1
+        return 0
     fi
 
     if ! ios_check_command_line_tools; then
