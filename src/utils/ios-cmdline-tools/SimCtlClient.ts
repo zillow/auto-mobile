@@ -62,7 +62,7 @@ export interface SimCtl {
 
   /**
    * Check if a simulator is running by name
-   * @param name - Simulator name
+   * @param name - Simulator name or UDID
    * @returns Promise with boolean indicating if running
    */
   isSimulatorRunning(name: string): Promise<boolean>;
@@ -429,8 +429,10 @@ export class SimCtlClient implements SimCtl {
     }
   }
 
-  async isSimulatorRunning(name: string): Promise<boolean> {
-    return (await this.getBootedSimulators()).find(simulator => simulator.name === name) !== undefined;
+  async isSimulatorRunning(identifier: string): Promise<boolean> {
+    return (await this.getBootedSimulators()).some(simulator =>
+      simulator.deviceId === identifier || simulator.name === identifier
+    );
   }
 
   async startSimulator(udid: string): Promise<ChildProcess> {
@@ -518,6 +520,7 @@ export class SimCtlClient implements SimCtl {
         timestamp: Date.now()
       };
 
+      devices.sort((a, b) => (a.deviceId || "").localeCompare(b.deviceId || ""));
       return devices;
     } catch (error) {
       logger.warn(`Failed to get iOS devices: ${error}`);
@@ -544,6 +547,7 @@ export class SimCtlClient implements SimCtl {
         }
       }
 
+      bootedDevices.sort((a, b) => a.deviceId.localeCompare(b.deviceId));
       return bootedDevices;
     } catch (error) {
       logger.warn(`Failed to get booted iOS devices: ${error}`);

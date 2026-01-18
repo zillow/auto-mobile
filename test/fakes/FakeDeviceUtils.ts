@@ -37,6 +37,7 @@ export class FakeDeviceUtils implements PlatformDeviceManager {
     // Track running device names
     devices.forEach(device => {
       this.runningDeviceNames.add(device.name);
+      this.runningDeviceNames.add(device.deviceId);
     });
   }
 
@@ -49,6 +50,7 @@ export class FakeDeviceUtils implements PlatformDeviceManager {
     const existing = this.bootedDevices.get(platform) || [];
     this.bootedDevices.set(platform, [...existing, device]);
     this.runningDeviceNames.add(device.name);
+    this.runningDeviceNames.add(device.deviceId);
   }
 
   /**
@@ -126,6 +128,9 @@ export class FakeDeviceUtils implements PlatformDeviceManager {
 
   async isDeviceImageRunning(device: DeviceInfo): Promise<boolean> {
     this.executedOperations.push(`isDeviceImageRunning:${device.name}`);
+    if (device.deviceId && this.runningDeviceNames.has(device.deviceId)) {
+      return true;
+    }
     return this.runningDeviceNames.has(device.name);
   }
 
@@ -144,6 +149,9 @@ export class FakeDeviceUtils implements PlatformDeviceManager {
   async startDevice(device: DeviceInfo): Promise<ChildProcess> {
     this.executedOperations.push(`startDevice:${device.name}`);
     this.runningDeviceNames.add(device.name);
+    if (device.deviceId) {
+      this.runningDeviceNames.add(device.deviceId);
+    }
 
     // Return mock process if configured, otherwise return a default mock
     if (this.mockChildProcesses.has(device.name)) {

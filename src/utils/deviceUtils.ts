@@ -101,7 +101,7 @@ export class MultiPlatformDeviceManager implements PlatformDeviceManager {
       case "android":
         return this.emulator.isAvdRunning(device.name);
       case "ios":
-        return this.simctl.isSimulatorRunning(device.name);
+        return this.simctl.isSimulatorRunning(device.deviceId ?? device.name);
     }
   }
 
@@ -130,6 +130,10 @@ export class MultiPlatformDeviceManager implements PlatformDeviceManager {
   async startDevice(
     device: DeviceInfo
   ): Promise<ChildProcess> {
+    if (device.platform === "ios" && !device.deviceId) {
+      throw new ActionableError("iOS simulator deviceId (UDID) is required to start a simulator.");
+    }
+
     const isRunning = await this.isDeviceImageRunning(device);
     if (isRunning) {
       throw new ActionableError(
@@ -141,7 +145,7 @@ export class MultiPlatformDeviceManager implements PlatformDeviceManager {
       case "android":
         return this.emulator.startEmulator(device.name);
       case "ios":
-        return this.simctl.startSimulator(device.name);
+        return this.simctl.startSimulator(device.deviceId!);
       default:
         throw new ActionableError("Unknown platform");
     }
@@ -177,7 +181,10 @@ export class MultiPlatformDeviceManager implements PlatformDeviceManager {
       case "android":
         return this.emulator.waitForEmulatorReady(device.name, timeoutMs);
       case "ios":
-        return this.simctl.waitForSimulatorReady(device.name);
+        if (!device.deviceId) {
+          throw new ActionableError("iOS simulator deviceId (UDID) is required to wait for readiness.");
+        }
+        return this.simctl.waitForSimulatorReady(device.deviceId);
       default:
         throw new ActionableError("Unknown platform");
     }
