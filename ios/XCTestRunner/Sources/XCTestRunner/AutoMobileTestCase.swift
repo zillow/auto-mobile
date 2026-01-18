@@ -34,15 +34,11 @@ open class AutoMobileTestCase: XCTestCase {
         logTimingOrdering(selection: orderingSelection, timingAvailable: timingAvailable)
 
         let timingOrderingActive = orderingSelection.resolved != .none && timingAvailable
-        let orderedTests = timingOrderingActive
-            ? orderTestsByTiming(tests, strategy: orderingSelection.resolved)
-            : tests
-
-        let suite = XCTestSuite(name: String(describing: self))
-        for test in orderedTests {
-            suite.addTest(test)
+        if timingOrderingActive {
+            let orderedTests = orderTestsByTiming(tests, strategy: orderingSelection.resolved)
+            baseSuite.setValue(orderedTests, forKey: "tests")
         }
-        return suite
+        return baseSuite
     }
     open var planPath: String {
         if let value = environment.firstNonEmpty(["AUTOMOBILE_TEST_PLAN", "PLAN_PATH"]) {
