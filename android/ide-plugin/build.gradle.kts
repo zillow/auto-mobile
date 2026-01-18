@@ -5,7 +5,7 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
   kotlin("plugin.compose")
   id("org.jetbrains.intellij.platform") version "2.10.5"
-  id("org.jetbrains.compose") version "1.8.0"
+  id("org.jetbrains.compose") version "1.10.0"
 }
 
 repositories {
