@@ -45,7 +45,8 @@ export class WcagAudit {
       const contrastViolations = await this.checkContrastRatios(
         elements,
         screenshotPath,
-        config.level
+        config.level,
+        config.contrast
       );
       violations.push(...contrastViolations);
     }
@@ -147,7 +148,8 @@ export class WcagAudit {
   private async checkContrastRatios(
     elements: Element[],
     screenshotPath: string,
-    wcagLevel: string
+    wcagLevel: string,
+    contrastConfig?: AccessibilityAuditConfig["contrast"]
   ): Promise<WcagViolation[]> {
     const violations: WcagViolation[] = [];
 
@@ -155,7 +157,8 @@ export class WcagAudit {
     const textElements = elements.filter(e => e.text && e.text.trim().length > 0);
 
     // Use batch processing for optimal performance
-    const results = await this.contrastChecker.checkContrastBatch(
+    const checker = contrastConfig ? new ContrastChecker(contrastConfig) : this.contrastChecker;
+    const results = await checker.checkContrastBatch(
       screenshotPath,
       textElements,
       wcagLevel as "A" | "AA" | "AAA"
@@ -163,17 +166,24 @@ export class WcagAudit {
 
     // Process results and create violations
     for (const [element, result] of results.entries()) {
-      if (result && result.ratio < result.requiredRatio) {
+      if (result && result.minRatio < result.requiredRatio) {
+        const ratioText = result.minRatio.toFixed(2);
+        const maxText = result.maxRatio.toFixed(2);
+        const avgText = result.avgRatio.toFixed(2);
+        const shadowNote = result.shadowDetected ? " (shadow-enhanced)" : "";
         violations.push({
           type: "insufficient-contrast",
           severity: wcagLevel === "AAA" ? "warning" : "error",
           criterion: "1.4.3", // Contrast (Minimum) for AA, 1.4.6 for AAA
-          message: `Text has insufficient contrast ratio: ${result.ratio.toFixed(2)}:1 (required: ${result.requiredRatio}:1)`,
+          message: `Text has insufficient contrast ratio: ${ratioText}:1 (required: ${result.requiredRatio}:1)`,
           element,
           details: {
-            contrastRatio: parseFloat(result.ratio.toFixed(2)),
+            contrastRatio: parseFloat(ratioText),
+            contrastMinRatio: parseFloat(ratioText),
+            contrastMaxRatio: parseFloat(maxText),
+            contrastAvgRatio: parseFloat(avgText),
             requiredRatio: result.requiredRatio,
-            explanation: `Text color RGB(${result.textColor.r},${result.textColor.g},${result.textColor.b}) on background RGB(${result.backgroundColor.r},${result.backgroundColor.g},${result.backgroundColor.b})`,
+            explanation: `Text color RGB(${result.textColor.r},${result.textColor.g},${result.textColor.b}) on background RGB(${result.backgroundColor.r},${result.backgroundColor.g},${result.backgroundColor.b}). Samples min/avg/max=${ratioText}/${avgText}/${maxText}${shadowNote}.`,
           },
           fingerprint: this.generateFingerprint(element, "insufficient-contrast"),
         });

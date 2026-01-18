@@ -15,10 +15,38 @@ interface RGB {
   b: number;
 }
 
+interface RGBA extends RGB {
+  a: number;
+}
+
+interface ContrastSample {
+  x: number;
+  y: number;
+  ratio: number;
+  backgroundColor: RGB;
+}
+
+type GradientDirection = "horizontal" | "vertical" | "diagonal-down" | "diagonal-up";
+
+interface GradientInfo {
+  isGradient: boolean;
+  direction: GradientDirection;
+  variance: number;
+  startColor: RGB;
+  endColor: RGB;
+}
+
 interface ContrastResult {
   ratio: number;
+  minRatio: number;
+  maxRatio: number;
+  avgRatio: number;
+  samples: ContrastSample[];
   textColor: RGB;
   backgroundColor: RGB;
+  gradient?: GradientInfo;
+  shadowDetected: boolean;
+  baseRequiredRatio: number;
   meetsAA: boolean;
   meetsAAA: boolean;
   requiredRatio: number;
@@ -28,6 +56,21 @@ interface ContrastResult {
  * Configuration options for contrast checking caches
  */
 export interface ContrastCheckConfig {
+  /** Enable multi-point sampling for contrast (default: true) */
+  useMultiPointSampling?: boolean;
+
+  /** Detect gradients and sample along gradient direction (default: true) */
+  detectGradients?: boolean;
+
+  /** Composite semi-transparent overlays when sampling colors (default: false) */
+  compositeOverlays?: boolean;
+
+  /** Detect text shadows and adjust contrast thresholds (default: false) */
+  detectTextShadows?: boolean;
+
+  /** Number of sampling points (default: 9) */
+  samplingPoints?: 5 | 9 | 13;
+
   /** Enable screenshot caching (default: true) */
   enableScreenshotCache?: boolean;
 
@@ -121,6 +164,11 @@ export class ContrastChecker {
 
   constructor(config: ContrastCheckConfig = {}) {
     this.config = {
+      useMultiPointSampling: config.useMultiPointSampling ?? true,
+      detectGradients: config.detectGradients ?? true,
+      compositeOverlays: config.compositeOverlays ?? false,
+      detectTextShadows: config.detectTextShadows ?? false,
+      samplingPoints: config.samplingPoints ?? 9,
       enableScreenshotCache: config.enableScreenshotCache ?? true,
       enableColorPairCache: config.enableColorPairCache ?? true,
       enableElementCache: config.enableElementCache ?? true,
@@ -287,21 +335,98 @@ export class ContrastChecker {
     // Sample text color (from center region of element)
     const textColor = await this.sampleTextColor(image, element.bounds);
 
-    // Sample background color (from edges and surrounding area)
-    const backgroundColor = await this.sampleBackgroundColor(image, element.bounds);
+    if (!this.config.useMultiPointSampling) {
+      const backgroundColor = await this.sampleBackgroundEdgeColor(image, element.bounds);
+      const ratio = this.getCachedContrast(textColor, backgroundColor);
+      const shadowDetected = this.config.detectTextShadows
+        ? this.detectTextShadow(image, element.bounds, textColor, backgroundColor)
+        : false;
+      const baseRequiredRatio = this.getRequiredContrastRatio(element, wcagLevel);
+      const requiredRatio = this.applyShadowAdjustment(baseRequiredRatio, element, shadowDetected);
+      const meetsAA = ratio >= this.applyShadowAdjustment(
+        this.getRequiredContrastRatio(element, "AA"),
+        element,
+        shadowDetected
+      );
+      const meetsAAA = ratio >= this.applyShadowAdjustment(
+        this.getRequiredContrastRatio(element, "AAA"),
+        element,
+        shadowDetected
+      );
 
-    // Phase 2: Calculate contrast ratio with caching
-    const ratio = this.getCachedContrast(textColor, backgroundColor);
+      return {
+        ratio,
+        minRatio: ratio,
+        maxRatio: ratio,
+        avgRatio: ratio,
+        samples: [{ x: Math.floor((left + right) / 2), y: Math.floor((top + bottom) / 2), ratio, backgroundColor }],
+        textColor,
+        backgroundColor,
+        shadowDetected,
+        baseRequiredRatio,
+        meetsAA,
+        meetsAAA,
+        requiredRatio,
+      };
+    }
 
-    // Determine minimum required ratio based on text size
-    const requiredRatio = this.getRequiredContrastRatio(element, wcagLevel);
+    const samplePoints = this.getSamplingPoints(element.bounds, this.config.samplingPoints);
+    const baseSamples = await this.sampleBackgroundColors(image, element.bounds, textColor, samplePoints);
+    const baseGradient = this.config.detectGradients
+      ? this.detectGradient(baseSamples)
+      : null;
+
+    let samples = baseSamples;
+    let gradient: GradientInfo | undefined;
+    if (baseGradient?.isGradient) {
+      gradient = baseGradient;
+      const gradientPoints = this.getGradientSamplingPoints(element.bounds, gradient.direction);
+      const gradientSamples = await this.sampleBackgroundColors(image, element.bounds, textColor, gradientPoints);
+      samples = this.mergeSamples(baseSamples, gradientSamples);
+    }
+
+    const sampleRatios = samples.map(sample => {
+      const ratio = this.getCachedContrast(textColor, sample.backgroundColor);
+      return { ...sample, ratio };
+    });
+
+    const ratios = sampleRatios.map(sample => sample.ratio);
+    const minRatio = Math.min(...ratios);
+    const maxRatio = Math.max(...ratios);
+    const avgRatio = ratios.reduce((sum, value) => sum + value, 0) / ratios.length;
+    const backgroundColor = this.averageColor(sampleRatios.map(sample => sample.backgroundColor));
+    this.setBackgroundCache(element.bounds, backgroundColor);
+
+    const shadowDetected = this.config.detectTextShadows
+      ? this.detectTextShadow(image, element.bounds, textColor, backgroundColor)
+      : false;
+    const baseRequiredRatio = this.getRequiredContrastRatio(element, wcagLevel);
+    const requiredRatio = this.applyShadowAdjustment(baseRequiredRatio, element, shadowDetected);
+
+    const meetsAA = minRatio >= this.applyShadowAdjustment(
+      this.getRequiredContrastRatio(element, "AA"),
+      element,
+      shadowDetected
+    );
+    const meetsAAA = minRatio >= this.applyShadowAdjustment(
+      this.getRequiredContrastRatio(element, "AAA"),
+      element,
+      shadowDetected
+    );
 
     return {
-      ratio,
+      ratio: minRatio,
+      minRatio,
+      maxRatio,
+      avgRatio,
+      samples: sampleRatios,
       textColor,
       backgroundColor,
-      meetsAA: ratio >= this.getRequiredContrastRatio(element, "AA"),
-      meetsAAA: ratio >= this.getRequiredContrastRatio(element, "AAA"),
+      gradient,
+      shadowDetected,
+      baseRequiredRatio,
+      meetsAA,
+      meetsAAA,
       requiredRatio,
     };
   }
@@ -494,8 +619,8 @@ export class ContrastChecker {
       for (let y = centerY - sampleSize; y <= centerY + sampleSize; y++) {
         if (x >= left && x < right && y >= top && y < bottom) {
           try {
-            const pixel = intToRGBA(image.getPixelColor(x, y));
-            colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
+            const color = this.resolvePixelColor(image, x, y);
+            colors.push(color);
           } catch (e) {
             // Skip invalid pixels
           }
@@ -508,75 +633,112 @@ export class ContrastChecker {
   }
 
   /**
-   * Sample the background color from the edges and surrounding area
-   * Phase 5: Includes caching for background colors by bounds
+   * Sample background colors for a set of points
    */
-  private async sampleBackgroundColor(image: Jimp, bounds: Element["bounds"]): Promise<RGB> {
-    // Phase 5: Check background color cache
+  private async sampleBackgroundColors(
+    image: Jimp,
+    bounds: Element["bounds"],
+    textColor: RGB,
+    points: Array<{ x: number; y: number }>
+  ): Promise<ContrastSample[]> {
+    const samples: ContrastSample[] = [];
+    for (const point of points) {
+      const backgroundColor = await this.sampleBackgroundAtPoint(image, bounds, textColor, point.x, point.y);
+      samples.push({
+        x: point.x,
+        y: point.y,
+        ratio: 0,
+        backgroundColor,
+      });
+    }
+    return samples;
+  }
+
+  private async sampleBackgroundAtPoint(
+    image: Jimp,
+    bounds: Element["bounds"],
+    textColor: RGB,
+    x: number,
+    y: number
+  ): Promise<RGB> {
+    const searchRadii = [2, 4, 6, 8];
+    for (const radius of searchRadii) {
+      const colors: RGB[] = [];
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          const sampleX = this.clamp(x + dx, bounds.left, bounds.right - 1);
+          const sampleY = this.clamp(y + dy, bounds.top, bounds.bottom - 1);
+          const color = this.resolvePixelColor(image, sampleX, sampleY);
+          if (!this.isSimilarColor(color, textColor)) {
+            colors.push(color);
+          }
+        }
+      }
+      if (colors.length > 0) {
+        return this.averageColor(colors);
+      }
+    }
+
     if (this.config.enableBackgroundCache) {
-      const key = `${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}`;
-      const cached = this.bgColorCache.get(key);
+      const cached = this.getBackgroundCache(bounds);
       if (cached) {
-        this.bgColorHits++;
         return cached;
       }
-      this.bgColorMisses++;
+    }
+
+    return await this.sampleBackgroundEdgeColor(image, bounds);
+  }
+
+  private async sampleBackgroundEdgeColor(image: Jimp, bounds: Element["bounds"]): Promise<RGB> {
+    const cached = this.config.enableBackgroundCache ? this.getBackgroundCache(bounds) : null;
+    if (cached) {
+      return cached;
     }
 
     const { left, top, right, bottom } = bounds;
     const colors: RGB[] = [];
-
-    // Sample from edges of the element
     const edgeSampleSize = 2;
 
-    // Top and bottom edges
     for (let x = left; x < right; x += 3) {
       for (let y = top; y < top + edgeSampleSize; y++) {
         try {
-          const pixel = intToRGBA(image.getPixelColor(x, y));
-          colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
+          colors.push(this.resolvePixelColor(image, x, y));
         } catch (e) {
           // Skip
         }
       }
       for (let y = bottom - edgeSampleSize; y < bottom; y++) {
         try {
-          const pixel = intToRGBA(image.getPixelColor(x, y));
-          colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
+          colors.push(this.resolvePixelColor(image, x, y));
         } catch (e) {
           // Skip
         }
       }
     }
 
-    // Left and right edges
     for (let y = top; y < bottom; y += 3) {
       for (let x = left; x < left + edgeSampleSize; x++) {
         try {
-          const pixel = intToRGBA(image.getPixelColor(x, y));
-          colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
+          colors.push(this.resolvePixelColor(image, x, y));
         } catch (e) {
           // Skip
         }
       }
       for (let x = right - edgeSampleSize; x < right; x++) {
         try {
-          const pixel = intToRGBA(image.getPixelColor(x, y));
-          colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
+          colors.push(this.resolvePixelColor(image, x, y));
         } catch (e) {
           // Skip
         }
       }
     }
 
-    // If we couldn't sample edges, try surrounding area
     if (colors.length === 0) {
       const margin = 5;
       for (let x = Math.max(0, left - margin); x < left; x++) {
         for (let y = top; y < bottom; y += 3) {
           try {
-            const pixel = intToRGBA(image.getPixelColor(x, y));
-            colors.push({ r: pixel.r, g: pixel.g, b: pixel.b });
+            colors.push(this.resolvePixelColor(image, x, y));
           } catch (e) {
             // Skip
           }
@@ -585,23 +747,337 @@ export class ContrastChecker {
     }
 
     const color = this.averageColor(colors);
+    this.setBackgroundCache(bounds, color);
+    return color;
+  }
 
-    // Phase 5: Cache the background color
-    if (this.config.enableBackgroundCache) {
-      const key = `${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}`;
-      this.bgColorCache.set(key, color);
+  private getBackgroundCache(bounds: Element["bounds"]): RGB | null {
+    const key = `${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}`;
+    const cached = this.bgColorCache.get(key);
+    if (cached) {
+      this.bgColorHits++;
+      return cached;
+    }
+    this.bgColorMisses++;
+    return null;
+  }
 
-      // Cleanup background cache if needed (simple check without timestamp)
-      if (this.bgColorCache.size > this.config.maxCacheSize.backgrounds) {
-        // Remove the first (oldest) entry
-        const firstKey = this.bgColorCache.keys().next().value;
-        if (firstKey) {
-          this.bgColorCache.delete(firstKey);
+  private setBackgroundCache(bounds: Element["bounds"], color: RGB): void {
+    if (!this.config.enableBackgroundCache) {
+      return;
+    }
+    const key = `${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}`;
+    this.bgColorCache.set(key, color);
+    if (this.bgColorCache.size > this.config.maxCacheSize.backgrounds) {
+      const firstKey = this.bgColorCache.keys().next().value;
+      if (firstKey) {
+        this.bgColorCache.delete(firstKey);
+      }
+    }
+  }
+
+  private resolvePixelColor(image: Jimp, x: number, y: number): RGB {
+    const pixel = intToRGBA(image.getPixelColor(x, y)) as RGBA;
+    if (!this.config.compositeOverlays || pixel.a === 255) {
+      return { r: pixel.r, g: pixel.g, b: pixel.b };
+    }
+
+    const baseColor = this.findUnderlyingColor(image, x, y);
+    if (!baseColor) {
+      return { r: pixel.r, g: pixel.g, b: pixel.b };
+    }
+    return this.compositeColors(baseColor, pixel);
+  }
+
+  private findUnderlyingColor(image: Jimp, x: number, y: number): RGB | null {
+    for (let radius = 1; radius <= 12; radius++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          const sampleX = this.clamp(x + dx, 0, image.bitmap.width - 1);
+          const sampleY = this.clamp(y + dy, 0, image.bitmap.height - 1);
+          const pixel = intToRGBA(image.getPixelColor(sampleX, sampleY)) as RGBA;
+          if (pixel.a === 255) {
+            return { r: pixel.r, g: pixel.g, b: pixel.b };
+          }
         }
       }
     }
 
-    return color;
+    return null;
+  }
+
+  private compositeColors(baseColor: RGB, overlay: RGBA): RGB {
+    const alpha = overlay.a / 255;
+    return {
+      r: Math.round(overlay.r * alpha + baseColor.r * (1 - alpha)),
+      g: Math.round(overlay.g * alpha + baseColor.g * (1 - alpha)),
+      b: Math.round(overlay.b * alpha + baseColor.b * (1 - alpha)),
+    };
+  }
+
+  private detectGradient(samples: ContrastSample[]): GradientInfo | null {
+    if (samples.length < 5) {
+      return null;
+    }
+
+    const colors = samples.map(sample => sample.backgroundColor);
+    const variance = this.calculateColorVariance(colors);
+    const gradientThreshold = 250;
+    if (variance < gradientThreshold) {
+      return null;
+    }
+
+    const byAxis = this.calculateGradientAxes(samples);
+    const direction = byAxis.direction;
+    return {
+      isGradient: true,
+      direction,
+      variance,
+      startColor: byAxis.startColor,
+      endColor: byAxis.endColor,
+    };
+  }
+
+  private calculateColorVariance(colors: RGB[]): number {
+    const mean = this.averageColor(colors);
+    const variance =
+      colors.reduce((sum, color) => {
+        const dr = color.r - mean.r;
+        const dg = color.g - mean.g;
+        const db = color.b - mean.b;
+        return sum + dr * dr + dg * dg + db * db;
+      }, 0) / colors.length;
+    return variance / 3;
+  }
+
+  private calculateGradientAxes(samples: ContrastSample[]): {
+    direction: GradientDirection;
+    startColor: RGB;
+    endColor: RGB;
+  } {
+    const sortedByX = [...samples].sort((a, b) => a.x - b.x);
+    const sortedByY = [...samples].sort((a, b) => a.y - b.y);
+    const left = this.averageColor(sortedByX.slice(0, 3).map(sample => sample.backgroundColor));
+    const right = this.averageColor(sortedByX.slice(-3).map(sample => sample.backgroundColor));
+    const top = this.averageColor(sortedByY.slice(0, 3).map(sample => sample.backgroundColor));
+    const bottom = this.averageColor(sortedByY.slice(-3).map(sample => sample.backgroundColor));
+
+    const horizontalDelta = this.colorDistance(left, right);
+    const verticalDelta = this.colorDistance(top, bottom);
+
+    const minX = sortedByX[0].x;
+    const maxX = sortedByX[sortedByX.length - 1].x;
+    const minY = sortedByY[0].y;
+    const maxY = sortedByY[sortedByY.length - 1].y;
+
+    const topLeft = this.closestSample(samples, minX, minY).backgroundColor;
+    const topRight = this.closestSample(samples, maxX, minY).backgroundColor;
+    const bottomLeft = this.closestSample(samples, minX, maxY).backgroundColor;
+    const bottomRight = this.closestSample(samples, maxX, maxY).backgroundColor;
+
+    const diagonalDownDelta = this.colorDistance(topLeft, bottomRight);
+    const diagonalUpDelta = this.colorDistance(topRight, bottomLeft);
+
+    if (horizontalDelta >= verticalDelta && horizontalDelta >= diagonalDownDelta && horizontalDelta >= diagonalUpDelta) {
+      return { direction: "horizontal", startColor: left, endColor: right };
+    }
+    if (verticalDelta >= horizontalDelta && verticalDelta >= diagonalDownDelta && verticalDelta >= diagonalUpDelta) {
+      return { direction: "vertical", startColor: top, endColor: bottom };
+    }
+
+    if (diagonalDownDelta >= diagonalUpDelta) {
+      return { direction: "diagonal-down", startColor: topLeft, endColor: bottomRight };
+    }
+
+    return { direction: "diagonal-up", startColor: bottomLeft, endColor: topRight };
+  }
+
+  private closestSample(samples: ContrastSample[], x: number, y: number): ContrastSample {
+    let closest = samples[0];
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const sample of samples) {
+      const dx = sample.x - x;
+      const dy = sample.y - y;
+      const distance = dx * dx + dy * dy;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        closest = sample;
+      }
+    }
+    return closest;
+  }
+
+  private getGradientSamplingPoints(
+    bounds: Element["bounds"],
+    direction: GradientDirection
+  ): Array<{ x: number; y: number }> {
+    const { left, top, right, bottom } = bounds;
+    const width = right - left;
+    const height = bottom - top;
+    const inset = Math.max(1, Math.floor(Math.min(width, height) * 0.1));
+    const xStart = left + inset;
+    const xEnd = right - inset - 1;
+    const yStart = top + inset;
+    const yEnd = bottom - inset - 1;
+
+    const steps = 5;
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < steps; i++) {
+      const t = i / (steps - 1);
+      if (direction === "horizontal") {
+        points.push({
+          x: Math.round(xStart + t * (xEnd - xStart)),
+          y: Math.round((yStart + yEnd) / 2),
+        });
+      } else if (direction === "vertical") {
+        points.push({
+          x: Math.round((xStart + xEnd) / 2),
+          y: Math.round(yStart + t * (yEnd - yStart)),
+        });
+      } else if (direction === "diagonal-up") {
+        points.push({
+          x: Math.round(xStart + t * (xEnd - xStart)),
+          y: Math.round(yEnd - t * (yEnd - yStart)),
+        });
+      } else {
+        points.push({
+          x: Math.round(xStart + t * (xEnd - xStart)),
+          y: Math.round(yStart + t * (yEnd - yStart)),
+        });
+      }
+    }
+
+    return points;
+  }
+
+  private mergeSamples(baseSamples: ContrastSample[], extraSamples: ContrastSample[]): ContrastSample[] {
+    const seen = new Set<string>();
+    const merged: ContrastSample[] = [];
+    for (const sample of [...baseSamples, ...extraSamples]) {
+      const key = `${sample.x},${sample.y}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      merged.push(sample);
+    }
+    return merged;
+  }
+
+  private getSamplingPoints(
+    bounds: Element["bounds"],
+    count: 5 | 9 | 13
+  ): Array<{ x: number; y: number }> {
+    const { left, top, right, bottom } = bounds;
+    const width = right - left;
+    const height = bottom - top;
+    const inset = Math.max(1, Math.floor(Math.min(width, height) * 0.1));
+    const xStart = left + inset;
+    const xEnd = right - inset - 1;
+    const yStart = top + inset;
+    const yEnd = bottom - inset - 1;
+
+    const positions = count === 5 ? [0.5, 0.1, 0.9] : [0.1, 0.5, 0.9];
+    const points: Array<{ x: number; y: number }> = [];
+
+    if (count === 5) {
+      points.push({ x: Math.round(xStart + positions[0] * (xEnd - xStart)), y: Math.round(yStart + positions[0] * (yEnd - yStart)) });
+      points.push({ x: Math.round(xStart), y: Math.round(yStart + positions[0] * (yEnd - yStart)) });
+      points.push({ x: Math.round(xEnd), y: Math.round(yStart + positions[0] * (yEnd - yStart)) });
+      points.push({ x: Math.round(xStart + positions[0] * (xEnd - xStart)), y: Math.round(yStart) });
+      points.push({ x: Math.round(xStart + positions[0] * (xEnd - xStart)), y: Math.round(yEnd) });
+      return points;
+    }
+
+    for (const xFactor of positions) {
+      for (const yFactor of positions) {
+        points.push({
+          x: Math.round(xStart + xFactor * (xEnd - xStart)),
+          y: Math.round(yStart + yFactor * (yEnd - yStart)),
+        });
+      }
+    }
+
+    if (count === 13) {
+      points.push({ x: Math.round(xStart), y: Math.round(yStart) });
+      points.push({ x: Math.round(xEnd), y: Math.round(yStart) });
+      points.push({ x: Math.round(xStart), y: Math.round(yEnd) });
+      points.push({ x: Math.round(xEnd), y: Math.round(yEnd) });
+    }
+
+    return points;
+  }
+
+  private detectTextShadow(
+    image: Jimp,
+    bounds: Element["bounds"],
+    textColor: RGB,
+    backgroundColor: RGB
+  ): boolean {
+    const { left, top, right, bottom } = bounds;
+    const inset = 1;
+    const samplePoints = [
+      { x: left + inset, y: top + inset },
+      { x: right - inset - 1, y: top + inset },
+      { x: left + inset, y: bottom - inset - 1 },
+      { x: right - inset - 1, y: bottom - inset - 1 },
+      { x: Math.round((left + right) / 2), y: top + inset },
+      { x: Math.round((left + right) / 2), y: bottom - inset - 1 },
+      { x: left + inset, y: Math.round((top + bottom) / 2) },
+      { x: right - inset - 1, y: Math.round((top + bottom) / 2) },
+    ];
+
+    const textLuminance = this.relativeLuminance(textColor);
+    const backgroundLuminance = this.relativeLuminance(backgroundColor);
+    const textIsLighter = textLuminance > backgroundLuminance;
+    const shadowHits = samplePoints.reduce((count, point) => {
+      const pixel = this.resolvePixelColor(image, point.x, point.y);
+      if (this.isSimilarColor(pixel, textColor)) {
+        return count;
+      }
+      const luminance = this.relativeLuminance(pixel);
+      if (textIsLighter && luminance < backgroundLuminance - 0.05) {
+        return count + 1;
+      }
+      if (!textIsLighter && luminance > backgroundLuminance + 0.05) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+
+    return shadowHits >= 3;
+  }
+
+  private applyShadowAdjustment(
+    requiredRatio: number,
+    element: Element,
+    shadowDetected: boolean
+  ): number {
+    if (!shadowDetected || !this.isLargeText(element)) {
+      return requiredRatio;
+    }
+
+    return Math.max(3.0, requiredRatio - 0.5);
+  }
+
+  private isLargeText(element: Element): boolean {
+    const height = element.bounds.bottom - element.bounds.top;
+    return height >= 24;
+  }
+
+  private isSimilarColor(color: RGB, other: RGB): boolean {
+    return this.colorDistance(color, other) <= 20;
+  }
+
+  private colorDistance(a: RGB, b: RGB): number {
+    const dr = a.r - b.r;
+    const dg = a.g - b.g;
+    const db = a.b - b.b;
+    return Math.sqrt(dr * dr + dg * dg + db * db);
+  }
+
+  private clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
   }
 
   /**
@@ -662,8 +1138,7 @@ export class ContrastChecker {
   private getRequiredContrastRatio(element: Element, level: WcagLevel): number {
     // Determine if text is large (18pt or 14pt bold)
     // We approximate based on element height in pixels
-    const height = element.bounds.bottom - element.bounds.top;
-    const isLargeText = height >= 24; // Rough approximation for large text
+    const isLargeText = this.isLargeText(element);
 
     if (level === "AAA") {
       return isLargeText ? 4.5 : 7.0;

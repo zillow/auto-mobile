@@ -40,6 +40,15 @@ export interface AccessibilityAuditConfig {
 
   /** Minimum severity level to report (default: warning for threshold, error for strict) */
   minSeverity?: ViolationSeverity;
+
+  /** Contrast sampling configuration */
+  contrast?: {
+    useMultiPointSampling?: boolean;
+    detectGradients?: boolean;
+    compositeOverlays?: boolean;
+    detectTextShadows?: boolean;
+    samplingPoints?: 5 | 9 | 13;
+  };
 }
 
 /**
@@ -65,6 +74,15 @@ export interface WcagViolation {
   details?: {
     /** For contrast violations: actual contrast ratio */
     contrastRatio?: number;
+
+    /** For contrast violations: worst-case contrast ratio across samples */
+    contrastMinRatio?: number;
+
+    /** For contrast violations: best-case contrast ratio across samples */
+    contrastMaxRatio?: number;
+
+    /** For contrast violations: average contrast ratio across samples */
+    contrastAvgRatio?: number;
 
     /** For contrast violations: required minimum ratio */
     requiredRatio?: number;
