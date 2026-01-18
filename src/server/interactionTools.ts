@@ -37,7 +37,6 @@ import { AdbClient } from "../utils/android-cmdline-tools/AdbClient";
 import { defaultTimer, type Timer } from "../utils/SystemTimer";
 import {
   elementContainerSchema,
-  elementIdTextSchema,
   elementSelectionStrategySchema
 } from "./elementSelectorSchemas";
 import {
@@ -205,8 +204,6 @@ const tapOnBaseSchema = z.object({
   container: elementContainerSchema.optional().describe(
     "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }."
   ),
-  id: elementIdTextSchema.shape.id,
-  text: elementIdTextSchema.shape.text,
   action: z.enum(["tap", "doubleTap", "longPress", "focus"]).describe("Action type"),
   selectionStrategy: elementSelectionStrategySchema.optional().describe(
     "Element selection strategy when multiple matches are found (default: first)"
@@ -218,16 +215,19 @@ const tapOnBaseSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Platform")
 }).strict();
 
-export const tapOnSchema = addDeviceTargetingToSchema(tapOnBaseSchema).superRefine((value, ctx) => {
-  const hasId = value.id !== undefined;
-  const hasText = value.text !== undefined;
-  if (hasId === hasText) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Provide exactly one of id or text"
-    });
-  }
-});
+const tapOnByIdSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    id: z.string().describe("Element resource ID / accessibility identifier")
+  }).strict()
+);
+
+const tapOnByTextSchema = addDeviceTargetingToSchema(
+  tapOnBaseSchema.extend({
+    text: z.string().describe("Element text")
+  }).strict()
+);
+
+export const tapOnSchema = z.union([tapOnByIdSchema, tapOnByTextSchema]);
 
 const tapOnResultSchema = z.object({
   success: z.boolean(),
