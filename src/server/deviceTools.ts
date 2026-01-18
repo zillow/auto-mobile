@@ -6,6 +6,8 @@ import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../mode
 import { BOOTED_DEVICE_RESOURCE_URIS, notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
 import { DEVICE_IMAGE_RESOURCE_URIS } from "./deviceImageResources";
 import { syncInstalledAppResources } from "./appResources";
+import { listActiveVideoRecordings, stopVideoRecording } from "./videoRecordingManager";
+import { logger } from "../utils/logger";
 
 // Schema definitions
 export const listDeviceImagesSchema = z.object({
@@ -167,6 +169,20 @@ export function registerDeviceTools() {
 
   const killDeviceHandler = async (args: KillDeviceArgs) => {
     try {
+      const activeRecordings = await listActiveVideoRecordings({
+        deviceId: args.device.deviceId,
+        platform: args.device.platform,
+      });
+      for (const recording of activeRecordings) {
+        try {
+          await stopVideoRecording(recording.recordingId);
+        } catch (error) {
+          logger.warn(
+            `[DeviceTools] Failed to stop recording ${recording.recordingId} before shutdown: ${error}`
+          );
+        }
+      }
+
       const deviceUtils = getDeviceToolsDependencies().deviceManagerFactory();
       await deviceUtils.killDevice(args.device);
 

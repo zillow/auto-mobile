@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import path from "node:path";
 import type { WriteStream } from "node:fs";
 import fs from "fs-extra";
 import { ActionableError, BootedDevice } from "../../models";
@@ -38,6 +39,9 @@ interface IosBackendHandle {
   exitState: ProcessExitState;
   exitPromise: Promise<void>;
   stderr: string[];
+  rawOutputPath: string;
+  outputPath: string;
+  resolution?: { width: number; height: number };
 }
 
 type BackendHandle = AndroidBackendHandle | IosBackendHandle;
@@ -185,7 +189,9 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       await new Promise(resolve => setTimeout(resolve, 1000));
     } else {
       await waitForExit(backendHandle.process, backendHandle.exitPromise);
-      logger.info(`[VideoCapture] Process exited with code: ${backendHandle.exitState.exitCode}, signal: ${backendHandle.exitState.signal}`);
+      logger.info(
+        `[VideoCapture] Process exited with code: ${backendHandle.exitState.exitCode}, signal: ${backendHandle.exitState.signal}`
+      );
     }
 
     if (backendHandle.kind === "android") {
@@ -224,6 +230,8 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
           resolve(); // Don't fail the whole operation if cleanup fails
         });
       });
+    } else {
+      await this.finalizeIosRecording(backendHandle);
     }
 
     const sizeBytes = await this.getFileSize(handle.outputPath);
@@ -336,12 +344,19 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       throw new ActionableError("simctl is not available. Install Xcode command line tools.");
     }
 
+    const rawOutputPath = config.resolution
+      ? path.join(config.outputDirectory, `raw-${config.fileName}`)
+      : config.outputPath;
+
     const args = [
       "simctl",
       "io",
       device.deviceId,
       "recordVideo",
-      config.outputPath,
+      "--codec",
+      "h264",
+      "--force",
+      rawOutputPath,
     ];
 
     const process = spawn("xcrun", args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -361,6 +376,9 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       exitState,
       exitPromise,
       stderr,
+      rawOutputPath,
+      outputPath: config.outputPath,
+      resolution: config.resolution,
     };
 
     return {
@@ -379,6 +397,32 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
     return ANDROID_SCREENRECORD_MAX_SECONDS;
   }
 
+  private async finalizeIosRecording(handle: IosBackendHandle): Promise<void> {
+    const needsScale = Boolean(handle.resolution);
+    if (!needsScale) {
+      if (handle.rawOutputPath !== handle.outputPath) {
+        await this.replaceOutputFile(handle.rawOutputPath, handle.outputPath);
+      }
+      return;
+    }
+
+    const resolution = handle.resolution!;
+    const ffmpegAvailable = await this.isFfmpegAvailable();
+    if (!ffmpegAvailable) {
+      logger.warn("[VideoCapture] FFmpeg not available; keeping original iOS recording.");
+      await this.replaceOutputFile(handle.rawOutputPath, handle.outputPath);
+      return;
+    }
+
+    try {
+      await this.scaleWithFfmpeg(handle.rawOutputPath, handle.outputPath, resolution);
+      await fs.remove(handle.rawOutputPath);
+    } catch (error) {
+      logger.warn(`[VideoCapture] Failed to scale iOS recording: ${error}`);
+      await this.replaceOutputFile(handle.rawOutputPath, handle.outputPath);
+    }
+  }
+
   private async waitForSpawn(process: ChildProcessWithoutNullStreams): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       process.once("spawn", () => resolve());
@@ -393,5 +437,69 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
     } catch {
       return undefined;
     }
+  }
+
+  private async replaceOutputFile(sourcePath: string, destinationPath: string): Promise<void> {
+    if (sourcePath === destinationPath) {
+      return;
+    }
+
+    const sourceExists = await fs.pathExists(sourcePath);
+    if (!sourceExists) {
+      logger.warn(`[VideoCapture] Missing iOS recording at ${sourcePath}`);
+      return;
+    }
+
+    await fs.remove(destinationPath);
+    await fs.move(sourcePath, destinationPath, { overwrite: true });
+  }
+
+  private async isFfmpegAvailable(): Promise<boolean> {
+    return new Promise(resolve => {
+      const process = spawn("ffmpeg", ["-version"], { stdio: ["ignore", "pipe", "pipe"] });
+      process.once("error", () => resolve(false));
+      process.once("exit", code => resolve(code === 0));
+    });
+  }
+
+  private async scaleWithFfmpeg(
+    inputPath: string,
+    outputPath: string,
+    resolution: { width: number; height: number }
+  ): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      const args = [
+        "-y",
+        "-i",
+        inputPath,
+        "-vf",
+        `scale=${resolution.width}:${resolution.height}`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        outputPath,
+      ];
+
+      const process = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
+      let stderr = "";
+
+      process.stderr.on("data", chunk => {
+        stderr += chunk.toString();
+      });
+
+      process.once("error", error => reject(error));
+      process.once("exit", code => {
+        if (code === 0) {
+          resolve();
+        } else {
+          reject(new Error(stderr || `ffmpeg exited with code ${code}`));
+        }
+      });
+    });
   }
 }

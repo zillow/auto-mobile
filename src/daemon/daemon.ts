@@ -29,6 +29,10 @@ import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./appea
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "../utils/appearance/AppearanceSyncScheduler";
+import { listActiveVideoRecordings, stopVideoRecording } from "../server/videoRecordingManager";
+
+const DEVICE_DISCONNECT_POLL_INTERVAL_MS = 5000;
+const DEVICE_DISCONNECT_MISS_THRESHOLD = 2;
 
 /**
  * Main daemon process
@@ -48,6 +52,9 @@ export class Daemon {
   private debug: boolean;
   private healthCheckTimer: NodeJS.Timeout | null = null;
   private heartbeatMonitorTimer: NodeJS.Timeout | null = null;
+  private deviceDisconnectTimer: NodeJS.Timeout | null = null;
+  private deviceDisconnectMisses: Map<string, number> = new Map();
+  private stoppingRecordings: Set<string> = new Set();
   private sessionManager: SessionManager;
   private devicePool: DevicePool;
   private daemonSessionId: string;
@@ -115,6 +122,7 @@ export class Daemon {
     await startDeviceSnapshotSocketServer();
     await startAppearanceSocketServer();
     startAppearanceSyncScheduler();
+    this.startDeviceDisconnectMonitor();
 
     // Write PID file
     await this.writePidFile();
@@ -527,6 +535,68 @@ export class Daemon {
     this.heartbeatMonitorTimer.unref();
   }
 
+  private startDeviceDisconnectMonitor(): void {
+    if (this.deviceDisconnectTimer) {
+      return;
+    }
+
+    const deviceManager = new MultiPlatformDeviceManager();
+
+    this.deviceDisconnectTimer = setInterval(async () => {
+      try {
+        const bootedDevices = await deviceManager.getBootedDevices("either");
+        const bootedDeviceIds = new Set(bootedDevices.map(device => device.deviceId));
+        const activeRecordings = await listActiveVideoRecordings();
+
+        const missingByDevice = new Map<string, string[]>();
+
+        for (const recording of activeRecordings) {
+          if (bootedDeviceIds.has(recording.deviceId)) {
+            this.deviceDisconnectMisses.delete(recording.deviceId);
+            continue;
+          }
+
+          const misses = (this.deviceDisconnectMisses.get(recording.deviceId) ?? 0) + 1;
+          this.deviceDisconnectMisses.set(recording.deviceId, misses);
+          if (misses < DEVICE_DISCONNECT_MISS_THRESHOLD) {
+            continue;
+          }
+
+          if (!missingByDevice.has(recording.deviceId)) {
+            missingByDevice.set(recording.deviceId, []);
+          }
+          missingByDevice.get(recording.deviceId)!.push(recording.recordingId);
+        }
+
+        for (const [deviceId, recordingIds] of missingByDevice.entries()) {
+          for (const recordingId of recordingIds) {
+            if (this.stoppingRecordings.has(recordingId)) {
+              continue;
+            }
+            this.stoppingRecordings.add(recordingId);
+            try {
+              await stopVideoRecording(recordingId);
+              logger.warn(
+                `[Daemon] Stopped recording ${recordingId} after device ${deviceId} disconnected`
+              );
+            } catch (error) {
+              logger.warn(
+                `[Daemon] Failed to stop recording ${recordingId} after device ${deviceId} disconnected: ${error}`
+              );
+            } finally {
+              this.stoppingRecordings.delete(recordingId);
+            }
+          }
+          this.deviceDisconnectMisses.delete(deviceId);
+        }
+      } catch (error) {
+        logger.warn(`[Daemon] Device disconnect monitor failed: ${error}`);
+      }
+    }, DEVICE_DISCONNECT_POLL_INTERVAL_MS);
+
+    this.deviceDisconnectTimer.unref();
+  }
+
   private async cancelAndReleaseSession(sessionId: string): Promise<void> {
     const cancelled = await executionTracker.cancelSessionUuidExecutions(sessionId);
     const deviceId = await this.sessionManager.releaseSession(sessionId);
@@ -658,6 +728,10 @@ export class Daemon {
     if (this.heartbeatMonitorTimer) {
       clearInterval(this.heartbeatMonitorTimer);
       this.heartbeatMonitorTimer = null;
+    }
+    if (this.deviceDisconnectTimer) {
+      clearInterval(this.deviceDisconnectTimer);
+      this.deviceDisconnectTimer = null;
     }
 
     // Close Unix socket server
