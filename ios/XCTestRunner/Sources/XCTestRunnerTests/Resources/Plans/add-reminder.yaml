@@ -1,0 +1,32 @@
+---
+name: add-reminder
+description: Create a basic reminder in the iOS Reminders app (English UI assumed)
+platform: ios
+steps:
+  - tool: launchApp
+    appId: com.apple.reminders
+    label: Launch Reminders
+
+  - tool: observe
+    waitFor:
+      element:
+        text: "Reminders"
+      timeout: 20000
+    label: Wait for Reminders UI
+
+  - tool: tapOn
+    text: "New Reminder"
+    action: "tap"
+    label: Focus new reminder field
+
+  - tool: inputText
+    text: "AutoMobile XCTest demo"
+    label: Type reminder title
+
+  - tool: pressButton
+    button: "return"
+    label: Save reminder
+
+  - tool: terminateApp
+    appId: com.apple.reminders
+    label: Close Reminders
