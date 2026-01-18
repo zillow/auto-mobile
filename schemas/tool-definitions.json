@@ -433,6 +433,10 @@
         "installCmdlineTools": {
           "description": "Automatically download and install Android SDK Command-line Tools to ANDROID_HOME if missing",
           "type": "boolean"
+        },
+        "installXcodeCommandLineTools": {
+          "description": "Install Xcode Command Line Tools if missing",
+          "type": "boolean"
         }
       },
       "additionalProperties": false

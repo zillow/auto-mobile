@@ -256,7 +256,7 @@ export class Window {
       if (!packageName || !activityName) {
         const sample = stdout.trim().slice(0, 200);
         logger.warn(
-          `[WINDOW] Failed to parse active window from dumpsys output. Sample: ${sample || "<empty>"}` 
+          `[WINDOW] Failed to parse active window from dumpsys output. Sample: ${sample || "<empty>"}`
         );
       }
 

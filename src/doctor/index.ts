@@ -83,7 +83,7 @@ export async function runDoctor(
   // Run iOS checks if applicable
   let iosChecks: CheckResult[] | undefined;
   if (runIos) {
-    iosChecks = await runIosChecks();
+    iosChecks = await runIosChecks(options);
     allChecks.push(...iosChecks);
   }
 
