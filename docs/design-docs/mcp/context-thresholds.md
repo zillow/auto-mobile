@@ -216,4 +216,4 @@ Potential improvements to consider:
 
 - [MCP Resources](resources.md) - Resource system design
 - [MCP Server](index.md) - Overall MCP architecture
-- [Validation Commands](../../../CLAUDE.md) - Development validation workflows
+- [Validation Commands](https://github.com/kaeawc/auto-mobile/blob/main/CLAUDE.md) - Development validation workflows

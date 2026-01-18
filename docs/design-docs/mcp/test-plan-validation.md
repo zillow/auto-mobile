@@ -409,4 +409,4 @@ Planned improvements for YAML validation:
 - [ExecutePlan Assertions Design](../plat/android/executeplan-assertions.md) - Design doc for assertion expectations
 - [MCP Migrations](storage/migrations.md) - Migration system design
 - [UI Tests Guide](../../using/ui-tests.md) - Guide for using AutoMobile for UI testing
-- [JSON Schema](../../../schemas/test-plan.schema.json) - Full schema definition
+- [JSON Schema](https://github.com/kaeawc/auto-mobile/blob/main/schemas/test-plan.schema.json) - Full schema definition
