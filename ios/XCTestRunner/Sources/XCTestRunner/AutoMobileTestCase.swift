@@ -25,7 +25,20 @@ open class AutoMobileTestCase: XCTestCase {
         if self == AutoMobileTestCase.self {
             return XCTestSuite(name: "AutoMobileTestCase")
         }
-        return super.defaultTestSuite
+        _ = AutoMobileTestObserver.registerIfNeeded()
+
+        let baseSuite = super.defaultTestSuite
+        let tests = baseSuite.tests
+        let orderingSelection = resolveTimingOrderingSelection()
+        let timingAvailable = TestTimingCache.shared.hasTimings()
+        logTimingOrdering(selection: orderingSelection, timingAvailable: timingAvailable)
+
+        let timingOrderingActive = orderingSelection.resolved != .none && timingAvailable
+        if timingOrderingActive {
+            let orderedTests = orderTestsByTiming(tests, strategy: orderingSelection.resolved)
+            baseSuite.setValue(orderedTests, forKey: "tests")
+        }
+        return baseSuite
     }
     open var planPath: String {
         if let value = environment.firstNonEmpty(["AUTOMOBILE_TEST_PLAN", "PLAN_PATH"]) {
@@ -186,49 +199,146 @@ open class AutoMobileTestCase: XCTestCase {
         }
         return "\(trimmed)/auto-mobile/streamable"
     }
-}
 
-private enum AutoMobileDaemonSocket {
-    static var defaultPath: String {
-        let uid = String(getuid())
-        return "/tmp/auto-mobile-daemon-\(uid).sock"
-    }
-}
-
-private struct AutoMobileEnvironment {
-    private let values: [String: String]
-
-    init(values: [String: String] = ProcessInfo.processInfo.environment) {
-        self.values = values
+    private enum TimingOrderingStrategy: String {
+        case none
+        case auto
+        case durationAsc
+        case durationDesc
     }
 
-    func firstNonEmpty(_ keys: [String]) -> String? {
-        for key in keys {
-            if let value = values[key], !value.isEmpty {
-                return value
-            }
+    private struct TimingOrderingSelection {
+        let requested: TimingOrderingStrategy
+        let resolved: TimingOrderingStrategy
+    }
+
+    private struct TimingCandidate {
+        let test: XCTest
+        let index: Int
+        let durationMs: Int?
+    }
+
+    private class func resolveTimingOrderingSelection() -> TimingOrderingSelection {
+        let rawValue = timingConfigValue("automobile.junit.timing.ordering")?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "auto"
+        let requested = parseTimingOrderingStrategy(rawValue)
+        let parallelWorkers = resolveParallelWorkerCount()
+        let resolved: TimingOrderingStrategy
+        if requested == .auto {
+            resolved = parallelWorkers > 1 ? .durationDesc : .durationAsc
+        } else {
+            resolved = requested
         }
-        return nil
+        return TimingOrderingSelection(requested: requested, resolved: resolved)
     }
 
-    func intValue(_ keys: [String]) -> Int? {
-        if let stringValue = firstNonEmpty(keys) {
-            return Int(stringValue)
+    private class func parseTimingOrderingStrategy(_ rawValue: String) -> TimingOrderingStrategy {
+        switch rawValue {
+        case "auto":
+            return .auto
+        case "duration-asc", "duration_asc", "shortest-first", "shortest_first", "shortest":
+            return .durationAsc
+        case "duration-desc", "duration_desc", "longest-first", "longest_first", "longest":
+            return .durationDesc
+        case "none", "off", "false", "disabled":
+            return .none
+        default:
+            return .none
         }
-        return nil
     }
 
-    func doubleValue(_ keys: [String]) -> Double? {
-        if let stringValue = firstNonEmpty(keys) {
-            return Double(stringValue)
+    private class func resolveParallelWorkerCount() -> Int {
+        if let argumentValue = argumentValue(flag: "-parallel-testing-worker-count"),
+           let workerCount = Int(argumentValue), workerCount > 0 {
+            return workerCount
         }
-        return nil
+        if let envValue = ProcessInfo.processInfo.environment["XCTEST_PARALLEL_THREAD_COUNT"],
+           let workerCount = Int(envValue), workerCount > 0 {
+            return workerCount
+        }
+        return 1
     }
 
-    func boolValue(_ keys: [String]) -> Bool? {
-        guard let value = firstNonEmpty(keys) else {
+    private class func argumentValue(flag: String) -> String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: flag), arguments.indices.contains(index + 1) else {
             return nil
         }
-        return ["1", "true", "yes", "y"].contains(value.lowercased())
+        return arguments[index + 1]
+    }
+
+    private class func logTimingOrdering(selection: TimingOrderingSelection, timingAvailable: Bool) {
+        if selection.requested == .auto {
+            print("AutoMobileTestCase: Timing ordering=auto (resolved=\(selection.resolved.rawValue)), timing data available=\(timingAvailable)")
+        } else {
+            print("AutoMobileTestCase: Timing ordering=\(selection.requested.rawValue), timing data available=\(timingAvailable)")
+        }
+    }
+
+    private class func orderTestsByTiming(
+        _ tests: [XCTest],
+        strategy: TimingOrderingStrategy
+    ) -> [XCTest] {
+        if strategy == .none || tests.isEmpty {
+            return tests
+        }
+
+        let candidates = tests.enumerated().map { index, test in
+            guard let testCase = test as? XCTestCase,
+                  let methodName = testMethodName(from: testCase) else {
+                return TimingCandidate(test: test, index: index, durationMs: nil)
+            }
+            let className = String(describing: type(of: testCase))
+            let durationMs = TestTimingCache.shared.getTiming(testClass: className, testMethod: methodName)?.averageDurationMs
+            return TimingCandidate(test: test, index: index, durationMs: durationMs)
+        }
+
+        let withTiming = candidates.filter { $0.durationMs != nil }
+        let withoutTiming = candidates.filter { $0.durationMs == nil }
+
+        if withTiming.isEmpty {
+            return tests
+        }
+
+        let sortedWithTiming: [TimingCandidate]
+        switch strategy {
+        case .durationDesc:
+            sortedWithTiming = withTiming.sorted {
+                if $0.durationMs == $1.durationMs {
+                    return $0.index < $1.index
+                }
+                return ($0.durationMs ?? 0) > ($1.durationMs ?? 0)
+            }
+        case .durationAsc:
+            sortedWithTiming = withTiming.sorted {
+                if $0.durationMs == $1.durationMs {
+                    return $0.index < $1.index
+                }
+                return ($0.durationMs ?? 0) < ($1.durationMs ?? 0)
+            }
+        case .auto, .none:
+            sortedWithTiming = withTiming
+        }
+
+        let sortedWithoutTiming = withoutTiming.sorted { $0.index < $1.index }
+        return sortedWithTiming.map { $0.test } + sortedWithoutTiming.map { $0.test }
+    }
+
+    private class func timingConfigValue(_ key: String) -> String? {
+        if let value = UserDefaults.standard.object(forKey: key) {
+            if let stringValue = value as? String {
+                return stringValue
+            }
+            return String(describing: value)
+        }
+        return ProcessInfo.processInfo.environment[key]
+    }
+
+    private class func testMethodName(from testCase: XCTestCase) -> String? {
+        let fullName = testCase.name
+        if let range = fullName.range(of: " ") {
+            let suffix = fullName[range.upperBound...]
+            return suffix.trimmingCharacters(in: CharacterSet(charactersIn: "]"))
+        }
+        return fullName
     }
 }

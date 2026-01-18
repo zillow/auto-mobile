@@ -294,6 +294,10 @@ private final class FakeMCPClient: AutoMobileMCPClient {
         return try queuedResults.removeFirst().get()
     }
 
+    func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
+        return MCPResourceResponse(text: "{}")
+    }
+
     func resetSession() {}
 }
 

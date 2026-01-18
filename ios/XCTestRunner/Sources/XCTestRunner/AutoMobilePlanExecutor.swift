@@ -140,6 +140,10 @@ public struct MCPToolResponse {
     public let text: String
 }
 
+public struct MCPResourceResponse {
+    public let text: String
+}
+
 public enum MCPClientError: Error, CustomStringConvertible, Equatable {
     case invalidEndpoint(String)
     case invalidResponse(String)
@@ -181,6 +185,7 @@ public enum MCPClientError: Error, CustomStringConvertible, Equatable {
 public protocol AutoMobileMCPClient {
     func initialize(timeout: TimeInterval) throws
     func callTool(name: String, arguments: [String: Any], timeout: TimeInterval) throws -> MCPToolResponse
+    func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse
     func resetSession()
 }
 
@@ -209,6 +214,15 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
         let result = try sendRequest(method: "tools/call", params: params, timeout: timeout)
         let text = try extractTextContent(from: result)
         return MCPToolResponse(text: text)
+    }
+
+    public func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
+        let params: [String: Any] = [
+            "uri": uri
+        ]
+        let result = try sendRequest(method: "resources/read", params: params, timeout: timeout)
+        let text = try extractResourceTextContent(from: result)
+        return MCPResourceResponse(text: text)
     }
 
     public func resetSession() {
@@ -372,6 +386,16 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
         }
         throw MCPClientError.invalidResponse("Missing text content")
     }
+
+    private func extractResourceTextContent(from result: [String: Any]) throws -> String {
+        guard let contents = result["contents"] as? [[String: Any]], let first = contents.first else {
+            throw MCPClientError.invalidResponse("Missing resource contents")
+        }
+        if let text = first["text"] as? String {
+            return text
+        }
+        throw MCPClientError.invalidResponse("Missing resource text content")
+    }
 }
 
 public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
@@ -422,6 +446,28 @@ public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
             let result = try sendRequest(method: "tools/call", params: params, timeout: timeout)
             let text = try extractTextContent(from: result)
             return MCPToolResponse(text: text)
+        }
+    }
+
+    public func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
+        if sessionId == nil {
+            try initialize(timeout: timeout)
+        }
+
+        let params: [String: Any] = [
+            "uri": uri
+        ]
+
+        do {
+            let result = try sendRequest(method: "resources/read", params: params, timeout: timeout)
+            let text = try extractResourceTextContent(from: result)
+            return MCPResourceResponse(text: text)
+        } catch let error as MCPClientError where error == .sessionExpired {
+            resetSession()
+            try initialize(timeout: timeout)
+            let result = try sendRequest(method: "resources/read", params: params, timeout: timeout)
+            let text = try extractResourceTextContent(from: result)
+            return MCPResourceResponse(text: text)
         }
     }
 
@@ -541,6 +587,16 @@ public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
             }
         }
         throw MCPClientError.invalidResponse("Missing text content")
+    }
+
+    private func extractResourceTextContent(from result: [String: Any]) throws -> String {
+        guard let contents = result["contents"] as? [[String: Any]], let first = contents.first else {
+            throw MCPClientError.invalidResponse("Missing resource contents")
+        }
+        if let text = first["text"] as? String {
+            return text
+        }
+        throw MCPClientError.invalidResponse("Missing resource text content")
     }
 }
 
@@ -686,7 +742,7 @@ public final class AutoMobilePlanExecutor {
         mcpClient: AutoMobileMCPClient? = nil,
         timer: AutoMobileTimer = SystemTimer(),
         logger: AutoMobileLogger = StdoutLogger(),
-        sessionIdProvider: @escaping () -> String = { UUID().uuidString }
+        sessionIdProvider: @escaping () -> String = { AutoMobileSession.currentSessionUuid() }
     ) {
         self.configuration = configuration
         self.planLoader = planLoader
@@ -873,6 +929,10 @@ private final class FailingMCPClient: AutoMobileMCPClient {
     }
 
     func callTool(name: String, arguments: [String: Any], timeout: TimeInterval) throws -> MCPToolResponse {
+        throw error
+    }
+
+    func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
         throw error
     }
 
