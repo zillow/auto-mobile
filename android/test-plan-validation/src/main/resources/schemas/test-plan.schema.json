@@ -16,12 +16,27 @@
       "type": "string",
       "description": "Human-readable description of what this test plan does"
     },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "android",
+        "ios"
+      ],
+      "description": "Optional platform hint for plan execution"
+    },
     "devices": {
       "type": "array",
-      "description": "List of device labels for multi-device test execution. Required when using device parameters or criticalSection.",
+      "description": "List of device labels or device definitions for multi-device test execution. Required when using device parameters or criticalSection.",
       "items": {
-        "type": "string",
-        "minLength": 1
+        "oneOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "$ref": "#/$defs/planDevice"
+          }
+        ]
       },
       "minItems": 1,
       "uniqueItems": true
@@ -113,6 +128,34 @@
     }
   },
   "$defs": {
+    "planDevice": {
+      "type": "object",
+      "required": ["label", "platform"],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Device label for multi-device routing",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
+          ],
+          "description": "Target platform for this device"
+        },
+        "simulatorType": {
+          "type": "string",
+          "description": "iOS simulator type (e.g., iPhone 15 Pro)"
+        },
+        "iosVersion": {
+          "type": "string",
+          "description": "iOS version for simulator selection"
+        }
+      }
+    },
     "planStep": {
       "type": "object",
       "required": ["tool"],

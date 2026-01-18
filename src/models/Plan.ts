@@ -1,13 +1,24 @@
+import { Platform } from "./Platform";
+
 export interface PlanStep {
   tool: string;
   params: Record<string, any>;
   label?: string;
 }
 
+export interface PlanDeviceDefinition {
+  label: string;
+  platform: Platform;
+  simulatorType?: string;
+  iosVersion?: string;
+}
+
+export type PlanDevice = string | PlanDeviceDefinition;
+
 export interface Plan {
   name: string;
   description?: string;
-  devices?: string[];
+  devices?: PlanDevice[];
   steps: PlanStep[];
   mcpVersion?: string;
   metadata?: {

@@ -33,6 +33,23 @@ describe("PlanValidator", () => {
       expect(() => PlanValidator.validate(plan)).not.toThrow();
     });
 
+    test("should validate a multi-device plan with device definitions", () => {
+      const plan: Plan = {
+        name: "Multi-Device Plan",
+        devices: [
+          { label: "A", platform: "ios", simulatorType: "iPhone 15 Pro" },
+          { label: "B", platform: "ios", iosVersion: "17.5" },
+        ],
+        steps: [
+          { tool: "observe", params: { device: "A" } },
+          { tool: "tapOn", params: { text: "Login", device: "B" } },
+          { tool: "observe", params: { device: "A" } },
+        ],
+      };
+
+      expect(() => PlanValidator.validate(plan)).not.toThrow();
+    });
+
     test("should validate critical sections without device labels", () => {
       const plan: Plan = {
         name: "Plan with Critical Section",
@@ -81,6 +98,20 @@ describe("PlanValidator", () => {
 
       expect(() => PlanValidator.validate(plan)).toThrow(ActionableError);
       expect(() => PlanValidator.validate(plan)).toThrow("duplicate labels");
+    });
+
+    test("should throw when devices mixes labels and objects", () => {
+      const plan: Plan = {
+        name: "Invalid Plan",
+        devices: ["A", { label: "B", platform: "ios" }],
+        steps: [
+          { tool: "observe", params: { device: "A" } },
+          { tool: "observe", params: { device: "B" } },
+        ],
+      };
+
+      expect(() => PlanValidator.validate(plan)).toThrow(ActionableError);
+      expect(() => PlanValidator.validate(plan)).toThrow("do not mix formats");
     });
 
     test("should throw when device labels contain non-strings", () => {
