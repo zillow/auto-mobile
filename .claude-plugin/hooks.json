@@ -1,0 +1,13 @@
+{
+  "PostToolUse": [
+    {
+      "matcher": "mcp__auto-mobile__*",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "if echo \"$CLAUDE_TOOL_STDOUT\" | grep -qiE '(ANDROID_HOME|JAVA_HOME|adb.*not found|device.*not found|no devices|daemon.*not running|accessibility.*not|emulator.*not|simulator.*not|xcode.*not|xcrun.*failed|simctl.*error|provisioning.*profile)'; then echo '{\"decision\": \"block\", \"reason\": \"AutoMobile error detected. Run /doctor to diagnose and fix the issue.\"}'; fi"
+        }
+      ]
+    }
+  ]
+}
