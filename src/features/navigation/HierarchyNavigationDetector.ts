@@ -1,4 +1,5 @@
 import { logger } from "../../utils/logger";
+import { TimingEntry } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { NavigationGraphManager } from "./NavigationGraphManager";
 import {
@@ -17,6 +18,13 @@ export interface HierarchyNavigationDetectorOptions {
   stabilityTimeoutMs?: number;
   /** Timer for setTimeout/clearTimeout (default: defaultTimer) */
   timer?: Timer;
+}
+
+export interface HierarchyNavigationUpdateMetrics {
+  source?: "android" | "ios";
+  conversionMs?: number;
+  externalTiming?: TimingEntry | TimingEntry[];
+  fingerprintMs?: number;
 }
 
 const DEFAULT_OPTIONS: Required<Omit<HierarchyNavigationDetectorOptions, "timer">> & { timer: Timer } = {
@@ -56,6 +64,8 @@ export class HierarchyNavigationDetector {
   private debounceTimer: NodeJS.Timeout | null = null;
   /** Stability timeout timer handle */
   private stabilityTimeoutTimer: NodeJS.Timeout | null = null;
+  /** Last recorded performance metrics for debugging */
+  private lastUpdateMetrics: HierarchyNavigationUpdateMetrics | null = null;
 
   constructor(
     navigationManager: NavigationGraphManager,
@@ -71,14 +81,32 @@ export class HierarchyNavigationDetector {
    * Handle a hierarchy update from the accessibility service.
    * This is the main entry point called when new hierarchy data arrives.
    */
-  public onHierarchyUpdate(hierarchy: AccessibilityHierarchy): void {
+  public onHierarchyUpdate(
+    hierarchy: AccessibilityHierarchy,
+    metrics?: HierarchyNavigationUpdateMetrics
+  ): void {
+    const fingerprintStart = this.timer.now();
     // Compute fingerprint for this hierarchy
     const fingerprint = ScreenFingerprint.compute(hierarchy);
+    const fingerprintMs = this.timer.now() - fingerprintStart;
+
+    const updateMetrics: HierarchyNavigationUpdateMetrics = {
+      ...metrics,
+      fingerprintMs,
+    };
+    this.lastUpdateMetrics = updateMetrics;
 
     logger.debug(
       `[HIERARCHY_NAV] Received hierarchy update: hash=${fingerprint.hash.substring(0, 12)}, ` +
       `elements=${fingerprint.elementCount}, pkg=${fingerprint.packageName}`
     );
+    if (updateMetrics.conversionMs !== undefined || updateMetrics.externalTiming || updateMetrics.source) {
+      logger.debug(
+        `[HIERARCHY_NAV] Perf: source=${updateMetrics.source ?? "unknown"}, ` +
+        `convert=${updateMetrics.conversionMs ?? "n/a"}ms, ` +
+        `fingerprint=${updateMetrics.fingerprintMs ?? "n/a"}ms`
+      );
+    }
 
     // Check if fingerprint is different from pending
     if (this.pendingFingerprint && this.pendingFingerprint.hash === fingerprint.hash) {
@@ -202,6 +230,13 @@ export class HierarchyNavigationDetector {
    */
   public getPreviousFingerprint(): FingerprintResult | null {
     return this.previousStableFingerprint;
+  }
+
+  /**
+   * Get the last recorded performance metrics for hierarchy updates.
+   */
+  public getLastUpdateMetrics(): HierarchyNavigationUpdateMetrics | null {
+    return this.lastUpdateMetrics;
   }
 
   /**
