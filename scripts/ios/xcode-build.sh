@@ -55,6 +55,12 @@ XCODE_VERSION=$(xcodebuild -version | head -1)
 print_info "Xcode version: ${XCODE_VERSION}"
 echo ""
 
+# Skip build if iOS Simulator SDK is not installed
+if ! xcodebuild -showsdks 2>/dev/null | grep -q "iphonesimulator"; then
+    echo -e "${YELLOW}No iOS Simulator SDK detected. Skipping iOS project builds.${NC}"
+    exit 0
+fi
+
 # Find all xcodeproj directories
 echo -e "${BLUE}Searching for Xcode projects...${NC}"
 XCODEPROJ_DIRS=$(find "${IOS_DIR}" -name "*.xcodeproj" -type d 2>/dev/null || true)
