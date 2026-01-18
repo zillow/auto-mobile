@@ -1,4 +1,5 @@
 import { Plan, PlanStep } from "../../models/Plan";
+import { getPlanDeviceLabels } from "./PlanDevices";
 
 /**
  * Represents a step in a device track with position tracking.
@@ -60,7 +61,7 @@ export class PlanPartitioner {
 
     // Single device with devices array is still multi-device mode
     // (for consistency and to enable critical sections)
-    const devices = plan.devices;
+    const devices = getPlanDeviceLabels(plan.devices);
     const deviceTracks = new Map<string, TrackedStep[]>();
     const timeline: TimelineEntry[] = [];
 

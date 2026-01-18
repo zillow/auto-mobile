@@ -1,6 +1,6 @@
 import { logger } from "../utils/logger";
 import { SessionManager } from "./sessionManager";
-import { ActionableError, BootedDevice, Platform } from "../models";
+import { ActionableError, BootedDevice, DeviceInfo, Platform } from "../models";
 import { Mutex } from "async-mutex";
 import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
 import { Timer, defaultTimer } from "../utils/SystemTimer";
@@ -64,7 +64,7 @@ export class DevicePool {
     daemonSessionId: string,
     timer: Timer = defaultTimer,
     installedAppsRepository?: InstalledAppsStore,
-    deviceManager?: PlatformDeviceManager
+    deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager()
   ) {
     this.instanceId = ++DevicePool.instanceCounter;
     logger.info(`[DEVICE-POOL-DEBUG] Creating DevicePool instance #${this.instanceId}`);
@@ -72,7 +72,7 @@ export class DevicePool {
     this.daemonSessionId = daemonSessionId;
     this.timer = timer;
     this.installedAppsRepository = installedAppsRepository ?? new InstalledAppsRepository();
-    this.deviceManager = deviceManager ?? new MultiPlatformDeviceManager();
+    this.deviceManager = deviceManager;
   }
 
   /**
@@ -240,7 +240,15 @@ export class DevicePool {
 
     // Validate we have enough devices
     await this.ensurePoolRefreshed();
-    const stats = this.getStatsForPlatform(platform);
+    let stats = this.getStatsForPlatform(platform);
+
+    if (stats.total < requiredCount) {
+      const started = await this.startAdditionalDevices(requiredCount - stats.total, platform);
+      if (started > 0) {
+        await this.refreshDevices();
+        stats = this.getStatsForPlatform(platform);
+      }
+    }
 
     if (stats.total < requiredCount) {
       throw new ActionableError(
@@ -337,6 +345,57 @@ export class DevicePool {
     );
 
     return assignments;
+  }
+
+  private async startAdditionalDevices(requiredCount: number, platform?: Platform): Promise<number> {
+    if (!platform || requiredCount <= 0) {
+      return 0;
+    }
+
+    try {
+      const availableImages = await this.deviceManager.listDeviceImages(platform);
+      if (availableImages.length === 0) {
+        return 0;
+      }
+
+      const bootedDevices = await this.deviceManager.getBootedDevices(platform);
+      const bootedIds = new Set(bootedDevices.map(device => device.deviceId));
+      const candidates: DeviceInfo[] = [];
+
+      for (const image of availableImages) {
+        if (image.deviceId && bootedIds.has(image.deviceId)) {
+          continue;
+        }
+        const running = image.isRunning === true
+          ? true
+          : await this.deviceManager.isDeviceImageRunning(image);
+        if (running) {
+          continue;
+        }
+        candidates.push(image);
+      }
+
+      if (candidates.length === 0) {
+        return 0;
+      }
+
+      const toStart = candidates.slice(0, requiredCount);
+      let started = 0;
+
+      for (const device of toStart) {
+        const label = device.deviceId ?? device.name;
+        logger.info(`[DevicePool] Starting additional ${device.platform} device ${label}`);
+        await this.deviceManager.startDevice(device);
+        const ready = await this.deviceManager.waitForDeviceReady(device);
+        await this.addDevice(ready);
+        started++;
+      }
+
+      return started;
+    } catch (error) {
+      logger.warn(`[DevicePool] Failed to start additional devices: ${error}`);
+      return 0;
+    }
   }
 
   /**
@@ -504,17 +563,6 @@ export class DevicePool {
 
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: totalDevices = ${totalDevices}`);
 
-      if (!device && platform === "ios") {
-        const bootedSimulator = await this.maybeBootDedicatedIosSimulator();
-        if (bootedSimulator) {
-          candidates = this.getDevicesByPlatform(platform);
-          totalDevices = candidates.length;
-          device = candidates.find(d => d.status === "idle" && d.id === bootedSimulator.deviceId)
-            ?? candidates.find(d => d.status === "idle");
-          logger.info(`[DevicePool] Added dedicated iOS simulator ${bootedSimulator.deviceId} to pool`);
-        }
-      }
-
       if (!device) {
         // No idle device - check if devices exist but are busy
         const busyDevices = candidates.filter(
@@ -547,35 +595,6 @@ export class DevicePool {
         totalDevices,
       };
     });
-  }
-
-  private async maybeBootDedicatedIosSimulator(): Promise<BootedDevice | null> {
-    try {
-      const available = await this.deviceManager.listDeviceImages("ios");
-      const candidates = available
-        .filter(device => device.deviceId)
-        .filter(device => !this.devices.has(device.deviceId!))
-        .filter(device => !device.isRunning);
-
-      if (candidates.length === 0) {
-        return null;
-      }
-
-      candidates.sort((a, b) => (a.deviceId || "").localeCompare(b.deviceId || ""));
-      const selected = candidates[0];
-
-      logger.info(
-        `[DevicePool] Booting dedicated iOS simulator ${selected.name} (${selected.deviceId})`
-      );
-
-      await this.deviceManager.startDevice(selected);
-      const booted = await this.deviceManager.waitForDeviceReady(selected);
-      await this.addDevice(booted);
-      return booted;
-    } catch (error) {
-      logger.warn(`[DevicePool] Failed to boot dedicated iOS simulator: ${error}`);
-      return null;
-    }
   }
 
   /**

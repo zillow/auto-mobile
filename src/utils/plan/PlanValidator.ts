@@ -1,5 +1,6 @@
 import { Plan } from "../../models/Plan";
 import { ActionableError } from "../../models";
+import { normalizePlanDevices } from "./PlanDevices";
 
 /**
  * Validates a plan structure and enforces multi-device rules.
@@ -49,16 +50,43 @@ export class PlanValidator {
       );
     }
 
-    // Check for duplicates
-    const uniqueDevices = new Set(plan.devices);
-    if (uniqueDevices.size !== plan.devices.length) {
+    const { labels, definitions, hasDefinitions, hasLabels } = normalizePlanDevices(plan.devices);
+
+    if (hasDefinitions && hasLabels) {
       throw new ActionableError(
-        `Plan 'devices' array contains duplicate labels: [${plan.devices.join(", ")}]`
+        "Plan 'devices' must be a list of labels or a list of objects with label/platform (do not mix formats)."
       );
     }
 
-    // Validate each device label
-    for (const device of plan.devices) {
+    if (hasDefinitions) {
+      for (const device of definitions) {
+        if (!device.label || device.label.trim() === "") {
+          throw new ActionableError(
+            `Invalid device label: ${JSON.stringify(device.label)}. Device labels must be non-empty strings.`
+          );
+        }
+        if (!device.platform || (device.platform !== "android" && device.platform !== "ios")) {
+          throw new ActionableError(
+            `Invalid device platform for ${device.label}: ${JSON.stringify(device.platform)}.`
+          );
+        }
+      }
+    }
+
+    if (labels.length !== plan.devices.length) {
+      throw new ActionableError(
+        "Plan 'devices' entries must be strings or objects with label/platform."
+      );
+    }
+
+    const uniqueDevices = new Set(labels);
+    if (uniqueDevices.size !== labels.length) {
+      throw new ActionableError(
+        `Plan 'devices' array contains duplicate labels: [${labels.join(", ")}]`
+      );
+    }
+
+    for (const device of labels) {
       if (typeof device !== "string" || device.trim() === "") {
         throw new ActionableError(
           `Invalid device label: ${JSON.stringify(device)}. Device labels must be non-empty strings.`
@@ -76,7 +104,7 @@ export class PlanValidator {
       return;
     }
 
-    const deviceSet = new Set(plan.devices);
+    const deviceSet = new Set(normalizePlanDevices(plan.devices).labels);
     const missingLabels: Array<{ index: number; tool: string }> = [];
     const invalidLabels: Array<{ index: number; tool: string; device: string }> = [];
 
@@ -119,7 +147,7 @@ export class PlanValidator {
         .map(m => `step ${m.index} (${m.tool}): device="${m.device}"`)
         .join(", ");
       errors.push(
-        `Plan declares devices [${plan.devices.join(", ")}] but the following steps use invalid device labels: ${steps}`
+        `Plan declares devices [${Array.from(deviceSet).join(", ")}] but the following steps use invalid device labels: ${steps}`
       );
     }
 

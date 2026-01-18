@@ -54,6 +54,24 @@ describe("PlanPartitioner", () => {
       expect(trackB[1].trackIndex).toBe(1);
     });
 
+    test("should partition plan with device definitions", () => {
+      const plan: Plan = {
+        name: "Multi-Device Plan",
+        devices: [
+          { label: "A", platform: "ios" },
+          { label: "B", platform: "ios" },
+        ],
+        steps: [
+          { tool: "observe", params: { device: "A" } },
+          { tool: "tapOn", params: { text: "Login", device: "B" } },
+        ],
+      };
+
+      const result = PlanPartitioner.partition(plan);
+      expect(result).not.toBeNull();
+      expect(result!.devices).toEqual(["A", "B"]);
+    });
+
     test("should add critical sections to all device tracks", () => {
       const plan: Plan = {
         name: "Plan with Critical Section",

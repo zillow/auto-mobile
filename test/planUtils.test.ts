@@ -200,6 +200,28 @@ metadata:
       expect(plan.steps[1].params.action).toBe("tap");
     });
 
+    test("should import plan with device definitions", () => {
+      const yamlContent = `
+name: Multi-Device Plan
+devices:
+  - label: A
+    platform: ios
+  - label: B
+    platform: ios
+steps:
+  - tool: observe
+    device: A
+  - tool: observe
+    device: B
+`;
+
+      const plan = importPlanFromYaml(yamlContent);
+
+      expect(plan.devices).toHaveLength(2);
+      expect((plan.devices![0] as any).label).toBe("A");
+      expect((plan.devices![1] as any).platform).toBe("ios");
+    });
+
     test("should throw error for invalid YAML", () => {
       const invalidYaml = "invalid: yaml: content: [";
 

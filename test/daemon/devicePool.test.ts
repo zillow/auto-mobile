@@ -3,8 +3,8 @@ import { DevicePool } from "../../src/daemon/devicePool";
 import { SessionManager } from "../../src/daemon/sessionManager";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
-import { FakeDeviceUtils } from "../fakes/FakeDeviceUtils";
-import { BootedDevice } from "../../src/models";
+import { FakeDeviceManager } from "../fakes/FakeDeviceManager";
+import { BootedDevice, DeviceInfo } from "../../src/models";
 
 describe("DevicePool", () => {
   let devicePool: DevicePool;
@@ -140,29 +140,22 @@ describe("DevicePool", () => {
       const device2 = await devicePool.assignDeviceToSession("session-2");
       expect(device1).toBe(device2);
     });
+  });
 
-    test("should boot a dedicated iOS simulator when pool is empty", async () => {
-      const fakeDeviceUtils = new FakeDeviceUtils();
-      fakeDeviceUtils.setDeviceImages("ios", [
-        {
-          name: "iPhone 15",
-          platform: "ios",
-          deviceId: "ios-udid-1",
-          isRunning: false
-        }
-      ]);
+  describe("assignMultipleDevices", () => {
+    test("should boot additional iOS simulators when pool is short", async () => {
+      const images: DeviceInfo[] = [
+        { name: "iPhone 15 Pro", platform: "ios", isRunning: false, deviceId: "sim-1" },
+        { name: "iPhone 15", platform: "ios", isRunning: false, deviceId: "sim-2" },
+      ];
+      const fakeDeviceManager = new FakeDeviceManager(images);
+      devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager);
 
-      devicePool = new DevicePool(
-        sessionManager,
-        "test-daemon-session-id",
-        fakeTimer,
-        fakeAppsRepo,
-        fakeDeviceUtils
-      );
+      const assignments = await devicePool.assignMultipleDevices(["session-a", "session-b"], 1000, "ios");
 
-      const deviceId = await devicePool.assignDeviceToSession("session-1", "ios");
-      expect(deviceId).toBe("ios-udid-1");
-      expect(fakeDeviceUtils.wasMethodCalled("startDevice")).toBe(true);
+      expect(assignments.size).toBe(2);
+      expect(fakeDeviceManager.startedDevices).toHaveLength(2);
+      expect(devicePool.getTotalDeviceCount()).toBe(2);
     });
   });
 
