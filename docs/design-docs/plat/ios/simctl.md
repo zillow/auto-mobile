@@ -2,7 +2,7 @@
 
 AutoMobile uses `simctl` for iOS simulator lifecycle and app management. This layer is
 responsible for booting simulators, installing apps, launching processes, and controlling
-system-level simulator behaviors that are not handled by AXe.
+system-level simulator behaviors.
 
 ## Responsibilities
 
@@ -24,5 +24,5 @@ system-level simulator behaviors that are not handled by AXe.
 
 ## See also
 
-- [AXe automation](axe-automation.md)
+- [XCTestService](xctestrunner.md) - Touch injection and element queries.
 - [iOS overview](index.md)
