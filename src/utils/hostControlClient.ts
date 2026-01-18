@@ -2,10 +2,10 @@
  * Host Control Client
  *
  * Client for communicating with the host control daemon when running in Docker.
- * Enables Docker containers to control Android SDK tools on the host machine.
+ * Enables Docker containers to control Android SDK tools and iOS simulators on the host machine.
  */
 
-import { createConnection, Socket } from "node:net";
+import { createConnection } from "node:net";
 import { logger } from "./logger";
 
 // Configuration from environment
@@ -54,13 +54,29 @@ interface SdkInfo {
   adbPath: string;
 }
 
+// iOS-related interfaces
+interface SimulatorInfo {
+  udid: string;
+  name: string;
+  state: string;
+  runtime?: string;
+  deviceTypeIdentifier?: string;
+}
+
+interface IosInfo {
+  isMacOS: boolean;
+  xcodeVersion?: string;
+  simctlVersion?: string;
+  developerDir?: string;
+}
+
 let requestId = 0;
 
 /**
  * Send a command to the host control daemon
  */
 async function sendCommand<T>(method: string, params?: Record<string, unknown>): Promise<HostControlResult<T>> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const socket = createConnection({
       host: HOST_CONTROL_HOST,
       port: HOST_CONTROL_PORT
@@ -95,13 +111,13 @@ async function sendCommand<T>(method: string, params?: Record<string, unknown>):
       socket.write(JSON.stringify(request) + "\n");
     });
 
-    socket.on("data", (data) => {
+    socket.on("data", data => {
       buffer += data.toString();
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (!line.trim()) continue;
+        if (!line.trim()) {continue;}
 
         try {
           const response: JsonRpcResponse = JSON.parse(line);
@@ -133,7 +149,7 @@ async function sendCommand<T>(method: string, params?: Record<string, unknown>):
       resolve({ success: false, error: "Connection timed out" });
     });
 
-    socket.on("error", (err) => {
+    socket.on("error", err => {
       cleanup();
       clearTimeout(timeout);
       resolve({ success: false, error: `Connection failed: ${err.message}` });
@@ -211,6 +227,63 @@ export async function getSdkInfo(): Promise<HostControlResult<SdkInfo>> {
   return sendCommand<SdkInfo>("sdk-info");
 }
 
+// ============================================================================
+// iOS Simulator Commands (macOS only)
+// ============================================================================
+
+/**
+ * List available iOS simulators on the host
+ */
+export async function listSimulators(): Promise<HostControlResult<{ simulators: SimulatorInfo[] }>> {
+  return sendCommand("list-simulators");
+}
+
+/**
+ * List running (booted) iOS simulators on the host
+ */
+export async function listRunningSimulators(): Promise<HostControlResult<{ simulators: SimulatorInfo[] }>> {
+  return sendCommand("list-running-simulators");
+}
+
+/**
+ * Boot an iOS simulator on the host
+ */
+export async function bootSimulator(udid: string): Promise<HostControlResult<{ message: string }>> {
+  return sendCommand("boot-simulator", { udid });
+}
+
+/**
+ * Shutdown an iOS simulator on the host
+ */
+export async function shutdownSimulator(udid: string): Promise<HostControlResult<{ message: string }>> {
+  return sendCommand("shutdown-simulator", { udid });
+}
+
+/**
+ * Run a simctl command on the host
+ */
+export async function runSimctl(
+  args: string[]
+): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
+  return sendCommand("simctl", { args });
+}
+
+/**
+ * Run an xcodebuild command on the host
+ */
+export async function runXcodebuild(
+  args: string[]
+): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
+  return sendCommand("xcodebuild", { args });
+}
+
+/**
+ * Get iOS tooling information from the host
+ */
+export async function getIosInfo(): Promise<HostControlResult<IosInfo>> {
+  return sendCommand<IosInfo>("ios-info");
+}
+
 /**
  * Check if we should use host control (running in Docker with external emulator mode)
  */
@@ -235,14 +308,20 @@ export async function initHostControl(): Promise<boolean> {
   if (available) {
     const sdkInfo = await getSdkInfo();
     if (sdkInfo.success && sdkInfo.data) {
-      logger.info(`Host control connected - SDK: ${sdkInfo.data.sdkRoot}`);
+      logger.info(`Host control connected - Android SDK: ${sdkInfo.data.sdkRoot}`);
     } else {
       logger.info("Host control connected");
+    }
+
+    // Check iOS support
+    const iosInfo = await getIosInfo();
+    if (iosInfo.success && iosInfo.data?.isMacOS) {
+      logger.info(`Host control iOS available - Xcode: ${iosInfo.data.xcodeVersion?.split("\n")[0] || "Unknown"}`);
     }
   } else {
     logger.warn(
       `Host control daemon not available at ${HOST_CONTROL_HOST}:${HOST_CONTROL_PORT}. ` +
-      `Run 'node scripts/docker/host-control-daemon.js' on the host to enable emulator control.`
+      `Run 'node scripts/docker/host-control-daemon.js' on the host to enable emulator/simulator control.`
     );
   }
 
