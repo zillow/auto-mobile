@@ -26,6 +26,14 @@ CONTAINER_DEVICE_ID=""
 STARTED_HOST_EMULATOR="false"
 ACTIVE_DEVICE_ID=""
 
+# ADB Server Tunnel Mode - connect to host's ADB server instead of direct device ports
+# Set USE_ADB_SERVER_TUNNEL=true to enable
+USE_ADB_SERVER_TUNNEL="${USE_ADB_SERVER_TUNNEL:-false}"
+ADB_SERVER_PORT="${ADB_SERVER_PORT:-5037}"
+
+# Host Control Daemon - for emulator start/stop from container
+HOST_CONTROL_PORT="${HOST_CONTROL_PORT:-15037}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 CONTAINER_NAME="auto-mobile-host-emulator-test-$$"
@@ -193,6 +201,15 @@ if [[ -n "${AUTOMOBILE_EMULATOR_ARGS}" ]]; then
 fi
 if [[ "${IS_DARWIN}" == "true" ]]; then
   docker_args+=(-e "AUTOMOBILE_EMULATOR_EXTERNAL=true")
+  # ADB Server Tunnel Mode - connect to host's ADB server for full ADB support
+  if [[ "${USE_ADB_SERVER_TUNNEL}" == "true" ]]; then
+    docker_args+=(-e "AUTOMOBILE_ADB_SERVER_HOST=${HOST_GATEWAY}")
+    docker_args+=(-e "AUTOMOBILE_ADB_SERVER_PORT=${ADB_SERVER_PORT}")
+    echo -e "${GREEN}Using ADB server tunnel to ${HOST_GATEWAY}:${ADB_SERVER_PORT}${NC}"
+  fi
+  # Host Control Daemon - for emulator management from container
+  docker_args+=(-e "AUTOMOBILE_HOST_CONTROL_HOST=${HOST_GATEWAY}")
+  docker_args+=(-e "AUTOMOBILE_HOST_CONTROL_PORT=${HOST_CONTROL_PORT}")
 fi
 docker_args+=(
   -v "${HOME}/.android:/home/automobile/.android:rw"
@@ -346,15 +363,41 @@ derive_ports_from_serial() {
   fi
 }
 
+wait_for_auto_connect() {
+  # Wait for the container's auto-connect service to detect the host emulator
+  local target="$1"
+  local attempts=30
+  local delay=2
+
+  echo -e "${YELLOW}Waiting for auto-connect to detect host emulator...${NC}"
+  for ((i=1; i<=attempts; i++)); do
+    if docker exec --user automobile "${CONTAINER_NAME}" adb devices 2>/dev/null | grep -q "${target}"; then
+      echo -e "${GREEN}Auto-connect detected host emulator: ${target}${NC}"
+      return 0
+    fi
+    sleep "${delay}"
+  done
+
+  echo -e "${YELLOW}Auto-connect did not detect device; falling back to manual connection${NC}"
+  return 1
+}
+
 connect_container_to_emulator() {
   local target="$1"
   local attempts=30
   local delay=2
 
+  # First try to wait for auto-connect (enabled via AUTOMOBILE_EMULATOR_EXTERNAL=true)
+  if wait_for_auto_connect "${target}"; then
+    return 0
+  fi
+
+  # Fallback to manual connection if auto-connect doesn't work
+  echo -e "${YELLOW}Attempting manual ADB connection to ${target}...${NC}"
   for ((i=1; i<=attempts; i++)); do
     if docker exec --user automobile "${CONTAINER_NAME}" adb connect "${target}" >/dev/null 2>&1; then
       if docker exec --user automobile "${CONTAINER_NAME}" adb devices | grep -q "${target}"; then
-        echo -e "${GREEN}Connected container ADB to ${target}${NC}"
+        echo -e "${GREEN}Manually connected container ADB to ${target}${NC}"
         return 0
       fi
     fi
@@ -657,21 +700,11 @@ fi
 echo -e "${GREEN}Clock app terminated.${NC}"
 
 if [[ "${IS_DARWIN}" == "true" ]]; then
+  # On Darwin, we connect to a host emulator via network (host.docker.internal:5555).
+  # killDevice uses 'adb emu kill' which requires console port access (5554), not available
+  # over the Docker network. Skip killing from within the container.
   if [[ "${STARTED_HOST_EMULATOR}" == "true" ]]; then
-    kill_request=$(jq -c -n \
-      --arg name "${avd_name}" \
-      --arg deviceId "${CONTAINER_DEVICE_ID}" \
-      '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"killDevice","arguments":{"device":{"name":$name,"deviceId":$deviceId,"platform":"android"}}}}')
-    send_request "${kill_request}"
-    kill_response="$(read_for_id 4)"
-
-    if echo "${kill_response}" | jq -e '.error' >/dev/null 2>&1; then
-      echo -e "${RED}killDevice failed:${NC}" >&2
-      echo "${kill_response}" | jq . >&2
-      exit 1
-    fi
-
-    echo -e "${GREEN}Emulator stopped successfully.${NC}"
+    echo -e "${YELLOW}Leaving host emulator running (cannot kill via network ADB).${NC}"
   else
     echo -e "${YELLOW}Leaving existing emulator running.${NC}"
   fi
