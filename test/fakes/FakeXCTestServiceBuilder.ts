@@ -76,7 +76,7 @@ export class FakeXCTestServiceBuilder {
   /**
    * Check if a rebuild is needed
    */
-  public async needsRebuild(): Promise<boolean> {
+  public async needsRebuild(_platform?: "simulator" | "device"): Promise<boolean> {
     this.trackOperation("needsRebuild");
     return this.needsRebuildValue;
   }
@@ -84,7 +84,7 @@ export class FakeXCTestServiceBuilder {
   /**
    * Build XCTestService
    */
-  public async build(_perf?: PerformanceTracker): Promise<XCTestServiceBuildResult> {
+  public async build(_platform?: "simulator" | "device", _perf?: PerformanceTracker): Promise<XCTestServiceBuildResult> {
     this.trackOperation("build");
 
     if (this.buildShouldFail) {
@@ -110,7 +110,7 @@ export class FakeXCTestServiceBuilder {
   /**
    * Get build products path
    */
-  public async getBuildProductsPath(): Promise<string | null> {
+  public async getBuildProductsPath(_platform?: "simulator" | "device"): Promise<string | null> {
     this.trackOperation("getBuildProductsPath");
     return this.buildProductsPath;
   }
@@ -118,7 +118,7 @@ export class FakeXCTestServiceBuilder {
   /**
    * Get xctestrun path
    */
-  public async getXctestrunPath(): Promise<string | null> {
+  public async getXctestrunPath(_platform?: "simulator" | "device"): Promise<string | null> {
     this.trackOperation("getXctestrunPath");
     return this.xctestrunPath;
   }

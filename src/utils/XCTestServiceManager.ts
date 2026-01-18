@@ -5,7 +5,6 @@ import { Timer, defaultTimer } from "./SystemTimer";
 import { XCTestServiceBuilder, type XCTestServiceBuildResult } from "./XCTestServiceBuilder";
 import { exec, type ChildProcess } from "child_process";
 import { promisify } from "util";
-import * as path from "path";
 
 const execAsync = promisify(exec);
 
@@ -340,7 +339,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       }
 
       // Check if build is needed
-      const needsBuild = await perf.track("checkBuild", () => this.builder.needsRebuild());
+      const needsBuild = await perf.track("checkBuild", () => this.builder.needsRebuild(this.isSimulator() ? "simulator" : "device"));
 
       let buildResult: XCTestServiceBuildResult | null = null;
       if (needsBuild) {
@@ -357,8 +356,8 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
             buildResult = waitedResult;
           } else {
             // Build synchronously
-            logger.info("[XCTestServiceManager] Building XCTestService");
-            buildResult = await perf.track("build", () => this.builder.build(perf));
+            logger.info("[XCTestServiceManager] Downloading XCTestService bundle");
+            buildResult = await perf.track("build", () => this.builder.build(this.isSimulator() ? "simulator" : "device", perf));
             if (!buildResult.success) {
               perf.end();
               return {
@@ -379,7 +378,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       perf.end();
       return {
         success: true,
-        message: needsBuild ? "XCTestService built and started successfully" : "XCTestService started successfully",
+        message: needsBuild ? "XCTestService downloaded and started successfully" : "XCTestService started successfully",
         buildResult: buildResult || undefined,
         perfTiming: perf.getTimings()
       };
@@ -408,7 +407,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     logger.info("[XCTestServiceManager] Starting XCTestService on simulator");
 
     // Try to get xctestrun path for faster test-without-building
-    const xctestrunPath = await this.builder.getXctestrunPath();
+    const xctestrunPath = await this.builder.getXctestrunPath("simulator");
 
     let command: string;
     if (xctestrunPath) {
@@ -424,19 +423,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
         "2>&1"
       ].join(" ");
     } else {
-      // Fall back to building from project
-      logger.info("[XCTestServiceManager] Using xcodebuild test (no xctestrun available)");
-      const projectDir = path.join(process.cwd(), "ios", "XCTestService");
-      command = [
-        `cd "${projectDir}" &&`,
-        "xcodebuild",
-        "test",
-        "-scheme XCTestServiceApp",
-        `-destination "id=${this.device.deviceId}"`,
-        "-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService",
-        `XCTESTSERVICE_PORT=${this.servicePort}`,
-        "2>&1"
-      ].join(" ");
+      throw new Error("XCTestService xctestrun not found. Download the XCTestService bundle before starting.");
     }
 
     // Start in background
@@ -549,10 +536,15 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
 
     // For physical devices, we need to use iproxy for port forwarding
     // and run the XCUITest via xcodebuild with device destination
+    const xctestrunPath = await this.builder.getXctestrunPath("device");
+    if (!xctestrunPath) {
+      throw new Error("XCTestService xctestrun not found for device. Download the XCTestService bundle before starting.");
+    }
+
     const command = [
       "xcodebuild",
-      "test",
-      "-scheme XCTestServiceApp",
+      "test-without-building",
+      `-xctestrun "${xctestrunPath}"`,
       "-destination", `id=${this.device.deviceId}`,
       "-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService",
       `XCTESTSERVICE_PORT=${this.servicePort}`,

@@ -1,20 +1,21 @@
-import { logger } from "./logger";
-import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
-import { exec } from "child_process";
-import { promisify } from "util";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { glob } from "glob";
-
-const execAsync = promisify(exec);
+import os from "os";
+import { logger } from "./logger";
+import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
+import { XCTESTSERVICE_IPA_URL, XCTESTSERVICE_RELEASE_VERSION, XCTESTSERVICE_SHA256_CHECKSUM } from "../constants/release";
+import {
+  DefaultXCTestServiceBundleDownloader,
+  type XCTestServiceBundleDownloader
+} from "./XCTestServiceBundleDownloader";
 
 /**
- * Result of XCTestService build
+ * Result of XCTestService download/install
  */
 export interface XCTestServiceBuildResult {
   success: boolean;
   message: string;
-  buildPath?: string;      // Path to built products
+  buildPath?: string;      // Path to build products
   xctestrunPath?: string;  // Path to .xctestrun file
   error?: string;
 }
@@ -27,55 +28,76 @@ export interface XCTestServiceBuildConfig {
   derivedDataPath: string;
   scheme: string;
   destination: string;
+  bundleCacheDir: string;
 }
+
+export interface XCTestServiceBuilderDependencies {
+  downloader?: XCTestServiceBundleDownloader;
+}
+
+type XCTestServicePlatform = "simulator" | "device";
+
+type XCTestServiceBundleMetadata = {
+  checksum: string | null;
+  version: string;
+  extractedAt: string;
+};
 
 /**
  * XCTestService Builder
- * Handles build detection, project generation, and xcodebuild orchestration for XCTestService
+ * Handles release bundle download and extraction for XCTestService
  */
 export class XCTestServiceBuilder {
-  // Source paths to monitor for changes (relative to project root)
-  private static readonly SOURCE_PATTERNS = [
-    "ios/XCTestService/Sources/**/*.swift",
-    "ios/XCTestService/Tests/**/*.swift",
-    "ios/XCTestService/project.yml",
-    "ios/XCTestService/XCTestServiceApp/**/*.swift",
-  ];
-
-  // Default paths
   private static readonly DEFAULT_PROJECT_ROOT = process.cwd();
   private static readonly DEFAULT_DERIVED_DATA_PATH = "/tmp/automobile-xctestservice";
   private static readonly DEFAULT_SCHEME = "XCTestServiceApp";
   private static readonly DEFAULT_DESTINATION = "generic/platform=iOS Simulator";
+  private static readonly DEFAULT_BUNDLE_CACHE_DIR = path.join(os.homedir(), ".automobile", "xctestservice");
+  private static readonly DEFAULT_BUNDLE_FILENAME = "XCTestService.ipa";
+  private static readonly METADATA_FILENAME = "xctestservice-bundle.json";
+  private static readonly MIN_BUNDLE_SIZE_BYTES = 10000;
 
   // Build state
   private static prefetchPromise: Promise<XCTestServiceBuildResult | null> | null = null;
   private static prefetchResult: XCTestServiceBuildResult | null = null;
   private static prefetchError: Error | null = null;
+  private static expectedChecksumOverride: string | null = null;
 
   // Singleton instances per configuration
   private static instances: Map<string, XCTestServiceBuilder> = new Map();
 
   private readonly config: XCTestServiceBuildConfig;
-  private cachedBuildProductsPath: string | null = null;
-  private cachedXctestrunPath: string | null = null;
+  private readonly downloader: XCTestServiceBundleDownloader;
+  private cachedBuildProductsPath: Map<XCTestServicePlatform, string | null> = new Map();
+  private cachedXctestrunPath: Map<string, string | null> = new Map();
 
-  private constructor(config: Partial<XCTestServiceBuildConfig> = {}) {
+  private constructor(
+    config: Partial<XCTestServiceBuildConfig> = {},
+    dependencies: XCTestServiceBuilderDependencies = {}
+  ) {
     this.config = {
       projectRoot: config.projectRoot || process.env.AUTOMOBILE_PROJECT_ROOT || XCTestServiceBuilder.DEFAULT_PROJECT_ROOT,
       derivedDataPath: config.derivedDataPath || process.env.AUTOMOBILE_XCTESTSERVICE_DERIVED_DATA || XCTestServiceBuilder.DEFAULT_DERIVED_DATA_PATH,
       scheme: config.scheme || XCTestServiceBuilder.DEFAULT_SCHEME,
       destination: config.destination || XCTestServiceBuilder.DEFAULT_DESTINATION,
+      bundleCacheDir: config.bundleCacheDir || process.env.AUTOMOBILE_XCTESTSERVICE_CACHE_DIR || XCTestServiceBuilder.DEFAULT_BUNDLE_CACHE_DIR,
     };
+    this.downloader = dependencies.downloader ?? new DefaultXCTestServiceBundleDownloader();
   }
 
   /**
    * Get singleton instance for default configuration
    */
-  public static getInstance(config?: Partial<XCTestServiceBuildConfig>): XCTestServiceBuilder {
-    const key = JSON.stringify(config || {});
+  public static getInstance(
+    config?: Partial<XCTestServiceBuildConfig>,
+    dependencies?: XCTestServiceBuilderDependencies
+  ): XCTestServiceBuilder {
+    const key = JSON.stringify({
+      config: config || {},
+      deps: dependencies?.downloader ? "custom" : "default"
+    });
     if (!XCTestServiceBuilder.instances.has(key)) {
-      XCTestServiceBuilder.instances.set(key, new XCTestServiceBuilder(config));
+      XCTestServiceBuilder.instances.set(key, new XCTestServiceBuilder(config, dependencies));
     }
     return XCTestServiceBuilder.instances.get(key)!;
   }
@@ -88,65 +110,27 @@ export class XCTestServiceBuilder {
     XCTestServiceBuilder.prefetchPromise = null;
     XCTestServiceBuilder.prefetchResult = null;
     XCTestServiceBuilder.prefetchError = null;
+    XCTestServiceBuilder.expectedChecksumOverride = null;
   }
 
   /**
-   * Check if Xcode is installed
+   * Override checksum for tests
    */
-  private async checkXcodeInstalled(): Promise<boolean> {
-    try {
-      await execAsync("xcode-select -p");
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get the XCTestService project directory
-   */
-  private getProjectDir(): string {
-    return path.join(this.config.projectRoot, "ios", "XCTestService");
-  }
-
-  /**
-   * Get the newest mtime from source files
-   */
-  private async getNewestSourceMtime(): Promise<number> {
-    let newestMtime = 0;
-
-    for (const pattern of XCTestServiceBuilder.SOURCE_PATTERNS) {
-      const fullPattern = path.join(this.config.projectRoot, pattern);
-      try {
-        const files = await glob(fullPattern);
-        for (const file of files) {
-          try {
-            const stats = await fs.stat(file);
-            if (stats.mtimeMs > newestMtime) {
-              newestMtime = stats.mtimeMs;
-            }
-          } catch {
-            // File might have been deleted, skip
-          }
-        }
-      } catch {
-        // Pattern might not match anything, skip
-      }
-    }
-
-    return newestMtime;
+  public static setExpectedChecksumForTesting(checksum: string | null): void {
+    XCTestServiceBuilder.expectedChecksumOverride = checksum;
   }
 
   /**
    * Get the build products directory path
    */
-  public async getBuildProductsPath(): Promise<string | null> {
-    if (this.cachedBuildProductsPath) {
+  public async getBuildProductsPath(platform: XCTestServicePlatform = "simulator"): Promise<string | null> {
+    const cachedPath = this.cachedBuildProductsPath.get(platform);
+    if (cachedPath) {
       try {
-        await fs.access(this.cachedBuildProductsPath);
-        return this.cachedBuildProductsPath;
+        await fs.access(cachedPath);
+        return cachedPath;
       } catch {
-        this.cachedBuildProductsPath = null;
+        this.cachedBuildProductsPath.set(platform, null);
       }
     }
 
@@ -154,12 +138,12 @@ export class XCTestServiceBuilder {
       this.config.derivedDataPath,
       "Build",
       "Products",
-      "Debug-iphonesimulator"
+      platform === "device" ? "Debug-iphoneos" : "Debug-iphonesimulator"
     );
 
     try {
       await fs.access(buildDir);
-      this.cachedBuildProductsPath = buildDir;
+      this.cachedBuildProductsPath.set(platform, buildDir);
       return buildDir;
     } catch {
       return null;
@@ -167,273 +151,141 @@ export class XCTestServiceBuilder {
   }
 
   /**
-   * Get the test runner app path
-   */
-  private async getTestRunnerAppPath(): Promise<string | null> {
-    const buildDir = await this.getBuildProductsPath();
-    if (!buildDir) {
-      return null;
-    }
-
-    const runnerPath = path.join(buildDir, "XCTestServiceUITests-Runner.app");
-    try {
-      await fs.access(runnerPath);
-      return runnerPath;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * Get the mtime of the build product
-   */
-  private async getBuildProductMtime(): Promise<number> {
-    const runnerPath = await this.getTestRunnerAppPath();
-    if (!runnerPath) {
-      return 0;
-    }
-
-    try {
-      const stats = await fs.stat(runnerPath);
-      return stats.mtimeMs;
-    } catch {
-      return 0;
-    }
-  }
-
-  /**
    * Get the .xctestrun file path
    */
-  public async getXctestrunPath(): Promise<string | null> {
-    if (this.cachedXctestrunPath) {
+  public async getXctestrunPath(platform?: XCTestServicePlatform): Promise<string | null> {
+    const cacheKey = platform || "any";
+    const cachedPath = this.cachedXctestrunPath.get(cacheKey);
+    if (cachedPath) {
       try {
-        await fs.access(this.cachedXctestrunPath);
-        return this.cachedXctestrunPath;
+        await fs.access(cachedPath);
+        return cachedPath;
       } catch {
-        this.cachedXctestrunPath = null;
+        this.cachedXctestrunPath.set(cacheKey, null);
       }
     }
 
-    const buildDir = await this.getBuildProductsPath();
-    if (!buildDir) {
-      return null;
-    }
-
-    // Look for .xctestrun files in the build products directory
-    const productsDir = path.dirname(buildDir);
+    const productsDir = path.join(this.config.derivedDataPath, "Build", "Products");
     try {
       const files = await fs.readdir(productsDir);
-      const xctestrunFile = files.find(f => f.endsWith(".xctestrun"));
-      if (xctestrunFile) {
-        const fullPath = path.join(productsDir, xctestrunFile);
-        this.cachedXctestrunPath = fullPath;
-        return fullPath;
-      }
-    } catch {
-      // Directory might not exist
-    }
-
-    return null;
-  }
-
-  /**
-   * Check if project.yml is newer than the xcodeproj
-   */
-  private async needsProjectGeneration(): Promise<boolean> {
-    const projectDir = this.getProjectDir();
-    const projectYml = path.join(projectDir, "project.yml");
-    const xcodeproj = path.join(projectDir, "XCTestService.xcodeproj", "project.pbxproj");
-
-    try {
-      const [ymlStats, projStats] = await Promise.all([
-        fs.stat(projectYml),
-        fs.stat(xcodeproj).catch(() => null),
-      ]);
-
-      // If xcodeproj doesn't exist, need generation
-      if (!projStats) {
-        return true;
+      const xctestrunFiles = files.filter(file => file.endsWith(".xctestrun"));
+      if (xctestrunFiles.length === 0) {
+        return null;
       }
 
-      // If project.yml is newer, need regeneration
-      return ymlStats.mtimeMs > projStats.mtimeMs;
+      const match = platform
+        ? xctestrunFiles.find(file => platform === "device"
+          ? file.includes("iphoneos")
+          : file.includes("iphonesimulator")
+        )
+        : null;
+
+      const selected = platform ? match : xctestrunFiles[0];
+      if (!selected) {
+        return null;
+      }
+
+      const fullPath = path.join(productsDir, selected);
+      this.cachedXctestrunPath.set(cacheKey, fullPath);
+      return fullPath;
     } catch {
-      // If project.yml doesn't exist, don't need generation (manual project)
-      return false;
+      return null;
     }
   }
 
   /**
-   * Check if xcodegen is available
+   * Check if a download/extract is needed
    */
-  private async isXcodegenAvailable(): Promise<boolean> {
-    try {
-      await execAsync("which xcodegen");
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Run xcodegen to generate the Xcode project
-   */
-  private async runXcodegen(perf?: PerformanceTracker): Promise<boolean> {
-    const projectDir = this.getProjectDir();
-    const tracker = perf || new NoOpPerformanceTracker();
-
-    logger.info("[XCTestServiceBuilder] Running xcodegen");
-
-    try {
-      await tracker.track("xcodegen", async () => {
-        const { stdout, stderr } = await execAsync("xcodegen generate", {
-          cwd: projectDir,
-          timeout: 60000, // 1 minute timeout
-        });
-        if (stderr) {
-          logger.warn("[XCTestServiceBuilder] xcodegen stderr:", stderr);
-        }
-        logger.info("[XCTestServiceBuilder] xcodegen output:", stdout);
-      });
-      return true;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error("[XCTestServiceBuilder] xcodegen failed:", errorMsg);
-      return false;
-    }
-  }
-
-  /**
-   * Check if a rebuild is needed
-   */
-  public async needsRebuild(): Promise<boolean> {
-    // Check if skip build is enabled
+  public async needsRebuild(platform?: XCTestServicePlatform): Promise<boolean> {
     if (process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD === "true" ||
         process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD === "1") {
-      logger.info("[XCTestServiceBuilder] Build skipped via AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD");
+      logger.info("[XCTestServiceBuilder] Download skipped via AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD");
       return false;
     }
 
-    // Check if build products exist
-    const buildProductMtime = await this.getBuildProductMtime();
-    if (buildProductMtime === 0) {
-      logger.info("[XCTestServiceBuilder] Build products don't exist, need rebuild");
+    const xctestrunPath = await this.getXctestrunPath(platform);
+    if (!xctestrunPath) {
+      logger.info("[XCTestServiceBuilder] XCTestService artifacts missing, need download");
       return true;
     }
 
-    // Check if source is newer than build products
-    const sourceMtime = await this.getNewestSourceMtime();
-    if (sourceMtime > buildProductMtime) {
-      logger.info("[XCTestServiceBuilder] Source files are newer than build products, need rebuild");
+    const metadata = await this.readBundleMetadata();
+    const expectedChecksum = this.getExpectedChecksum();
+    if (expectedChecksum.length > 0) {
+      if (!metadata || metadata.checksum?.toLowerCase() !== expectedChecksum.toLowerCase()) {
+        logger.info("[XCTestServiceBuilder] XCTestService checksum mismatch, need download");
+        return true;
+      }
+    } else if (!metadata || metadata.version !== XCTESTSERVICE_RELEASE_VERSION) {
+      logger.info("[XCTestServiceBuilder] XCTestService version mismatch, need download");
       return true;
     }
 
-    // Check if project needs regeneration
-    if (await this.needsProjectGeneration()) {
-      logger.info("[XCTestServiceBuilder] project.yml is newer than xcodeproj, need rebuild");
-      return true;
-    }
-
-    logger.info("[XCTestServiceBuilder] Build products are up to date");
+    logger.info("[XCTestServiceBuilder] XCTestService artifacts are up to date");
     return false;
   }
 
   /**
-   * Build XCTestService using xcodebuild build-for-testing
+   * Download and extract XCTestService release bundle
    */
-  public async build(perf: PerformanceTracker = new NoOpPerformanceTracker()): Promise<XCTestServiceBuildResult> {
-    perf.serial("xcTestServiceBuild");
+  public async build(
+    platform?: XCTestServicePlatform,
+    perf: PerformanceTracker = new NoOpPerformanceTracker()
+  ): Promise<XCTestServiceBuildResult> {
+    perf.serial("xcTestServiceDownload");
 
-    // Check if Xcode is installed
-    const xcodeInstalled = await perf.track("checkXcode", () => this.checkXcodeInstalled());
-    if (!xcodeInstalled) {
+    if (process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD === "true" ||
+        process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD === "1") {
       perf.end();
       return {
         success: false,
-        message: "Xcode is not installed",
-        error: "Xcode is required to build XCTestService. Install Xcode from the App Store or run 'xcode-select --install'.",
+        message: "XCTestService download skipped",
+        error: "AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD is set"
       };
     }
 
-    // Check if project needs regeneration
-    const needsRegen = await perf.track("checkProjectGen", () => this.needsProjectGeneration());
-    if (needsRegen) {
-      const xcodegenAvailable = await this.isXcodegenAvailable();
-      if (xcodegenAvailable) {
-        const regenSuccess = await this.runXcodegen(perf);
-        if (!regenSuccess) {
-          perf.end();
-          return {
-            success: false,
-            message: "Failed to generate Xcode project",
-            error: "xcodegen failed to generate the project from project.yml",
-          };
-        }
-      } else {
-        logger.warn("[XCTestServiceBuilder] xcodegen not available but project.yml is newer than xcodeproj");
-      }
-    }
-
-    const projectDir = this.getProjectDir();
-
-    // Build command
-    const buildCommand = [
-      "xcodebuild",
-      "build-for-testing",
-      `-scheme ${this.config.scheme}`,
-      `-destination '${this.config.destination}'`,
-      `-derivedDataPath '${this.config.derivedDataPath}'`,
-      "-quiet",
-    ].join(" ");
-
-    logger.info("[XCTestServiceBuilder] Running build:", buildCommand);
-
     try {
-      await perf.track("xcodebuild", async () => {
-        const { stdout, stderr } = await execAsync(buildCommand, {
-          cwd: projectDir,
-          timeout: 300000, // 5 minute timeout
-          maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-        });
-
-        if (stderr && !stderr.includes("Build Succeeded")) {
-          logger.warn("[XCTestServiceBuilder] xcodebuild stderr:", stderr.slice(0, 1000));
-        }
-        if (stdout) {
-          logger.info("[XCTestServiceBuilder] xcodebuild output:", stdout.slice(0, 500));
-        }
-      });
+      const bundlePath = await perf.track("downloadBundle", () => this.ensureBundleDownloaded());
+      await perf.track("extractBundle", () => this.extractBundle(bundlePath));
 
       // Clear cached paths to force rediscovery
-      this.cachedBuildProductsPath = null;
-      this.cachedXctestrunPath = null;
+      this.cachedBuildProductsPath.clear();
+      this.cachedXctestrunPath.clear();
 
-      const buildPath = await this.getBuildProductsPath();
-      const xctestrunPath = await this.getXctestrunPath();
+      const buildPath = await this.getBuildProductsPath(platform ?? "simulator");
+      const xctestrunPath = await this.getXctestrunPath(platform);
+
+      if (!xctestrunPath) {
+        perf.end();
+        return {
+          success: false,
+          message: "Downloaded XCTestService bundle missing xctestrun",
+          error: "No .xctestrun file found after extraction"
+        };
+      }
 
       perf.end();
       return {
         success: true,
-        message: "XCTestService built successfully",
+        message: "XCTestService downloaded and extracted successfully",
         buildPath: buildPath || undefined,
         xctestrunPath: xctestrunPath || undefined,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error("[XCTestServiceBuilder] Build failed:", errorMsg);
+      logger.error("[XCTestServiceBuilder] Download failed:", errorMsg);
 
       perf.end();
       return {
         success: false,
-        message: "XCTestService build failed",
+        message: "XCTestService download failed",
         error: errorMsg,
       };
     }
   }
 
   /**
-   * Prefetch build at startup (background, non-blocking)
-   * This is similar to Android's APK prefetch pattern
+   * Prefetch download at startup (background, non-blocking)
    */
   public static prefetchBuild(): void {
     // Only run on macOS
@@ -442,20 +294,18 @@ export class XCTestServiceBuilder {
       return;
     }
 
-    // Skip if already prefetching
     if (XCTestServiceBuilder.prefetchPromise !== null) {
       logger.info("[XCTestServiceBuilder] Prefetch already initiated, skipping");
       return;
     }
 
-    // Skip if disabled
     if (process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD === "true" ||
         process.env.AUTOMOBILE_SKIP_XCTESTSERVICE_BUILD === "1") {
       logger.info("[XCTestServiceBuilder] Prefetch skipped via environment variable");
       return;
     }
 
-    logger.info("[XCTestServiceBuilder] Starting build prefetch");
+    logger.info("[XCTestServiceBuilder] Starting download prefetch");
     const startTime = Date.now();
 
     XCTestServiceBuilder.prefetchPromise = XCTestServiceBuilder.doPrefetch()
@@ -488,22 +338,18 @@ export class XCTestServiceBuilder {
    */
   private static async doPrefetch(): Promise<XCTestServiceBuildResult | null> {
     const builder = XCTestServiceBuilder.getInstance();
-
-    // Check if build is needed
-    const needsBuild = await builder.needsRebuild();
-    if (!needsBuild) {
-      // Return existing build info
+    const needsDownload = await builder.needsRebuild();
+    if (!needsDownload) {
       const buildPath = await builder.getBuildProductsPath();
       const xctestrunPath = await builder.getXctestrunPath();
       return {
         success: true,
-        message: "Build products are up to date",
+        message: "XCTestService artifacts are up to date",
         buildPath: buildPath || undefined,
         xctestrunPath: xctestrunPath || undefined,
       };
     }
 
-    // Build in background
     return builder.build();
   }
 
@@ -543,8 +389,8 @@ export class XCTestServiceBuilder {
   public async cleanBuildArtifacts(): Promise<void> {
     try {
       await fs.rm(this.config.derivedDataPath, { recursive: true, force: true });
-      this.cachedBuildProductsPath = null;
-      this.cachedXctestrunPath = null;
+      this.cachedBuildProductsPath.clear();
+      this.cachedXctestrunPath.clear();
       logger.info("[XCTestServiceBuilder] Build artifacts cleaned up");
     } catch (error) {
       logger.warn("[XCTestServiceBuilder] Failed to clean build artifacts:", error);
@@ -556,5 +402,224 @@ export class XCTestServiceBuilder {
    */
   public getConfig(): XCTestServiceBuildConfig {
     return { ...this.config };
+  }
+
+  private getBundlePath(): string {
+    return path.join(this.config.bundleCacheDir, XCTestServiceBuilder.DEFAULT_BUNDLE_FILENAME);
+  }
+
+  private getBundleUrl(): string {
+    const override = process.env.AUTOMOBILE_XCTESTSERVICE_BUNDLE_URL?.trim();
+    if (override) {
+      return override;
+    }
+    return XCTESTSERVICE_IPA_URL;
+  }
+
+  private getBundlePathOverride(): string | null {
+    const override = process.env.AUTOMOBILE_XCTESTSERVICE_IPA_PATH?.trim()
+      || process.env.AUTOMOBILE_XCTESTSERVICE_BUNDLE_PATH?.trim();
+    return override && override.length > 0 ? override : null;
+  }
+
+  private getExpectedChecksum(): string {
+    const override = XCTestServiceBuilder.expectedChecksumOverride;
+    return override ?? XCTESTSERVICE_SHA256_CHECKSUM ?? "";
+  }
+
+  private async ensureBundleDownloaded(): Promise<string> {
+    await fs.mkdir(this.config.bundleCacheDir, { recursive: true });
+    const bundlePath = this.getBundlePath();
+
+    const overridePath = this.getBundlePathOverride();
+    if (overridePath) {
+      logger.info("[XCTestServiceBuilder] Using local XCTestService bundle override", { path: overridePath });
+      const stats = await fs.stat(overridePath);
+      if (!stats.isFile()) {
+        throw new Error(`XCTestService bundle override is not a file: ${overridePath}`);
+      }
+      await fs.copyFile(overridePath, bundlePath);
+    } else {
+      const expectedChecksum = this.getExpectedChecksum();
+      const bundleReady = await this.isBundleValid(bundlePath, expectedChecksum);
+      if (!bundleReady) {
+        logger.info("[XCTestServiceBuilder] Downloading XCTestService bundle", {
+          url: this.getBundleUrl(),
+          destination: bundlePath
+        });
+        await this.downloader.download(this.getBundleUrl(), bundlePath);
+      }
+    }
+
+    await this.verifyBundle(bundlePath);
+    return bundlePath;
+  }
+
+  private async isBundleValid(bundlePath: string, expectedChecksum: string): Promise<boolean> {
+    try {
+      const stats = await fs.stat(bundlePath);
+      if (!stats.isFile() || stats.size < XCTestServiceBuilder.MIN_BUNDLE_SIZE_BYTES) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+
+    if (!expectedChecksum) {
+      return true;
+    }
+
+    const { checksum } = await this.downloader.computeFileSha256(bundlePath);
+    return checksum.toLowerCase() === expectedChecksum.toLowerCase();
+  }
+
+  private async verifyBundle(bundlePath: string): Promise<void> {
+    const stats = await fs.stat(bundlePath);
+    if (stats.size < XCTestServiceBuilder.MIN_BUNDLE_SIZE_BYTES) {
+      throw new Error(`Downloaded bundle is too small (${stats.size} bytes), likely invalid`);
+    }
+
+    const expectedChecksum = this.getExpectedChecksum();
+    if (expectedChecksum.length > 0) {
+      const { checksum, source } = await this.downloader.computeFileSha256(bundlePath);
+      if (checksum.toLowerCase() !== expectedChecksum.toLowerCase()) {
+        throw new Error(`XCTestService checksum verification failed. Expected: ${expectedChecksum}, Got: ${checksum}`);
+      }
+      logger.info("[XCTestServiceBuilder] Bundle checksum verified", { checksum, source });
+    } else {
+      logger.warn("[XCTestServiceBuilder] Bundle checksum verification skipped (no checksum provided)");
+    }
+  }
+
+  private async extractBundle(bundlePath: string): Promise<void> {
+    await this.downloader.extractBundle(bundlePath, this.config.derivedDataPath);
+    await this.normalizeExtractedBundle();
+    await this.verifyExtractedArtifacts();
+
+    const metadata: XCTestServiceBundleMetadata = {
+      checksum: this.getExpectedChecksum() || null,
+      version: XCTESTSERVICE_RELEASE_VERSION,
+      extractedAt: new Date().toISOString()
+    };
+    await fs.writeFile(this.getMetadataPath(), JSON.stringify(metadata, null, 2), "utf-8");
+  }
+
+  private async readBundleMetadata(): Promise<XCTestServiceBundleMetadata | null> {
+    try {
+      const raw = await fs.readFile(this.getMetadataPath(), "utf-8");
+      return JSON.parse(raw) as XCTestServiceBundleMetadata;
+    } catch {
+      return null;
+    }
+  }
+
+  private getMetadataPath(): string {
+    return path.join(this.config.bundleCacheDir, XCTestServiceBuilder.METADATA_FILENAME);
+  }
+
+  private async normalizeExtractedBundle(): Promise<void> {
+    const xctestrunFiles = await this.findXctestrunFiles(this.config.derivedDataPath);
+    if (xctestrunFiles.length === 0) {
+      throw new Error("No .xctestrun file found in extracted XCTestService bundle");
+    }
+
+    const derivedRoot = this.resolveDerivedDataRoot(xctestrunFiles[0]);
+    if (!derivedRoot) {
+      return;
+    }
+
+    if (derivedRoot === this.config.derivedDataPath) {
+      return;
+    }
+
+    const sourceBuildDir = path.join(derivedRoot, "Build");
+    const targetBuildDir = path.join(this.config.derivedDataPath, "Build");
+
+    await fs.rm(targetBuildDir, { recursive: true, force: true });
+    await fs.mkdir(this.config.derivedDataPath, { recursive: true });
+
+    try {
+      await fs.rename(sourceBuildDir, targetBuildDir);
+    } catch {
+      await fs.cp(sourceBuildDir, targetBuildDir, { recursive: true });
+      await fs.rm(sourceBuildDir, { recursive: true, force: true });
+    }
+  }
+
+  private async verifyExtractedArtifacts(): Promise<void> {
+    const simXctestrun = await this.getXctestrunPath("simulator");
+    const deviceXctestrun = await this.getXctestrunPath("device");
+
+    if (!simXctestrun && !deviceXctestrun) {
+      throw new Error("Extracted XCTestService bundle missing .xctestrun file");
+    }
+
+    if (simXctestrun) {
+      await this.verifyPlatformArtifacts("simulator");
+    }
+
+    if (deviceXctestrun) {
+      await this.verifyPlatformArtifacts("device");
+    }
+  }
+
+  private async verifyPlatformArtifacts(platform: XCTestServicePlatform): Promise<void> {
+    const buildDir = await this.getBuildProductsPath(platform);
+    if (!buildDir) {
+      throw new Error(`XCTestService build products missing for ${platform}`);
+    }
+
+    const requiredPaths = [
+      path.join(buildDir, "XCTestServiceApp.app"),
+      path.join(buildDir, "XCTestServiceUITests-Runner.app"),
+      path.join(buildDir, "XCTestServiceTests.xctest")
+    ];
+
+    for (const requiredPath of requiredPaths) {
+      try {
+        await fs.access(requiredPath);
+      } catch {
+        throw new Error(`XCTestService bundle missing required artifact: ${requiredPath}`);
+      }
+    }
+  }
+
+  private resolveDerivedDataRoot(xctestrunPath: string): string | null {
+    const segments = path.resolve(xctestrunPath).split(path.sep);
+    for (let i = 0; i < segments.length - 1; i++) {
+      if (segments[i] === "Build" && segments[i + 1] === "Products") {
+        return segments.slice(0, i).join(path.sep);
+      }
+    }
+    return null;
+  }
+
+  private async findXctestrunFiles(root: string): Promise<string[]> {
+    const results: string[] = [];
+    const stack: string[] = [root];
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current) {
+        continue;
+      }
+      let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
+      try {
+        entries = await fs.readdir(current, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+
+      for (const entry of entries) {
+        const fullPath = path.join(current, entry.name);
+        if (entry.isDirectory()) {
+          stack.push(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith(".xctestrun")) {
+          results.push(fullPath);
+        }
+      }
+    }
+
+    return results;
   }
 }
