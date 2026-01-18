@@ -51,7 +51,7 @@ const profileXml = `<?xml version="1.0" encoding="UTF-8"?>
 const buildFingerprint = (certBase64: string): string => {
   const raw = Buffer.from(certBase64, "base64");
   const cert = new X509Certificate(raw);
-  return createHash("sha1").update(cert.raw).digest("hex").toUpperCase();
+  return createHash("sha256").update(cert.raw).digest("hex").toUpperCase();
 };
 
 const createFakeDependencies = (options?: { identities?: string; profiles?: string[] }) => {

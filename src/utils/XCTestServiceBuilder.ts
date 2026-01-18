@@ -486,13 +486,24 @@ export class XCTestServiceBuilder {
 
   public getExpectedAppHash(platform: XCTestServicePlatform): string {
     const envPlatform = platform.toUpperCase();
-    const override = process.env[`AUTOMOBILE_XCTESTSERVICE_APP_HASH_${envPlatform}`]
-      ?? process.env.AUTOMOBILE_XCTESTSERVICE_APP_HASH
-      ?? process.env.AUTOMOBILE_IOS_XCTESTSERVICE_APP_HASH;
-    if (override && override.trim().length > 0) {
-      return override.trim();
+    // Check for platform-specific override first
+    const platformOverride = process.env[`AUTOMOBILE_XCTESTSERVICE_APP_HASH_${envPlatform}`];
+    if (platformOverride && platformOverride.trim().length > 0) {
+      return platformOverride.trim();
     }
-    return XCTESTSERVICE_APP_HASH ?? "";
+    // For device platform, check generic overrides and the release constant (device build hash)
+    if (platform === "device") {
+      const genericOverride = process.env.AUTOMOBILE_XCTESTSERVICE_APP_HASH
+        ?? process.env.AUTOMOBILE_IOS_XCTESTSERVICE_APP_HASH;
+      if (genericOverride && genericOverride.trim().length > 0) {
+        return genericOverride.trim();
+      }
+      // XCTESTSERVICE_APP_HASH is documented as the device build hash
+      return XCTESTSERVICE_APP_HASH || "";
+    }
+    // For simulator, only use platform-specific override (already checked above)
+    // Skip verification if no simulator-specific hash is provided
+    return "";
   }
 
   private async ensureBundleDownloaded(): Promise<string> {

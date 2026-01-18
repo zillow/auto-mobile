@@ -148,7 +148,7 @@ const parseSigningIdentities = (output: string): SigningIdentity[] => {
   const identities: SigningIdentity[] = [];
   const lines = output.split("\n");
   for (const line of lines) {
-    const match = line.match(/^\s*\d+\)\s+([0-9A-F]{40})\s+\"([^\"]+)\"/i);
+    const match = line.match(/^\s*\d+\)\s+([0-9A-F]{40,64})\s+\"([^\"]+)\"/i);
     if (!match) {
       continue;
     }
@@ -164,7 +164,7 @@ const fingerprintFromCertificate = (base64Der: string): CertificateInfo | null =
   try {
     const raw = Buffer.from(base64Der, "base64");
     const cert = new X509Certificate(raw);
-    const fingerprint = createHash("sha1").update(cert.raw).digest("hex").toUpperCase();
+    const fingerprint = createHash("sha256").update(cert.raw).digest("hex").toUpperCase();
     return {
       fingerprint,
       validTo: new Date(cert.validTo),
@@ -199,8 +199,8 @@ const isAppleIssuer = (certificate: CertificateInfo): boolean => {
 };
 
 const formatBuildSettingValue = (value: string): string => {
-  if (value.includes("\"")) {
-    const escaped = value.replace(/"/g, "\\\"");
+  if (value.includes("\"") || value.includes("\\")) {
+    const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
     return `"${escaped}"`;
   }
   if (value.includes(" ") || value.includes("\t")) {
