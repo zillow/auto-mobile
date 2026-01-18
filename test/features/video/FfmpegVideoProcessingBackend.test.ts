@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { FfmpegVideoCaptureBackend } from "../../../src/features/video/FfmpegVideoCaptureBackend";
+import { FfmpegVideoProcessingBackend } from "../../../src/features/video/FfmpegVideoProcessingBackend";
 import type { VideoCaptureConfig } from "../../../src/features/video/VideoRecorderService";
 import type { BootedDevice } from "../../../src/models";
 
-describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
-  let backend: FfmpegVideoCaptureBackend;
+describe("FfmpegVideoProcessingBackend - Unit Tests", function() {
+  let backend: FfmpegVideoProcessingBackend;
   let mockDevice: BootedDevice;
   let mockConfig: VideoCaptureConfig;
   let listEncodersCalls: number;
   let checkVersionCalls: number;
 
   beforeEach(function() {
-    backend = new FfmpegVideoCaptureBackend();
+    backend = new FfmpegVideoProcessingBackend();
     listEncodersCalls = 0;
     checkVersionCalls = 0;
 
@@ -78,7 +78,7 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
       const args = await (backend as any).buildFfmpegArgs(
         mockConfig,
         hwAccel,
-        true
+        { type: "pipe" }
       );
 
       expect(args).toContain("-f");
@@ -109,7 +109,7 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
       const args = await (backend as any).buildFfmpegArgs(
         configWithResolution,
         hwAccel,
-        true
+        { type: "pipe" }
       );
 
       expect(args).toContain("-vf");
@@ -126,7 +126,7 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
       const args = await (backend as any).buildFfmpegArgs(
         mockConfig,
         hwAccel,
-        true
+        { type: "pipe" }
       );
 
       expect(args).toContain("-c:v");
@@ -149,7 +149,7 @@ describe("FfmpegVideoCaptureBackend - Unit Tests", function() {
       const args = await (backend as any).buildFfmpegArgs(
         configWithDuration,
         hwAccel,
-        true
+        { type: "pipe" }
       );
 
       expect(args).toContain("-t");

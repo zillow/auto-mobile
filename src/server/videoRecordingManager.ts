@@ -10,7 +10,7 @@ import {
   VideoRecordingMetadata,
 } from "../models";
 import {
-  PlatformVideoCaptureBackend,
+  HybridVideoCaptureBackend,
   VideoRecorderService,
   parseVideoRecordingConfig,
   type ActiveVideoRecording,
@@ -91,11 +91,8 @@ const highlightSessions = new Map<string, VideoRecordingHighlightSession>();
 const highlightSessionsByDeviceId = new Map<string, string>();
 
 async function selectBackend(): Promise<VideoCaptureBackend> {
-  // Use PlatformVideoCaptureBackend for now as it's more reliable
-  // FfmpegVideoCaptureBackend has issues with MP4-over-pipe from screenrecord
-  // (MP4 format needs seeking to write moov atom, which doesn't work well over stdin)
-  logger.debug("[VideoRecording] Using PlatformVideoCaptureBackend");
-  return new PlatformVideoCaptureBackend();
+  logger.debug("[VideoRecording] Using HybridVideoCaptureBackend (iOS FFmpeg, Android platform)");
+  return new HybridVideoCaptureBackend();
 }
 
 async function createRecorderService(): Promise<VideoRecorderService> {
