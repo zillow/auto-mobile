@@ -1,4 +1,4 @@
-import { UIState, SelectedElement, SelectedElementDetection, ScrollPosition } from "../../utils/interfaces/NavigationGraph";
+import { UIState, SelectedElement, SelectedElementDetection, ScrollPosition, ModalState } from "../../utils/interfaces/NavigationGraph";
 import { ObserveResult, ViewHierarchyResult } from "../../models";
 import { SwipeOnOptions } from "../../models";
 import { resolveSwipeDirection } from "../../utils/swipeOnUtils";
@@ -18,28 +18,33 @@ export class UIStateExtractor {
 
     const selectedElements: SelectedElement[] = [];
     let destinationId: string | undefined;
+    const modalStack: ModalState[] = [];
 
     // Traverse the hierarchy to find selected elements and destination
-    this.traverseHierarchy(viewHierarchy.hierarchy, node => {
+    this.traverseHierarchy(viewHierarchy.hierarchy, (node, depth) => {
+      const attrs = this.getNodeAttributes(node);
+
       // Check for destination ID (resource-id like "navigation.HomeDestination")
-      const resourceId = node["resource-id"];
+      const resourceId = this.getAttribute(attrs, ["resource-id", "resourceId"]);
       if (resourceId && resourceId.startsWith("navigation.") && resourceId.endsWith("Destination")) {
         destinationId = resourceId.replace("navigation.", "");
       }
 
       // Check for selected elements (tabs, menu items, etc.)
-      if (node.selected === "true") {
+      if (this.getAttribute(attrs, ["selected"]) === "true") {
         const element: SelectedElement = {};
 
         // Try to get identifying information
-        if (node.text) {
-          element.text = node.text;
+        const text = this.getAttribute(attrs, ["text"]);
+        const contentDesc = this.getAttribute(attrs, ["content-desc", "contentDesc"]);
+        if (text) {
+          element.text = text;
         }
-        if (node["resource-id"]) {
-          element.resourceId = node["resource-id"];
+        if (resourceId) {
+          element.resourceId = resourceId;
         }
-        if (node["content-desc"]) {
-          element.contentDesc = node["content-desc"];
+        if (contentDesc) {
+          element.contentDesc = contentDesc;
         }
 
         // Also check child nodes for text (common in Compose where text is nested)
@@ -55,16 +60,32 @@ export class UIStateExtractor {
           selectedElements.push(element);
         }
       }
+
+      const className = this.getAttribute(attrs, ["class", "className"]);
+      if (className) {
+        const modalType = this.classifyModalType(className);
+        if (modalType) {
+          const modalId = this.getModalIdentifier(attrs, className);
+          modalStack.push({
+            type: modalType,
+            identifier: modalId,
+            layer: depth
+          });
+        }
+      }
     });
 
+    const normalizedModalStack = this.normalizeModalStack(modalStack);
+
     // Return undefined if no useful state was found
-    if (selectedElements.length === 0 && !destinationId) {
+    if (selectedElements.length === 0 && !destinationId && normalizedModalStack.length === 0) {
       return undefined;
     }
 
     return {
       selectedElements,
-      destinationId
+      destinationId,
+      modalStack: normalizedModalStack.length > 0 ? normalizedModalStack : undefined
     };
   }
 
@@ -113,18 +134,19 @@ export class UIStateExtractor {
    */
   private static traverseHierarchy(
     node: Record<string, any>,
-    visitor: (node: Record<string, any>) => void
+    visitor: (node: Record<string, any>, depth: number) => void,
+    depth: number = 0
   ): void {
-    visitor(node);
+    visitor(node, depth);
 
     // Handle array of child nodes
     if (Array.isArray(node.node)) {
       for (const child of node.node) {
-        this.traverseHierarchy(child, visitor);
+        this.traverseHierarchy(child, visitor, depth + 1);
       }
     } else if (node.node && typeof node.node === "object") {
       // Handle single child node
-      this.traverseHierarchy(node.node, visitor);
+      this.traverseHierarchy(node.node, visitor, depth + 1);
     }
   }
 
@@ -144,8 +166,10 @@ export class UIStateExtractor {
   private static findTextInChildren(node: Record<string, any> | Record<string, any>[]): string | undefined {
     if (Array.isArray(node)) {
       for (const child of node) {
-        if (child.text) {
-          return child.text;
+        const attrs = this.getNodeAttributes(child);
+        const text = this.getAttribute(attrs, ["text"]);
+        if (text) {
+          return text;
         }
         if (child.node) {
           const result = this.findTextInChildren(child.node);
@@ -155,14 +179,78 @@ export class UIStateExtractor {
         }
       }
     } else if (node && typeof node === "object") {
-      if (node.text) {
-        return node.text;
+      const attrs = this.getNodeAttributes(node);
+      const text = this.getAttribute(attrs, ["text"]);
+      if (text) {
+        return text;
       }
       if (node.node) {
         return this.findTextInChildren(node.node);
       }
     }
     return undefined;
+  }
+
+  private static getNodeAttributes(node: Record<string, any>): Record<string, any> {
+    return node.$ && typeof node.$ === "object" ? node.$ : node;
+  }
+
+  private static getAttribute(
+    attrs: Record<string, any>,
+    keys: string[]
+  ): string | undefined {
+    for (const key of keys) {
+      const value = attrs[key];
+      if (typeof value === "string" && value !== "") {
+        return value;
+      }
+    }
+    return undefined;
+  }
+
+  private static classifyModalType(className: string): ModalState["type"] | null {
+    const normalized = className.toLowerCase();
+    if (normalized.includes("alert") || normalized.includes("dialog")) {
+      return "dialog";
+    }
+    if (normalized.includes("actionsheet") || normalized.includes("sheet")) {
+      return "bottomsheet";
+    }
+    if (normalized.includes("popover")) {
+      return "popup";
+    }
+    if (normalized.includes("menu")) {
+      return "menu";
+    }
+    if (normalized.includes("modal") || normalized.includes("presentation")) {
+      return "overlay";
+    }
+    return null;
+  }
+
+  private static getModalIdentifier(attrs: Record<string, any>, className: string): string | undefined {
+    return this.getAttribute(attrs, ["resource-id", "resourceId", "content-desc", "contentDesc", "text"]) ?? className;
+  }
+
+  private static normalizeModalStack(modals: ModalState[]): ModalState[] {
+    if (modals.length === 0) {
+      return [];
+    }
+
+    const unique = new Map<string, ModalState>();
+    for (const modal of modals) {
+      const key = modal.identifier ?? `${modal.type}-${modal.layer}`;
+      if (!unique.has(key)) {
+        unique.set(key, modal);
+      }
+    }
+
+    return Array.from(unique.values())
+      .sort((a, b) => a.layer - b.layer)
+      .map((modal, index) => ({
+        ...modal,
+        layer: index
+      }));
   }
 
   /**

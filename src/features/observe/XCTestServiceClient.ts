@@ -9,6 +9,12 @@ import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOption
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { RequestManager } from "../../utils/RequestManager";
+import { NavigationGraphManager } from "../navigation/NavigationGraphManager";
+import {
+  HierarchyNavigationDetector,
+  HierarchyNavigationUpdateMetrics
+} from "../navigation/HierarchyNavigationDetector";
+import { AccessibilityHierarchy } from "../navigation/ScreenFingerprint";
 
 /**
  * Interface for iOS accessibility node format (matching Android format)
@@ -335,6 +341,7 @@ export class XCTestServiceClient implements XCTestService {
   // Hierarchy caching
   private cachedHierarchy: CachedHierarchy | null = null;
   private static readonly CACHE_FRESH_TTL_MS = 500;
+  private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
 
   // Auto-reconnect
   private autoReconnectEnabled: boolean = true;
@@ -512,6 +519,10 @@ export class XCTestServiceClient implements XCTestService {
       return;
     }
 
+    if (type === "hierarchy_update" && message.data) {
+      this.handleHierarchyUpdateForNavigation(message.data, message.perfTiming);
+    }
+
     // Handle request/response messages (with requestId) first
     if (requestId) {
       // Build result based on message type
@@ -647,6 +658,27 @@ export class XCTestServiceClient implements XCTestService {
     }
 
     this.cachedHierarchy = null;
+
+    if (this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector.dispose();
+      this.hierarchyNavigationDetector = null;
+    }
+  }
+
+  public getHierarchyNavigationDetector(): HierarchyNavigationDetector {
+    if (!this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector = new HierarchyNavigationDetector(
+        NavigationGraphManager.getInstance(),
+        { timer: this.timer }
+      );
+    }
+    return this.hierarchyNavigationDetector;
+  }
+
+  public resetHierarchyNavigationDetector(): void {
+    if (this.hierarchyNavigationDetector) {
+      this.hierarchyNavigationDetector.reset();
+    }
   }
 
   public async waitForConnection(maxAttempts: number = 3, delayMs: number = 1000): Promise<boolean> {
@@ -717,6 +749,79 @@ export class XCTestServiceClient implements XCTestService {
     }
 
     return this.convertToViewHierarchyResult(response.hierarchy);
+  }
+
+  private handleHierarchyUpdateForNavigation(
+    hierarchy: XCTestHierarchy,
+    perfTiming?: XCTestPerfTiming | XCTestPerfTiming[]
+  ): void {
+    if (!hierarchy.hierarchy) {
+      logger.warn("[XCTestServiceClient] Skipping navigation detection: hierarchy missing in update");
+      return;
+    }
+
+    if (hierarchy.error) {
+      logger.warn(`[XCTestServiceClient] Skipping navigation detection due to hierarchy error: ${hierarchy.error}`);
+      return;
+    }
+
+    const conversionStart = this.timer.now();
+    const convertedHierarchy = this.convertHierarchyForNavigation(hierarchy);
+    const conversionMs = this.timer.now() - conversionStart;
+
+    const metrics: HierarchyNavigationUpdateMetrics = {
+      source: "ios",
+      conversionMs,
+      externalTiming: perfTiming
+    };
+
+    this.getHierarchyNavigationDetector().onHierarchyUpdate(convertedHierarchy, metrics);
+  }
+
+  private convertHierarchyForNavigation(hierarchy: XCTestHierarchy): AccessibilityHierarchy {
+    return {
+      updatedAt: hierarchy.updatedAt,
+      packageName: hierarchy.packageName,
+      hierarchy: this.convertNodeForNavigation(hierarchy.hierarchy) as AccessibilityHierarchy["hierarchy"],
+    };
+  }
+
+  private convertNodeForNavigation(
+    node: XCTestNode | XCTestNode[]
+  ): Record<string, any> | Record<string, any>[] {
+    if (Array.isArray(node)) {
+      return node.map(child => this.convertNodeForNavigation(child));
+    }
+
+    const converted: Record<string, any> = {};
+
+    if (node.text) {
+      converted.text = node.text;
+    }
+    if (node.contentDesc) {
+      converted["content-desc"] = node.contentDesc;
+    }
+    if (node.resourceId) {
+      converted["resource-id"] = node.resourceId;
+    }
+    if (node.testTag) {
+      converted["test-tag"] = node.testTag;
+    }
+    if (node.className) {
+      converted.className = node.className;
+    }
+    if (node.scrollable) {
+      converted.scrollable = node.scrollable;
+    }
+    if (node.selected) {
+      converted.selected = node.selected;
+    }
+
+    if (node.node) {
+      converted.node = this.convertNodeForNavigation(node.node);
+    }
+
+    return converted;
   }
 
   public async getLatestHierarchy(
