@@ -19,7 +19,7 @@
     "adb",
     "simctl"
   ],
-  "commands": ["./commands/"],
+  "commands": ["./skills/"],
   "hooks": "./hooks.json",
   "mcpServers": {
     "auto-mobile": {
