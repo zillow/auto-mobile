@@ -119,7 +119,8 @@ export function registerNavigationTools() {
     "Navigate to screen using navigation graph",
     navigateToSchema,
     navigateToHandler,
-    true // supports progress
+    true, // supports progress
+    true // debugOnly - navigation graph not production-ready
   );
 
   ToolRegistry.registerDeviceAware(
@@ -173,6 +174,7 @@ export function registerNavigationTools() {
     "Automatically explore app to build navigation graph",
     exploreSchema,
     exploreHandler,
-    true // supports progress
+    true, // supports progress
+    true // debugOnly - navigation graph not production-ready
   );
 }

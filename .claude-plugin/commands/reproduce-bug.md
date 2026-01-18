@@ -1,6 +1,6 @@
 ---
 description: Systematically reproduce a bug and document reproduction steps
-allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__tapOn, mcp__auto-mobile__swipeOn, mcp__auto-mobile__inputText, mcp__auto-mobile__launchApp, mcp__auto-mobile__highlight, mcp__auto-mobile__videoRecording, mcp__auto-mobile__deviceSnapshot
+allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__tapOn, mcp__auto-mobile__swipeOn, mcp__auto-mobile__inputText, mcp__auto-mobile__clearText, mcp__auto-mobile__selectAllText, mcp__auto-mobile__pressButton, mcp__auto-mobile__pinchOn, mcp__auto-mobile__dragAndDrop, mcp__auto-mobile__launchApp, mcp__auto-mobile__terminateApp, mcp__auto-mobile__highlight, mcp__auto-mobile__deviceSnapshot, mcp__auto-mobile__homeScreen
 ---
 
 Systematically reproduce a reported bug, document exact steps, and capture evidence.
@@ -14,26 +14,31 @@ Systematically reproduce a reported bug, document exact steps, and capture evide
    - Any error messages or visual symptoms?
 
 2. **Prepare environment**:
-   - Start video recording with `videoRecording` action: "start"
    - Capture initial device state with `deviceSnapshot` for restoration
-   - Launch the app to a known starting point
+   - Launch the app to a known starting point using `launchApp`
+   - Use `observe` to verify starting screen
 
-3. **Attempt reproduction**:
-   - Follow reported steps using interaction tools
+3. **Attempt reproduction** using interaction tools:
+   - `tapOn` - tap, double-tap, long-press on elements
+   - `swipeOn` - scroll, swipe, fling gestures
+   - `inputText` - enter text into fields
+   - `clearText` / `selectAllText` - manipulate existing text
+   - `pressButton` - hardware buttons (back, home, menu)
+   - `pinchOn` - zoom in/out gestures
+   - `dragAndDrop` - drag elements between locations
    - Use `observe` frequently to verify screen state
    - Document each action taken
-   - Note any deviations from expected behavior
 
 4. **When bug is reproduced**:
    - Use `highlight` to visually mark the defect on screen
    - Capture the final state with `observe`
-   - Stop video recording to preserve evidence
+   - Note exact sequence that triggered the issue
 
 5. **Document findings**:
    - Exact reproduction steps (numbered list)
    - Environment details (device, OS, app version)
    - Expected vs actual behavior
-   - Screenshots/video timestamps showing the issue
+   - Screenshots showing the issue
    - Any patterns (intermittent, specific conditions)
 
 6. **If cannot reproduce**:
@@ -42,10 +47,9 @@ Systematically reproduce a reported bug, document exact steps, and capture evide
    - Suggest additional information needed
    - Try variations of the reported steps
 
-7. **Create regression test** (optional):
-   - Convert reproduction steps to a test plan
-   - Add assertions that would catch this bug
-   - Suggest where to add the test in the suite
+7. **Cleanup**:
+   - Use `terminateApp` to close the app
+   - Restore device snapshot if needed
 
 ## Output Format
 
@@ -72,8 +76,7 @@ Systematically reproduce a reported bug, document exact steps, and capture evide
 [Description]
 
 ### Evidence
-- Video: [timestamp range]
-- Screenshots: [attached]
+- Screenshots: [attached/described]
 
 ### Notes
 [Any additional observations]

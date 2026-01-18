@@ -806,82 +806,6 @@
     }
   },
   {
-    "name": "explore",
-    "description": "Automatically explore app to build navigation graph",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "maxInteractions": {
-          "description": "Max interactions (default: 50)",
-          "type": "number"
-        },
-        "timeoutMs": {
-          "description": "Timeout ms (default: 300000)",
-          "type": "number"
-        },
-        "strategy": {
-          "description": "Strategy (default: weighted)",
-          "type": "string",
-          "enum": [
-            "breadth-first",
-            "depth-first",
-            "weighted"
-          ]
-        },
-        "resetToHome": {
-          "description": "Reset to home periodically (default: false)",
-          "type": "boolean"
-        },
-        "resetInterval": {
-          "description": "Reset interval (default: 15)",
-          "type": "number"
-        },
-        "mode": {
-          "description": "Mode (default: hybrid)",
-          "type": "string",
-          "enum": [
-            "discover",
-            "validate",
-            "hybrid"
-          ]
-        },
-        "packageName": {
-          "description": "Package to limit exploration",
-          "type": "string"
-        },
-        "dryRun": {
-          "description": "Dry run (no interactions)",
-          "type": "boolean"
-        },
-        "platform": {
-          "default": "android",
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ]
-        },
-        "sessionUuid": {
-          "description": "Session UUID for device targeting",
-          "type": "string"
-        },
-        "keepScreenAwake": {
-          "description": "Keep physical Android devices awake during the session (default: true)",
-          "type": "boolean"
-        },
-        "device": {
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
-          "type": "string"
-        }
-      },
-      "required": [
-        "platform"
-      ],
-      "additionalProperties": false
-    }
-  },
-  {
     "name": "getDeepLinks",
     "description": "Query deep links for app",
     "inputSchema": {
@@ -1909,45 +1833,6 @@
           ]
         }
       },
-      "additionalProperties": false
-    }
-  },
-  {
-    "name": "navigateTo",
-    "description": "Navigate to screen using navigation graph",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "targetScreen": {
-          "type": "string",
-          "description": "Target screen name"
-        },
-        "platform": {
-          "default": "android",
-          "type": "string",
-          "enum": [
-            "android",
-            "ios"
-          ]
-        },
-        "sessionUuid": {
-          "description": "Session UUID for device targeting",
-          "type": "string"
-        },
-        "keepScreenAwake": {
-          "description": "Keep physical Android devices awake during the session (default: true)",
-          "type": "boolean"
-        },
-        "device": {
-          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
-          "type": "string"
-        }
-      },
-      "required": [
-        "targetScreen",
-        "platform"
-      ],
       "additionalProperties": false
     }
   },
