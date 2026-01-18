@@ -1,52 +1,80 @@
 ---
 description: Systematically reproduce a bug and document reproduction steps
-allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__highlight, mcp__auto-mobile__deviceSnapshot, mcp__auto-mobile__launchApp, mcp__auto-mobile__terminateApp
+allowed-tools: mcp__auto-mobile__observe, mcp__auto-mobile__highlight, mcp__auto-mobile__launchApp, mcp__auto-mobile__terminateApp
 ---
 
 Systematically reproduce a reported bug, document exact steps, and capture evidence.
 
-For UI interactions (tapping, typing, swiping, etc.), use the `/explore` command which provides all interaction tools.
+## Available Skills
+
+For device interactions during bug reproduction, use these skills:
+
+- `/apps` - Launch and terminate apps
+- `/system` - Navigate with hardware buttons, home screen
+- `/gesture` - Tap, swipe, scroll to reproduce user actions
+- `/text` - Input text, manipulate fields
+- `/notifications` - Check notification-related bugs
+- `/snapshot` - Capture device state for restoration
 
 ## Workflow
 
-1. **Understand the bug report**:
-   - What is the expected behavior?
-   - What is the actual behavior?
-   - What conditions trigger it? (device, OS version, user state)
-   - Any error messages or visual symptoms?
+### 1. Understand the Bug Report
 
-2. **Prepare environment**:
-   - Capture initial device state with `deviceSnapshot` for restoration
-   - Launch the app to a known starting point using `launchApp`
-   - Use `observe` to verify starting screen
+Gather information:
+- What is the expected behavior?
+- What is the actual behavior?
+- What conditions trigger it? (device, OS version, user state)
+- Any error messages or visual symptoms?
 
-3. **Attempt reproduction**:
-   - Use `/explore` for all UI interactions
-   - Use `observe` frequently to verify screen state
-   - Document each action taken
-   - Note any deviations from expected behavior
+### 2. Prepare Environment
 
-4. **When bug is reproduced**:
-   - Use `highlight` to visually mark the defect on screen
-   - Capture the final state with `observe`
-   - Note exact sequence that triggered the issue
+```
+/snapshot capture "before_repro"  # Save initial state
+/apps launch the target app
+observe                           # Get initial screen state
+```
 
-5. **Document findings**:
-   - Exact reproduction steps (numbered list)
-   - Environment details (device, OS, app version)
-   - Expected vs actual behavior
-   - Screenshots showing the issue
-   - Any patterns (intermittent, specific conditions)
+Use `observe` at the start of a session to capture initial state. After that, interaction tools automatically return updated screen state.
 
-6. **If cannot reproduce**:
-   - Document attempted steps
-   - Note differences from reported environment
-   - Suggest additional information needed
-   - Try variations of the reported steps
+### 3. Attempt Reproduction
 
-7. **Cleanup**:
-   - Use `terminateApp` to close the app
-   - Restore device snapshot if needed
+Follow the reported steps using interaction skills:
+- Use `/gesture` for taps, swipes, scrolls
+- Use `/text` for text input
+- Use `/system` for hardware button presses
+
+Document each action taken and note any deviations. Only use `observe` if an action resulted in an incomplete or loading state that needs re-checking.
+
+### 4. When Bug is Reproduced
+
+```
+highlight                         # Mark defect visually on screen
+```
+
+Record the exact sequence that triggered the issue. If the screen showed a loading state, use `observe` to capture the final state.
+
+### 5. Document Findings
+
+Create a structured report with:
+- Exact reproduction steps (numbered list)
+- Environment details (device, OS, app version)
+- Expected vs actual behavior
+- Screenshots showing the issue
+- Any patterns (intermittent, specific conditions)
+
+### 6. If Cannot Reproduce
+
+- Document attempted steps
+- Note differences from reported environment
+- Suggest additional information needed
+- Try variations of the reported steps
+
+### 7. Cleanup
+
+```
+/apps terminate the app
+/snapshot restore "before_repro"  # Restore initial state
+```
 
 ## Output Format
 
@@ -78,3 +106,11 @@ For UI interactions (tapping, typing, swiping, etc.), use the `/explore` command
 ### Notes
 [Any additional observations]
 ```
+
+## Tips
+
+- Capture a snapshot before starting to enable easy state restoration
+- Use `observe` only at session start or after loading/incomplete states
+- Use `highlight` to visually mark the bug location on screen
+- Document environment details early - they often matter for reproduction
+- Try multiple devices/OS versions if bug doesn't reproduce
