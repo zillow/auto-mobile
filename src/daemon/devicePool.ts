@@ -465,8 +465,8 @@ export class DevicePool {
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: devices.size = ${this.devices.size}`);
       logger.info(`[DEVICE-POOL-DEBUG] tryAssignDevice: device IDs = ${Array.from(this.devices.keys()).join(", ")}`);
 
-      const candidates = this.getDevicesByPlatform(platform);
-      const totalDevices = candidates.length;
+      let candidates = this.getDevicesByPlatform(platform);
+      let totalDevices = candidates.length;
 
       // Find idle devices and prefer most recently released for reuse
       const idleDevices = candidates.filter(d => d.status === "idle");
@@ -486,13 +486,16 @@ export class DevicePool {
 
       // If no devices available and pool is empty, try to refresh
       // This handles race conditions during daemon startup
-      if (!device && this.devices.size === 0) {
-        logger.info("Device pool is empty, attempting auto-refresh...");
+      if (!device && (this.devices.size === 0 || totalDevices === 0)) {
+        const refreshReason = this.devices.size === 0 ? "empty pool" : "platform pool empty";
+        logger.info(`[DevicePool] Auto-refreshing devices due to ${refreshReason}...`);
         const addedCount = await this.refreshDevices();
         logger.info(`[DEVICE-POOL-DEBUG] Auto-refresh added ${addedCount} devices`);
         if (addedCount > 0) {
           // Try again after refresh
-          device = this.getDevicesByPlatform(platform).find(d => d.status === "idle");
+          candidates = this.getDevicesByPlatform(platform);
+          totalDevices = candidates.length;
+          device = candidates.find(d => d.status === "idle");
           logger.info(`[DEVICE-POOL-DEBUG] After refresh, found idle device = ${device?.id || "none"}`);
         }
       }
