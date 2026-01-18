@@ -173,7 +173,7 @@ class ToolRegistryClass {
       let platform: SomePlatform = args.platform || "either";
 
       if (shouldResolveDevice) {
-        await this.enforceSessionUuidForMultipleIos(platform, sessionUuid);
+        await this.enforceSessionUuidForMultipleIos(platform, sessionUuid, providedDeviceId);
       }
 
       // If session UUID provided, resolve device from session
@@ -370,9 +370,10 @@ class ToolRegistryClass {
 
   private async enforceSessionUuidForMultipleIos(
     platform: SomePlatform,
-    sessionUuid: string | undefined
+    sessionUuid: string | undefined,
+    providedDeviceId: string | undefined
   ): Promise<void> {
-    if (sessionUuid) {
+    if (sessionUuid || providedDeviceId) {
       return;
     }
 

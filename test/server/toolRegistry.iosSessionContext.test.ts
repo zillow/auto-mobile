@@ -73,4 +73,26 @@ describe("ToolRegistry iOS session context", () => {
     expect(response).toEqual({ success: true });
     expect(fakeDeviceSessionManager.getEnsureDeviceReadyCallCount()).toBe(1);
   });
+
+  test("allows explicit deviceId when multiple iOS simulators are booted", async () => {
+    fakeDeviceSessionManager.setConnectedDevices([iosDeviceA, iosDeviceB]);
+
+    ToolRegistry.registerDeviceAware(
+      "iosDeviceIdAllowedTool",
+      "Tool allows deviceId without sessionUuid when multiple iOS simulators are booted",
+      z.object({
+        platform: z.enum(["ios", "android"]).optional(),
+        deviceId: z.string().optional(),
+        sessionUuid: z.string().optional(),
+      }),
+      async () => ({ success: true })
+    );
+
+    const tool = ToolRegistry.getTool("iosDeviceIdAllowedTool");
+    expect(tool).toBeDefined();
+
+    const response = await tool!.handler({ platform: "ios", deviceId: "ios-device-b" });
+    expect(response).toEqual({ success: true });
+    expect(fakeDeviceSessionManager.getEnsureDeviceReadyCallCount()).toBe(1);
+  });
 });
