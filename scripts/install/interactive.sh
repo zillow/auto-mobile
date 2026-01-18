@@ -2190,7 +2190,12 @@ main() {
 
     # Only do interactive platform/component selection if not using a preset
     if [[ -z "${PRESET}" ]] && [[ "${NON_INTERACTIVE}" != "true" ]] && [[ "${CONFIGURE_MCP_CLIENTS}" != "true" || "${INSTALL_BUN}" != "true" ]]; then
-        platform_choice=$(gum choose "Android" "iOS" "Both" "Skip platform setup")
+        if [[ "${os}" != "macos" ]]; then
+            log_warn "iOS setup is only available on macOS. Android setup is available."
+            platform_choice=$(gum choose "Android" "Skip platform setup")
+        else
+            platform_choice=$(gum choose "Android" "iOS" "Both" "Skip platform setup")
+        fi
 
         if spin_check "Checking Bun" "command -v bun >/dev/null 2>&1"; then
             BUN_INSTALLED=true
