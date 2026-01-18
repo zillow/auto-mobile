@@ -17,4 +17,5 @@ export interface BootedDevice {
   platform: Platform;
   deviceId: string;
   source?: "local";
+  iosVersion?: string;
 }

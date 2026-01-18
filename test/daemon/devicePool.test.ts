@@ -4,17 +4,23 @@ import { SessionManager } from "../../src/daemon/sessionManager";
 import { FakeTimer } from "../fakes/FakeTimer";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
 import { FakeDeviceManager } from "../fakes/FakeDeviceManager";
-import { BootedDevice, DeviceInfo } from "../../src/models";
+import { BootedDevice, DeviceInfo, Platform } from "../../src/models";
 
 describe("DevicePool", () => {
   let devicePool: DevicePool;
   let sessionManager: SessionManager;
   let fakeTimer: FakeTimer;
   let fakeAppsRepo: FakeInstalledAppsRepository;
-  const createBootedDevice = (deviceId: string): BootedDevice => ({
-    name: deviceId,
-    platform: "android",
-    deviceId
+  const createBootedDevice = (
+    deviceId: string,
+    platform: Platform = "android",
+    name?: string,
+    iosVersion?: string
+  ): BootedDevice => ({
+    name: name ?? deviceId,
+    platform,
+    deviceId,
+    iosVersion
   });
 
   beforeEach(() => {
@@ -143,7 +149,7 @@ describe("DevicePool", () => {
   });
 
   describe("assignMultipleDevices", () => {
-    test("should boot additional iOS simulators when pool is short", async () => {
+    test("should not auto-start iOS simulators when pool is short", async () => {
       const images: DeviceInfo[] = [
         { name: "iPhone 15 Pro", platform: "ios", isRunning: false, deviceId: "sim-1" },
         { name: "iPhone 15", platform: "ios", isRunning: false, deviceId: "sim-2" },
@@ -151,11 +157,30 @@ describe("DevicePool", () => {
       const fakeDeviceManager = new FakeDeviceManager(images);
       devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager);
 
-      const assignments = await devicePool.assignMultipleDevices(["session-a", "session-b"], 1000, "ios");
+      await expect(
+        devicePool.assignMultipleDevices(["session-a", "session-b"], 1000, "ios")
+      ).rejects.toThrow(/Not enough devices in pool/);
+      expect(fakeDeviceManager.startedDevices).toHaveLength(0);
+      expect(devicePool.getTotalDeviceCount()).toBe(0);
+    });
 
-      expect(assignments.size).toBe(2);
-      expect(fakeDeviceManager.startedDevices).toHaveLength(2);
-      expect(devicePool.getTotalDeviceCount()).toBe(2);
+    test("should assign iOS simulators by criteria", async () => {
+      await devicePool.initializeWithDevices([
+        createBootedDevice("sim-1", "ios", "iPhone 15 Pro", "17.5"),
+        createBootedDevice("sim-2", "ios", "iPhone 15", "17.4"),
+      ]);
+
+      const assignments = await devicePool.assignMultipleDevicesByCriteria(
+        [
+          {
+            sessionId: "session-a",
+            criteria: { platform: "ios", simulatorType: "iPhone 15 Pro", iosVersion: "17.5" },
+          },
+        ],
+        1000
+      );
+
+      expect(assignments.get("session-a")).toBe("sim-1");
     });
   });
 

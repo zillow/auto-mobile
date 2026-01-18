@@ -10,6 +10,7 @@ import { DEVICE_LABEL_DESCRIPTION } from "./toolSchemaHelpers";
 import { registerDeviceLabelMap, buildDeviceLabelMap } from "./deviceLabelMapping";
 import { PlanSchemaValidator } from "../utils/plan/PlanSchemaValidator";
 import { DaemonState } from "../daemon/daemonState";
+import { normalizePlanDevices } from "../utils/plan/PlanDevices";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -168,16 +169,35 @@ const executePlanTool = async (device: BootedDevice, params: {
     const plan = importPlanFromYaml(yamlContent);
     logger.info(`Plan parsed successfully: '${plan.name}' with ${plan.steps.length} steps`);
 
+    const normalizedPlanDevices = normalizePlanDevices(plan.devices);
+    const planDeviceLabels = normalizedPlanDevices.labels;
+    const effectiveDeviceLabels = params.devices && params.devices.length > 0
+      ? params.devices
+      : planDeviceLabels;
+
+    if (params.devices && planDeviceLabels.length > 0) {
+      const declared = [...new Set(planDeviceLabels)].sort();
+      const provided = [...new Set(params.devices)].sort();
+      const sameLength = declared.length === provided.length;
+      const sameValues = sameLength && declared.every((label, index) => label === provided[index]);
+      if (!sameValues) {
+        throw new ActionableError(
+          `Devices list does not match plan devices. ` +
+          `Plan devices: [${declared.join(", ")}], provided: [${provided.join(", ")}].`
+        );
+      }
+    }
+
     // Device allocation for multi-device plans
     let deviceMapping: Record<string, string> | undefined;
 
-    if (params.devices && params.devices.length > 0) {
+    if (effectiveDeviceLabels && effectiveDeviceLabels.length > 0) {
       if (!params.sessionUuid) {
         throw new ActionableError("Device labels require a sessionUuid to be provided.");
       }
-      if (params.device && !params.devices.includes(params.device)) {
+      if (params.device && !effectiveDeviceLabels.includes(params.device)) {
         throw new ActionableError(
-          `Device label '${params.device}' was not declared in devices list: ${params.devices.join(", ")}`
+          `Device label '${params.device}' was not declared in devices list: ${effectiveDeviceLabels.join(", ")}`
         );
       }
 
@@ -192,7 +212,7 @@ const executePlanTool = async (device: BootedDevice, params: {
       const sessionManager = DaemonState.getInstance().getSessionManager();
 
       // Build device label map to get session UUIDs
-      const labelToSessionMap = buildDeviceLabelMap(params.devices, params.sessionUuid, params.device);
+      const labelToSessionMap = buildDeviceLabelMap(effectiveDeviceLabels, params.sessionUuid, params.device);
       const sessionIds = Object.values(labelToSessionMap);
 
       logger.info(
@@ -201,11 +221,39 @@ const executePlanTool = async (device: BootedDevice, params: {
       );
 
       // Allocate all devices upfront with shared timeout
-      const sessionToDeviceMap = await devicePool.assignMultipleDevices(
-        sessionIds,
-        params.deviceAllocationTimeoutMs,
-        params.platform
-      );
+      let sessionToDeviceMap: Map<string, string>;
+      if (normalizedPlanDevices.hasDefinitions) {
+        const definitionMap = new Map(
+          normalizedPlanDevices.definitions.map(definition => [definition.label, definition])
+        );
+        const requests = effectiveDeviceLabels.map(label => {
+          const definition = definitionMap.get(label);
+          if (!definition) {
+            throw new ActionableError(
+              `Device definition for label '${label}' not found in plan devices.`
+            );
+          }
+          return {
+            sessionId: labelToSessionMap[label],
+            criteria: {
+              platform: definition.platform,
+              simulatorType: definition.simulatorType,
+              iosVersion: definition.iosVersion,
+            },
+          };
+        });
+
+        sessionToDeviceMap = await devicePool.assignMultipleDevicesByCriteria(
+          requests,
+          params.deviceAllocationTimeoutMs
+        );
+      } else {
+        sessionToDeviceMap = await devicePool.assignMultipleDevices(
+          sessionIds,
+          params.deviceAllocationTimeoutMs,
+          params.platform
+        );
+      }
 
       // Verify sessions were created in SessionManager for each allocated device
       for (const sessionUuid of sessionToDeviceMap.keys()) {
@@ -241,7 +289,7 @@ const executePlanTool = async (device: BootedDevice, params: {
       // Register the device label map (sessions are already created, this just caches the mapping)
       await registerDeviceLabelMap(
         params.sessionUuid,
-        params.devices,
+        effectiveDeviceLabels,
         params.device,
         { keepScreenAwake: params.keepScreenAwake, platform: params.platform }
       );

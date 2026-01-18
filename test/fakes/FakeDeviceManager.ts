@@ -43,7 +43,8 @@ export class FakeDeviceManager implements PlatformDeviceManager {
         name: device.name,
         platform: device.platform,
         deviceId: id,
-        source: device.source
+        source: device.source,
+        iosVersion: device.iosVersion
       });
     }
     return { pid: 0 } as ChildProcess;
@@ -57,7 +58,8 @@ export class FakeDeviceManager implements PlatformDeviceManager {
       name: device.name,
       platform: device.platform,
       deviceId: id,
-      source: device.source
+      source: device.source,
+      iosVersion: device.iosVersion
     };
   }
 }
