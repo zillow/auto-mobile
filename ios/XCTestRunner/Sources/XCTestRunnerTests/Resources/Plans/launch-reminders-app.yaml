@@ -1,0 +1,19 @@
+---
+name: launch-reminders-app
+description: Launch the iOS Reminders app and wait for the main UI
+platform: ios
+steps:
+  - tool: launchApp
+    appId: com.apple.reminders
+    label: Launch Reminders
+
+  - tool: observe
+    waitFor:
+      element:
+        text: "Reminders"
+      timeout: 20000
+    label: Wait for Reminders UI
+
+  - tool: terminateApp
+    appId: com.apple.reminders
+    label: Close Reminders

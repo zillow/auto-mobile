@@ -33,18 +33,13 @@ Base XCTestCase class for executing automation plans:
 import XCTest
 import XCTestRunner
 
-class MyAppTests: AutoMobileTestCase {
-    override func testConfiguration() -> Configuration {
-        return Configuration(
-            mcpEndpoint: "http://localhost:3000",
-            planPath: "plans/login-flow.yaml",
-            retryCount: 2,
-            timeout: 300
-        )
-    }
+final class MyAppTests: AutoMobileTestCase {
+    override var planPath: String { "Plans/login-flow.yaml" }
+    override var retryCount: Int { 2 }
+    override var timeoutSeconds: TimeInterval { 300 }
 
     func testLoginFlow() throws {
-        try testPlan()
+        try executePlan()
     }
 }
 ```
@@ -54,9 +49,9 @@ class MyAppTests: AutoMobileTestCase {
 Executes automation plans with retry and cleanup logic:
 
 ```swift
-let config = AutoMobileTestCase.Configuration(
-    mcpEndpoint: "http://localhost:3000",
-    planPath: "plans/checkout.yaml",
+let config = AutoMobilePlanExecutor.Configuration(
+    transport: .streamableHttp(url: URL(string: "http://localhost:9000/auto-mobile/streamable")!),
+    planPath: "Plans/checkout.yaml",
     retryCount: 3
 )
 
@@ -81,10 +76,21 @@ try observer.exportTimingData(to: "timing-history.json")
 
 ### Environment Variables
 
-- `MCP_ENDPOINT`: MCP server endpoint (default: http://localhost:3000)
+Primary:
+- `AUTOMOBILE_DAEMON_SOCKET_PATH`: Daemon socket path (default: `/tmp/auto-mobile-daemon-$UID.sock`)
+- `AUTOMOBILE_MCP_URL`: MCP HTTP endpoint (optional override)
+- `AUTOMOBILE_TEST_PLAN`: Path to YAML automation plan
+- `AUTOMOBILE_TEST_RETRY_COUNT`: Number of retry attempts (default: 0)
+- `AUTOMOBILE_TEST_TIMEOUT_SECONDS`: Test timeout in seconds (default: 300)
+- `AUTOMOBILE_TEST_RETRY_DELAY_SECONDS`: Retry backoff in seconds (default: 1)
+- `AUTOMOBILE_INTEGRATION_TESTS`: Set to `1` to enable MCP integration tests
+
+Legacy (still supported):
+- `AUTO_MOBILE_DAEMON_SOCKET_PATH`: Daemon socket path
+- `MCP_ENDPOINT`: MCP server endpoint
 - `PLAN_PATH`: Path to YAML automation plan
-- `RETRY_COUNT`: Number of retry attempts (default: 0)
-- `TEST_TIMEOUT`: Test timeout in seconds (default: 300)
+- `RETRY_COUNT`: Number of retry attempts
+- `TEST_TIMEOUT`: Test timeout in seconds
 
 ### Test Scheme Settings
 
@@ -113,6 +119,39 @@ xcodebuild -scheme XCTestRunner -destination 'platform=iOS Simulator,name=iPhone
 3. Subclass AutoMobileTestCase
 4. Configure test scheme with environment variables
 5. Run tests via Xcode Test Navigator or xcodebuild
+
+## Example XCTest Target (Reminders)
+
+Plan fixtures live in `ios/XCTestRunner/Sources/XCTestRunnerTests/Resources/Plans`:
+- `Plans/launch-reminders-app.yaml`
+- `Plans/add-reminder.yaml`
+
+Platform-specific plans should declare a top-level `platform` field (e.g., `platform: ios`). Multi-device plans must declare platform per device at the top level.
+
+Sample XCTest case:
+
+```swift
+import XCTest
+import XCTestRunner
+
+final class RemindersLaunchPlanTests: AutoMobileTestCase {
+    override var planPath: String { "Plans/launch-reminders-app.yaml" }
+
+    func testLaunchRemindersPlan() throws {
+        try executePlan()
+    }
+}
+```
+
+Integration test (opt-in, requires MCP + iOS simulator running):
+
+```bash
+AUTOMOBILE_INTEGRATION_TESTS=1 \
+AUTOMOBILE_DAEMON_SOCKET_PATH=/tmp/auto-mobile-daemon-$UID.sock \
+swift test --filter RemindersLaunchPlanTests
+```
+
+Note: The Reminders plans assume English UI labels and may need adjustment for other locales.
 
 ## Development Status
 

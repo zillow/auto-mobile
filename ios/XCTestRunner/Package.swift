@@ -24,7 +24,10 @@ let package = Package(
         ),
         .testTarget(
             name: "XCTestRunnerTests",
-            dependencies: ["XCTestRunner"]
+            dependencies: ["XCTestRunner"],
+            resources: [
+                .process("Resources")
+            ]
         ),
     ]
 )
