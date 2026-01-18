@@ -387,6 +387,19 @@ export class DevicePool {
 
     await this.ensurePoolRefreshed();
 
+    let needsRefresh = false;
+    for (const request of requests) {
+      const candidates = this.getDevicesMatchingCriteria(request.criteria);
+      if (candidates.length === 0) {
+        needsRefresh = true;
+        break;
+      }
+    }
+
+    if (needsRefresh) {
+      await this.refreshDevices();
+    }
+
     for (const request of requests) {
       const candidates = this.getDevicesMatchingCriteria(request.criteria);
       if (candidates.length === 0) {
