@@ -6,6 +6,18 @@
 
 set -e
 
+# Options
+DRY_RUN=false
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run)
+            DRY_RUN=true
+            ;;
+        *)
+            ;;
+    esac
+done
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -45,6 +57,22 @@ print_info() {
     echo -e "  ${BLUE}ℹ${NC} $1"
 }
 
+run_cmd() {
+    if [ "$DRY_RUN" = true ]; then
+        echo -e "  ${YELLOW}↳${NC} (dry-run) $*"
+        return 0
+    fi
+    "$@"
+}
+
+has_simulator_sdk() {
+    if [ "$DRY_RUN" = true ]; then
+        echo -e "${YELLOW}(dry-run) Skipping simulator SDK detection.${NC}"
+        return 0
+    fi
+    xcodebuild -showsdks 2>/dev/null | grep -q "iphonesimulator"
+}
+
 # Check if xcodebuild is available
 if ! command -v xcodebuild &> /dev/null; then
     echo -e "${RED}Error: xcodebuild not found. Please install Xcode.${NC}"
@@ -57,10 +85,10 @@ print_info "Xcode version: ${XCODE_VERSION}"
 echo ""
 
 # Ensure iOS Simulator SDK is installed
-if ! xcodebuild -showsdks 2>/dev/null | grep -q "iphonesimulator"; then
+if ! has_simulator_sdk; then
     echo -e "${YELLOW}No iOS Simulator SDK detected. Attempting to install iOS platform...${NC}"
     set +e
-    xcodebuild -downloadPlatform iOS 2>&1
+    run_cmd xcodebuild -downloadPlatform iOS 2>&1
     DOWNLOAD_EXIT_CODE=$?
     set -e
 
@@ -68,7 +96,7 @@ if ! xcodebuild -showsdks 2>/dev/null | grep -q "iphonesimulator"; then
         echo -e "${RED}Failed to download iOS platform (exit ${DOWNLOAD_EXIT_CODE}).${NC}"
     fi
 
-    if ! xcodebuild -showsdks 2>/dev/null | grep -q "iphonesimulator"; then
+    if ! has_simulator_sdk; then
         echo -e "${RED}iOS Simulator SDK still missing after download attempt.${NC}"
         echo -e "${YELLOW}Install the iOS platform in Xcode or ensure CI has the simulator SDK preinstalled.${NC}"
         exit 1
@@ -91,7 +119,7 @@ for xcodeproj in ${XCODEPROJ_DIRS}; do
     echo -e "  Building ${PROJECT_NAME}..."
 
     # Get available schemes
-    SCHEMES=$(xcodebuild -project "${xcodeproj}" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | sed 's/^[[:space:]]*//' | grep -v '^$' || true)
+    SCHEMES=$(run_cmd xcodebuild -project "${xcodeproj}" -list 2>/dev/null | sed -n '/Schemes:/,/^$/p' | grep -v "Schemes:" | sed 's/^[[:space:]]*//' | grep -v '^$' || true)
 
     if [ -z "${SCHEMES}" ]; then
         print_info "No schemes found for ${PROJECT_NAME}, skipping"
@@ -103,7 +131,7 @@ for xcodeproj in ${XCODEPROJ_DIRS}; do
     while IFS= read -r scheme; do
         if [ -n "${scheme}" ]; then
             echo -e "    Building scheme: ${scheme}..."
-            if xcodebuild \
+            if run_cmd xcodebuild \
                 -project "${xcodeproj}" \
                 -scheme "${scheme}" \
                 -destination 'generic/platform=iOS Simulator' \
