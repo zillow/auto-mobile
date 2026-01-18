@@ -19,3 +19,4 @@ export {
 export { NoopVideoCaptureBackend } from "./NoopVideoCaptureBackend";
 export { PlatformVideoCaptureBackend } from "./PlatformVideoCaptureBackend";
 export { FfmpegVideoProcessingBackend } from "./FfmpegVideoProcessingBackend";
+export { HybridVideoCaptureBackend } from "./HybridVideoCaptureBackend";

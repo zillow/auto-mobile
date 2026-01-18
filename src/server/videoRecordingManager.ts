@@ -10,7 +10,7 @@ import {
   VideoRecordingMetadata,
 } from "../models";
 import {
-  FfmpegVideoProcessingBackend,
+  HybridVideoCaptureBackend,
   VideoRecorderService,
   parseVideoRecordingConfig,
   type ActiveVideoRecording,
@@ -91,8 +91,8 @@ const highlightSessions = new Map<string, VideoRecordingHighlightSession>();
 const highlightSessionsByDeviceId = new Map<string, string>();
 
 async function selectBackend(): Promise<VideoCaptureBackend> {
-  logger.debug("[VideoRecording] Using FfmpegVideoProcessingBackend");
-  return new FfmpegVideoProcessingBackend();
+  logger.debug("[VideoRecording] Using HybridVideoCaptureBackend (iOS FFmpeg, Android platform)");
+  return new HybridVideoCaptureBackend();
 }
 
 async function createRecorderService(): Promise<VideoRecorderService> {
