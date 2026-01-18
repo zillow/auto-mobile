@@ -36,6 +36,7 @@ BACKUP_TIMESTAMP=""
 # Format: "client_name|config_path|format|scope"
 MCP_CLIENT_LIST=()
 SELECTED_MCP_CLIENTS=()
+IOS_RUNTIME_NAMES=()
 
 # ============================================================================
 # Original Global State
@@ -1726,6 +1727,259 @@ check_android_sdk() {
     return 1
 }
 
+ios_log_heading() {
+    gum style --bold "iOS Setup"
+    echo ""
+}
+
+ios_check_xcode() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        log_warn "iOS setup requires macOS."
+        return 1
+    fi
+
+    if spin_check "Checking Xcode" "command -v xcodebuild >/dev/null 2>&1"; then
+        local xcode_version
+        xcode_version=$(xcodebuild -version 2>/dev/null | head -1 || true)
+        if [[ -n "${xcode_version}" ]]; then
+            log_info "Xcode detected: ${xcode_version}"
+        else
+            log_info "Xcode detected."
+        fi
+        return 0
+    fi
+
+    log_warn "Xcode not detected. Install Xcode from the App Store."
+    return 1
+}
+
+ios_install_command_line_tools() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        return 1
+    fi
+
+    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        log_warn "Command Line Tools missing. Run: xcode-select --install"
+        return 1
+    fi
+
+    if gum confirm "Command Line Tools missing. Install now?"; then
+        if execute "Install Command Line Tools" xcode-select --install; then
+            log_info "Command Line Tools installer started."
+            log_info "Complete the installer prompt, then re-run this setup."
+            return 0
+        fi
+        log_warn "Command Line Tools install failed. Run: xcode-select --install"
+        return 1
+    fi
+
+    log_warn "Skipping Command Line Tools install. Run: xcode-select --install"
+    return 1
+}
+
+ios_check_command_line_tools() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        return 1
+    fi
+
+    if spin_check "Checking Command Line Tools" "xcode-select -p >/dev/null 2>&1"; then
+        local developer_dir
+        developer_dir=$(xcode-select -p 2>/dev/null || true)
+        if [[ -n "${developer_dir}" ]]; then
+            log_info "Command Line Tools path: ${developer_dir}"
+        fi
+        return 0
+    fi
+
+    return 1
+}
+
+ios_get_installed_runtimes() {
+    local runtime_output=""
+    local runtimes=""
+
+    if runtime_output=$(xcrun simctl list runtimes -j 2>/dev/null); then
+        if command_exists python3; then
+            runtimes=$(python3 -c '
+import json, sys
+data=json.loads(sys.stdin.read())
+runtimes=[]
+for runtime in data.get("runtimes", []):
+    name=runtime.get("name", "")
+    if name.startswith("iOS") and runtime.get("isAvailable", True):
+        runtimes.append(name)
+print("\n".join(runtimes))
+' <<<"${runtime_output}")
+        else
+            runtime_output=""
+        fi
+    fi
+
+    if [[ -z "${runtime_output}" ]] && runtime_output=$(xcrun simctl list runtimes 2>/dev/null); then
+        runtimes=$(printf '%s\n' "${runtime_output}" | grep -E "^iOS" | sed 's/ - .*//' | sed 's/[[:space:]]*$//')
+    fi
+
+    if [[ -z "${runtimes}" ]]; then
+        return 1
+    fi
+
+    IOS_RUNTIME_NAMES=()
+    while IFS= read -r runtime; do
+        if [[ -n "${runtime}" ]]; then
+            IOS_RUNTIME_NAMES+=("${runtime}")
+        fi
+    done <<< "${runtimes}"
+
+    return 0
+}
+
+ios_show_available_runtimes() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        return 1
+    fi
+
+    if command_exists xcodebuild; then
+        if xcodebuild -downloadPlatform iOS -list 2>/dev/null; then
+            return 0
+        fi
+    fi
+
+    log_warn "Unable to list downloadable runtimes from xcodebuild."
+    log_info "Open Xcode > Settings > Platforms to view available runtimes."
+    return 1
+}
+
+ios_download_runtime() {
+    local runtime_version="${1:-}"
+    if [[ -n "${runtime_version}" ]]; then
+        execute_spinner "Downloading iOS runtime ${runtime_version}" \
+            xcodebuild -downloadPlatform iOS -buildVersion "${runtime_version}"
+    else
+        execute_spinner "Downloading latest iOS runtime" \
+            xcodebuild -downloadPlatform iOS
+    fi
+}
+
+ios_prompt_download_runtimes() {
+    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        log_warn "No iOS runtimes installed. Run: xcodebuild -downloadPlatform iOS"
+        log_info "Or install via Xcode > Settings > Platforms."
+        return 1
+    fi
+
+    gum style --faint "Missing iOS simulator runtimes."
+    echo ""
+
+    local choice
+    choice=$(gum choose \
+        "Yes, install latest iOS runtime" \
+        "Choose runtime version" \
+        "Show available runtimes" \
+        "No, skip")
+
+    case "${choice}" in
+        "Yes, install latest iOS runtime")
+            ios_download_runtime
+            ;;
+        "Choose runtime version")
+            if ios_show_available_runtimes; then
+                local version
+                version=$(gum input --prompt "Runtime build version (e.g. 21E213): " --value "")
+                if [[ -n "${version}" ]]; then
+                    ios_download_runtime "${version}"
+                else
+                    log_warn "No version provided. Skipping runtime install."
+                fi
+            else
+                local version
+                version=$(gum input --prompt "Runtime build version (optional): " --value "")
+                if [[ -n "${version}" ]]; then
+                    ios_download_runtime "${version}"
+                else
+                    ios_download_runtime
+                fi
+            fi
+            ;;
+        "Show available runtimes")
+            ios_show_available_runtimes
+            ios_prompt_download_runtimes
+            ;;
+        *)
+            log_warn "Skipping runtime installation."
+            ;;
+    esac
+}
+
+ios_check_simulator_runtimes() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        return 1
+    fi
+
+    if ! command_exists xcrun; then
+        log_warn "xcrun not available. Install Xcode Command Line Tools."
+        return 1
+    fi
+
+    if ! ios_get_installed_runtimes; then
+        log_warn "No iOS simulator runtimes available."
+        ios_prompt_download_runtimes
+        return 1
+    fi
+
+    local runtime_list
+    runtime_list=$(IFS=", "; printf '%s' "${IOS_RUNTIME_NAMES[*]}")
+    log_info "iOS runtimes available: ${runtime_list}"
+    return 0
+}
+
+ios_check_xctestservice_build() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        return 1
+    fi
+
+    if [[ "${IS_REPO}" != "true" ]]; then
+        log_info "XCTestService build handled by AutoMobile on first use."
+        return 0
+    fi
+
+    local xctest_dir="${PROJECT_ROOT}/ios/XCTestService"
+    if [[ ! -d "${xctest_dir}" ]]; then
+        log_warn "XCTestService project not found in repo."
+        log_info "AutoMobile will install/build XCTestService when needed."
+        return 1
+    fi
+
+    if run_spinner "Validating XCTestService project" bash -c "cd \"${xctest_dir}\" && xcodebuild -list -json >/dev/null 2>&1"; then
+        log_info "XCTestService project detected. AutoMobile will build on demand."
+        return 0
+    fi
+
+    log_warn "Unable to query XCTestService project. AutoMobile will build on demand."
+    return 1
+}
+
+run_ios_setup() {
+    if [[ "$(detect_os)" != "macos" ]]; then
+        log_warn "iOS setup skipped (macOS required)."
+        return 1
+    fi
+
+    ios_log_heading
+
+    if ! ios_check_xcode; then
+        log_warn "Skipping iOS setup because Xcode is missing."
+        return 1
+    fi
+
+    if ! ios_check_command_line_tools; then
+        ios_install_command_line_tools
+    fi
+
+    ios_check_simulator_runtimes
+    ios_check_xctestservice_build
+    return 0
+}
+
 collect_choices() {
     if [[ "${BUN_INSTALLED}" == "false" ]]; then
         if gum confirm "Bun is required for AutoMobile. Install Bun now?"; then
@@ -2013,14 +2267,14 @@ main() {
             fi
             ;;
         iOS)
-            log_warn "iOS support is not available yet. See docs/design-docs/plat/ios/index.md."
+            run_ios_setup
             ;;
         Both)
             check_android_sdk
             if [[ "${INSTALL_IDE_PLUGIN}" == "true" ]]; then
                 install_ide_plugin
             fi
-            log_warn "iOS support is not available yet. See docs/design-docs/plat/ios/index.md."
+            run_ios_setup
             ;;
         *)
             log_info "Skipping platform-specific setup."
