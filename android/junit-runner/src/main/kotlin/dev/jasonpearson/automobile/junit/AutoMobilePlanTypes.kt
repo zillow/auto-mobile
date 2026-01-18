@@ -8,7 +8,7 @@ import dev.jasonpearson.automobile.validation.ToolResultEntry
 
 /** Configuration options for AutoMobile plan execution. */
 data class AutoMobilePlanExecutionOptions(
-    val timeoutMs: Long = 60000L, // 1 minute default
+    val timeoutMs: Long = 30000L, // 30 second default
     val device: String = "auto",
     val aiAssistance: Boolean = true,
     val maxRetries: Int = 0,

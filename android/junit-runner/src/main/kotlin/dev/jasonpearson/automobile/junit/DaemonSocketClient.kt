@@ -362,6 +362,7 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable, D
             type = "mcp_request",
             method = "tools/call",
             params = buildJsonParams(toolName, arguments),
+            timeoutMs = timeoutMs,
         )
 
     val responseFuture = CompletableFuture<DaemonResponse>()
@@ -389,6 +390,7 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable, D
             type = "mcp_request",
             method = "resources/read",
             params = JsonObject(mapOf("uri" to JsonPrimitive(uri))),
+            timeoutMs = timeoutMs,
         )
 
     val responseFuture = CompletableFuture<DaemonResponse>()
@@ -498,7 +500,9 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable, D
   private fun buildJsonParams(toolName: String, arguments: JsonObject): JsonObject {
     // Include sessionUuid in tool arguments to enable per-thread plan execution locking
     val argumentsWithSession = JsonObject(arguments.toMutableMap().apply {
-      put("sessionUuid", JsonPrimitive(sessionUuid))
+      if (!containsKey("sessionUuid")) {
+        put("sessionUuid", JsonPrimitive(sessionUuid))
+      }
     })
     return JsonObject(mapOf("name" to JsonPrimitive(toolName), "arguments" to argumentsWithSession))
   }
@@ -539,6 +543,7 @@ internal data class DaemonRequest(
     val type: String,
     val method: String,
     val params: JsonObject,
+    val timeoutMs: Long? = null,
 )
 
 @Serializable

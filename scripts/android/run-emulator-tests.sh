@@ -80,8 +80,8 @@ retry_with_backoff() {
   local exit_code=0
 
   # Transient error patterns that warrant retry
-  # Network/HTTP errors
-  local network_errors="status code 403|Forbidden|Could not resolve|timeout|Connection refused|Connection reset|ETIMEDOUT|ECONNRESET|503 Service Unavailable|502 Bad Gateway"
+  # Network/HTTP errors (be specific to avoid matching app-level timeouts like MCP)
+  local network_errors="status code 403|Forbidden|Could not resolve|Connection refused|Connection reset|ETIMEDOUT|ECONNRESET|503 Service Unavailable|502 Bad Gateway|SocketTimeoutException|ConnectTimeoutException|connection timed out"
   # Emulator/ADB infrastructure errors (#808)
   local emulator_errors="device offline|device not found|adb server|AdbHostServer|emulator: ERROR|waiting for device|cannot connect to daemon"
   local transient_pattern="($network_errors|$emulator_errors)"
@@ -323,7 +323,7 @@ echo "Retry configuration:"
 echo "  Max attempts: ${RETRY_MAX_ATTEMPTS:-3}"
 echo "  Initial delay: ${RETRY_INITIAL_DELAY:-10}s (doubles on each retry)"
 echo "  Retryable errors:"
-echo "    - Network: 403, timeout, connection refused/reset"
+echo "    - Network: 403, connection refused/reset, socket timeouts"
 echo "    - Emulator: device offline, device not found, adb server issues"
 echo ""
 

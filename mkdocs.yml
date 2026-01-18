@@ -149,7 +149,6 @@ nav:
           - 'iOS':
             - 'Overview': design-docs/plat/ios/index.md
             - 'Accessibility Bridge': design-docs/plat/ios/accessibility-service.md
-            - 'AXe Automation': design-docs/plat/ios/axe-automation.md
             - 'simctl Integration': design-docs/plat/ios/simctl.md
             - 'Managed App Configuration': design-docs/plat/ios/managed-app-config.md
             - 'Managed Apple IDs': design-docs/plat/ios/managed-apple-ids.md

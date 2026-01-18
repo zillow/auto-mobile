@@ -463,45 +463,72 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
       val base64Content = java.util.Base64.getEncoder().encodeToString(planContent.toByteArray())
       PerformanceTracker.measure("Base64 encoding", base64Start)
 
-      // Generate unique session UUID for this test execution to enable proper device assignment
-      val sessionUuid = UUID.randomUUID().toString()
-      println(
-          "[${Thread.currentThread().name}] Generated session UUID: $sessionUuid for test: $testName"
-      )
-
-      val requestBuildStart = System.currentTimeMillis()
-      val daemonRequestArgs =
-          buildDaemonExecutePlanArgs(base64Content, annotation, sessionUuid, testName, klass.simpleName)
-      PerformanceTracker.measure("Daemon request build", requestBuildStart)
-
       val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
-      if (debugMode) {
-        println("Executing via daemon socket: executePlan")
+      val maxRetries = annotation.maxRetries.coerceAtLeast(0)
+      var attempt = 0
+      var response: DaemonResponse
+      var parseResult: ParsedToolResult
+      var outputPayload: String
+      var errorMessage: String?
+      var executionTime = 0L
+
+      while (true) {
+        attempt++
+        // Generate unique session UUID for this attempt to enable proper device assignment
+        val sessionUuid = UUID.randomUUID().toString()
+        println(
+            "[${Thread.currentThread().name}] Generated session UUID: $sessionUuid for test: $testName (attempt $attempt)"
+        )
+
+        val requestBuildStart = System.currentTimeMillis()
+        val daemonRequestArgs =
+            buildDaemonExecutePlanArgs(base64Content, annotation, sessionUuid, testName, klass.simpleName)
+        PerformanceTracker.measure("Daemon request build", requestBuildStart)
+
+        if (debugMode) {
+          println("Executing via daemon socket: executePlan")
+        }
+
+        DaemonHeartbeat.registerSession(sessionUuid)
+        val execStart = System.currentTimeMillis()
+        response =
+            try {
+              DaemonSocketClientManager.callTool(
+                  "executePlan",
+                  daemonRequestArgs,
+                  annotation.timeoutMs,
+              )
+            } finally {
+              DaemonHeartbeat.unregisterSession(sessionUuid)
+            }
+        PerformanceTracker.measure("Daemon request execution", execStart)
+
+        // Verify daemon is still alive after test execution
+        // This helps detect if the daemon crashed or was killed by heartbeat timeout
+        verifyDaemonHealth(testName)
+
+        executionTime = System.currentTimeMillis() - startTime
+
+        outputPayload =
+            response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
+        parseResult = parseDaemonToolResult(response, json)
+        errorMessage = response.error ?: parseResult.errorMessage
+
+        val success = response.success && parseResult.success
+        if (success) {
+          break
+        }
+
+        if (attempt > maxRetries || !shouldRetry(errorMessage)) {
+          break
+        }
+
+        println(
+            "[${Thread.currentThread().name}] Retrying AutoMobile plan after error: $errorMessage"
+        )
+        PerformanceTracker.clear()
+        Thread.sleep(RETRY_BACKOFF_MS)
       }
-
-      DaemonHeartbeat.registerSession(sessionUuid)
-      val execStart = System.currentTimeMillis()
-      val response =
-          try {
-            DaemonSocketClientManager.callTool(
-                "executePlan",
-                daemonRequestArgs,
-                annotation.timeoutMs,
-            )
-          } finally {
-            DaemonHeartbeat.unregisterSession(sessionUuid)
-          }
-      PerformanceTracker.measure("Daemon request execution", execStart)
-
-      // Verify daemon is still alive after test execution
-      // This helps detect if the daemon crashed or was killed by heartbeat timeout
-      verifyDaemonHealth(testName)
-
-      val executionTime = System.currentTimeMillis() - startTime
-
-      val outputPayload =
-          response.result?.let { json.encodeToString(JsonElement.serializer(), it) } ?: ""
-      val parseResult = parseDaemonToolResult(response, json)
 
       // Write log file for this test execution
       val logWriteStart = System.currentTimeMillis()
@@ -510,7 +537,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
               testName = testName,
               className = klass.simpleName,
               stdout = outputPayload,
-              stderr = response.error ?: "",
+              stderr = errorMessage ?: "",
               exitCode = if (response.success && parseResult.success) 0 else 1,
               executionTimeMs = executionTime,
               success = response.success && parseResult.success,
@@ -556,6 +583,16 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     } finally {
       PerformanceTracker.clear()
     }
+  }
+
+  private fun shouldRetry(errorMessage: String?): Boolean {
+    if (errorMessage.isNullOrBlank()) {
+      return false
+    }
+    val normalized = errorMessage.lowercase()
+    return normalized.contains("request timed out") ||
+        normalized.contains("plan execution in progress") ||
+        normalized.contains("daemon request timeout")
   }
 
   private fun buildDaemonExecutePlanArgs(
@@ -824,6 +861,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         }
 
     private const val MAX_LOGS_TO_KEEP = 10
+    private const val RETRY_BACKOFF_MS = 2000L
 
     // Phase 7: Cache frequently used strings to avoid repeated allocations
     private val SEPARATOR_LONG = "=".repeat(80)

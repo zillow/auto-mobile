@@ -45,7 +45,7 @@ fun `create timer from prompt`() {
 - `prompt`: Natural language description for AI-generated test plan (requires `aiAssistance = true`)
 - `maxRetries`: Maximum retry attempts before AI intervention (default: 0)
 - `aiAssistance`: Enable/disable AI agent recovery on failure (default: true)
-- `timeoutMs`: Maximum execution time per test in milliseconds (default: 60000 - 1 minute)
+- `timeoutMs`: Maximum execution time per test in milliseconds (default: 30000 - 30 seconds)
 - `device`: Target device ID or "auto" for any available device (default: "auto")
 - `appId`: App package name to clean up after the test (terminate or clear app data)
 - `cleanupAfter`: Terminate the app after the test completes (default: true)

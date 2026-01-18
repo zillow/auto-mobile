@@ -10,6 +10,8 @@ export interface DaemonRequest {
   method: string;
   /** MCP or daemon method parameters */
   params: any;
+  /** Request timeout in milliseconds (optional, defaults to MCP SDK default of 60000) */
+  timeoutMs?: number;
 }
 
 /**

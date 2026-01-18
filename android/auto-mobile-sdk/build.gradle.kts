@@ -3,7 +3,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
   alias(libs.plugins.android.library)
-  alias(libs.plugins.kotlin.android)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.mavenPublish)
 }
@@ -34,14 +33,6 @@ android {
   buildFeatures { compose = true }
 }
 
-kotlin {
-  compilerOptions {
-    jvmTarget.set(
-        org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get())
-    )
-  }
-}
-
 version = "0.0.7-SNAPSHOT"
 
 dependencies {
@@ -70,6 +61,9 @@ dependencies {
 // Configure Kotlin compilation options
 tasks.withType<KotlinCompile>().configureEach {
   compilerOptions {
+    jvmTarget.set(
+        org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.build.java.target.get())
+    )
     languageVersion.set(
         KotlinVersion.valueOf(
             "KOTLIN_${libs.versions.build.kotlin.language.get().replace(".", "_")}"
