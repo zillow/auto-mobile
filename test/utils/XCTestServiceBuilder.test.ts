@@ -320,5 +320,33 @@ describe("XCTestServiceBuilder", function() {
       expect(result.success).toBe(true);
       expect(buildProducts).toBe(path.join(derivedDataPath, "Build", "Products", "Debug-iphonesimulator"));
     });
+
+    test("should redownload when version changes without checksum", async function() {
+      const derivedDataPath = path.join(tempDir, "DerivedData");
+      const cacheDir = path.join(tempDir, "cache");
+      await fs.mkdir(cacheDir, { recursive: true });
+
+      const existingBundle = path.join(cacheDir, "XCTestService.ipa");
+      await fs.writeFile(existingBundle, "a".repeat(12000));
+      await fs.writeFile(
+        path.join(cacheDir, "xctestservice-bundle.json"),
+        JSON.stringify({ checksum: null, version: "old", extractedAt: new Date().toISOString() })
+      );
+
+      const downloader = new FakeXCTestServiceBundleDownloader();
+      XCTestServiceBuilder.setExpectedChecksumForTesting("");
+      const builder = XCTestServiceBuilder.getInstance(
+        {
+          derivedDataPath,
+          bundleCacheDir: cacheDir
+        },
+        { downloader }
+      );
+
+      const result = await builder.build("simulator");
+
+      expect(result.success).toBe(true);
+      expect(downloader.downloadedUrls.length).toBe(1);
+    });
   });
 });

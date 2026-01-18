@@ -1,4 +1,4 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { createWriteStream } from "fs";
 import * as fs from "fs/promises";
 import http from "http";
@@ -9,7 +9,7 @@ import AdmZip from "adm-zip";
 import crypto from "crypto";
 import { logger } from "./logger";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export type Sha256Source = "sha256sum" | "shasum" | "node";
 
@@ -49,12 +49,12 @@ export class DefaultXCTestServiceBundleDownloader implements XCTestServiceBundle
   }
 
   public async computeFileSha256(filePath: string): Promise<{ checksum: string; source: Sha256Source }> {
-    const sha256sum = await this.tryChecksumCommand(`sha256sum "${filePath}"`, "sha256sum");
+    const sha256sum = await this.tryChecksumCommand([filePath], "sha256sum");
     if (sha256sum) {
       return { checksum: sha256sum, source: "sha256sum" };
     }
 
-    const shasum = await this.tryChecksumCommand(`shasum -a 256 "${filePath}"`, "shasum");
+    const shasum = await this.tryChecksumCommand(["-a", "256", filePath], "shasum");
     if (shasum) {
       return { checksum: shasum, source: "shasum" };
     }
@@ -74,13 +74,29 @@ export class DefaultXCTestServiceBundleDownloader implements XCTestServiceBundle
   }
 
   private async downloadWithCurl(url: string, destination: string): Promise<void> {
-    const command = `curl --fail --location --retry 3 --retry-delay 1 --silent --show-error -o "${destination}" "${url}"`;
-    await this.execShell(command);
+    await this.execFile("curl", [
+      "--fail",
+      "--location",
+      "--retry",
+      "3",
+      "--retry-delay",
+      "1",
+      "--silent",
+      "--show-error",
+      "-o",
+      destination,
+      url
+    ]);
   }
 
   private async downloadWithWget(url: string, destination: string): Promise<void> {
-    const command = `wget --tries=3 --timeout=30 -O "${destination}" "${url}"`;
-    await this.execShell(command);
+    await this.execFile("wget", [
+      "--tries=3",
+      "--timeout=30",
+      "-O",
+      destination,
+      url
+    ]);
   }
 
   private async downloadWithNodeHttp(url: string, destination: string, redirectCount: number): Promise<void> {
@@ -132,18 +148,14 @@ export class DefaultXCTestServiceBundleDownloader implements XCTestServiceBundle
     });
   }
 
-  private async execShell(command: string): Promise<void> {
-    await execAsync(command, { timeout: 120000, maxBuffer: 10 * 1024 * 1024 });
-  }
-
   private isCommandUnavailable(error: unknown, command: string): boolean {
     const message = error instanceof Error ? error.message : String(error);
     return message.includes(`${command}: command not found`) || message.includes(`not found: ${command}`);
   }
 
-  private async tryChecksumCommand(command: string, tool: string): Promise<string | null> {
+  private async tryChecksumCommand(command: string[], tool: string): Promise<string | null> {
     try {
-      const { stdout } = await execAsync(command, { timeout: 10000, maxBuffer: 1024 * 1024 });
+      const { stdout } = await this.execFile(tool, command);
       const checksum = stdout.trim().split(/\s+/)[0];
       if (!checksum) {
         logger.warn("[XCTestServiceDownloader] checksum tool returned no output", { tool });
@@ -157,5 +169,12 @@ export class DefaultXCTestServiceBundleDownloader implements XCTestServiceBundle
       });
       return null;
     }
+  }
+
+  private async execFile(command: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+    return execFileAsync(command, args, {
+      timeout: 120000,
+      maxBuffer: 10 * 1024 * 1024
+    });
   }
 }

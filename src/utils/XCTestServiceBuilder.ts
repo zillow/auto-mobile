@@ -441,11 +441,15 @@ export class XCTestServiceBuilder {
       await fs.copyFile(overridePath, bundlePath);
     } else {
       const expectedChecksum = this.getExpectedChecksum();
+      const metadata = await this.readBundleMetadata();
+      const versionMismatch = !metadata || metadata.version !== XCTESTSERVICE_RELEASE_VERSION;
       const bundleReady = await this.isBundleValid(bundlePath, expectedChecksum);
-      if (!bundleReady) {
+
+      if (!bundleReady || (expectedChecksum.length === 0 && versionMismatch)) {
         logger.info("[XCTestServiceBuilder] Downloading XCTestService bundle", {
           url: this.getBundleUrl(),
-          destination: bundlePath
+          destination: bundlePath,
+          reason: bundleReady ? "version-mismatch" : "missing-or-invalid"
         });
         await this.downloader.download(this.getBundleUrl(), bundlePath);
       }
