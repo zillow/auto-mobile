@@ -17,6 +17,9 @@ export const doctorSchema = z.object({
   installCmdlineTools: z.boolean().optional().describe(
     "Automatically download and install Android SDK Command-line Tools to ANDROID_HOME if missing"
   ),
+  installXcodeCommandLineTools: z.boolean().optional().describe(
+    "Install Xcode Command Line Tools if missing"
+  ),
 }).strict();
 
 /**
@@ -26,6 +29,7 @@ export interface DoctorArgs {
   android?: boolean;
   ios?: boolean;
   installCmdlineTools?: boolean;
+  installXcodeCommandLineTools?: boolean;
 }
 
 /**
@@ -41,6 +45,7 @@ export function registerDoctorTools(): void {
         android: args.android,
         ios: args.ios,
         installCmdlineTools: args.installCmdlineTools,
+        installXcodeCommandLineTools: args.installXcodeCommandLineTools,
       });
 
       return createJSONToolResponse(report);
