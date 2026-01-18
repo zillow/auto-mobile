@@ -51,10 +51,10 @@ Server to client response:
 
 ## Limitations
 
-- Simulator-only initially.
-- Physical device support requires additional provisioning and touch injection.
+- Simulator-only currently.
+- Physical device support requires provisioning (see GitHub issues #912-914).
 
 ## See also
 
-- [AXe automation](axe-automation.md)
+- [XCTestService](xctestrunner.md) - Touch injection via native XCUITest APIs.
 - [MCP actions](../../mcp/tools.md)

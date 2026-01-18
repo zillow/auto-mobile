@@ -4,76 +4,38 @@ This directory contains all iOS-specific components for the AutoMobile automatio
 
 ## Overview
 
-The iOS platform implementation provides native automation capabilities for iOS simulators and devices, featuring a hybrid architecture with WebSocket-based automation and macOS accessibility APIs for touch injection.
+The iOS platform implementation provides native automation capabilities for iOS simulators using XCTest APIs. Touch injection and gesture simulation use native XCUITest APIs (`XCUICoordinate`, `XCUIElement`) which work on both simulators and physical devices.
 
 ## Architecture
 
 The iOS platform consists of the following components:
 
-1. **Accessibility Service** - Native iOS automation server
-2. **AXe Automation** - Touch injection layer for macOS
-3. **Simctl Integration** - Simulator lifecycle management
-4. **XCTest Runner** - Test execution framework
-5. **Xcode Companion** - macOS companion app for IDE integration
-6. **Xcode Extension** - Xcode source editor extension
+1. **XCTest Service** - Native iOS automation server with WebSocket API
+2. **XCTest Runner** - Test execution framework for plan-based tests
+3. **Xcode Companion** - macOS companion app for IDE integration
+4. **Xcode Extension** - Xcode source editor extension
 
 For detailed architecture documentation, see `docs/design-docs/plat/ios/`.
 
 ## Components
 
-### AccessibilityService
+### XCTestService
 
-**Path**: `ios/AccessibilityService/`
-**Type**: Swift Package (iOS app)
-**Purpose**: Exposes accessibility tree over WebSocket
+**Path**: `ios/XCTestService/`
+**Type**: Swift Package (iOS library)
+**Purpose**: WebSocket-based automation server using native XCTest APIs
 
-Native iOS application that runs on simulator or device, providing:
-- WebSocket server for external automation clients
-- Accessibility tree traversal and element lookup
-- Element bounds for touch coordinate calculation
-- View hierarchy updates on UI changes
+Core automation library providing:
+- WebSocket server (port 8765) for external automation clients
+- Element location via `ElementLocator` using XCUITest queries
+- Touch/gesture injection via `GesturePerformer` using native `XCUICoordinate` APIs
+- App lifecycle management via `XCUIApplication`
+- Screenshot capture
 
 ```bash
-cd ios/AccessibilityService
+cd ios/XCTestService
 swift build
 swift test
-```
-
-### AXeAutomation
-
-**Path**: `ios/AXeAutomation/`
-**Type**: Swift Package (macOS library)
-**Purpose**: Touch injection and automation coordination
-
-macOS library that bridges MCP commands to iOS simulator:
-- WebSocket client for Accessibility Service
-- Touch/key event injection via CGEvent APIs
-- Coordinate translation from app space to simulator window
-- Gesture simulation (tap, swipe, scroll)
-
-```bash
-cd ios/AXeAutomation
-swift build
-swift test
-```
-
-### SimctlIntegration
-
-**Path**: `ios/SimctlIntegration/`
-**Type**: TypeScript/Bun package
-**Purpose**: iOS Simulator lifecycle and app management
-
-TypeScript wrapper for `xcrun simctl`:
-- Device discovery and capability reporting
-- Simulator lifecycle (boot, shutdown, erase)
-- App lifecycle (install, uninstall, launch, terminate)
-- Status bar configuration and screenshot capture
-
-```bash
-cd ios/SimctlIntegration
-bun install
-bun run build
-bun test
 ```
 
 ### XCTestRunner
@@ -236,20 +198,17 @@ All components have been scaffolded with:
 - ✅ CI/CD validation scripts
 
 **Next Steps**:
-1. Implement full WebSocket protocol in AccessibilityService
-2. Add coordinate translation logic in AXeAutomation
-3. Integrate YAML parsing in XCTestRunner
-4. Connect MCP client in Companion and Runner
-5. Create Xcode projects for app distribution
-6. Add comprehensive test coverage
-7. Add real iOS app integration examples
+1. Integrate YAML parsing in XCTestRunner
+2. Connect MCP client in Companion and Runner
+3. Create Xcode projects for app distribution
+4. Add comprehensive test coverage
+5. Add real iOS app integration examples
+6. Physical device support (see GitHub issues #912, #913, #914)
 
 ## Documentation
 
 - **Design Docs**: `docs/design-docs/plat/ios/`
   - `index.md` - Architecture overview
-  - `accessibility-service.md` - WebSocket automation server
-  - `axe-automation.md` - Touch injection layer
   - `simctl.md` - Simulator lifecycle
   - `xctestrunner.md` - XCTest integration
   - `ide-plugin/overview.md` - Xcode companion and extension
