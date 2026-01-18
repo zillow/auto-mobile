@@ -172,6 +172,10 @@ class ToolRegistryClass {
       // Extract platform from args, default to "either" for backward compatibility
       let platform: SomePlatform = args.platform || "either";
 
+      if (shouldResolveDevice) {
+        await this.enforceSessionUuidForMultipleIos(platform, sessionUuid);
+      }
+
       // If session UUID provided, resolve device from session
       if (shouldResolveDevice && sessionUuid && DaemonState.getInstance().isInitialized()) {
         logger.info(`[ToolRegistry] Entering session-based device assignment for ${sessionUuid}`);
@@ -362,6 +366,36 @@ class ToolRegistryClass {
       debugOnly,
       outputSchema: options.outputSchema
     });
+  }
+
+  private async enforceSessionUuidForMultipleIos(
+    platform: SomePlatform,
+    sessionUuid: string | undefined
+  ): Promise<void> {
+    if (sessionUuid) {
+      return;
+    }
+
+    if (platform !== "ios" && platform !== "either") {
+      return;
+    }
+
+    const connectedPlatforms = await this.deviceSessionManager.detectConnectedPlatforms();
+    const iosDevices = connectedPlatforms.filter(device => device.platform === "ios");
+    if (iosDevices.length <= 1) {
+      return;
+    }
+
+    if (platform === "either") {
+      const androidDevices = connectedPlatforms.filter(device => device.platform === "android");
+      if (androidDevices.length > 0) {
+        return;
+      }
+    }
+
+    throw new ActionableError(
+      "Multiple iOS simulators detected. Provide sessionUuid to target a specific simulator."
+    );
   }
 
   // Get all registered tools
