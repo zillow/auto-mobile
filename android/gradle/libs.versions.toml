@@ -38,7 +38,7 @@ media3 = "1.9.0"
 
 # Library versions
 clikt = "5.0.3"
-junit-jupiter-api = "6.0.1"
+junit-jupiter-api = "6.0.2"
 junit-vintage-engine = "6.0.1"
 koog-agents = "0.6.0"
 mockk = "1.14.7"
