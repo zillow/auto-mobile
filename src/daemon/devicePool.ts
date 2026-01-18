@@ -26,6 +26,18 @@ export interface PooledDevice {
   lastUsedAt: number;            // Last usage timestamp
   assignmentCount: number;       // How many times assigned
   errorCount: number;            // Consecutive errors
+  iosVersion?: string;           // iOS version (simulators only)
+}
+
+export interface DeviceAllocationCriteria {
+  platform?: Platform;
+  simulatorType?: string;
+  iosVersion?: string;
+}
+
+export interface DeviceAllocationRequest {
+  sessionId: string;
+  criteria?: DeviceAllocationCriteria;
 }
 
 /**
@@ -94,6 +106,7 @@ export class DevicePool {
         lastUsedAt: now,
         assignmentCount: 0,
         errorCount: 0,
+        iosVersion: device.iosVersion,
       });
       this.deviceSessionStarts.set(device.deviceId, now);
       await this.setDeviceSessionTracking(device.deviceId, now);
@@ -139,6 +152,7 @@ export class DevicePool {
             lastUsedAt: now,
             assignmentCount: 0,
             errorCount: 0,
+            iosVersion: device.iosVersion,
           });
           this.deviceSessionStarts.set(device.deviceId, now);
           await this.setDeviceSessionTracking(device.deviceId, now);
@@ -186,6 +200,7 @@ export class DevicePool {
       lastUsedAt: now,
       assignmentCount: 0,
       errorCount: 0,
+      iosVersion: device.iosVersion,
     });
     this.deviceSessionStarts.set(device.deviceId, now);
     await this.setDeviceSessionTracking(device.deviceId, now);
@@ -347,8 +362,122 @@ export class DevicePool {
     return assignments;
   }
 
+  /**
+   * Assign multiple devices with per-session criteria.
+   *
+   * This is used when plans specify device definitions (platform/type/version).
+   * iOS allocations are restricted to already-booted simulators.
+   */
+  async assignMultipleDevicesByCriteria(
+    requests: DeviceAllocationRequest[],
+    timeoutMs: number = 300000
+  ): Promise<Map<string, string>> {
+    const startTime = this.timer.now();
+    const assignments = new Map<string, string>();
+    const requiredCount = requests.length;
+
+    if (requiredCount === 0) {
+      return assignments;
+    }
+
+    logger.info(
+      `[DevicePool] Starting criteria-based allocation of ${requiredCount} devices ` +
+      `(timeout: ${timeoutMs / 1000}s)`
+    );
+
+    await this.ensurePoolRefreshed();
+
+    for (const request of requests) {
+      const candidates = this.getDevicesMatchingCriteria(request.criteria);
+      if (candidates.length === 0) {
+        const summary = this.formatCriteriaSummary(request.criteria);
+        throw new ActionableError(
+          `No devices match criteria for session ${request.sessionId}${summary}.\n` +
+          `Ensure the required devices are already booted and available.`
+        );
+      }
+    }
+
+    const sortedRequests = [...requests].sort((a, b) => this.scoreCriteria(b.criteria) - this.scoreCriteria(a.criteria));
+    let attemptCount = 0;
+
+    while (assignments.size < requiredCount) {
+      attemptCount++;
+      const elapsed = this.timer.now() - startTime;
+
+      if (elapsed > timeoutMs) {
+        for (const deviceId of assignments.values()) {
+          await this.releaseDevice(deviceId);
+        }
+        throw new ActionableError(
+          `Timed out allocating devices after ${Math.round(elapsed / 1000)}s (${attemptCount} attempts).\n` +
+          `Required: ${requiredCount} devices, allocated: ${assignments.size}\n` +
+          `Suggestions:\n` +
+          `  - Boot additional simulators or emulators that match the plan requirements\n` +
+          `  - Reduce the number of devices required in the test plan\n` +
+          `  - Increase device allocation timeout`
+        );
+      }
+
+      let assignedThisRound = 0;
+
+      for (const request of sortedRequests) {
+        if (assignments.has(request.sessionId)) {
+          continue;
+        }
+
+        const result = await this.tryAssignDeviceWithCriteria(request.sessionId, request.criteria);
+
+        if (result.success) {
+          assignments.set(request.sessionId, result.deviceId!);
+          assignedThisRound++;
+          logger.info(
+            `[DevicePool] Allocated device ${result.deviceId} to session ${request.sessionId} ` +
+            `(${assignments.size}/${requiredCount})`
+          );
+        } else if (!result.shouldWait) {
+          for (const deviceId of assignments.values()) {
+            await this.releaseDevice(deviceId);
+          }
+          const summary = this.formatCriteriaSummary(request.criteria);
+          throw new ActionableError(
+            `Failed to allocate device for session ${request.sessionId}${summary}.\n` +
+            `No matching devices are currently available.\n` +
+            `Suggestions:\n` +
+            `  - Boot a simulator or emulator that matches the requested criteria\n` +
+            `  - Wait for a device to become idle\n` +
+            `  - Reduce parallel test count to match available devices`
+          );
+        }
+      }
+
+      if (assignments.size >= requiredCount) {
+        break;
+      }
+
+      if (assignedThisRound === 0) {
+        if (attemptCount === 1) {
+          logger.info(`[DevicePool] Waiting for matching devices to become available...`);
+        }
+        await this.timer.sleep(this.DEVICE_WAIT_INTERVAL_MS);
+      }
+    }
+
+    const totalElapsed = this.timer.now() - startTime;
+    logger.info(
+      `[DevicePool] Successfully allocated ${requiredCount} devices by criteria ` +
+      `in ${totalElapsed}ms (${attemptCount} attempts)`
+    );
+
+    return assignments;
+  }
+
   private async startAdditionalDevices(requiredCount: number, platform?: Platform): Promise<number> {
     if (!platform || requiredCount <= 0) {
+      return 0;
+    }
+    if (platform === "ios") {
+      logger.info("[DevicePool] Skipping auto-start for iOS simulators; only booted simulators are eligible.");
       return 0;
     }
 
@@ -597,6 +726,71 @@ export class DevicePool {
     });
   }
 
+  private async tryAssignDeviceWithCriteria(
+    sessionId: string,
+    criteria?: DeviceAllocationCriteria
+  ): Promise<{
+    success: boolean;
+    deviceId?: string;
+    shouldWait: boolean;
+    totalDevices: number;
+  }> {
+    return await this.assignmentMutex.runExclusive(async () => {
+      let candidates = this.getDevicesMatchingCriteria(criteria);
+      let totalDevices = candidates.length;
+
+      const idleDevices = candidates.filter(d => d.status === "idle");
+      let device: PooledDevice | undefined;
+
+      if (idleDevices.length > 0) {
+        if (this.lastReleasedDeviceId) {
+          device = idleDevices.find(d => d.id === this.lastReleasedDeviceId);
+        }
+        if (!device) {
+          device = idleDevices[0];
+        }
+      }
+
+      if (!device && (this.devices.size === 0 || totalDevices === 0)) {
+        const refreshReason = this.devices.size === 0 ? "empty pool" : "criteria pool empty";
+        logger.info(`[DevicePool] Auto-refreshing devices due to ${refreshReason}...`);
+        const addedCount = await this.refreshDevices();
+        logger.info(`[DevicePool] Auto-refresh added ${addedCount} devices`);
+        if (addedCount > 0) {
+          candidates = this.getDevicesMatchingCriteria(criteria);
+          totalDevices = candidates.length;
+          device = candidates.find(d => d.status === "idle");
+        }
+      }
+
+      if (!device) {
+        const busyDevices = candidates.filter(d => d.status === "busy").length;
+        return {
+          success: false,
+          shouldWait: busyDevices > 0,
+          totalDevices,
+        };
+      }
+
+      device.sessionId = sessionId;
+      device.status = "busy";
+      device.lastUsedAt = this.nextLastUsedAt();
+      device.assignmentCount++;
+      device.errorCount = 0;
+
+      await this.sessionManager.createSession(sessionId, device.id, device.platform);
+
+      logger.info(`Assigned device ${device.id} to session ${sessionId}`);
+
+      return {
+        success: true,
+        deviceId: device.id,
+        shouldWait: false,
+        totalDevices,
+      };
+    });
+  }
+
   /**
    * Release device from session
    *
@@ -718,6 +912,71 @@ export class DevicePool {
    */
   getAllDevices(): PooledDevice[] {
     return Array.from(this.devices.values());
+  }
+
+  private normalizeCriteriaValue(value?: string): string | undefined {
+    if (typeof value !== "string") {
+      return undefined;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed.toLowerCase() : undefined;
+  }
+
+  private getDevicesMatchingCriteria(criteria?: DeviceAllocationCriteria): PooledDevice[] {
+    const normalizedType = this.normalizeCriteriaValue(criteria?.simulatorType);
+    const normalizedVersion = this.normalizeCriteriaValue(criteria?.iosVersion);
+
+    return this.getDevicesByPlatform(criteria?.platform).filter(device => {
+      if (normalizedType) {
+        const deviceType = this.normalizeCriteriaValue(device.name);
+        if (deviceType !== normalizedType) {
+          return false;
+        }
+      }
+
+      if (normalizedVersion) {
+        const deviceVersion = this.normalizeCriteriaValue(device.iosVersion);
+        if (deviceVersion !== normalizedVersion) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  private scoreCriteria(criteria?: DeviceAllocationCriteria): number {
+    if (!criteria) {
+      return 0;
+    }
+    let score = 0;
+    if (criteria.platform) {
+      score += 1;
+    }
+    if (criteria.simulatorType) {
+      score += 1;
+    }
+    if (criteria.iosVersion) {
+      score += 1;
+    }
+    return score;
+  }
+
+  private formatCriteriaSummary(criteria?: DeviceAllocationCriteria): string {
+    if (!criteria) {
+      return "";
+    }
+    const parts: string[] = [];
+    if (criteria.platform) {
+      parts.push(`platform=${criteria.platform}`);
+    }
+    if (criteria.simulatorType) {
+      parts.push(`simulatorType=${criteria.simulatorType}`);
+    }
+    if (criteria.iosVersion) {
+      parts.push(`iosVersion=${criteria.iosVersion}`);
+    }
+    return parts.length > 0 ? ` (${parts.join(", ")})` : "";
   }
 
   private getDevicesByPlatform(platform?: Platform): PooledDevice[] {

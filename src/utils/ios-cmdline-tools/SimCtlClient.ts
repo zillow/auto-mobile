@@ -542,7 +542,12 @@ export class SimCtlClient implements SimCtl {
       for (const runtimeDevices of Object.values(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable && device.state === "Booted") {
-            bootedDevices.push({ name: device.name, platform: "ios", deviceId: device.udid } as BootedDevice);
+            bootedDevices.push({
+              name: device.name,
+              platform: "ios",
+              deviceId: device.udid,
+              iosVersion: normalizeIosVersion(runtimeId, device.os_version)
+            } as BootedDevice);
           }
         }
       }
