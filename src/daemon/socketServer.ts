@@ -188,12 +188,17 @@ export class UnixSocketServer {
     mcpClient: Client,
     request: DaemonRequest
   ): Promise<any> {
+    // Extract timeout from request, defaulting to 30 seconds if not provided
+    // (MCP SDK default is 60 seconds, but we prefer faster failure for better UX)
+    const DEFAULT_MCP_REQUEST_TIMEOUT_MS = 30000;
+    const requestOptions = { timeout: request.timeoutMs ?? DEFAULT_MCP_REQUEST_TIMEOUT_MS };
+
     switch (request.method) {
       case "tools/call": {
         return await mcpClient.callTool({
           name: request.params.name,
           arguments: request.params.arguments,
-        });
+        }, undefined, requestOptions);
       }
       case "resources/list": {
         return await mcpClient.listResources();
@@ -202,14 +207,14 @@ export class UnixSocketServer {
         if (!request.params?.uri) {
           throw new Error("resources/read requires params.uri");
         }
-        return await mcpClient.readResource({ uri: request.params.uri });
+        return await mcpClient.readResource({ uri: request.params.uri }, undefined, requestOptions);
       }
       case "resources/list-templates": {
         return await mcpClient.listResourceTemplates();
       }
       case "ide/getNavigationGraph": {
         const args = request.params ?? {};
-        return await mcpClient.callTool({ name: "getNavigationGraph", arguments: args });
+        return await mcpClient.callTool({ name: "getNavigationGraph", arguments: args }, undefined, requestOptions);
       }
       case "ide/ping": {
         return { ok: true, timestamp: Date.now() };
