@@ -144,6 +144,33 @@ describe("Device Image Resources with Fakes", () => {
       }
     });
 
+    test("should pass through iOS simulator metadata", async () => {
+      const iosDevices: DeviceInfo[] = [
+        {
+          name: "iPhone 15 Pro",
+          platform: "ios",
+          deviceId: "sim-15-pro",
+          source: "local",
+          state: "Booted",
+          iosVersion: "17.4",
+          deviceType: "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro"
+        }
+      ];
+      fakeDeviceUtils.setDeviceImages("ios", iosDevices);
+      fakeAvdManager.setListDeviceImagesResponse([]);
+
+      const handler = createDeviceImageResourcesHandler({
+        deviceManager: fakeDeviceUtils,
+        avdManager: fakeAvdManager
+      });
+
+      const result = await handler.getDeviceImagesForPlatforms(["ios"]);
+      expect(result.totalCount).toBe(1);
+      expect(result.images[0].state).toBe("Booted");
+      expect(result.images[0].iosVersion).toBe("17.4");
+      expect(result.images[0].deviceType).toBe("com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro");
+    });
+
     test("should include extended AVD metadata for Android images", async () => {
       // Set up mock Android devices
       const androidDevices: DeviceInfo[] = [

@@ -3,6 +3,7 @@ import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/devi
 import { logger } from "../utils/logger";
 import { BootedDevice, Platform } from "../models";
 import { DaemonState } from "../daemon/daemonState";
+import type { Session } from "../daemon/sessionManager";
 import type { DevicePool } from "../daemon/devicePool";
 
 // Resource URIs
@@ -18,8 +19,10 @@ export interface BootedDeviceInfo {
   deviceId: string;
   source: "local" | "remote";
   isVirtual: boolean;
+  status: "booted";
   poolStatus?: PoolDeviceStatus;
   assignedSession?: string;
+  session?: DeviceSessionInfo;
 }
 
 // Resource content schema
@@ -42,6 +45,16 @@ export interface PoolStatusSummary {
   assigned: number;
   error: number;
   total: number;
+}
+
+export interface DeviceSessionInfo {
+  sessionId: string;
+  createdAt: string;
+  lastUsedAt: string;
+  lastHeartbeat: string;
+  expiresAt: string;
+  heartbeatTimeoutMs: number;
+  hasReceivedHeartbeat: boolean;
 }
 
 interface PoolDeviceInfo {
@@ -72,23 +85,31 @@ export function getDeviceManager(): PlatformDeviceManager {
 }
 
 // Convert BootedDevice to BootedDeviceInfo
-function toBootedDeviceInfo(device: BootedDevice, poolInfo?: PoolDeviceInfo): BootedDeviceInfo {
+function toBootedDeviceInfo(
+  device: BootedDevice,
+  poolInfo?: PoolDeviceInfo,
+  sessionInfo?: DeviceSessionInfo
+): BootedDeviceInfo {
   const info: BootedDeviceInfo = {
     name: device.name,
     platform: device.platform,
     deviceId: device.deviceId,
     source: device.source || "local",
-    isVirtual: isVirtualDevice(device)
+    isVirtual: isVirtualDevice(device),
+    status: "booted"
   };
 
-  if (!poolInfo) {
+  if (!poolInfo && !sessionInfo) {
     return info;
   }
 
   return {
     ...info,
-    poolStatus: poolInfo.poolStatus,
-    ...(poolInfo.assignedSession ? { assignedSession: poolInfo.assignedSession } : {})
+    ...(poolInfo ? {
+      poolStatus: poolInfo.poolStatus,
+      ...(poolInfo.assignedSession ? { assignedSession: poolInfo.assignedSession } : {})
+    } : {}),
+    ...(sessionInfo ? { session: sessionInfo } : {})
   };
 }
 
@@ -117,6 +138,18 @@ function getPoolDeviceInfo(devicePool: DevicePool | null, deviceId: string): Poo
   return {
     poolStatus,
     assignedSession: pooledDevice.sessionId || undefined
+  };
+}
+
+function toDeviceSessionInfo(session: Session): DeviceSessionInfo {
+  return {
+    sessionId: session.sessionId,
+    createdAt: new Date(session.createdAt).toISOString(),
+    lastUsedAt: new Date(session.lastUsedAt).toISOString(),
+    lastHeartbeat: new Date(session.lastHeartbeat).toISOString(),
+    expiresAt: new Date(session.expiresAt).toISOString(),
+    heartbeatTimeoutMs: session.heartbeatTimeoutMs,
+    hasReceivedHeartbeat: session.hasReceivedHeartbeat
   };
 }
 
@@ -160,6 +193,7 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
   let iosCount = 0;
   let devicePool: DevicePool | null = null;
   let poolStatus: PoolStatusSummary | undefined;
+  let sessionInfoByDeviceId: Map<string, DeviceSessionInfo> | null = null;
 
   const daemonState = DaemonState.getInstance();
   if (daemonState.isInitialized()) {
@@ -177,6 +211,17 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
       logger.warn(`[BootedDeviceResources] Failed to read device pool status: ${error}`);
       devicePool = null;
     }
+
+    try {
+      const sessionManager = daemonState.getSessionManager();
+      const sessions = sessionManager.getAllSessions();
+      sessionInfoByDeviceId = new Map(
+        sessions.map(session => [session.assignedDevice, toDeviceSessionInfo(session)])
+      );
+    } catch (error) {
+      logger.warn(`[BootedDeviceResources] Failed to read session manager state: ${error}`);
+      sessionInfoByDeviceId = null;
+    }
   }
 
   try {
@@ -185,7 +230,13 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
       try {
         const androidDevices = await deviceManager.getBootedDevices("android");
         for (const device of androidDevices) {
-          devices.push(toBootedDeviceInfo(device, getPoolDeviceInfo(devicePool, device.deviceId)));
+          devices.push(
+            toBootedDeviceInfo(
+              device,
+              getPoolDeviceInfo(devicePool, device.deviceId),
+              sessionInfoByDeviceId?.get(device.deviceId)
+            )
+          );
           androidCount++;
         }
       } catch (error) {
@@ -198,7 +249,13 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
       try {
         const iosDevices = await deviceManager.getBootedDevices("ios");
         for (const device of iosDevices) {
-          devices.push(toBootedDeviceInfo(device, getPoolDeviceInfo(devicePool, device.deviceId)));
+          devices.push(
+            toBootedDeviceInfo(
+              device,
+              getPoolDeviceInfo(devicePool, device.deviceId),
+              sessionInfoByDeviceId?.get(device.deviceId)
+            )
+          );
           iosCount++;
         }
       } catch (error) {

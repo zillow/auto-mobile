@@ -4,7 +4,7 @@ import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/devi
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { ActionableError, BootedDevice, DeviceInfo, SomePlatform } from "../models";
 import { BOOTED_DEVICE_RESOURCE_URIS, notifyBootedDeviceResourcesUpdated } from "./bootedDeviceResources";
-import { DEVICE_IMAGE_RESOURCE_URIS } from "./deviceImageResources";
+import { DEVICE_IMAGE_RESOURCE_URIS, notifyDeviceImageResourcesUpdated } from "./deviceImageResources";
 import { syncInstalledAppResources } from "./appResources";
 import { listActiveVideoRecordings, stopVideoRecording } from "./videoRecordingManager";
 import { logger } from "../utils/logger";
@@ -148,6 +148,7 @@ export function registerDeviceTools() {
 
       // Notify that booted device resources have changed
       await notifyBootedDeviceResourcesUpdated();
+      await notifyDeviceImageResourcesUpdated();
       await syncInstalledAppResources();
 
       return createJSONToolResponse({
@@ -193,6 +194,7 @@ export function registerDeviceTools() {
 
       // Notify that booted device resources have changed
       await notifyBootedDeviceResourcesUpdated();
+      await notifyDeviceImageResourcesUpdated();
       await syncInstalledAppResources();
 
       return createJSONToolResponse({

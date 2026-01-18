@@ -65,13 +65,22 @@ export interface AppsResourceContent {
   message?: string;
 }
 
-export interface InstalledAppInfo {
+export interface AndroidInstalledAppInfo {
   packageName: string;
   userId: number;
   userProfile: "personal" | "work";
   foreground: boolean;
   recent: boolean;
 }
+
+export interface IosInstalledAppInfo {
+  bundleId: string;
+  displayName?: string;
+  version?: string;
+  path?: string;
+}
+
+export type InstalledAppInfo = AndroidInstalledAppInfo | IosInstalledAppInfo;
 
 interface AppsCacheEntry {
   expiresAt: number;
@@ -101,7 +110,7 @@ function toInstalledAppInfo(app: InstalledApp): InstalledAppInfo {
   };
 }
 
-function toQueryUserApp(app: InstalledAppInfo): AppsQueryAppInfo {
+function toQueryAndroidApp(app: AndroidInstalledAppInfo): AppsQueryAppInfo {
   return {
     packageName: app.packageName,
     type: "user",
@@ -123,17 +132,17 @@ function toQuerySystemApp(app: SystemInstalledApp): AppsQueryAppInfo {
 }
 
 function normalizeAndroidApps(installedApps: InstalledAppsByProfile): {
-  userApps: InstalledAppInfo[];
+  userApps: AndroidInstalledAppInfo[];
   queryApps: AppsQueryAppInfo[];
 } {
-  const userApps: InstalledAppInfo[] = [];
+  const userApps: AndroidInstalledAppInfo[] = [];
   const queryApps: AppsQueryAppInfo[] = [];
 
   for (const profileApps of Object.values(installedApps.profiles)) {
     for (const app of profileApps) {
-      const info = toInstalledAppInfo(app);
+      const info = toInstalledAppInfo(app) as AndroidInstalledAppInfo;
       userApps.push(info);
-      queryApps.push(toQueryUserApp(info));
+      queryApps.push(toQueryAndroidApp(info));
     }
   }
 
@@ -183,6 +192,40 @@ function extractIosDisplayName(app: Record<string, unknown>): string | undefined
   ]);
 }
 
+function extractIosVersion(app: Record<string, unknown>): string | undefined {
+  return readIosAppField(app, [
+    "bundleShortVersionString",
+    "bundleVersion",
+    "CFBundleShortVersionString",
+    "CFBundleVersion",
+    "BundleShortVersionString",
+    "BundleVersion",
+    "version"
+  ]);
+}
+
+function extractIosPath(app: Record<string, unknown>): string | undefined {
+  return readIosAppField(app, [
+    "bundlePath",
+    "bundleContainer",
+    "path",
+    "Path",
+    "dataContainer"
+  ]);
+}
+
+function toQueryIosApp(app: IosInstalledAppInfo): AppsQueryAppInfo {
+  return {
+    packageName: app.bundleId,
+    type: "user",
+    userId: 0,
+    userProfile: "personal",
+    foreground: false,
+    recent: false,
+    displayName: app.displayName
+  };
+}
+
 function recordAppsQueryUri(deviceId: string, uri: string): void {
   const now = Date.now();
   let entries = appsQueryUrisByDeviceId.get(deviceId);
@@ -226,14 +269,19 @@ function getAppsQueryUrisForDevice(deviceId: string): string[] {
   return uris;
 }
 
+function getInstalledAppIdentifier(app: InstalledAppInfo): string {
+  return "bundleId" in app ? app.bundleId : app.packageName;
+}
+
 function buildAppsByPackage(apps: InstalledAppInfo[]): Map<string, InstalledAppInfo[]> {
   const appsByPackage = new Map<string, InstalledAppInfo[]>();
   for (const app of apps) {
-    const existing = appsByPackage.get(app.packageName);
+    const identifier = getInstalledAppIdentifier(app);
+    const existing = appsByPackage.get(identifier);
     if (existing) {
       existing.push(app);
     } else {
-      appsByPackage.set(app.packageName, [app]);
+      appsByPackage.set(identifier, [app]);
     }
   }
   return appsByPackage;
@@ -295,7 +343,7 @@ async function fetchAppsForDevice(device: BootedDevice): Promise<AppsCacheEntry>
 
   const simctl = new SimCtlClient(device);
   const installedApps = await simctl.listApps();
-  const apps: InstalledAppInfo[] = [];
+  const apps: IosInstalledAppInfo[] = [];
   const queryApps: AppsQueryAppInfo[] = [];
 
   for (const app of installedApps) {
@@ -304,17 +352,17 @@ async function fetchAppsForDevice(device: BootedDevice): Promise<AppsCacheEntry>
       continue;
     }
     const displayName = extractIosDisplayName(app as Record<string, unknown>);
-    const info: InstalledAppInfo = {
-      packageName: bundleId,
-      userId: 0,
-      userProfile: "personal",
-      foreground: false,
-      recent: false
+    const version = extractIosVersion(app as Record<string, unknown>);
+    const path = extractIosPath(app as Record<string, unknown>);
+    const info: IosInstalledAppInfo = {
+      bundleId,
+      displayName,
+      ...(version ? { version } : {}),
+      ...(path ? { path } : {})
     };
     apps.push(info);
     queryApps.push({
-      ...toQueryUserApp(info),
-      displayName
+      ...toQueryIosApp(info)
     });
   }
 
