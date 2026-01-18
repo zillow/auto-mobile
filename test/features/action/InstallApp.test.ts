@@ -32,7 +32,6 @@ describe("InstallApp", () => {
   let fakeHost: FakeHostCommandExecutor;
   let fakeLocator: FakeAndroidBuildToolsLocator;
   let fakeTimer: FakeTimer;
-  let fakeSimctl: FakeSimctl;
 
   beforeEach(() => {
     fakeAdb = new FakeAdbExecutor();
@@ -40,7 +39,6 @@ describe("InstallApp", () => {
     fakeLocator = new FakeAndroidBuildToolsLocator();
     fakeTimer = new FakeTimer();
     fakeTimer.setManualMode();
-    fakeSimctl = new FakeSimctl();
   });
 
   test("installs using aapt2 and targets work profile user", async () => {
