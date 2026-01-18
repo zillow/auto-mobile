@@ -9,6 +9,7 @@ import { ViewHierarchyQueryOptions } from "../../models/ViewHierarchyQueryOption
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { RequestManager } from "../../utils/RequestManager";
+import { PortManager } from "../../utils/PortManager";
 import { NavigationGraphManager } from "../navigation/NavigationGraphManager";
 import {
   HierarchyNavigationDetector,
@@ -379,11 +380,14 @@ export class XCTestServiceClient implements XCTestService {
    */
   public static getInstance(
     device: BootedDevice,
-    port: number = XCTestServiceClient.DEFAULT_PORT
+    port?: number
   ): XCTestServiceClient {
-    const key = `${device.deviceId}:${port}`;
+    const resolvedPort = port ?? (
+      device.platform === "ios" ? PortManager.allocate(device.deviceId) : XCTestServiceClient.DEFAULT_PORT
+    );
+    const key = `${device.deviceId}:${resolvedPort}`;
     if (!XCTestServiceClient.instances.has(key)) {
-      XCTestServiceClient.instances.set(key, new XCTestServiceClient(device, port));
+      XCTestServiceClient.instances.set(key, new XCTestServiceClient(device, resolvedPort));
     }
     return XCTestServiceClient.instances.get(key)!;
   }

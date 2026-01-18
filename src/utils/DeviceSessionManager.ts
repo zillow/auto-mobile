@@ -521,7 +521,8 @@ export class DeviceSessionManager implements DeviceSessionManager {
     try {
       const skipXCTestServiceSetup = options?.skipAccessibilityDownload ?? options?.skipAccessibilitySetup;
 
-      const xcTestClient = XCTestServiceClient.getInstance(device);
+      const manager = IOSXCTestServiceManager.getInstance(device);
+      const xcTestClient = XCTestServiceClient.getInstance(device, manager.getServicePort());
 
       // Check if WebSocket is already connected
       if (xcTestClient.isConnected()) {
@@ -538,8 +539,6 @@ export class DeviceSessionManager implements DeviceSessionManager {
         // Service not responsive despite connected socket - fall through to normal flow
         logger.warn(`[DeviceSessionManager] WebSocket connected but XCTestService not responsive for ${deviceId}, checking status`);
       }
-
-      const manager = IOSXCTestServiceManager.getInstance(device);
 
       // Check current status
       const isRunning = await perf.track("checkRunning", () => manager.isRunning());
