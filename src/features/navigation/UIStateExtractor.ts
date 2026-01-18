@@ -19,6 +19,7 @@ export class UIStateExtractor {
     const selectedElements: SelectedElement[] = [];
     let destinationId: string | undefined;
     const modalStack: ModalState[] = [];
+    const windowsWithHierarchy = viewHierarchy.windows?.filter(window => window.hierarchy) ?? [];
 
     // Traverse the hierarchy to find selected elements and destination
     this.traverseHierarchy(viewHierarchy.hierarchy, (node, depth) => {
@@ -61,19 +62,22 @@ export class UIStateExtractor {
         }
       }
 
-      const className = this.getAttribute(attrs, ["class", "className"]);
-      if (className) {
-        const modalType = this.classifyModalType(className);
-        if (modalType) {
-          const modalId = this.getModalIdentifier(attrs, className);
-          modalStack.push({
-            type: modalType,
-            identifier: modalId,
-            layer: depth
-          });
-        }
+      if (windowsWithHierarchy.length === 0) {
+        this.collectModalStack(modalStack, attrs, depth);
       }
     });
+
+    if (windowsWithHierarchy.length > 0) {
+      for (const [index, window] of windowsWithHierarchy.entries()) {
+        const windowId = window.id ?? undefined;
+        const windowType = window.type !== undefined ? String(window.type) : undefined;
+        const windowLayer = window.windowLayer ?? index;
+        this.traverseHierarchy(window.hierarchy as Record<string, any>, (node, depth) => {
+          const attrs = this.getNodeAttributes(node);
+          this.collectModalStack(modalStack, attrs, windowLayer + depth, { windowId, windowType });
+        });
+      }
+    }
 
     const normalizedModalStack = this.normalizeModalStack(modalStack);
 
@@ -208,6 +212,63 @@ export class UIStateExtractor {
     return undefined;
   }
 
+  private static collectModalStack(
+    modalStack: ModalState[],
+    attrs: Record<string, any>,
+    depth: number,
+    context?: { windowId?: number; windowType?: string }
+  ): void {
+    const className = this.getAttribute(attrs, ["class", "className"]);
+    if (!className) {
+      return;
+    }
+
+    const modalType = this.classifyModalType(className);
+    if (!modalType) {
+      return;
+    }
+
+    const modalId = this.getModalIdentifier(attrs, className);
+    const windowId = this.getWindowId(attrs, context?.windowId, modalType, modalId, className);
+    const windowType = this.getWindowType(attrs, context?.windowType);
+
+    modalStack.push({
+      type: modalType,
+      identifier: modalId,
+      layer: depth,
+      windowId,
+      windowType
+    });
+  }
+
+  private static getWindowId(
+    attrs: Record<string, any>,
+    contextWindowId: number | undefined,
+    modalType: ModalState["type"],
+    modalId: string | undefined,
+    className: string
+  ): number | undefined {
+    const attrWindowId = this.getAttribute(attrs, ["window-id", "windowId", "window_id"]);
+    const parsed = attrWindowId ? Number(attrWindowId) : NaN;
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+
+    if (contextWindowId !== undefined) {
+      return contextWindowId;
+    }
+
+    const stableKey = `${modalType}:${modalId ?? className}`;
+    return this.hashToId(stableKey);
+  }
+
+  private static getWindowType(
+    attrs: Record<string, any>,
+    contextWindowType: string | undefined
+  ): string | undefined {
+    return this.getAttribute(attrs, ["window-type", "windowType", "window_type"]) ?? contextWindowType;
+  }
+
   private static classifyModalType(className: string): ModalState["type"] | null {
     const normalized = className.toLowerCase();
     if (normalized.includes("alert") || normalized.includes("dialog")) {
@@ -230,6 +291,14 @@ export class UIStateExtractor {
 
   private static getModalIdentifier(attrs: Record<string, any>, className: string): string | undefined {
     return this.getAttribute(attrs, ["resource-id", "resourceId", "content-desc", "contentDesc", "text"]) ?? className;
+  }
+
+  private static hashToId(input: string): number {
+    let hash = 0;
+    for (let i = 0; i < input.length; i += 1) {
+      hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+    }
+    return hash;
   }
 
   private static normalizeModalStack(modals: ModalState[]): ModalState[] {

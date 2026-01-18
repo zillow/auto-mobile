@@ -48,7 +48,8 @@ describe("UIStateExtractor (iOS hierarchy)", () => {
           $: {
             "class": "UIAlertController",
             "resource-id": "alert.main",
-            "text": "Alert"
+            "text": "Alert",
+            "window-id": "7"
           }
         }
       }
@@ -60,7 +61,8 @@ describe("UIStateExtractor (iOS hierarchy)", () => {
     expect(state?.modalStack?.[0]).toMatchObject({
       type: "dialog",
       identifier: "alert.main",
-      layer: 0
+      layer: 0,
+      windowId: 7
     });
   });
 
@@ -73,7 +75,17 @@ describe("UIStateExtractor (iOS hierarchy)", () => {
             "resource-id": "sheet.main"
           }
         }
-      }
+      },
+      windows: [{
+        id: 22,
+        type: 3,
+        hierarchy: {
+          $: {
+            "class": "UIActionSheet",
+            "resource-id": "sheet.main"
+          }
+        }
+      }]
     };
 
     const observation: ObserveResult = {
@@ -89,7 +101,9 @@ describe("UIStateExtractor (iOS hierarchy)", () => {
     expect(state?.modalStack?.[0]).toMatchObject({
       type: "bottomsheet",
       identifier: "sheet.main",
-      layer: 0
+      layer: 0,
+      windowId: 22,
+      windowType: "3"
     });
   });
 });
