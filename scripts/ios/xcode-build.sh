@@ -51,14 +51,28 @@ if ! command -v xcodebuild &> /dev/null; then
     exit 1
 fi
 
-XCODE_VERSION=$(xcodebuild -version | head -1)
+XCODE_VERSION=$(xcodebuild -version)
+XCODE_VERSION=${XCODE_VERSION%%$'\n'*}
 print_info "Xcode version: ${XCODE_VERSION}"
 echo ""
 
-# Skip build if iOS Simulator SDK is not installed
+# Ensure iOS Simulator SDK is installed
 if ! xcodebuild -showsdks 2>/dev/null | grep -q "iphonesimulator"; then
-    echo -e "${YELLOW}No iOS Simulator SDK detected. Skipping iOS project builds.${NC}"
-    exit 0
+    echo -e "${YELLOW}No iOS Simulator SDK detected. Attempting to install iOS platform...${NC}"
+    set +e
+    xcodebuild -downloadPlatform iOS 2>&1
+    DOWNLOAD_EXIT_CODE=$?
+    set -e
+
+    if [ $DOWNLOAD_EXIT_CODE -ne 0 ]; then
+        echo -e "${RED}Failed to download iOS platform (exit ${DOWNLOAD_EXIT_CODE}).${NC}"
+    fi
+
+    if ! xcodebuild -showsdks 2>/dev/null | grep -q "iphonesimulator"; then
+        echo -e "${RED}iOS Simulator SDK still missing after download attempt.${NC}"
+        echo -e "${YELLOW}Install the iOS platform in Xcode or ensure CI has the simulator SDK preinstalled.${NC}"
+        exit 1
+    fi
 fi
 
 # Find all xcodeproj directories
