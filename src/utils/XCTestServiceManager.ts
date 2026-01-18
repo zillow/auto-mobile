@@ -297,6 +297,9 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
         logger.info("[XCTestServiceManager] Waiting for WebSocket server initialization");
         await this.timer.sleep(500);
 
+        if (!this.isSimulator()) {
+          this.startIproxyMonitoring();
+        }
         return;
       }
       if (i > 0 && i % 10 === 0) {
@@ -693,7 +696,6 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     });
 
     await this.waitForIproxyStartup();
-    this.startIproxyMonitoring();
   }
 
   private async stopIproxyTunnel(): Promise<void> {
