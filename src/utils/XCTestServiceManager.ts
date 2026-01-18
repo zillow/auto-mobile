@@ -6,6 +6,8 @@ import { XCTestServiceBuilder, type XCTestServiceBuildResult } from "./XCTestSer
 import { exec, type ChildProcess } from "child_process";
 import { PortManager } from "./PortManager";
 import { DefaultProcessExecutor, type ProcessExecutor } from "./ProcessExecutor";
+import { XcodeSigningManager } from "./ios-cmdline-tools/XcodeSigning";
+import { DeviceAppInspector } from "./ios-cmdline-tools/DeviceAppInspector";
 
 /**
  * Result of XCTestService setup
@@ -51,6 +53,8 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private servicePort: number;
   private readonly builder: XCTestServiceBuilder;
   private readonly processExecutor: ProcessExecutor;
+  private readonly signingManager: XcodeSigningManager;
+  private readonly appInspector: DeviceAppInspector;
 
   // Singleton instances per device
   private static instances: Map<string, IOSXCTestServiceManager> = new Map();
@@ -83,6 +87,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
 
   public static readonly DEFAULT_PORT = 8765;
   public static readonly BUNDLE_ID = "dev.jasonpearson.automobile.XCTestService";
+  public static readonly APP_BUNDLE_ID = "dev.jasonpearson.automobile.XCTestServiceApp";
   private static readonly IPROXY_HEALTH_CHECK_INTERVAL_MS = 5000;
   private static readonly IPROXY_MAX_HEALTH_FAILURES = 2;
   private static readonly IPROXY_RESTART_BASE_DELAY_MS = 1000;
@@ -93,13 +98,17 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     device: BootedDevice,
     timer: Timer = defaultTimer,
     builder?: XCTestServiceBuilder,
-    processExecutor: ProcessExecutor = new DefaultProcessExecutor()
+    processExecutor: ProcessExecutor = new DefaultProcessExecutor(),
+    signingManager: XcodeSigningManager = new XcodeSigningManager(),
+    appInspector: DeviceAppInspector = new DeviceAppInspector()
   ) {
     this.device = device;
     this.timer = timer;
     this.servicePort = PortManager.allocate(device.deviceId);
     this.builder = builder || XCTestServiceBuilder.getInstance();
     this.processExecutor = processExecutor;
+    this.signingManager = signingManager;
+    this.appInspector = appInspector;
   }
 
   /**
@@ -129,9 +138,11 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     device: BootedDevice,
     timer: Timer,
     builder: XCTestServiceBuilder | undefined,
-    processExecutor: ProcessExecutor
+    processExecutor: ProcessExecutor,
+    signingManager?: XcodeSigningManager,
+    appInspector?: DeviceAppInspector
   ): IOSXCTestServiceManager {
-    return new IOSXCTestServiceManager(device, timer, builder, processExecutor);
+    return new IOSXCTestServiceManager(device, timer, builder, processExecutor, signingManager, appInspector);
   }
 
   /**
@@ -593,6 +604,15 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     }
 
     await this.startIproxyTunnel();
+    await this.verifyInstalledAppBundle();
+
+    const signing = await this.signingManager.resolveSigningForDevice(this.device.deviceId);
+    signing.warnings.forEach(warning => logger.warn(`[XCTestServiceManager] ${warning}`));
+
+    const signingArgs = [...signing.buildSettings];
+    if (signing.allowProvisioningUpdates) {
+      signingArgs.unshift("-allowProvisioningUpdates");
+    }
 
     const command = [
       "xcodebuild",
@@ -601,6 +621,7 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       "-destination", `id=${this.device.deviceId}`,
       "-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService",
       `XCTESTSERVICE_PORT=${this.servicePort}`,
+      ...signingArgs,
       "2>&1"
     ].join(" ");
 
@@ -622,6 +643,44 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       // Capture output for debugging
       this.captureProcessOutput(child);
     }
+  }
+
+  private async verifyInstalledAppBundle(): Promise<void> {
+    if (process.env.AUTOMOBILE_IOS_SKIP_XCTESTSERVICE_APP_HASH === "true" ||
+        process.env.AUTOMOBILE_IOS_SKIP_XCTESTSERVICE_APP_HASH === "1") {
+      return;
+    }
+
+    const expectedHash = this.builder.getExpectedAppHash("device");
+    if (!expectedHash) {
+      logger.warn("[XCTestServiceManager] XCTestService app hash verification skipped (no expected hash configured)");
+      return;
+    }
+
+    const deviceHash = await this.appInspector.getInstalledAppBundleHash(
+      this.device.deviceId,
+      IOSXCTestServiceManager.APP_BUNDLE_ID
+    );
+    if (!deviceHash) {
+      logger.warn("[XCTestServiceManager] Unable to read installed XCTestService app hash from device");
+      return;
+    }
+
+    if (deviceHash.toLowerCase() !== expectedHash.toLowerCase()) {
+      logger.warn("[XCTestServiceManager] Installed XCTestService app hash mismatch", {
+        deviceHash,
+        expectedHash
+      });
+      try {
+        await this.appInspector.uninstallApp(this.device.deviceId, IOSXCTestServiceManager.APP_BUNDLE_ID);
+        logger.info("[XCTestServiceManager] Uninstalled XCTestService app to force reinstall");
+      } catch (error) {
+        logger.warn(`[XCTestServiceManager] Failed to uninstall XCTestService app: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return;
+    }
+
+    logger.info("[XCTestServiceManager] Installed XCTestService app hash matches expected bundle");
   }
 
   private async checkHealthEndpoint(): Promise<boolean> {

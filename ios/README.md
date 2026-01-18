@@ -38,6 +38,21 @@ swift build
 swift test
 ```
 
+#### Code signing for physical devices
+
+XCTestService deployment to physical devices requires a valid provisioning profile and signing identity. AutoMobile
+attempts automatic signing via Xcode when possible and falls back to manual signing with matching profiles.
+The MCP server also verifies the installed XCTestService app bundle hash (excluding signing artifacts) against the
+expected release hash before starting.
+
+Manual overrides (optional):
+- `AUTOMOBILE_IOS_TEAM_ID` or `AUTOMOBILE_IOS_TEAM_IDS` (comma-separated)
+- `AUTOMOBILE_IOS_PROFILE_UUID` / `AUTOMOBILE_IOS_PROFILE_NAME` / `AUTOMOBILE_IOS_PROFILE_SPECIFIER`
+- `AUTOMOBILE_IOS_CODE_SIGN_IDENTITY`
+- `AUTOMOBILE_IOS_CODE_SIGN_ENTITLEMENTS_PATH`
+- `AUTOMOBILE_IOS_SKIP_XCTESTSERVICE_APP_HASH` (skip installed-app hash verification)
+- `AUTOMOBILE_XCTESTSERVICE_APP_HASH` or `AUTOMOBILE_XCTESTSERVICE_APP_HASH_DEVICE` (expected app bundle hash override)
+
 ### XCTestRunner
 
 **Path**: `ios/XCTestRunner/`

@@ -32,3 +32,4 @@ export const XCTESTSERVICE_IPA_URL: string = XCTESTSERVICE_RELEASE_VERSION === "
   ? "https://github.com/kaeawc/auto-mobile/releases/latest/download/XCTestService.ipa"
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${XCTESTSERVICE_RELEASE_VERSION}/XCTestService.ipa`;
 export const XCTESTSERVICE_SHA256_CHECKSUM: string = ""; // Empty = skip verification (local dev only)
+export const XCTESTSERVICE_APP_HASH: string = ""; // Hash of XCTestServiceApp.app (device build), empty = skip verification

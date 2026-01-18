@@ -141,6 +141,10 @@ export class FakeTimer implements Timer {
     toFireIntervals.forEach(interval => interval.callback());
   }
 
+  now(): number {
+    return this.currentTime;
+  }
+
   /**
    * Resolve all pending sleeps immediately regardless of time
    * Useful for tests that don't care about timing
