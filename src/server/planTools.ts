@@ -203,7 +203,8 @@ const executePlanTool = async (device: BootedDevice, params: {
       // Allocate all devices upfront with shared timeout
       const sessionToDeviceMap = await devicePool.assignMultipleDevices(
         sessionIds,
-        params.deviceAllocationTimeoutMs
+        params.deviceAllocationTimeoutMs,
+        params.platform
       );
 
       // Verify sessions were created in SessionManager for each allocated device
@@ -242,7 +243,7 @@ const executePlanTool = async (device: BootedDevice, params: {
         params.sessionUuid,
         params.devices,
         params.device,
-        { keepScreenAwake: params.keepScreenAwake }
+        { keepScreenAwake: params.keepScreenAwake, platform: params.platform }
       );
     } else if (params.device) {
       throw new ActionableError("Device label requires a devices list to be provided.");

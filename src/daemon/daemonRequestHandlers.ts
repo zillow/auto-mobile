@@ -96,6 +96,7 @@ export async function handleDaemonRequest(
         result: {
           sessionId: session.sessionId,
           assignedDevice: session.assignedDevice,
+          platform: session.platform,
           createdAt: session.createdAt,
           lastUsedAt: session.lastUsedAt,
           expiresAt: session.expiresAt,

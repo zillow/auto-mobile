@@ -3,7 +3,7 @@ import type { Session } from "../daemon/sessionManager";
 import { DevicePool } from "../daemon/devicePool";
 import { AndroidAccessibilityServiceManager } from "../utils/AccessibilityServiceManager";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
-import { ActionableError, BootedDevice } from "../models";
+import { ActionableError, BootedDevice, Platform } from "../models";
 import { logger } from "../utils/logger";
 import { KeepScreenAwakeManager, KEEP_SCREEN_AWAKE_STATE_KEY, KeepScreenAwakeState } from "../utils/KeepScreenAwakeManager";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
@@ -54,12 +54,14 @@ export function consumeSetupTiming(deviceId: string): TimingData | null {
 export interface ToolExecutionContext {
   sessionId?: string;
   deviceId?: string;
+  devicePlatform?: Platform;
   sessionManager?: SessionManager;
   devicePool?: DevicePool;
 }
 
 export interface SessionOptions {
   keepScreenAwake?: boolean;
+  platform?: Platform;
 }
 
 /**
@@ -80,12 +82,18 @@ export async function createToolExecutionContext(
   const existingSession = sessionManager.getSession(sessionUuid);
 
   // Get or create session
-  const session = await sessionManager.getOrCreateSession(sessionUuid, devicePool);
+  const session = await sessionManager.getOrCreateSession(
+    sessionUuid,
+    devicePool,
+    sessionOptions.platform
+  );
 
   await ensureKeepScreenAwake(session, sessionManager, sessionOptions);
 
   if (!existingSession) {
-    await ensureAccessibilityServiceReady(session.assignedDevice, sessionUuid);
+    if (session.platform === "android") {
+      await ensureAccessibilityServiceReady(session.assignedDevice, sessionUuid);
+    }
 
     // Start test coverage session for navigation graph tracking
     // This enables automatic tracking of screens and transitions during test execution
@@ -99,6 +107,7 @@ export async function createToolExecutionContext(
   return {
     sessionId: sessionUuid,
     deviceId: session.assignedDevice,
+    devicePlatform: session.platform,
     sessionManager,
     devicePool,
   };
@@ -149,6 +158,9 @@ async function ensureKeepScreenAwake(
   sessionManager: SessionManager,
   sessionOptions: SessionOptions
 ): Promise<void> {
+  if (session.platform !== "android") {
+    return;
+  }
   const existingState = session.cacheData.customData?.[KEEP_SCREEN_AWAKE_STATE_KEY] as KeepScreenAwakeState | undefined;
   if (existingState) {
     return;

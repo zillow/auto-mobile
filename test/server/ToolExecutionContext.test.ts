@@ -5,6 +5,7 @@ import { createToolExecutionContext } from "../../src/server/ToolExecutionContex
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
+import { BootedDevice } from "../../src/models";
 
 describe("ToolExecutionContext", () => {
   let sessionManager: SessionManager;
@@ -13,12 +14,17 @@ describe("ToolExecutionContext", () => {
   let originalGetInstance: typeof AndroidAccessibilityServiceManager.getInstance;
   let originalClientGetInstance: typeof AccessibilityServiceClient.getInstance;
   const sessionOptions = { keepScreenAwake: false };
+  const createBootedDevice = (deviceId: string): BootedDevice => ({
+    name: deviceId,
+    platform: "android",
+    deviceId
+  });
 
   beforeEach(async () => {
     sessionManager = new SessionManager();
     fakeAppsRepo = new FakeInstalledAppsRepository();
     devicePool = new DevicePool(sessionManager, "test-daemon-session-id", undefined, fakeAppsRepo);
-    await devicePool.initializeWithDevices(["device-1"]);
+    await devicePool.initializeWithDevices([createBootedDevice("device-1")]);
     originalGetInstance = AndroidAccessibilityServiceManager.getInstance;
     originalClientGetInstance = AccessibilityServiceClient.getInstance;
 
@@ -64,7 +70,7 @@ describe("ToolExecutionContext", () => {
         }
       } as any);
 
-    await sessionManager.createSession("session-1", "device-1");
+    await sessionManager.createSession("session-1", "device-1", "android");
     const context = await createToolExecutionContext("session-1", sessionManager, devicePool, sessionOptions);
 
     expect(context.deviceId).toBe("device-1");

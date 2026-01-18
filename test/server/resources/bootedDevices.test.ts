@@ -324,8 +324,8 @@ describe("MCP Booted Device Resources", () => {
       const fakeAppsRepo = new FakeInstalledAppsRepository();
       const devicePool = new DevicePool(sessionManager, "test-daemon-session-id", undefined, fakeAppsRepo);
       await devicePool.initializeWithDevices([
-        mockAndroidDevice1.deviceId,
-        mockAndroidDevice2.deviceId
+        mockAndroidDevice1,
+        mockAndroidDevice2
       ]);
 
       const sessionId = "session-123";

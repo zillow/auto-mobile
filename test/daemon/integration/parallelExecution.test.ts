@@ -3,19 +3,29 @@ import { SessionManager } from "../../../src/daemon/sessionManager";
 import { DevicePool } from "../../../src/daemon/devicePool";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeInstalledAppsRepository } from "../../fakes/FakeInstalledAppsRepository";
+import { BootedDevice } from "../../../src/models";
 
 describe("Parallel Execution Across Multiple Devices", function() {
   let sessionManager: SessionManager;
   let devicePool: DevicePool;
   let fakeTimer: FakeTimer;
   let fakeAppsRepo: FakeInstalledAppsRepository;
+  const createBootedDevice = (deviceId: string): BootedDevice => ({
+    name: deviceId,
+    platform: "android",
+    deviceId
+  });
 
   beforeEach(async function() {
     sessionManager = new SessionManager();
     fakeTimer = new FakeTimer();
     fakeAppsRepo = new FakeInstalledAppsRepository();
     devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo);
-    await devicePool.initializeWithDevices(["device-1", "device-2", "device-3"]);
+    await devicePool.initializeWithDevices([
+      createBootedDevice("device-1"),
+      createBootedDevice("device-2"),
+      createBootedDevice("device-3")
+    ]);
   });
 
   afterEach(function() {
