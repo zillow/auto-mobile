@@ -474,6 +474,9 @@ jobs:
     runs-on: ${{ matrix.config.runner }}
     needs: detect-changes
     if: needs.detect-changes.outputs.ios_should_run == 'true'
+    env:
+      IOS_SIGNING_ENABLED: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+      MACOS_SIGNING_ENABLED: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -490,7 +493,7 @@ jobs:
           xcode-version: ${{ matrix.config.xcode }}
 
       - name: "Install macOS Developer ID certificate"
-        if: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 != '' }}
+        if: ${{ env.MACOS_SIGNING_ENABLED == 'true' }}
         env:
           MACOS_DEVELOPER_ID_CERT_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 }}
           MACOS_DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_CERT_PASSWORD }}
@@ -498,7 +501,7 @@ jobs:
         run: ./scripts/ios/setup-macos-signing-keychain.sh
 
       - name: "Install iOS signing certificate"
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        if: ${{ env.IOS_SIGNING_ENABLED == 'true' }}
         env:
           IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
           IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
@@ -507,14 +510,14 @@ jobs:
 
       - name: "Build Swift Packages"
         env:
-          MACOS_SIGNING_ENABLED: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 != '' }}
+          MACOS_SIGNING_ENABLED: ${{ env.MACOS_SIGNING_ENABLED }}
           MACOS_DEVELOPER_ID_SIGNING_IDENTITY: ${{ secrets.MACOS_DEVELOPER_ID_SIGNING_IDENTITY }}
           MACOS_DEVELOPER_ID_TEAM_ID: ${{ secrets.MACOS_DEVELOPER_ID_TEAM_ID }}
-          MACOS_SIGNING_STRICT: ${{ secrets.MACOS_DEVELOPER_ID_CERT_BASE64 != '' }}
-          IOS_SIGNING_ENABLED: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+          MACOS_SIGNING_STRICT: ${{ env.MACOS_SIGNING_ENABLED }}
+          IOS_SIGNING_ENABLED: ${{ env.IOS_SIGNING_ENABLED }}
           IOS_SIGNING_IDENTITY: ${{ secrets.IOS_SIGNING_IDENTITY }}
           IOS_SIGNING_TEAM_ID: ${{ secrets.IOS_SIGNING_TEAM_ID }}
-          IOS_SIGNING_STRICT: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+          IOS_SIGNING_STRICT: ${{ env.IOS_SIGNING_ENABLED }}
         run: ./scripts/ios/swift-build.sh
 
   ios-swift-test:

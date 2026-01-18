@@ -38,6 +38,7 @@ STRICT_MODE="${MACOS_SIGNING_STRICT:-false}"
 sign_package() {
   local package_name="$1"
   local product_name="$2"
+  local require_signables="$3"
   local package_dir="${IOS_DIR}/${package_name}"
 
   if [[ ! -d "${package_dir}" ]]; then
@@ -66,17 +67,16 @@ sign_package() {
   done < <(find "${bin_path}" -maxdepth 2 \( -name "*.app" -o -name "*.appex" -o -name "*.framework" -o -name "*.dylib" \) -print0)
 
   if [[ "${found}" != true ]]; then
-    if [[ "${STRICT_MODE}" == "true" ]]; then
+    if [[ "${STRICT_MODE}" == "true" && "${require_signables}" == "true" ]]; then
       echo "Error: no signable artifacts found for ${package_name} in ${bin_path}" >&2
       exit 1
-    else
-      echo "Warning: no signable artifacts found for ${package_name} in ${bin_path}"
     fi
+    echo "Warning: no signable artifacts found for ${package_name} in ${bin_path}"
   fi
 }
 
-sign_package "XcodeCompanion" "AutoMobileCompanion"
-sign_package "XcodeExtension" ""
+sign_package "XcodeCompanion" "AutoMobileCompanion" "true"
+sign_package "XcodeExtension" "" "false"
 
 for artifact in "${sign_paths[@]}"; do
   echo "Signing ${artifact}"
