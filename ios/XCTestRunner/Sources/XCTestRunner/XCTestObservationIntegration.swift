@@ -3,6 +3,9 @@ import XCTest
 
 /// XCTestObservation integration for collecting timing data and test results
 public class AutoMobileTestObserver: NSObject, XCTestObservation {
+    private static let registrationLock = NSLock()
+    private static var sharedObserver: AutoMobileTestObserver?
+
     /// Timing data for test cases
     public struct TimingData {
         public let testName: String
@@ -15,27 +18,47 @@ public class AutoMobileTestObserver: NSObject, XCTestObservation {
     /// Collected timing data
     private var timingData: [TimingData] = []
 
-    /// Current test start time
-    private var currentTestStartTime: Date?
+    /// Current test start times keyed by test instance
+    private var testStartTimes: [ObjectIdentifier: Date] = [:]
+
+    private let timingLock = NSLock()
 
     /// Register this observer with the test observation center
     public static func register() -> AutoMobileTestObserver {
+        return registerIfNeeded()
+    }
+
+    public static func registerIfNeeded() -> AutoMobileTestObserver {
+        registrationLock.lock()
+        defer { registrationLock.unlock() }
+
+        if let existing = sharedObserver {
+            return existing
+        }
+
         let observer = AutoMobileTestObserver()
         XCTestObservationCenter.shared.addTestObserver(observer)
+        sharedObserver = observer
         return observer
     }
 
     /// Called when a test case starts
     public func testCaseWillStart(_ testCase: XCTestCase) {
-        currentTestStartTime = Date()
+        timingLock.lock()
+        testStartTimes[ObjectIdentifier(testCase)] = Date()
+        timingLock.unlock()
         print("Test case starting: \(testCase.name)")
     }
 
     /// Called when a test case finishes
     public func testCaseDidFinish(_ testCase: XCTestCase) {
-        guard let startTime = currentTestStartTime else {
+        timingLock.lock()
+        let key = ObjectIdentifier(testCase)
+        guard let startTime = testStartTimes.removeValue(forKey: key) else {
+            timingLock.unlock()
             return
         }
+        timingLock.unlock()
 
         let endTime = Date()
         let duration = endTime.timeIntervalSince(startTime)
@@ -48,11 +71,11 @@ public class AutoMobileTestObserver: NSObject, XCTestObservation {
             passed: testCase.testRun?.totalFailureCount == 0
         )
 
+        timingLock.lock()
         timingData.append(timing)
+        timingLock.unlock()
 
         print("Test case finished: \(testCase.name) - Duration: \(duration)s - Passed: \(timing.passed)")
-
-        currentTestStartTime = nil
     }
 
     /// Called when a test suite starts
@@ -68,7 +91,10 @@ public class AutoMobileTestObserver: NSObject, XCTestObservation {
 
     /// Gets all collected timing data
     public func getTimingData() -> [TimingData] {
-        return timingData
+        timingLock.lock()
+        let data = timingData
+        timingLock.unlock()
+        return data
     }
 
     /// Exports timing data to JSON
