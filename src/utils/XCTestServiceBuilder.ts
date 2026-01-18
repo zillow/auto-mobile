@@ -3,11 +3,17 @@ import * as path from "path";
 import os from "os";
 import { logger } from "./logger";
 import { NoOpPerformanceTracker, type PerformanceTracker } from "./PerformanceTracker";
-import { XCTESTSERVICE_IPA_URL, XCTESTSERVICE_RELEASE_VERSION, XCTESTSERVICE_SHA256_CHECKSUM } from "../constants/release";
+import {
+  XCTESTSERVICE_APP_HASH,
+  XCTESTSERVICE_IPA_URL,
+  XCTESTSERVICE_RELEASE_VERSION,
+  XCTESTSERVICE_SHA256_CHECKSUM
+} from "../constants/release";
 import {
   DefaultXCTestServiceBundleDownloader,
   type XCTestServiceBundleDownloader
 } from "./XCTestServiceBundleDownloader";
+import { hashAppBundle } from "./ios-cmdline-tools/AppBundleHasher";
 
 /**
  * Result of XCTestService download/install
@@ -41,6 +47,7 @@ type XCTestServiceBundleMetadata = {
   checksum: string | null;
   version: string;
   extractedAt: string;
+  appHashes?: Partial<Record<XCTestServicePlatform, string>>;
 };
 
 /**
@@ -70,6 +77,7 @@ export class XCTestServiceBuilder {
   private readonly downloader: XCTestServiceBundleDownloader;
   private cachedBuildProductsPath: Map<XCTestServicePlatform, string | null> = new Map();
   private cachedXctestrunPath: Map<string, string | null> = new Map();
+  private cachedAppBundleHash: Map<XCTestServicePlatform, string | null> = new Map();
 
   private constructor(
     config: Partial<XCTestServiceBuildConfig> = {},
@@ -221,6 +229,21 @@ export class XCTestServiceBuilder {
       return true;
     }
 
+    if (platform) {
+      const expectedAppHash = this.getExpectedAppHash(platform);
+      if (expectedAppHash) {
+        const localHash = await this.getAppBundleHash(platform);
+        if (!localHash || localHash.toLowerCase() !== expectedAppHash.toLowerCase()) {
+          logger.info("[XCTestServiceBuilder] XCTestService app hash mismatch, need download");
+          return true;
+        }
+        if (!metadata?.appHashes?.[platform]) {
+          logger.info("[XCTestServiceBuilder] XCTestService app hash missing from metadata, need download");
+          return true;
+        }
+      }
+    }
+
     logger.info("[XCTestServiceBuilder] XCTestService artifacts are up to date");
     return false;
   }
@@ -251,6 +274,7 @@ export class XCTestServiceBuilder {
       // Clear cached paths to force rediscovery
       this.cachedBuildProductsPath.clear();
       this.cachedXctestrunPath.clear();
+      this.cachedAppBundleHash.clear();
 
       const buildPath = await this.getBuildProductsPath(platform ?? "simulator");
       const xctestrunPath = await this.getXctestrunPath(platform);
@@ -391,6 +415,7 @@ export class XCTestServiceBuilder {
       await fs.rm(this.config.derivedDataPath, { recursive: true, force: true });
       this.cachedBuildProductsPath.clear();
       this.cachedXctestrunPath.clear();
+      this.cachedAppBundleHash.clear();
       logger.info("[XCTestServiceBuilder] Build artifacts cleaned up");
     } catch (error) {
       logger.warn("[XCTestServiceBuilder] Failed to clean build artifacts:", error);
@@ -402,6 +427,38 @@ export class XCTestServiceBuilder {
    */
   public getConfig(): XCTestServiceBuildConfig {
     return { ...this.config };
+  }
+
+  public async getAppBundlePath(platform: XCTestServicePlatform = "simulator"): Promise<string | null> {
+    const buildPath = await this.getBuildProductsPath(platform);
+    if (!buildPath) {
+      return null;
+    }
+    const appPath = path.join(buildPath, "XCTestServiceApp.app");
+    try {
+      await fs.access(appPath);
+      return appPath;
+    } catch {
+      return null;
+    }
+  }
+
+  public async getAppBundleHash(platform: XCTestServicePlatform = "simulator"): Promise<string | null> {
+    const cached = this.cachedAppBundleHash.get(platform);
+    if (cached) {
+      return cached;
+    }
+    const appPath = await this.getAppBundlePath(platform);
+    if (!appPath) {
+      return null;
+    }
+    try {
+      const hash = await hashAppBundle(appPath);
+      this.cachedAppBundleHash.set(platform, hash);
+      return hash;
+    } catch {
+      return null;
+    }
   }
 
   private getBundlePath(): string {
@@ -425,6 +482,28 @@ export class XCTestServiceBuilder {
   private getExpectedChecksum(): string {
     const override = XCTestServiceBuilder.expectedChecksumOverride;
     return override ?? XCTESTSERVICE_SHA256_CHECKSUM ?? "";
+  }
+
+  public getExpectedAppHash(platform: XCTestServicePlatform): string {
+    const envPlatform = platform.toUpperCase();
+    // Check for platform-specific override first
+    const platformOverride = process.env[`AUTOMOBILE_XCTESTSERVICE_APP_HASH_${envPlatform}`];
+    if (platformOverride && platformOverride.trim().length > 0) {
+      return platformOverride.trim();
+    }
+    // For device platform, check generic overrides and the release constant (device build hash)
+    if (platform === "device") {
+      const genericOverride = process.env.AUTOMOBILE_XCTESTSERVICE_APP_HASH
+        ?? process.env.AUTOMOBILE_IOS_XCTESTSERVICE_APP_HASH;
+      if (genericOverride && genericOverride.trim().length > 0) {
+        return genericOverride.trim();
+      }
+      // XCTESTSERVICE_APP_HASH is documented as the device build hash
+      return XCTESTSERVICE_APP_HASH || "";
+    }
+    // For simulator, only use platform-specific override (already checked above)
+    // Skip verification if no simulator-specific hash is provided
+    return "";
   }
 
   private async ensureBundleDownloaded(): Promise<string> {
@@ -500,10 +579,12 @@ export class XCTestServiceBuilder {
     await this.normalizeExtractedBundle();
     await this.verifyExtractedArtifacts();
 
+    const appHashes = await this.computeAppHashes();
     const metadata: XCTestServiceBundleMetadata = {
       checksum: this.getExpectedChecksum() || null,
       version: XCTESTSERVICE_RELEASE_VERSION,
-      extractedAt: new Date().toISOString()
+      extractedAt: new Date().toISOString(),
+      appHashes
     };
     await fs.writeFile(this.getMetadataPath(), JSON.stringify(metadata, null, 2), "utf-8");
   }
@@ -586,6 +667,33 @@ export class XCTestServiceBuilder {
         throw new Error(`XCTestService bundle missing required artifact: ${requiredPath}`);
       }
     }
+
+    const expectedAppHash = this.getExpectedAppHash(platform);
+    if (expectedAppHash) {
+      const localHash = await this.getAppBundleHash(platform);
+      if (!localHash) {
+        throw new Error(`XCTestService app hash unavailable for ${platform}`);
+      }
+      if (localHash.toLowerCase() !== expectedAppHash.toLowerCase()) {
+        throw new Error(`XCTestService app hash mismatch for ${platform}. Expected: ${expectedAppHash}, Got: ${localHash}`);
+      }
+      logger.info("[XCTestServiceBuilder] App bundle hash verified", { platform, hash: localHash });
+    } else {
+      logger.warn(`[XCTestServiceBuilder] App bundle hash verification skipped for ${platform} (no hash provided)`);
+    }
+  }
+
+  private async computeAppHashes(): Promise<Partial<Record<XCTestServicePlatform, string>>> {
+    const hashes: Partial<Record<XCTestServicePlatform, string>> = {};
+    const simulatorHash = await this.getAppBundleHash("simulator");
+    if (simulatorHash) {
+      hashes.simulator = simulatorHash;
+    }
+    const deviceHash = await this.getAppBundleHash("device");
+    if (deviceHash) {
+      hashes.device = deviceHash;
+    }
+    return hashes;
   }
 
   private resolveDerivedDataRoot(xctestrunPath: string): string | null {
