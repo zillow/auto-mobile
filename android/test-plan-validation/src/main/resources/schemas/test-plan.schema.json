@@ -147,7 +147,7 @@
           }
         }
       },
-      "description": "A step can have tool-specific parameters either in a 'params' object or as top-level properties (e.g., 'selector', 'appId', 'text', 'direction', etc.)",
+      "description": "A step can have tool-specific parameters either in a 'params' object or as top-level properties (e.g., 'id', 'text', 'appId', 'direction', etc.)",
       "allOf": [
         {
           "if": {

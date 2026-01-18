@@ -124,8 +124,7 @@ class TestPlanValidatorTest {
                 label: Launch the app
               - tool: tapOn
                 params:
-                  selector:
-                    testTag: button
+                  text: button
                 label: Tap button
             metadata:
               createdAt: "2024-01-01T00:00:00Z"
@@ -205,8 +204,7 @@ class TestPlanValidatorTest {
               - tool: observe
               - tool: tapOn
                 params:
-                  selector:
-                    testTag: button
+                  text: button
               - tool: launchApp
                 params:
                   appId: com.example.app

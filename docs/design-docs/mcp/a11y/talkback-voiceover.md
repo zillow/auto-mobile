@@ -532,7 +532,8 @@ async function tapOnElement(params: TapOnParams): Promise<TapResult> {
   if (isTalkBackEnabled) {
     // Use AccessibilityService ACTION_CLICK
     await accessibilityClient.performAction(deviceId, {
-      selector: { text: params.text, resourceId: params.id },
+      text: params.text,
+      id: params.id,
       action: 'CLICK',
       focusFirst: true,  // Set accessibility focus before clicking
     });

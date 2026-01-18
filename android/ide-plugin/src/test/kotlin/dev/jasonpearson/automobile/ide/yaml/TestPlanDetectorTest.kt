@@ -79,8 +79,7 @@ class TestPlanDetectorTest {
                   appId: com.example
               - tool: tapOn
                 params:
-                  selector:
-                    testTag: button
+                  text: button
             metadata:
               version: "1.0.0"
         """.trimIndent()

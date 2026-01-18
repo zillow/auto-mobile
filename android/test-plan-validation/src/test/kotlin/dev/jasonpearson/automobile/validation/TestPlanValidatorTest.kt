@@ -435,8 +435,7 @@ class TestPlanValidatorTest {
               - tool: observe
               - tool: tapOn
                 params:
-                  selector:
-                    testTag: button
+                  text: button
               - tool: launchApp
                 params:
                   appId: com.example.app
