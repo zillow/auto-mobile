@@ -444,6 +444,12 @@ export class PlatformVideoCaptureBackend implements VideoCaptureBackend {
       return;
     }
 
+    const sourceExists = await fs.pathExists(sourcePath);
+    if (!sourceExists) {
+      logger.warn(`[VideoCapture] Missing iOS recording at ${sourcePath}`);
+      return;
+    }
+
     await fs.remove(destinationPath);
     await fs.move(sourcePath, destinationPath, { overwrite: true });
   }
