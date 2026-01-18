@@ -127,11 +127,9 @@ export class FakeDeviceUtils implements PlatformDeviceManager {
   }
 
   async isDeviceImageRunning(device: DeviceInfo): Promise<boolean> {
-    this.executedOperations.push(`isDeviceImageRunning:${device.name}`);
-    if (device.deviceId && this.runningDeviceNames.has(device.deviceId)) {
-      return true;
-    }
-    return this.runningDeviceNames.has(device.name);
+    const identifier = device.deviceId ?? device.name;
+    this.executedOperations.push(`isDeviceImageRunning:${identifier}`);
+    return this.runningDeviceNames.has(identifier) || this.runningDeviceNames.has(device.name);
   }
 
   async getBootedDevices(platform: SomePlatform): Promise<BootedDevice[]> {
