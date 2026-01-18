@@ -24,7 +24,10 @@ runs:
     - name: "Install dependencies"
       shell: ${{ inputs.shell }}
       run: |
-        bun install --frozen-lockfile
+        bun install --frozen-lockfile || {
+          bun pm cache rm
+          bun install --frozen-lockfile
+        }
 
     - name: "Build AutoMobile"
       shell: ${{ inputs.shell }}
