@@ -638,7 +638,6 @@ jobs:
       - name: "Run Reminders integration tests"
         env:
           AUTOMOBILE_TEST_PLAN: "Plans/launch-reminders-app.yaml"
-          AUTOMOBILE_DAEMON_SOCKET_PATH: "/tmp/auto-mobile-daemon-${UID}.sock"
         run: |
           cd ios/XCTestRunner
           swift test --filter RemindersLaunchPlanTests
