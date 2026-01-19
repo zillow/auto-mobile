@@ -77,15 +77,6 @@ const createFakeDependencies = (options?: { identities?: string; profiles?: stri
         includes(searchString: string) { return this.stdout.includes(searchString); }
       };
     }
-    if (command.includes("xcodebuild -showBuildSettings")) {
-      return {
-        stdout: `DEVELOPMENT_TEAM = ${teamId}`,
-        stderr: "",
-        toString() { return this.stdout; },
-        trim() { return this.stdout.trim(); },
-        includes(searchString: string) { return this.stdout.includes(searchString); }
-      };
-    }
     return {
       stdout: "",
       stderr: "",
@@ -99,6 +90,27 @@ const createFakeDependencies = (options?: { identities?: string; profiles?: stri
     deps: {
       platform: () => "darwin" as const,
       exec,
+      xcodebuild: {
+        executeCommand: async (args: string[]) => {
+          if (args.includes("-showBuildSettings")) {
+            return {
+              stdout: `DEVELOPMENT_TEAM = ${teamId}`,
+              stderr: "",
+              toString() { return this.stdout; },
+              trim() { return this.stdout.trim(); },
+              includes(searchString: string) { return this.stdout.includes(searchString); }
+            };
+          }
+          return {
+            stdout: "",
+            stderr: "",
+            toString() { return this.stdout; },
+            trim() { return this.stdout.trim(); },
+            includes(searchString: string) { return this.stdout.includes(searchString); }
+          };
+        },
+        isAvailable: async () => true
+      },
       readDir: async () => options?.profiles ?? ["test.mobileprovision"],
       readFile: async () => "",
       stat: async () => ({ isFile: () => true }),
