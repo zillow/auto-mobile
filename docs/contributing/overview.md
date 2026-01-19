@@ -2,6 +2,8 @@
 
 Thank you for your interest in contributing to AutoMobile!
 
+![AutoMobile](../img/auto-mobile-party.gif)
+
 ## Getting Started
 
 1. **File an issue first** - Discuss your idea before starting work

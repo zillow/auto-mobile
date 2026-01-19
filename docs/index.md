@@ -1,31 +1,33 @@
-# Overview
+# AutoMobile
 
-AutoMobile is a bun TypeScript MCP server providing Android & iOS device automation capabilities through its tools and resources. It also uses its own Kotlin & Swift supporting libraries and apps to make highly performant and accurate automation possible. The point is to provide mobile engineers with AI workflow tools to run explorations, reproduce bugs, and run automated tests.
+AutoMobile lets AI agents control your Android & iOS devices using natural language. [Install it now](install/index.md) and [get started](using/ux-exploration.md).
 
-![Setting an alarm in the Clock app](img/clock-app-demo.gif)
-*Demo: An AI agent navigating to the Clock app, opening the alarm tab, and creating a new alarm.*
+It can do this by being an MCP server that uses standard platform tools like `adb` & `simctl` paired with additional Kotlin & Swift libraries and apps. All components are open source. The point is to provide mobile engineers with AI workflow tools to perform UX deep dives, reproduce bugs, and run automated tests.
+
+![Setting an alarm in the Clock app](img/clock-app.gif)
+*An AI agent navigating to the Clock app, creating a new alarm*
 
 ![Searching YouTube for a video](img/youtube-search.gif)
-*Demo: An AI agent opening YouTube, entering a search query, and browsing the results.*
+*An AI agent searching YouTube and browsing results*
 
-## Get Started
+### Explore and Test
 
-1. [Install AutoMobile](install/overview.md)
-2. Try some use cases:
+| Task | What it does |
+|------|-------------|
+| **[Explore app UX](using/ux-exploration.md)** | Navigate your app, discover screens, map user flows, identify confusing interactions |
+| **[Reproduce bugs](using/reproducting-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
+| **[Create UI tests](using/ui-tests.md)** | Describe test scenarios in plain English, get executable test plans |
+| **[Measure startup time](using/perf-analysis/startup.md)** | Profile cold and warm launch performance |
+| **[Check scroll performance](using/perf-analysis/scroll-framerate.md)** | Detect jank and dropped frames |
+| **[Audit contrast](using/a11y/contrast.md)** | Find accessibility issues with color contrast |
+| **[Check tap targets](using/a11y/tap-targets.md)** | Ensure touch targets meet size guidelines |
 
-	- [Explore app ux](using/ux-exploration.md), [create UI tests](using/ui-tests.md), and easily create [bug reports]() with built-in [video recording](design-docs/mcp/observe/video-recording.md) and [visual highlights](design-docs/mcp/observe/visual-highlighting.md).
-	- Measure [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [screen transitions](using/perf-analysis/screen-transition.md).
-	- Audit accessibility compliance with [contrast ratios](using/a11y/contrast.md) & [tap targets](using/a11y/tap-targets.md).
-    - (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
-    - Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and (coming soon) XCTestRunner for iOS.
+## How it works
 
-## Resources
-
-- [Design Docs](design-docs/index.md) - Architecture and implementation details
-- [FAQ](faq.md) - Common questions
-- [Contributing](contributing/overview.md) - How to contribute
-
-![AutoMobile](img/auto-mobile-party.gif)
+- 🤖 **Fast UX Inspection** Kotlin Accessibility Service and Swift XCTestService to enable fast, accurate observations. 10x faster than the next fastest observation toolkit.
+- 🦾 **Full Touch Injection** Tap, Swipe, Pinch, Drag & Drop, Shake with automatic element targeting.
+- ♻️ **Tool Feedback** [Observations](design-docs/mcp/observe/index.md) drive the [interaction loop](design-docs/mcp/interaction-loop.md) for all [tool calls](design-docs/mcp/tools.md).
+- 🧪 **Test Execution** [Kotlin JUnitRunner](design-docs/plat/android/junitrunner.md) & [Swift XCTestRunner](design-docs/plat/ios/xctestrunner.md) execute tests natively handling device pooling, multi-device tests, and automatically optimizing test timing.
 
 ## License
 

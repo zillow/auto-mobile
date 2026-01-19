@@ -72,9 +72,10 @@ markdown_extensions:
 
 nav:
   - 'Overview': index.md
-  - 'Origin': origin.md
   - 'Install':
-      - 'Overview': install/overview.md
+      - 'Overview': install/index.md
+      - 'Manual Guide': install/manual.md
+      - 'Docker': install/docker.md
       - 'Platform Specific':
           - 'Android': install/plat/android.md
           - 'iOS': install/plat/ios.md
@@ -104,6 +105,7 @@ nav:
           - 'Daemon':
              - 'Overview': design-docs/mcp/daemon/index.md
              - 'Critical Section': design-docs/mcp/daemon/critical-section.md
+          - 'Multi-device': design-docs/mcp/multi-device.md
           - 'Navigation Graph':
              - 'Overview': design-docs/mcp/nav/index.md
              - 'Graph Structure': design-docs/mcp/nav/graph-structure.md
@@ -128,8 +130,6 @@ nav:
             - 'Accessibility Service': design-docs/plat/android/accessibility-service.md
             - 'AutoMobile SDK': design-docs/plat/android/auto-mobile-sdk.md
             - 'JUnitRunner': design-docs/plat/android/junitrunner.md
-            - 'Docker': design-docs/plat/android/docker.md
-            - 'Multi-device': design-docs/plat/android/multi-device.md
             - 'IDE Plugin':
               - 'Overview': design-docs/plat/android/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/android/ide-plugin/test-recording.md
@@ -164,7 +164,6 @@ nav:
       - 'Local Development': contributing/local-development.md
       - 'iOS Signing': contributing/ios-signing.md
       - 'npm Publishing': contributing/publishing.md
-      - 'Docker Hub Publishing': docker-hub-setup.md
       - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md
   - 'Change Log': changelog.md

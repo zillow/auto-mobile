@@ -1,20 +1,22 @@
-# Overview
-
-AutoMobile runs as an MCP server, connecting AI agents to Android devices for automation.
-
-## Interactive Installer (MacOS)
-
-``` bash title="One-line install (click to copy)"
-curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/install/interactive.sh | bash
-```
-
-## Manual Setup
+# Manual Guide
 
 Prerequisites:
 
-- **Bun 1.3.5+** (or Node.js for npx)
-- **Android SDK** with platform-tools (ADB)
+- **Bun 1.3.6+**
+- **Node 24+**
+- **Android SDK** with platform-tools (adb & emulator) - only for Android
+- **XCode Developer Tools** with platform-tools (simctl & xcodebuild) - only for iOS
 - **Connected device** (emulator or physical with USB debugging)
+
+## Claude Code Plugin
+
+The easiest way to get started is with the [AutoMobile plugin for Claude Code](https://github.com/kaeawc/auto-mobile). It bundles the MCP server configuration plus specialized skills:
+
+- `/explore` - Comprehensive device interaction and navigation
+- `/reproduce-bug` - Structured bug reproduction workflow
+- `/apps`, `/gesture`, `/text`, `/system` - Focused interaction skills
+- `/snapshot` - Capture and restore device state
+- `/doctor` - Diagnose setup issues
 
 Add to your MCP client configuration:
 
@@ -44,8 +46,6 @@ args = ["-y", "@kaeawc/auto-mobile@latest"]
 ANDROID_HOME = "/path/to/android/sdk"
 ```
 
-The installer checks dependencies, optionally downloads Android tools, installs the Accessibility Service APK, and configures the MCP daemon.
-
 ## Private npm Registry
 
 ```json
@@ -63,6 +63,10 @@ The installer checks dependencies, optionally downloads Android tools, installs 
   }
 }
 ```
+
+## Docker
+
+See [docker specific instructions](docker.md)
 
 ## Specific Platform Setup
 
