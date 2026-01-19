@@ -2,7 +2,7 @@
 
 The MCP server exposes AutoMobile's capabilities as tool calls, resources, and real-time observations.
 
-AutoMobile's MCP makes its various [actions](tools.md) available as tool calls and automatically performs
+AutoMobile's MCP makes its various [actions](tools/index.md) available as tool calls and automatically performs
 [observations](observe/index.md) within an [interaction loop](interaction-loop.md).
 
 ```mermaid
@@ -68,7 +68,7 @@ flowchart TB
 
 | Area | Documentation |
 |------|---------------|
-| **Actions** | [Tool calls](tools.md) for taps, swipes, input, app management |
+| **Actions** | [Tool calls](tools/index.md) for taps, swipes, input, app management |
 | **Observation** | [Real-time UI capture](observe/index.md) with view hierarchy |
 | **Interaction Loop** | [Observe-act-observe](interaction-loop.md) cycle with idle detection |
 | **Resources** | [Device state](resources.md) exposed via MCP resources |

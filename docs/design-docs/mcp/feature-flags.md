@@ -1,8 +1,6 @@
 # Feature Flags
 
 Runtime configuration system for experimental features and performance tuning.
-
-
 Feature flags allow:
 
 - **Experimental Features** - Enable/disable features in development
@@ -54,10 +52,10 @@ setFeatureFlag("predictive-ui", true)
 
 ## MCP Tools
 
-### `listFeatureFlags`
+### 🚩 [`listFeatureFlags`](tools/index.md)
 Lists all available feature flags and their current states.
 
-### `setFeatureFlag`
+### ⚙️ [`setFeatureFlag`](tools/index.md)
 Enable or disable a feature flag:
 
 ```json
@@ -92,4 +90,4 @@ setFeatureFlag("ui-perf-mode", true, {
 
 Feature flags are stored in memory and can be persisted to configuration files for permanent settings.
 
-See [MCP Actions](tools.md) for flag management tools.
+See [tool reference](tools/index.md) for the full MCP tool list.

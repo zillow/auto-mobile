@@ -5,7 +5,7 @@ The XCTestService provides a WebSocket server that exposes XCUITest capabilities
 simctl handles simulator lifecycle management.
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph "MCP Client"
         Agent[AI Agent]
     end
@@ -36,7 +36,6 @@ graph TB
 - [simctl integration](simctl.md) - simulator lifecycle and app management.
 - [Managed App Configuration](managed-app-config.md) - MDM policies and app config payloads.
 - [Managed Apple IDs](managed-apple-ids.md) - account policies and device profiles.
-- [XCTest runner](xctestrunner.md) - plan execution and timing integration.
 - [Xcode integration](ide-plugin/overview.md) - companion app + source editor extension.
 
 ## Status
@@ -67,4 +66,4 @@ underlying system tooling differs.
 ## See also
 
 - [MCP server](../../mcp/index.md)
-- [MCP actions](../../mcp/tools.md)
+- [MCP tool reference](../../mcp/tools/index.md)

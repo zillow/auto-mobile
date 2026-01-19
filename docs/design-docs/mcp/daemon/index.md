@@ -1,8 +1,6 @@
 # Overview
 
 Background daemon service for device pooling and parallel test execution.
-
-
 The AutoMobile daemon:
 
 1. Maintains a pool of available devices specifically for running tests
@@ -12,7 +10,7 @@ The AutoMobile daemon:
 
 ## Architecture
 
-With Android in mind, JUnitRunner is able to use the MCP Daemon to orchestrate and control N-number devices under test. Since the Daemon is simply a long lived node process with all the same capabilies as the MCP server it is able to handle and reproduce the same interactions it took when an AI Agent was driving it. This architecture also enables multi-device features like [critical section](critical-section.md).
+With Android in mind, JUnitRunner uses the MCP Daemon to orchestrate and control N devices under test. The daemon is a long-lived Node process with the same MCP capabilities, so it can replay the same interactions an AI agent would run. This architecture also enables multi-device features like [critical section](critical-section.md).
 
 ```mermaid
 stateDiagram-v2

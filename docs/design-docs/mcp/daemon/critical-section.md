@@ -2,11 +2,11 @@
 
 ## Overview
 
-The `criticalSection` tool provides multi-device synchronization for serialized execution of steps. It implements a barrier synchronization pattern where all devices must arrive at the critical section before any can proceed, and then executes steps one device at a time.
+The 🔒 [`criticalSection`](../tools/index.md) tool provides multi-device synchronization for serialized execution of steps. It implements a barrier synchronization pattern where all devices must arrive at the critical section before any can proceed, and then executes steps one device at a time.
 
 ## Availability
 
-The `criticalSection` tool is available only when the AutoMobile as an [MCP Daemon](index.md). It is not registered in standalone MCP mode.
+The 🔒 `criticalSection` tool is available only when AutoMobile runs as an [MCP Daemon](index.md). It is not registered in standalone MCP mode.
 
 ## Use Cases
 
@@ -100,14 +100,14 @@ steps:
   - tool: criticalSection
     steps:
       - tool: tapOn
-          device: A
-          text: Edit Profile
+        device: A
+        text: Edit Profile
       - tool: tapOn
-          device: A
-          text: Status
+        device: A
+        text: Status
       - tool: inputText
-          device: A
-          text: Pretty awesome
+        device: A
+        text: Pretty awesome
       - tool: tapOn
         device: A
         text: Clear Status
@@ -116,14 +116,12 @@ steps:
         await:
           - text: No Status
       - tool: tapOn
-        params:
-          device: A
-          text: Save profile
+        device: A
+        text: Save profile
       - tool: observe
-        params:
-          device: B
-          await:
-            - text: Pretty awesome
+        device: B
+        await:
+          - text: Pretty awesome
 ```
 
 ## Error Handling

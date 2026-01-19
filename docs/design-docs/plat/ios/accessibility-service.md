@@ -57,4 +57,4 @@ Server to client response:
 ## See also
 
 - [XCTestService](xctestrunner.md) - Touch injection via native XCUITest APIs.
-- [MCP actions](../../mcp/tools.md)
+- [MCP tool reference](../../mcp/tools/index.md)

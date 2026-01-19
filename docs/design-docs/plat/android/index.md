@@ -1,9 +1,9 @@
 # Overview
 
-AutoMobile has a lot of custom tooling, libraries, and various communication protocols
+AutoMobile's Android stack spans the MCP server, daemon, IDE plugin, JUnitRunner, and device-side services.
 
 ```mermaid
-graph TB
+flowchart TB
     subgraph "AI Agents"
         Agent[AI Agent<br/>Claude, GPT, etc.]
     end
@@ -29,7 +29,7 @@ graph TB
     MCP -->|Manages| Daemon
     MCP -->|ADB Commands| Device1
     MCP -->|ADB Commands| Device2
-    JUnit -->|MCP Tools| MCP
+    JUnit -->|MCP tools| MCP
     Daemon -->|Allocates| Device1
     Daemon -->|Allocates| Device2
     Device1 -->|WebSocket/File| AccessService
@@ -43,43 +43,31 @@ graph TB
     style Daemon fill:#7ED321,color:#000
 ```
 
-#### MCP Server
+## MCP Server
 
 The [MCP server](../../mcp/index.md) implements the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
 It has [observation](../../mcp/observe/index.md) built into its [interaction loop](../../mcp/interaction-loop.md)
-that is fast. This is supported with UI stability checks (gfxinfo-based on Android) to determine idling. Together, that
-allows for accurate and precise exploration that gets better as more capabilities and heuristics are added.
+with UI stability checks (gfxinfo-based on Android). Together, that enables fast, precise exploration.
 
-#### Test Execution
+## Test Execution
 
-The Android JUnitRunner is responsible for executing AutoMobile tests on Android devices and emulators. It extends the
-standard Android testing framework to provide enhanced capabilities including intelligent test execution, detailed
-reporting, and integration with the MCP server's device management features. The runner is designed to eventually
-support agentic self-healing capabilities, allowing tests to automatically adapt and recover from common failure
-scenarios by leveraging AI-driven analysis of test failures and UI changes.
+The Android JUnitRunner executes AutoMobile tests on devices and emulators. It extends the standard
+Android testing framework with richer reporting and tighter MCP integration, with a long-term goal of
+self-healing test flows.
 
-#### Pooled Device Management
+## Pooled Device Management
 
-Multi-device support with emulator control and app lifecycle management. As long as you have available adb connections,
-AutoMobile can automatically track which one its using for which execution plan or MCP session. CI still needs available
-device connections, but AutoMobile handles selection and readiness checks. During STDIO MCP sessions the tool call `setActiveDevice` will be done and kept for the duration of your session.
+Multi-device support includes emulator control and app lifecycle management. As long as you have available ADB
+connections, AutoMobile tracks which device is used for each execution plan or MCP session. CI still needs available
+device connections, but AutoMobile handles selection and readiness checks. During STDIO MCP sessions,
+🔧 [`setActiveDevice`](../../mcp/tools/index.md) is set once and reused for the session.
 
-#### Android Accessibility Service
+## Android Accessibility Service
 
-The Android Accessibility Service provides real-time access to view hierarchy data and user interface elements without
-requiring device rooting or special permissions beyond accessibility service enablement. This service acts as a bridge
-between the Android system's accessibility framework and AutoMobile's automation capabilities. When enabled, the
-accessibility service continuously monitors UI changes and provides detailed information about view hierarchies. It
-writes the latest hierarchy to app-private storage and can stream updates over WebSocket for AutoMobile to consume.
+The Android Accessibility Service provides real-time access to view hierarchy data and UI elements without
+rooting or special permissions beyond accessibility enablement. When enabled, it monitors UI changes,
+stores the latest hierarchy in app-private storage, and streams updates over WebSocket.
 
-#### Batteries Included
+## Batteries Included
 
-AutoMobile comes with extensive functionality to minimize and streamline setup of required platform tools.
-
-## Components 
-
-#### MCP Server
-
-The Model Context Protocol ([MCP](https://modelcontextprotocol.io/introduction)) server is the core component of AutoMobile, built with Bun and TypeScript using the
-MCP TypeScript SDK. It serves as both a server for AI agents to interact with Android devices and a command-line
-interface for direct usage. You can read more about its setup and system design in our [MCP server docs](../../mcp/index.md)
+AutoMobile includes tooling to minimize setup for required platform dependencies.

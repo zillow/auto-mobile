@@ -29,7 +29,7 @@ Once a bug is reproduced, you can create an [automated test](ui-tests.md).
 
 ### Automate Reproduction Steps
 
-Convert your bug reproduction steps into an automated test using [executePlan](../design-docs/mcp/tools.md#testing-debugging):
+Convert your bug reproduction steps into an automated test using [executePlan](../design-docs/mcp/tools/index.md#testing-debugging):
 
 ```javascript
 await executePlan({
