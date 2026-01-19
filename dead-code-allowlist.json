@@ -1,0 +1,28 @@
+{
+  "ignorePaths": [
+    "src/db/index.ts",
+    "src/features/accessibility/index.ts",
+    "src/features/action/Fling.ts",
+    "src/features/action/SwipeOnBounds.ts",
+    "src/features/action/SwipeOnScreen.ts",
+    "src/features/action/UninstallApp.ts",
+    "src/features/utility/index.ts",
+    "src/models/index.ts",
+    "src/utils/factories/DeviceSessionManagerFactory.ts",
+    "src/utils/hostControlClient.ts",
+    "src/utils/interfaces/PlanExecutor.ts",
+    "src/utils/interfaces/PlanSerializer.ts",
+    "src/utils/interfaces/index.ts",
+    "src/utils/plan/index.ts",
+    "src/utils/screenshot/index.ts",
+    "src/utils/screenshot-utils.ts"
+  ],
+  "ignorePathPatterns": [],
+  "ignoreEntries": [
+    {
+      "file": "src/features/action/UninstallApp.ts",
+      "name": "UninstallApp",
+      "reason": "TODO: planned usage in future PR"
+    }
+  ]
+}
