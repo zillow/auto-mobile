@@ -83,20 +83,23 @@ async function rebuildMigrationTable(
   const kept = availableMigrations.map(migration => migration.name).filter(name => executedSet.has(name));
 
   await ensureMigrationTableExists(db);
-  await db.deleteFrom(DEFAULT_MIGRATION_TABLE as any).execute();
 
-  if (kept.length > 0) {
-    const baseTimestamp = Date.now();
-    await db
-      .insertInto(DEFAULT_MIGRATION_TABLE as any)
-      .values(
-        kept.map((name, index) => ({
-          name,
-          timestamp: new Date(baseTimestamp + index).toISOString(),
-        }))
-      )
-      .execute();
-  }
+  await db.transaction().execute(async trx => {
+    await trx.deleteFrom(DEFAULT_MIGRATION_TABLE as any).execute();
+
+    if (kept.length > 0) {
+      const baseTimestamp = Date.now();
+      await trx
+        .insertInto(DEFAULT_MIGRATION_TABLE as any)
+        .values(
+          kept.map((name, index) => ({
+            name,
+            timestamp: new Date(baseTimestamp + index).toISOString(),
+          }))
+        )
+        .execute();
+    }
+  });
 
   return { pruned, kept };
 }
