@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src",
+    "test",
+    "scripts",
+    "build.ts"
+  ],
+  "exclude": [
+    "src/db/migrations"
+  ]
+}

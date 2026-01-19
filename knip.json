@@ -3,11 +3,13 @@
   "entry": [
     "src/index.ts",
     "src/**/*.test.ts",
+    "test/**/*.ts",
     "scripts/**/*.ts",
     "build.ts"
   ],
   "project": [
     "src/**/*.ts",
+    "test/**/*.ts",
     "scripts/**/*.ts",
     "build.ts"
   ],
@@ -15,6 +17,7 @@
     "dist/**",
     "node_modules/**",
     "android/**",
+    "src/db/migrations/**",
     "**/*.d.ts"
   ],
   "ignoreDependencies": [],
@@ -22,6 +25,6 @@
   "ignoreExportsUsedInFile": true,
   "includeEntryExports": false,
   "typescript": {
-    "config": "tsconfig.json"
+    "config": "tsconfig.dead-code.json"
   }
 }

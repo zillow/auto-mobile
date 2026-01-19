@@ -74,7 +74,7 @@ echo "📦 Running ts-prune..."
 
 # Run ts-prune (it exits with non-zero when issues found, that's okay)
 set +e  # Temporarily disable exit on error
-npx ts-prune --error > "$TS_PRUNE_OUTPUT" 2>&1
+npx ts-prune --error --project tsconfig.dead-code.json > "$TS_PRUNE_OUTPUT" 2>&1
 TS_PRUNE_EXIT=$?
 set -e  # Re-enable exit on error
 
@@ -231,8 +231,71 @@ fi
 echo ""
 
 # ============================================================================
+# Filter allowlisted issues and bash-referenced TypeScript files
+# ============================================================================
+ALLOWLIST_FILE="dead-code-allowlist.json"
+ALLOWLIST_JSON="{}"
+if [ -f "$ALLOWLIST_FILE" ]; then
+    ALLOWLIST_JSON=$(cat "$ALLOWLIST_FILE")
+fi
+
+BASH_USED_PATHS="$TEMP_DIR/bash-used-paths.txt"
+: > "$BASH_USED_PATHS"
+if command -v rg &> /dev/null; then
+    SHELL_FILES=$(rg --files -g "*.sh" .)
+    if [ -n "$SHELL_FILES" ]; then
+        while IFS= read -r file; do
+            rg -o "(src|scripts|test)/[A-Za-z0-9_./-]+\\.tsx?|build\\.ts" "$file" >> "$BASH_USED_PATHS" || true
+        done <<< "$SHELL_FILES"
+    fi
+fi
+
+PACKAGE_SCRIPTS_MAP="$TEMP_DIR/package-scripts.tsv"
+if [ -f "package.json" ]; then
+    jq -r '.scripts | to_entries[] | "\(.key)\t\(.value)"' package.json > "$PACKAGE_SCRIPTS_MAP"
+fi
+
+SHELL_INVOKED_SCRIPTS="$TEMP_DIR/shell-invoked-scripts.txt"
+: > "$SHELL_INVOKED_SCRIPTS"
+if [ -n "${SHELL_FILES:-}" ]; then
+    while IFS= read -r file; do
+        rg -o "\\b(bun|npm|pnpm)\\s+run\\s+[A-Za-z0-9:_-]+" "$file" | awk '{print $NF}' >> "$SHELL_INVOKED_SCRIPTS" || true
+        rg -o "\\byarn\\s+run\\s+[A-Za-z0-9:_-]+" "$file" | awk '{print $3}' >> "$SHELL_INVOKED_SCRIPTS" || true
+        rg -o "\\byarn\\s+[A-Za-z0-9:_-]+" "$file" | awk '{print $2}' >> "$SHELL_INVOKED_SCRIPTS" || true
+    done <<< "$SHELL_FILES"
+fi
+sort -u "$SHELL_INVOKED_SCRIPTS" -o "$SHELL_INVOKED_SCRIPTS"
+
+if [ -s "$PACKAGE_SCRIPTS_MAP" ] && [ -s "$SHELL_INVOKED_SCRIPTS" ]; then
+    while IFS= read -r script_name; do
+        script_cmd=$(awk -F '\t' -v script="$script_name" '$1 == script {print $2}' "$PACKAGE_SCRIPTS_MAP")
+        if [ -n "$script_cmd" ]; then
+            printf "%s\n" "$script_cmd" | rg -o "(src|scripts|test)/[A-Za-z0-9_./-]+\\.tsx?|build\\.ts" >> "$BASH_USED_PATHS" || true
+        fi
+    done < "$SHELL_INVOKED_SCRIPTS"
+fi
+
+sort -u "$BASH_USED_PATHS" -o "$BASH_USED_PATHS"
+BASH_USED_JSON=$(jq -R -s 'split("\n") | map(select(length > 0))' "$BASH_USED_PATHS")
+
+jq --argjson allow "$ALLOWLIST_JSON" --argjson bashUsed "$BASH_USED_JSON" '
+  ($allow.ignorePaths // []) as $ignorePaths
+  | ($allow.ignorePathPatterns // []) as $ignorePathPatterns
+  | ($allow.ignoreEntries // []) as $ignoreEntries
+  | ($ignorePaths + $bashUsed | unique) as $ignorePaths
+  | map(
+      . as $issue
+      | ($ignorePaths | index($issue.file)) as $pathIndex
+      | ($ignorePathPatterns | map($issue.file | test(.)) | any) as $patternMatch
+      | ($ignoreEntries | map(select(.file == $issue.file and (.name == null or .name == $issue.name))) | length) as $entryMatch
+      | select($pathIndex == null and ($patternMatch | not) and $entryMatch == 0)
+    )
+' "$ISSUES_JSON" > "$TEMP_DIR/issues.filtered.json" && mv "$TEMP_DIR/issues.filtered.json" "$ISSUES_JSON"
+
+# ============================================================================
 # Generate report
 # ============================================================================
+
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
 TOTAL_ISSUES=$(jq 'length' "$ISSUES_JSON")
 
