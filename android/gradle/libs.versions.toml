@@ -14,7 +14,6 @@ build-android-agp = "9.0.0"
 build-kotlin = "2.3.0"
 build-kotlin-language = "2.0"              # Used in all Kotlin modules
 build-kotlin-coroutines = "1.10.2"
-build-kotlin-datetime = "0.7.1"
 
 # Java versions
 build-java-target = "21"                   # Used in root build.gradle.kts and playground
@@ -87,7 +86,6 @@ koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog-agents" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines-test" }
 kotlinx-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "build-kotlin-coroutines" }
-kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "build-kotlin-datetime" }
 kotlinx-serialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
@@ -154,7 +152,7 @@ okhttp-sse = { module = "com.squareup.okhttp3:okhttp-sse", version.ref = "okhttp
 
 # Libraries can be bundled together for easier import
 [bundles]
-kotlinx-ecosystem = ["kotlinx-datetime", "kotlinx-serialization", "kotlinx-coroutines"]
+kotlinx-ecosystem = ["kotlinx-serialization", "kotlinx-coroutines"]
 compose-ui = [
   "androidx-activity-compose",
   "compose-ui-core",
