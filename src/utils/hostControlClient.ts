@@ -303,6 +303,20 @@ export async function runXcodebuild(
   return sendCommand("xcodebuild", { args });
 }
 
+export async function runXcodebuildExec(
+  args: string[]
+): Promise<HostControlResult<ReturnType<typeof createExecResult>>> {
+  const result = await runXcodebuild(args);
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "xcodebuild failed" };
+  }
+
+  return {
+    success: true,
+    data: createExecResult(result.data.stdout, result.data.stderr)
+  };
+}
+
 export async function startXCTestService(params: {
   deviceId: string;
   port: number;

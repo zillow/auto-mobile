@@ -5,6 +5,7 @@ import { createHash, X509Certificate } from "crypto";
 import { Parser } from "xml2js";
 import type { ExecResult } from "../../models";
 import { logger } from "../logger";
+import { Xcodebuild, XcodebuildClient } from "./XcodebuildClient";
 
 export type SigningStyle = "automatic" | "manual";
 
@@ -52,6 +53,7 @@ export interface SigningResolution {
 export interface XcodeSigningDependencies {
   platform: () => NodeJS.Platform;
   exec: (command: string) => Promise<ExecResult>;
+  xcodebuild: Xcodebuild;
   readDir: (path: string) => Promise<string[]>;
   readFile: (path: string) => Promise<string>;
   stat: (path: string) => Promise<{ isFile: () => boolean }>;
@@ -89,6 +91,7 @@ const createDefaultDependencies = (): XcodeSigningDependencies => ({
       includes(searchString: string) { return stdout.includes(searchString); }
     };
   },
+  xcodebuild: new XcodebuildClient(),
   readDir: async path => fs.readdir(path),
   readFile: async path => fs.readFile(path, "utf-8"),
   stat: async path => fs.stat(path),
@@ -327,13 +330,19 @@ export class XcodeSigningManager {
   }
 
   public async detectTeamIdsFromXcode(): Promise<string[]> {
-    if (this.dependencies.platform() !== "darwin") {
-      return [];
-    }
     const projectPath = join(process.cwd(), "ios", "XCTestService", "XCTestService.xcodeproj");
-    const command = `xcodebuild -showBuildSettings -project ${quoteShell(projectPath)} -scheme XCTestServiceApp`;
     try {
-      const result = await this.dependencies.exec(command);
+      if (this.dependencies.platform() !== "darwin") {
+        const available = await this.dependencies.xcodebuild.isAvailable();
+        if (!available) {
+          return [];
+        }
+      }
+
+      const result = await this.dependencies.xcodebuild.executeCommand(
+        ["-showBuildSettings", "-project", projectPath, "-scheme", "XCTestServiceApp"],
+        { timeoutMs: 30000, maxBuffer: 10 * 1024 * 1024 }
+      );
       const teams = new Set<string>();
       for (const line of result.stdout.split("\n")) {
         const match = line.match(/DEVELOPMENT_TEAM\s*=\s*([A-Z0-9]+)/);
