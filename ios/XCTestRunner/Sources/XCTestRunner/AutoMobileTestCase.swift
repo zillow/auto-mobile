@@ -225,48 +225,20 @@ open class AutoMobileTestCase: XCTestCase {
             return
         }
 
-        let timeoutSeconds: TimeInterval = 5
-        let client = try makeMcpClient()
-        do {
-            try client.initialize(timeout: timeoutSeconds)
-        } catch {
-            throw AutoMobileTestCaseError.devicePoolUnavailable(
-                "Failed to initialize MCP client: \(error.localizedDescription)"
-            )
-        }
-
-        let response: MCPResourceResponse
-        do {
-            response = try client.readResource(uri: "automobile:devices/booted/ios", timeout: timeoutSeconds)
-        } catch {
-            throw AutoMobileTestCaseError.devicePoolUnavailable(
-                "Failed to read booted device resource: \(error.localizedDescription)"
-            )
-        }
-
-        guard let data = response.text.data(using: .utf8) else {
-            throw AutoMobileTestCaseError.devicePoolUnavailable("Invalid device pool response.")
-        }
-
-        if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []),
-           let object = jsonObject as? [String: Any],
-           let error = object["error"] as? String,
-           !error.isEmpty {
-            throw AutoMobileTestCaseError.devicePoolUnavailable(error)
-        }
-
-        let decoder = JSONDecoder()
-        let resource: BootedDevicesResource
-        do {
-            resource = try decoder.decode(BootedDevicesResource.self, from: data)
-        } catch {
-            throw AutoMobileTestCaseError.devicePoolUnavailable(
-                "Failed to parse booted device resource: \(error.localizedDescription)"
-            )
-        }
-        let devices = resource.devices
         let bootedSimulatorDetected = hasBootedSimulator()
+        let usesDaemonSocket = isDaemonSocketTransport()
 
+        var resource = try fetchBootedDevicesResource(
+            timeoutSeconds: 5,
+            allowDaemonStart: usesDaemonSocket
+        )
+
+        if usesDaemonSocket && resource.devices.contains(where: { $0.poolStatus == nil }) {
+            try startDaemon()
+            resource = try fetchBootedDevicesResource(timeoutSeconds: 5, allowDaemonStart: false)
+        }
+
+        let devices = resource.devices
         if bootedSimulatorDetected && devices.isEmpty {
             throw AutoMobileTestCaseError.devicePoolUnavailable(
                 "Booted iOS simulator detected, but no booted iOS devices reported by the daemon."
@@ -307,6 +279,95 @@ open class AutoMobileTestCase: XCTestCase {
             return try StreamableHTTPMCPClient(endpoint: endpointURL)
         }
         return AutoMobileDaemonClient(socketPath: daemonSocketPath)
+    }
+
+    private func isDaemonSocketTransport() -> Bool {
+        return environment.firstNonEmpty([
+            "AUTOMOBILE_MCP_URL",
+            "AUTOMOBILE_MCP_HTTP_URL",
+            "MCP_ENDPOINT"
+        ]) == nil
+    }
+
+    private func fetchBootedDevicesResource(
+        timeoutSeconds: TimeInterval,
+        allowDaemonStart: Bool
+    ) throws -> BootedDevicesResource {
+        let client = try makeMcpClient()
+
+        do {
+            try client.initialize(timeout: timeoutSeconds)
+        } catch {
+            if allowDaemonStart {
+                try startDaemon()
+                return try fetchBootedDevicesResource(timeoutSeconds: timeoutSeconds, allowDaemonStart: false)
+            }
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to initialize MCP client: \(error.localizedDescription)"
+            )
+        }
+
+        let response: MCPResourceResponse
+        do {
+            response = try client.readResource(uri: "automobile:devices/booted/ios", timeout: timeoutSeconds)
+        } catch {
+            if allowDaemonStart {
+                try startDaemon()
+                return try fetchBootedDevicesResource(timeoutSeconds: timeoutSeconds, allowDaemonStart: false)
+            }
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to read booted device resource: \(error.localizedDescription)"
+            )
+        }
+
+        guard let data = response.text.data(using: .utf8) else {
+            throw AutoMobileTestCaseError.devicePoolUnavailable("Invalid device pool response.")
+        }
+
+        if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []),
+           let object = jsonObject as? [String: Any],
+           let error = object["error"] as? String,
+           !error.isEmpty {
+            throw AutoMobileTestCaseError.devicePoolUnavailable(error)
+        }
+
+        let decoder = JSONDecoder()
+        do {
+            return try decoder.decode(BootedDevicesResource.self, from: data)
+        } catch {
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to parse booted device resource: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func startDaemon() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["auto-mobile", "--daemon", "start"]
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
+        do {
+            try process.run()
+        } catch {
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to start daemon: \(error.localizedDescription)"
+            )
+        }
+
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let stderr = String(data: errorData, encoding: .utf8) ?? ""
+            let message = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to start daemon: \(message.isEmpty ? "exit code \(process.terminationStatus)" : message)"
+            )
+        }
     }
 
     internal func hasBootedSimulator() -> Bool {

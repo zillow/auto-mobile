@@ -21,6 +21,9 @@ way to execute AutoMobile plans within XCTest and collect timing data for optimi
 Environment variables and test scheme settings configure how the runner connects to MCP, loads plans,
 and orders tests.
 
+When using the daemon socket transport, the runner will attempt to start the AutoMobile daemon if it
+is not detected.
+
 ### Environment variables
 
 Primary:

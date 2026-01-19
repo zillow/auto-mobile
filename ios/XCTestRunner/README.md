@@ -150,6 +150,9 @@ xcodebuild -scheme XCTestRunner -destination 'platform=iOS Simulator,name=iPhone
 4. Configure test scheme with environment variables
 5. Run tests via Xcode Test Navigator or xcodebuild
 
+When using the daemon socket transport (default), XCTestRunner will attempt to start the AutoMobile
+daemon automatically if it cannot connect.
+
 ## Example XCTest Target (Reminders)
 
 Plan fixtures live in `ios/XCTestRunner/Sources/XCTestRunnerTests/Resources/Plans`:
