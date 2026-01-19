@@ -87,7 +87,6 @@ Primary:
 - `AUTOMOBILE_CI_MODE`: Marks runs as CI for metadata and timing fetch behavior.
 - `AUTOMOBILE_APP_VERSION`: App version metadata passed to MCP.
 - `AUTOMOBILE_GIT_COMMIT`: Git commit metadata passed to MCP.
-- `AUTOMOBILE_INTEGRATION_TESTS`: Set to `1` to enable MCP integration tests.
 
 Legacy (still supported):
 - `AUTO_MOBILE_DAEMON_SOCKET_PATH`
@@ -180,7 +179,6 @@ and compiles as part of the `XCTestRunnerTests` target.
 Integration test (opt-in, requires MCP + iOS simulator running):
 
 ```bash
-AUTOMOBILE_INTEGRATION_TESTS=1 \
 AUTOMOBILE_DAEMON_SOCKET_PATH=/tmp/auto-mobile-daemon-$UID.sock \
 swift test --filter RemindersLaunchPlanTests
 ```

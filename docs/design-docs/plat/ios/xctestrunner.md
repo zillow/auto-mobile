@@ -34,7 +34,6 @@ Primary:
 - `AUTOMOBILE_CI_MODE`: Marks runs as CI for metadata and disables timing fetch in CI.
 - `AUTOMOBILE_APP_VERSION`: Metadata for plan execution.
 - `AUTOMOBILE_GIT_COMMIT`: Metadata for plan execution.
-- `AUTOMOBILE_INTEGRATION_TESTS`: Set to `1` to run sample integration tests.
 
 Legacy (still supported):
 - `AUTO_MOBILE_DAEMON_SOCKET_PATH`

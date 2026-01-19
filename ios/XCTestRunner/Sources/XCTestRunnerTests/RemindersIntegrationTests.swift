@@ -3,9 +3,11 @@ import XCTest
 
 class RemindersIntegrationBase: AutoMobileTestCase {
     override func setUpAutoMobile() throws {
-        let enabled = ProcessInfo.processInfo.environment["AUTOMOBILE_INTEGRATION_TESTS"]
-        guard enabled == "1" else {
-            throw XCTSkip("Set AUTOMOBILE_INTEGRATION_TESTS=1 to run MCP integration tests.")
+        let environment = ProcessInfo.processInfo.environment
+        let simulatorDetected = environment["SIMULATOR_UDID"] != nil
+            || environment["SIMULATOR_DEVICE_NAME"] != nil
+        guard simulatorDetected else {
+            throw XCTSkip("iOS Simulator not detected; skipping Reminders integration tests.")
         }
     }
 }
