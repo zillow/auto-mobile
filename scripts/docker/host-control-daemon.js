@@ -96,6 +96,17 @@ const runningEmulators = new Map(); // avdName -> { pid, process }
 const runningSimulators = new Map(); // udid -> { name, state }
 const runningXCTestServices = new Map(); // deviceId -> { pid, process, port, startedAt, deviceId }
 
+function drainChildOutput(child) {
+  if (child.stdout) {
+    child.stdout.on("data", () => {});
+    child.stdout.resume();
+  }
+  if (child.stderr) {
+    child.stderr.on("data", () => {});
+    child.stderr.resume();
+  }
+}
+
 function isProcessRunning(pid) {
   try {
     process.kill(pid, 0);
@@ -557,6 +568,8 @@ const handlers = {
       if (!child.pid) {
         return { success: false, error: "Failed to start xcodebuild (no PID)" };
       }
+
+      drainChildOutput(child);
 
       const entry = { pid: child.pid, process: child, port, startedAt: Date.now(), deviceId };
       runningXCTestServices.set(deviceId, entry);
