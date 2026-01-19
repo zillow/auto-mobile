@@ -8,6 +8,15 @@ import { PortManager } from "./PortManager";
 import { DefaultProcessExecutor, type ProcessExecutor } from "./ProcessExecutor";
 import { XcodeSigningManager } from "./ios-cmdline-tools/XcodeSigning";
 import { DeviceAppInspector } from "./ios-cmdline-tools/DeviceAppInspector";
+import { isRunningInDocker } from "./dockerEnv";
+import {
+  getHostControlHost,
+  getXCTestServiceStatus,
+  isHostControlAvailable,
+  shouldUseHostControl,
+  startXCTestService,
+  stopXCTestService
+} from "./hostControlClient";
 
 /**
  * Result of XCTestService setup
@@ -33,6 +42,26 @@ export interface XCTestServiceManager {
   getServicePort(): number;
 }
 
+interface HostControlXCTestServiceRunner {
+  shouldUseHostControl(): boolean;
+  isRunningInDocker(): boolean;
+  isAvailable(): Promise<boolean>;
+  getHost(): string;
+  start(params: {
+    deviceId: string;
+    port: number;
+    xctestrunPath?: string;
+    bundleId?: string;
+    timeoutSeconds?: number;
+  }): Promise<{ success: boolean; error?: string; data?: { pid: number; message: string } }>;
+  stop(params: { deviceId?: string; pid?: number }): Promise<{ success: boolean; error?: string }>;
+  status(params: {
+    deviceId?: string;
+    pid?: number;
+    port?: number;
+  }): Promise<{ success: boolean; error?: string; data?: { running: boolean; pid?: number } }>;
+}
+
 /**
  * Capabilities of the iOS device for XCTestService
  */
@@ -55,6 +84,8 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private readonly processExecutor: ProcessExecutor;
   private readonly signingManager: XcodeSigningManager;
   private readonly appInspector: DeviceAppInspector;
+  private readonly hostControl: HostControlXCTestServiceRunner;
+  private hostControlAvailability: Promise<boolean> | null = null;
 
   // Singleton instances per device
   private static instances: Map<string, IOSXCTestServiceManager> = new Map();
@@ -100,7 +131,8 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     builder?: XCTestServiceBuilder,
     processExecutor: ProcessExecutor = new DefaultProcessExecutor(),
     signingManager: XcodeSigningManager = new XcodeSigningManager(),
-    appInspector: DeviceAppInspector = new DeviceAppInspector()
+    appInspector: DeviceAppInspector = new DeviceAppInspector(),
+    hostControlRunner?: HostControlXCTestServiceRunner
   ) {
     this.device = device;
     this.timer = timer;
@@ -109,6 +141,15 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     this.processExecutor = processExecutor;
     this.signingManager = signingManager;
     this.appInspector = appInspector;
+    this.hostControl = hostControlRunner || {
+      shouldUseHostControl,
+      isRunningInDocker,
+      isAvailable: () => isHostControlAvailable(),
+      getHost: () => getHostControlHost(),
+      start: params => startXCTestService(params),
+      stop: params => stopXCTestService(params),
+      status: params => getXCTestServiceStatus(params)
+    };
   }
 
   /**
@@ -140,9 +181,18 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     builder: XCTestServiceBuilder | undefined,
     processExecutor: ProcessExecutor,
     signingManager?: XcodeSigningManager,
-    appInspector?: DeviceAppInspector
+    appInspector?: DeviceAppInspector,
+    hostControlRunner?: HostControlXCTestServiceRunner
   ): IOSXCTestServiceManager {
-    return new IOSXCTestServiceManager(device, timer, builder, processExecutor, signingManager, appInspector);
+    return new IOSXCTestServiceManager(
+      device,
+      timer,
+      builder,
+      processExecutor,
+      signingManager,
+      appInspector,
+      hostControlRunner
+    );
   }
 
   /**
@@ -329,6 +379,25 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     logger.info("[XCTestServiceManager] Stopping XCTestService");
     this.isStopping = true;
 
+    if (this.useHostControl()) {
+      try {
+        if (this.xcTestProcessId) {
+          await this.hostControl.stop({ deviceId: this.device.deviceId, pid: this.xcTestProcessId });
+        }
+      } catch (error) {
+        logger.warn(`[XCTestServiceManager] Host control stop failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      this.xcTestProcessId = null;
+      this.xcTestProcess = null;
+      this.stopProcessMonitoring();
+      this.clearCaches();
+      PortManager.release(this.device.deviceId);
+      this.isStopping = false;
+      logger.info("[XCTestServiceManager] Service stopped");
+      return;
+    }
+
     // Stop process monitoring first
     this.stopProcessMonitoring();
 
@@ -401,7 +470,9 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       }
 
       // Check if build is needed
-      const needsBuild = await perf.track("checkBuild", () => this.builder.needsRebuild(this.isSimulator() ? "simulator" : "device"));
+      const needsBuild = this.useHostControl()
+        ? false
+        : await perf.track("checkBuild", () => this.builder.needsRebuild(this.isSimulator() ? "simulator" : "device"));
 
       let buildResult: XCTestServiceBuildResult | null = null;
       if (needsBuild) {
@@ -465,8 +536,40 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     return uuidPattern.test(this.device.deviceId);
   }
 
+  private useHostControl(): boolean {
+    return this.hostControl.shouldUseHostControl() && this.hostControl.isRunningInDocker();
+  }
+
+  private async isHostControlAvailable(): Promise<boolean> {
+    if (!this.hostControlAvailability) {
+      this.hostControlAvailability = this.hostControl.isAvailable();
+    }
+    return this.hostControlAvailability;
+  }
+
   private async startOnSimulator(): Promise<void> {
     logger.info("[XCTestServiceManager] Starting XCTestService on simulator");
+
+    if (this.useHostControl()) {
+      if (!await this.isHostControlAvailable()) {
+        throw new Error("Host control daemon not available for XCTestService startup");
+      }
+
+      const xctestrunPath = await this.builder.getXctestrunPath("simulator");
+      const result = await this.hostControl.start({
+        deviceId: this.device.deviceId,
+        port: this.servicePort,
+        xctestrunPath: xctestrunPath || undefined
+      });
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Host control failed to start XCTestService");
+      }
+
+      this.xcTestProcessId = result.data.pid;
+      this.xcTestProcess = null;
+      return;
+    }
 
     // Try to get xctestrun path for faster test-without-building
     const xctestrunPath = await this.builder.getXctestrunPath("simulator");
@@ -596,6 +699,10 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private async startOnDevice(): Promise<void> {
     logger.info("[XCTestServiceManager] Starting XCTestService on physical device");
 
+    if (this.useHostControl()) {
+      throw new Error("Host control XCTestService for physical devices is not supported yet.");
+    }
+
     // For physical devices, we need to use iproxy for port forwarding
     // and run the XCUITest via xcodebuild with device destination
     const xctestrunPath = await this.builder.getXctestrunPath("device");
@@ -685,9 +792,24 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
 
   private async checkHealthEndpoint(): Promise<boolean> {
     try {
-      // Use curl to check the health endpoint
+      const host = this.useHostControl() ? this.hostControl.getHost() : "localhost";
+      if (this.useHostControl()) {
+        const controller = new AbortController();
+        const timeoutId = this.timer.setTimeout(() => controller.abort(), 2000);
+        try {
+          const response = await fetch(`http://${host}:${this.servicePort}/health`, {
+            signal: controller.signal
+          });
+          const body = await response.text();
+          return body.includes("ok") || body.includes("healthy");
+        } finally {
+          this.timer.clearTimeout(timeoutId);
+        }
+      }
+
+      // Use curl to check the health endpoint locally
       const { stdout } = await this.processExecutor.exec(
-        `curl -s --max-time 2 http://localhost:${this.servicePort}/health`
+        `curl -s --max-time 2 http://${host}:${this.servicePort}/health`
       );
       return stdout.includes("ok") || stdout.includes("healthy");
     } catch {

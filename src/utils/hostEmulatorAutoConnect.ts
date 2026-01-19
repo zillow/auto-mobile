@@ -15,6 +15,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { logger } from "./logger";
+import { isRunningInDocker } from "./dockerEnv";
 
 const execFileAsync = promisify(execFile);
 
@@ -209,24 +210,6 @@ async function scanAndConnect(): Promise<void> {
     logger.debug(`Scan error: ${error}`);
   } finally {
     isScanning = false;
-  }
-}
-
-/**
- * Check if running in a Docker container
- */
-function isRunningInDocker(): boolean {
-  try {
-    const fs = require("fs");
-    // Check for Docker-specific files
-    if (fs.existsSync("/.dockerenv")) {
-      return true;
-    }
-    // Check cgroup for docker
-    const cgroup = fs.readFileSync("/proc/1/cgroup", "utf8");
-    return cgroup.includes("docker") || cgroup.includes("containerd");
-  } catch {
-    return false;
   }
 }
 

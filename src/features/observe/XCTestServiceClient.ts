@@ -10,6 +10,8 @@ import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/Performa
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { RequestManager } from "../../utils/RequestManager";
 import { PortManager } from "../../utils/PortManager";
+import { shouldUseHostControl, getHostControlHost } from "../../utils/hostControlClient";
+import { isRunningInDocker } from "../../utils/dockerEnv";
 import { NavigationGraphManager } from "../navigation/NavigationGraphManager";
 import {
   HierarchyNavigationDetector,
@@ -428,6 +430,13 @@ export class XCTestServiceClient implements XCTestService {
     return this.connectWebSocket(perf ?? new NoOpPerformanceTracker());
   }
 
+  private resolveWebSocketHost(): string {
+    if (shouldUseHostControl() && isRunningInDocker()) {
+      return getHostControlHost();
+    }
+    return "localhost";
+  }
+
   private async connectWebSocket(perf: PerformanceTracker): Promise<boolean> {
     if (this.isConnecting) {
       // Wait for current connection attempt
@@ -453,7 +462,8 @@ export class XCTestServiceClient implements XCTestService {
     try {
       // For iOS simulator, we connect directly to localhost
       // TODO: For real devices, may need port forwarding via iproxy
-      const wsUrl = `ws://localhost:${this.port}/ws`;
+      const wsHost = this.resolveWebSocketHost();
+      const wsUrl = `ws://${wsHost}:${this.port}/ws`;
       logger.info(`[XCTestServiceClient] Connecting to ${wsUrl}`);
 
       return await new Promise<boolean>(resolve => {
@@ -799,17 +809,21 @@ export class XCTestServiceClient implements XCTestService {
 
     const converted: Record<string, any> = {};
 
+    const contentDesc = this.readNodeField<string>(node, "contentDesc", "content-desc");
+    const resourceId = this.readNodeField<string>(node, "resourceId", "resource-id");
+    const testTag = this.readNodeField<string>(node, "testTag", "test-tag");
+
     if (node.text) {
       converted.text = node.text;
     }
-    if (node.contentDesc) {
-      converted["content-desc"] = node.contentDesc;
+    if (contentDesc) {
+      converted["content-desc"] = contentDesc;
     }
-    if (node.resourceId) {
-      converted["resource-id"] = node.resourceId;
+    if (resourceId) {
+      converted["resource-id"] = resourceId;
     }
-    if (node.testTag) {
-      converted["test-tag"] = node.testTag;
+    if (testTag) {
+      converted["test-tag"] = testTag;
     }
     if (node.className) {
       converted.className = node.className;
@@ -1085,10 +1099,19 @@ export class XCTestServiceClient implements XCTestService {
     const attrs: Record<string, string> = {};
 
     if (node.text) {attrs["text"] = node.text;}
-    if (node.contentDesc) {attrs["content-desc"] = node.contentDesc;}
-    if (node.resourceId) {attrs["resource-id"] = node.resourceId;}
+    const contentDesc = this.readNodeField<string>(node, "contentDesc", "content-desc");
+    const resourceId = this.readNodeField<string>(node, "resourceId", "resource-id");
+    const testTag = this.readNodeField<string>(node, "testTag", "test-tag");
+    const accessibilityFocused = this.readNodeField<string>(node, "accessibilityFocused", "accessibility-focused");
+    const longClickable = this.readNodeField<string>(node, "longClickable", "long-clickable");
+    const stateDescription = this.readNodeField<string>(node, "stateDescription", "state-description");
+    const errorMessage = this.readNodeField<string>(node, "errorMessage", "error-message");
+    const hintText = this.readNodeField<string>(node, "hintText", "hint-text");
+
+    if (contentDesc) {attrs["content-desc"] = contentDesc;}
+    if (resourceId) {attrs["resource-id"] = resourceId;}
     if (node.className) {attrs["class"] = node.className;}
-    if (node.testTag) {attrs["test-tag"] = node.testTag;}
+    if (testTag) {attrs["test-tag"] = testTag;}
     if (node.bounds) {
       attrs["bounds"] = `[${node.bounds.left},${node.bounds.top}][${node.bounds.right},${node.bounds.bottom}]`;
     }
@@ -1096,12 +1119,16 @@ export class XCTestServiceClient implements XCTestService {
     if (node.enabled) {attrs["enabled"] = node.enabled;}
     if (node.focusable) {attrs["focusable"] = node.focusable;}
     if (node.focused) {attrs["focused"] = node.focused;}
+    if (accessibilityFocused) {attrs["accessibility-focused"] = accessibilityFocused;}
     if (node.scrollable) {attrs["scrollable"] = node.scrollable;}
     if (node.password) {attrs["password"] = node.password;}
     if (node.checkable) {attrs["checkable"] = node.checkable;}
     if (node.checked) {attrs["checked"] = node.checked;}
     if (node.selected) {attrs["selected"] = node.selected;}
-    if (node.longClickable) {attrs["long-clickable"] = node.longClickable;}
+    if (longClickable) {attrs["long-clickable"] = longClickable;}
+    if (stateDescription) {attrs["state-description"] = stateDescription;}
+    if (errorMessage) {attrs["error-message"] = errorMessage;}
+    if (hintText) {attrs["hint-text"] = hintText;}
 
     const result: { $: Record<string, string>; node?: Array<{ $: Record<string, string> }> } = { $: attrs };
 
@@ -1111,6 +1138,17 @@ export class XCTestServiceClient implements XCTestService {
     }
 
     return result;
+  }
+
+  private readNodeField<T>(node: XCTestNode, camelKey: keyof XCTestNode, dashedKey?: string): T | undefined {
+    const record = node as Record<string, unknown>;
+    if (record[camelKey as string] !== undefined) {
+      return record[camelKey as string] as T;
+    }
+    if (dashedKey && record[dashedKey] !== undefined) {
+      return record[dashedKey] as T;
+    }
+    return undefined;
   }
 
   // MARK: - Gestures
