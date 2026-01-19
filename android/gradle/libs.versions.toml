@@ -26,7 +26,7 @@ build-gradle-sortDependencies = "0.14"
 # AndroidX versions
 androidx-core = "1.17.0"
 androidx-activity-compose = "1.12.2"
-androidx-compose-bom = "2025.12.01"
+androidx-compose-bom = "2026.01.00"
 androidx-lifecycle = "2.10.0"
 androidx-startup = "1.2.0"
 
