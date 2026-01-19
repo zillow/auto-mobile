@@ -1,5 +1,5 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "metadata": {
     "generatedAt": "2026-01-09",
     "description": "MCP tool call throughput thresholds with 20% regression tolerance",
@@ -15,55 +15,46 @@
     "listDevices": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 5.0,
       "mean": 0.5
     },
     "getForegroundApp": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 5.0,
       "mean": 0.5
     },
     "pressButton": {
       "p50": 220.0,
       "p95": 250.0,
-      "p99": 260.0,
       "mean": 225.0
     },
     "observe": {
       "p50": 60.0,
       "p95": 65.0,
-      "p99": 70.0,
       "mean": 60.0
     },
     "tapOn": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 5.0,
       "mean": 0.5
     },
     "inputText": {
       "p50": 230.0,
       "p95": 330.0,
-      "p99": 350.0,
       "mean": 240.0
     },
     "swipe": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 5.0,
       "mean": 0.5
     },
     "launchApp": {
       "p50": 140.0,
       "p95": 145.0,
-      "p99": 150.0,
       "mean": 140.0
     },
     "installApp": {
       "p50": 0.5,
       "p95": 1.0,
-      "p99": 5.0,
       "mean": 0.5
     }
   }

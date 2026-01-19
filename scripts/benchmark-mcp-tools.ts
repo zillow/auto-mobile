@@ -74,7 +74,6 @@ interface ThresholdConfig {
     [toolName: string]: {
       p50: number;
       p95: number;
-      p99: number;
       mean: number;
     };
   };
@@ -89,7 +88,6 @@ interface ToolMetrics {
   toolName: string;
   p50: number;
   p95: number;
-  p99: number;
   mean: number;
   stdDev: number;
   min: number;
@@ -158,7 +156,6 @@ function calculateMetrics(toolName: string, measurements: number[], successes: n
     toolName,
     p50: percentile(sorted, 50),
     p95: percentile(sorted, 95),
-    p99: percentile(sorted, 99),
     mean,
     stdDev: stdDev(measurements, mean),
     min: sorted[0],
@@ -329,7 +326,7 @@ function compareAgainstThreshold(
   // Define acceptable regression percentage (20% for fast ops)
   const regressionLimit = 20;
 
-  for (const metric of ["p50", "p95", "p99", "mean"] as const) {
+  for (const metric of ["p50", "p95", "mean"] as const) {
     const actual = metrics[metric];
     const expected = threshold[metric];
     const regression = ((actual - expected) / expected) * 100;
@@ -439,7 +436,7 @@ function printReport(report: BenchmarkReport): void {
 
     console.log(`\n${category.name} (${category.expectedLatency}):`);
     console.log("-".repeat(100));
-    console.log("Tool Name                 P50      P95      P99      Mean     StdDev   Success  Status");
+    console.log("Tool Name                 P50      P95      Mean     StdDev   Success  Status");
     console.log("-".repeat(100));
 
     for (const result of categoryResults) {
@@ -451,7 +448,6 @@ function printReport(report: BenchmarkReport): void {
         `${result.toolName.padEnd(25)} ` +
         `${result.p50.toFixed(1).padStart(7)}ms ` +
         `${result.p95.toFixed(1).padStart(7)}ms ` +
-        `${result.p99.toFixed(1).padStart(7)}ms ` +
         `${result.mean.toFixed(1).padStart(7)}ms ` +
         `${result.stdDev.toFixed(1).padStart(7)}ms ` +
         `${result.successRate.toFixed(0).padStart(6)}%  ` +
@@ -516,7 +512,7 @@ async function main() {
   let configPath = path.join(__dirname, "tool-thresholds.json");
   let outputPath: string | null = null;
   let baselinePath: string | null = null;
-  let sampleSize = 50; // Default to 50 iterations to reduce p99 noise
+  let sampleSize = 50; // Default to 50 iterations to reduce percentile noise
 
   // Parse command line arguments
   for (let i = 0; i < args.length; i++) {

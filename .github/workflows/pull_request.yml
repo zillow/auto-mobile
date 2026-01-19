@@ -1395,17 +1395,16 @@ jobs:
                 renderedAnyCategory = true;
 
                 body += `#### ${category.name} (${category.expectedLatency})\n\n`;
-                body += '| Tool | P50 | P95 | P99 | Mean | Success | Status |\n';
-                body += '|------|-----|-----|-----|------|---------|--------|\n';
+                body += '| Tool | P50 | P95 | Mean | Success | Status |\n';
+                body += '|------|-----|-----|------|---------|--------|\n';
 
                 for (const result of categoryResults) {
                   const status = result.overallPassed === false ? '❌' : '✅';
                   const p50 = typeof result.p50 === 'number' ? `${result.p50.toFixed(1)}ms` : 'n/a';
                   const p95 = typeof result.p95 === 'number' ? `${result.p95.toFixed(1)}ms` : 'n/a';
-                  const p99 = typeof result.p99 === 'number' ? `${result.p99.toFixed(1)}ms` : 'n/a';
                   const mean = typeof result.mean === 'number' ? `${result.mean.toFixed(1)}ms` : 'n/a';
                   const success = typeof result.successRate === 'number' ? `${result.successRate.toFixed(0)}%` : 'n/a';
-                  body += `| ${result.toolName} | ${p50} | ${p95} | ${p99} | ${mean} | ${success} | ${status} |\n`;
+                  body += `| ${result.toolName} | ${p50} | ${p95} | ${mean} | ${success} | ${status} |\n`;
 
                   if (Array.isArray(result.thresholdChecks) && result.overallPassed === false) {
                     for (const check of result.thresholdChecks.filter(c => !c.passed)) {
