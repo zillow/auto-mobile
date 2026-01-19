@@ -212,12 +212,12 @@
                 "description": "Tool name to execute"
               },
               "params": {
+                "description": "Tool-specific parameters",
                 "type": "object",
                 "propertyNames": {
                   "type": "string"
                 },
-                "additionalProperties": {},
-                "description": "Tool-specific parameters"
+                "additionalProperties": {}
               },
               "label": {
                 "description": "Optional human-readable label",
@@ -225,10 +225,9 @@
               }
             },
             "required": [
-              "tool",
-              "params"
+              "tool"
             ],
-            "additionalProperties": false
+            "additionalProperties": {}
           },
           "description": "Steps to execute serially within the critical section. Each step should target a specific device using the 'device' parameter."
         },
