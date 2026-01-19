@@ -54,7 +54,8 @@ automatically adapt and recover from common failure scenarios by leveraging AI-d
 
 Multi-device support with emulator control and app lifecycle management. As long as you have available adb connections,
 AutoMobile can automatically track which one its using for which execution plan or MCP session. CI still needs available
-device connections, but AutoMobile handles selection and readiness checks. During STDIO MCP sessions the tool call `setActiveDevice` will be done and kept for the duration of your session.
+device connections, but AutoMobile handles selection and readiness checks. During STDIO MCP sessions,
+🔧 [`setActiveDevice`](../../mcp/tools/index.md) is set once and reused for the session.
 
 ## Historical Timing Data
 

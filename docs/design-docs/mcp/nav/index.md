@@ -3,7 +3,7 @@
 As AutoMobile explores an app it automatically maps what it observes into a [navigation graph](graph-structure.md).
 
 ```mermaid
-graph TD
+flowchart TD
     subgraph Navigation Graph
         Home["🏠 Home Screen"]
         Profile["👤 Profile Screen"]
@@ -13,16 +13,16 @@ graph TD
         Privacy["🔒 Privacy Settings"]
     end
 
-    Home -->|"tapOn 'Profile'"| Profile
-    Home -->|"tapOn 'Settings'"| Settings
-    Home -->|"tapOn 'Notifications'"| Notifications
-    Profile -->|"tapOn 'Edit'"| EditProfile
-    Profile -->|"pressButton 'back'"| Home
-    EditProfile -->|"pressButton 'back'"| Profile
-    Settings -->|"tapOn 'Privacy'"| Privacy
-    Settings -->|"pressButton 'back'"| Home
-    Privacy -->|"pressButton 'back'"| Settings
-    Notifications -->|"pressButton 'back'"| Home
+    Home -->|"👆 tapOn 'Profile'"| Profile
+    Home -->|"👆 tapOn 'Settings'"| Settings
+    Home -->|"👆 tapOn 'Notifications'"| Notifications
+    Profile -->|"👆 tapOn 'Edit'"| EditProfile
+    Profile -->|"🔘 pressButton 'back'"| Home
+    EditProfile -->|"🔘 pressButton 'back'"| Profile
+    Settings -->|"👆 tapOn 'Privacy'"| Privacy
+    Settings -->|"🔘 pressButton 'back'"| Home
+    Privacy -->|"🔘 pressButton 'back'"| Settings
+    Notifications -->|"🔘 pressButton 'back'"| Home
 
     classDef screen fill:#525FE1,stroke-width:0px,color:white;
     class Home,Profile,Settings,EditProfile,Notifications,Privacy screen;
@@ -38,7 +38,7 @@ This process has been [benchmarked to take at most 1ms](performance.md) and it i
 
 ### Navigate to Screen
 
-The `navigateTo` tool uses the graph to find paths:
+The 🗺️ [`navigateTo`](../tools/index.md) tool uses the graph to find paths:
 
 1. Finds target screen in graph
 2. Calculates shortest path from current node to the target
@@ -47,13 +47,13 @@ The `navigateTo` tool uses the graph to find paths:
 
 ### Explore Efficiently
 
-The `explore` tool uses the graph to:
+The 🔍 [`explore`](../tools/index.md) tool uses the graph to:
 
 - Avoid revisiting known screens
 - Prioritize unexplored branches
 - Track coverage of app features
 
-Read more about [how to use the `explore` tool's various modes](explore.md)
+Read more about [how to use the 🔍 `explore` tool's modes](explore.md).
 
 ## Edge Cases & Limitations
 

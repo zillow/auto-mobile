@@ -11,7 +11,7 @@ flowchart LR
 
     subgraph Adaptation
         Tap["👆 tapOn<br/>ACTION_CLICK"]
-        Scroll["📜 swipeOn<br/>Two-finger / Scroll Action"]
+        Scroll["👉 swipeOn<br/>Two-finger / Scroll Action"]
         Input["⌨️ inputText<br/>ACTION_SET_TEXT"]
     end
 

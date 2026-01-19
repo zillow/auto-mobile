@@ -94,7 +94,7 @@ nav:
       - 'Overview': design-docs/index.md
       - 'MCP':
           - 'Overview': design-docs/mcp/index.md
-          - 'Tools': design-docs/mcp/tools.md
+          - 'Tools': design-docs/mcp/tools/index.md
           - 'Observe':
              - 'Overview': design-docs/mcp/observe/index.md
              - 'Appearance Sync': design-docs/mcp/observe/appearance.md

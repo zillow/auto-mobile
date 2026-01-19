@@ -39,7 +39,7 @@ stateDiagram-v2
 | [MCP Server](mcp/index.md) | Protocol server enabling AI agent interaction |
 | [Interaction Loop](mcp/interaction-loop.md) | Observe-act-observe cycle with idle detection |
 | [Observation](mcp/observe/index.md) | Real-time UI hierarchy and screen capture |
-| [Actions](mcp/tools.md) | Touch, swipe, input, and app management |
+| [Actions](mcp/tools/index.md) | Touch, swipe, input, and app management |
 | [Navigation Graph](mcp/nav/index.md) | Automatic screen flow mapping |
 | [Daemon](mcp/daemon/index.md) | Device pooling and test execution |
 
@@ -62,4 +62,3 @@ stateDiagram-v2
 | [Accessibility Bridge](plat/ios/accessibility-service.md) | WebSocket automation server |
 | [XCTest Runner](plat/ios/xctestrunner.md) | Test execution framework |
 | [Xcode Integration](plat/ios/ide-plugin/overview.md) | Editor extension |
-
