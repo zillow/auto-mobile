@@ -322,6 +322,8 @@ jobs:
           xcrun simctl bootstatus "iPhone 15" -b
 
       - name: "Start AutoMobile daemon"
+        env:
+          AUTOMOBILE_DAEMON_STARTUP_TIMEOUT_MS: "30000"
         run: bun run dist/src/index.js --daemon start
 
       - name: "Run Reminders integration tests"
