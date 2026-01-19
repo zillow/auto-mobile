@@ -2,66 +2,44 @@
 
 ![AutoMobile sticker](docs/img/auto_mobile_sticker_splash.png)
 
-**AutoMobile lets AI agents control your Android and iOS devices.** It's an MCP server that enables natural language automation of mobile apps - explore UX flows, reproduce bugs, run UI tests, and audit accessibility or performance.
+**AutoMobile lets AI agents control your mobile devices using natural language.** Tell an AI what you want to do, and it interacts with your Android or iOS app.
 
-![AutoMobile Demo](docs/img/clock-app.gif)
-*An AI agent setting an alarm in the Clock app*
+It can do all this by being an MCP server that uses standard platform tools like adb & simctl paired with additional Kotlin & Swift libraries and apps. All components are open source. The point is to provide mobile engineers with AI workflow tools to perform UX deep dives, reproduce bugs, and run automated tests.
 
-## What can I do with AutoMobile?
+![Setting an alarm in the Clock app](img/clock-app.gif)
+*An AI agent navigating to the Clock app, creating a new alarm*
 
-| Use Case | Description |
-|----------|-------------|
-| **[Explore app UX](docs/using/ux-exploration.md)** | Ask an AI to navigate your app, map user flows, and identify confusing interactions |
-| **[Reproduce bugs](docs/using/reproducting-bugs.md)** | Paste a bug report and let the agent find and document exact reproduction steps |
-| **[Create UI tests](docs/using/ui-tests.md)** | Generate automated tests from natural language descriptions |
-| **[Audit accessibility](docs/using/a11y/contrast.md)** | Check contrast ratios, tap target sizes, and screen reader compatibility |
-| **[Measure performance](docs/using/perf-analysis/startup.md)** | Profile app startup, scroll framerate, and screen transitions |
+![Searching YouTube for a video](img/youtube-search.gif)
+*An AI agent searching YouTube and browsing results*
+
+### Explore and Test
+
+| Task | What it does |
+|------|-------------|
+| **[Explore app UX](using/ux-exploration.md)** | Navigate your app, discover screens, map user flows, identify confusing interactions |
+| **[Reproduce bugs](using/reproducting-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
+| **[Create UI tests](using/ui-tests.md)** | Describe test scenarios in plain English, get executable test plans |
+| **[Measure startup time](using/perf-analysis/startup.md)** | Profile cold and warm launch performance |
+| **[Check scroll performance](using/perf-analysis/scroll-framerate.md)** | Detect jank and dropped frames |
+| **[Audit contrast](using/a11y/contrast.md)** | Find accessibility issues with color contrast |
+| **[Check tap targets](using/a11y/tap-targets.md)** | Ensure touch targets meet size guidelines |
 
 ## How it works
 
-AutoMobile is built from three components:
-
-1. **MCP Server** (TypeScript) - Exposes device automation as tool calls that any MCP-compatible AI agent can use
-2. **Platform Libraries** (Kotlin for Android, Swift for iOS) - Native code that enables fast, accurate observations and touch injection
-3. **IDE Plugins** - Android Studio plugin and macOS companion app for test recording and navigation graph visualization
+- 🤖 **Fast UX Inspection** Kotlin Accessibility Service and Swift XCTestService to enable fast, accurate observations. 10x faster than the next fastest observation toolkit.
+- 🦾 **Full Touch Injection** Tap, Swipe, Pinch, Drag & Drop, Shake with automatic element targeting.
+- ♻️ **Tool Feedback** [Observations](docs/features/mcp-server/observation.md) drive the [interaction loop](docs/features/mcp-server/interaction-loop.md) for all [tool calls](docs/features/mcp-server/tools.md).
+- 🧪 **[Test Execution](docs/features/test-execution/index.md)** Kotlin JUnitRunner & Swift XCTestRunner execute tests natively handling device pooling, multi-device tests, and automatically optimizing test timing.
 
 ## Get Started
 
-The easiest way to get started is to run the fully automated interactive installer.
+You can use our interactive installer to step through all host platform requirements and configuration options. It checks host dependencies, optionally downloads Android or iOS developer tools, and configured the MCP daemon.
 
-### Claude Code Plugin
-
-The easiest way to get started is with the [AutoMobile plugin for Claude Code](https://github.com/kaeawc/auto-mobile). It bundles the MCP server configuration plus specialized skills:
-
-- `/explore` - Comprehensive device interaction and navigation
-- `/reproduce-bug` - Structured bug reproduction workflow
-- `/apps`, `/gesture`, `/text`, `/system` - Focused interaction skills
-- `/snapshot` - Capture and restore device state
-- `/doctor` - Diagnose setup issues
-
-### Manual Setup
-
-Add to your MCP client configuration:
-
-```json
-{
-  "mcpServers": {
-    "auto-mobile": {
-      "command": "npx",
-      "args": ["-y", "@kaeawc/auto-mobile@latest"]
-    }
-  }
-}
+``` bash title="One-line install (click to copy)"
+curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/install/interactive.sh | bash
 ```
 
-See the [installation guide](docs/install/overview.md) for detailed setup instructions including Docker configuration.
-
-## Platform Support
-
-| Platform | Status |
-|----------|--------|
-| **Android** | Fully supported - emulators and physical devices |
-| **iOS** | Simulator support available, physical devices coming soon |
+or you can read and follow the [step-by-step manual guide](manual.md).
 
 ## Documentation
 

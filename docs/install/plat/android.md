@@ -1,8 +1,5 @@
 # Android
 
-!!! tip "First time?"
-    Start with the [interactive installer](../overview.md#interactive-installer-macos).
-
 ## Prerequisites
 
 1. [Install Android SDK](https://developer.android.com/studio/install)
@@ -11,7 +8,7 @@
 
 ## Docker Setup
 
-For Docker-based MCP server setup, see [Android Docker Configuration](../../design-docs/plat/android/docker.md).
+For Docker-based MCP server setup, see [Docker Configuration](../docker.md).
 
 Quick example:
 
@@ -40,10 +37,6 @@ Quick example:
 | Run AutoMobile tests in Gradle/CI | MCP server + [JUnitRunner](../../design-docs/plat/android/junitrunner.md) |
 | Collect recomposition tracking data | MCP server + [Android SDK library](../../design-docs/plat/android/auto-mobile-sdk.md) |
 
-### What's next
-
-Learn [how to use AutoMobile for Android](../../using/ux-exploration.md)
-
 ## Troubleshooting
 
 **ADB not found:**
@@ -59,3 +52,7 @@ Learn [how to use AutoMobile for Android](../../using/ux-exploration.md)
 3. Try `adb kill-server && adb start-server`
 
 For more issues, see [GitHub Issues](https://github.com/kaeawc/auto-mobile/issues).
+
+### What's next
+
+Learn [how to use AutoMobile for Android](../../using/ux-exploration.md)

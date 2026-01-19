@@ -6,13 +6,13 @@ AutoMobile supports iOS simulator automation. Physical device support is coming 
 
 - **macOS 13.0+** (Ventura or newer)
 - **Xcode 15.0+** with Command Line Tools installed
-- **Bun 1.3.5+** or Node.js 18+ for the MCP server
+- **Bun or Node.js** - see [requirements](../index.md#requirements)
 
 ## Setup
 
 1. Install Xcode from the App Store
 2. Install Command Line Tools: `xcode-select --install`
-3. Configure AutoMobile with your MCP client (see [installation overview](../overview.md))
+3. Configure AutoMobile with your MCP client (see [installation overview](../index.md))
 
 ## Limitations
 

@@ -6,7 +6,7 @@
 - Measure [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [screen transitions](using/perf-analysis/screen-transition.md).
 - Audit accessibility compliance with [contrast ratios](using/a11y/contrast.md) & [tap targets](using/a11y/tap-targets.md).
 - (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
-- Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and (coming soon) XCTestRunner for iOS.
+- Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and [XCTestRunner for iOS](design-docs/plat/ios/xctestrunner.md).
 
 #### Why another MCP? Aren't they all worthless?
 
@@ -18,7 +18,7 @@ As for context bloat there are MCP benchmarks we run on every change that keep c
 
 #### Is my AI agent supported?
 
-Any MCP tool-compatible client. See [installation](install/overview.md) for configuration examples. The project does make use of MCP resources because they have significant advantages and adoption across AI agents, please file an issue if this is not supported in your workflow.
+Any MCP tool-compatible client. See [installation](install/index.md) for configuration examples. The project does make use of MCP resources because they have significant advantages and adoption across AI agents, please file an issue if this is not supported in your workflow.
 
 #### Do I need root access?
 
