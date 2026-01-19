@@ -1,9 +1,10 @@
 package dev.jasonpearson.automobile.ide.yaml
 
-import com.networknt.schema.JsonSchema
-import com.networknt.schema.JsonSchemaFactory
-import com.networknt.schema.SpecVersion
-import com.networknt.schema.ValidationMessage
+import com.networknt.schema.Error
+import com.networknt.schema.InputFormat
+import com.networknt.schema.Schema
+import com.networknt.schema.SchemaRegistry
+import com.networknt.schema.SpecificationVersion
 import org.yaml.snakeyaml.Yaml
 
 /**
@@ -38,7 +39,7 @@ data class TestPlanValidationError(
  * Supports schema versioning based on mcpVersion field.
  */
 object TestPlanValidator {
-    private var schema: JsonSchema? = null
+    private var schema: Schema? = null
     private val yaml = Yaml()
 
     // Deprecated fields that should generate warnings instead of errors
@@ -84,7 +85,7 @@ object TestPlanValidator {
      * Load the JSON schema from resources
      */
     @Synchronized
-    private fun loadSchema(): JsonSchema {
+    private fun loadSchema(): Schema {
         if (schema != null) {
             return schema!!
         }
@@ -102,8 +103,8 @@ object TestPlanValidator {
 
         // Use V7 to match junit-runner implementation
         // Note: V7 doesn't officially support $defs, but the validator tolerates it
-        val factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7)
-        schema = factory.getSchema(schemaJson)
+        val registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_7)
+        schema = registry.getSchema(schemaJson, InputFormat.JSON)
 
         return schema!!
     }
@@ -164,20 +165,18 @@ object TestPlanValidator {
         }
 
         // Validate against schema
-        val validationMessages: Set<ValidationMessage> = schema.validate(
-            com.fasterxml.jackson.databind.ObjectMapper().readTree(jsonString)
-        )
+        val validationErrors: List<Error> = schema.validate(jsonString, InputFormat.JSON)
 
         // Validate tool names
         val toolNameErrors = validateToolNames(parsedObject, yamlContent)
 
-        if (validationMessages.isEmpty() && toolNameErrors.isEmpty()) {
+        if (validationErrors.isEmpty() && toolNameErrors.isEmpty()) {
             return TestPlanValidationResult(valid = true)
         }
 
         // Format validation errors
-        val errors = validationMessages.map { msg ->
-            formatError(msg, yamlContent)
+        val errors = validationErrors.map { error ->
+            formatError(error, yamlContent)
         }.toMutableList()
 
         // Add tool name validation errors
@@ -292,7 +291,7 @@ object TestPlanValidator {
     /**
      * Format a validation error message
      */
-    private fun formatError(msg: ValidationMessage, yamlContent: String): TestPlanValidationError {
+    private fun formatError(msg: Error, yamlContent: String): TestPlanValidationError {
         // Get the field path from the validation message
         var field = msg.instanceLocation?.toString() ?: "root"
 
@@ -311,7 +310,7 @@ object TestPlanValidator {
 
         // Extract friendly error message from the validation message
         val rawMessage = msg.message ?: "Validation error"
-        val messageType = msg.type ?: ""
+        val messageType = msg.messageKey ?: msg.keyword ?: ""
 
         // Determine severity based on whether this is a deprecated field
         val severity = if (isDeprecatedFieldError(field, rawMessage, messageType)) {
