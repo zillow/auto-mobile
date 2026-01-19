@@ -2,8 +2,17 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+# Handle Ctrl-C (SIGINT) - exit immediately
+trap 'echo ""; echo "Installation cancelled."; exit 130' INT
+
+# Handle piped execution (curl | bash) where BASH_SOURCE is empty
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+else
+    SCRIPT_DIR=""
+    PROJECT_ROOT="$(pwd)"
+fi
 if [[ ! -f "${PROJECT_ROOT}/package.json" ]]; then
     PROJECT_ROOT="$(pwd)"
 fi
@@ -23,7 +32,7 @@ PRESET=""
 CONFIGURE_MCP_CLIENTS=false
 
 # Gum bundling configuration
-GUM_VERSION="0.15.2"
+GUM_VERSION="0.17.0"
 GUM_INSTALL_DIR="${HOME}/.automobile/bin"
 GUM_BINARY="${GUM_INSTALL_DIR}/gum"
 GUM_VERSION_FILE="${GUM_INSTALL_DIR}/.gum-version"
@@ -36,6 +45,7 @@ BACKUP_TIMESTAMP=""
 # Format: "client_name|config_path|format|scope"
 MCP_CLIENT_LIST=()
 SELECTED_MCP_CLIENTS=()
+PRESET_CLIENT_FILTER=""  # When set, auto-select clients matching this prefix
 IOS_RUNTIME_NAMES=()
 
 # ============================================================================
@@ -49,12 +59,72 @@ IDE_PLUGIN_METHOD=""
 IDE_PLUGIN_ZIP_URL=""
 IDE_PLUGIN_DIR=""
 INSTALL_AUTOMOBILE_CLI=false
+INSTALL_CLAUDE_MARKETPLACE=false
 START_DAEMON=false
 DAEMON_STARTED=false
 AUTO_MOBILE_CMD=()
 
+# Early detection state
+CLI_ALREADY_INSTALLED=false
+DAEMON_ALREADY_RUNNING=false
+CLAUDE_CLI_INSTALLED=false
+CLAUDE_MARKETPLACE_INSTALLED=false
+IOS_SETUP_OK=false
+ANDROID_SETUP_OK=false
+
+# Track if any changes were made
+CHANGES_MADE=false
+
+# Track if ANDROID_HOME was already set in environment
+ANDROID_HOME_FROM_ENV=false
+if [[ -n "${ANDROID_HOME:-}" ]]; then
+    ANDROID_HOME_FROM_ENV=true
+fi
+
 command_exists() {
     command -v "$1" >/dev/null 2>&1
+}
+
+# Check if auto-mobile CLI is installed
+is_cli_installed() {
+    command_exists auto-mobile
+}
+
+# Check if MCP daemon is running (fast check - just verify socket exists)
+is_daemon_running() {
+    local socket_path
+    socket_path="/tmp/auto-mobile-daemon-$(id -u).sock"
+    [[ -S "${socket_path}" ]]
+}
+
+# Check if Claude CLI is installed
+is_claude_cli_installed() {
+    command_exists claude
+}
+
+# Check if auto-mobile marketplace plugin is already installed
+is_claude_marketplace_installed() {
+    if ! command_exists claude; then
+        return 1
+    fi
+    # Check if auto-mobile marketplace is in the list
+    claude plugin marketplace list 2>/dev/null | grep -q "auto-mobile" 2>/dev/null
+}
+
+# Perform early detection of installed components (fast checks only, before gum)
+detect_existing_setup() {
+    if is_cli_installed; then
+        CLI_ALREADY_INSTALLED=true
+    fi
+
+    if is_daemon_running; then
+        DAEMON_ALREADY_RUNNING=true
+    fi
+
+    if is_claude_cli_installed; then
+        CLAUDE_CLI_INSTALLED=true
+        # Note: marketplace check is deferred to after gum is available (slow network call)
+    fi
 }
 
 # ============================================================================
@@ -167,22 +237,43 @@ execute_spinner() {
     run_spinner "${title}" "$@"
 }
 
-# Write file or show content in dry-run mode
+# Write file with diff preview and user approval
 write_file() {
     local path="$1"
     local content="$2"
     local description="${3:-Write to ${path}}"
 
+    # Get existing content if file exists
+    local existing_content=""
+    if [[ -f "${path}" ]]; then
+        existing_content=$(cat "${path}" 2>/dev/null || echo "")
+    fi
+
+    # Check if content is actually different
+    if [[ "${existing_content}" == "${content}" ]]; then
+        log_info "No changes needed for ${path}"
+        return 0
+    fi
+
+    # Show the diff
+    if [[ -f "${path}" ]]; then
+        show_colored_diff "${existing_content}" "${content}" "${path}"
+    else
+        show_new_file "${content}" "${path}"
+    fi
+
     if [[ "${DRY_RUN}" == "true" ]]; then
         DRY_RUN_LOG+=("[DRY-RUN] ${description}")
-        if command_exists gum; then
-            gum log --level info "[DRY-RUN] Would write to: ${path}"
-            gum style --border rounded --padding "0 1" --margin "0 2" "${content}"
-        else
-            printf '[DRY-RUN] Would write to: %s\n' "${path}"
-            printf '%s\n' "${content}"
-        fi
+        log_info "[DRY-RUN] Would write to: ${path}"
         return 0
+    fi
+
+    # Ask for approval (skip in non-interactive mode)
+    if [[ "${NON_INTERACTIVE}" != "true" ]]; then
+        if ! gum confirm "Apply these changes to ${path}?"; then
+            log_info "Skipped changes to ${path}"
+            return 0
+        fi
     fi
 
     # Create parent directory if needed
@@ -193,6 +284,7 @@ write_file() {
     fi
 
     printf '%s\n' "${content}" > "${path}"
+    log_info "Updated ${path}"
 }
 
 # Print dry-run summary at the end
@@ -223,6 +315,70 @@ print_dry_run_summary() {
     gum style --foreground 214 "Run without --dry-run to execute these actions."
 }
 
+# Terminal colors for diffs
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+RESET='\033[0m'
+BOLD='\033[1m'
+
+# Show a colored diff between old and new content
+show_colored_diff() {
+    local old_content="$1"
+    local new_content="$2"
+    local file_path="$3"
+
+    local temp_old temp_new
+    temp_old=$(mktemp)
+    temp_new=$(mktemp)
+
+    printf '%s\n' "${old_content}" > "${temp_old}"
+    printf '%s\n' "${new_content}" > "${temp_new}"
+
+    echo ""
+    printf '%b--- %s (current)%b\n' "${BOLD}" "${file_path}" "${RESET}"
+    printf '%b+++ %s (proposed)%b\n' "${BOLD}" "${file_path}" "${RESET}"
+
+    # Generate unified diff (diff returns 1 when files differ, which is expected)
+    local diff_output
+    diff_output=$(diff -u "${temp_old}" "${temp_new}" 2>/dev/null || true)
+
+    # Skip the first 2 lines (header) and colorize
+    echo "${diff_output}" | tail -n +3 | while IFS= read -r line; do
+        case "${line}" in
+            -*)
+                printf '%b%s%b\n' "${RED}" "${line}" "${RESET}"
+                ;;
+            +*)
+                printf '%b%s%b\n' "${GREEN}" "${line}" "${RESET}"
+                ;;
+            @*)
+                printf '%b%s%b\n' "${CYAN}" "${line}" "${RESET}"
+                ;;
+            *)
+                printf '%s\n' "${line}"
+                ;;
+        esac
+    done
+
+    rm -f "${temp_old}" "${temp_new}"
+    echo ""
+}
+
+# Show new file content (all green)
+show_new_file() {
+    local content="$1"
+    local file_path="$2"
+
+    echo ""
+    printf '%b+++ %s (new file)%b\n' "${BOLD}" "${file_path}" "${RESET}"
+    echo ""
+    while IFS= read -r line; do
+        printf '%b+%s%b\n' "${GREEN}" "${line}" "${RESET}"
+    done <<< "${content}"
+    echo ""
+}
+
 plain_info() {
     printf '[INFO] %s\n' "$1"
 }
@@ -247,6 +403,167 @@ prompt_confirm_plain() {
             return 1
             ;;
     esac
+}
+
+# Offer to set ANDROID_HOME in a shell profile
+# Called when SDK is detected but ANDROID_HOME is not set in environment
+offer_android_home_shell_setup() {
+    local detected_path="$1"
+
+    # Common shell profile files
+    local profile_files=(
+        "${HOME}/.zshrc"
+        "${HOME}/.zprofile"
+        "${HOME}/.bash_profile"
+        "${HOME}/.bashrc"
+        "${HOME}/.profile"
+    )
+
+    # First, check if ANDROID_HOME is already configured in any profile file
+    local configured_in=""
+    for profile in "${profile_files[@]}"; do
+        if [[ -f "${profile}" ]] && grep -q "ANDROID_HOME" "${profile}" 2>/dev/null; then
+            configured_in="${profile}"
+            break
+        fi
+    done
+
+    # If already configured in a profile, offer to source it
+    if [[ -n "${configured_in}" ]]; then
+        local short_name="${configured_in#"${HOME}"/}"
+        log_info "ANDROID_HOME is configured in ~/${short_name} but not loaded in current shell"
+
+        if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+            log_info "Run: source ~/${short_name}"
+            return 0
+        fi
+
+        # Extract ANDROID_HOME value from the file (don't source - may have shell-specific syntax)
+        local extracted_value
+        extracted_value=$(grep -E '^\s*(export\s+)?ANDROID_HOME=' "${configured_in}" 2>/dev/null | head -1 | sed -E 's/.*ANDROID_HOME=["'\'']?([^"'\'']+)["'\'']?.*/\1/')
+
+        # Expand $HOME if present in the value
+        extracted_value="${extracted_value/\$HOME/${HOME}}"
+        extracted_value="${extracted_value/\~/${HOME}}"
+
+        if [[ -n "${extracted_value}" ]]; then
+            log_info "Found: ANDROID_HOME=${extracted_value}"
+
+            if gum confirm "Set ANDROID_HOME for this session?"; then
+                export ANDROID_HOME="${extracted_value}"
+                log_info "ANDROID_HOME set for current session"
+                # Update our tracking variable since it's now set
+                ANDROID_HOME_FROM_ENV=true
+            else
+                log_info "Skipped setting ANDROID_HOME"
+                log_info "Run 'source ~/${short_name}' in your shell to load it"
+            fi
+        else
+            log_warn "Could not extract ANDROID_HOME value from ~/${short_name}"
+            log_info "Run 'source ~/${short_name}' manually in your shell"
+        fi
+        return 0
+    fi
+
+    # ANDROID_HOME not configured anywhere - offer to add it
+    # Skip in non-interactive mode
+    if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        log_warn "ANDROID_HOME is not set in your environment"
+        log_info "Add this to your shell profile: export ANDROID_HOME=\"${detected_path}\""
+        return 0
+    fi
+
+    log_warn "ANDROID_HOME is not configured in any shell profile"
+    log_info "The Android SDK was found at: ${detected_path}"
+    echo ""
+
+    # Build options list - existing files first, then creatable files
+    local existing_files=()
+    local creatable_files=()
+
+    for profile in "${profile_files[@]}"; do
+        local short_name="${profile#"${HOME}"/}"
+        # shellcheck disable=SC2088 # Tilde is intentional for display purposes
+        if [[ -f "${profile}" ]]; then
+            existing_files+=("~/${short_name}")
+        else
+            creatable_files+=("~/${short_name} (create)")
+        fi
+    done
+
+    # Build final options array (handle empty arrays safely with set -u)
+    local options=()
+    if [[ ${#existing_files[@]} -gt 0 ]]; then
+        options+=("${existing_files[@]}")
+    fi
+    if [[ ${#creatable_files[@]} -gt 0 ]]; then
+        options+=("${creatable_files[@]}")
+    fi
+    options+=("Skip (I'll set it manually)")
+
+    local choice
+    choice=$(printf '%s\n' "${options[@]}" | gum choose --header "Add ANDROID_HOME to shell profile?")
+
+    if [[ -z "${choice}" || "${choice}" == "Skip (I'll set it manually)" ]]; then
+        log_info "Skipped ANDROID_HOME shell setup"
+        log_info "You can add this manually: export ANDROID_HOME=\"${detected_path}\""
+        return 0
+    fi
+
+    # Extract the file path from the choice
+    local selected_file="${choice% (create)}"  # Remove "(create)" suffix if present
+    selected_file="${selected_file/#\~/${HOME}}"  # Expand ~ to HOME
+
+    # Prepare the export line
+    local export_line="export ANDROID_HOME=\"${detected_path}\""
+    # shellcheck disable=SC2016 # Single quotes intentional - we want literal $ANDROID_HOME in file
+    local path_line='export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"'
+
+    # Check if already present
+    if [[ -f "${selected_file}" ]] && grep -q "ANDROID_HOME" "${selected_file}" 2>/dev/null; then
+        log_info "ANDROID_HOME is already configured in ${choice% (create)}"
+        return 0
+    fi
+
+    # Prepare the content to append
+    local append_content
+    append_content=$(cat << EOF
+
+# Android SDK (added by auto-mobile installer)
+${export_line}
+${path_line}
+EOF
+)
+
+    # Show what will be added
+    local current_content=""
+    if [[ -f "${selected_file}" ]]; then
+        current_content=$(cat "${selected_file}" 2>/dev/null || true)
+    fi
+    local new_content="${current_content}${append_content}"
+
+    if [[ -f "${selected_file}" ]]; then
+        show_colored_diff "${current_content}" "${new_content}" "${selected_file}"
+    else
+        show_new_file "${new_content}" "${selected_file}"
+    fi
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        DRY_RUN_LOG+=("[DRY-RUN] Add ANDROID_HOME to ${selected_file}")
+        log_info "[DRY-RUN] Would add ANDROID_HOME to: ${selected_file}"
+        return 0
+    fi
+
+    if ! gum confirm "Apply these changes to ${selected_file}?"; then
+        log_info "Skipped ANDROID_HOME shell setup"
+        return 0
+    fi
+
+    # Append to file (create if doesn't exist)
+    printf '%s\n' "${append_content}" >> "${selected_file}"
+    log_info "Added ANDROID_HOME to ${selected_file}"
+    log_info "Run 'source ${selected_file}' or open a new terminal to apply"
+    CHANGES_MADE=true
 }
 
 detect_os() {
@@ -558,6 +875,27 @@ run_spinner() {
     gum spin --spinner dot --title "${title}" -- "$@"
 }
 
+# Run command with spinner, show output on failure
+run_with_error_output() {
+    local title="$1"
+    shift
+
+    local output
+    local status=0
+    output=$("$@" 2>&1) || status=$?
+
+    if [[ ${status} -ne 0 ]]; then
+        log_error "${title} failed"
+        if [[ -n "${output}" ]]; then
+            echo "${output}"
+        fi
+        return ${status}
+    fi
+
+    log_info "${title}: ok"
+    return 0
+}
+
 spin_check() {
     local label="$1"
     local check_cmd="$2"
@@ -574,28 +912,8 @@ spin_check() {
 run_with_progress() {
     local title="$1"
     shift
-
-    set +e
-    {
-        "$@" &
-        cmd_pid=$!
-        progress=0
-        while kill -0 "${cmd_pid}" 2>/dev/null; do
-            if (( progress < 95 )); then
-                progress=$((progress + 3))
-                echo "${progress}"
-            fi
-            sleep 0.2
-        done
-        wait "${cmd_pid}"
-        cmd_status=$?
-        echo 100
-        exit "${cmd_status}"
-    } | gum progress --title "${title}"
-
-    local status=${PIPESTATUS[0]}
-    set -e
-    return "${status}"
+    # gum doesn't have a progress command, use spinner instead
+    run_spinner "${title}" "$@"
 }
 
 run_download_with_progress() {
@@ -612,7 +930,7 @@ play_car_animation_simple() {
     local parked="🚘"
     # Car drives right to left (matches emoji direction)
     local simple_frames=("      ${car}" "     ${car} " "    ${car}  " "   ${car}   " "  ${car}    " " ${car}     " "${car}      ")
-    local delay=0.08
+    local delay=0.07  # 7 frames * 0.07 = ~500ms
 
     if [[ ! -t 1 ]]; then
         echo "${parked} AutoMobile"
@@ -636,7 +954,7 @@ play_car_animation() {
     local parked="🚘"
     local dust="💨"
     local trail_chars=("·" "." " " " ")
-    local frame_count=50
+    local frame_count=20  # 20 frames * 0.025 = 500ms
     local delay=0.025
     local term_cols=80
     local car_width=2  # Emoji display width
@@ -720,6 +1038,96 @@ play_logo_animation() {
     else
         play_car_animation_simple
     fi
+}
+
+# ============================================================================
+# AI Agent Installation Detection
+# ============================================================================
+
+# Check if Claude Desktop is installed
+is_claude_desktop_installed() {
+    local os
+    os=$(detect_os)
+    if [[ "${os}" == "macos" ]]; then
+        [[ -d "${HOME}/Library/Application Support/Claude" ]] || [[ -d "/Applications/Claude.app" ]]
+    elif [[ "${os}" == "linux" ]]; then
+        [[ -d "${HOME}/.config/Claude" ]]
+    else
+        return 1
+    fi
+}
+
+# Check if Cursor is installed
+is_cursor_installed() {
+    [[ -d "${HOME}/.cursor" ]] || command_exists cursor
+}
+
+# Check if Windsurf is installed
+is_windsurf_installed() {
+    [[ -d "${HOME}/.codeium/windsurf" ]] || [[ -d "${HOME}/.codeium" ]] || command_exists windsurf
+}
+
+# Check if VS Code is installed
+is_vscode_installed() {
+    local os
+    os=$(detect_os)
+    if command_exists code; then
+        return 0
+    elif [[ "${os}" == "macos" && -d "/Applications/Visual Studio Code.app" ]]; then
+        return 0
+    elif [[ "${os}" == "linux" && -d "${HOME}/.vscode" ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Check if Codex (OpenAI) is installed
+is_codex_installed() {
+    [[ -d "${HOME}/.codex" ]] || command_exists codex
+}
+
+# Check if Firebender IntelliJ plugin is installed
+is_firebender_installed() {
+    # Check for Firebender config directory
+    if [[ -d "${HOME}/.firebender" ]]; then
+        return 0
+    fi
+
+    # Check for Firebender plugin in IntelliJ-based IDEs
+    local plugin_dirs=(
+        "${HOME}/Library/Application Support/Google/AndroidStudio"*"/plugins"
+        "${HOME}/Library/Application Support/JetBrains/IntelliJIdea"*"/plugins"
+        "${HOME}/Library/Application Support/JetBrains/IdeaIC"*"/plugins"
+        "${HOME}/.local/share/Google/AndroidStudio"*"/plugins"
+        "${HOME}/.local/share/JetBrains/IntelliJIdea"*"/plugins"
+        "${HOME}/.local/share/JetBrains/IdeaIC"*"/plugins"
+    )
+
+    # Use ripgrep to search for firebender in plugin directories
+    for pattern in "${plugin_dirs[@]}"; do
+        # shellcheck disable=SC2086 # Glob expansion is intentional
+        for dir in ${pattern}; do
+            if [[ -d "${dir}" ]]; then
+                if rg -q -i "firebender" "${dir}" 2>/dev/null; then
+                    return 0
+                fi
+                # Also check directory names using glob pattern
+                # shellcheck disable=SC2231 # Glob in loop is intentional
+                for plugin in "${dir}"/*[Ff]irebender* "${dir}"/*[Ff]ire[Bb]ender*; do
+                    if [[ -e "${plugin}" ]]; then
+                        return 0
+                    fi
+                done
+            fi
+        done
+    done
+
+    return 1
+}
+
+# Check if Goose is installed
+is_goose_installed() {
+    [[ -d "${HOME}/.config/goose" ]] || command_exists goose
 }
 
 # ============================================================================
@@ -865,6 +1273,28 @@ get_client_config_scope() {
     fi
 }
 
+# Check if a client config file already has auto-mobile configured
+client_has_auto_mobile() {
+    local client="$1"
+    local config_path
+    config_path=$(get_client_config_path "${client}")
+    local format
+    format=$(get_client_config_format "${client}")
+
+    if [[ ! -f "${config_path}" ]]; then
+        return 1
+    fi
+
+    if [[ "${format}" == "toml" ]]; then
+        grep -q '\[mcp_servers.auto-mobile\]' "${config_path}" 2>/dev/null
+    elif [[ "${format}" == "yaml" ]]; then
+        grep -q 'auto-mobile:' "${config_path}" 2>/dev/null
+    else
+        # JSON - check for "auto-mobile" key in mcpServers
+        grep -q '"auto-mobile"' "${config_path}" 2>/dev/null
+    fi
+}
+
 # Interactive MCP client selection
 select_mcp_clients() {
     detect_mcp_clients
@@ -877,29 +1307,81 @@ select_mcp_clients() {
         return 1
     fi
 
+    # Check which clients already have auto-mobile configured
+    local clients_with_auto_mobile=()
+    local clients_without_auto_mobile=()
+
+    while IFS= read -r client; do
+        if client_has_auto_mobile "${client}"; then
+            clients_with_auto_mobile+=("${client}")
+        else
+            clients_without_auto_mobile+=("${client}")
+        fi
+    done <<< "${available_clients}"
+
     gum style --bold "Detected MCP Clients:"
     echo ""
 
-    # Show what's detected with their config paths
+    # Show what's detected with their config paths and auto-mobile status
     while IFS= read -r client; do
         local path
         path=$(get_client_config_path "${client}")
-        local scope
-        scope=$(get_client_config_scope "${client}")
-        local exists_marker=""
+        local status_marker=""
         if [[ -f "${path}" ]]; then
-            exists_marker=" (config exists)"
+            if client_has_auto_mobile "${client}"; then
+                status_marker=" (auto-mobile configured)"
+            else
+                status_marker=" (config exists)"
+            fi
         fi
-        gum style --faint "  ${client}: ${path}${exists_marker}"
+        gum style --faint "  ${client}: ${path}${status_marker}"
     done <<< "${available_clients}"
 
     echo ""
-    gum style --italic --faint "Use arrow keys to navigate, space to select/deselect, enter to confirm"
+
+    # If some clients already have auto-mobile, offer different options
+    if [[ ${#clients_with_auto_mobile[@]} -gt 0 ]]; then
+        local action_choice
+        action_choice=$(gum choose \
+            "Leave existing configurations" \
+            "Update existing configurations to use @latest" \
+            "Configure new clients only" \
+            --header "Some clients already have auto-mobile configured:")
+
+        case "${action_choice}" in
+            "Leave existing configurations")
+                log_info "Keeping existing configurations unchanged."
+                return 1
+                ;;
+            "Update existing configurations to use @latest")
+                # Select all clients that have auto-mobile for update
+                SELECTED_MCP_CLIENTS=("${clients_with_auto_mobile[@]}")
+                log_info "Will update ${#SELECTED_MCP_CLIENTS[@]} existing configuration(s)"
+                return 0
+                ;;
+            "Configure new clients only")
+                if [[ ${#clients_without_auto_mobile[@]} -eq 0 ]]; then
+                    log_info "All detected clients already have auto-mobile configured."
+                    return 1
+                fi
+                # Fall through to select from unconfigured clients
+                available_clients=$(printf '%s\n' "${clients_without_auto_mobile[@]}")
+                ;;
+            *)
+                log_info "No action selected. Skipping MCP configuration."
+                return 1
+                ;;
+        esac
+    fi
+
+    echo ""
+    gum style --italic --foreground 243 "Press SPACE to select/deselect, ENTER to confirm, ESC to skip"
     echo ""
 
     # Multi-select with gum choose
+    # Use filter for better UX - it allows typing to filter and space to select
     local selected
-    selected=$(echo "${available_clients}" | gum choose --no-limit --header "Select clients to configure:")
+    selected=$(printf '%s\n' "${available_clients}" | gum filter --no-limit --placeholder "Type to filter, SPACE to select..." --header "Select clients to configure:")
 
     if [[ -z "${selected}" ]]; then
         log_info "No clients selected. Skipping MCP configuration."
@@ -919,6 +1401,7 @@ select_mcp_clients() {
         return 1
     fi
 
+    log_info "Selected ${#SELECTED_MCP_CLIENTS[@]} client(s) for configuration"
     return 0
 }
 
@@ -1040,7 +1523,7 @@ if "mcpServers" not in existing:
 
 # Check if auto-mobile already exists
 if "auto-mobile" in existing["mcpServers"]:
-    print("WARNING:auto-mobile already configured, will be updated", file=sys.stderr)
+    print("INFO:auto-mobile already configured, will be updated", file=sys.stderr)
 
 # Merge (overwrites existing auto-mobile)
 existing["mcpServers"]["auto-mobile"] = new_auto_mobile
@@ -1081,7 +1564,7 @@ except Exception:
 
 # Check if auto-mobile already configured
 if "[mcp_servers.auto-mobile]" in existing:
-    print("WARNING:auto-mobile already configured in TOML, will be updated", file=sys.stderr)
+    print("INFO:auto-mobile already configured in TOML, will be updated", file=sys.stderr)
     # Remove existing auto-mobile section (lines from [mcp_servers.auto-mobile] until next section or EOF)
     lines = existing.split("\n")
     result = []
@@ -1115,41 +1598,24 @@ else:
     fi
 }
 
-# Show diff between old and new config
+# Show diff between old and new config (uses colored diff)
 show_config_diff() {
     local old_content="$1"
     local new_content="$2"
     local config_path="$3"
 
     if [[ -z "${old_content}" ]] || [[ "${old_content}" == "{}" ]]; then
-        gum style --bold "New configuration for ${config_path}:"
-        echo "${new_content}" | gum format --type code
+        show_new_file "${new_content}" "${config_path}"
         return 0
     fi
 
-    if command_exists diff; then
-        local temp_old temp_new
-        temp_old=$(mktemp)
-        temp_new=$(mktemp)
-
-        echo "${old_content}" > "${temp_old}"
-        echo "${new_content}" > "${temp_new}"
-
-        local diff_output
-        diff_output=$(diff -u "${temp_old}" "${temp_new}" 2>/dev/null || true)
-
-        rm -f "${temp_old}" "${temp_new}"
-
-        if [[ -n "${diff_output}" ]]; then
-            gum style --bold "Configuration changes for ${config_path}:"
-            echo "${diff_output}" | head -50 | gum format --type code
-        else
-            gum style --faint "No changes needed for ${config_path}"
-        fi
-    else
-        gum style --bold "New configuration:"
-        echo "${new_content}" | gum format --type code
+    # Check if content is the same
+    if [[ "${old_content}" == "${new_content}" ]]; then
+        log_info "No changes needed for ${config_path}"
+        return 0
     fi
+
+    show_colored_diff "${old_content}" "${new_content}" "${config_path}"
 }
 
 # Generate auto-mobile MCP server config based on preset
@@ -1164,7 +1630,8 @@ generate_auto_mobile_config() {
 EOF
             ;;
         development)
-            if [[ -n "${android_home}" ]]; then
+            # Only add ANDROID_HOME to env if it wasn't already set in the environment
+            if [[ -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
                 cat << EOF
 {"command":"npx","args":["-y","@kaeawc/auto-mobile@latest","--debug","--debug-perf"],"env":{"ANDROID_HOME":"${android_home}"}}
 EOF
@@ -1173,11 +1640,6 @@ EOF
 {"command":"npx","args":["-y","@kaeawc/auto-mobile@latest","--debug","--debug-perf"]}
 EOF
             fi
-            ;;
-        ci)
-            cat << 'EOF'
-{"command":"npx","args":["-y","@kaeawc/auto-mobile@latest","--transport","sse","--port","9000"]}
-EOF
             ;;
         *)
             # Default to minimal
@@ -1202,7 +1664,8 @@ args = ["-y", "@kaeawc/auto-mobile@latest"]
 EOF
             ;;
         development)
-            if [[ -n "${android_home}" ]]; then
+            # Only add ANDROID_HOME to env if it wasn't already set in the environment
+            if [[ -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
                 cat << EOF
 [mcp_servers.auto-mobile]
 command = "npx"
@@ -1219,13 +1682,6 @@ args = ["-y", "@kaeawc/auto-mobile@latest", "--debug", "--debug-perf"]
 EOF
             fi
             ;;
-        ci)
-            cat << 'EOF'
-[mcp_servers.auto-mobile]
-command = "npx"
-args = ["-y", "@kaeawc/auto-mobile@latest", "--transport", "sse", "--port", "9000"]
-EOF
-            ;;
         *)
             # Default to minimal
             cat << 'EOF'
@@ -1235,6 +1691,191 @@ args = ["-y", "@kaeawc/auto-mobile@latest"]
 EOF
             ;;
     esac
+}
+
+# Check if yq is installed
+is_yq_installed() {
+    command_exists yq
+}
+
+# Install yq for YAML processing
+install_yq() {
+    local os
+    os=$(detect_os)
+
+    if [[ "${NON_INTERACTIVE}" != "true" ]]; then
+        if ! gum confirm "yq is required for YAML configuration. Install yq now?"; then
+            log_info "Skipped yq installation"
+            return 1
+        fi
+    fi
+
+    if [[ "${os}" == "macos" ]] && command_exists brew; then
+        if ! run_spinner "Installing yq via Homebrew" brew install yq; then
+            log_error "Failed to install yq"
+            return 1
+        fi
+    elif command_exists go; then
+        if ! run_spinner "Installing yq via go install" go install github.com/mikefarah/yq/v4@latest; then
+            log_error "Failed to install yq"
+            return 1
+        fi
+    else
+        # Try direct binary download
+        local arch
+        arch=$(detect_arch)
+        local yq_binary="yq_${os}_${arch}"
+        local yq_url="https://github.com/mikefarah/yq/releases/latest/download/${yq_binary}"
+
+        local install_dir="${HOME}/.local/bin"
+        mkdir -p "${install_dir}"
+
+        if command_exists curl; then
+            if ! run_spinner "Downloading yq" curl -fsSL "${yq_url}" -o "${install_dir}/yq"; then
+                log_error "Failed to download yq"
+                return 1
+            fi
+        elif command_exists wget; then
+            if ! run_spinner "Downloading yq" wget -qO "${install_dir}/yq" "${yq_url}"; then
+                log_error "Failed to download yq"
+                return 1
+            fi
+        else
+            log_error "curl or wget required to download yq"
+            return 1
+        fi
+
+        chmod +x "${install_dir}/yq"
+        export PATH="${install_dir}:${PATH}"
+    fi
+
+    if command_exists yq; then
+        log_info "yq installed: $(yq --version 2>&1 | head -1)"
+        return 0
+    else
+        log_error "yq installation failed"
+        return 1
+    fi
+}
+
+# Ensure yq is available, installing if needed
+ensure_yq() {
+    if is_yq_installed; then
+        return 0
+    fi
+    install_yq
+}
+
+# Generate auto-mobile MCP server config in YAML format (for Goose)
+generate_auto_mobile_config_yaml() {
+    local preset="${1:-minimal}"
+    local android_home="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+
+    case "${preset}" in
+        minimal)
+            cat << 'EOF'
+extensions:
+  auto-mobile:
+    name: auto-mobile
+    type: stdio
+    enabled: true
+    cmd: npx
+    args:
+      - "-y"
+      - "@kaeawc/auto-mobile@latest"
+EOF
+            ;;
+        development)
+            # Only add ANDROID_HOME to env if it wasn't already set in the environment
+            if [[ -n "${android_home}" && "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
+                cat << EOF
+extensions:
+  auto-mobile:
+    name: auto-mobile
+    type: stdio
+    enabled: true
+    cmd: npx
+    args:
+      - "-y"
+      - "@kaeawc/auto-mobile@latest"
+      - "--debug"
+      - "--debug-perf"
+    env:
+      ANDROID_HOME: "${android_home}"
+EOF
+            else
+                cat << 'EOF'
+extensions:
+  auto-mobile:
+    name: auto-mobile
+    type: stdio
+    enabled: true
+    cmd: npx
+    args:
+      - "-y"
+      - "@kaeawc/auto-mobile@latest"
+      - "--debug"
+      - "--debug-perf"
+EOF
+            fi
+            ;;
+        *)
+            # Default to minimal
+            cat << 'EOF'
+extensions:
+  auto-mobile:
+    name: auto-mobile
+    type: stdio
+    enabled: true
+    cmd: npx
+    args:
+      - "-y"
+      - "@kaeawc/auto-mobile@latest"
+EOF
+            ;;
+    esac
+}
+
+# Merge auto-mobile config into existing YAML config (for Goose)
+merge_mcp_config_yaml() {
+    local config_file="$1"
+    local auto_mobile_yaml="$2"
+
+    # Handle case where file doesn't exist
+    if [[ ! -f "${config_file}" ]]; then
+        echo "${auto_mobile_yaml}"
+        return 0
+    fi
+
+    # Use yq to merge the configs
+    if ! command_exists yq; then
+        log_error "yq required for YAML configuration"
+        return 1
+    fi
+
+    # Check if auto-mobile already exists in the config
+    if yq -e '.extensions.auto-mobile' "${config_file}" &>/dev/null; then
+        log_info "auto-mobile already configured in YAML, will be updated"
+    fi
+
+    # Create a temp file with the new auto-mobile config
+    local temp_new
+    temp_new=$(mktemp)
+    echo "${auto_mobile_yaml}" > "${temp_new}"
+
+    # Merge: existing config + new auto-mobile extension
+    # This overwrites .extensions.auto-mobile with the new config
+    local merged
+    merged=$(yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${config_file}" "${temp_new}" 2>/dev/null)
+
+    rm -f "${temp_new}"
+
+    if [[ -z "${merged}" ]]; then
+        log_error "Failed to merge YAML configs"
+        return 1
+    fi
+
+    echo "${merged}"
 }
 
 # Update a single MCP client's configuration
@@ -1254,7 +1895,12 @@ update_mcp_client_config() {
 
     # Generate merged config based on format
     local new_content
-    if [[ "${format}" == "toml" ]]; then
+    if [[ "${format}" == "yaml" ]]; then
+        if ! new_content=$(merge_mcp_config_yaml "${config_path}" "${auto_mobile_config}"); then
+            log_error "Failed to generate YAML config for ${client_name}"
+            return 1
+        fi
+    elif [[ "${format}" == "toml" ]]; then
         if ! new_content=$(merge_toml_config "${config_path}" "${auto_mobile_config}"); then
             log_error "Failed to generate TOML config for ${client_name}"
             return 1
@@ -1266,36 +1912,53 @@ update_mcp_client_config() {
         fi
     fi
 
+    # Check if there are any changes needed
+    if [[ "${existing_content}" == "${new_content}" ]]; then
+        log_info "No changes needed for ${client_name}"
+        return 0
+    fi
+
     # Show diff
     show_config_diff "${existing_content}" "${new_content}" "${config_path}"
-    echo ""
+
+    # Reset terminal after colored output
+    printf '%s' "${RESET}"
 
     # In non-interactive mode, just apply
     if [[ "${NON_INTERACTIVE}" == "true" ]]; then
         backup_config "${config_path}"
-        write_file "${config_path}" "${new_content}" "Configure ${client_name}"
+        printf '%s\n' "${new_content}" > "${config_path}"
         log_info "${client_name} configured successfully"
+        CHANGES_MADE=true
         return 0
     fi
 
     # Confirm with user
+    local confirm_prompt
     if [[ -n "${existing_content}" ]]; then
-        if ! gum confirm "Apply changes to ${config_path}?"; then
-            log_info "Skipping ${client_name} configuration"
-            return 0
-        fi
+        confirm_prompt="Apply changes to ${config_path}?"
     else
-        if ! gum confirm "Create ${config_path}?"; then
-            log_info "Skipping ${client_name} configuration"
-            return 0
-        fi
+        confirm_prompt="Create ${config_path}?"
     fi
 
-    # Backup and write
-    backup_config "${config_path}"
-    write_file "${config_path}" "${new_content}" "Configure ${client_name}"
+    if ! gum confirm "${confirm_prompt}"; then
+        log_info "Skipping ${client_name} configuration"
+        return 0
+    fi
 
+    # Backup and write (skip confirmation since we already confirmed above)
+    backup_config "${config_path}"
+
+    # Create parent directory if needed
+    local parent_dir
+    parent_dir=$(dirname "${config_path}")
+    if [[ ! -d "${parent_dir}" ]]; then
+        mkdir -p "${parent_dir}"
+    fi
+
+    printf '%s\n' "${new_content}" > "${config_path}"
     log_info "${client_name} configured successfully"
+    CHANGES_MADE=true
 }
 
 # Configure all selected MCP clients
@@ -1313,7 +1976,6 @@ configure_selected_mcp_clients() {
         preset_choice=$(gum choose \
             "Minimal (basic setup)" \
             "Development (debug flags enabled)" \
-            "CI (SSE transport, port 9000)" \
             --header "Select configuration preset for MCP servers:")
 
         case "${preset_choice}" in
@@ -1323,9 +1985,6 @@ configure_selected_mcp_clients() {
             "Development"*)
                 config_preset="development"
                 ;;
-            "CI"*)
-                config_preset="ci"
-                ;;
         esac
     fi
 
@@ -1333,6 +1992,8 @@ configure_selected_mcp_clients() {
     auto_mobile_config_json=$(generate_auto_mobile_config "${config_preset}")
     local auto_mobile_config_toml
     auto_mobile_config_toml=$(generate_auto_mobile_config_toml "${config_preset}")
+    local auto_mobile_config_yaml
+    auto_mobile_config_yaml=$(generate_auto_mobile_config_yaml "${config_preset}")
 
     gum style --bold "Using ${config_preset} preset configuration"
     echo ""
@@ -1344,12 +2005,14 @@ configure_selected_mcp_clients() {
         format=$(get_client_config_format "${client}")
 
         if [[ "${format}" == "yaml" ]]; then
-            log_warn "YAML configuration for ${client} is not yet supported. Skipping."
-            log_info "Manual configuration required for: ${config_path}"
-            continue
-        fi
-
-        if [[ "${format}" == "toml" ]]; then
+            # Ensure yq is available for YAML processing
+            if ! ensure_yq; then
+                log_warn "YAML configuration for ${client} requires yq. Skipping."
+                log_info "Manual configuration required for: ${config_path}"
+                continue
+            fi
+            update_mcp_client_config "${client}" "${config_path}" "${auto_mobile_config_yaml}" "yaml"
+        elif [[ "${format}" == "toml" ]]; then
             update_mcp_client_config "${client}" "${config_path}" "${auto_mobile_config_toml}" "toml"
         else
             update_mcp_client_config "${client}" "${config_path}" "${auto_mobile_config_json}" "json"
@@ -1570,30 +2233,95 @@ install_auto_mobile_cli() {
         return 0
     fi
 
-    if command_exists bun; then
-        if run_with_progress "Installing AutoMobile CLI (bun)" \
-            bun add -g @kaeawc/auto-mobile@latest; then
-            return 0
-        fi
-        if run_with_progress "Installing AutoMobile CLI (bun install)" \
-            bun install -g @kaeawc/auto-mobile@latest; then
-            return 0
-        fi
-        log_error "AutoMobile CLI installation failed with Bun."
-        return 1
-    fi
-
-    if command_exists npm; then
-        if ! run_with_progress "Installing AutoMobile CLI (npm)" \
-            npm install -g @kaeawc/auto-mobile@latest; then
-            log_error "AutoMobile CLI installation failed."
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        if command_exists bun; then
+            DRY_RUN_LOG+=("[DRY-RUN] Install AutoMobile CLI with Bun")
+            log_info "[DRY-RUN] Would install AutoMobile CLI with: bun add -g @kaeawc/auto-mobile@latest"
+        elif command_exists npm; then
+            DRY_RUN_LOG+=("[DRY-RUN] Install AutoMobile CLI with npm")
+            log_info "[DRY-RUN] Would install AutoMobile CLI with: npm install -g @kaeawc/auto-mobile@latest"
+        else
+            log_error "Bun or npm is required to install AutoMobile CLI."
             return 1
         fi
         return 0
     fi
 
+    if command_exists bun; then
+        local install_output
+        local install_status=0
+        install_output=$(bun add -g @kaeawc/auto-mobile@latest 2>&1) || install_status=$?
+
+        if [[ ${install_status} -eq 0 ]]; then
+            log_info "AutoMobile CLI installed with Bun"
+            CHANGES_MADE=true
+            return 0
+        fi
+
+        # Try alternative bun install command
+        install_output=$(bun install -g @kaeawc/auto-mobile@latest 2>&1) || install_status=$?
+
+        if [[ ${install_status} -eq 0 ]]; then
+            log_info "AutoMobile CLI installed with Bun"
+            CHANGES_MADE=true
+            return 0
+        fi
+
+        log_error "AutoMobile CLI installation failed with Bun:"
+        echo "${install_output}"
+        return 1
+    fi
+
+    if command_exists npm; then
+        local install_output
+        local install_status=0
+        install_output=$(npm install -g @kaeawc/auto-mobile@latest 2>&1) || install_status=$?
+
+        if [[ ${install_status} -ne 0 ]]; then
+            log_error "AutoMobile CLI installation failed with npm:"
+            echo "${install_output}"
+            return 1
+        fi
+        log_info "AutoMobile CLI installed with npm"
+        CHANGES_MADE=true
+        return 0
+    fi
+
     log_error "Bun or npm is required to install AutoMobile CLI."
     return 1
+}
+
+install_claude_marketplace() {
+    if [[ "${CLAUDE_MARKETPLACE_INSTALLED}" == "true" ]]; then
+        return 0
+    fi
+
+    if [[ "${CLAUDE_CLI_INSTALLED}" != "true" ]]; then
+        log_error "Claude CLI is required to install marketplace plugin"
+        return 1
+    fi
+
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        DRY_RUN_LOG+=("[DRY-RUN] Install Claude Marketplace plugin")
+        log_info "[DRY-RUN] Would run: claude plugin marketplace add kaeawc/auto-mobile"
+        return 0
+    fi
+
+    log_info "Installing Claude Marketplace plugin..."
+    local install_output
+    local install_status=0
+    install_output=$(claude plugin marketplace add kaeawc/auto-mobile 2>&1) || install_status=$?
+
+    if [[ ${install_status} -ne 0 ]]; then
+        log_error "Failed to install Claude Marketplace plugin:"
+        echo "${install_output}"
+        return 1
+    fi
+
+    log_info "Claude Marketplace plugin installed successfully"
+    CLAUDE_MARKETPLACE_INSTALLED=true
+    CHANGES_MADE=true
+    return 0
 }
 
 install_ide_plugin() {
@@ -1688,13 +2416,81 @@ start_mcp_daemon() {
         return 1
     fi
 
-    if ! run_spinner "Starting MCP daemon" "${AUTO_MOBILE_CMD[@]}" --daemon start; then
-        log_error "Failed to start MCP daemon."
-        return 1
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        DRY_RUN_LOG+=("[DRY-RUN] Start MCP daemon")
+        DRY_RUN_LOG+=("[DRY-RUN] Check daemon health")
+        log_info "[DRY-RUN] Would start MCP daemon"
+        log_info "[DRY-RUN] Would check daemon health"
+        return 0
     fi
 
-    if ! run_spinner "Checking MCP daemon health" "${AUTO_MOBILE_CMD[@]}" --daemon health; then
-        log_error "Daemon health check failed."
+    local daemon_output
+    local daemon_status=0
+    daemon_output=$("${AUTO_MOBILE_CMD[@]}" --daemon start 2>&1) || daemon_status=$?
+
+    if [[ ${daemon_status} -ne 0 ]]; then
+        # Check for corrupted migrations error
+        if echo "${daemon_output}" | grep -q "corrupted migrations"; then
+            # Extract just the migration error message (from the "error:" line, not source code)
+            local migration_error
+            migration_error=$(echo "${daemon_output}" | grep "^error: corrupted migrations:" | sed 's/^error: //' | head -1)
+            if [[ -z "${migration_error}" ]]; then
+                # Fallback if format is different
+                migration_error="corrupted migrations (version mismatch)"
+            fi
+            log_warn "Database has ${migration_error}"
+            echo ""
+
+            local should_reset=false
+            if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+                # Default to reset in non-interactive mode
+                should_reset=true
+                log_info "Resetting database automatically..."
+            else
+                if gum confirm "Reset the AutoMobile database to fix this?" --default=true; then
+                    should_reset=true
+                fi
+            fi
+
+            if [[ "${should_reset}" == "true" ]]; then
+                local db_dir="${HOME}/.auto-mobile"
+                if [[ "${DRY_RUN}" == "true" ]]; then
+                    DRY_RUN_LOG+=("[DRY-RUN] Remove database files in ${db_dir}")
+                    log_info "[DRY-RUN] Would remove database files: ${db_dir}/*.db*"
+                    log_info "[DRY-RUN] Would retry daemon start"
+                else
+                    # Remove all database files (main db, WAL, SHM)
+                    rm -f "${db_dir}"/*.db* 2>/dev/null || true
+                    log_info "Database files removed from ${db_dir}"
+
+                    # Retry daemon start (reset status first)
+                    daemon_status=0
+                    daemon_output=$("${AUTO_MOBILE_CMD[@]}" --daemon start 2>&1) || daemon_status=$?
+                    if [[ ${daemon_status} -ne 0 ]]; then
+                        log_error "Failed to start MCP daemon after database reset:"
+                        echo "${daemon_output}"
+                        return 1
+                    fi
+                    log_info "MCP daemon started after database reset"
+                fi
+            else
+                log_error "Cannot start daemon with corrupted database. Exiting."
+                return 1
+            fi
+        else
+            log_error "Failed to start MCP daemon:"
+            echo "${daemon_output}"
+            return 1
+        fi
+    fi
+
+    local health_output
+    local health_status=0
+    health_output=$("${AUTO_MOBILE_CMD[@]}" --daemon health 2>&1) || health_status=$?
+
+    if [[ ${health_status} -ne 0 ]]; then
+        log_error "Daemon health check failed:"
+        echo "${health_output}"
         return 1
     fi
 
@@ -1706,16 +2502,28 @@ handle_bun_setup() {
         return 0
     fi
 
+    # If INSTALL_BUN was explicitly set (e.g., by development preset), skip Yes/No confirmation
     if [[ "${INSTALL_BUN}" == "true" ]]; then
-        install_bun
-        if command_exists bun; then
-            BUN_INSTALLED=true
+        if install_bun "true"; then
+            if command_exists bun; then
+                BUN_INSTALLED=true
+                CHANGES_MADE=true
+            fi
         fi
         return 0
     fi
 
-    log_warn "Skipping Bun installation. Some workflows may not work without it."
-    return 1
+    # Otherwise, prompt the user (install_bun handles the Yes/No prompt)
+    if [[ "${NON_INTERACTIVE}" != "true" ]]; then
+        if install_bun; then
+            if command_exists bun; then
+                BUN_INSTALLED=true
+                CHANGES_MADE=true
+            fi
+        fi
+    fi
+
+    return 0
 }
 
 check_android_sdk() {
@@ -2005,12 +2813,18 @@ collect_choices() {
         fi
     fi
 
-    if gum confirm "Install AutoMobile CLI (auto-mobile command) globally?"; then
-        INSTALL_AUTOMOBILE_CLI=true
+    # Only ask about CLI install if not already installed
+    if [[ "${CLI_ALREADY_INSTALLED}" != "true" ]]; then
+        if gum confirm "Install AutoMobile CLI (auto-mobile command) globally?"; then
+            INSTALL_AUTOMOBILE_CLI=true
+        fi
     fi
 
-    if gum confirm "Start MCP daemon and verify health?"; then
-        START_DAEMON=true
+    # Only ask about daemon if not already running
+    if [[ "${DAEMON_ALREADY_RUNNING}" != "true" ]]; then
+        if gum confirm "Start MCP daemon and verify health?"; then
+            START_DAEMON=true
+        fi
     fi
 }
 
@@ -2035,7 +2849,7 @@ resolve_android_sdk_root() {
     fi
 }
 
-install_bun() {
+install_bun_curl() {
     local temp_dir
     temp_dir=$(mktemp -d)
     local installer_path="${temp_dir}/bun-install.sh"
@@ -2069,14 +2883,111 @@ install_bun() {
     fi
 
     export PATH="${HOME}/.bun/bin:${PATH}"
+    rm -rf "${temp_dir}"
+    return 0
+}
+
+install_bun_homebrew() {
+    # Add the oven-sh/bun tap if not already added
+    if ! brew tap 2>/dev/null | grep -q "oven-sh/bun"; then
+        if ! run_spinner "Adding Homebrew tap oven-sh/bun" brew tap oven-sh/bun; then
+            log_error "Failed to add Homebrew tap."
+            return 1
+        fi
+    fi
+
+    if ! run_spinner "Installing Bun via Homebrew" brew install oven-sh/bun/bun; then
+        log_error "Bun installation via Homebrew failed."
+        return 1
+    fi
+
+    return 0
+}
+
+install_bun_npm() {
+    if ! run_spinner "Installing Bun via npm" npm install -g bun; then
+        log_error "Bun installation via npm failed."
+        return 1
+    fi
+
+    return 0
+}
+
+install_bun() {
+    local skip_confirm="${1:-false}"  # If true, skip the Yes/No prompt (already confirmed)
+    local os
+    os=$(detect_os)
+    local install_method="curl"
+
+    # Build list of available installation methods
+    local options=()
+    options+=("Official installer (curl | bash)")
+    if [[ "${os}" == "macos" ]] && command_exists brew; then
+        options+=("Homebrew (brew install)")
+    fi
+    if command_exists npm; then
+        options+=("npm (npm install -g)")
+    fi
+
+    # Ask user which method to use
+    if [[ "${NON_INTERACTIVE}" != "true" ]]; then
+        if [[ ${#options[@]} -gt 1 ]]; then
+            # Multiple options - show choose menu with Skip option
+            options+=("Skip")
+            local choice
+            choice=$(printf '%s\n' "${options[@]}" | gum choose --header "How would you like to install Bun?")
+
+            if [[ -z "${choice}" || "${choice}" == "Skip" ]]; then
+                log_info "Skipped Bun installation"
+                return 1
+            fi
+
+            case "${choice}" in
+                "Homebrew"*)
+                    install_method="homebrew"
+                    ;;
+                "npm"*)
+                    install_method="npm"
+                    ;;
+                *)
+                    install_method="curl"
+                    ;;
+            esac
+        else
+            # Only one option - ask Yes/No confirmation unless already confirmed
+            if [[ "${skip_confirm}" != "true" ]]; then
+                if ! gum confirm "Install Bun via official installer (curl | bash)?"; then
+                    log_info "Skipped Bun installation"
+                    return 1
+                fi
+            fi
+        fi
+    fi
+
+    local install_status=0
+    case "${install_method}" in
+        homebrew)
+            install_bun_homebrew || install_status=$?
+            ;;
+        npm)
+            install_bun_npm || install_status=$?
+            ;;
+        *)
+            install_bun_curl || install_status=$?
+            ;;
+    esac
+
+    if [[ "${install_status}" -ne 0 ]]; then
+        return 1
+    fi
 
     if command_exists bun; then
         log_info "Bun installed: $(bun --version)"
     else
-        log_warn "Bun installed but not on PATH. Restart your shell or add ${HOME}/.bun/bin to PATH."
+        log_warn "Bun installed but not on PATH. Restart your shell or add bun to PATH."
     fi
 
-    rm -rf "${temp_dir}"
+    return 0
 }
 
 # ============================================================================
@@ -2089,11 +3000,21 @@ apply_preset() {
 
     case "${preset_name}" in
         minimal)
+            # MCP client config only - no CLI, no daemon, no IDE plugin
             INSTALL_BUN=false
             INSTALL_IDE_PLUGIN=false
-            INSTALL_AUTOMOBILE_CLI=true
+            INSTALL_AUTOMOBILE_CLI=false
             START_DAEMON=false
             CONFIGURE_MCP_CLIENTS=true
+            ;;
+        marketplace)
+            # Claude Marketplace plugin
+            INSTALL_BUN=false
+            INSTALL_IDE_PLUGIN=false
+            INSTALL_AUTOMOBILE_CLI=false
+            START_DAEMON=false
+            CONFIGURE_MCP_CLIENTS=false
+            INSTALL_CLAUDE_MARKETPLACE=true
             ;;
         development)
             INSTALL_BUN=true
@@ -2108,8 +3029,18 @@ apply_preset() {
             else
                 INSTALL_IDE_PLUGIN=false
             fi
-            INSTALL_AUTOMOBILE_CLI=true
-            START_DAEMON=true
+            # Skip CLI install if already installed
+            if [[ "${CLI_ALREADY_INSTALLED}" == "true" ]]; then
+                INSTALL_AUTOMOBILE_CLI=false
+            else
+                INSTALL_AUTOMOBILE_CLI=true
+            fi
+            # Skip daemon start if already running
+            if [[ "${DAEMON_ALREADY_RUNNING}" == "true" ]]; then
+                START_DAEMON=false
+            else
+                START_DAEMON=true
+            fi
             CONFIGURE_MCP_CLIENTS=true
             ;;
         *)
@@ -2117,32 +3048,128 @@ apply_preset() {
             return 1
             ;;
     esac
+}
 
-    log_info "Applied ${preset_name} preset"
+# Check if a client base name has auto-mobile configured
+# Matches "Cursor" to "Cursor (Global)" etc.
+client_base_has_config() {
+    local base_name="$1"
+    detect_mcp_clients
+    for entry in "${MCP_CLIENT_LIST[@]}"; do
+        local entry_name
+        entry_name=$(echo "${entry}" | cut -d'|' -f1)
+        if [[ "${entry_name}" == "${base_name}"* ]]; then
+            if client_has_auto_mobile "${entry_name}"; then
+                return 0
+            fi
+        fi
+    done
+    return 1
 }
 
 # Interactive preset selection
 select_preset() {
     local choice
-    choice=$(gum choose \
-        "Minimal (CLI + MCP config only)" \
-        "Development (Full setup with debug flags)" \
-        "Custom (Choose components individually)" \
-        --header "Select installation preset:")
+    local options=()
+
+    # Keep current setup option first
+    options+=("Keep current AI agent setup")
+
+    # Claude marketplace option if Claude CLI is installed
+    if [[ "${CLAUDE_CLI_INSTALLED}" == "true" ]]; then
+        if [[ "${CLAUDE_MARKETPLACE_INSTALLED}" == "true" ]]; then
+            options+=("Claude Marketplace (configured)")
+        else
+            options+=("Claude Marketplace")
+        fi
+    fi
+
+    # AI Agent MCP client options - only show installed agents with config status
+    if is_claude_desktop_installed; then
+        if client_base_has_config "Claude Desktop"; then
+            options+=("Claude Desktop (configured)")
+        else
+            options+=("Claude Desktop")
+        fi
+    fi
+    if is_cursor_installed; then
+        if client_base_has_config "Cursor"; then
+            options+=("Cursor (configured)")
+        else
+            options+=("Cursor")
+        fi
+    fi
+    if is_windsurf_installed; then
+        if client_base_has_config "Windsurf"; then
+            options+=("Windsurf (configured)")
+        else
+            options+=("Windsurf")
+        fi
+    fi
+    if is_vscode_installed; then
+        if client_base_has_config "VS Code"; then
+            options+=("VS Code (configured)")
+        else
+            options+=("VS Code")
+        fi
+    fi
+    if is_codex_installed; then
+        if client_base_has_config "Codex"; then
+            options+=("Codex (configured)")
+        else
+            options+=("Codex")
+        fi
+    fi
+    if is_firebender_installed; then
+        if client_base_has_config "Firebender"; then
+            options+=("Firebender (configured)")
+        else
+            options+=("Firebender")
+        fi
+    fi
+    if is_goose_installed; then
+        if client_base_has_config "Goose"; then
+            options+=("Goose (configured)")
+        else
+            options+=("Goose")
+        fi
+    fi
+
+    # Development option
+    options+=("Development (for contributors)")
+
+    choice=$(printf '%s\n' "${options[@]}" | gum filter --header "Select installation preset:" --placeholder "Type to filter...") || true
+
+    # Handle Ctrl+C or empty selection - exit script
+    if [[ -z "${choice}" ]]; then
+        echo ""
+        echo "Installation cancelled."
+        exit 130
+    fi
 
     case "${choice}" in
-        "Minimal"*)
+        "Keep current AI agent setup")
+            log_info "Keeping current AI agent setup"
+            log_info "No changes necessary"
+            exit 0
+            ;;
+        "Claude Marketplace"*)
+            PRESET="marketplace"
+            apply_preset "marketplace"
+            return 0
+            ;;
+        "Claude Desktop"*|"Cursor"*|"Windsurf"*|"VS Code"*|"Codex"*|"Firebender"*|"Goose"*)
+            # Configure specific AI agent
+            PRESET="minimal"
             apply_preset "minimal"
+            # Extract base client name - strip " (configured)" suffix if present
+            PRESET_CLIENT_FILTER="${choice% (configured)}"
             return 0
             ;;
         "Development"*)
+            PRESET="development"
             apply_preset "development"
             return 0
-            ;;
-        "Custom"*)
-            # Fall through to interactive selection
-            CONFIGURE_MCP_CLIENTS=true
-            return 1
             ;;
     esac
 
@@ -2152,6 +3179,9 @@ select_preset() {
 main() {
     # Parse command line arguments first (before gum is available)
     parse_args "$@"
+
+    # Early detection of existing setup (before gum)
+    detect_existing_setup
 
     ensure_gum
 
@@ -2174,7 +3204,139 @@ main() {
 
     log_info "Starting setup from ${PROJECT_ROOT}"
 
+    # =========================================================================
+    # Detect current setup BEFORE asking any questions
+    # =========================================================================
+    echo ""
+    gum style --bold "Current Setup"
+
+    # Check Bun
+    if spin_check "Checking Bun" "command -v bun >/dev/null 2>&1"; then
+        BUN_INSTALLED=true
+    else
+        BUN_INSTALLED=false
+    fi
+
+    # Check Android SDK
+    local adb_check="command -v adb >/dev/null 2>&1 || [[ -x \"${ANDROID_HOME:-}/platform-tools/adb\" ]] || [[ -x \"${ANDROID_SDK_ROOT:-}/platform-tools/adb\" ]] || [[ -x \"${HOME}/Library/Android/sdk/platform-tools/adb\" ]] || [[ -x \"${HOME}/Android/Sdk/platform-tools/adb\" ]]"
+    if spin_check "Checking Android SDK (adb)" "${adb_check}"; then
+        ANDROID_SDK_DETECTED=true
+        ANDROID_SETUP_OK=true
+
+        # Detect ANDROID_HOME
+        local detected_android_home=""
+        if [[ -n "${ANDROID_HOME:-}" ]]; then
+            detected_android_home="${ANDROID_HOME}"
+        elif [[ -n "${ANDROID_SDK_ROOT:-}" ]]; then
+            detected_android_home="${ANDROID_SDK_ROOT}"
+        elif [[ -d "${HOME}/Library/Android/sdk" ]]; then
+            detected_android_home="${HOME}/Library/Android/sdk"
+        elif [[ -d "${HOME}/Android/Sdk" ]]; then
+            detected_android_home="${HOME}/Android/Sdk"
+        fi
+
+        if [[ -n "${detected_android_home}" ]]; then
+            log_info "Android SDK path: ${detected_android_home}"
+
+            # Offer to set ANDROID_HOME in shell profile if not already set
+            if [[ "${ANDROID_HOME_FROM_ENV}" != "true" ]]; then
+                offer_android_home_shell_setup "${detected_android_home}"
+            fi
+
+            # List available AVDs with API levels
+            local emulator_path="${detected_android_home}/emulator/emulator"
+            if [[ -x "${emulator_path}" ]]; then
+                local avd_list
+                avd_list=$("${emulator_path}" -list-avds 2>/dev/null | head -10 || true)
+                if [[ -n "${avd_list}" ]]; then
+                    # Get API levels for each AVD
+                    local avd_info=""
+                    while IFS= read -r avd_name; do
+                        if [[ -n "${avd_name}" ]]; then
+                            local avd_ini="${HOME}/.android/avd/${avd_name}.avd/config.ini"
+                            local api_level=""
+                            if [[ -f "${avd_ini}" ]]; then
+                                api_level=$(grep -o 'image.sysdir.1=.*android-[0-9]*' "${avd_ini}" 2>/dev/null | grep -o 'android-[0-9]*' | head -1 || true)
+                                api_level="${api_level#android-}"
+                            fi
+                            if [[ -n "${api_level}" ]]; then
+                                avd_info="${avd_info}${avd_name} (API ${api_level}),"
+                            else
+                                avd_info="${avd_info}${avd_name},"
+                            fi
+                        fi
+                    done <<< "${avd_list}"
+                    avd_info="${avd_info%,}"  # Remove trailing comma
+                    if [[ -n "${avd_info}" ]]; then
+                        log_info "Android AVDs available: ${avd_info}"
+                    fi
+                fi
+            fi
+        fi
+    else
+        ANDROID_SDK_DETECTED=false
+    fi
+
+    # Check iOS setup (macOS only)
+    if [[ "${os}" == "macos" ]]; then
+        # Check Xcode
+        if spin_check "Checking Xcode" "command -v xcodebuild >/dev/null 2>&1"; then
+            local xcode_version
+            xcode_version=$(xcodebuild -version 2>/dev/null | head -1 || true)
+            if [[ -n "${xcode_version}" ]]; then
+                log_info "Xcode detected: ${xcode_version}"
+            fi
+
+            # Check Command Line Tools
+            if spin_check "Checking Command Line Tools" "xcode-select -p >/dev/null 2>&1"; then
+                local clt_path
+                clt_path=$(xcode-select -p 2>/dev/null || true)
+                log_info "Command Line Tools path: ${clt_path}"
+
+                # Check iOS runtimes
+                local runtimes
+                runtimes=$(xcrun simctl list runtimes 2>/dev/null | grep -o 'iOS [0-9.]*' | tr '\n' ',' | sed 's/,$//' || true)
+                if [[ -n "${runtimes}" ]]; then
+                    log_info "iOS runtimes available: ${runtimes}"
+                fi
+
+                IOS_SETUP_OK=true
+            fi
+        fi
+    fi
+
+    # Check AutoMobile CLI
+    if [[ "${CLI_ALREADY_INSTALLED}" == "true" ]]; then
+        log_info "Checking AutoMobile CLI: installed"
+    else
+        log_info "Checking AutoMobile CLI: not installed"
+    fi
+
+    # Check MCP daemon
+    if [[ "${DAEMON_ALREADY_RUNNING}" == "true" ]]; then
+        log_info "Checking MCP daemon: running"
+    else
+        log_info "Checking MCP daemon: not running"
+    fi
+
+    # Check Claude CLI and marketplace
+    if [[ "${CLAUDE_CLI_INSTALLED}" == "true" ]]; then
+        # Check marketplace plugin (deferred from early detection because it's a slow network call)
+        if spin_check "Checking Claude marketplace plugin" "claude plugin marketplace list 2>/dev/null | grep -q 'auto-mobile' 2>/dev/null"; then
+            CLAUDE_MARKETPLACE_INSTALLED=true
+            log_info "Claude CLI: installed (marketplace plugin installed)"
+        else
+            log_info "Claude CLI: installed"
+        fi
+    else
+        log_info "Checking Claude CLI: not installed"
+    fi
+
+    echo ""
+
+    # =========================================================================
     # Handle preset mode
+    # =========================================================================
     if [[ -n "${PRESET}" ]]; then
         apply_preset "${PRESET}"
     elif [[ "${NON_INTERACTIVE}" == "true" ]]; then
@@ -2188,51 +3350,68 @@ main() {
         fi
     fi
 
-    # Only do interactive platform/component selection if not using a preset
+    # Only do interactive platform/component selection if using Custom preset
+    local platform_choice="Skip platform setup"
     if [[ -z "${PRESET}" ]] && [[ "${NON_INTERACTIVE}" != "true" ]] && [[ "${CONFIGURE_MCP_CLIENTS}" != "true" || "${INSTALL_BUN}" != "true" ]]; then
-        if [[ "${os}" != "macos" ]]; then
-            log_warn "iOS setup is only available on macOS. Android setup is available."
-            platform_choice=$(gum choose "Android" "Skip platform setup")
-        else
-            platform_choice=$(gum choose "Android" "iOS" "Both" "Skip platform setup")
-        fi
+        # Determine if we need to ask about platform setup
+        local need_platform_choice=false
+        local platform_options=()
 
-        if spin_check "Checking Bun" "command -v bun >/dev/null 2>&1"; then
-            BUN_INSTALLED=true
-        else
-            BUN_INSTALLED=false
-        fi
-
-        if [[ "${platform_choice}" == "Android" || "${platform_choice}" == "Both" ]]; then
-            local adb_check="command -v adb >/dev/null 2>&1 || [[ -x \"${ANDROID_HOME:-}/platform-tools/adb\" ]] || [[ -x \"${ANDROID_SDK_ROOT:-}/platform-tools/adb\" ]] || [[ -x \"${HOME}/Library/Android/sdk/platform-tools/adb\" ]] || [[ -x \"${HOME}/Android/Sdk/platform-tools/adb\" ]]"
-            if spin_check "Checking Android SDK (adb)" "${adb_check}"; then
-                ANDROID_SDK_DETECTED=true
+        if [[ "${os}" == "macos" ]]; then
+            # macOS can have both Android and iOS
+            if [[ "${ANDROID_SETUP_OK}" == "true" && "${IOS_SETUP_OK}" == "true" ]]; then
+                # Both platforms fully setup - skip the question
+                log_info "Both Android and iOS environments detected and ready"
+                platform_choice="Both"
             else
-                ANDROID_SDK_DETECTED=false
+                need_platform_choice=true
+                # Build options based on what's missing
+                if [[ "${ANDROID_SETUP_OK}" != "true" ]]; then
+                    platform_options+=("Android")
+                fi
+                if [[ "${IOS_SETUP_OK}" != "true" ]]; then
+                    platform_options+=("iOS")
+                fi
+                if [[ "${ANDROID_SETUP_OK}" != "true" && "${IOS_SETUP_OK}" != "true" ]]; then
+                    platform_options+=("Both")
+                fi
+
+                # Add skip option with current status
+                local skip_label="Skip"
+                if [[ "${ANDROID_SETUP_OK}" == "true" ]]; then
+                    skip_label="Skip (Android ready)"
+                elif [[ "${IOS_SETUP_OK}" == "true" ]]; then
+                    skip_label="Skip (iOS ready)"
+                else
+                    skip_label="Skip (no platform setup)"
+                fi
+                platform_options+=("${skip_label}")
+            fi
+        else
+            # Non-macOS - only Android is available
+            if [[ "${ANDROID_SETUP_OK}" == "true" ]]; then
+                log_info "Android environment detected and ready"
+                platform_choice="Android"
+            else
+                need_platform_choice=true
+                platform_options+=("Android")
+                platform_options+=("Skip (no platform setup)")
+            fi
+        fi
+
+        if [[ "${need_platform_choice}" == "true" ]]; then
+            platform_choice=$(printf '%s\n' "${platform_options[@]}" | gum choose --header "Platform setup:")
+            # Normalize skip choices
+            if [[ "${platform_choice}" == Skip* ]]; then
+                platform_choice="Skip platform setup"
             fi
         fi
 
         collect_choices
     else
-        # Check current state for preset mode
-        if spin_check "Checking Bun" "command -v bun >/dev/null 2>&1"; then
-            BUN_INSTALLED=true
-        else
-            BUN_INSTALLED=false
-        fi
-
-        local adb_check="command -v adb >/dev/null 2>&1 || [[ -x \"${ANDROID_HOME:-}/platform-tools/adb\" ]] || [[ -x \"${ANDROID_SDK_ROOT:-}/platform-tools/adb\" ]] || [[ -x \"${HOME}/Library/Android/sdk/platform-tools/adb\" ]] || [[ -x \"${HOME}/Android/Sdk/platform-tools/adb\" ]]"
-        if spin_check "Checking Android SDK (adb)" "${adb_check}"; then
-            ANDROID_SDK_DETECTED=true
-        else
-            ANDROID_SDK_DETECTED=false
-        fi
-
-        # Set platform_choice based on IDE plugin installation
+        # Set platform_choice based on IDE plugin installation (for preset mode)
         if [[ "${INSTALL_IDE_PLUGIN}" == "true" ]]; then
             platform_choice="Android"
-        else
-            platform_choice="Skip platform setup"
         fi
     fi
 
@@ -2242,7 +3421,28 @@ main() {
         gum style --bold "MCP Client Configuration"
         echo ""
 
-        if [[ "${NON_INTERACTIVE}" == "true" ]]; then
+        if [[ -n "${PRESET_CLIENT_FILTER}" ]]; then
+            # User selected a specific AI agent - auto-configure matching clients
+            detect_mcp_clients
+            local matching_clients=()
+            for entry in "${MCP_CLIENT_LIST[@]}"; do
+                local entry_name
+                entry_name=$(echo "${entry}" | cut -d'|' -f1)
+                # Match clients that start with the filter (e.g., "Cursor" matches "Cursor (Global)")
+                if [[ "${entry_name}" == "${PRESET_CLIENT_FILTER}"* ]]; then
+                    matching_clients+=("${entry_name}")
+                fi
+            done
+
+            if [[ ${#matching_clients[@]} -gt 0 ]]; then
+                SELECTED_MCP_CLIENTS=("${matching_clients[@]}")
+                log_info "Configuring ${PRESET_CLIENT_FILTER}..."
+                configure_selected_mcp_clients
+            else
+                log_warn "No ${PRESET_CLIENT_FILTER} installation detected."
+                log_info "Install ${PRESET_CLIENT_FILTER} first, then run this installer again."
+            fi
+        elif [[ "${NON_INTERACTIVE}" == "true" ]]; then
             # In non-interactive mode, auto-detect and configure Claude Code
             detect_mcp_clients
             local claude_code_entry
@@ -2266,29 +3466,42 @@ main() {
     # Platform-specific setup
     case "${platform_choice}" in
         Android)
-            check_android_sdk
+            # Only run setup if not already detected as ready
+            if [[ "${ANDROID_SETUP_OK}" != "true" ]]; then
+                check_android_sdk
+            fi
             if [[ "${INSTALL_IDE_PLUGIN}" == "true" ]]; then
                 install_ide_plugin
             fi
             ;;
         iOS)
-            run_ios_setup
+            # Only run setup if not already detected as ready
+            if [[ "${IOS_SETUP_OK}" != "true" ]]; then
+                run_ios_setup
+            fi
             ;;
         Both)
-            check_android_sdk
+            # Only run setup for platforms not already detected as ready
+            if [[ "${ANDROID_SETUP_OK}" != "true" ]]; then
+                check_android_sdk
+            fi
             if [[ "${INSTALL_IDE_PLUGIN}" == "true" ]]; then
                 install_ide_plugin
             fi
-            run_ios_setup
-            ;;
-        *)
-            log_info "Skipping platform-specific setup."
+            if [[ "${IOS_SETUP_OK}" != "true" ]]; then
+                run_ios_setup
+            fi
             ;;
     esac
 
     # CLI installation
     if [[ "${INSTALL_AUTOMOBILE_CLI}" == "true" ]]; then
         install_auto_mobile_cli
+    fi
+
+    # Claude Marketplace plugin installation
+    if [[ "${INSTALL_CLAUDE_MARKETPLACE}" == "true" ]]; then
+        install_claude_marketplace
     fi
 
     # Daemon startup
@@ -2299,8 +3512,13 @@ main() {
     # Print dry-run summary if applicable
     print_dry_run_summary
 
+    echo ""
     if [[ "${DRY_RUN}" != "true" ]]; then
-        log_info "Setup complete. Review docs/install/overview.md for MCP configuration examples."
+        if [[ "${CHANGES_MADE}" == "true" ]]; then
+            log_info "Setup complete. Review docs/install/overview.md for MCP configuration examples."
+        else
+            log_info "No changes necessary"
+        fi
     fi
 }
 
