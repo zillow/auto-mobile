@@ -102,30 +102,44 @@ open class AutoMobileTestCase: XCTestCase {
     private static var devicePoolCheckCompleted = false
 
     override open func setUpWithError() throws {
+        print("[AutoMobileTestCase] setUpWithError starting for \(name)")
         try super.setUpWithError()
         try setUpAutoMobile()
-        try ensureDevicePoolReady()
+        print("[AutoMobileTestCase] Creating configuration...")
         let config = try makeConfiguration()
+        print("[AutoMobileTestCase] Configuration created: planPath=\(config.planPath), transport=\(config.transport)")
         executor = AutoMobilePlanExecutor(configuration: config)
+        print("[AutoMobileTestCase] Executor created")
     }
 
     override open func tearDownWithError() throws {
+        print("[AutoMobileTestCase] tearDownWithError starting for \(name)")
         try tearDownAutoMobile()
         executor = nil
+        // Note: Session release is handled automatically by the daemon after executePlan completes
         try super.tearDownWithError()
+        print("[AutoMobileTestCase] tearDownWithError complete")
     }
 
     public func executePlan() throws -> AutoMobilePlanExecutor.ExecutePlanResult {
+        print("[AutoMobileTestCase] executePlan starting...")
         guard let executor = executor else {
+            print("[AutoMobileTestCase] ERROR: executor is nil")
             throw AutoMobileTestCaseError.executorUnavailable
         }
         let metadata = buildTestMetadata()
-        return try executor.execute(testMetadata: metadata)
+        print("[AutoMobileTestCase] Executing with metadata: testClass=\(metadata.testClass), testMethod=\(metadata.testMethod)")
+        let result = try executor.execute(testMetadata: metadata)
+        print("[AutoMobileTestCase] executePlan completed")
+        return result
     }
 
     private func makeConfiguration() throws -> AutoMobilePlanExecutor.Configuration {
+        print("[AutoMobileTestCase] makeConfiguration starting...")
         let planPath = planPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        print("[AutoMobileTestCase] planPath: \(planPath)")
         guard !planPath.isEmpty else {
+            print("[AutoMobileTestCase] ERROR: planPath is empty")
             throw AutoMobileTestCaseError.missingPlanPath
         }
 
@@ -135,12 +149,14 @@ open class AutoMobileTestCase: XCTestCase {
             "AUTOMOBILE_MCP_HTTP_URL",
             "MCP_ENDPOINT"
         ]) {
+            print("[AutoMobileTestCase] Using HTTP transport with endpoint: \(endpoint)")
             let normalizedEndpoint = normalizeEndpoint(endpoint)
             guard let endpointURL = URL(string: normalizedEndpoint) else {
                 throw AutoMobileTestCaseError.invalidEndpoint(normalizedEndpoint)
             }
             transport = .streamableHttp(url: endpointURL)
         } else {
+            print("[AutoMobileTestCase] Using Unix socket transport at: \(daemonSocketPath)")
             transport = .daemonUnixSocket(path: daemonSocketPath)
         }
 
