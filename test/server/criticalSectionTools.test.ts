@@ -172,6 +172,7 @@ describe("criticalSection tool", () => {
     expect(executionLog).toEqual(["step1", "step2", "step3"]);
   });
 
+
   test("fails fast when a step fails", async () => {
     const tool = ToolRegistry.getTool("criticalSection");
     expect(tool).toBeDefined();

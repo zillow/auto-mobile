@@ -83,45 +83,60 @@ sequenceDiagram
 ```yaml
 steps:
   - tool: navigateTo
-    device: A
-    text: Edit Profile
+    params:
+      device: A
+      text: Edit Profile
   - tool: tapOn
-    device: A
-    text: Clear Status
+    params:
+      device: A
+      text: Clear Status
   - tool: navigateTo
-    device: A
-    text: Search
+    params:
+      device: A
+      text: Search
   - tool: inputText
-    device: B
-    text: Test User A
+    params:
+      device: B
+      text: Test User A
   - tool: imeAction
-    device: B
-    text: done
+    params:
+      device: B
+      text: done
   - tool: criticalSection
-    steps:
-      - tool: tapOn
-        device: A
-        text: Edit Profile
-      - tool: tapOn
-        device: A
-        text: Status
-      - tool: inputText
-        device: A
-        text: Pretty awesome
-      - tool: tapOn
-        device: A
-        text: Clear Status
-      - tool: observe
-        device: B
-        await:
-          - text: No Status
-      - tool: tapOn
-        device: A
-        text: Save profile
-      - tool: observe
-        device: B
-        await:
-          - text: Pretty awesome
+    params:
+      lock: profile-sync
+      deviceCount: 2
+      steps:
+        - tool: tapOn
+          params:
+            device: A
+            text: Edit Profile
+        - tool: tapOn
+          params:
+            device: A
+            text: Status
+        - tool: inputText
+          params:
+            device: A
+            text: Pretty awesome
+        - tool: tapOn
+          params:
+            device: A
+            text: Clear Status
+        - tool: observe
+          params:
+            device: B
+            await:
+              - text: No Status
+        - tool: tapOn
+          params:
+            device: A
+            text: Save profile
+        - tool: observe
+          params:
+            device: B
+            await:
+              - text: Pretty awesome
 ```
 
 ## Error Handling

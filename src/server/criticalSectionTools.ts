@@ -1,16 +1,24 @@
 import { z } from "zod";
 import { ToolRegistry } from "./toolRegistry";
-import { ActionableError, BootedDevice, PlanStep } from "../models/index";
+import { ActionableError, BootedDevice } from "../models/index";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse, throwIfAborted } from "../utils/toolUtils";
 import { CriticalSectionCoordinator } from "./CriticalSectionCoordinator";
+import { PlanNormalizer } from "../utils/plan/PlanNormalizer";
 
 // Schema for steps inside critical section
-const planStepSchema: z.ZodType<PlanStep> = z.object({
-  tool: z.string().describe("Tool name to execute"),
-  params: z.record(z.string(), z.any()).describe("Tool-specific parameters"),
-  label: z.string().optional().describe("Optional human-readable label"),
-});
+const criticalSectionStepSchema = z
+  .object({
+    tool: z.string().describe("Tool name to execute"),
+    params: z
+      .record(z.string(), z.any())
+      .optional()
+      .describe("Tool-specific parameters"),
+    label: z.string().optional().describe("Optional human-readable label"),
+  })
+  .passthrough();
+
+type CriticalSectionStepInput = z.infer<typeof criticalSectionStepSchema>;
 
 // Critical section tool schema
 const criticalSectionSchema = z.object({
@@ -20,7 +28,7 @@ const criticalSectionSchema = z.object({
       "Global lock identifier. All devices using the same lock name will wait for each other at this barrier."
     ),
   steps: z
-    .array(planStepSchema)
+    .array(criticalSectionStepSchema)
     .min(1)
     .describe(
       "Steps to execute serially within the critical section. Each step should target a specific device using the 'device' parameter."
@@ -55,6 +63,9 @@ const criticalSectionHandler = async (
   signal?: AbortSignal
 ): Promise<any> => {
   const { lock, steps, deviceCount, timeout } = params;
+  const normalizedSteps = PlanNormalizer.normalizeSteps(
+    steps as CriticalSectionStepInput[]
+  );
   const coordinator = CriticalSectionCoordinator.getInstance();
 
   logger.info(
@@ -65,7 +76,7 @@ const criticalSectionHandler = async (
   throwIfAborted(signal);
 
   // Validate steps to prevent nesting
-  for (const step of steps) {
+  for (const step of normalizedSteps) {
     if (step.tool === "criticalSection") {
       throw new ActionableError(
         `Nested critical sections are not supported. Found criticalSection step inside critical section "${lock}".`
@@ -93,18 +104,18 @@ const criticalSectionHandler = async (
     );
 
     logger.info(
-      `Device ${device.deviceId} executing ${steps.length} steps in critical section "${lock}"`
+      `Device ${device.deviceId} executing ${normalizedSteps.length} steps in critical section "${lock}"`
     );
 
     // Execute steps serially
     const executedSteps: Array<{ tool: string; success: boolean }> = [];
 
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
+    for (let i = 0; i < normalizedSteps.length; i++) {
+      const step = normalizedSteps[i];
       throwIfAborted(signal);
 
       logger.debug(
-        `Device ${device.deviceId} executing step ${i + 1}/${steps.length}: ${step.tool}`
+        `Device ${device.deviceId} executing step ${i + 1}/${normalizedSteps.length}: ${step.tool}`
       );
 
       try {
@@ -165,7 +176,7 @@ const criticalSectionHandler = async (
       lock,
       deviceId: device.deviceId,
       executedSteps: executedSteps.length,
-      totalSteps: steps.length,
+      totalSteps: normalizedSteps.length,
     });
   } catch (error) {
     // Force cleanup on error to prevent other devices from waiting forever

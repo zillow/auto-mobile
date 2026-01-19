@@ -39,32 +39,39 @@ devices: ["A", "B"]
 
 steps:
   - tool: launchApp
-    device: A
-    appId: com.chat.app
+    params:
+      device: A
+      appId: com.chat.app
     label: Launch sender
 
   - tool: launchApp
-    device: B
-    appId: com.chat.app
+    params:
+      device: B
+      appId: com.chat.app
     label: Launch receiver
 
   - tool: criticalSection
-    lock: "chat-room"
-    steps:
-      - tool: inputText
-        device: A
-        text: "Hello"
-        label: Type message
-      - tool: imeAction
-        device: A
-        action: send
-        label: Send message
+    params:
+      lock: "chat-room"
+      deviceCount: 2
+      steps:
+        - tool: inputText
+          params:
+            device: A
+            text: "Hello"
+          label: Type message
+        - tool: imeAction
+          params:
+            device: A
+            action: send
+          label: Send message
 
   - tool: systemTray
-    device: B
-    action: find
-    notification: { body: "Hello" }
-    awaitTimeout: 5000
+    params:
+      device: B
+      action: find
+      notification: { body: "Hello" }
+      awaitTimeout: 5000
     label: Verify notification
 ```
 
