@@ -640,10 +640,6 @@ jobs:
           cd ios/XCTestRunner
           swift test --filter RemindersLaunchPlanTests
 
-      - name: "Stop AutoMobile daemon"
-        if: always()
-        run: bun run dist/src/index.js --daemon stop
-
   # =============================================================================
   # Android Build and Test Jobs (Android-related changes only)
   # =============================================================================
