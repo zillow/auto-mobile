@@ -129,7 +129,13 @@ export class XcodebuildClient implements Xcodebuild {
     if (!this.hostControlAvailability) {
       this.hostControlAvailability = this.hostControl.isAvailable();
     }
-    return this.hostControlAvailability;
+
+    const available = await this.hostControlAvailability;
+    if (!available) {
+      this.hostControlAvailability = null;
+    }
+
+    return available;
   }
 
   private async isLocalXcodebuildAvailable(): Promise<boolean> {
