@@ -30,6 +30,7 @@ docs/changelog.md
 docs/contributing/index.md
 
 /.cache
+.mcp.json
 .mcp.local.json
 *.pid
 # IntelliJ Platform Gradle plugin artifacts

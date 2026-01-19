@@ -2,7 +2,7 @@
   "mcpServers": {
     "auto-mobile": {
       "type": "http",
-      "url": "http://localhost:9831/auto-mobile/streamable"
+      "url": "http://localhost:9000/auto-mobile/streamable"
     }
   }
 }
