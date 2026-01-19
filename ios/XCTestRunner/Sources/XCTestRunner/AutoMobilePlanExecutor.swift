@@ -91,6 +91,9 @@ public struct DefaultPlanLoader: AutoMobilePlanLoading {
             if let resourceURL = resolveBundleResource(path: path, bundle: bundle) {
                 return try readFile(at: resourceURL)
             }
+            if let fallbackURL = resolveBundleFallback(path: path, bundle: bundle) {
+                return try readFile(at: fallbackURL)
+            }
         }
 
         if let mainURL = Bundle.main.url(forResource: path, withExtension: nil) {
@@ -125,6 +128,17 @@ public struct DefaultPlanLoader: AutoMobilePlanLoading {
             return bundle.url(forResource: name, withExtension: ext)
         }
         return nil
+    }
+
+    private func resolveBundleFallback(path: String, bundle: Bundle) -> URL? {
+        guard path.contains("/") else {
+            return nil
+        }
+        let filename = URL(fileURLWithPath: path).lastPathComponent
+        if let resourceURL = bundle.url(forResource: filename, withExtension: nil) {
+            return resourceURL
+        }
+        return resolveBundleResource(path: filename, bundle: bundle)
     }
 
     private func readFile(at url: URL) throws -> String {
