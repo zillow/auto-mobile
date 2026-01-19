@@ -29,6 +29,7 @@ import { FeatureFlagService } from "../featureFlags/FeatureFlagService";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
+import { ObserveElementsBuilder } from "./ObserveElementsBuilder";
 
 /**
  * Interface for cached observe result
@@ -52,6 +53,7 @@ export class ObserveScreen {
   private backStack: GetBackStack;
   private adb: AdbClient;
   private predictiveUIState: PredictiveUIState;
+  private observeElementsBuilder: ObserveElementsBuilder;
 
   // Static cache for observe results
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
@@ -112,7 +114,11 @@ export class ObserveScreen {
     ScreenshotJobTracker.clear();
   }
 
-  constructor(device: BootedDevice, adb: AdbClient | null = null) {
+  constructor(
+    device: BootedDevice,
+    adb: AdbClient | null = null,
+    observeElementsBuilder: ObserveElementsBuilder = new ObserveElementsBuilder()
+  ) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
     this.screenSize = new GetScreenSize(device, this.adb);
@@ -123,6 +129,7 @@ export class ObserveScreen {
     this.dumpsysWindow = new GetDumpsysWindow(device, this.adb);
     this.backStack = new GetBackStack(this.adb);
     this.predictiveUIState = new PredictiveUIState();
+    this.observeElementsBuilder = observeElementsBuilder;
 
     // Ensure observe result cache directory exists
     if (!fs.existsSync(ObserveScreen.observeResultCacheDir)) {
@@ -375,6 +382,14 @@ export class ObserveScreen {
     }
   }
 
+  private populateElements(result: ObserveResult): void {
+    if (result.elements || !result.viewHierarchy?.hierarchy) {
+      return;
+    }
+
+    result.elements = this.observeElementsBuilder.build(result.viewHierarchy);
+  }
+
   /**
    * Collect active window information using cache if available
    * @param result - ObserveResult to update
@@ -448,6 +463,8 @@ export class ObserveScreen {
           };
         }
 
+        this.populateElements(result);
+
         // Fallback: if activeWindow still not populated, use the Window class
         if (!result.activeWindow) {
           await this.collectActiveWindow(result);
@@ -491,6 +508,8 @@ export class ObserveScreen {
             attachRawViewHierarchy(result.viewHierarchy, rawHierarchy);
           }
         }
+
+        this.populateElements(result);
 
         perf.end();
         break;

@@ -27,6 +27,7 @@ const { spawn, execFile } = require("child_process");
 const { promisify } = require("util");
 const path = require("path");
 const os = require("os");
+const fs = require("fs");
 
 const execFileAsync = promisify(execFile);
 
@@ -93,6 +94,63 @@ async function isXcodeAvailable() {
 // Track running emulator processes
 const runningEmulators = new Map(); // avdName -> { pid, process }
 const runningSimulators = new Map(); // udid -> { name, state }
+const runningXCTestServices = new Map(); // deviceId -> { pid, process, port, startedAt, deviceId }
+
+function drainChildOutput(child) {
+  if (child.stdout) {
+    child.stdout.on("data", () => {});
+    child.stdout.resume();
+  }
+  if (child.stderr) {
+    child.stderr.on("data", () => {});
+    child.stderr.resume();
+  }
+}
+
+function isProcessRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function findXctestrunPath(requestedPath) {
+  if (requestedPath && fs.existsSync(requestedPath)) {
+    return requestedPath;
+  }
+
+  const cacheDir = path.join(os.homedir(), ".automobile", "xctestservice");
+  if (!fs.existsSync(cacheDir)) {
+    return null;
+  }
+
+  const stack = [{ dir: cacheDir, depth: 3 }];
+  while (stack.length > 0) {
+    const { dir, depth } = stack.pop();
+    if (depth < 0) continue;
+
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isFile() && entry.name.endsWith(".xctestrun")) {
+        return entryPath;
+      }
+      if (entry.isDirectory()) {
+        stack.push({ dir: entryPath, depth: depth - 1 });
+      }
+    }
+  }
+
+  return null;
+}
 
 // Command handlers
 const handlers = {
@@ -454,6 +512,164 @@ const handlers = {
   },
 
   /**
+   * Start XCTestService via xcodebuild on the host
+   */
+  async "xctest-start"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "XCTestService is only available on macOS" };
+    }
+
+    const { deviceId, port, xctestrunPath, bundleId, timeoutSeconds } = params;
+    if (!deviceId || !port) {
+      return { success: false, error: "deviceId and port are required" };
+    }
+
+    const existing = runningXCTestServices.get(deviceId);
+    if (existing && isProcessRunning(existing.pid)) {
+      return { success: true, pid: existing.pid, message: "XCTestService already running" };
+    }
+
+    const resolvedXctestrunPath = findXctestrunPath(xctestrunPath);
+    const args = [];
+    if (resolvedXctestrunPath) {
+      args.push(
+        "test-without-building",
+        "-xctestrun",
+        resolvedXctestrunPath
+      );
+    } else {
+      const projectRoot = path.resolve(__dirname, "..", "..");
+      const projectPath = path.join(projectRoot, "ios", "XCTestService", "XCTestService.xcodeproj");
+      args.push(
+        "test",
+        "-project",
+        projectPath,
+        "-scheme",
+        "XCTestServiceApp"
+      );
+    }
+
+    args.push(
+      "-destination",
+      `id=${deviceId}`,
+      "-only-testing:XCTestServiceUITests/XCTestServiceUITests/testRunService",
+      `XCTESTSERVICE_PORT=${port}`
+    );
+
+    if (bundleId) {
+      args.push(`XCTESTSERVICE_BUNDLE_ID=${bundleId}`);
+    }
+    if (timeoutSeconds) {
+      args.push(`XCTESTSERVICE_TIMEOUT=${timeoutSeconds}`);
+    }
+
+    try {
+      const child = spawn("xcodebuild", args, { stdio: ["ignore", "pipe", "pipe"] });
+      if (!child.pid) {
+        return { success: false, error: "Failed to start xcodebuild (no PID)" };
+      }
+
+      drainChildOutput(child);
+
+      const entry = { pid: child.pid, process: child, port, startedAt: Date.now(), deviceId };
+      runningXCTestServices.set(deviceId, entry);
+
+      child.on("exit", () => {
+        runningXCTestServices.delete(deviceId);
+      });
+
+      return { success: true, pid: child.pid, message: "XCTestService started" };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Stop XCTestService on the host
+   */
+  async "xctest-stop"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "XCTestService is only available on macOS" };
+    }
+
+    const { deviceId, pid } = params || {};
+    let targetEntry = null;
+    if (deviceId && runningXCTestServices.has(deviceId)) {
+      targetEntry = runningXCTestServices.get(deviceId);
+    } else if (pid) {
+      for (const entry of runningXCTestServices.values()) {
+        if (entry.pid === pid) {
+          targetEntry = entry;
+          break;
+        }
+      }
+    }
+
+    if (!targetEntry) {
+      return { success: false, error: "XCTestService process not found" };
+    }
+
+    try {
+      process.kill(targetEntry.pid);
+      runningXCTestServices.delete(deviceId || targetEntry.deviceId);
+      return { success: true, message: `Stopped XCTestService pid ${targetEntry.pid}` };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Check XCTestService status on the host
+   */
+  async "xctest-status"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "XCTestService is only available on macOS" };
+    }
+
+    const { deviceId, pid, port } = params || {};
+    let entry = null;
+
+    if (deviceId && runningXCTestServices.has(deviceId)) {
+      entry = runningXCTestServices.get(deviceId);
+    } else if (pid) {
+      for (const item of runningXCTestServices.values()) {
+        if (item.pid === pid) {
+          entry = item;
+          break;
+        }
+      }
+    } else if (port) {
+      for (const item of runningXCTestServices.values()) {
+        if (item.port === port) {
+          entry = item;
+          break;
+        }
+      }
+    }
+
+    if (!entry) {
+      return { success: true, running: false };
+    }
+
+    const running = isProcessRunning(entry.pid);
+    if (!running) {
+      if (deviceId) {
+        runningXCTestServices.delete(deviceId);
+      }
+      return { success: true, running: false };
+    }
+
+    return {
+      success: true,
+      running: true,
+      pid: entry.pid,
+      port: entry.port,
+      deviceId: entry.deviceId,
+      startedAt: entry.startedAt
+    };
+  },
+
+  /**
    * Get iOS tooling info
    */
   async "ios-info"() {
@@ -586,6 +802,9 @@ iOS Commands (macOS only):
   - shutdown-simulator     Shutdown a simulator (params: udid)
   - simctl                 Run simctl command (params: args)
   - xcodebuild             Run xcodebuild command (params: args)
+  - xctest-start           Start XCTestService (params: deviceId, port, xctestrunPath, bundleId, timeoutSeconds)
+  - xctest-stop            Stop XCTestService (params: deviceId or pid)
+  - xctest-status          Check XCTestService status (params: deviceId, pid, port)
   - ios-info               Get iOS tooling info
 
 Press Ctrl+C to stop.
@@ -601,6 +820,16 @@ process.on("SIGINT", () => {
     try {
       process.kill(pid, "SIGTERM");
       console.log(`Stopped emulator ${avd} (pid ${pid})`);
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  // Kill any XCTestService processes we started
+  for (const [deviceId, { pid }] of runningXCTestServices) {
+    try {
+      process.kill(pid, "SIGTERM");
+      console.log(`Stopped XCTestService for ${deviceId} (pid ${pid})`);
     } catch {
       // Ignore errors
     }

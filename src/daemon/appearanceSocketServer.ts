@@ -20,11 +20,12 @@ import { triggerAppearanceSync } from "../utils/appearance/AppearanceSyncSchedul
 import { DaemonState } from "./daemonState";
 import type { AppearanceMode, BootedDevice } from "../models";
 
-const DEFAULT_SOCKET_PATH = path.join(
-  os.homedir(),
-  ".auto-mobile",
-  "appearance.sock"
-);
+// Use /tmp for socket when running with external emulator (Docker container with mounted home)
+// because Unix sockets don't work on Docker Desktop's mounted volumes
+const isExternalMode = process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
+const DEFAULT_SOCKET_PATH = isExternalMode
+  ? "/tmp/auto-mobile-appearance.sock"
+  : path.join(os.homedir(), ".auto-mobile", "appearance.sock");
 
 const VALID_MODES = new Set(["light", "dark", "auto"]);
 

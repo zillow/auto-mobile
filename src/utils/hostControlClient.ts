@@ -7,6 +7,7 @@
 
 import { createConnection } from "node:net";
 import { logger } from "./logger";
+import { createExecResult } from "./execResult";
 
 // Configuration from environment
 const HOST_CONTROL_HOST = process.env.AUTOMOBILE_HOST_CONTROL_HOST || "host.docker.internal";
@@ -68,6 +69,14 @@ interface IosInfo {
   xcodeVersion?: string;
   simctlVersion?: string;
   developerDir?: string;
+}
+
+interface XCTestServiceStatus {
+  running: boolean;
+  pid?: number;
+  port?: number;
+  deviceId?: string;
+  startedAt?: number;
 }
 
 let requestId = 0;
@@ -271,6 +280,20 @@ export async function runSimctl(
   return sendCommand("simctl", { args });
 }
 
+export async function runSimctlExec(
+  args: string[]
+): Promise<HostControlResult<ReturnType<typeof createExecResult>>> {
+  const result = await runSimctl(args);
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "simctl failed" };
+  }
+
+  return {
+    success: true,
+    data: createExecResult(result.data.stdout, result.data.stderr)
+  };
+}
+
 /**
  * Run an xcodebuild command on the host
  */
@@ -278,6 +301,31 @@ export async function runXcodebuild(
   args: string[]
 ): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
   return sendCommand("xcodebuild", { args });
+}
+
+export async function startXCTestService(params: {
+  deviceId: string;
+  port: number;
+  xctestrunPath?: string;
+  bundleId?: string;
+  timeoutSeconds?: number;
+}): Promise<HostControlResult<{ pid: number; message: string }>> {
+  return sendCommand("xctest-start", params);
+}
+
+export async function stopXCTestService(params: {
+  deviceId?: string;
+  pid?: number;
+}): Promise<HostControlResult<{ message: string }>> {
+  return sendCommand("xctest-stop", params);
+}
+
+export async function getXCTestServiceStatus(params: {
+  deviceId?: string;
+  pid?: number;
+  port?: number;
+} = {}): Promise<HostControlResult<XCTestServiceStatus>> {
+  return sendCommand<XCTestServiceStatus>("xctest-status", params);
 }
 
 /**
@@ -294,6 +342,14 @@ export function shouldUseHostControl(): boolean {
   const externalMode = process.env.AUTOMOBILE_EMULATOR_EXTERNAL === "true";
   const hostControlEnabled = process.env.AUTOMOBILE_HOST_CONTROL_ENABLED !== "false";
   return externalMode && hostControlEnabled;
+}
+
+export function getHostControlHost(): string {
+  return HOST_CONTROL_HOST;
+}
+
+export function getHostControlPort(): number {
+  return HOST_CONTROL_PORT;
 }
 
 /**

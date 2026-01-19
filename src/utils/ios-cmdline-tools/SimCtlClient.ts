@@ -1,6 +1,9 @@
 import { ChildProcess, execFile } from "child_process";
 import { promisify } from "util";
 import { logger } from "../logger";
+import { createExecResult } from "../execResult";
+import { isRunningInDocker } from "../dockerEnv";
+import { isHostControlAvailable, runSimctlExec, shouldUseHostControl } from "../hostControlClient";
 import { ExecResult, ActionableError, DeviceInfo, BootedDevice, ScreenSize } from "../../models";
 
 export interface AppleDevice {
@@ -203,27 +206,21 @@ export interface SimCtl {
   setAppearance(mode: "light" | "dark", deviceId?: string): Promise<void>;
 }
 
+interface SimctlHostControlRunner {
+  isAvailable(): Promise<boolean>;
+  isRunningInDocker(): boolean;
+  runSimctl(args: string[]): Promise<ExecResult>;
+  shouldUseHostControl(): boolean;
+}
+
 // Enhance the standard execAsync result to implement the ExecResult interface
 const execAsync = async (file: string, args: string[], maxBuffer?: number): Promise<ExecResult> => {
   const options = maxBuffer ? { maxBuffer } : undefined;
   const result = await promisify(execFile)(file, args, options);
 
-  // Add the required string methods
-  const enhancedResult: ExecResult = {
-    stdout: typeof result.stdout === "string" ? result.stdout : result.stdout.toString(),
-    stderr: typeof result.stderr === "string" ? result.stderr : result.stderr.toString(),
-    toString() {
-      return this.stdout;
-    },
-    trim() {
-      return this.stdout.trim();
-    },
-    includes(searchString: string) {
-      return this.stdout.includes(searchString);
-    }
-  };
-
-  return enhancedResult;
+  const stdout = typeof result.stdout === "string" ? result.stdout : result.stdout.toString();
+  const stderr = typeof result.stderr === "string" ? result.stderr : result.stderr.toString();
+  return createExecResult(stdout, stderr);
 };
 
 function splitCommandArgs(command: string): string[] {
@@ -310,6 +307,8 @@ export interface SimulatorList {
 export class SimCtlClient implements SimCtl {
   device: BootedDevice | null;
   execAsync: (file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>;
+  private hostControl: SimctlHostControlRunner;
+  private hostControlAvailability: Promise<boolean> | null = null;
 
   // Static cache for device list
   private static deviceListCache: { devices: DeviceInfo[], timestamp: number } | null = null;
@@ -322,10 +321,23 @@ export class SimCtlClient implements SimCtl {
    */
   constructor(
     device: BootedDevice | null = null,
-    execAsyncFn: ((file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>) | null = null
+    execAsyncFn: ((file: string, args: string[], maxBuffer?: number) => Promise<ExecResult>) | null = null,
+    hostControlRunner: SimctlHostControlRunner | null = null
   ) {
     this.device = device;
     this.execAsync = execAsyncFn || execAsync;
+    this.hostControl = hostControlRunner || {
+      isAvailable: () => isHostControlAvailable(),
+      isRunningInDocker,
+      runSimctl: async (args: string[]) => {
+        const result = await runSimctlExec(args);
+        if (!result.success || !result.data) {
+          throw new Error(result.error || "Host control simctl failed");
+        }
+        return result.data;
+      },
+      shouldUseHostControl
+    };
   }
 
   /**
@@ -343,16 +355,32 @@ export class SimCtlClient implements SimCtl {
    * @returns Promise with command output
    */
   async executeCommand(command: string, timeoutMs?: number): Promise<ExecResult> {
-
-    if (!(await this.isAvailable())) {
-      throw new ActionableError("simctl is not available. Please install Xcode command line tools to continue.");
-    }
-
-    const fullCommand = `xcrun simctl ${command}`;
-    const args = ["simctl", ...splitCommandArgs(command)];
+    const hostArgs = splitCommandArgs(command);
+    const localArgs = ["simctl", ...hostArgs];
+    const wantsHostControl = this.hostControl.shouldUseHostControl() && this.hostControl.isRunningInDocker();
+    const hostControlAvailable = wantsHostControl ? await this.isHostControlAvailable() : false;
+    const useHostControl = wantsHostControl && hostControlAvailable;
+    const fullCommand = useHostControl ? `host-control simctl ${command}` : `xcrun simctl ${command}`;
     const startTime = Date.now();
 
     logger.debug(`[iOS] Executing command: ${fullCommand}`);
+
+    if (wantsHostControl && !hostControlAvailable) {
+      throw new ActionableError(
+        "simctl is not available via host control. " +
+        "Ensure the host control daemon is running and reachable from the container."
+      );
+    }
+
+    if (!useHostControl && !(await this.isLocalSimctlAvailable())) {
+      throw new ActionableError("simctl is not available. Please install Xcode command line tools to continue.");
+    }
+
+    const runCommand = () => (
+      useHostControl
+        ? this.hostControl.runSimctl(hostArgs)
+        : this.execAsync("xcrun", localArgs)
+    );
 
     // Use Promise.race to implement timeout if specified
     if (timeoutMs) {
@@ -366,7 +394,7 @@ export class SimCtlClient implements SimCtl {
       });
 
       try {
-        const result = await Promise.race([this.execAsync("xcrun", args), timeoutPromise]);
+        const result = await Promise.race([runCommand(), timeoutPromise]);
         const duration = Date.now() - startTime;
         logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
         return result;
@@ -381,7 +409,7 @@ export class SimCtlClient implements SimCtl {
 
     // No timeout specified
     try {
-      const result = await this.execAsync("xcrun", args);
+      const result = await runCommand();
       const duration = Date.now() - startTime;
       logger.debug(`[iOS] Command completed in ${duration}ms: ${command}`);
       return result;
@@ -397,11 +425,32 @@ export class SimCtlClient implements SimCtl {
    * @returns Promise with boolean indicating availability
    */
   async isAvailable(): Promise<boolean> {
+    const wantsHostControl = this.hostControl.shouldUseHostControl() && this.hostControl.isRunningInDocker();
+    if (wantsHostControl) {
+      return this.isHostControlAvailable();
+    }
+
     try {
-      await this.execAsync("xcrun simctl --version");
+      await this.execAsync("xcrun", ["simctl", "--version"]);
       return true;
     } catch (error) {
       logger.warn("simctl is not available - iOS functionality requires Xcode command line tools to be installed.");
+      return false;
+    }
+  }
+
+  private async isHostControlAvailable(): Promise<boolean> {
+    if (!this.hostControlAvailability) {
+      this.hostControlAvailability = this.hostControl.isAvailable();
+    }
+    return this.hostControlAvailability;
+  }
+
+  private async isLocalSimctlAvailable(): Promise<boolean> {
+    try {
+      await this.execAsync("xcrun", ["simctl", "--version"]);
+      return true;
+    } catch {
       return false;
     }
   }
@@ -539,7 +588,7 @@ export class SimCtlClient implements SimCtl {
       const bootedDevices: BootedDevice[] = [];
 
       // Extract booted devices from all runtime versions
-      for (const runtimeDevices of Object.values(simulatorList.devices)) {
+      for (const [runtimeId, runtimeDevices] of Object.entries(simulatorList.devices)) {
         for (const device of runtimeDevices) {
           if (device.isAvailable && device.state === "Booted") {
             bootedDevices.push({

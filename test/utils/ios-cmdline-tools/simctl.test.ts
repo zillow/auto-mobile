@@ -1,6 +1,7 @@
 import { expect, describe, test, beforeEach } from "bun:test";
 import { Simctl } from "../../../src/utils/ios-cmdline-tools/SimCtlClient";
 import { BootedDevice, ExecResult } from "../../../src/models";
+import { createExecResult } from "../../../src/utils/execResult";
 
 describe("Simctl", function() {
   let simctl: Simctl;
@@ -91,6 +92,49 @@ describe("Simctl", function() {
 
       expect(executedFile).toBe("xcrun");
       expect(executedArgs).toEqual(["simctl", "list", "devices"]);
+    });
+  });
+
+  describe("host control routing", function() {
+    test("should report available when host control is enabled in docker", async function() {
+      mockExecAsync = async (): Promise<ExecResult> => {
+        throw new Error("Command not found: xcrun");
+      };
+
+      const hostControlRunner = {
+        isAvailable: async () => true,
+        isRunningInDocker: () => true,
+        runSimctl: async () => createExecResult("simctl version 1.2.3", ""),
+        shouldUseHostControl: () => true
+      };
+
+      simctl = new Simctl(null, mockExecAsync, hostControlRunner);
+
+      const available = await simctl.isAvailable();
+      expect(available).toBe(true);
+    });
+
+    test("should execute simctl commands via host control when enabled", async function() {
+      let receivedArgs: string[] = [];
+
+      mockExecAsync = async (): Promise<ExecResult> => {
+        throw new Error("Local simctl should not be invoked");
+      };
+
+      const hostControlRunner = {
+        isAvailable: async () => true,
+        isRunningInDocker: () => true,
+        runSimctl: async (args: string[]) => {
+          receivedArgs = args;
+          return createExecResult("command executed", "");
+        },
+        shouldUseHostControl: () => true
+      };
+
+      simctl = new Simctl(mockDevice, mockExecAsync, hostControlRunner);
+      await simctl.executeCommand("list devices");
+
+      expect(receivedArgs).toEqual(["list", "devices"]);
     });
   });
 });
