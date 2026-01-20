@@ -19,7 +19,7 @@ export const RELEASE_VERSION: string = "latest";
 export const APK_URL: string = RELEASE_VERSION === "latest"
   ? `https://github.com/kaeawc/auto-mobile/releases/latest/download/accessibility-service-debug.apk`
   : `https://github.com/kaeawc/auto-mobile/releases/download/v${RELEASE_VERSION}/accessibility-service-debug.apk`;
-export const APK_SHA256_CHECKSUM: string = "7244543b00c3dc253cfd2aff23b2ca68ab97c3f1c2f333d99da03bc3360268d8"; // Empty = skip verification (local dev only)
+export const APK_SHA256_CHECKSUM: string = "cc42969f791aec80133dca95c2a15c3bae0e3a49406fe6b2f407017a4d847201"; // Empty = skip verification (local dev only)
 
 /**
  * iOS XCTestService Release Constants
