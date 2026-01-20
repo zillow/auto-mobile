@@ -144,9 +144,9 @@ export class DaemonManager {
 
     console.log("Starting AutoMobile daemon...");
 
-    // Get the path to the current executable
-    const bunExe = process.argv[0]; // "bun" executable
-    const scriptPath = process.argv[1]; // Path to index.ts/js
+    // Use the installed auto-mobile command instead of current script path
+    // This ensures the daemon uses the same version as the CLI/MCP server
+    const autoMobileCmd = "auto-mobile";
 
     // Start daemon as detached process
     const args = ["--daemon-mode"];
@@ -187,9 +187,10 @@ export class DaemonManager {
     // Open with restricted permissions (0o600 = owner read/write only)
     const logFd = openSync(logPath, "w", 0o600);
 
-    const daemonProcess = spawn(bunExe, [scriptPath, ...args], {
+    const daemonProcess = spawn(autoMobileCmd, args, {
       detached: true,
       stdio: ["ignore", logFd, logFd], // Write stdout/stderr to log file
+      shell: true, // Use shell to resolve command from PATH
     });
 
     // Close our reference to the log file (daemon process still has it open)
