@@ -99,6 +99,8 @@ const runningSimulators = new Map(); // udid -> { name, state }
 const runningXCTestServices = new Map(); // deviceId -> { pid, process, port, startedAt, deviceId }
 const runningIproxyTunnels = new Map(); // key -> { pid, process, deviceId, localPort, devicePort }
 
+const sanitizeForLog = value => String(value ?? "").replace(/[\r\n]/g, "");
+
 const skipPathSegment = segment => (
   segment === "_CodeSignature" ||
   segment === "SC_Info"
@@ -1313,7 +1315,7 @@ process.on("SIGINT", () => {
   for (const { pid, deviceId } of runningIproxyTunnels.values()) {
     try {
       process.kill(pid, "SIGTERM");
-      console.log(`Stopped iproxy for ${deviceId || "unknown device"} (pid ${pid})`);
+      console.log(`Stopped iproxy for ${sanitizeForLog(deviceId || "unknown device")} (pid ${pid})`);
     } catch {
       // Ignore errors
     }
