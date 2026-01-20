@@ -46,8 +46,15 @@ public class ElementLocator: ElementLocating {
         /// Cache of resource IDs to XCUIElements
         private var elementCache: [String: XCUIElement] = [:]
 
-        public init(application: XCUIApplication? = nil) {
+        /// Performance tracking provider
+        private let perfProvider: PerfProvider
+
+        public init(
+            application: XCUIApplication? = nil,
+            perfProvider: PerfProvider = PerfProvider.instance
+        ) {
             self.foregroundApp = application
+            self.perfProvider = perfProvider
         }
 
         // MARK: - Main Thread Helper
@@ -108,14 +115,17 @@ public class ElementLocator: ElementLocating {
             // Run XCUITest state checks on main thread
             // IMPORTANT: Create fresh XCUIApplication instances to check state, because
             // cached instances may return stale state values
-            let stateInfo: (springboardState: UInt, currentAppState: UInt?, currentBundleId: String?) = runOnMainThread {
-                let sbState = self.springboard.state.rawValue
-                // Create fresh instance to get accurate state (cached instances return stale state)
-                let freshAppState: UInt? = self.foregroundBundleId.map { bundleId in
-                    XCUIApplication(bundleIdentifier: bundleId).state.rawValue
+            let stateInfo: (springboardState: UInt, currentAppState: UInt?, currentBundleId: String?) =
+                perfProvider.track("checkState") {
+                    runOnMainThread {
+                        let sbState = self.springboard.state.rawValue
+                        // Create fresh instance to get accurate state (cached instances return stale state)
+                        let freshAppState: UInt? = self.foregroundBundleId.map { bundleId in
+                            XCUIApplication(bundleIdentifier: bundleId).state.rawValue
+                        }
+                        return (sbState, freshAppState, self.foregroundBundleId)
+                    }
                 }
-                return (sbState, freshAppState, self.foregroundBundleId)
-            }
 
             let isSpringboardInForeground = stateInfo.springboardState == 4 // .runningForeground
             let isCurrentAppInForeground = stateInfo.currentAppState == 4 // .runningForeground
@@ -129,7 +139,7 @@ public class ElementLocator: ElementLocating {
             // This is because springboard may report as foreground even when another app is visible
 
             // Try to find the foreground app by checking springboard
-            if let detectedBundleId = detectForegroundAppBundleId() {
+            if let detectedBundleId = perfProvider.track("detectForeground", block: { detectForegroundAppBundleId() }) {
                 if detectedBundleId != foregroundBundleId {
                     // Release old app before creating new one
                     foregroundApp = nil
@@ -211,14 +221,44 @@ public class ElementLocator: ElementLocating {
         private func detectForegroundAppBundleId() -> String? {
             // First, try to find bundle IDs from springboard's element tree
             // This can work when apps embed their bundle ID in element identifiers
-            if let snapshot: XCUIElementSnapshot = runOnMainThread({
-                return try? self.springboard.snapshot()
-            }) {
-                var candidateBundleIds: [String] = []
-                collectBundleIdsFromElement(snapshot, into: &candidateBundleIds)
+            let snapshot: XCUIElementSnapshot? = perfProvider.track("springboardSnapshot") {
+                runOnMainThread {
+                    try? self.springboard.snapshot()
+                }
+            }
 
-                for bundleId in candidateBundleIds {
-                    if bundleId == "com.apple.springboard" {
+            if let snapshot = snapshot {
+                let result: String? = perfProvider.track("checkCandidates") {
+                    var candidateBundleIds: [String] = []
+                    collectBundleIdsFromElement(snapshot, into: &candidateBundleIds)
+
+                    for bundleId in candidateBundleIds {
+                        if bundleId == "com.apple.springboard" {
+                            continue
+                        }
+
+                        let stateRawValue: UInt = runOnMainThread {
+                            let testApp = XCUIApplication(bundleIdentifier: bundleId)
+                            return testApp.state.rawValue
+                        }
+                        if stateRawValue == 4 { // .runningForeground
+                            return bundleId
+                        }
+                    }
+                    return nil
+                }
+                if let foundBundleId = result {
+                    return foundBundleId
+                }
+            }
+
+            // Fallback: Check common system apps directly
+            // This is necessary because when another app is in foreground,
+            // springboard's element tree may not contain that app's bundle ID
+            return perfProvider.track("checkSystemApps") {
+                for bundleId in Self.commonSystemApps {
+                    // Skip current app (we already know it's not in foreground)
+                    if bundleId == foregroundBundleId {
                         continue
                     }
 
@@ -230,27 +270,8 @@ public class ElementLocator: ElementLocating {
                         return bundleId
                     }
                 }
+                return nil
             }
-
-            // Fallback: Check common system apps directly
-            // This is necessary because when another app is in foreground,
-            // springboard's element tree may not contain that app's bundle ID
-            for bundleId in Self.commonSystemApps {
-                // Skip current app (we already know it's not in foreground)
-                if bundleId == foregroundBundleId {
-                    continue
-                }
-
-                let stateRawValue: UInt = runOnMainThread {
-                    let testApp = XCUIApplication(bundleIdentifier: bundleId)
-                    return testApp.state.rawValue
-                }
-                if stateRawValue == 4 { // .runningForeground
-                    return bundleId
-                }
-            }
-
-            return nil
         }
 
         /// Collect all potential bundle IDs from springboard element tree
@@ -281,8 +302,13 @@ public class ElementLocator: ElementLocating {
         // MARK: - View Hierarchy
 
         public func getViewHierarchy() throws -> ViewHierarchy {
+            perfProvider.serial("getViewHierarchy")
+            defer { perfProvider.end() }
+
             // First, ensure we're observing the foreground app
-            ensureForegroundApp()
+            perfProvider.track("ensureForegroundApp") {
+                ensureForegroundApp()
+            }
 
             // Get the current app to observe (foreground app or springboard)
             let app = currentApplication
@@ -296,23 +322,29 @@ public class ElementLocator: ElementLocating {
             // snapshot() captures all element data in ONE IPC call (fast!)
             // vs accessing properties individually which is extremely slow
             // Must be called on main thread
-            let snapshot = try runOnMainThread {
-                try app.snapshot()
+            let snapshot = try perfProvider.track("snapshot") {
+                try runOnMainThread {
+                    try app.snapshot()
+                }
             }
 
             // Get screen bounds for offscreen filtering
             let screenBounds = snapshot.frame
 
             // Build hierarchy from snapshot (no more IPC calls - all data is local)
-            let rawElement = buildElementInfoFromSnapshot(
-                snapshot,
-                depth: 0,
-                screenBounds: screenBounds
-            )
+            let rawElement = perfProvider.track("buildHierarchy") {
+                buildElementInfoFromSnapshot(
+                    snapshot,
+                    depth: 0,
+                    screenBounds: screenBounds
+                )
+            }
 
             // Apply optimization - flatten structural wrappers and filter empty nodes
-            let optimizedElements = optimizeHierarchy(rawElement, isRoot: true)
-            let rootElement = optimizedElements.first ?? rawElement
+            let rootElement = perfProvider.track("optimize") {
+                let optimizedElements = optimizeHierarchy(rawElement, isRoot: true)
+                return optimizedElements.first ?? rawElement
+            }
 
             // Get window info from snapshot
             let frame = snapshot.frame
@@ -331,7 +363,9 @@ public class ElementLocator: ElementLocating {
 
             // Check for system alerts (presented by springboard, not the app)
             // These include permission dialogs like "Would Like to Send You Notifications"
-            let systemAlerts = getSystemAlerts()
+            let systemAlerts = perfProvider.track("systemAlerts") {
+                getSystemAlerts()
+            }
 
             // If there are system alerts, include them in the hierarchy
             let finalHierarchy: UIElementInfo
