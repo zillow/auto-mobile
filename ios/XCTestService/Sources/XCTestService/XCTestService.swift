@@ -34,10 +34,14 @@ public class XCTestService {
         /// Default bundle ID to use when none is specified (iOS Settings app)
         public static let defaultBundleId = "com.apple.Preferences"
 
-        /// Sets the application under test
-        public func setApplication(_ app: XCUIApplication) {
+        /// Sets the application under test with its bundle ID
+        public func setApplication(_ app: XCUIApplication, bundleId: String? = nil) {
             application = app
-            elementLocator.setApplication(app)
+            if let bundleId = bundleId {
+                elementLocator.setApplication(app, bundleId: bundleId)
+            } else {
+                elementLocator.setApplication(app)
+            }
             gesturePerformer.setApplication(app)
         }
 
@@ -48,7 +52,7 @@ public class XCTestService {
             let targetBundleId = bundleId ?? Self.defaultBundleId
             let app = XCUIApplication(bundleIdentifier: targetBundleId)
             app.launch()
-            setApplication(app)
+            setApplication(app, bundleId: targetBundleId)
             print("[XCTestService] Launched app: \(targetBundleId)")
 
             // Start the server

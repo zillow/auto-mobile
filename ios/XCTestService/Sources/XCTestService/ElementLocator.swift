@@ -33,38 +33,229 @@ public class ElementLocator: ElementLocating {
     }
 
     #if canImport(XCTest) && os(iOS)
-        private weak var application: XCUIApplication?
+        /// The foreground app we're currently observing (not springboard)
+        /// At most one instance besides springboard should exist
+        private var foregroundApp: XCUIApplication?
+        private var foregroundBundleId: String?
+
+        /// Springboard app for detecting foreground app - always kept
+        private lazy var springboard: XCUIApplication = {
+            XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        }()
 
         /// Cache of resource IDs to XCUIElements
         private var elementCache: [String: XCUIElement] = [:]
 
         public init(application: XCUIApplication? = nil) {
-            self.application = application
+            self.foregroundApp = application
+        }
+
+        // MARK: - Main Thread Helper
+
+        /// Executes a throwing closure on the main thread and returns the result.
+        /// XCUITest APIs must be called on the main thread.
+        private func runOnMainThread<T>(_ block: @escaping () throws -> T) throws -> T {
+            if Thread.isMainThread {
+                return try block()
+            }
+
+            var result: Result<T, Error>!
+            DispatchQueue.main.sync {
+                do {
+                    result = .success(try block())
+                } catch {
+                    result = .failure(error)
+                }
+            }
+            return try result.get()
+        }
+
+        /// Executes a non-throwing closure on the main thread and returns the result.
+        private func runOnMainThread<T>(_ block: @escaping () -> T) -> T {
+            if Thread.isMainThread {
+                return block()
+            }
+
+            var result: T!
+            DispatchQueue.main.sync {
+                result = block()
+            }
+            return result
         }
 
         public func setApplication(_ app: XCUIApplication) {
-            application = app
+            // Release old app reference before setting new one
+            foregroundApp = nil
+            foregroundBundleId = nil
+
+            foregroundApp = app
             elementCache.removeAll()
+        }
+
+        /// Set the application to observe with its bundle ID
+        public func setApplication(_ app: XCUIApplication, bundleId: String) {
+            // Release old app reference before setting new one
+            foregroundApp = nil
+            foregroundBundleId = nil
+
+            foregroundApp = app
+            foregroundBundleId = bundleId
+            elementCache.removeAll()
+            print("[ElementLocator] Set application to observe: \(bundleId)")
+        }
+
+        /// Detect and switch to the foreground application if current app is not in foreground
+        private func ensureForegroundApp() {
+            // Run XCUITest state checks on main thread
+            let needsUpdate: (isSpringboardInForeground: Bool, isCurrentAppInForeground: Bool) = runOnMainThread {
+                let springboardInForeground = self.springboard.state == .runningForeground
+                let currentAppInForeground = (self.foregroundApp?.state == .runningForeground) == true
+                return (springboardInForeground, currentAppInForeground)
+            }
+
+            // If we have an app and it's in foreground, we're good
+            if needsUpdate.isCurrentAppInForeground {
+                return
+            }
+
+            // Check if springboard is in foreground (home screen)
+            if needsUpdate.isSpringboardInForeground {
+                print("[ElementLocator] Springboard is in foreground, clearing foreground app")
+                // Clear foreground app - we'll observe springboard
+                foregroundApp = nil
+                foregroundBundleId = nil
+                elementCache.removeAll()
+                return
+            }
+
+            print("[ElementLocator] Current app not in foreground, detecting foreground app...")
+
+            // Try to find the foreground app by checking springboard
+            if let detectedBundleId = detectForegroundAppBundleId() {
+                if detectedBundleId != foregroundBundleId {
+                    print("[ElementLocator] Switching to foreground app: \(detectedBundleId)")
+                    // Release old app before creating new one
+                    foregroundApp = nil
+                    foregroundBundleId = nil
+                    elementCache.removeAll()
+
+                    // Create new app instance for the detected bundle
+                    foregroundApp = XCUIApplication(bundleIdentifier: detectedBundleId)
+                    foregroundBundleId = detectedBundleId
+                }
+            }
+        }
+
+        /// Get the current application to observe
+        /// Returns foreground app if available and in foreground, otherwise springboard
+        private var currentApplication: XCUIApplication {
+            // Check state on main thread
+            let foregroundAppInForeground: Bool = runOnMainThread {
+                self.foregroundApp?.state == .runningForeground
+            }
+            if let app = foregroundApp, foregroundAppInForeground {
+                return app
+            }
+            return springboard
+        }
+
+        /// Detect the bundle ID of the foreground app using springboard
+        /// Returns nil if detection fails or springboard is in front
+        private func detectForegroundAppBundleId() -> String? {
+            // Get springboard snapshot on main thread - this captures all system-level UI
+            guard let snapshot: XCUIElementSnapshot = runOnMainThread({
+                return try? self.springboard.snapshot()
+            }) else {
+                print("[ElementLocator] Failed to get springboard snapshot")
+                return nil
+            }
+
+            // Collect candidate bundle IDs from springboard elements
+            var candidateBundleIds: [String] = []
+            collectBundleIdsFromElement(snapshot, into: &candidateBundleIds)
+
+            // Check each candidate to find one that's in foreground
+            // We create temporary apps just to check state, then discard
+            for bundleId in candidateBundleIds {
+                // Skip springboard itself
+                if bundleId == "com.apple.springboard" {
+                    continue
+                }
+
+                // If this is our current app, check it first
+                if bundleId == foregroundBundleId, let app = foregroundApp {
+                    let isInForeground = runOnMainThread {
+                        app.state == .runningForeground
+                    }
+                    if isInForeground {
+                        return bundleId
+                    }
+                    continue
+                }
+
+                // Create temporary app just to check state
+                // This is unavoidable - XCUIApplication.state requires an instance
+                let isInForeground = runOnMainThread {
+                    let testApp = XCUIApplication(bundleIdentifier: bundleId)
+                    return testApp.state == .runningForeground
+                }
+                if isInForeground {
+                    return bundleId
+                }
+            }
+
+            return nil
+        }
+
+        /// Collect all potential bundle IDs from springboard element tree
+        private func collectBundleIdsFromElement(_ element: XCUIElementSnapshot, into bundleIds: inout [String]) {
+            let identifier = element.identifier
+
+            // Many springboard elements have identifiers like "com.apple.AppName-window"
+            // or just the bundle ID directly
+            if identifier.contains(".") && !identifier.contains(" ") {
+                // Looks like a bundle ID pattern
+                let cleanId = identifier.replacingOccurrences(of: "-window", with: "")
+                    .replacingOccurrences(of: "-sceneID", with: "")
+                    .replacingOccurrences(of: "-SceneWindow", with: "")
+                if cleanId.hasPrefix("com.") || cleanId.hasPrefix("io.") || cleanId.hasPrefix("org.") ||
+                   cleanId.hasPrefix("net.") || cleanId.hasPrefix("me.") {
+                    if !bundleIds.contains(cleanId) {
+                        bundleIds.append(cleanId)
+                    }
+                }
+            }
+
+            // Recursively check children
+            for child in element.children {
+                collectBundleIdsFromElement(child, into: &bundleIds)
+            }
         }
 
         // MARK: - View Hierarchy
 
         public func getViewHierarchy() throws -> ViewHierarchy {
-            guard let app = application else {
-                throw LocatorError.noApplication
-            }
+            // First, ensure we're observing the foreground app
+            ensureForegroundApp()
+
+            // Get the current app to observe (foreground app or springboard)
+            let app = currentApplication
 
             elementCache.removeAll()
 
-            let bundleId = Bundle.main.bundleIdentifier
+            // Use the observed app's bundle identifier for packageName
+            let bundleId = foregroundBundleId ?? "com.apple.springboard"
 
             // Use snapshot() for fast hierarchy extraction - single IPC call captures everything
-            print("[ElementLocator] Taking snapshot of view hierarchy...")
+            print("[ElementLocator] Taking snapshot of \(bundleId)...")
             let startTime = Date()
 
             // snapshot() captures all element data in ONE IPC call (fast!)
             // vs accessing properties individually which is extremely slow
-            let snapshot = try app.snapshot()
+            // Must be called on main thread
+            let snapshot = try runOnMainThread {
+                try app.snapshot()
+            }
 
             let snapshotTime = Date().timeIntervalSince(startTime) * 1000
             print("[ElementLocator] Snapshot captured in \(Int(snapshotTime))ms")
@@ -475,9 +666,13 @@ public class ElementLocator: ElementLocating {
                 return cached
             }
 
-            guard let app = application else { return nil }
-            let element = app.descendants(matching: .any).matching(identifier: resourceId).firstMatch
-            if element.exists {
+            let app = currentApplication
+            // Run on main thread since XCUITest APIs require it
+            let element: XCUIElement = runOnMainThread {
+                app.descendants(matching: .any).matching(identifier: resourceId).firstMatch
+            }
+            let exists = runOnMainThread { element.exists }
+            if exists {
                 elementCache[resourceId] = element
                 return element
             }
@@ -485,9 +680,13 @@ public class ElementLocator: ElementLocating {
         }
 
         public func findElement(byText text: String) -> Any? {
-            guard let app = application else { return nil }
-            let element = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", text)).firstMatch
-            return element.exists ? element : nil
+            let app = currentApplication
+            // Run on main thread since XCUITest APIs require it
+            let element: XCUIElement = runOnMainThread {
+                app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", text)).firstMatch
+            }
+            let exists = runOnMainThread { element.exists }
+            return exists ? element : nil
         }
 
         public func getCachedElement(_ resourceId: String) -> XCUIElement? {

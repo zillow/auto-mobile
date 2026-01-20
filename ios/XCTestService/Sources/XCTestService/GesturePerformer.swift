@@ -38,6 +38,39 @@ public class GesturePerformer: GesturePerforming {
             application = app
         }
 
+        // MARK: - Main Thread Helper
+
+        /// Executes a throwing closure on the main thread and returns the result.
+        /// XCUITest APIs must be called on the main thread.
+        private func runOnMainThread<T>(_ block: @escaping () throws -> T) throws -> T {
+            if Thread.isMainThread {
+                return try block()
+            }
+
+            var result: Result<T, Error>!
+            DispatchQueue.main.sync {
+                do {
+                    result = .success(try block())
+                } catch {
+                    result = .failure(error)
+                }
+            }
+            return try result.get()
+        }
+
+        /// Executes a non-throwing closure on the main thread and returns the result.
+        private func runOnMainThread<T>(_ block: @escaping () -> T) -> T {
+            if Thread.isMainThread {
+                return block()
+            }
+
+            var result: T!
+            DispatchQueue.main.sync {
+                result = block()
+            }
+            return result
+        }
+
         // MARK: - Tap Gestures
 
         public func tap(x: Double, y: Double, duration: TimeInterval = 0) throws {
@@ -45,13 +78,15 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            let coordinate = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: x, dy: y))
+            runOnMainThread {
+                let coordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: x, dy: y))
 
-            if duration > 0 {
-                coordinate.press(forDuration: duration)
-            } else {
-                coordinate.tap()
+                if duration > 0 {
+                    coordinate.press(forDuration: duration)
+                } else {
+                    coordinate.tap()
+                }
             }
         }
 
@@ -60,9 +95,11 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            let coordinate = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: x, dy: y))
-            coordinate.doubleTap()
+            runOnMainThread {
+                let coordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: x, dy: y))
+                coordinate.doubleTap()
+            }
         }
 
         public func longPress(x: Double, y: Double, duration: TimeInterval) throws {
@@ -70,9 +107,11 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            let coordinate = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: x, dy: y))
-            coordinate.press(forDuration: duration)
+            runOnMainThread {
+                let coordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: x, dy: y))
+                coordinate.press(forDuration: duration)
+            }
         }
 
         // MARK: - Swipe Gestures
@@ -82,17 +121,19 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            let startCoordinate = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: startX, dy: startY))
-            let endCoordinate = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: endX, dy: endY))
+            runOnMainThread {
+                let startCoordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: startX, dy: startY))
+                let endCoordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: endX, dy: endY))
 
-            startCoordinate.press(
-                forDuration: 0.05,
-                thenDragTo: endCoordinate,
-                withVelocity: .default,
-                thenHoldForDuration: 0
-            )
+                startCoordinate.press(
+                    forDuration: 0.05,
+                    thenDragTo: endCoordinate,
+                    withVelocity: .default,
+                    thenHoldForDuration: 0
+                )
+            }
         }
 
         // MARK: - Drag Gestures
@@ -110,18 +151,20 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            let startCoordinate = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: startX, dy: startY))
-            let endCoordinate = app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: endX, dy: endY))
+            runOnMainThread {
+                let startCoordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: startX, dy: startY))
+                let endCoordinate = app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: endX, dy: endY))
 
-            // Press, drag, and hold
-            startCoordinate.press(
-                forDuration: pressDuration,
-                thenDragTo: endCoordinate,
-                withVelocity: .default,
-                thenHoldForDuration: holdDuration
-            )
+                // Press, drag, and hold
+                startCoordinate.press(
+                    forDuration: pressDuration,
+                    thenDragTo: endCoordinate,
+                    withVelocity: .default,
+                    thenHoldForDuration: holdDuration
+                )
+            }
         }
 
         // MARK: - Pinch Gestures
@@ -139,7 +182,9 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            app.typeText(text)
+            runOnMainThread {
+                app.typeText(text)
+            }
         }
 
         public func setText(resourceId: String, text: String) throws {
@@ -147,16 +192,18 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.elementNotFound(resourceId)
             }
 
-            // Clear existing text and type new text
-            element.tap()
+            runOnMainThread {
+                // Clear existing text and type new text
+                element.tap()
 
-            // Select all and delete
-            if let existingText = element.value as? String, !existingText.isEmpty {
-                let deleteString = String(repeating: XCUIKeyboardKey.delete.rawValue, count: existingText.count)
-                element.typeText(deleteString)
+                // Select all and delete
+                if let existingText = element.value as? String, !existingText.isEmpty {
+                    let deleteString = String(repeating: XCUIKeyboardKey.delete.rawValue, count: existingText.count)
+                    element.typeText(deleteString)
+                }
+
+                element.typeText(text)
             }
-
-            element.typeText(text)
         }
 
         public func clearText(resourceId: String? = nil) throws {
@@ -165,18 +212,22 @@ public class GesturePerformer: GesturePerforming {
                     throw GestureError.elementNotFound(resourceId)
                 }
 
-                element.tap()
+                runOnMainThread {
+                    element.tap()
 
-                if let existingText = element.value as? String, !existingText.isEmpty {
-                    let deleteString = String(repeating: XCUIKeyboardKey.delete.rawValue, count: existingText.count)
-                    element.typeText(deleteString)
+                    if let existingText = element.value as? String, !existingText.isEmpty {
+                        let deleteString = String(repeating: XCUIKeyboardKey.delete.rawValue, count: existingText.count)
+                        element.typeText(deleteString)
+                    }
                 }
             } else {
                 guard let app = application else {
                     throw GestureError.noApplication
                 }
-                // Clear focused element
-                app.typeText(XCUIKeyboardKey.delete.rawValue)
+                runOnMainThread {
+                    // Clear focused element
+                    app.typeText(XCUIKeyboardKey.delete.rawValue)
+                }
             }
         }
 
@@ -185,8 +236,10 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            // Try Cmd+A (select all)
-            app.typeText("a") // Note: This is simplified, real select all would need modifier keys
+            runOnMainThread {
+                // Try Cmd+A (select all)
+                app.typeText("a") // Note: This is simplified, real select all would need modifier keys
+            }
         }
 
         public func performImeAction(_ action: String) throws {
@@ -196,7 +249,9 @@ public class GesturePerformer: GesturePerforming {
 
             switch action.lowercased() {
             case "done", "go", "search", "send", "next":
-                app.typeText("\n")
+                runOnMainThread {
+                    app.typeText("\n")
+                }
             default:
                 throw GestureError.notSupported("IME action: \(action)")
             }
@@ -210,21 +265,23 @@ public class GesturePerformer: GesturePerforming {
                     throw GestureError.elementNotFound(resourceId)
                 }
 
-                switch action.lowercased() {
-                case "click", "tap":
-                    element.tap()
-                case "long_click", "long_press":
-                    element.press(forDuration: 1.0)
-                case "double_tap", "double_click":
-                    element.doubleTap()
-                case "scroll_forward":
-                    element.swipeUp()
-                case "scroll_backward":
-                    element.swipeDown()
-                case "focus":
-                    element.tap()
-                default:
-                    throw GestureError.notSupported("Action: \(action)")
+                try runOnMainThread {
+                    switch action.lowercased() {
+                    case "click", "tap":
+                        element.tap()
+                    case "long_click", "long_press":
+                        element.press(forDuration: 1.0)
+                    case "double_tap", "double_click":
+                        element.doubleTap()
+                    case "scroll_forward":
+                        element.swipeUp()
+                    case "scroll_backward":
+                        element.swipeDown()
+                    case "focus":
+                        element.tap()
+                    default:
+                        throw GestureError.notSupported("Action: \(action)")
+                    }
                 }
             } else {
                 throw GestureError.elementNotFound("resourceId required for action")
@@ -238,60 +295,74 @@ public class GesturePerformer: GesturePerforming {
                 throw GestureError.noApplication
             }
 
-            let screenshot = app.screenshot()
-            return screenshot.pngRepresentation
+            return runOnMainThread {
+                let screenshot = app.screenshot()
+                return screenshot.pngRepresentation
+            }
         }
 
         // MARK: - Device Control
 
         public func setOrientation(_ orientation: String) throws {
-            let device = XCUIDevice.shared
+            try runOnMainThread {
+                let device = XCUIDevice.shared
 
-            switch orientation.lowercased() {
-            case "portrait":
-                device.orientation = .portrait
-            case "portrait_upside_down", "portraitupsidedown":
-                device.orientation = .portraitUpsideDown
-            case "landscape_left", "landscapeleft":
-                device.orientation = .landscapeLeft
-            case "landscape_right", "landscaperight":
-                device.orientation = .landscapeRight
-            default:
-                throw GestureError.gestureFailed("Unknown orientation: \(orientation)")
+                switch orientation.lowercased() {
+                case "portrait":
+                    device.orientation = .portrait
+                case "portrait_upside_down", "portraitupsidedown":
+                    device.orientation = .portraitUpsideDown
+                case "landscape_left", "landscapeleft":
+                    device.orientation = .landscapeLeft
+                case "landscape_right", "landscaperight":
+                    device.orientation = .landscapeRight
+                default:
+                    throw GestureError.gestureFailed("Unknown orientation: \(orientation)")
+                }
             }
         }
 
         public func getOrientation() -> String {
-            let device = XCUIDevice.shared
+            return runOnMainThread {
+                let device = XCUIDevice.shared
 
-            switch device.orientation {
-            case .portrait: return "portrait"
-            case .portraitUpsideDown: return "portrait_upside_down"
-            case .landscapeLeft: return "landscape_left"
-            case .landscapeRight: return "landscape_right"
-            default: return "unknown"
+                switch device.orientation {
+                case .portrait: return "portrait"
+                case .portraitUpsideDown: return "portrait_upside_down"
+                case .landscapeLeft: return "landscape_left"
+                case .landscapeRight: return "landscape_right"
+                default: return "unknown"
+                }
             }
         }
 
         public func pressHome() throws {
-            XCUIDevice.shared.press(.home)
+            runOnMainThread {
+                XCUIDevice.shared.press(.home)
+            }
         }
 
         // MARK: - App Control
 
         public func launchApp(bundleId: String) throws {
-            let app = XCUIApplication(bundleIdentifier: bundleId)
-            app.launch()
+            runOnMainThread {
+                let app = XCUIApplication(bundleIdentifier: bundleId)
+                app.launch()
+            }
         }
 
         public func terminateApp(bundleId: String) throws {
-            let app = XCUIApplication(bundleIdentifier: bundleId)
-            app.terminate()
+            runOnMainThread {
+                let app = XCUIApplication(bundleIdentifier: bundleId)
+                app.terminate()
+            }
         }
 
         public func activateApp(bundleId: String) throws {
-            let app = XCUIApplication(bundleIdentifier: bundleId)
-            app.activate()
+            runOnMainThread {
+                let app = XCUIApplication(bundleIdentifier: bundleId)
+                app.activate()
+            }
         }
 
     #else
