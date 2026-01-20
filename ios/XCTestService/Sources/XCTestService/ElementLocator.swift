@@ -129,9 +129,12 @@ public class ElementLocator: ElementLocating {
 
             let isSpringboardInForeground = stateInfo.springboardState == 4 // .runningForeground
             let isCurrentAppInForeground = stateInfo.currentAppState == 4 // .runningForeground
+            let isCurrentAppSpringboard = stateInfo.currentBundleId == "com.apple.springboard"
 
-            // If we have an app and it's in foreground, we're good
-            if isCurrentAppInForeground {
+            // If we have an app (not springboard) and it's in foreground, we're good
+            // Note: We always try to detect when current app is springboard, because
+            // springboard reports as foreground even when another app is on top
+            if isCurrentAppInForeground && !isCurrentAppSpringboard {
                 return
             }
 

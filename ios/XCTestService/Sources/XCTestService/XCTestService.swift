@@ -31,8 +31,8 @@ public class XCTestService {
     }
 
     #if canImport(XCTest) && os(iOS)
-        /// Default bundle ID to use when none is specified (iOS Settings app)
-        public static let defaultBundleId = "com.apple.Preferences"
+        /// Default bundle ID to use when none is specified (iOS Springboard/home screen)
+        public static let defaultBundleId = "com.apple.springboard"
 
         /// Sets the application under test with its bundle ID
         public func setApplication(_ app: XCUIApplication, bundleId: String? = nil) {
@@ -45,15 +45,15 @@ public class XCTestService {
             gesturePerformer.setApplication(app)
         }
 
-        /// Launches the target application and starts the service
+        /// Activates the target application and starts the service
         public func start(bundleId: String? = nil) throws {
-            // Launch or connect to target app
-            // Use provided bundleId, or default to Settings app (avoids XCUIApplication() crash in SPM tests)
+            // Activate or connect to target app
+            // Use provided bundleId, or default to Springboard (home screen)
             let targetBundleId = bundleId ?? Self.defaultBundleId
             let app = XCUIApplication(bundleIdentifier: targetBundleId)
-            app.launch()
+            app.activate()
             setApplication(app, bundleId: targetBundleId)
-            print("[XCTestService] Launched app: \(targetBundleId)")
+            print("[XCTestService] Activated app: \(targetBundleId)")
 
             // Start the server
             try server.start()
