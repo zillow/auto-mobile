@@ -25,20 +25,10 @@ import {
   selectedElementSchema,
   systemInsetsSchema
 } from "./toolOutputSchemas";
+import { elementIdTextSelectorSchema } from "./elementSelectorSchemas";
 
 // Schema definitions
-const waitForElementSchema = z.object({
-  id: z.string().optional().describe("Element ID to wait for"),
-  text: z.string().optional().describe("Element text to wait for"),
-}).superRefine((value, ctx) => {
-  const provided = [value.id, value.text].filter(Boolean).length;
-  if (provided !== 1) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "waitFor.element must specify exactly one of id or text"
-    });
-  }
-});
+const waitForElementSchema = elementIdTextSelectorSchema.describe("Element to wait for");
 
 const waitForSchema = z.object({
   element: waitForElementSchema.describe("Element to wait for"),
@@ -114,15 +104,15 @@ const findWaitForElement = (
   waitFor: ObserveWaitForOptions,
   viewHierarchy: ViewHierarchyResult
 ): Element | null => {
-  if (waitFor.element.id) {
+  if ("elementId" in waitFor.element) {
     return elementUtils.findElementByResourceId(
       viewHierarchy,
-      waitFor.element.id,
+      waitFor.element.elementId,
       undefined
     );
   }
 
-  if (waitFor.element.text) {
+  if ("text" in waitFor.element) {
     return elementUtils.findElementByText(
       viewHierarchy,
       waitFor.element.text,
@@ -149,8 +139,8 @@ const waitForObservation = async (
   const timeoutMs = waitFor.timeout ?? 5000;
   const elementUtils = new ElementUtils();
   const queryOptions = {
-    text: waitFor.element.text,
-    elementId: waitFor.element.id
+    text: "text" in waitFor.element ? waitFor.element.text : undefined,
+    elementId: "elementId" in waitFor.element ? waitFor.element.elementId : undefined
   };
 
   throwIfAborted(signal);

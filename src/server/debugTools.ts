@@ -9,6 +9,11 @@ import { createJSONToolResponse } from "../utils/toolUtils";
 import { BootedDevice, HighlightShape, Platform } from "../models";
 import { addDeviceTargetingToSchema } from "./toolSchemaHelpers";
 import { isDebugModeEnabled } from "../utils/debug";
+import {
+  elementContainerSchema,
+  elementIdTextFieldsSchema,
+  validateElementIdTextSelector
+} from "./elementSelectorSchemas";
 
 const ensureDebugEnabled = () => {
   if (!isDebugModeEnabled()) {
@@ -25,7 +30,7 @@ export interface RawViewHierarchyArgs {
 export interface DebugSearchArgs {
   platform: Platform;
   text?: string;
-  id?: string;
+  elementId?: string;
   container?: {
     elementId?: string;
     text?: string;
@@ -63,11 +68,12 @@ export const rawViewHierarchySchema = addDeviceTargetingToSchema(z.object({
 const debugSearchBaseSchema = z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   text: z.string().optional().describe("Text to search for in elements"),
-  id: z.string().optional().describe("Element resource ID / accessibility identifier to search for"),
-  container: z.object({
-    elementId: z.string().optional().describe("Container element resource ID to restrict search within"),
-    text: z.string().optional().describe("Container element text to restrict search within")
-  }).optional().describe("Container element to scope the search - specify elementId or text to locate it"),
+  elementId: elementIdTextFieldsSchema.shape.elementId.describe(
+    "Element resource ID / accessibility identifier to search for"
+  ),
+  container: elementContainerSchema.optional().describe(
+    "Container element to scope the search - specify elementId or text to locate it"
+  ),
   fuzzyMatch: z.boolean().optional().describe("Whether to use fuzzy matching (default: true)"),
   caseSensitive: z.boolean().optional().describe("Whether to use case-sensitive matching (default: false)"),
   includeNearMisses: z.boolean().optional().describe("Include elements that almost matched (default: true)"),
@@ -75,14 +81,7 @@ const debugSearchBaseSchema = z.object({
 }).strict();
 
 export const debugSearchSchema = addDeviceTargetingToSchema(debugSearchBaseSchema).superRefine((value, ctx) => {
-  const hasId = value.id !== undefined;
-  const hasText = value.text !== undefined;
-  if (hasId === hasText) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Provide exactly one of id or text"
-    });
-  }
+  validateElementIdTextSelector(value, ctx);
 });
 
 export const bugReportSchema = addDeviceTargetingToSchema(z.object({
@@ -121,14 +120,14 @@ export function registerDebugTools() {
   const debugSearchHandler = async (device: BootedDevice, args: DebugSearchArgs) => {
     try {
       ensureDebugEnabled();
-      if (!args.text && !args.id) {
-        throw new ActionableError("Either 'text' or 'id' must be provided");
+      if (!args.text && !args.elementId) {
+        throw new ActionableError("Either 'text' or 'elementId' must be provided");
       }
 
       const debugSearch = new DebugSearch(device);
       const result = await debugSearch.execute({
         text: args.text,
-        resourceId: args.id,
+        resourceId: args.elementId,
         container: args.container,
         fuzzyMatch: args.fuzzyMatch,
         caseSensitive: args.caseSensitive,

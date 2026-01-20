@@ -12,13 +12,14 @@ public class XCTestService {
     private let elementLocator: ElementLocator
     private let gesturePerformer: GesturePerformer
     private let commandHandler: CommandHandler
+    private let hierarchyDebouncer: HierarchyDebouncer
 
     #if canImport(XCTest) && os(iOS)
         private var application: XCUIApplication?
     #endif
 
     /// Creates the service with specified port
-    public init(port: UInt16 = defaultPort) {
+    public init(port: UInt16 = defaultPort, timer: Timer = SystemTimer()) {
         elementLocator = ElementLocator()
         gesturePerformer = GesturePerformer(elementLocator: elementLocator)
         commandHandler = CommandHandler(
@@ -26,6 +27,7 @@ public class XCTestService {
             gesturePerformer: gesturePerformer
         )
         server = WebSocketServer(port: port, commandHandler: commandHandler)
+        hierarchyDebouncer = HierarchyDebouncer(elementLocator: elementLocator, timer: timer)
     }
 
     #if canImport(XCTest) && os(iOS)
@@ -52,10 +54,26 @@ public class XCTestService {
             // Start the server
             try server.start()
 
+            // Wire up hierarchy debouncer to broadcast updates when content changes
+            hierarchyDebouncer.setOnResult { [weak self] result in
+                switch result {
+                case let .changed(hierarchy, hash, extractionTimeMs):
+                    print("[XCTestService] Hierarchy changed (hash=\(hash), extraction=\(extractionTimeMs)ms), broadcasting")
+                    self?.server.broadcastHierarchyUpdate(hierarchy)
+                case .unchanged:
+                    // Don't broadcast unchanged results (animation mode)
+                    break
+                case let .error(message):
+                    print("[XCTestService] Hierarchy extraction error: \(message)")
+                }
+            }
+            hierarchyDebouncer.start()
+
             print("[XCTestService] Service started")
             print("[XCTestService] WebSocket server listening on port \(Self.defaultPort)")
             print("[XCTestService] Endpoint: ws://localhost:\(Self.defaultPort)/ws")
             print("[XCTestService] Health check: http://localhost:\(Self.defaultPort)/health")
+            print("[XCTestService] Hierarchy debouncer active (polling every \(HierarchyDebouncer.defaultPollIntervalMs)ms)")
             print("[XCTestService] Ready to accept connections")
         }
     #else
@@ -67,6 +85,7 @@ public class XCTestService {
 
     /// Stops the service
     public func stop() {
+        hierarchyDebouncer.stop()
         server.stop()
         print("[XCTestService] Service stopped")
     }

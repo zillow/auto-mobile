@@ -19,6 +19,7 @@
 		471BDC31826855445CB0FF30 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B265512A37308C098B3E01 /* AppDelegate.swift */; };
 		5151C4235C549690408DE674 /* PerfProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3ADC91E330FEFCD9882A30A /* PerfProviderTests.swift */; };
 		66FB888E218A443091A2DD8B /* XCTestService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56827EE4350DFB34C181E6F9 /* XCTestService.swift */; };
+		682BCA31038636F8DDBFEBA7 /* HierarchyDebouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D86213D75803C8AA93B9583F /* HierarchyDebouncer.swift */; };
 		6BE1A8BAB50B6EC54287A6C6 /* ModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6802366B39546509F431F39 /* ModelsTests.swift */; };
 		76C282F48CB5169159D6A6D9 /* PerfProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2405456E61E2BE2AB9837DD /* PerfProvider.swift */; };
 		9CA64759740038CD0BACC740 /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A36DE1E4D00CEF199F076EBE /* WebSocketServer.swift */; };
@@ -27,6 +28,7 @@
 		AC84EB7D0DB0475DCB749CEC /* XCTestService.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 9788C24D07660B4E2960BC91 /* XCTestService.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AFF0F4FB01A3EF5919FEDA22 /* GesturePerformer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B65ACD5F3352EAF7DF305F8 /* GesturePerformer.swift */; };
 		B52D39007BB9B35F65DA162B /* Protocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38BA6768C288E782FD4BF007 /* Protocols.swift */; };
+		B542B471C14DBC8AFD9DB912 /* HierarchyDebouncer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D86213D75803C8AA93B9583F /* HierarchyDebouncer.swift */; };
 		D6F565155DCCD47DE1D137F0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DCBC1B4FA0889E01E6670015 /* Assets.xcassets */; };
 		E4386D208A9A2B600DD0C5F0 /* CommandHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E6580240FAAEF11D3AE486 /* CommandHandler.swift */; };
 		EFF6AEFF4C9BA793D21D1FE0 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0E0ED91DB46F9FC23B3868E /* Models.swift */; };
@@ -100,6 +102,7 @@
 		B3ADC91E330FEFCD9882A30A /* PerfProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfProviderTests.swift; sourceTree = "<group>"; };
 		B6802366B39546509F431F39 /* ModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelsTests.swift; sourceTree = "<group>"; };
 		BF3CE124F2A6CD97A0B61A20 /* Fakes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fakes.swift; sourceTree = "<group>"; };
+		D86213D75803C8AA93B9583F /* HierarchyDebouncer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HierarchyDebouncer.swift; sourceTree = "<group>"; };
 		DCBC1B4FA0889E01E6670015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Assets.xcassets; path = XCTestServiceApp/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		E0033B69189AE1222D06ACA8 /* XCTestServiceUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XCTestServiceUITests.swift; sourceTree = "<group>"; };
 		F0E0ED91DB46F9FC23B3868E /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -168,6 +171,7 @@
 				FA85B8D1F76B85F7A40A9AC1 /* ElementLocator.swift */,
 				BF3CE124F2A6CD97A0B61A20 /* Fakes.swift */,
 				7B65ACD5F3352EAF7DF305F8 /* GesturePerformer.swift */,
+				D86213D75803C8AA93B9583F /* HierarchyDebouncer.swift */,
 				F0E0ED91DB46F9FC23B3868E /* Models.swift */,
 				B2405456E61E2BE2AB9837DD /* PerfProvider.swift */,
 				38BA6768C288E782FD4BF007 /* Protocols.swift */,
@@ -360,6 +364,7 @@
 				26BE4CDC25C50AF275B5D62D /* ElementLocator.swift in Sources */,
 				0C0DA069D9B774797B08050D /* Fakes.swift in Sources */,
 				AFF0F4FB01A3EF5919FEDA22 /* GesturePerformer.swift in Sources */,
+				B542B471C14DBC8AFD9DB912 /* HierarchyDebouncer.swift in Sources */,
 				3E431C908DCDEFB2E52F4564 /* Models.swift in Sources */,
 				76C282F48CB5169159D6A6D9 /* PerfProvider.swift in Sources */,
 				052E12A5C50F95E644253CEB /* Protocols.swift in Sources */,
@@ -383,6 +388,7 @@
 				A056201FD1164D5BD940F478 /* CommandHandler.swift in Sources */,
 				196923B8D693CBFA0F64FBE8 /* ElementLocator.swift in Sources */,
 				2EB2329D4CC93BCE10835479 /* GesturePerformer.swift in Sources */,
+				682BCA31038636F8DDBFEBA7 /* HierarchyDebouncer.swift in Sources */,
 				EFF6AEFF4C9BA793D21D1FE0 /* Models.swift in Sources */,
 				2E3CACA8F6B100AA92191D14 /* PerfProvider.swift in Sources */,
 				B52D39007BB9B35F65DA162B /* Protocols.swift in Sources */,

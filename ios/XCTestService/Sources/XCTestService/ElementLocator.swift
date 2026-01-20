@@ -5,7 +5,19 @@ import Foundation
 #endif
 
 /// Locates elements using XCUITest APIs and returns Android-compatible format
+/// Applies filtering similar to Android's ViewHierarchyExtractor to reduce hierarchy size
 public class ElementLocator: ElementLocating {
+    // MARK: - Filtering Constants
+
+    /// Maximum depth to traverse (prevent infinite recursion)
+    private static let maxDepth = 30
+
+    /// Generic class names that are typically structural wrappers
+    private static let structuralClassNames: Set<String> = [
+        "UIView",
+        "UIImageView",
+        "UIWindow",
+    ]
     public enum LocatorError: LocalizedError {
         case noApplication
         case elementNotFound(String)
@@ -57,8 +69,22 @@ public class ElementLocator: ElementLocating {
             let snapshotTime = Date().timeIntervalSince(startTime) * 1000
             print("[ElementLocator] Snapshot captured in \(Int(snapshotTime))ms")
 
+            // Get screen bounds for offscreen filtering
+            let screenBounds = snapshot.frame
+
             // Build hierarchy from snapshot (no more IPC calls - all data is local)
-            let rootElement = buildElementInfoFromSnapshot(snapshot, depth: 0, maxDepth: 30)
+            let rawElement = buildElementInfoFromSnapshot(
+                snapshot,
+                depth: 0,
+                screenBounds: screenBounds
+            )
+
+            let buildTime = Date().timeIntervalSince(startTime) * 1000
+            print("[ElementLocator] Raw hierarchy built in \(Int(buildTime))ms")
+
+            // Apply optimization - flatten structural wrappers and filter empty nodes
+            let optimizedElements = optimizeHierarchy(rawElement, isRoot: true)
+            let rootElement = optimizedElements.first ?? rawElement
 
             let totalTime = Date().timeIntervalSince(startTime) * 1000
             print("[ElementLocator] View hierarchy extraction complete in \(Int(totalTime))ms")
@@ -87,14 +113,20 @@ public class ElementLocator: ElementLocating {
         }
 
         /// Build element info from XCUIElementSnapshot - all data is already captured, no IPC calls
+        /// Applies early filtering: offscreen elements, zero-area elements
+        /// Only sets boolean fields when true (nil = false) to reduce JSON size
         private func buildElementInfoFromSnapshot(
             _ snapshot: XCUIElementSnapshot,
             depth: Int,
-            maxDepth: Int
+            screenBounds: CGRect
         )
             -> UIElementInfo
         {
             let frame = snapshot.frame
+
+            // Skip zero-area elements
+            let hasZeroArea = frame.width <= 0 || frame.height <= 0
+
             let bounds = ElementBounds(
                 left: Int(frame.origin.x),
                 top: Int(frame.origin.y),
@@ -106,62 +138,216 @@ public class ElementLocator: ElementLocating {
             let identifier = snapshot.identifier
 
             // Get children from snapshot (already captured - fast!)
+            // Filter out offscreen and zero-area children
             var childNodes: [UIElementInfo]? = nil
-            if depth < maxDepth {
+            if depth < ElementLocator.maxDepth {
                 let children = snapshot.children
                 if !children.isEmpty {
-                    childNodes = children.map { child in
-                        buildElementInfoFromSnapshot(child, depth: depth + 1, maxDepth: maxDepth)
+                    let filteredChildren = children.compactMap { child -> UIElementInfo? in
+                        let childFrame = child.frame
+
+                        // Skip zero-area children
+                        if childFrame.width <= 0 || childFrame.height <= 0 {
+                            return nil
+                        }
+
+                        // Skip completely offscreen children (with margin)
+                        let margin: CGFloat = 50
+                        let expandedScreen = screenBounds.insetBy(dx: -margin, dy: -margin)
+                        if !expandedScreen.intersects(childFrame) {
+                            return nil
+                        }
+
+                        return buildElementInfoFromSnapshot(
+                            child,
+                            depth: depth + 1,
+                            screenBounds: screenBounds
+                        )
                     }
+                    childNodes = filteredChildren.isEmpty ? nil : filteredChildren
                 }
             }
 
             // Map element type to className
             let className = mapElementType(snapshot.elementType)
 
-            // Get actions based on element state
-            var actions: [String] = []
-            if snapshot.isEnabled {
-                actions.append("click")
-                if snapshot.elementType == .textField || snapshot.elementType == .textView || snapshot
-                    .elementType == .secureTextField
-                {
-                    actions.append("set_text")
-                    actions.append("clear_text")
-                }
+            // Determine boolean properties - only set to "true", leave nil for false
+            // This significantly reduces JSON size
+            let isEnabled = snapshot.isEnabled
+
+            // Only mark specific element types as clickable (not generic UIViews)
+            let isClickableType = isActuallyClickableType(snapshot.elementType)
+            let isClickable = isEnabled && isClickableType
+
+            let isScrollable = isScrollableType(snapshot.elementType)
+            let isCheckable = isCheckableType(snapshot.elementType)
+            let isSelected = snapshot.isSelected
+            let hasFocus = snapshot.hasFocus
+            let isPassword = snapshot.elementType == .secureTextField
+
+            // Only include actions for text input elements (click is implied by clickable)
+            var actions: [String]? = nil
+            if isEnabled && (snapshot.elementType == .textField || snapshot.elementType == .textView ||
+                             snapshot.elementType == .secureTextField) {
+                actions = ["set_text", "clear_text"]
             }
 
-            // Note: isHittable is NOT available on XCUIElementSnapshot (only on XCUIElement)
-            // and is expensive to compute. We approximate clickable based on isEnabled.
-            // This matches WebDriverAgent's approach for performance.
-            let isClickable = snapshot.isEnabled
+            // Get label - use for text (don't duplicate in content-desc)
+            let label = snapshot.label.isEmpty ? nil : snapshot.label
+
+            // Use resourceId (don't duplicate in testTag)
+            let resId = identifier.isEmpty ? nil : identifier
 
             return UIElementInfo(
-                text: snapshot.label.isEmpty ? nil : snapshot.label,
+                text: label,
                 textSize: nil,
-                contentDesc: snapshot.label.isEmpty ? nil : snapshot.label,
-                resourceId: identifier.isEmpty ? nil : identifier,
+                contentDesc: nil, // Don't duplicate - label is in text
+                resourceId: resId,
                 className: className,
-                bounds: bounds,
-                clickable: isClickable ? "true" : "false",
-                enabled: snapshot.isEnabled ? "true" : "false",
-                focusable: "true",
-                focused: snapshot.hasFocus ? "true" : "false",
+                bounds: hasZeroArea ? nil : bounds, // Don't include bounds for zero-area elements
+                // Only include boolean fields when true (nil = false)
+                clickable: isClickable ? "true" : nil,
+                enabled: nil, // Don't include enabled - it's almost always true and implied by clickable
+                focusable: nil, // Don't include - almost all elements are focusable on iOS
+                focused: hasFocus ? "true" : nil,
                 accessibilityFocused: nil,
-                scrollable: isScrollableType(snapshot.elementType) ? "true" : "false",
-                password: snapshot.elementType == .secureTextField ? "true" : "false",
-                checkable: isCheckableType(snapshot.elementType) ? "true" : "false",
-                checked: snapshot.isSelected ? "true" : "false",
-                selected: snapshot.isSelected ? "true" : "false",
-                longClickable: isClickable ? "true" : "false",
-                testTag: identifier.isEmpty ? nil : identifier,
+                scrollable: isScrollable ? "true" : nil,
+                password: isPassword ? "true" : nil,
+                checkable: isCheckable ? "true" : nil,
+                checked: (isCheckable && isSelected) ? "true" : nil,
+                selected: isSelected ? "true" : nil,
+                longClickable: nil, // Don't include - same as clickable on iOS
+                testTag: nil, // Don't duplicate - identifier is in resourceId
                 role: mapRole(snapshot.elementType),
                 stateDescription: nil,
                 errorMessage: nil,
                 hintText: snapshot.placeholderValue,
-                actions: actions.isEmpty ? nil : actions,
+                actions: actions,
                 node: childNodes
             )
+        }
+
+        // MARK: - Hierarchy Optimization
+
+        /// Check if an element has meaningful content that should be preserved
+        private func meetsFilterCriteria(_ element: UIElementInfo) -> Bool {
+            // String criteria - element has useful identifying information
+            let hasStringCriteria =
+                element.text != nil ||
+                element.resourceId != nil ||
+                element.role != nil ||
+                element.hintText != nil
+
+            // Boolean criteria - element is interactive
+            let hasBooleanCriteria =
+                element.clickable == "true" ||
+                element.scrollable == "true" ||
+                element.focused == "true" ||
+                element.selected == "true" ||
+                element.checkable == "true"
+
+            return hasStringCriteria || hasBooleanCriteria
+        }
+
+        /// Check if a class name is a structural wrapper (no semantic meaning)
+        private func isStructuralWrapper(_ className: String?) -> Bool {
+            guard let className = className else { return false }
+            return ElementLocator.structuralClassNames.contains(className)
+        }
+
+        /// Optimizes the hierarchy by:
+        /// 1. Promoting children of bounds-only wrapper nodes (structural nodes with only bounds)
+        /// 2. Filtering out empty structural nodes
+        /// 3. Preserving interactive elements and their children
+        ///
+        /// This significantly reduces hierarchy size for complex UIs.
+        private func optimizeHierarchy(_ element: UIElementInfo, isRoot: Bool = false) -> [UIElementInfo] {
+            // Check if this element is a bounds-only wrapper (has no useful properties)
+            let meetsCriteria = meetsFilterCriteria(element)
+            let isStructural = isStructuralWrapper(element.className)
+            let isBoundsOnlyWrapper = !meetsCriteria && isStructural
+
+            // Never promote children of interactive elements
+            let isInteractive = element.clickable == "true" ||
+                element.scrollable == "true" ||
+                element.selected == "true"
+
+            // First, recursively optimize children
+            var optimizedChildren: [UIElementInfo]? = nil
+            if let children = element.node {
+                let optimized = children.flatMap { child in
+                    optimizeHierarchy(child, isRoot: false)
+                }
+                optimizedChildren = optimized.isEmpty ? nil : optimized
+            }
+
+            // Root element is always kept
+            if isRoot {
+                return [UIElementInfo(
+                    text: element.text,
+                    textSize: element.textSize,
+                    contentDesc: element.contentDesc,
+                    resourceId: element.resourceId,
+                    className: element.className,
+                    bounds: element.bounds,
+                    clickable: element.clickable,
+                    enabled: element.enabled,
+                    focusable: element.focusable,
+                    focused: element.focused,
+                    accessibilityFocused: element.accessibilityFocused,
+                    scrollable: element.scrollable,
+                    password: element.password,
+                    checkable: element.checkable,
+                    checked: element.checked,
+                    selected: element.selected,
+                    longClickable: element.longClickable,
+                    testTag: element.testTag,
+                    role: element.role,
+                    stateDescription: element.stateDescription,
+                    errorMessage: element.errorMessage,
+                    hintText: element.hintText,
+                    actions: element.actions,
+                    node: optimizedChildren
+                )]
+            }
+
+            // Only promote children (flatten hierarchy) if this is a bounds-only wrapper AND not interactive
+            if isBoundsOnlyWrapper && !isInteractive {
+                if let children = optimizedChildren {
+                    // Promote children - flatten this wrapper node
+                    return children
+                }
+                // No children and no content - filter out completely
+                return []
+            }
+
+            // Keep this element with optimized children
+            return [UIElementInfo(
+                text: element.text,
+                textSize: element.textSize,
+                contentDesc: element.contentDesc,
+                resourceId: element.resourceId,
+                className: element.className,
+                bounds: element.bounds,
+                clickable: element.clickable,
+                enabled: element.enabled,
+                focusable: element.focusable,
+                focused: element.focused,
+                accessibilityFocused: element.accessibilityFocused,
+                scrollable: element.scrollable,
+                password: element.password,
+                checkable: element.checkable,
+                checked: element.checked,
+                selected: element.selected,
+                longClickable: element.longClickable,
+                testTag: element.testTag,
+                role: element.role,
+                stateDescription: element.stateDescription,
+                errorMessage: element.errorMessage,
+                hintText: element.hintText,
+                actions: element.actions,
+                node: optimizedChildren
+            )]
         }
 
         /// Legacy slow method - keeping for reference but not used
@@ -240,6 +426,43 @@ public class ElementLocator: ElementLocating {
             switch type {
             case .switch, .checkBox, .radioButton:
                 return true
+            default:
+                return false
+            }
+        }
+
+        /// Check if an element type is actually clickable (not just a generic container)
+        /// This prevents marking every UIView as clickable just because it's enabled
+        private func isActuallyClickableType(_ type: XCUIElement.ElementType) -> Bool {
+            switch type {
+            // Interactive controls
+            case .button, .link, .switch, .slider, .stepper, .segmentedControl:
+                return true
+            // Checkable items
+            case .checkBox, .radioButton:
+                return true
+            // Text input
+            case .textField, .textView, .secureTextField, .searchField:
+                return true
+            // List items (cells are tappable)
+            case .cell:
+                return true
+            // Tab and navigation items
+            case .tab, .tabBar:
+                return true
+            // Pickers
+            case .picker, .datePicker:
+                return true
+            // Alert/sheet buttons
+            case .alert, .sheet:
+                return true
+            // Keyboard keys
+            case .key:
+                return true
+            // Images can be tappable
+            case .image:
+                return true
+            // Everything else (UIView, window, staticText, etc.) is not inherently clickable
             default:
                 return false
             }

@@ -11,6 +11,7 @@ import { AdbExecutor } from "./android-cmdline-tools/interfaces/AdbExecutor";
 import { PlatformDeviceManager } from "./interfaces/DeviceUtils";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { XCTestServiceClient } from "../features/observe/XCTestServiceClient";
+import { ObserveScreen } from "../features/observe/ObserveScreen";
 import { createPerformanceTracker } from "./PerformanceTracker";
 import { storeSetupTiming } from "../server/ToolExecutionContext";
 import { applyAppearanceOnConnect } from "./appearance/applyAppearanceOnConnect";
@@ -94,6 +95,9 @@ export class DeviceSessionManager implements DeviceSessionManager {
   private androidEmulator: AndroidEmulatorClient | undefined;
   private deviceUtils: PlatformDeviceManager;
   private window: Window | undefined;
+
+  // Track devices that have push update listeners registered
+  private static pushUpdateListenersRegistered: Set<string> = new Set();
 
   private constructor(adb?: AdbExecutor, deviceUtils?: PlatformDeviceManager) {
     // Use injected adb or create default AdbClient
@@ -533,6 +537,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
         );
         if (isReady) {
           logger.info(`[DeviceSessionManager] XCTestService verified responsive for ${deviceId}`);
+          this.registerPushUpdateListener(device);
           perf.end();
           return;
         }
@@ -549,6 +554,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
         const connected = await perf.track("verifyConnection", () => xcTestClient.waitForConnection(3, 200));
         if (connected) {
           logger.info(`[DeviceSessionManager] XCTestService running and WebSocket connected for ${deviceId}`);
+          this.registerPushUpdateListener(device);
           perf.end();
           return;
         }
@@ -592,6 +598,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
           logger.warn(`[DeviceSessionManager] XCTestService not responsive after setup for ${deviceId}`);
         } else {
           logger.info(`[DeviceSessionManager] XCTestService setup complete and verified for ${deviceId}`);
+          this.registerPushUpdateListener(device);
         }
       } else {
         logger.warn(`[DeviceSessionManager] WebSocket connection failed after XCTestService setup for ${deviceId}`);
@@ -700,5 +707,31 @@ export class DeviceSessionManager implements DeviceSessionManager {
     const bootedDevice = await this.simctl!.bootSimulator(deviceId);
     await this.verifyIosDevice(deviceId, options);
     return bootedDevice;
+  }
+
+  /**
+   * Register push update listener for an iOS device to clear ObserveScreen cache when UI changes.
+   * This is called when XCTestService is successfully connected.
+   */
+  private registerPushUpdateListener(device: BootedDevice): void {
+    const deviceId = device.deviceId;
+    if (DeviceSessionManager.pushUpdateListenersRegistered.has(deviceId)) {
+      return; // Already registered
+    }
+
+    try {
+      const manager = IOSXCTestServiceManager.getInstance(device);
+      const xcTestClient = XCTestServiceClient.getInstance(device, manager.getServicePort());
+
+      xcTestClient.onPushUpdate(() => {
+        logger.info(`[DeviceSessionManager] Received iOS UI change notification for ${deviceId}, clearing ObserveScreen cache`);
+        ObserveScreen.clearCache();
+      });
+
+      DeviceSessionManager.pushUpdateListenersRegistered.add(deviceId);
+      logger.info(`[DeviceSessionManager] Registered push update listener for ${deviceId}`);
+    } catch (error) {
+      logger.warn(`[DeviceSessionManager] Failed to register push update listener for ${deviceId}: ${error}`);
+    }
   }
 }

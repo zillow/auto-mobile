@@ -238,7 +238,7 @@ export class DefaultUIStateSetup implements UIStateSetup {
       if (element.text) {
         args.text = element.text;
       } else if (element.resourceId) {
-        args.id = element.resourceId;
+        args.elementId = element.resourceId;
       }
 
       await tapTool.handler(args);

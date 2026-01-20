@@ -229,8 +229,8 @@ export class AppearanceSocketServer {
       for (const device of pooledDevices) {
         targets.set(device.id, {
           deviceId: device.id,
-          name: device.id,
-          platform: "android",
+          name: device.name,
+          platform: device.platform,
         });
       }
     }
