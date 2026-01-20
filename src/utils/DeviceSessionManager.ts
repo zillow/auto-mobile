@@ -553,10 +553,16 @@ export class DeviceSessionManager implements DeviceSessionManager {
         // Service is running, try to connect WebSocket
         const connected = await perf.track("verifyConnection", () => xcTestClient.waitForConnection(3, 200));
         if (connected) {
-          logger.info(`[DeviceSessionManager] XCTestService running and WebSocket connected for ${deviceId}`);
-          this.registerPushUpdateListener(device);
-          perf.end();
-          return;
+          // Verify service is responsive and cache hierarchy for fast first observe
+          logger.info(`[DeviceSessionManager] Verifying XCTestService is responsive for ${deviceId}`);
+          const ready = await perf.track("verifyServiceReady", () => xcTestClient.verifyServiceReady(3, 500, 3000));
+          if (ready) {
+            logger.info(`[DeviceSessionManager] XCTestService running, connected, and verified for ${deviceId}`);
+            this.registerPushUpdateListener(device);
+            perf.end();
+            return;
+          }
+          logger.warn(`[DeviceSessionManager] XCTestService running and connected but not responsive for ${deviceId}`);
         }
         // WebSocket won't connect despite service running - may need restart
         logger.warn(`[DeviceSessionManager] XCTestService running but WebSocket failed for ${deviceId}, will attempt restart`);
