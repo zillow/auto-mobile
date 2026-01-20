@@ -101,7 +101,6 @@ public class ElementLocator: ElementLocating {
             foregroundApp = app
             foregroundBundleId = bundleId
             elementCache.removeAll()
-            print("[ElementLocator] Set application to observe: \(bundleId)")
         }
 
         /// Detect and switch to the foreground application if current app is not in foreground
@@ -118,26 +117,20 @@ public class ElementLocator: ElementLocating {
                 return (sbState, freshAppState, self.foregroundBundleId)
             }
 
-            // Debug: Log all state info
-            print("[ElementLocator] ensureForegroundApp - springboard.state=\(stateInfo.springboardState) (4=runningForeground), currentApp.state=\(stateInfo.currentAppState ?? 0), currentBundleId=\(stateInfo.currentBundleId ?? "nil")")
-
             let isSpringboardInForeground = stateInfo.springboardState == 4 // .runningForeground
             let isCurrentAppInForeground = stateInfo.currentAppState == 4 // .runningForeground
 
             // If we have an app and it's in foreground, we're good
             if isCurrentAppInForeground {
-                print("[ElementLocator] Current app is in foreground, no switch needed")
                 return
             }
 
             // Always try to detect foreground app first, even if springboard reports as foreground
             // This is because springboard may report as foreground even when another app is visible
-            print("[ElementLocator] Current app not in foreground (state=\(stateInfo.currentAppState ?? 0)), detecting foreground app...")
 
             // Try to find the foreground app by checking springboard
             if let detectedBundleId = detectForegroundAppBundleId() {
                 if detectedBundleId != foregroundBundleId {
-                    print("[ElementLocator] Switching to foreground app: \(detectedBundleId)")
                     // Release old app before creating new one
                     foregroundApp = nil
                     foregroundBundleId = nil
@@ -146,17 +139,12 @@ public class ElementLocator: ElementLocating {
                     // Create new app instance for the detected bundle
                     foregroundApp = XCUIApplication(bundleIdentifier: detectedBundleId)
                     foregroundBundleId = detectedBundleId
-                } else {
-                    print("[ElementLocator] Detected app \(detectedBundleId) is already current, no switch needed")
                 }
             } else if isSpringboardInForeground {
                 // Only clear foreground app if we couldn't detect any app AND springboard reports as foreground
-                print("[ElementLocator] No foreground app detected and springboard is in foreground, clearing foreground app")
                 foregroundApp = nil
                 foregroundBundleId = nil
                 elementCache.removeAll()
-            } else {
-                print("[ElementLocator] Could not detect foreground app, keeping current: \(foregroundBundleId ?? "nil")")
             }
         }
 
@@ -172,10 +160,8 @@ public class ElementLocator: ElementLocating {
             }
             let foregroundAppInForeground = stateInfo.state == 4 // .runningForeground
             if let app = foregroundApp, foregroundAppInForeground {
-                print("[ElementLocator] currentApplication returning foreground app: \(stateInfo.bundleId ?? "unknown")")
                 return app
             }
-            print("[ElementLocator] currentApplication returning springboard (foregroundApp.state=\(stateInfo.state ?? 0), bundleId=\(stateInfo.bundleId ?? "nil"))")
             return springboard
         }
 
@@ -223,8 +209,6 @@ public class ElementLocator: ElementLocating {
         /// Detect the bundle ID of the foreground app
         /// Returns nil if detection fails or springboard is in front
         private func detectForegroundAppBundleId() -> String? {
-            print("[ElementLocator] detectForegroundAppBundleId() called")
-
             // First, try to find bundle IDs from springboard's element tree
             // This can work when apps embed their bundle ID in element identifiers
             if let snapshot: XCUIElementSnapshot = runOnMainThread({
@@ -232,7 +216,6 @@ public class ElementLocator: ElementLocating {
             }) {
                 var candidateBundleIds: [String] = []
                 collectBundleIdsFromElement(snapshot, into: &candidateBundleIds)
-                print("[ElementLocator] Found \(candidateBundleIds.count) candidate bundle IDs from springboard: \(candidateBundleIds)")
 
                 for bundleId in candidateBundleIds {
                     if bundleId == "com.apple.springboard" {
@@ -243,24 +226,18 @@ public class ElementLocator: ElementLocating {
                         let testApp = XCUIApplication(bundleIdentifier: bundleId)
                         return testApp.state.rawValue
                     }
-                    print("[ElementLocator] Checking \(bundleId): state=\(stateRawValue) (4=runningForeground)")
                     if stateRawValue == 4 { // .runningForeground
-                        print("[ElementLocator] Detected foreground app from springboard: \(bundleId)")
                         return bundleId
                     }
                 }
-            } else {
-                print("[ElementLocator] Failed to get springboard snapshot")
             }
 
             // Fallback: Check common system apps directly
             // This is necessary because when another app is in foreground,
             // springboard's element tree may not contain that app's bundle ID
-            print("[ElementLocator] No foreground app found in springboard tree, checking common system apps...")
             for bundleId in Self.commonSystemApps {
                 // Skip current app (we already know it's not in foreground)
                 if bundleId == foregroundBundleId {
-                    print("[ElementLocator] Skipping current app: \(bundleId)")
                     continue
                 }
 
@@ -268,17 +245,11 @@ public class ElementLocator: ElementLocating {
                     let testApp = XCUIApplication(bundleIdentifier: bundleId)
                     return testApp.state.rawValue
                 }
-                // Only log apps that are running (state > 0) to reduce noise
-                if stateRawValue > 0 {
-                    print("[ElementLocator] System app \(bundleId): state=\(stateRawValue) (4=runningForeground)")
-                }
                 if stateRawValue == 4 { // .runningForeground
-                    print("[ElementLocator] Detected foreground app from system apps: \(bundleId)")
                     return bundleId
                 }
             }
 
-            print("[ElementLocator] Could not detect foreground app from any source")
             return nil
         }
 
@@ -322,18 +293,12 @@ public class ElementLocator: ElementLocating {
             let bundleId = foregroundBundleId ?? "com.apple.springboard"
 
             // Use snapshot() for fast hierarchy extraction - single IPC call captures everything
-            print("[ElementLocator] Taking snapshot of \(bundleId)...")
-            let startTime = Date()
-
             // snapshot() captures all element data in ONE IPC call (fast!)
             // vs accessing properties individually which is extremely slow
             // Must be called on main thread
             let snapshot = try runOnMainThread {
                 try app.snapshot()
             }
-
-            let snapshotTime = Date().timeIntervalSince(startTime) * 1000
-            print("[ElementLocator] Snapshot captured in \(Int(snapshotTime))ms")
 
             // Get screen bounds for offscreen filtering
             let screenBounds = snapshot.frame
@@ -345,15 +310,9 @@ public class ElementLocator: ElementLocating {
                 screenBounds: screenBounds
             )
 
-            let buildTime = Date().timeIntervalSince(startTime) * 1000
-            print("[ElementLocator] Raw hierarchy built in \(Int(buildTime))ms")
-
             // Apply optimization - flatten structural wrappers and filter empty nodes
             let optimizedElements = optimizeHierarchy(rawElement, isRoot: true)
             let rootElement = optimizedElements.first ?? rawElement
-
-            let totalTime = Date().timeIntervalSince(startTime) * 1000
-            print("[ElementLocator] View hierarchy extraction complete in \(Int(totalTime))ms")
 
             // Get window info from snapshot
             let frame = snapshot.frame
@@ -377,7 +336,6 @@ public class ElementLocator: ElementLocating {
             // If there are system alerts, include them in the hierarchy
             let finalHierarchy: UIElementInfo
             if !systemAlerts.isEmpty {
-                print("[ElementLocator] Found \(systemAlerts.count) system alert(s), including in hierarchy")
                 // Create a wrapper that contains both the app hierarchy and alerts
                 var children = rootElement.node ?? []
                 children.append(contentsOf: systemAlerts)
@@ -416,8 +374,6 @@ public class ElementLocator: ElementLocating {
             guard alertCount > 0 else {
                 return []
             }
-
-            print("[ElementLocator] Springboard has \(alertCount) alert(s), capturing...")
 
             // Get snapshots of all alerts
             var alertElements: [UIElementInfo] = []
