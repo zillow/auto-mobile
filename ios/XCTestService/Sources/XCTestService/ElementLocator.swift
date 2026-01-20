@@ -107,28 +107,32 @@ public class ElementLocator: ElementLocating {
         /// Detect and switch to the foreground application if current app is not in foreground
         private func ensureForegroundApp() {
             // Run XCUITest state checks on main thread
-            let needsUpdate: (isSpringboardInForeground: Bool, isCurrentAppInForeground: Bool) = runOnMainThread {
-                let springboardInForeground = self.springboard.state == .runningForeground
-                let currentAppInForeground = (self.foregroundApp?.state == .runningForeground) == true
-                return (springboardInForeground, currentAppInForeground)
+            // IMPORTANT: Create fresh XCUIApplication instances to check state, because
+            // cached instances may return stale state values
+            let stateInfo: (springboardState: UInt, currentAppState: UInt?, currentBundleId: String?) = runOnMainThread {
+                let sbState = self.springboard.state.rawValue
+                // Create fresh instance to get accurate state (cached instances return stale state)
+                let freshAppState: UInt? = self.foregroundBundleId.map { bundleId in
+                    XCUIApplication(bundleIdentifier: bundleId).state.rawValue
+                }
+                return (sbState, freshAppState, self.foregroundBundleId)
             }
+
+            // Debug: Log all state info
+            print("[ElementLocator] ensureForegroundApp - springboard.state=\(stateInfo.springboardState) (4=runningForeground), currentApp.state=\(stateInfo.currentAppState ?? 0), currentBundleId=\(stateInfo.currentBundleId ?? "nil")")
+
+            let isSpringboardInForeground = stateInfo.springboardState == 4 // .runningForeground
+            let isCurrentAppInForeground = stateInfo.currentAppState == 4 // .runningForeground
 
             // If we have an app and it's in foreground, we're good
-            if needsUpdate.isCurrentAppInForeground {
+            if isCurrentAppInForeground {
+                print("[ElementLocator] Current app is in foreground, no switch needed")
                 return
             }
 
-            // Check if springboard is in foreground (home screen)
-            if needsUpdate.isSpringboardInForeground {
-                print("[ElementLocator] Springboard is in foreground, clearing foreground app")
-                // Clear foreground app - we'll observe springboard
-                foregroundApp = nil
-                foregroundBundleId = nil
-                elementCache.removeAll()
-                return
-            }
-
-            print("[ElementLocator] Current app not in foreground, detecting foreground app...")
+            // Always try to detect foreground app first, even if springboard reports as foreground
+            // This is because springboard may report as foreground even when another app is visible
+            print("[ElementLocator] Current app not in foreground (state=\(stateInfo.currentAppState ?? 0)), detecting foreground app...")
 
             // Try to find the foreground app by checking springboard
             if let detectedBundleId = detectForegroundAppBundleId() {
@@ -142,68 +146,139 @@ public class ElementLocator: ElementLocating {
                     // Create new app instance for the detected bundle
                     foregroundApp = XCUIApplication(bundleIdentifier: detectedBundleId)
                     foregroundBundleId = detectedBundleId
+                } else {
+                    print("[ElementLocator] Detected app \(detectedBundleId) is already current, no switch needed")
                 }
+            } else if isSpringboardInForeground {
+                // Only clear foreground app if we couldn't detect any app AND springboard reports as foreground
+                print("[ElementLocator] No foreground app detected and springboard is in foreground, clearing foreground app")
+                foregroundApp = nil
+                foregroundBundleId = nil
+                elementCache.removeAll()
+            } else {
+                print("[ElementLocator] Could not detect foreground app, keeping current: \(foregroundBundleId ?? "nil")")
             }
         }
 
         /// Get the current application to observe
         /// Returns foreground app if available and in foreground, otherwise springboard
         private var currentApplication: XCUIApplication {
-            // Check state on main thread
-            let foregroundAppInForeground: Bool = runOnMainThread {
-                self.foregroundApp?.state == .runningForeground
+            // Check state on main thread using fresh instance (cached instances return stale state)
+            let stateInfo: (state: UInt?, bundleId: String?) = runOnMainThread {
+                let freshState: UInt? = self.foregroundBundleId.map { bundleId in
+                    XCUIApplication(bundleIdentifier: bundleId).state.rawValue
+                }
+                return (freshState, self.foregroundBundleId)
             }
+            let foregroundAppInForeground = stateInfo.state == 4 // .runningForeground
             if let app = foregroundApp, foregroundAppInForeground {
+                print("[ElementLocator] currentApplication returning foreground app: \(stateInfo.bundleId ?? "unknown")")
                 return app
             }
+            print("[ElementLocator] currentApplication returning springboard (foregroundApp.state=\(stateInfo.state ?? 0), bundleId=\(stateInfo.bundleId ?? "nil"))")
             return springboard
         }
 
-        /// Detect the bundle ID of the foreground app using springboard
+        /// Common system apps to check when detecting foreground app
+        /// These are apps that might be launched by the user during testing
+        private static let commonSystemApps: [String] = [
+            "com.apple.Preferences",      // Settings
+            "com.apple.mobilesafari",     // Safari
+            "com.apple.MobileAddressBook", // Contacts
+            "com.apple.mobilephone",       // Phone
+            "com.apple.MobileSMS",         // Messages
+            "com.apple.mobileslideshow",   // Photos
+            "com.apple.camera",            // Camera
+            "com.apple.AppStore",          // App Store
+            "com.apple.Maps",              // Maps
+            "com.apple.Health",            // Health
+            "com.apple.Fitness",           // Fitness
+            "com.apple.weather",           // Weather
+            "com.apple.mobilenotes",       // Notes
+            "com.apple.reminders",         // Reminders
+            "com.apple.mobilecal",         // Calendar
+            "com.apple.mobilemail",        // Mail
+            "com.apple.Music",             // Music
+            "com.apple.Podcasts",          // Podcasts
+            "com.apple.TV",                // TV
+            "com.apple.news",              // News
+            "com.apple.stocks",            // Stocks
+            "com.apple.tips",              // Tips
+            "com.apple.iBooks",            // Books
+            "com.apple.DocumentsApp",      // Files
+            "com.apple.calculator",        // Calculator
+            "com.apple.VoiceMemos",        // Voice Memos
+            "com.apple.compass",           // Compass
+            "com.apple.measure",           // Measure
+            "com.apple.facetime",          // FaceTime
+            "com.apple.Home",              // Home
+            "com.apple.shortcuts",         // Shortcuts
+            "com.apple.Translate",         // Translate
+            "com.apple.Magnifier",         // Magnifier
+            "com.apple.clock",             // Clock
+            "com.apple.findmy",            // Find My
+            "com.apple.Passbook",          // Wallet
+        ]
+
+        /// Detect the bundle ID of the foreground app
         /// Returns nil if detection fails or springboard is in front
         private func detectForegroundAppBundleId() -> String? {
-            // Get springboard snapshot on main thread - this captures all system-level UI
-            guard let snapshot: XCUIElementSnapshot = runOnMainThread({
+            print("[ElementLocator] detectForegroundAppBundleId() called")
+
+            // First, try to find bundle IDs from springboard's element tree
+            // This can work when apps embed their bundle ID in element identifiers
+            if let snapshot: XCUIElementSnapshot = runOnMainThread({
                 return try? self.springboard.snapshot()
-            }) else {
-                print("[ElementLocator] Failed to get springboard snapshot")
-                return nil
-            }
+            }) {
+                var candidateBundleIds: [String] = []
+                collectBundleIdsFromElement(snapshot, into: &candidateBundleIds)
+                print("[ElementLocator] Found \(candidateBundleIds.count) candidate bundle IDs from springboard: \(candidateBundleIds)")
 
-            // Collect candidate bundle IDs from springboard elements
-            var candidateBundleIds: [String] = []
-            collectBundleIdsFromElement(snapshot, into: &candidateBundleIds)
-
-            // Check each candidate to find one that's in foreground
-            // We create temporary apps just to check state, then discard
-            for bundleId in candidateBundleIds {
-                // Skip springboard itself
-                if bundleId == "com.apple.springboard" {
-                    continue
-                }
-
-                // If this is our current app, check it first
-                if bundleId == foregroundBundleId, let app = foregroundApp {
-                    let isInForeground = runOnMainThread {
-                        app.state == .runningForeground
+                for bundleId in candidateBundleIds {
+                    if bundleId == "com.apple.springboard" {
+                        continue
                     }
-                    if isInForeground {
+
+                    let stateRawValue: UInt = runOnMainThread {
+                        let testApp = XCUIApplication(bundleIdentifier: bundleId)
+                        return testApp.state.rawValue
+                    }
+                    print("[ElementLocator] Checking \(bundleId): state=\(stateRawValue) (4=runningForeground)")
+                    if stateRawValue == 4 { // .runningForeground
+                        print("[ElementLocator] Detected foreground app from springboard: \(bundleId)")
                         return bundleId
                     }
+                }
+            } else {
+                print("[ElementLocator] Failed to get springboard snapshot")
+            }
+
+            // Fallback: Check common system apps directly
+            // This is necessary because when another app is in foreground,
+            // springboard's element tree may not contain that app's bundle ID
+            print("[ElementLocator] No foreground app found in springboard tree, checking common system apps...")
+            for bundleId in Self.commonSystemApps {
+                // Skip current app (we already know it's not in foreground)
+                if bundleId == foregroundBundleId {
+                    print("[ElementLocator] Skipping current app: \(bundleId)")
                     continue
                 }
 
-                // Create temporary app just to check state
-                // This is unavoidable - XCUIApplication.state requires an instance
-                let isInForeground = runOnMainThread {
+                let stateRawValue: UInt = runOnMainThread {
                     let testApp = XCUIApplication(bundleIdentifier: bundleId)
-                    return testApp.state == .runningForeground
+                    return testApp.state.rawValue
                 }
-                if isInForeground {
+                // Only log apps that are running (state > 0) to reduce noise
+                if stateRawValue > 0 {
+                    print("[ElementLocator] System app \(bundleId): state=\(stateRawValue) (4=runningForeground)")
+                }
+                if stateRawValue == 4 { // .runningForeground
+                    print("[ElementLocator] Detected foreground app from system apps: \(bundleId)")
                     return bundleId
                 }
             }
 
+            print("[ElementLocator] Could not detect foreground app from any source")
             return nil
         }
 
