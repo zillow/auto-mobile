@@ -672,12 +672,18 @@ jobs:
           XCTESTRUN=$(find /tmp/automobile-xctestservice/Build/Products -name "*.xctestrun" | head -1)
           echo "xctestrun file: ${XCTESTRUN}"
 
+      - name: "List available tests"
+        run: |
+          cd ios/XCTestRunner
+          echo "Listing tests (this verifies test discovery works)..."
+          swift test list 2>&1 || echo "swift test list failed with exit code $?"
+
       - name: "Run Reminders integration tests"
         env:
           AUTOMOBILE_TEST_PLAN: "Plans/launch-reminders-app.yaml"
         run: |
           cd ios/XCTestRunner
-          swift test --filter RemindersLaunchPlanTests
+          swift test --filter RemindersLaunchPlanTests -v 2>&1
 
   # =============================================================================
   # Android Build and Test Jobs (Android-related changes only)
