@@ -9,20 +9,12 @@ class RemindersIntegrationBase: AutoMobileTestCase {
     override func setUpAutoMobile() throws {
         PerfTimer.log("setUpAutoMobile START")
 
-        let env = AutoMobileEnvironment()
-        if let explicit = env.boolValue(["AUTOMOBILE_INTEGRATION_TESTS"]) {
-            PerfTimer.log("AUTOMOBILE_INTEGRATION_TESTS explicit value: \(explicit)")
-            if !explicit {
-                throw XCTSkip("Integration tests disabled via AUTOMOBILE_INTEGRATION_TESTS=0")
-            }
-        } else {
-            let hasSimulator = PerfTimer.measure("SimulatorDetection.hasAvailableSimulator") {
-                SimulatorDetection.hasAvailableSimulator()
-            }
-            PerfTimer.log("hasAvailableSimulator: \(hasSimulator)")
-            guard hasSimulator else {
-                throw XCTSkip("No simulator available. Set AUTOMOBILE_INTEGRATION_TESTS=1 to force run.")
-            }
+        // Skip if no simulator is booted - this is a fast check
+        let hasBooted = PerfTimer.measure("SimulatorDetection.hasBootedSimulator") {
+            SimulatorDetection.hasBootedSimulator()
+        }
+        guard hasBooted else {
+            throw XCTSkip("No booted simulator found. Boot a simulator first.")
         }
 
         let daemonRunning = PerfTimer.measure("DaemonManager.ensureDaemonRunning") {

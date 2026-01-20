@@ -47,11 +47,12 @@ enum AutoMobileDaemonSocket {
 }
 
 enum SimulatorDetection {
-    static func hasAvailableSimulator() -> Bool {
-        PerfTimer.log("hasAvailableSimulator: starting xcrun simctl")
+    /// Check if any iOS simulator is currently booted (fast check)
+    static func hasBootedSimulator() -> Bool {
+        PerfTimer.log("hasBootedSimulator: starting xcrun simctl")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = ["simctl", "list", "devices", "available", "--json"]
+        process.arguments = ["simctl", "list", "devices", "booted", "--json"]
 
         let pipe = Pipe()
         process.standardOutput = pipe
@@ -59,34 +60,30 @@ enum SimulatorDetection {
 
         do {
             try process.run()
-            PerfTimer.log("hasAvailableSimulator: waiting for simctl to complete")
+            PerfTimer.log("hasBootedSimulator: waiting for simctl to complete")
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else {
-                PerfTimer.log("hasAvailableSimulator: simctl failed with status \(process.terminationStatus)")
+                PerfTimer.log("hasBootedSimulator: simctl failed with status \(process.terminationStatus)")
                 return false
             }
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            PerfTimer.log("hasAvailableSimulator: parsing \(data.count) bytes of JSON")
+            PerfTimer.log("hasBootedSimulator: parsing \(data.count) bytes of JSON")
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let devices = json["devices"] as? [String: [[String: Any]]] else {
-                PerfTimer.log("hasAvailableSimulator: failed to parse JSON")
+                PerfTimer.log("hasBootedSimulator: failed to parse JSON")
                 return false
             }
 
-            var availableCount = 0
+            var bootedCount = 0
             for (_, deviceList) in devices {
-                for device in deviceList {
-                    if let isAvailable = device["isAvailable"] as? Bool, isAvailable {
-                        availableCount += 1
-                    }
-                }
+                bootedCount += deviceList.count
             }
-            PerfTimer.log("hasAvailableSimulator: found \(availableCount) available simulators")
-            return availableCount > 0
+            PerfTimer.log("hasBootedSimulator: found \(bootedCount) booted simulators")
+            return bootedCount > 0
         } catch {
-            PerfTimer.log("hasAvailableSimulator: ERROR - \(error)")
+            PerfTimer.log("hasBootedSimulator: ERROR - \(error)")
             return false
         }
     }
