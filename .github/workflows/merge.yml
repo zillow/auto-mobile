@@ -294,15 +294,15 @@ jobs:
 
   ios-xctestservice-build:
     name: "Build XCTestService for Testing"
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
-      - name: "Select Xcode 15.4"
+      - name: "Select Xcode 16.2"
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "15.4"
+          xcode-version: "16.2"
 
       - name: "Install XcodeGen"
         run: brew install xcodegen
@@ -316,28 +316,28 @@ jobs:
       - name: "Upload XCTestService Artifacts"
         uses: actions/upload-artifact@v4
         with:
-          name: xctestservice-simulator-xcode15
+          name: xctestservice-simulator-xcode16
           path: /tmp/automobile-xctestservice/Build/Products
           retention-days: 1
 
   ios-xctest-runner-simulator-tests:
     name: "XCTestRunner Simulator Tests"
-    runs-on: macos-14
+    runs-on: macos-15
     needs: ios-xctestservice-build
     timeout-minutes: 30
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
-      - name: "Select Xcode 15.4"
+      - name: "Select Xcode 16.2"
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "15.4"
+          xcode-version: "16.2"
 
       - name: "Download XCTestService Artifacts"
         uses: actions/download-artifact@v4
         with:
-          name: xctestservice-simulator-xcode15
+          name: xctestservice-simulator-xcode16
           path: /tmp/automobile-xctestservice/Build/Products
 
       - name: "Setup Bun"
@@ -349,8 +349,8 @@ jobs:
 
       - name: "Boot iOS Simulator"
         run: |
-          xcrun simctl boot "iPhone 15"
-          xcrun simctl bootstatus "iPhone 15" -b
+          xcrun simctl boot "iPhone 16"
+          xcrun simctl bootstatus "iPhone 16" -b
 
       - name: "Verify XCTestService Artifacts"
         run: |
