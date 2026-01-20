@@ -63,7 +63,7 @@ ktor = "3.3.3"
 okhttp = "5.3.2"
 
 # Publishing
-mavenpublish = "0.35.0"
+mavenpublish = "0.36.0"
 
 [plugins]
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "build-kotlin" }
