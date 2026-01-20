@@ -924,120 +924,97 @@ run_download_with_progress() {
     run_with_progress "${title}" "$@"
 }
 
-# Simple animation for narrow terminals or fallback
-play_car_animation_simple() {
-    local car="🚗"
-    local parked="🚘"
-    # Car drives right to left (matches emoji direction)
-    local simple_frames=("      ${car}" "     ${car} " "    ${car}  " "   ${car}   " "  ${car}    " " ${car}     " "${car}      ")
-    local delay=0.07  # 7 frames * 0.07 = ~500ms
+# Display the AutoMobile logo with animation
+# Uses only unicode symbols known to work with agg (DejaVu Sans fallback)
+play_logo_animation() {
+    local RED=$'\033[31m'
+    local GRAY=$'\033[90m'
+    local BOLD=$'\033[1m'
+    local RESET=$'\033[0m'
 
-    if [[ ! -t 1 ]]; then
-        echo "${parked} AutoMobile"
-        return 0
-    fi
+    # Truck ASCII art (5 lines, ~17 chars wide)
+    local line1="    ${RED}┌───┐${RESET}       "
+    local line2="   ${RED}╱    │${RESET}       "
+    local line3="${RED}┌─╱     └══════╦${RESET}"
+    local line4="${RED}│  ┌──┐   ┌──┐ ║${RESET}"
+    local line5="${RED}└──┘${GRAY}()${RED}└───┘${GRAY}()${RED}└─╝${RESET}"
 
-    tput civis 2>/dev/null || true
-
-    for frame in "${simple_frames[@]}"; do
-        printf "\r  %s" "${frame}"
-        sleep "${delay}"
-    done
-
-    printf "\r  %s AutoMobile          \n" "${parked}"
-    tput cnorm 2>/dev/null || true
-}
-
-# Full car animation with dust trail
-play_car_animation() {
-    local car="🚗"
-    local parked="🚘"
-    local dust="💨"
-    local trail_chars=("·" "." " " " ")
-    local frame_count=20  # 20 frames * 0.025 = 500ms
-    local delay=0.025
-    local term_cols=80
-    local car_width=2  # Emoji display width
+    local car_height=5
+    local car_width=17
+    local frame_count=12
+    local delay=0.045
 
     # Check terminal capabilities
     if ! command_exists tput || [[ ! -t 1 ]]; then
-        echo "  ${parked} AutoMobile"
+        echo ""
+        echo -e "${line1}"
+        echo -e "${line2}"
+        echo -e "${line3}"
+        echo -e "${line4}  ${BOLD}AutoMobile${RESET}"
+        echo -e "${line5}"
+        echo ""
         return 0
     fi
 
+    local term_cols
     term_cols=$(tput cols 2>/dev/null || echo 80)
 
-    # Calculate animation parameters
-    local text="AutoMobile "
-    local text_len=${#text}
-    local start_pos=$((term_cols - car_width - 4))
-    local end_pos=$((text_len + 2))
-
-    if (( start_pos < 30 )); then
-        # Terminal too narrow, use simple animation
-        play_car_animation_simple
+    # Need space for animation
+    if (( term_cols < 40 )); then
+        echo ""
+        echo -e "${line1}"
+        echo -e "${line2}"
+        echo -e "${line3}"
+        echo -e "${line4}  ${BOLD}AutoMobile${RESET}"
+        echo -e "${line5}"
+        echo ""
         return 0
     fi
+
+    local start_pos=$((term_cols - car_width - 2))
+    local end_pos=3
 
     # Hide cursor
     tput civis 2>/dev/null || true
 
-    # Animation loop - car moves right to left (matches emoji direction)
+    # Print empty lines for car
+    echo ""
+    local i
+    for ((i = 0; i < car_height; i++)); do
+        echo ""
+    done
+
+    # Animation loop
     for ((frame = 0; frame <= frame_count; frame++)); do
-        # Calculate position (right to left)
         local pos=$((start_pos - (start_pos - end_pos) * frame / frame_count))
 
-        # Build dust trail (appears to the right of car, fading)
-        local trail=""
-        local trail_len=6
-        for ((d = 1; d <= trail_len; d++)); do
-            local trail_pos=$((pos + car_width + d * 2))
-            if (( trail_pos < term_cols - 2 )); then
-                local char_idx=$(( (d - 1) % ${#trail_chars[@]} ))
-                if (( d == 1 )); then
-                    trail="${dust}${trail_chars[char_idx]}"
-                else
-                    trail="${trail}${trail_chars[char_idx]}"
-                fi
+        # Move cursor up
+        printf "\033[%dA" "${car_height}"
+
+        # Draw each line with position offset
+        local lines=("$line1" "$line2" "$line3" "$line4" "$line5")
+        for line in "${lines[@]}"; do
+            printf "\033[2K"
+            if (( pos > 0 )); then
+                printf "%*s" "${pos}" ""
             fi
+            echo -e "${line}"
         done
-
-        # Clear line and draw
-        printf "\r\033[2K"
-
-        # Print leading spaces, then car, then trail
-        if (( pos > 0 )); then
-            printf "%*s" "${pos}" ""
-        fi
-        printf "%s" "${car}"
-        if [[ -n "${trail}" ]]; then
-            printf "%s" "${trail}"
-        fi
 
         sleep "${delay}"
     done
 
-    # Final frame with "AutoMobile" text and parked car
-    printf "\r\033[2K"
-    printf "  %s %s\n" "${text}" "${parked}"
+    # Final frame with title
+    printf "\033[%dA" "${car_height}"
+    printf "\033[2K%*s%s\n" "${end_pos}" "" "${line1}"
+    printf "\033[2K%*s%s\n" "${end_pos}" "" "${line2}"
+    printf "\033[2K%*s%s\n" "${end_pos}" "" "${line3}"
+    printf "\033[2K%*s%s  ${BOLD}AutoMobile${RESET}\n" "${end_pos}" "" "${line4}"
+    printf "\033[2K%*s%s\n" "${end_pos}" "" "${line5}"
+    echo ""
 
     # Show cursor
     tput cnorm 2>/dev/null || true
-}
-
-# Main animation dispatcher
-play_logo_animation() {
-    local term_cols=80
-
-    if command_exists tput && [[ -t 1 ]]; then
-        term_cols=$(tput cols 2>/dev/null || echo 80)
-    fi
-
-    if (( term_cols >= 50 )); then
-        play_car_animation
-    else
-        play_car_animation_simple
-    fi
 }
 
 # ============================================================================
@@ -3138,7 +3115,17 @@ select_preset() {
     # Development option
     options+=("Development (for contributors)")
 
-    choice=$(printf '%s\n' "${options[@]}" | gum filter --header "Select installation preset:" --placeholder "Type to filter...") || true
+    # In dry-run mode, auto-select Claude Marketplace for demo recording
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        gum style --bold "Select installation preset:"
+        sleep 0.3
+        echo ""
+        gum style --foreground 212 "> Claude Marketplace"
+        sleep 0.2
+        choice="Claude Marketplace"
+    else
+        choice=$(printf '%s\n' "${options[@]}" | gum filter --header "Select installation preset:" --placeholder "Type to filter...") || true
+    fi
 
     # Handle Ctrl+C or empty selection - exit script
     if [[ -z "${choice}" ]]; then
