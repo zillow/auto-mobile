@@ -370,12 +370,73 @@ public class ElementLocator: ElementLocating {
                 )
             )
 
+            // Check for system alerts (presented by springboard, not the app)
+            // These include permission dialogs like "Would Like to Send You Notifications"
+            let systemAlerts = getSystemAlerts()
+
+            // If there are system alerts, include them in the hierarchy
+            let finalHierarchy: UIElementInfo
+            if !systemAlerts.isEmpty {
+                print("[ElementLocator] Found \(systemAlerts.count) system alert(s), including in hierarchy")
+                // Create a wrapper that contains both the app hierarchy and alerts
+                var children = rootElement.node ?? []
+                children.append(contentsOf: systemAlerts)
+                finalHierarchy = UIElementInfo(
+                    text: rootElement.text,
+                    resourceId: rootElement.resourceId,
+                    className: rootElement.className,
+                    bounds: rootElement.bounds,
+                    clickable: rootElement.clickable,
+                    focused: rootElement.focused,
+                    scrollable: rootElement.scrollable,
+                    selected: rootElement.selected,
+                    role: rootElement.role,
+                    node: children
+                )
+            } else {
+                finalHierarchy = rootElement
+            }
+
             return ViewHierarchy(
                 packageName: bundleId,
-                hierarchy: rootElement,
+                hierarchy: finalHierarchy,
                 windowInfo: windowInfo,
                 windows: [windowInfo]
             )
+        }
+
+        /// Get system alerts from springboard (permission dialogs, etc.)
+        /// These are presented by springboard, not the app, so we need to check separately
+        private func getSystemAlerts() -> [UIElementInfo] {
+            // Check if springboard has any alerts
+            let alertCount: Int = runOnMainThread {
+                self.springboard.alerts.count
+            }
+
+            guard alertCount > 0 else {
+                return []
+            }
+
+            print("[ElementLocator] Springboard has \(alertCount) alert(s), capturing...")
+
+            // Get snapshots of all alerts
+            var alertElements: [UIElementInfo] = []
+
+            for i in 0..<alertCount {
+                if let alertSnapshot: XCUIElementSnapshot = runOnMainThread({
+                    let alert = self.springboard.alerts.element(boundBy: i)
+                    return try? alert.snapshot()
+                }) {
+                    let alertElement = buildElementInfoFromSnapshot(
+                        alertSnapshot,
+                        depth: 0,
+                        screenBounds: alertSnapshot.frame
+                    )
+                    alertElements.append(alertElement)
+                }
+            }
+
+            return alertElements
         }
 
         /// Build element info from XCUIElementSnapshot - all data is already captured, no IPC calls
