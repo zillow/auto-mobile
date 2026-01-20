@@ -692,6 +692,7 @@ jobs:
         timeout-minutes: 5
         env:
           AUTOMOBILE_TEST_PLAN: "Plans/launch-reminders-app.yaml"
+          AUTOMOBILE_INTEGRATION_TESTS: "1"
         run: |
           cd ios/XCTestRunner
           swift test --filter RemindersLaunchPlanTests 2>&1
