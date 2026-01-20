@@ -79,6 +79,18 @@ interface XCTestServiceStatus {
   startedAt?: number;
 }
 
+interface IproxyStatus {
+  running: boolean;
+  pid?: number;
+  deviceId?: string;
+  localPort?: number;
+  devicePort?: number;
+}
+
+interface DeviceAppHashResult {
+  hash: string | null;
+}
+
 let requestId = 0;
 
 /**
@@ -315,6 +327,167 @@ export async function runXcodebuildExec(
     success: true,
     data: createExecResult(result.data.stdout, result.data.stderr)
   };
+}
+
+/**
+ * Run an xcode-select command on the host
+ */
+export async function runXcodeSelect(
+  args: string[]
+): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
+  return sendCommand("xcode-select", { args });
+}
+
+export async function runXcodeSelectExec(
+  args: string[]
+): Promise<HostControlResult<ReturnType<typeof createExecResult>>> {
+  const result = await runXcodeSelect(args);
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "xcode-select failed" };
+  }
+
+  return {
+    success: true,
+    data: createExecResult(result.data.stdout, result.data.stderr)
+  };
+}
+
+/**
+ * Run an xcrun command on the host
+ */
+export async function runXcrun(
+  args: string[]
+): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
+  return sendCommand("xcrun", { args });
+}
+
+export async function runXcrunExec(
+  args: string[]
+): Promise<HostControlResult<ReturnType<typeof createExecResult>>> {
+  const result = await runXcrun(args);
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "xcrun failed" };
+  }
+
+  return {
+    success: true,
+    data: createExecResult(result.data.stdout, result.data.stderr)
+  };
+}
+
+/**
+ * Run a security command on the host
+ */
+export async function runSecurity(
+  args: string[]
+): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
+  return sendCommand("security", { args });
+}
+
+export async function runSecurityExec(
+  args: string[]
+): Promise<HostControlResult<ReturnType<typeof createExecResult>>> {
+  const result = await runSecurity(args);
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "security failed" };
+  }
+
+  return {
+    success: true,
+    data: createExecResult(result.data.stdout, result.data.stderr)
+  };
+}
+
+/**
+ * Run idevice_id on the host
+ */
+export async function runIdeviceId(
+  args: string[]
+): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
+  return sendCommand("idevice-id", { args });
+}
+
+export async function runIdeviceIdExec(
+  args: string[]
+): Promise<HostControlResult<ReturnType<typeof createExecResult>>> {
+  const result = await runIdeviceId(args);
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "idevice_id failed" };
+  }
+
+  return {
+    success: true,
+    data: createExecResult(result.data.stdout, result.data.stderr)
+  };
+}
+
+/**
+ * Run ideviceinstaller on the host
+ */
+export async function runIdeviceInstaller(
+  args: string[]
+): Promise<HostControlResult<{ stdout: string; stderr: string }>> {
+  return sendCommand("ideviceinstaller", { args });
+}
+
+export async function runIdeviceInstallerExec(
+  args: string[]
+): Promise<HostControlResult<ReturnType<typeof createExecResult>>> {
+  const result = await runIdeviceInstaller(args);
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error || "ideviceinstaller failed" };
+  }
+
+  return {
+    success: true,
+    data: createExecResult(result.data.stdout, result.data.stderr)
+  };
+}
+
+/**
+ * Manage iproxy on the host
+ */
+export async function startIproxy(params: {
+  deviceId: string;
+  localPort: number;
+  devicePort?: number;
+}): Promise<HostControlResult<{ pid: number; message: string }>> {
+  return sendCommand("iproxy-start", params);
+}
+
+export async function stopIproxy(params: {
+  pid?: number;
+  deviceId?: string;
+  localPort?: number;
+  devicePort?: number;
+}): Promise<HostControlResult<{ message: string }>> {
+  return sendCommand("iproxy-stop", params);
+}
+
+export async function getIproxyStatus(params: {
+  pid?: number;
+  deviceId?: string;
+  localPort?: number;
+  devicePort?: number;
+} = {}): Promise<HostControlResult<IproxyStatus>> {
+  return sendCommand<IproxyStatus>("iproxy-status", params);
+}
+
+/**
+ * Run devicectl on the host to fetch app bundle hash
+ */
+export async function getDeviceAppBundleHash(params: {
+  deviceId: string;
+  bundleId: string;
+}): Promise<HostControlResult<DeviceAppHashResult>> {
+  return sendCommand<DeviceAppHashResult>("devicectl-app-hash", params);
+}
+
+export async function uninstallDeviceApp(params: {
+  deviceId: string;
+  bundleId: string;
+}): Promise<HostControlResult<{ message: string }>> {
+  return sendCommand("devicectl-uninstall", params);
 }
 
 export async function startXCTestService(params: {

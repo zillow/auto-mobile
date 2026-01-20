@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { DeviceAppInspector, parseDevicectlJsonOutputPath } from "../../../src/utils/ios-cmdline-tools/DeviceAppInspector";
 import { hashAppBundle } from "../../../src/utils/ios-cmdline-tools/AppBundleHasher";
+import { FakeHostControlDeviceAppInspector } from "../../fakes/FakeHostControlDeviceAppInspector";
 
 const bundleId = "dev.jasonpearson.automobile.XCTestServiceApp";
 
@@ -31,6 +32,7 @@ describe("DeviceAppInspector", () => {
     const workDir = await createTempDir();
     const fixtureApp = await createFixtureApp(workDir);
     const fixtureHash = await hashAppBundle(fixtureApp);
+    const hostControl = new FakeHostControlDeviceAppInspector();
 
     const exec = async (command: string) => {
       if (command.includes("device info apps")) {
@@ -72,15 +74,46 @@ describe("DeviceAppInspector", () => {
       rm: async path => fs.rm(path, { recursive: true, force: true }),
       readdir: async path => fs.readdir(path),
       stat: async path => fs.stat(path),
-      tmpdir
+      tmpdir,
+      hostControl
     });
 
     const hash = await inspector.getInstalledAppBundleHash("device-udid", bundleId);
     expect(hash).toBe(fixtureHash);
   });
 
+  test("delegates app hash to host control when enabled", async () => {
+    const hostControl = new FakeHostControlDeviceAppInspector();
+    hostControl.setUseHostControl(true);
+    hostControl.setRunningInDocker(true);
+    hostControl.setAvailable(true);
+    hostControl.setAppHash("host-hash");
+
+    const inspector = new DeviceAppInspector({
+      platform: () => "linux",
+      exec: async () => ({
+        stdout: "",
+        stderr: "",
+        toString() { return this.stdout; },
+        trim() { return this.stdout.trim(); },
+        includes(searchString: string) { return this.stdout.includes(searchString); }
+      }),
+      readFile: async () => "",
+      mkdtemp: async prefix => fs.mkdtemp(prefix),
+      rm: async path => fs.rm(path, { recursive: true, force: true }),
+      readdir: async path => fs.readdir(path),
+      stat: async path => fs.stat(path),
+      tmpdir,
+      hostControl
+    });
+
+    const hash = await inspector.getInstalledAppBundleHash("device-udid", bundleId);
+    expect(hash).toBe("host-hash");
+  });
+
   test("uninstallApp issues devicectl uninstall command", async () => {
     const commands: string[] = [];
+    const hostControl = new FakeHostControlDeviceAppInspector();
     const exec = async (command: string) => {
       commands.push(command);
       return {
@@ -100,7 +133,8 @@ describe("DeviceAppInspector", () => {
       rm: async path => fs.rm(path, { recursive: true, force: true }),
       readdir: async path => fs.readdir(path),
       stat: async path => fs.stat(path),
-      tmpdir
+      tmpdir,
+      hostControl
     });
 
     await inspector.uninstallApp("device-udid", bundleId);

@@ -4,6 +4,8 @@ import { join } from "path";
 import type { ExecResult } from "../../models";
 import { hashAppBundle } from "./AppBundleHasher";
 import { logger } from "../logger";
+import { isRunningInDocker } from "../dockerEnv";
+import { getDeviceAppBundleHash, isHostControlAvailable, shouldUseHostControl, uninstallDeviceApp } from "../hostControlClient";
 
 export interface DeviceAppInspectorDependencies {
   platform: () => NodeJS.Platform;
@@ -14,6 +16,13 @@ export interface DeviceAppInspectorDependencies {
   readdir: (path: string) => Promise<string[]>;
   stat: (path: string) => Promise<{ isDirectory: () => boolean }>;
   tmpdir: () => string;
+  hostControl: {
+    shouldUseHostControl: () => boolean;
+    isRunningInDocker: () => boolean;
+    isAvailable: () => Promise<boolean>;
+    getAppBundleHash: (deviceId: string, bundleId: string) => Promise<{ success: boolean; error?: string; data?: { hash: string | null } }>;
+    uninstallApp: (deviceId: string, bundleId: string) => Promise<{ success: boolean; error?: string }>;
+  };
 }
 
 const defaultDependencies: DeviceAppInspectorDependencies = {
@@ -37,7 +46,14 @@ const defaultDependencies: DeviceAppInspectorDependencies = {
   rm: async path => fs.rm(path, { recursive: true, force: true }),
   readdir: async path => fs.readdir(path),
   stat: async path => fs.stat(path),
-  tmpdir
+  tmpdir,
+  hostControl: {
+    shouldUseHostControl,
+    isRunningInDocker,
+    isAvailable: () => isHostControlAvailable(),
+    getAppBundleHash: async (deviceId: string, bundleId: string) => getDeviceAppBundleHash({ deviceId, bundleId }),
+    uninstallApp: async (deviceId: string, bundleId: string) => uninstallDeviceApp({ deviceId, bundleId })
+  }
 };
 
 const quoteShell = (value: string): string => `'${value.replace(/'/g, "'\\''")}'`;
@@ -137,6 +153,22 @@ export class DeviceAppInspector {
   }
 
   public async getInstalledAppBundleHash(deviceUdid: string, bundleId: string): Promise<string | null> {
+    const useHostControl = this.deps.hostControl.shouldUseHostControl() && this.deps.hostControl.isRunningInDocker();
+    if (useHostControl) {
+      const available = await this.deps.hostControl.isAvailable();
+      if (!available) {
+        logger.warn("[DeviceAppInspector] Host control not available for devicectl");
+        return null;
+      }
+
+      const result = await this.deps.hostControl.getAppBundleHash(deviceUdid, bundleId);
+      if (!result.success) {
+        logger.warn(`[DeviceAppInspector] Host control devicectl failed: ${result.error || "Unknown error"}`);
+        return null;
+      }
+      return result.data?.hash ?? null;
+    }
+
     if (this.deps.platform() !== "darwin") {
       return null;
     }
@@ -200,6 +232,21 @@ export class DeviceAppInspector {
   }
 
   public async uninstallApp(deviceUdid: string, bundleId: string): Promise<void> {
+    const useHostControl = this.deps.hostControl.shouldUseHostControl() && this.deps.hostControl.isRunningInDocker();
+    if (useHostControl) {
+      const available = await this.deps.hostControl.isAvailable();
+      if (!available) {
+        logger.warn("[DeviceAppInspector] Host control not available for devicectl uninstall");
+        return;
+      }
+
+      const result = await this.deps.hostControl.uninstallApp(deviceUdid, bundleId);
+      if (!result.success) {
+        throw new Error(result.error || "Host control devicectl uninstall failed");
+      }
+      return;
+    }
+
     if (this.deps.platform() !== "darwin") {
       return;
     }
