@@ -2,6 +2,12 @@ import Foundation
 import Darwin
 import XCTest
 
+// Module load logging - this runs when the test module is first loaded
+private let _moduleLoadLog: Void = {
+    let line = "[XCTestRunner] Module loaded at \(Date())\n"
+    fputs(line, stderr)
+}()
+
 public enum AutoMobileTestCaseError: Error, CustomStringConvertible {
     case missingPlanPath
     case invalidEndpoint(String)
@@ -25,13 +31,20 @@ public enum AutoMobileTestCaseError: Error, CustomStringConvertible {
 /// Base XCTestCase for executing AutoMobile YAML automation plans via MCP.
 open class AutoMobileTestCase: XCTestCase {
     override open class var defaultTestSuite: XCTestSuite {
+        // Ensure module load logging is triggered
+        _ = _moduleLoadLog
+        PerfTimer.log("defaultTestSuite START for \(self)")
         if self == AutoMobileTestCase.self {
+            PerfTimer.log("defaultTestSuite: returning empty suite for base class")
             return XCTestSuite(name: "AutoMobileTestCase")
         }
+        PerfTimer.log("defaultTestSuite: registering observer")
         _ = AutoMobileTestObserver.registerIfNeeded()
 
+        PerfTimer.log("defaultTestSuite: calling super.defaultTestSuite")
         let baseSuite = super.defaultTestSuite
         let tests = baseSuite.tests
+        PerfTimer.log("defaultTestSuite: found \(tests.count) tests")
         let orderingSelection = resolveTimingOrderingSelection()
         let timingAvailable = TestTimingCache.shared.hasTimings()
         logTimingOrdering(selection: orderingSelection, timingAvailable: timingAvailable)
@@ -41,6 +54,7 @@ open class AutoMobileTestCase: XCTestCase {
             let orderedTests = orderTestsByTiming(tests, strategy: orderingSelection.resolved)
             baseSuite.setValue(orderedTests, forKey: "tests")
         }
+        PerfTimer.log("defaultTestSuite END for \(self)")
         return baseSuite
     }
     open var planPath: String {

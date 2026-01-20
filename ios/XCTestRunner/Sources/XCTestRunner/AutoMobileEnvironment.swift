@@ -48,6 +48,7 @@ enum AutoMobileDaemonSocket {
 
 enum SimulatorDetection {
     static func hasAvailableSimulator() -> Bool {
+        PerfTimer.log("hasAvailableSimulator: starting xcrun simctl")
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
         process.arguments = ["simctl", "list", "devices", "available", "--json"]
@@ -58,27 +59,34 @@ enum SimulatorDetection {
 
         do {
             try process.run()
+            PerfTimer.log("hasAvailableSimulator: waiting for simctl to complete")
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else {
+                PerfTimer.log("hasAvailableSimulator: simctl failed with status \(process.terminationStatus)")
                 return false
             }
 
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            PerfTimer.log("hasAvailableSimulator: parsing \(data.count) bytes of JSON")
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let devices = json["devices"] as? [String: [[String: Any]]] else {
+                PerfTimer.log("hasAvailableSimulator: failed to parse JSON")
                 return false
             }
 
+            var availableCount = 0
             for (_, deviceList) in devices {
                 for device in deviceList {
                     if let isAvailable = device["isAvailable"] as? Bool, isAvailable {
-                        return true
+                        availableCount += 1
                     }
                 }
             }
-            return false
+            PerfTimer.log("hasAvailableSimulator: found \(availableCount) available simulators")
+            return availableCount > 0
         } catch {
+            PerfTimer.log("hasAvailableSimulator: ERROR - \(error)")
             return false
         }
     }
@@ -123,13 +131,14 @@ public enum DaemonManager {
     }
 
     public static func startDaemon(repoRoot: String? = nil) -> Bool {
+        PerfTimer.log("startDaemon: looking for repo root")
         let root = repoRoot ?? findRepoRoot()
         guard let root = root else {
-            print("[AutoMobile] Could not find repo root to start daemon")
+            PerfTimer.log("startDaemon: ERROR - could not find repo root")
             return false
         }
 
-        print("[AutoMobile] Starting daemon from \(root)...")
+        PerfTimer.log("startDaemon: found repo root at \(root)")
 
         let process = Process()
         process.currentDirectoryURL = URL(fileURLWithPath: root)
@@ -143,26 +152,36 @@ public enum DaemonManager {
         }
         process.environment = env
 
+        PerfTimer.log("startDaemon: searching for bun executable")
         if let bunPath = findExecutable("bun") {
+            PerfTimer.log("startDaemon: found bun at \(bunPath)")
             process.executableURL = URL(fileURLWithPath: bunPath)
             process.arguments = ["run", "--cwd", root, "src/index.ts", "--daemon", "start"]
-        } else if let npxPath = findExecutable("npx") {
-            process.executableURL = URL(fileURLWithPath: npxPath)
-            process.arguments = ["--yes", "tsx", "src/index.ts", "--daemon", "start"]
         } else {
-            print("[AutoMobile] Neither bun nor npx found in PATH")
-            return false
+            PerfTimer.log("startDaemon: bun not found, searching for npx")
+            if let npxPath = findExecutable("npx") {
+                PerfTimer.log("startDaemon: found npx at \(npxPath)")
+                process.executableURL = URL(fileURLWithPath: npxPath)
+                process.arguments = ["--yes", "tsx", "src/index.ts", "--daemon", "start"]
+            } else {
+                PerfTimer.log("startDaemon: ERROR - neither bun nor npx found in PATH")
+                return false
+            }
         }
 
+        PerfTimer.log("startDaemon: launching process with args: \(process.arguments ?? [])")
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
         do {
             try process.run()
+            PerfTimer.log("startDaemon: process launched, waiting for exit")
             process.waitUntilExit()
-            return process.terminationStatus == 0
+            let status = process.terminationStatus
+            PerfTimer.log("startDaemon: process exited with status \(status)")
+            return status == 0
         } catch {
-            print("[AutoMobile] Failed to start daemon: \(error)")
+            PerfTimer.log("startDaemon: ERROR - failed to run process: \(error)")
             return false
         }
     }

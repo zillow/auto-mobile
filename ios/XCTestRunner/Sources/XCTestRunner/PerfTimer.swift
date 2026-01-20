@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Simple performance timing utility for debugging test execution
 public struct PerfTimer {
@@ -9,10 +10,11 @@ public struct PerfTimer {
         return Int(Date().timeIntervalSince(startTime) * 1000)
     }
 
-    /// Log a message with elapsed time prefix
+    /// Log a message with elapsed time prefix (uses stderr for immediate unbuffered output)
     public static func log(_ message: String) {
         let ms = elapsed()
-        print("[PERF +\(ms)ms] \(message)")
+        let line = "[PERF +\(ms)ms] \(message)\n"
+        fputs(line, stderr)
     }
 
     /// Measure a block and log its duration
