@@ -728,6 +728,9 @@
             "ios"
           ]
         },
+        "deviceId": {
+          "type": "string"
+        },
         "deviceMapping": {
           "type": "object",
           "propertyNames": {

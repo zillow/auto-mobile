@@ -7,37 +7,40 @@ class RemindersIntegrationBase: AutoMobileTestCase {
     }
 
     override func setUpAutoMobile() throws {
-        print("[RemindersIntegrationBase] setUpAutoMobile starting...")
+        PerfTimer.log("setUpAutoMobile START")
 
         let env = AutoMobileEnvironment()
         if let explicit = env.boolValue(["AUTOMOBILE_INTEGRATION_TESTS"]) {
-            print("[RemindersIntegrationBase] AUTOMOBILE_INTEGRATION_TESTS explicit value: \(explicit)")
+            PerfTimer.log("AUTOMOBILE_INTEGRATION_TESTS explicit value: \(explicit)")
             if !explicit {
                 throw XCTSkip("Integration tests disabled via AUTOMOBILE_INTEGRATION_TESTS=0")
             }
         } else {
-            print("[RemindersIntegrationBase] Checking for available simulator...")
-            let hasSimulator = SimulatorDetection.hasAvailableSimulator()
-            print("[RemindersIntegrationBase] hasAvailableSimulator: \(hasSimulator)")
+            let hasSimulator = PerfTimer.measure("SimulatorDetection.hasAvailableSimulator") {
+                SimulatorDetection.hasAvailableSimulator()
+            }
+            PerfTimer.log("hasAvailableSimulator: \(hasSimulator)")
             guard hasSimulator else {
                 throw XCTSkip("No simulator available. Set AUTOMOBILE_INTEGRATION_TESTS=1 to force run.")
             }
         }
 
-        print("[RemindersIntegrationBase] Ensuring daemon is running...")
-        guard DaemonManager.ensureDaemonRunning() else {
+        let daemonRunning = PerfTimer.measure("DaemonManager.ensureDaemonRunning") {
+            DaemonManager.ensureDaemonRunning()
+        }
+        guard daemonRunning else {
             throw XCTSkip("Failed to start AutoMobile daemon. Ensure bun is installed and repo is accessible.")
         }
-        print("[RemindersIntegrationBase] Daemon is running")
 
-        print("[RemindersIntegrationBase] Refreshing device pool...")
-        let refreshResult = DaemonManager.refreshDevicePool()
-        print("[RemindersIntegrationBase] refreshDevicePool result: success=\(refreshResult.success), availableDevices=\(refreshResult.availableDevices)")
+        let refreshResult = PerfTimer.measure("DaemonManager.refreshDevicePool") {
+            DaemonManager.refreshDevicePool()
+        }
+        PerfTimer.log("refreshDevicePool result: success=\(refreshResult.success), availableDevices=\(refreshResult.availableDevices)")
         guard refreshResult.success && refreshResult.availableDevices > 0 else {
             throw XCTSkip("No devices available in pool after refresh. Boot a simulator first.")
         }
 
-        print("[RemindersIntegrationBase] setUpAutoMobile complete")
+        PerfTimer.log("setUpAutoMobile END")
     }
 }
 
@@ -49,9 +52,9 @@ final class RemindersLaunchPlanTests: RemindersIntegrationBase {
     }
 
     func testLaunchRemindersPlan() throws {
-        print("[RemindersLaunchPlanTests] Starting testLaunchRemindersPlan with planPath: \(planPath)")
+        PerfTimer.log("testLaunchRemindersPlan START - planPath: \(planPath)")
         let result = try executePlan()
-        print("[RemindersLaunchPlanTests] executePlan completed with result: \(result)")
+        PerfTimer.log("testLaunchRemindersPlan END - result: \(result)")
     }
 }
 
@@ -63,8 +66,8 @@ final class RemindersAddPlanTests: RemindersIntegrationBase {
     }
 
     func testAddReminderPlan() throws {
-        print("[RemindersAddPlanTests] Starting testAddReminderPlan with planPath: \(planPath)")
+        PerfTimer.log("testAddReminderPlan START - planPath: \(planPath)")
         let result = try executePlan()
-        print("[RemindersAddPlanTests] executePlan completed with result: \(result)")
+        PerfTimer.log("testAddReminderPlan END - result: \(result)")
     }
 }

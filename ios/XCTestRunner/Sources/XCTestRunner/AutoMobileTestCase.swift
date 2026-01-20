@@ -102,14 +102,21 @@ open class AutoMobileTestCase: XCTestCase {
     private static var devicePoolCheckCompleted = false
 
     override open func setUpWithError() throws {
-        print("[AutoMobileTestCase] setUpWithError starting for \(name)")
-        try super.setUpWithError()
-        try setUpAutoMobile()
-        print("[AutoMobileTestCase] Creating configuration...")
-        let config = try makeConfiguration()
-        print("[AutoMobileTestCase] Configuration created: planPath=\(config.planPath), transport=\(config.transport)")
-        executor = AutoMobilePlanExecutor(configuration: config)
-        print("[AutoMobileTestCase] Executor created")
+        PerfTimer.log("setUpWithError START for \(name)")
+        try PerfTimer.measure("super.setUpWithError") {
+            try super.setUpWithError()
+        }
+        try PerfTimer.measure("setUpAutoMobile") {
+            try setUpAutoMobile()
+        }
+        let config = try PerfTimer.measure("makeConfiguration") {
+            try makeConfiguration()
+        }
+        PerfTimer.log("Configuration: planPath=\(config.planPath), transport=\(config.transport)")
+        executor = PerfTimer.measure("createExecutor") {
+            AutoMobilePlanExecutor(configuration: config)
+        }
+        PerfTimer.log("setUpWithError END for \(name)")
     }
 
     override open func tearDownWithError() throws {
@@ -122,44 +129,50 @@ open class AutoMobileTestCase: XCTestCase {
     }
 
     public func executePlan() throws -> AutoMobilePlanExecutor.ExecutePlanResult {
-        print("[AutoMobileTestCase] executePlan starting...")
+        PerfTimer.log("executePlan START")
         guard let executor = executor else {
-            print("[AutoMobileTestCase] ERROR: executor is nil")
+            PerfTimer.log("ERROR: executor is nil")
             throw AutoMobileTestCaseError.executorUnavailable
         }
-        let metadata = buildTestMetadata()
-        print("[AutoMobileTestCase] Executing with metadata: testClass=\(metadata.testClass), testMethod=\(metadata.testMethod)")
-        let result = try executor.execute(testMetadata: metadata)
-        print("[AutoMobileTestCase] executePlan completed")
+        let metadata = PerfTimer.measure("buildTestMetadata") {
+            buildTestMetadata()
+        }
+        PerfTimer.log("Executing with metadata: testClass=\(metadata.testClass), testMethod=\(metadata.testMethod)")
+        let result = try PerfTimer.measure("executor.execute") {
+            try executor.execute(testMetadata: metadata)
+        }
+        PerfTimer.log("executePlan END - success=\(result.success), steps=\(result.executedSteps)/\(result.totalSteps)")
         return result
     }
 
     private func makeConfiguration() throws -> AutoMobilePlanExecutor.Configuration {
-        print("[AutoMobileTestCase] makeConfiguration starting...")
+        PerfTimer.log("makeConfiguration: resolving planPath")
         let planPath = planPath.trimmingCharacters(in: .whitespacesAndNewlines)
-        print("[AutoMobileTestCase] planPath: \(planPath)")
+        PerfTimer.log("makeConfiguration: planPath=\(planPath)")
         guard !planPath.isEmpty else {
-            print("[AutoMobileTestCase] ERROR: planPath is empty")
+            PerfTimer.log("ERROR: planPath is empty")
             throw AutoMobileTestCaseError.missingPlanPath
         }
 
         let transport: AutoMobilePlanExecutor.Transport
+        PerfTimer.log("makeConfiguration: checking for MCP endpoint env vars")
         if let endpoint = environment.firstNonEmpty([
             "AUTOMOBILE_MCP_URL",
             "AUTOMOBILE_MCP_HTTP_URL",
             "MCP_ENDPOINT"
         ]) {
-            print("[AutoMobileTestCase] Using HTTP transport with endpoint: \(endpoint)")
+            PerfTimer.log("makeConfiguration: using HTTP transport endpoint=\(endpoint)")
             let normalizedEndpoint = normalizeEndpoint(endpoint)
             guard let endpointURL = URL(string: normalizedEndpoint) else {
                 throw AutoMobileTestCaseError.invalidEndpoint(normalizedEndpoint)
             }
             transport = .streamableHttp(url: endpointURL)
         } else {
-            print("[AutoMobileTestCase] Using Unix socket transport at: \(daemonSocketPath)")
+            PerfTimer.log("makeConfiguration: using Unix socket transport at \(daemonSocketPath)")
             transport = .daemonUnixSocket(path: daemonSocketPath)
         }
 
+        PerfTimer.log("makeConfiguration: creating Configuration object")
         return AutoMobilePlanExecutor.Configuration(
             transport: transport,
             planPath: planPath,

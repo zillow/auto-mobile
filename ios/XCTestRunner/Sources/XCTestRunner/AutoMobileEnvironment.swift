@@ -168,28 +168,35 @@ public enum DaemonManager {
     }
 
     public static func ensureDaemonRunning(repoRoot: String? = nil, timeoutSeconds: TimeInterval = 15) -> Bool {
+        PerfTimer.log("ensureDaemonRunning: checking isDaemonRunning")
         if isDaemonRunning() {
-            print("[AutoMobile] Daemon already running")
+            PerfTimer.log("ensureDaemonRunning: daemon already running")
             return true
         }
 
+        PerfTimer.log("ensureDaemonRunning: starting daemon")
         guard startDaemon(repoRoot: repoRoot) else {
+            PerfTimer.log("ensureDaemonRunning: startDaemon failed")
             return false
         }
 
+        PerfTimer.log("ensureDaemonRunning: waiting for daemon")
         return waitForDaemon(timeoutSeconds: timeoutSeconds)
     }
 
     public static func waitForDaemon(timeoutSeconds: TimeInterval) -> Bool {
+        PerfTimer.log("waitForDaemon: timeout=\(timeoutSeconds)s")
         let deadline = Date().addingTimeInterval(timeoutSeconds)
+        var pollCount = 0
         while Date() < deadline {
+            pollCount += 1
             if isDaemonRunning() && FileManager.default.fileExists(atPath: socketPath) {
-                print("[AutoMobile] Daemon is ready")
+                PerfTimer.log("waitForDaemon: ready after \(pollCount) polls")
                 return true
             }
             Thread.sleep(forTimeInterval: 0.2)
         }
-        print("[AutoMobile] Timed out waiting for daemon")
+        PerfTimer.log("waitForDaemon: TIMEOUT after \(pollCount) polls")
         return false
     }
 
@@ -288,8 +295,9 @@ public enum DaemonManager {
     }
 
     public static func refreshDevicePool(timeoutSeconds: TimeInterval = 30) -> RefreshDevicesResult {
+        PerfTimer.log("refreshDevicePool START")
         guard isDaemonRunning() else {
-            print("[AutoMobile] Cannot refresh devices: daemon not running")
+            PerfTimer.log("refreshDevicePool: daemon not running")
             return RefreshDevicesResult(success: false, addedDevices: 0, totalDevices: 0, availableDevices: 0)
         }
 
@@ -303,16 +311,17 @@ public enum DaemonManager {
 
         guard let requestData = try? JSONSerialization.data(withJSONObject: request),
               var requestLine = String(data: requestData, encoding: .utf8) else {
-            print("[AutoMobile] Failed to serialize refresh request")
+            PerfTimer.log("refreshDevicePool: failed to serialize request")
             return RefreshDevicesResult(success: false, addedDevices: 0, totalDevices: 0, availableDevices: 0)
         }
         requestLine.append("\n")
 
+        PerfTimer.log("refreshDevicePool: sending daemon request")
         let result = sendDaemonRequest(requestLine, timeoutSeconds: timeoutSeconds)
         guard let result = result,
               let success = result["success"] as? Bool, success,
               let resultData = result["result"] as? [String: Any] else {
-            print("[AutoMobile] Device refresh failed or returned error")
+            PerfTimer.log("refreshDevicePool: request failed")
             return RefreshDevicesResult(success: false, addedDevices: 0, totalDevices: 0, availableDevices: 0)
         }
 
@@ -320,7 +329,7 @@ public enum DaemonManager {
         let totalDevices = resultData["totalDevices"] as? Int ?? 0
         let availableDevices = resultData["availableDevices"] as? Int ?? 0
 
-        print("[AutoMobile] Device pool refreshed: +\(addedDevices) devices, \(availableDevices)/\(totalDevices) available")
+        PerfTimer.log("refreshDevicePool END: +\(addedDevices) devices, \(availableDevices)/\(totalDevices) available")
         return RefreshDevicesResult(success: true, addedDevices: addedDevices, totalDevices: totalDevices, availableDevices: availableDevices)
     }
 

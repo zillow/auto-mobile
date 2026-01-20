@@ -77,16 +77,20 @@ class AppearanceSyncScheduler {
       const pool = daemonState.getDevicePool();
       const pooledDevices = pool.getAllDevices();
       if (pooledDevices.length > 0) {
-        return pooledDevices.map(device => ({
-          deviceId: device.id,
-          name: device.id,
-          platform: "android",
-        }));
+        // Only return Android devices - appearance sync via ADB only works for Android
+        return pooledDevices
+          .filter(device => device.platform === "android")
+          .map(device => ({
+            deviceId: device.id,
+            name: device.id,
+            platform: device.platform,
+          }));
       }
     }
 
     const current = DeviceSessionManager.getInstance().getCurrentDevice();
-    return current ? [current] : [];
+    // Only return if it's an Android device
+    return current && current.platform === "android" ? [current] : [];
   }
 }
 

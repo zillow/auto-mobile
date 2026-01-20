@@ -25,6 +25,7 @@ export interface ExecutePlanResult {
   };
   error?: string;
   platform?: "android" | "ios";
+  deviceId?: string; // The device ID that executed the plan (e.g., "emulator-5554" or "7B3A3792-DB53-4654-BA94-27A1D305C3B7")
   deviceMapping?: Record<string, string>; // Maps device labels to device IDs (e.g., {"A": "emulator-5554", "B": "emulator-5556"})
   debug?: ExecutePlanDebugInfo;
 }
