@@ -292,9 +292,38 @@ jobs:
       - name: "Build Xcode Projects"
         run: ./scripts/ios/xcode-build.sh
 
+  ios-xctestservice-build:
+    name: "Build XCTestService for Testing"
+    runs-on: macos-14
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Select Xcode 15.4"
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "15.4"
+
+      - name: "Install XcodeGen"
+        run: brew install xcodegen
+
+      - name: "Install xcpretty"
+        run: gem install xcpretty
+
+      - name: "Build XCTestService for Testing"
+        run: ./scripts/ios/xctestservice-build-for-testing.sh
+
+      - name: "Upload XCTestService Artifacts"
+        uses: actions/upload-artifact@v4
+        with:
+          name: xctestservice-simulator-xcode15
+          path: /tmp/automobile-xctestservice/Build/Products
+          retention-days: 1
+
   ios-xctest-runner-simulator-tests:
     name: "XCTestRunner Simulator Tests"
     runs-on: macos-14
+    needs: ios-xctestservice-build
     timeout-minutes: 30
     steps:
       - name: "Git Checkout"
@@ -304,6 +333,12 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "15.4"
+
+      - name: "Download XCTestService Artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          name: xctestservice-simulator-xcode15
+          path: /tmp/automobile-xctestservice/Build/Products
 
       - name: "Setup Bun"
         uses: oven-sh/setup-bun@v2
@@ -316,6 +351,14 @@ jobs:
         run: |
           xcrun simctl boot "iPhone 15"
           xcrun simctl bootstatus "iPhone 15" -b
+
+      - name: "Verify XCTestService Artifacts"
+        run: |
+          echo "Checking XCTestService artifacts..."
+          ls -la /tmp/automobile-xctestservice/Build/Products/
+          ls -la /tmp/automobile-xctestservice/Build/Products/Debug-iphonesimulator/ || true
+          XCTESTRUN=$(find /tmp/automobile-xctestservice/Build/Products -name "*.xctestrun" | head -1)
+          echo "xctestrun file: ${XCTESTRUN}"
 
       - name: "Run Reminders integration tests"
         env:
