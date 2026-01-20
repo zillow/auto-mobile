@@ -453,19 +453,6 @@
             {
               "type": "object",
               "properties": {
-                "text": {
-                  "type": "string",
-                  "description": "Source text"
-                }
-              },
-              "required": [
-                "text"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
                 "elementId": {
                   "type": "string",
                   "description": "Source ID"
@@ -473,6 +460,19 @@
               },
               "required": [
                 "elementId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Source text"
+                }
+              },
+              "required": [
+                "text"
               ],
               "additionalProperties": false
             }
@@ -484,19 +484,6 @@
             {
               "type": "object",
               "properties": {
-                "text": {
-                  "type": "string",
-                  "description": "Target text"
-                }
-              },
-              "required": [
-                "text"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
                 "elementId": {
                   "type": "string",
                   "description": "Target ID"
@@ -504,6 +491,19 @@
               },
               "required": [
                 "elementId"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Target text"
+                }
+              },
+              "required": [
+                "text"
               ],
               "additionalProperties": false
             }
@@ -1432,7 +1432,7 @@
             }
           ]
         },
-        "id": {
+        "elementId": {
           "type": "string",
           "description": "Element resource ID / accessibility identifier"
         },
@@ -1858,18 +1858,34 @@
           "type": "object",
           "properties": {
             "element": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "description": "Element ID to wait for",
-                  "type": "string"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "elementId": {
+                      "type": "string",
+                      "description": "Element resource ID / accessibility identifier"
+                    }
+                  },
+                  "required": [
+                    "elementId"
+                  ],
+                  "additionalProperties": false
                 },
-                "text": {
-                  "description": "Element text to wait for",
-                  "type": "string"
+                {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "Element text"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "additionalProperties": false
                 }
-              },
-              "additionalProperties": false,
+              ],
               "description": "Element to wait for"
             },
             "timeout": {
@@ -2976,7 +2992,7 @@
               "properties": {
                 "elementId": {
                   "type": "string",
-                  "description": "Container ID"
+                  "description": "Container resource ID"
                 }
               },
               "required": [
@@ -3467,18 +3483,34 @@
         },
         "container": {
           "description": "Container to swipe within (elementId or text). REQUIRED for lists. Omit for full-screen swipes.",
-          "type": "object",
-          "properties": {
-            "elementId": {
-              "description": "Container resource ID",
-              "type": "string"
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "elementId": {
+                  "type": "string",
+                  "description": "Container resource ID"
+                }
+              },
+              "required": [
+                "elementId"
+              ],
+              "additionalProperties": false
             },
-            "text": {
-              "description": "Container text",
-              "type": "string"
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Container text"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
             }
-          },
-          "additionalProperties": false
+          ]
         },
         "autoTarget": {
           "description": "Auto-target scrollable container (default true)",
@@ -4185,210 +4217,108 @@
     "description": "Tap UI elements by text or ID (returns selectedElement metadata)",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "anyOf": [
-        {
-          "type": "object",
-          "properties": {
-            "container": {
-              "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }.",
-              "anyOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "elementId": {
-                      "type": "string",
-                      "description": "Container resource ID"
-                    }
-                  },
-                  "required": [
-                    "elementId"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "text": {
-                      "type": "string",
-                      "description": "Container text"
-                    }
-                  },
-                  "required": [
-                    "text"
-                  ],
-                  "additionalProperties": false
-                }
-              ]
-            },
-            "action": {
-              "type": "string",
-              "enum": [
-                "tap",
-                "doubleTap",
-                "longPress",
-                "focus"
-              ],
-              "description": "Action type"
-            },
-            "selectionStrategy": {
-              "description": "Element selection strategy when multiple matches are found (default: first)",
-              "type": "string",
-              "enum": [
-                "first",
-                "random"
-              ]
-            },
-            "duration": {
-              "description": "Long press duration (ms)",
-              "type": "number"
-            },
-            "searchUntil": {
-              "description": "Poll for element before tapping",
+      "type": "object",
+      "properties": {
+        "container": {
+          "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }.",
+          "anyOf": [
+            {
               "type": "object",
               "properties": {
-                "duration": {
-                  "description": "Polling duration (ms, default: 500)",
-                  "type": "number",
-                  "minimum": 100,
-                  "maximum": 12000
+                "elementId": {
+                  "type": "string",
+                  "description": "Container resource ID"
                 }
               },
+              "required": [
+                "elementId"
+              ],
               "additionalProperties": false
             },
-            "platform": {
-              "type": "string",
-              "enum": [
-                "android",
-                "ios"
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Container text"
+                }
+              },
+              "required": [
+                "text"
               ],
-              "description": "Platform"
-            },
-            "id": {
-              "type": "string",
-              "description": "Element resource ID / accessibility identifier"
-            },
-            "sessionUuid": {
-              "description": "Session UUID for device targeting",
-              "type": "string"
-            },
-            "keepScreenAwake": {
-              "description": "Keep physical Android devices awake during the session (default: true)",
-              "type": "boolean"
-            },
-            "device": {
-              "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
-              "type": "string"
+              "additionalProperties": false
+            }
+          ]
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "tap",
+            "doubleTap",
+            "longPress",
+            "focus"
+          ],
+          "description": "Action type"
+        },
+        "selectionStrategy": {
+          "description": "Element selection strategy when multiple matches are found (default: first)",
+          "type": "string",
+          "enum": [
+            "first",
+            "random"
+          ]
+        },
+        "duration": {
+          "description": "Long press duration (ms)",
+          "type": "number"
+        },
+        "searchUntil": {
+          "description": "Poll for element before tapping",
+          "type": "object",
+          "properties": {
+            "duration": {
+              "description": "Polling duration (ms, default: 500)",
+              "type": "number",
+              "minimum": 100,
+              "maximum": 12000
             }
           },
-          "required": [
-            "action",
-            "platform",
-            "id"
-          ],
           "additionalProperties": false
         },
-        {
-          "type": "object",
-          "properties": {
-            "container": {
-              "description": "Container selector object to scope search. Provide { \"elementId\": \"<id>\" } or { \"text\": \"<text>\" }.",
-              "anyOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "elementId": {
-                      "type": "string",
-                      "description": "Container resource ID"
-                    }
-                  },
-                  "required": [
-                    "elementId"
-                  ],
-                  "additionalProperties": false
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "text": {
-                      "type": "string",
-                      "description": "Container text"
-                    }
-                  },
-                  "required": [
-                    "text"
-                  ],
-                  "additionalProperties": false
-                }
-              ]
-            },
-            "action": {
-              "type": "string",
-              "enum": [
-                "tap",
-                "doubleTap",
-                "longPress",
-                "focus"
-              ],
-              "description": "Action type"
-            },
-            "selectionStrategy": {
-              "description": "Element selection strategy when multiple matches are found (default: first)",
-              "type": "string",
-              "enum": [
-                "first",
-                "random"
-              ]
-            },
-            "duration": {
-              "description": "Long press duration (ms)",
-              "type": "number"
-            },
-            "searchUntil": {
-              "description": "Poll for element before tapping",
-              "type": "object",
-              "properties": {
-                "duration": {
-                  "description": "Polling duration (ms, default: 500)",
-                  "type": "number",
-                  "minimum": 100,
-                  "maximum": 12000
-                }
-              },
-              "additionalProperties": false
-            },
-            "platform": {
-              "type": "string",
-              "enum": [
-                "android",
-                "ios"
-              ],
-              "description": "Platform"
-            },
-            "text": {
-              "type": "string",
-              "description": "Element text"
-            },
-            "sessionUuid": {
-              "description": "Session UUID for device targeting",
-              "type": "string"
-            },
-            "keepScreenAwake": {
-              "description": "Keep physical Android devices awake during the session (default: true)",
-              "type": "boolean"
-            },
-            "device": {
-              "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
-              "type": "string"
-            }
-          },
-          "required": [
-            "action",
-            "platform",
-            "text"
+        "platform": {
+          "type": "string",
+          "enum": [
+            "android",
+            "ios"
           ],
-          "additionalProperties": false
+          "description": "Platform"
+        },
+        "elementId": {
+          "type": "string",
+          "description": "Element resource ID / accessibility identifier"
+        },
+        "text": {
+          "type": "string",
+          "description": "Element text"
+        },
+        "sessionUuid": {
+          "description": "Session UUID for device targeting",
+          "type": "string"
+        },
+        "keepScreenAwake": {
+          "description": "Keep physical Android devices awake during the session (default: true)",
+          "type": "boolean"
+        },
+        "device": {
+          "description": "Device label for multi-device plans (e.g., \"A\", \"B\")",
+          "type": "string"
         }
-      ]
+      },
+      "required": [
+        "action",
+        "platform"
+      ],
+      "additionalProperties": false
     },
     "outputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
