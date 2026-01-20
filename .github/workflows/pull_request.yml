@@ -672,6 +672,16 @@ jobs:
           XCTESTRUN=$(find /tmp/automobile-xctestservice/Build/Products -name "*.xctestrun" | head -1)
           echo "xctestrun file: ${XCTESTRUN}"
 
+      - name: "Verify simulator is responding"
+        run: |
+          echo "Checking booted simulators..."
+          xcrun simctl list devices booted
+          echo ""
+          echo "Testing simctl responsiveness with timeout..."
+          timeout 30 xcrun simctl list devices available --json | head -100
+          echo ""
+          echo "Simulator is responding correctly"
+
       - name: "List available tests"
         run: |
           cd ios/XCTestRunner
@@ -679,11 +689,12 @@ jobs:
           swift test list 2>&1 || echo "swift test list failed with exit code $?"
 
       - name: "Run Reminders integration tests"
+        timeout-minutes: 5
         env:
           AUTOMOBILE_TEST_PLAN: "Plans/launch-reminders-app.yaml"
         run: |
           cd ios/XCTestRunner
-          swift test --filter RemindersLaunchPlanTests -v 2>&1
+          swift test --filter RemindersLaunchPlanTests 2>&1
 
   # =============================================================================
   # Android Build and Test Jobs (Android-related changes only)
