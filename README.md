@@ -6,30 +6,30 @@
 
 It can do all this by being an MCP server that uses standard platform tools like adb & simctl paired with additional Kotlin & Swift libraries and apps. All components are open source. The point is to provide mobile engineers with AI workflow tools to perform UX deep dives, reproduce bugs, and run automated tests.
 
-![Setting an alarm in the Clock app](img/clock-app.gif)
+![Setting an alarm in the Clock app](docs/img/clock-app.gif)
 *An AI agent navigating to the Clock app, creating a new alarm*
 
-![Searching YouTube for a video](img/youtube-search.gif)
+![Searching YouTube for a video](docs/img/youtube-search.gif)
 *An AI agent searching YouTube and browsing results*
 
 ### Explore and Test
 
 | Task | What it does |
 |------|-------------|
-| **[Explore app UX](using/ux-exploration.md)** | Navigate your app, discover screens, map user flows, identify confusing interactions |
-| **[Reproduce bugs](using/reproducting-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
-| **[Create UI tests](using/ui-tests.md)** | Describe test scenarios in plain English, get executable test plans |
-| **[Measure startup time](using/perf-analysis/startup.md)** | Profile cold and warm launch performance |
-| **[Check scroll performance](using/perf-analysis/scroll-framerate.md)** | Detect jank and dropped frames |
-| **[Audit contrast](using/a11y/contrast.md)** | Find accessibility issues with color contrast |
-| **[Check tap targets](using/a11y/tap-targets.md)** | Ensure touch targets meet size guidelines |
+| **[Explore app UX](docs/using/ux-exploration.md)** | Navigate your app, discover screens, map user flows, identify confusing interactions |
+| **[Reproduce bugs](docs/using/reproducting-bugs.md)** | Paste a bug report and get exact reproduction steps with screenshots |
+| **[Create UI tests](docs/using/ui-tests.md)** | Describe test scenarios in plain English, get executable test plans |
+| **[Measure startup time](docs/using/perf-analysis/startup.md)** | Profile cold and warm launch performance |
+| **[Check scroll performance](docs/using/perf-analysis/scroll-framerate.md)** | Detect jank and dropped frames |
+| **[Audit contrast](docs/using/a11y.md#contrast)** | Find accessibility issues with color contrast |
+| **[Check tap targets](docs/using/a11y.md#tap-targets)** | Ensure touch targets meet size guidelines |
 
 ## How it works
 
 - 🤖 **Fast UX Inspection** Kotlin Accessibility Service and Swift XCTestService to enable fast, accurate observations. 10x faster than the next fastest observation toolkit.
 - 🦾 **Full Touch Injection** Tap, Swipe, Pinch, Drag & Drop, Shake with automatic element targeting.
-- ♻️ **Tool Feedback** [Observations](docs/features/mcp-server/observation.md) drive the [interaction loop](docs/features/mcp-server/interaction-loop.md) for all [tool calls](docs/features/mcp-server/tools.md).
-- 🧪 **[Test Execution](docs/features/test-execution/index.md)** Kotlin JUnitRunner & Swift XCTestRunner execute tests natively handling device pooling, multi-device tests, and automatically optimizing test timing.
+- ♻️ **Tool Feedback** [Observations](docs/design-docs/mcp/observe/index.md) drive the [interaction loop](docs/design-docs/mcp/interaction-loop.md) for all [tool calls](docs/design-docs/mcp/tools/index.md).
+- 🧪 **Test Execution** [Kotlin JUnitRunner](docs/design-docs/plat/android/junitrunner.md) & [Swift XCTestRunner](docs/design-docs/plat/ios/xctestrunner.md) execute tests natively handling device pooling, multi-device tests, and automatically optimizing test timing.
 
 ## Get Started
 
@@ -39,7 +39,7 @@ You can use our interactive installer to step through all host platform requirem
 curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/install/interactive.sh | bash
 ```
 
-or you can read and follow the [step-by-step manual guide](manual.md).
+or you can read and follow the [step-by-step manual guide](docs/install.md).
 
 ## Documentation
 
