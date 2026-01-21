@@ -144,7 +144,7 @@ nav:
               - 'TalkBack simulation': design-docs/plat/android/talkback.md
           - 'iOS':
             - 'Overview': design-docs/plat/ios/index.md
-            - 'Accessibility Bridge': design-docs/plat/ios/accessibility-service.md
+            - 'XCTest Service': design-docs/plat/ios/xctestservice.md
             - 'simctl Integration': design-docs/plat/ios/simctl.md
             - 'Managed App Configuration': design-docs/plat/ios/managed-app-config.md
             - 'Managed Apple IDs': design-docs/plat/ios/managed-apple-ids.md
@@ -152,6 +152,7 @@ nav:
             - 'Xcode Integration':
               - 'Overview': design-docs/plat/ios/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/ios/ide-plugin/test-recording.md
+              - 'Feature Flags': design-docs/plat/ios/ide-plugin/feature-flags.md
   - 'Contributing': contributing.md
   - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md
