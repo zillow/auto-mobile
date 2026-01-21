@@ -64,8 +64,9 @@ asciinema rec "$CAST_FILE" \
   --idle-time-limit 2
 
 # Convert cast to gif with agg
+# Reduced cols and increased font-size for a more square, readable output
 CLI_GIF="$OUTPUT_DIR/${DEMO_NAME}-cli.gif"
-agg "$CAST_FILE" "$CLI_GIF" --cols 120 --rows 30 --font-size 14 --theme dracula --font-family "SF Mono,Menlo,DejaVu Sans Mono" --renderer resvg > /dev/null 2>&1 || true
+agg "$CAST_FILE" "$CLI_GIF" --cols 100 --rows 48 --font-size 24 --theme dracula --font-family "Menlo" --renderer fontdue > /dev/null 2>&1 || true
 
 # Convert GIF to MP4
 ffmpeg -i "$CLI_GIF" -movflags faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -y "$CLI_VIDEO" > /dev/null 2>&1 || true || true

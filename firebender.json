@@ -26,15 +26,5 @@
     ".view_hierarchy_cache/",
     "*.js"
   ],
-  "mcpServers": {
-    "auto-mobile": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@kaeawc/auto-mobile@latest",
-        "--debug",
-        "--debug-perf"
-      ]
-    }
-  }
+  "mcpServers": {}
 }

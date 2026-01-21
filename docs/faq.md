@@ -18,7 +18,7 @@ As for context bloat there are MCP benchmarks we run on every change that keep c
 
 #### Is my AI agent supported?
 
-Any MCP tool-compatible client. See [installation](install/index.md) for configuration examples. The project does make use of MCP resources because they have significant advantages and adoption across AI agents, please file an issue if this is not supported in your workflow.
+Any MCP tool-compatible client. See [installation](install.md) for configuration examples. The project does make use of MCP resources because they have significant advantages and adoption across AI agents, please file an issue if this is not supported in your workflow.
 
 #### Do I need root access?
 

@@ -2,15 +2,6 @@
 
 Use AI agents to interactively explore your app and discover UI flows.
 
-![Exploring Google Maps](../img/google-maps.gif)
-*Demo: An AI agent exploring Google Maps, searching for locations, and interacting with map controls.*
-
-![Setting an alarm in the Clock app](../img/clock-app.gif)
-*Demo: An AI agent navigating to the Clock app, opening the alarm tab, and creating a new alarm.*
-
-![Taking a photo and viewing the gallery](../img/camera-gallery.gif)
-*Demo: An AI agent opening the Camera app, taking a photo, and viewing it in the Gallery.*
-
 ## Example Prompts
 
 | Goal | Prompt |
@@ -28,3 +19,12 @@ Use AI agents to interactively explore your app and discover UI flows.
 | Set clear objectives | Helps agent focus on what matters |
 | Define boundaries | "Don't submit forms" prevents unwanted actions |
 | Request specific outputs | "Build a navigation summary" gives concrete results |
+
+![Exploring Google Maps](../img/google-maps.gif)
+*Demo: An AI agent exploring Google Maps, searching for locations, and interacting with map controls.*
+
+![Setting an alarm in the Clock app](../img/clock-app.gif)
+*Demo: An AI agent navigating to the Clock app, opening the alarm tab, and creating a new alarm.*
+
+![Taking a photo and viewing the gallery](../img/camera-gallery.gif)
+*Demo: An AI agent opening the Camera app, taking a photo, and viewing it in the Gallery.*

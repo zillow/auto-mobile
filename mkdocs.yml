@@ -72,13 +72,7 @@ markdown_extensions:
 
 nav:
   - 'Overview': index.md
-  - 'Install':
-      - 'Overview': install/index.md
-      - 'Manual Guide': install/manual.md
-      - 'Docker': install/docker.md
-      - 'Platform Specific':
-          - 'Android': install/plat/android.md
-          - 'iOS': install/plat/ios.md
+  - 'Install': install.md
   - 'Using AutoMobile':
       - 'UX Exploration': using/ux-exploration.md
       - 'Reproducing Bugs': using/reproducting-bugs.md
