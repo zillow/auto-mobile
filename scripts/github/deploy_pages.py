@@ -186,6 +186,10 @@ def deploy_docs():
 def serve_docs():
     """Serve docs locally for testing"""
     print_status("Starting local documentation server...")
+
+    # Copy required files first
+    copy_required_files()
+
     print_status("Documentation will be available at: http://127.0.0.1:8000")
     print_status("Press Ctrl+C to stop the server")
 
