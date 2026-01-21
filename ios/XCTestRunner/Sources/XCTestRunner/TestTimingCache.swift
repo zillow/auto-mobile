@@ -130,7 +130,8 @@ final class TestTimingCache {
             if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []),
                let object = jsonObject as? [String: Any],
                let error = object["error"] as? String,
-               !error.isEmpty {
+               !error.isEmpty
+            {
                 return
             }
             let parsed = try jsonDecoder.decode(TestTimingSummary.self, from: data)
@@ -140,13 +141,15 @@ final class TestTimingCache {
                     (TestTimingKey(testClass: $0.testClass, testMethod: $0.testMethod), $0)
                 }
             )
-        } catch {
-        }
+        } catch {}
     }
 
     private func buildRequestUri() -> String {
         var params: [String: String] = [:]
-        params["lookbackDays"] = String(resolvePositiveIntProperty("automobile.junit.timing.lookback.days", fallback: 90))
+        params["lookbackDays"] = String(resolvePositiveIntProperty(
+            "automobile.junit.timing.lookback.days",
+            fallback: 90
+        ))
         params["limit"] = String(resolvePositiveIntProperty("automobile.junit.timing.limit", fallback: 1000))
         params["minSamples"] = String(resolveMinSamples())
         params["devicePlatform"] = "ios"
@@ -234,7 +237,7 @@ private final class AutoMobileTestTimingClient {
         if let endpoint = environment.firstNonEmpty([
             "AUTOMOBILE_MCP_URL",
             "AUTOMOBILE_MCP_HTTP_URL",
-            "MCP_ENDPOINT"
+            "MCP_ENDPOINT",
         ]) {
             let normalizedEndpoint = AutoMobileTestTimingClient.normalizeEndpoint(endpoint)
             guard let endpointURL = URL(string: normalizedEndpoint) else {
@@ -244,7 +247,7 @@ private final class AutoMobileTestTimingClient {
         } else {
             let socketPath = environment.firstNonEmpty([
                 "AUTOMOBILE_DAEMON_SOCKET_PATH",
-                "AUTO_MOBILE_DAEMON_SOCKET_PATH"
+                "AUTO_MOBILE_DAEMON_SOCKET_PATH",
             ]) ?? AutoMobileDaemonSocket.defaultPath
             mcpClient = AutoMobileDaemonClient(socketPath: socketPath)
         }

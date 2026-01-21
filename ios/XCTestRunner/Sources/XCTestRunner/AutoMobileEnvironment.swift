@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 
 struct AutoMobileEnvironment {
     private let values: [String: String]
@@ -71,7 +71,8 @@ enum SimulatorDetection {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             PerfTimer.log("hasBootedSimulator: parsing \(data.count) bytes of JSON")
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let devices = json["devices"] as? [String: [[String: Any]]] else {
+                  let devices = json["devices"] as? [String: [[String: Any]]]
+            else {
                 PerfTimer.log("hasBootedSimulator: failed to parse JSON")
                 return false
             }
@@ -117,7 +118,8 @@ public enum DaemonManager {
             return false
         }
         guard let data = FileManager.default.contents(atPath: pidFilePath),
-              let pidData = try? JSONDecoder().decode(PidFileData.self, from: data) else {
+              let pidData = try? JSONDecoder().decode(PidFileData.self, from: data)
+        else {
             return false
         }
         return isProcessRunning(pid: pidData.pid)
@@ -128,17 +130,16 @@ public enum DaemonManager {
     }
 
     public static func startDaemon(repoRoot: String? = nil) -> Bool {
-        PerfTimer.log("startDaemon: looking for repo root")
-        let root = repoRoot ?? findRepoRoot()
-        guard let root = root else {
-            PerfTimer.log("startDaemon: ERROR - could not find repo root")
+        PerfTimer.log("startDaemon: searching for auto-mobile executable")
+        guard let autoMobilePath = findExecutable("auto-mobile") else {
+            PerfTimer.log("startDaemon: ERROR - auto-mobile not found in PATH")
             return false
         }
-
-        PerfTimer.log("startDaemon: found repo root at \(root)")
+        PerfTimer.log("startDaemon: found auto-mobile at \(autoMobilePath)")
 
         let process = Process()
-        process.currentDirectoryURL = URL(fileURLWithPath: root)
+        process.executableURL = URL(fileURLWithPath: autoMobilePath)
+        process.arguments = ["--daemon", "start"]
 
         // Inherit essential environment variables for device discovery
         var env = ProcessInfo.processInfo.environment
@@ -148,23 +149,6 @@ public enum DaemonManager {
             env["PATH"] = "/usr/bin:/usr/local/bin:\(currentPath)"
         }
         process.environment = env
-
-        PerfTimer.log("startDaemon: searching for bun executable")
-        if let bunPath = findExecutable("bun") {
-            PerfTimer.log("startDaemon: found bun at \(bunPath)")
-            process.executableURL = URL(fileURLWithPath: bunPath)
-            process.arguments = ["run", "--cwd", root, "src/index.ts", "--daemon", "start"]
-        } else {
-            PerfTimer.log("startDaemon: bun not found, searching for npx")
-            if let npxPath = findExecutable("npx") {
-                PerfTimer.log("startDaemon: found npx at \(npxPath)")
-                process.executableURL = URL(fileURLWithPath: npxPath)
-                process.arguments = ["--yes", "tsx", "src/index.ts", "--daemon", "start"]
-            } else {
-                PerfTimer.log("startDaemon: ERROR - neither bun nor npx found in PATH")
-                return false
-            }
-        }
 
         PerfTimer.log("startDaemon: launching process with args: \(process.arguments ?? [])")
         process.standardOutput = FileHandle.nullDevice
@@ -218,11 +202,12 @@ public enum DaemonManager {
 
     private static func findRepoRoot() -> String? {
         var current = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-        for _ in 0..<10 {
+        for _ in 0 ..< 10 {
             let packageJson = current.appendingPathComponent("package.json")
             let srcIndex = current.appendingPathComponent("src/index.ts")
-            if FileManager.default.fileExists(atPath: packageJson.path) &&
-               FileManager.default.fileExists(atPath: srcIndex.path) {
+            if FileManager.default.fileExists(atPath: packageJson.path),
+               FileManager.default.fileExists(atPath: srcIndex.path)
+            {
                 return current.path
             }
             current = current.deletingLastPathComponent()
@@ -236,7 +221,7 @@ public enum DaemonManager {
             "/opt/homebrew/bin/\(name)",
             "/usr/bin/\(name)",
             "\(NSHomeDirectory())/.bun/bin/\(name)",
-            "\(NSHomeDirectory())/.local/bin/\(name)"
+            "\(NSHomeDirectory())/.local/bin/\(name)",
         ]
         for path in commonPaths {
             if FileManager.default.isExecutableFile(atPath: path) {
@@ -255,7 +240,8 @@ public enum DaemonManager {
             if process.terminationStatus == 0 {
                 let data = pipe.fileHandleForReading.readDataToEndOfFile()
                 if let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !path.isEmpty {
+                   !path.isEmpty
+                {
                     return path
                 }
             }
@@ -281,11 +267,12 @@ public enum DaemonManager {
             "id": requestId,
             "type": "daemon_request",
             "method": "daemon/releaseSession",
-            "params": ["sessionId": sessionId]
+            "params": ["sessionId": sessionId],
         ]
 
         guard let requestData = try? JSONSerialization.data(withJSONObject: request),
-              var requestLine = String(data: requestData, encoding: .utf8) else {
+              var requestLine = String(data: requestData, encoding: .utf8)
+        else {
             print("[AutoMobile] Failed to serialize release session request")
             return false
         }
@@ -295,7 +282,8 @@ public enum DaemonManager {
         if let result = result, let success = result["success"] as? Bool, success {
             if let resultData = result["result"] as? [String: Any],
                let alreadyReleased = resultData["alreadyReleased"] as? Bool,
-               alreadyReleased {
+               alreadyReleased
+            {
                 print("[AutoMobile] Session \(sessionId) was already released (auto-released by daemon)")
             } else {
                 print("[AutoMobile] Session \(sessionId) released")
@@ -322,11 +310,12 @@ public enum DaemonManager {
             "id": requestId,
             "type": "daemon_request",
             "method": "daemon/refreshDevices",
-            "params": [String: Any]()
+            "params": [String: Any](),
         ]
 
         guard let requestData = try? JSONSerialization.data(withJSONObject: request),
-              var requestLine = String(data: requestData, encoding: .utf8) else {
+              var requestLine = String(data: requestData, encoding: .utf8)
+        else {
             PerfTimer.log("refreshDevicePool: failed to serialize request")
             return RefreshDevicesResult(success: false, addedDevices: 0, totalDevices: 0, availableDevices: 0)
         }
@@ -336,7 +325,8 @@ public enum DaemonManager {
         let result = sendDaemonRequest(requestLine, timeoutSeconds: timeoutSeconds)
         guard let result = result,
               let success = result["success"] as? Bool, success,
-              let resultData = result["result"] as? [String: Any] else {
+              let resultData = result["result"] as? [String: Any]
+        else {
             PerfTimer.log("refreshDevicePool: request failed")
             return RefreshDevicesResult(success: false, addedDevices: 0, totalDevices: 0, availableDevices: 0)
         }
@@ -346,7 +336,12 @@ public enum DaemonManager {
         let availableDevices = resultData["availableDevices"] as? Int ?? 0
 
         PerfTimer.log("refreshDevicePool END: +\(addedDevices) devices, \(availableDevices)/\(totalDevices) available")
-        return RefreshDevicesResult(success: true, addedDevices: addedDevices, totalDevices: totalDevices, availableDevices: availableDevices)
+        return RefreshDevicesResult(
+            success: true,
+            addedDevices: addedDevices,
+            totalDevices: totalDevices,
+            availableDevices: availableDevices
+        )
     }
 
     private static func sendDaemonRequest(_ request: String, timeoutSeconds: TimeInterval) -> [String: Any]? {
@@ -400,11 +395,13 @@ public enum DaemonManager {
             if bytesRead > 0 {
                 buffer.append(readBuffer, count: bytesRead)
                 if let responseStr = String(data: buffer, encoding: .utf8),
-                   responseStr.contains("\n") {
+                   responseStr.contains("\n")
+                {
                     let lines = responseStr.split(separator: "\n", maxSplits: 1)
                     if let firstLine = lines.first,
                        let lineData = String(firstLine).data(using: .utf8),
-                       let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] {
+                       let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any]
+                    {
                         return json
                     }
                 }

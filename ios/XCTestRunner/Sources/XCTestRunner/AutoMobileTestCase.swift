@@ -1,5 +1,5 @@
-import Foundation
 import Darwin
+import Foundation
 import XCTest
 
 // Module load logging - this runs when the test module is first loaded
@@ -57,6 +57,7 @@ open class AutoMobileTestCase: XCTestCase {
         PerfTimer.log("defaultTestSuite END for \(self)")
         return baseSuite
     }
+
     open var planPath: String {
         if let value = environment.firstNonEmpty(["AUTOMOBILE_TEST_PLAN", "PLAN_PATH"]) {
             return value
@@ -68,14 +69,14 @@ open class AutoMobileTestCase: XCTestCase {
         return environment.firstNonEmpty([
             "AUTOMOBILE_MCP_URL",
             "AUTOMOBILE_MCP_HTTP_URL",
-            "MCP_ENDPOINT"
+            "MCP_ENDPOINT",
         ]) ?? "http://localhost:9000/auto-mobile/streamable"
     }
 
     open var daemonSocketPath: String {
         return environment.firstNonEmpty([
             "AUTOMOBILE_DAEMON_SOCKET_PATH",
-            "AUTO_MOBILE_DAEMON_SOCKET_PATH"
+            "AUTO_MOBILE_DAEMON_SOCKET_PATH",
         ]) ?? AutoMobileDaemonSocket.defaultPath
     }
 
@@ -173,7 +174,7 @@ open class AutoMobileTestCase: XCTestCase {
         if let endpoint = environment.firstNonEmpty([
             "AUTOMOBILE_MCP_URL",
             "AUTOMOBILE_MCP_HTTP_URL",
-            "MCP_ENDPOINT"
+            "MCP_ENDPOINT",
         ]) {
             PerfTimer.log("makeConfiguration: using HTTP transport endpoint=\(endpoint)")
             let normalizedEndpoint = normalizeEndpoint(endpoint)
@@ -206,14 +207,14 @@ open class AutoMobileTestCase: XCTestCase {
         let appVersion = environment.firstNonEmpty([
             "AUTOMOBILE_APP_VERSION",
             "AUTO_MOBILE_APP_VERSION",
-            "APP_VERSION"
+            "APP_VERSION",
         ])
         let gitCommit = environment.firstNonEmpty([
             "AUTOMOBILE_GIT_COMMIT",
             "AUTO_MOBILE_GIT_COMMIT",
             "GITHUB_SHA",
             "GIT_COMMIT",
-            "CI_COMMIT_SHA"
+            "CI_COMMIT_SHA",
         ])
         let isCi = environment.boolValue(["AUTOMOBILE_CI_MODE", "CI", "GITHUB_ACTIONS"])
 
@@ -276,13 +277,13 @@ open class AutoMobileTestCase: XCTestCase {
             allowDaemonStart: usesDaemonSocket
         )
 
-        if usesDaemonSocket && resource.devices.contains(where: { $0.poolStatus == nil }) {
+        if usesDaemonSocket, resource.devices.contains(where: { $0.poolStatus == nil }) {
             try startDaemon()
             resource = try fetchBootedDevicesResource(timeoutSeconds: 5, allowDaemonStart: false)
         }
 
         let devices = resource.devices
-        if bootedSimulatorDetected && devices.isEmpty {
+        if bootedSimulatorDetected, devices.isEmpty {
             throw AutoMobileTestCaseError.devicePoolUnavailable(
                 "Booted iOS simulator detected, but no booted iOS devices reported by the daemon."
             )
@@ -313,7 +314,7 @@ open class AutoMobileTestCase: XCTestCase {
         if let endpoint = environment.firstNonEmpty([
             "AUTOMOBILE_MCP_URL",
             "AUTOMOBILE_MCP_HTTP_URL",
-            "MCP_ENDPOINT"
+            "MCP_ENDPOINT",
         ]) {
             let normalizedEndpoint = normalizeEndpoint(endpoint)
             guard let endpointURL = URL(string: normalizedEndpoint) else {
@@ -328,14 +329,16 @@ open class AutoMobileTestCase: XCTestCase {
         return environment.firstNonEmpty([
             "AUTOMOBILE_MCP_URL",
             "AUTOMOBILE_MCP_HTTP_URL",
-            "MCP_ENDPOINT"
+            "MCP_ENDPOINT",
         ]) == nil
     }
 
     private func fetchBootedDevicesResource(
         timeoutSeconds: TimeInterval,
         allowDaemonStart: Bool
-    ) throws -> BootedDevicesResource {
+    )
+        throws -> BootedDevicesResource
+    {
         let client = try makeMcpClient()
 
         do {
@@ -370,7 +373,8 @@ open class AutoMobileTestCase: XCTestCase {
         if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []),
            let object = jsonObject as? [String: Any],
            let error = object["error"] as? String,
-           !error.isEmpty {
+           !error.isEmpty
+        {
             throw AutoMobileTestCaseError.devicePoolUnavailable(error)
         }
 
@@ -413,7 +417,7 @@ open class AutoMobileTestCase: XCTestCase {
         }
     }
 
-    internal func hasBootedSimulator() -> Bool {
+    func hasBootedSimulator() -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
         process.arguments = ["simctl", "list", "devices", "--json"]
@@ -437,7 +441,8 @@ open class AutoMobileTestCase: XCTestCase {
         let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
         guard let json = try? JSONSerialization.jsonObject(with: data, options: []),
               let payload = json as? [String: Any],
-              let devices = payload["devices"] as? [String: Any] else {
+              let devices = payload["devices"] as? [String: Any]
+        else {
             return false
         }
 
@@ -476,7 +481,8 @@ open class AutoMobileTestCase: XCTestCase {
     }
 
     private class func resolveTimingOrderingSelection() -> TimingOrderingSelection {
-        let rawValue = timingConfigValue("automobile.junit.timing.ordering")?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "auto"
+        let rawValue = timingConfigValue("automobile.junit.timing.ordering")?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "auto"
         let requested = parseTimingOrderingStrategy(rawValue)
         let parallelWorkers = resolveParallelWorkerCount()
         let resolved: TimingOrderingStrategy
@@ -505,11 +511,13 @@ open class AutoMobileTestCase: XCTestCase {
 
     private class func resolveParallelWorkerCount() -> Int {
         if let argumentValue = argumentValue(flag: "-parallel-testing-worker-count"),
-           let workerCount = Int(argumentValue), workerCount > 0 {
+           let workerCount = Int(argumentValue), workerCount > 0
+        {
             return workerCount
         }
         if let envValue = ProcessInfo.processInfo.environment["XCTEST_PARALLEL_THREAD_COUNT"],
-           let workerCount = Int(envValue), workerCount > 0 {
+           let workerCount = Int(envValue), workerCount > 0
+        {
             return workerCount
         }
         return 1
@@ -525,27 +533,35 @@ open class AutoMobileTestCase: XCTestCase {
 
     private class func logTimingOrdering(selection: TimingOrderingSelection, timingAvailable: Bool) {
         if selection.requested == .auto {
-            print("AutoMobileTestCase: Timing ordering=auto (resolved=\(selection.resolved.rawValue)), timing data available=\(timingAvailable)")
+            print(
+                "AutoMobileTestCase: Timing ordering=auto (resolved=\(selection.resolved.rawValue)), timing data available=\(timingAvailable)"
+            )
         } else {
-            print("AutoMobileTestCase: Timing ordering=\(selection.requested.rawValue), timing data available=\(timingAvailable)")
+            print(
+                "AutoMobileTestCase: Timing ordering=\(selection.requested.rawValue), timing data available=\(timingAvailable)"
+            )
         }
     }
 
     private class func orderTestsByTiming(
         _ tests: [XCTest],
         strategy: TimingOrderingStrategy
-    ) -> [XCTest] {
+    )
+        -> [XCTest]
+    {
         if strategy == .none || tests.isEmpty {
             return tests
         }
 
         let candidates = tests.enumerated().map { index, test in
             guard let testCase = test as? XCTestCase,
-                  let methodName = testMethodName(from: testCase) else {
+                  let methodName = testMethodName(from: testCase)
+            else {
                 return TimingCandidate(test: test, index: index, durationMs: nil)
             }
             let className = String(describing: type(of: testCase))
-            let durationMs = TestTimingCache.shared.getTiming(testClass: className, testMethod: methodName)?.averageDurationMs
+            let durationMs = TestTimingCache.shared.getTiming(testClass: className, testMethod: methodName)?
+                .averageDurationMs
             return TimingCandidate(test: test, index: index, durationMs: durationMs)
         }
 

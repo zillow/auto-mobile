@@ -70,7 +70,7 @@ When using prompt-based testing:
 - `automobile.debug`: Enable debug logging (default: false)
 - `automobile.ci.mode`: Disable AI assistance in CI environments (default: false)
 - `automobile.plan.max.age.ms`: Max age for generated plans in milliseconds (default: 3600000 - 1 hour)
-- `automobile.daemon.startup.timeout.ms`: Daemon startup timeout in milliseconds (default: 10000)
+- `automobile.daemon.startup.timeout.ms`: Daemon startup timeout in milliseconds (default: 10000). Can also be set via `AUTOMOBILE_DAEMON_STARTUP_TIMEOUT_MS` environment variable.
 - `automobile.junit.shuffle.enabled`: Randomize test execution order (default: true)
 - `automobile.junit.shuffle.seed`: Seed for randomized order (default: current time)
 - `automobile.junit.timing.enabled`: Fetch historical timing data from the daemon (default: true)

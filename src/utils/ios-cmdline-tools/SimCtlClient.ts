@@ -11,6 +11,7 @@ export interface AppleDevice {
   name: string;
   state: string;
   isAvailable: boolean;
+  availabilityError?: string;
   deviceTypeIdentifier?: string;
   runtime?: string;
   model?: string;
@@ -548,18 +549,21 @@ export class SimCtlClient implements SimCtl {
       // Extract all devices from all runtime versions
       for (const [runtimeId, runtimeDevices] of Object.entries(simulatorList.devices)) {
         for (const device of runtimeDevices) {
-          if (device.isAvailable) {
-            logger.debug(`Found iOS simulator: ${device.name} (${device.udid})`);
-            devices.push({
-              name: device.name,
-              platform: "ios",
-              deviceId: device.udid,
-              isRunning: device.state === "Booted",
-              state: device.state,
-              iosVersion: normalizeIosVersion(runtimeId, device.os_version),
-              deviceType: device.deviceTypeIdentifier
-            } as DeviceInfo);
-          }
+          logger.debug(`Found iOS simulator: ${device.name} (${device.udid}) state=${device.state}`);
+          devices.push({
+            name: device.name,
+            platform: "ios",
+            deviceId: device.udid,
+            isRunning: device.state === "Booted",
+            state: device.state,
+            isAvailable: device.isAvailable,
+            availabilityError: device.availabilityError,
+            iosVersion: normalizeIosVersion(runtimeId, device.os_version),
+            deviceType: device.deviceTypeIdentifier,
+            runtime: runtimeId,
+            model: device.model,
+            architecture: device.architecture
+          } as DeviceInfo);
         }
       }
 

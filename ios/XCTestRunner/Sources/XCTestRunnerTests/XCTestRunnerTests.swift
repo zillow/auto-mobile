@@ -252,7 +252,7 @@ final class XCTestRunnerTests: XCTestCase {
 private struct FakePlanLoader: AutoMobilePlanLoading {
     let content: String
 
-    func loadPlan(at path: String, bundle: Bundle?) throws -> String {
+    func loadPlan(at _: String, bundle _: Bundle?) throws -> String {
         return content
     }
 }
@@ -271,7 +271,7 @@ private final class FakeMCPClient: AutoMobileMCPClient {
         let payload: [String: Any] = [
             "success": success,
             "executedSteps": executedSteps,
-            "totalSteps": totalSteps
+            "totalSteps": totalSteps,
         ]
         let data = try? JSONSerialization.data(withJSONObject: payload, options: [])
         let text = String(data: data ?? Data(), encoding: .utf8) ?? "{}"
@@ -282,11 +282,11 @@ private final class FakeMCPClient: AutoMobileMCPClient {
         queuedResults.append(.failure(error))
     }
 
-    func initialize(timeout: TimeInterval) throws {
+    func initialize(timeout _: TimeInterval) throws {
         initializeCount += 1
     }
 
-    func callTool(name: String, arguments: [String: Any], timeout: TimeInterval) throws -> MCPToolResponse {
+    func callTool(name: String, arguments: [String: Any], timeout _: TimeInterval) throws -> MCPToolResponse {
         calls.append(Call(name: name, arguments: arguments))
         guard !queuedResults.isEmpty else {
             return MCPToolResponse(text: "{\"success\":true,\"executedSteps\":0,\"totalSteps\":0}")
@@ -294,7 +294,7 @@ private final class FakeMCPClient: AutoMobileMCPClient {
         return try queuedResults.removeFirst().get()
     }
 
-    func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
+    func readResource(uri _: String, timeout _: TimeInterval) throws -> MCPResourceResponse {
         return MCPResourceResponse(text: "{}")
     }
 
@@ -302,9 +302,9 @@ private final class FakeMCPClient: AutoMobileMCPClient {
 }
 
 private struct NullLogger: AutoMobileLogger {
-    func info(_ message: String) {}
-    func warn(_ message: String) {}
-    func error(_ message: String) {}
+    func info(_: String) {}
+    func warn(_: String) {}
+    func error(_: String) {}
 }
 
 private func decodePlanContent(from encoded: String?) -> String? {

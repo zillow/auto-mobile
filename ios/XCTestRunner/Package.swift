@@ -26,7 +26,7 @@ let package = Package(
             name: "XCTestRunnerTests",
             dependencies: ["XCTestRunner"],
             resources: [
-                .process("Resources")
+                .process("Resources"),
             ]
         ),
     ]

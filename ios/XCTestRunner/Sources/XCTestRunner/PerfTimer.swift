@@ -1,8 +1,8 @@
-import Foundation
 import Darwin
+import Foundation
 
 /// Simple performance timing utility for debugging test execution
-public struct PerfTimer {
+public enum PerfTimer {
     private static let startTime = Date()
 
     /// Returns elapsed time since process start in milliseconds

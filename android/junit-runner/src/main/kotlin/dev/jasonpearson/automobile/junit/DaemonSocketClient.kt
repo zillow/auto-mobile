@@ -255,9 +255,6 @@ internal object DaemonSocketClientManager {
 
 internal object DaemonSocketPaths {
   private const val DEFAULT_DAEMON_STARTUP_TIMEOUT_MS = 10000L
-  private var localAutoMobileExistsCache: Boolean? = null
-  private val localAutoMobilePath: String
-    get() = File("../../dist/src/index.js").absolutePath
 
   fun socketPath(): String {
     val userId = getUserId()
@@ -265,11 +262,10 @@ internal object DaemonSocketPaths {
   }
 
   fun daemonStartTimeoutMs(): Long {
-    val configured =
-        SystemPropertyCache.get(
-            "automobile.daemon.startup.timeout.ms",
-            DEFAULT_DAEMON_STARTUP_TIMEOUT_MS.toString(),
-        )
+    // Check system property first, then environment variable
+    val sysProp = SystemPropertyCache.get("automobile.daemon.startup.timeout.ms", "")
+    val envVar = System.getenv("AUTOMOBILE_DAEMON_STARTUP_TIMEOUT_MS")?.trim().orEmpty()
+    val configured = sysProp.ifEmpty { envVar }.ifEmpty { DEFAULT_DAEMON_STARTUP_TIMEOUT_MS.toString() }
     return configured.toLongOrNull() ?: DEFAULT_DAEMON_STARTUP_TIMEOUT_MS
   }
 
@@ -282,22 +278,8 @@ internal object DaemonSocketPaths {
   }
 
   private fun buildDaemonCommand(subCommand: String): List<String> {
-    val command = ArrayList<String>(4)
-    if (localAutoMobileExists()) {
-      command.add("bun")
-      command.add(localAutoMobilePath)
-    } else {
-      command.add("bunx")
-      command.add("auto-mobile")
-    }
-    command.add("--daemon")
-    command.add(subCommand)
-    return command
-  }
-
-  private fun localAutoMobileExists(): Boolean {
-    return localAutoMobileExistsCache
-        ?: File(localAutoMobilePath).exists().also { localAutoMobileExistsCache = it }
+    // Use auto-mobile CLI directly - must be on PATH
+    return listOf("auto-mobile", "--daemon", subCommand)
   }
 
   private fun getUserId(): String {

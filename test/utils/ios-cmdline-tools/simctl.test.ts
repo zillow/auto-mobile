@@ -137,4 +137,89 @@ describe("Simctl", function() {
       expect(receivedArgs).toEqual(["list", "devices"]);
     });
   });
+
+  describe("listSimulatorImages", function() {
+    test("should include unavailable and transitional simulators", async function() {
+      const simulatorPayload = {
+        devices: {
+          "com.apple.CoreSimulator.SimRuntime.iOS-17-4": [
+            {
+              udid: "booted-udid",
+              name: "iPhone 15 Pro",
+              state: "Booted",
+              isAvailable: true,
+              deviceTypeIdentifier: "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro",
+              os_version: "17.4",
+              model: "iPhone15,3",
+              architecture: "arm64"
+            },
+            {
+              udid: "shutdown-udid",
+              name: "iPhone 15",
+              state: "Shutdown",
+              isAvailable: true,
+              deviceTypeIdentifier: "com.apple.CoreSimulator.SimDeviceType.iPhone-15",
+              os_version: "17.4"
+            },
+            {
+              udid: "creating-udid",
+              name: "iPhone 14",
+              state: "Creating",
+              isAvailable: true,
+              deviceTypeIdentifier: "com.apple.CoreSimulator.SimDeviceType.iPhone-14",
+              os_version: "17.4"
+            },
+            {
+              udid: "unavailable-udid",
+              name: "iPhone 13",
+              state: "Unavailable",
+              isAvailable: false,
+              availabilityError: "runtime missing",
+              deviceTypeIdentifier: "com.apple.CoreSimulator.SimDeviceType.iPhone-13"
+            }
+          ]
+        },
+        runtimes: [],
+        devicetypes: [],
+        pairs: []
+      };
+
+      mockExecAsync = async (file: string, args: string[]): Promise<ExecResult> => {
+        if (file === "xcrun" && args.join(" ") === "simctl --version") {
+          return {
+            stdout: "simctl version 1.0.0",
+            stderr: "",
+            toString: () => "simctl version 1.0.0",
+            trim: () => "simctl version 1.0.0",
+            includes: () => false
+          };
+        }
+        if (file === "xcrun" && args.join(" ") === "simctl list devices --json") {
+          const payload = JSON.stringify(simulatorPayload);
+          return {
+            stdout: payload,
+            stderr: "",
+            toString: () => payload,
+            trim: () => payload.trim(),
+            includes: (search: string) => payload.includes(search)
+          };
+        }
+        return { stdout: "", stderr: "", toString: () => "", trim: () => "", includes: () => false };
+      };
+
+      simctl = new Simctl(null, mockExecAsync);
+      (Simctl as unknown as { deviceListCache: { devices: unknown[]; timestamp: number } | null })
+        .deviceListCache = null;
+
+      const devices = await simctl.listSimulatorImages();
+
+      expect(devices).toHaveLength(4);
+      const unavailable = devices.find(device => device.deviceId === "unavailable-udid");
+      expect(unavailable?.state).toBe("Unavailable");
+      expect(unavailable?.isAvailable).toBe(false);
+      expect(unavailable?.availabilityError).toBe("runtime missing");
+      expect(unavailable?.runtime).toBe("com.apple.CoreSimulator.SimRuntime.iOS-17-4");
+      expect(unavailable?.iosVersion).toBe("17.4");
+    });
+  });
 });

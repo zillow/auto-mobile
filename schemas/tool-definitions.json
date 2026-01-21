@@ -1855,48 +1855,42 @@
         },
         "waitFor": {
           "description": "Wait for element to appear before returning observation",
-          "type": "object",
-          "properties": {
-            "element": {
-              "anyOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "elementId": {
-                      "type": "string",
-                      "description": "Element resource ID / accessibility identifier"
-                    }
-                  },
-                  "required": [
-                    "elementId"
-                  ],
-                  "additionalProperties": false
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "elementId": {
+                  "type": "string",
+                  "description": "Element resource ID / accessibility identifier"
                 },
-                {
-                  "type": "object",
-                  "properties": {
-                    "text": {
-                      "type": "string",
-                      "description": "Element text"
-                    }
-                  },
-                  "required": [
-                    "text"
-                  ],
-                  "additionalProperties": false
+                "timeout": {
+                  "description": "Wait timeout ms (default: 5000)",
+                  "type": "number"
                 }
+              },
+              "required": [
+                "elementId"
               ],
-              "description": "Element to wait for"
+              "additionalProperties": false
             },
-            "timeout": {
-              "description": "Wait timeout ms (default: 5000)",
-              "type": "number"
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "Element text"
+                },
+                "timeout": {
+                  "description": "Wait timeout ms (default: 5000)",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "element"
-          ],
-          "additionalProperties": false
+          ]
         },
         "sessionUuid": {
           "description": "Session UUID for device targeting",

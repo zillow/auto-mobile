@@ -319,6 +319,14 @@ print_section "RUNNING TEST SCRIPT"
 echo "Working directory: $(pwd)"
 echo "About to execute: $TEST_SCRIPT"
 echo ""
+
+# Increase daemon startup timeout for CI environments (default 10s is too short)
+# The emulator environment is slower, so we give the daemon more time to start
+export AUTOMOBILE_DAEMON_STARTUP_TIMEOUT_MS=60000
+echo "AutoMobile configuration:"
+echo "  Daemon startup timeout: ${AUTOMOBILE_DAEMON_STARTUP_TIMEOUT_MS}ms"
+echo ""
+
 echo "Retry configuration:"
 echo "  Max attempts: ${RETRY_MAX_ATTEMPTS:-3}"
 echo "  Initial delay: ${RETRY_INITIAL_DELAY:-10}s (doubles on each retry)"

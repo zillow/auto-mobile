@@ -39,9 +39,7 @@ public class ElementLocator: ElementLocating {
         private var foregroundBundleId: String?
 
         /// Springboard app for detecting foreground app - always kept
-        private lazy var springboard: XCUIApplication = {
-            XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        }()
+        private lazy var springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
 
         /// Cache of resource IDs to XCUIElements
         private var elementCache: [String: XCUIElement] = [:]
@@ -53,7 +51,7 @@ public class ElementLocator: ElementLocating {
             application: XCUIApplication? = nil,
             perfProvider: PerfProvider = PerfProvider.instance
         ) {
-            self.foregroundApp = application
+            foregroundApp = application
             self.perfProvider = perfProvider
         }
 
@@ -69,7 +67,7 @@ public class ElementLocator: ElementLocating {
             var result: Result<T, Error>!
             DispatchQueue.main.sync {
                 do {
-                    result = .success(try block())
+                    result = try .success(block())
                 } catch {
                     result = .failure(error)
                 }
@@ -181,42 +179,42 @@ public class ElementLocator: ElementLocating {
         /// Common system apps to check when detecting foreground app
         /// These are apps that might be launched by the user during testing
         private static let commonSystemApps: [String] = [
-            "com.apple.Preferences",      // Settings
-            "com.apple.mobilesafari",     // Safari
+            "com.apple.Preferences", // Settings
+            "com.apple.mobilesafari", // Safari
             "com.apple.MobileAddressBook", // Contacts
-            "com.apple.mobilephone",       // Phone
-            "com.apple.MobileSMS",         // Messages
-            "com.apple.mobileslideshow",   // Photos
-            "com.apple.camera",            // Camera
-            "com.apple.AppStore",          // App Store
-            "com.apple.Maps",              // Maps
-            "com.apple.Health",            // Health
-            "com.apple.Fitness",           // Fitness
-            "com.apple.weather",           // Weather
-            "com.apple.mobilenotes",       // Notes
-            "com.apple.reminders",         // Reminders
-            "com.apple.mobilecal",         // Calendar
-            "com.apple.mobilemail",        // Mail
-            "com.apple.Music",             // Music
-            "com.apple.Podcasts",          // Podcasts
-            "com.apple.TV",                // TV
-            "com.apple.news",              // News
-            "com.apple.stocks",            // Stocks
-            "com.apple.tips",              // Tips
-            "com.apple.iBooks",            // Books
-            "com.apple.DocumentsApp",      // Files
-            "com.apple.calculator",        // Calculator
-            "com.apple.VoiceMemos",        // Voice Memos
-            "com.apple.compass",           // Compass
-            "com.apple.measure",           // Measure
-            "com.apple.facetime",          // FaceTime
-            "com.apple.Home",              // Home
-            "com.apple.shortcuts",         // Shortcuts
-            "com.apple.Translate",         // Translate
-            "com.apple.Magnifier",         // Magnifier
-            "com.apple.clock",             // Clock
-            "com.apple.findmy",            // Find My
-            "com.apple.Passbook",          // Wallet
+            "com.apple.mobilephone", // Phone
+            "com.apple.MobileSMS", // Messages
+            "com.apple.mobileslideshow", // Photos
+            "com.apple.camera", // Camera
+            "com.apple.AppStore", // App Store
+            "com.apple.Maps", // Maps
+            "com.apple.Health", // Health
+            "com.apple.Fitness", // Fitness
+            "com.apple.weather", // Weather
+            "com.apple.mobilenotes", // Notes
+            "com.apple.reminders", // Reminders
+            "com.apple.mobilecal", // Calendar
+            "com.apple.mobilemail", // Mail
+            "com.apple.Music", // Music
+            "com.apple.Podcasts", // Podcasts
+            "com.apple.TV", // TV
+            "com.apple.news", // News
+            "com.apple.stocks", // Stocks
+            "com.apple.tips", // Tips
+            "com.apple.iBooks", // Books
+            "com.apple.DocumentsApp", // Files
+            "com.apple.calculator", // Calculator
+            "com.apple.VoiceMemos", // Voice Memos
+            "com.apple.compass", // Compass
+            "com.apple.measure", // Measure
+            "com.apple.facetime", // FaceTime
+            "com.apple.Home", // Home
+            "com.apple.shortcuts", // Shortcuts
+            "com.apple.Translate", // Translate
+            "com.apple.Magnifier", // Magnifier
+            "com.apple.clock", // Clock
+            "com.apple.findmy", // Find My
+            "com.apple.Passbook", // Wallet
         ]
 
         /// Detect the bundle ID of the foreground app
@@ -289,7 +287,8 @@ public class ElementLocator: ElementLocating {
                     .replacingOccurrences(of: "-sceneID", with: "")
                     .replacingOccurrences(of: "-SceneWindow", with: "")
                 if cleanId.hasPrefix("com.") || cleanId.hasPrefix("io.") || cleanId.hasPrefix("org.") ||
-                   cleanId.hasPrefix("net.") || cleanId.hasPrefix("me.") {
+                    cleanId.hasPrefix("net.") || cleanId.hasPrefix("me.")
+                {
                     if !bundleIds.contains(cleanId) {
                         bundleIds.append(cleanId)
                     }
@@ -415,7 +414,7 @@ public class ElementLocator: ElementLocating {
             // Get snapshots of all alerts
             var alertElements: [UIElementInfo] = []
 
-            for i in 0..<alertCount {
+            for i in 0 ..< alertCount {
                 if let alertSnapshot: XCUIElementSnapshot = runOnMainThread({
                     let alert = self.springboard.alerts.element(boundBy: i)
                     return try? alert.snapshot()
@@ -508,7 +507,8 @@ public class ElementLocator: ElementLocating {
             // Only include actions for text input elements (click is implied by clickable)
             var actions: [String]? = nil
             if isEnabled && (snapshot.elementType == .textField || snapshot.elementType == .textView ||
-                             snapshot.elementType == .secureTextField) {
+                snapshot.elementType == .secureTextField)
+            {
                 actions = ["set_text", "clear_text"]
             }
 

@@ -27,8 +27,11 @@ class RemindersIntegrationBase: AutoMobileTestCase {
         let refreshResult = PerfTimer.measure("DaemonManager.refreshDevicePool") {
             DaemonManager.refreshDevicePool()
         }
-        PerfTimer.log("refreshDevicePool result: success=\(refreshResult.success), availableDevices=\(refreshResult.availableDevices)")
-        guard refreshResult.success && refreshResult.availableDevices > 0 else {
+        PerfTimer
+            .log(
+                "refreshDevicePool result: success=\(refreshResult.success), availableDevices=\(refreshResult.availableDevices)"
+            )
+        guard refreshResult.success, refreshResult.availableDevices > 0 else {
             throw XCTSkip("No devices available in pool after refresh. Boot a simulator first.")
         }
 

@@ -25,15 +25,18 @@ import {
   selectedElementSchema,
   systemInsetsSchema
 } from "./toolOutputSchemas";
-import { elementIdTextSelectorSchema } from "./elementSelectorSchemas";
-
 // Schema definitions
-const waitForElementSchema = elementIdTextSelectorSchema.describe("Element to wait for");
-
-const waitForSchema = z.object({
-  element: waitForElementSchema.describe("Element to wait for"),
-  timeout: z.number().optional().describe("Wait timeout ms (default: 5000)")
-});
+// waitFor accepts elementId OR text directly (oneOf), plus optional timeout
+const waitForSchema = z.union([
+  z.object({
+    elementId: z.string().describe("Element resource ID / accessibility identifier"),
+    timeout: z.number().optional().describe("Wait timeout ms (default: 5000)")
+  }),
+  z.object({
+    text: z.string().describe("Element text"),
+    timeout: z.number().optional().describe("Wait timeout ms (default: 5000)")
+  })
+]);
 
 export const observeSchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Platform"),
@@ -104,18 +107,18 @@ const findWaitForElement = (
   waitFor: ObserveWaitForOptions,
   viewHierarchy: ViewHierarchyResult
 ): Element | null => {
-  if ("elementId" in waitFor.element) {
+  if ("elementId" in waitFor) {
     return elementUtils.findElementByResourceId(
       viewHierarchy,
-      waitFor.element.elementId,
+      waitFor.elementId,
       undefined
     );
   }
 
-  if ("text" in waitFor.element) {
+  if ("text" in waitFor) {
     return elementUtils.findElementByText(
       viewHierarchy,
-      waitFor.element.text,
+      waitFor.text,
       undefined,
       true,
       false
@@ -139,8 +142,8 @@ const waitForObservation = async (
   const timeoutMs = waitFor.timeout ?? 5000;
   const elementUtils = new ElementUtils();
   const queryOptions = {
-    text: "text" in waitFor.element ? waitFor.element.text : undefined,
-    elementId: "elementId" in waitFor.element ? waitFor.element.elementId : undefined
+    text: "text" in waitFor ? waitFor.text : undefined,
+    elementId: "elementId" in waitFor ? waitFor.elementId : undefined
   };
 
   throwIfAborted(signal);

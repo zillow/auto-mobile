@@ -101,6 +101,10 @@ internal object TestTimingCache {
     if (isCiMode()) {
       return false
     }
+    // Skip timing fetch if no devices are available - tests will be skipped anyway
+    if (!AutoMobileSharedUtils.deviceChecker.areDevicesAvailable()) {
+      return false
+    }
     return SystemPropertyCache.getBoolean("automobile.junit.timing.enabled", true)
   }
 
