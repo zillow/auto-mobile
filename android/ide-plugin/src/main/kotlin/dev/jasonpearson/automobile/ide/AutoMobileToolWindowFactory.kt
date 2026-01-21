@@ -8,11 +8,7 @@ import javax.swing.JPanel
 
 class AutoMobileToolWindowFactory : ToolWindowFactory, DumbAware {
   override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-    val content = toolWindow.contentManager.factory.createContent(
-      JPanel(),
-      "",
-      false
-    )
+    val content = toolWindow.contentManager.factory.createContent(JPanel(), "", false)
     toolWindow.contentManager.addContent(content)
   }
 }

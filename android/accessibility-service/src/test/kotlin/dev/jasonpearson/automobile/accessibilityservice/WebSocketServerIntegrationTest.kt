@@ -64,7 +64,7 @@ class WebSocketServerIntegrationTest {
                     else -> null
                   }
               enqueueHighlightResponse(requestId, error == null, error)
-            }
+            },
         )
   }
 
@@ -105,16 +105,15 @@ class WebSocketServerIntegrationTest {
       error: String?,
   ) {
     val errorJson = json.encodeToString<String?>(error)
-    val message =
-        buildString {
-          append("""{"type":"highlight_response","timestamp":${System.currentTimeMillis()}""")
-          if (requestId != null) {
-            append(""","requestId":"$requestId"""")
-          }
-          append(""","success":$success""")
-          append(""","error":$errorJson""")
-          append("}")
-        }
+    val message = buildString {
+      append("""{"type":"highlight_response","timestamp":${System.currentTimeMillis()}""")
+      if (requestId != null) {
+        append(""","requestId":"$requestId"""")
+      }
+      append(""","success":$success""")
+      append(""","error":$errorJson""")
+      append("}")
+    }
 
     testScope.launch { server.broadcast(message) }
   }

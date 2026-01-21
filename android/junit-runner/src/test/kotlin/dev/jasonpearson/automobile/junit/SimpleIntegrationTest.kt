@@ -60,7 +60,9 @@ class SimpleIntegrationTest {
 /** Test target class for SimpleIntegrationTest */
 class SimpleTestTargetClass {
 
-  @Test @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml") fun testWithAutoMobileAnnotation() {}
+  @Test
+  @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml")
+  fun testWithAutoMobileAnnotation() {}
 
   @Test
   @AutoMobileTest(plan = "test-plans/launch-clock-app.yaml", aiAssistance = false)

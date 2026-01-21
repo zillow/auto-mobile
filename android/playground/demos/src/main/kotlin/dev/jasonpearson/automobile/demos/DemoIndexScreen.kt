@@ -134,8 +134,7 @@ fun DemoIndexScreen(
         ) {
           items(demos, key = { it.id }) { demo ->
             Card(
-                modifier =
-                    Modifier.fillMaxWidth().semantics { testTag = demo.id },
+                modifier = Modifier.fillMaxWidth().semantics { testTag = demo.id },
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             ) {
               Column(
@@ -147,8 +146,7 @@ fun DemoIndexScreen(
                 Button(
                     onClick = demo.onClick,
                     modifier =
-                        Modifier.align(Alignment.End)
-                            .semantics { testTag = "${demo.id}_action" },
+                        Modifier.align(Alignment.End).semantics { testTag = "${demo.id}_action" },
                 ) {
                   Text(demo.buttonLabel)
                 }

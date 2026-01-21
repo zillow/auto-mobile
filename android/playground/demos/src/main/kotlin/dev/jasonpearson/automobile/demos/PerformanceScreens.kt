@@ -69,10 +69,9 @@ fun StartupDemoScreen(onNavigateBack: () -> Unit) {
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "startup_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "startup_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(
@@ -85,7 +84,8 @@ fun StartupDemoScreen(onNavigateBack: () -> Unit) {
         )
         Card(
             modifier = Modifier.fillMaxWidth().semantics { testTag = "startup_ready_card" },
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            colors =
+                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
           Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(text = "Ready", style = MaterialTheme.typography.titleMedium)
@@ -106,7 +106,10 @@ fun PerformanceListScreen(
     onNavigateToDetail: (Int) -> Unit,
     onNavigateBack: () -> Unit,
 ) {
-  TrackRecomposition(id = "screen.demo.performance.list", composableName = "PerformanceListScreen") {
+  TrackRecomposition(
+      id = "screen.demo.performance.list",
+      composableName = "PerformanceListScreen",
+  ) {
     Scaffold(
         topBar = {
           TopAppBar(
@@ -127,10 +130,9 @@ fun PerformanceListScreen(
     ) { paddingValues ->
       LazyColumn(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(horizontal = 16.dp)
-                  .semantics { testTag = "performance_list" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 16.dp).semantics {
+                testTag = "performance_list"
+              },
           verticalArrangement = Arrangement.spacedBy(12.dp),
       ) {
         items(performanceItems, key = { it.id }) { item ->
@@ -144,7 +146,10 @@ fun PerformanceListScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-              Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+              Column(
+                  modifier = Modifier.weight(1f),
+                  verticalArrangement = Arrangement.spacedBy(4.dp),
+              ) {
                 Text(text = item.title, style = MaterialTheme.typography.titleMedium)
                 Text(text = item.subtitle, style = MaterialTheme.typography.bodySmall)
                 Text(text = item.price, style = MaterialTheme.typography.bodySmall)
@@ -193,10 +198,9 @@ fun PerformanceDetailScreen(
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "performance_detail_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "performance_detail_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(

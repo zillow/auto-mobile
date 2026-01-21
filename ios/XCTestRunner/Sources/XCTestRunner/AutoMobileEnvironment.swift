@@ -129,7 +129,7 @@ public enum DaemonManager {
         return kill(Int32(pid), 0) == 0
     }
 
-    public static func startDaemon(repoRoot: String? = nil) -> Bool {
+    public static func startDaemon(repoRoot _: String? = nil) -> Bool {
         PerfTimer.log("startDaemon: searching for auto-mobile executable")
         guard let autoMobilePath = findExecutable("auto-mobile") else {
             PerfTimer.log("startDaemon: ERROR - auto-mobile not found in PATH")

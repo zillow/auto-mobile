@@ -89,7 +89,9 @@ class WebSocketServer(
         ((requestId: String?, x: Int, y: Int, duration: Long) -> Unit)? =
         null,
     private val onRequestTwoFingerSwipe:
-        ((requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, offset: Int) -> Unit)? =
+        ((
+            requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, offset: Int,
+        ) -> Unit)? =
         null,
     private val onRequestDrag:
         ((
@@ -122,8 +124,7 @@ class WebSocketServer(
     private val onRequestAction:
         ((requestId: String?, action: String, resourceId: String?) -> Unit)? =
         null,
-    private val onRequestClipboard:
-        ((requestId: String?, action: String, text: String?) -> Unit)? =
+    private val onRequestClipboard: ((requestId: String?, action: String, text: String?) -> Unit)? =
         null,
     private val onRequestInstallCaCert: ((requestId: String?, certificate: String) -> Unit)? = null,
     private val onRequestRemoveCaCert:
@@ -341,7 +342,10 @@ class WebSocketServer(
       when (request.type) {
         "request_hierarchy" -> {
           val disableAllFiltering = request.disableAllFiltering ?: false
-          Log.d(TAG, "Received hierarchy request (requestId: ${request.requestId}, disableAllFiltering: $disableAllFiltering)")
+          Log.d(
+              TAG,
+              "Received hierarchy request (requestId: ${request.requestId}, disableAllFiltering: $disableAllFiltering)",
+          )
           onRequestHierarchy?.invoke(disableAllFiltering)
         }
         "request_hierarchy_if_stale" -> {

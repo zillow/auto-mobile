@@ -144,9 +144,7 @@ class ToolResultParserTest {
 
   @Test
   fun `malformed JSON throws serialization exception`() {
-    assertFailsWith<SerializationException> {
-      ToolResultParser.parseTapOnResponse("{")
-    }
+    assertFailsWith<SerializationException> { ToolResultParser.parseTapOnResponse("{") }
   }
 
   @Test
@@ -189,11 +187,9 @@ class ToolResultParserTest {
                 "type" to JsonPrimitive("object"),
                 "properties" to
                     JsonObject(
-                        mapOf(
-                            "success" to JsonObject(mapOf("type" to JsonPrimitive("boolean")))
-                        )
+                        mapOf("success" to JsonObject(mapOf("type" to JsonPrimitive("boolean"))))
                     ),
-                "required" to JsonArray(listOf(JsonPrimitive("success")))
+                "required" to JsonArray(listOf(JsonPrimitive("success"))),
             )
         )
 
@@ -283,9 +279,15 @@ private object SchemaSampleGenerator {
       return generate(resolved, root)
     }
 
-    schema["anyOf"]?.jsonArray?.firstOrNull()?.jsonObject?.let { return generate(it, root) }
-    schema["oneOf"]?.jsonArray?.firstOrNull()?.jsonObject?.let { return generate(it, root) }
-    schema["allOf"]?.jsonArray?.firstOrNull()?.jsonObject?.let { return generate(it, root) }
+    schema["anyOf"]?.jsonArray?.firstOrNull()?.jsonObject?.let {
+      return generate(it, root)
+    }
+    schema["oneOf"]?.jsonArray?.firstOrNull()?.jsonObject?.let {
+      return generate(it, root)
+    }
+    schema["allOf"]?.jsonArray?.firstOrNull()?.jsonObject?.let {
+      return generate(it, root)
+    }
 
     val enumValues = schema["enum"]?.jsonArray
     if (enumValues != null && enumValues.isNotEmpty()) {
@@ -322,10 +324,7 @@ private object SchemaSampleGenerator {
   private fun generateObject(schema: JsonObject, root: JsonObject): JsonElement {
     val properties = schema["properties"]?.jsonObject ?: JsonObject(emptyMap())
     val required =
-        schema["required"]
-            ?.jsonArray
-            ?.mapNotNull { (it as? JsonPrimitive)?.content }
-            ?.toSet()
+        schema["required"]?.jsonArray?.mapNotNull { (it as? JsonPrimitive)?.content }?.toSet()
             ?: emptySet()
 
     val values = mutableMapOf<String, JsonElement>()

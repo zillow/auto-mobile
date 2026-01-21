@@ -13,13 +13,19 @@ internal object MemoryMonitor {
   }
   private val sampleInterval: Int by lazy {
     val configured =
-        System.getProperty("automobile.junit.memory.monitor.sample.interval", DEFAULT_SAMPLE_INTERVAL.toString())
+        System.getProperty(
+                "automobile.junit.memory.monitor.sample.interval",
+                DEFAULT_SAMPLE_INTERVAL.toString(),
+            )
             .toIntOrNull()
     if (configured == null || configured <= 0) DEFAULT_SAMPLE_INTERVAL else configured
   }
   private val maxGrowthBytes: Long by lazy {
     val configured =
-        System.getProperty("automobile.junit.memory.max.growth.mb", DEFAULT_MAX_GROWTH_MB.toString())
+        System.getProperty(
+                "automobile.junit.memory.max.growth.mb",
+                DEFAULT_MAX_GROWTH_MB.toString(),
+            )
             .toLongOrNull()
     val resolved = configured ?: DEFAULT_MAX_GROWTH_MB
     resolved * BYTES_PER_MB
@@ -82,8 +88,7 @@ internal object MemoryMonitor {
 
     val thresholdBreached = maxGrowthBytes > 0 && deltaBytes > maxGrowthBytes
     val shouldCaptureDiagnostics = diagnosticsEnabled && (!success || thresholdBreached)
-    val shouldDumpHeap =
-        (dumpOnFailure && !success) || (dumpOnThreshold && thresholdBreached)
+    val shouldDumpHeap = (dumpOnFailure && !success) || (dumpOnThreshold && thresholdBreached)
 
     if (shouldCaptureDiagnostics || shouldDumpHeap) {
       val reason = buildString {

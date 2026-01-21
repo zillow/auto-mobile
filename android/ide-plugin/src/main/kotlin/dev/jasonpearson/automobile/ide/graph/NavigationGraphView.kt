@@ -28,13 +28,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.jewel.foundation.theme.JewelTheme
-import org.jetbrains.jewel.ui.component.Text
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import org.jetbrains.jewel.foundation.theme.JewelTheme
+import org.jetbrains.jewel.ui.component.Text
 
 @Composable
 fun NavigationGraphView(
@@ -92,12 +92,7 @@ fun NavigationGraphLegend(modifier: Modifier = Modifier) {
 @Composable
 private fun LegendItem(palette: GraphPalette, color: Color, label: String) {
   Row(verticalAlignment = Alignment.CenterVertically) {
-    Box(
-        modifier =
-            Modifier
-                .size(10.dp)
-                .background(color, CircleShape)
-    )
+    Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
     Text(
         text = label,
         color = palette.labelMuted,
@@ -121,10 +116,7 @@ private fun GraphCanvas(
 ) {
   BoxWithConstraints(modifier = modifier) {
     val density = LocalDensity.current
-    val size =
-        with(density) {
-          IntSize(maxWidth.roundToPx(), maxHeight.roundToPx())
-        }
+    val size = with(density) { IntSize(maxWidth.roundToPx(), maxHeight.roundToPx()) }
     val baseRadiusPx = with(density) { 16.dp.toPx() }
     val paddingPx = with(density) { 32.dp.toPx() }
     val layout =
@@ -154,9 +146,7 @@ private fun GraphCanvas(
           ranks
         }
     val historyNodes =
-        remember(recentTransitions) {
-          recentTransitions.flatMap { listOf(it.from, it.to) }.toSet()
-        }
+        remember(recentTransitions) { recentTransitions.flatMap { listOf(it.from, it.to) }.toSet() }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
       drawEdges(summary, layout, palette, historyById, historyByEdge, recentTransitions.size)
@@ -194,9 +184,7 @@ private fun GraphCanvas(
         val maxX = (widthPx - labelMaxWidthPx - 4f).coerceAtLeast(4f)
         val maxY = (heightPx - labelHeightPx - 4f).coerceAtLeast(4f)
         val x = rawX.coerceIn(4f, maxX)
-        val y =
-            (nodeLayout.center.y - nodeLayout.radius - 6f)
-                .coerceIn(4f, maxY)
+        val y = (nodeLayout.center.y - nodeLayout.radius - 6f).coerceIn(4f, maxY)
 
         Text(
             text = label,
@@ -205,9 +193,7 @@ private fun GraphCanvas(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier =
-                Modifier
-                    .offset { IntOffset(x.roundToInt(), y.roundToInt()) }
-                    .widthIn(max = 140.dp),
+                Modifier.offset { IntOffset(x.roundToInt(), y.roundToInt()) }.widthIn(max = 140.dp),
         )
       }
     }
@@ -229,8 +215,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawEdges(
   summary.edges.forEach { edge ->
     val from = layout.nodeLayouts[edge.from] ?: return@forEach
     val to = layout.nodeLayouts[edge.to] ?: return@forEach
-    val recencyIndex =
-        historyById[edge.id] ?: historyByEdge[ScreenEdgeKey(edge.from, edge.to)]
+    val recencyIndex = historyById[edge.id] ?: historyByEdge[ScreenEdgeKey(edge.from, edge.to)]
     val recencyRatio =
         if (recencyIndex != null && historySize > 0) {
           (recencyIndex + 1).toFloat() / historySize.toFloat()

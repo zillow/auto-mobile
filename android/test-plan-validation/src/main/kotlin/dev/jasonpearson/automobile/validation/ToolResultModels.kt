@@ -124,10 +124,8 @@ data class ActiveWindowInfo(
 @Serializable
 data class SelectedElement(
     val text: String? = null,
-    @JsonNames("resourceId", "resource-id")
-    val resourceId: String? = null,
-    @JsonNames("contentDesc", "content-desc")
-    val contentDesc: String? = null,
+    @JsonNames("resourceId", "resource-id") val resourceId: String? = null,
+    @JsonNames("contentDesc", "content-desc") val contentDesc: String? = null,
     val bounds: ElementBounds? = null,
     val indexInMatches: Int? = null,
     val totalMatches: Int? = null,
@@ -146,14 +144,10 @@ data class SelectedElementState(
 data class Element(
     val bounds: ElementBounds? = null,
     val text: String? = null,
-    @JsonNames("resource-id", "resourceId")
-    val resourceId: String? = null,
-    @JsonNames("content-desc", "contentDesc")
-    val contentDesc: String? = null,
-    @SerialName("class")
-    val className: String? = null,
-    @SerialName("package")
-    val packageName: String? = null,
+    @JsonNames("resource-id", "resourceId") val resourceId: String? = null,
+    @JsonNames("content-desc", "contentDesc") val contentDesc: String? = null,
+    @SerialName("class") val className: String? = null,
+    @SerialName("package") val packageName: String? = null,
     val checkable: Boolean? = null,
     val checked: Boolean? = null,
     val clickable: Boolean? = null,

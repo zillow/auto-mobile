@@ -76,7 +76,10 @@ class AutoMobileRunnerTest {
     val metadata = args["testMetadata"]?.jsonObject
     assertNotNull("testMetadata should be included by default", metadata)
     assertEquals("TestTargetClass", metadata?.get("testClass")?.jsonPrimitive?.content)
-    assertEquals("testWithAutoMobileAnnotation", metadata?.get("testMethod")?.jsonPrimitive?.content)
+    assertEquals(
+        "testWithAutoMobileAnnotation",
+        metadata?.get("testMethod")?.jsonPrimitive?.content,
+    )
   }
 
   @Test

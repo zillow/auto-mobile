@@ -2,8 +2,8 @@ package dev.jasonpearson.automobile.demos
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -64,10 +64,9 @@ fun ContrastDemoScreen(onNavigateBack: () -> Unit) {
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "contrast_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "contrast_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(
@@ -132,10 +131,9 @@ fun TapTargetsDemoScreen(onNavigateBack: () -> Unit) {
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "tap_targets_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "tap_targets_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(

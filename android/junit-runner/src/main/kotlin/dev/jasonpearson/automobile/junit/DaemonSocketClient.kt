@@ -33,8 +33,7 @@ internal object DaemonSocketClientManager {
   // This enables true parallel execution since socket server queues requests per connection
   private val threadLocalClient = ThreadLocal<DaemonSocketClient>()
   private val clientLock = Any()
-  @Volatile
-  private var daemonEnsured = false
+  @Volatile private var daemonEnsured = false
   @JvmStatic internal var testClient: DaemonToolClient? = null
 
   fun callTool(toolName: String, arguments: JsonObject, timeoutMs: Long): DaemonResponse {
@@ -127,9 +126,8 @@ internal object DaemonSocketClientManager {
   }
 
   /**
-   * Wait for daemon device pool to have at least one device
-   * This is a blocking health check that prevents tests from running
-   * until devices are available.
+   * Wait for daemon device pool to have at least one device This is a blocking health check that
+   * prevents tests from running until devices are available.
    */
   private fun waitForDevicePoolReady(timeoutMs: Long) {
     val debugMode = SystemPropertyCache.getBoolean("automobile.debug", false)
@@ -153,14 +151,11 @@ internal object DaemonSocketClientManager {
             println("Triggering device pool refresh...")
           }
           try {
-            val refreshResponse = socketClient.callDaemonMethod(
-                "daemon/refreshDevices",
-                5000
-            )
+            val refreshResponse = socketClient.callDaemonMethod("daemon/refreshDevices", 5000)
             if (debugMode && refreshResponse.success) {
-              val addedDevices = refreshResponse.result
-                  ?.jsonObject?.get("addedDevices")
-                  ?.jsonPrimitive?.intOrNull ?: 0
+              val addedDevices =
+                  refreshResponse.result?.jsonObject?.get("addedDevices")?.jsonPrimitive?.intOrNull
+                      ?: 0
               println("Device pool refresh complete: added $addedDevices devices")
             }
           } catch (e: Exception) {
@@ -171,27 +166,31 @@ internal object DaemonSocketClientManager {
           nextRefreshTime = now + 2000 // Schedule next refresh in 2 seconds
         }
 
-        val response = socketClient.callTool(
-            "listDevices",
-            JsonObject(mapOf("platform" to JsonPrimitive("android"))),
-            5000
-        )
+        val response =
+            socketClient.callTool(
+                "listDevices",
+                JsonObject(mapOf("platform" to JsonPrimitive("android"))),
+                5000,
+            )
         socketClient.close()
 
         if (response.success) {
-          val payloadText = response.result
-              ?.jsonObject?.get("content")
-              ?.jsonArray?.firstOrNull()
-              ?.jsonObject?.get("text")
-              ?.jsonPrimitive?.content
+          val payloadText =
+              response.result
+                  ?.jsonObject
+                  ?.get("content")
+                  ?.jsonArray
+                  ?.firstOrNull()
+                  ?.jsonObject
+                  ?.get("text")
+                  ?.jsonPrimitive
+                  ?.content
           val parsedResult = payloadText?.let { json.parseToJsonElement(it).jsonObject }
           val poolStatus = parsedResult?.get("poolStatus")?.jsonObject
-          val totalDevices = poolStatus
-              ?.get("total")
-              ?.jsonPrimitive
-              ?.intOrNull
-              ?: parsedResult?.get("totalCount")?.jsonPrimitive?.intOrNull
-              ?: 0
+          val totalDevices =
+              poolStatus?.get("total")?.jsonPrimitive?.intOrNull
+                  ?: parsedResult?.get("totalCount")?.jsonPrimitive?.intOrNull
+                  ?: 0
 
           if (totalDevices > 0) {
             if (debugMode) {
@@ -221,7 +220,7 @@ internal object DaemonSocketClientManager {
     // Device pool is still empty after timeout - throw error
     throw DaemonUnavailableException(
         "Daemon device pool is empty after ${timeoutMs}ms. " +
-        "Start an emulator or connect a physical device before running tests."
+            "Start an emulator or connect a physical device before running tests."
     )
   }
 
@@ -246,8 +245,12 @@ internal object DaemonSocketClientManager {
     val candidates =
         listOf(
             File("accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"),
-            File("../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"),
-            File("../../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"),
+            File(
+                "../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
+            ),
+            File(
+                "../../accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk"
+            ),
         )
     return candidates.firstOrNull { it.exists() }?.absolutePath
   }
@@ -265,7 +268,8 @@ internal object DaemonSocketPaths {
     // Check system property first, then environment variable
     val sysProp = SystemPropertyCache.get("automobile.daemon.startup.timeout.ms", "")
     val envVar = System.getenv("AUTOMOBILE_DAEMON_STARTUP_TIMEOUT_MS")?.trim().orEmpty()
-    val configured = sysProp.ifEmpty { envVar }.ifEmpty { DEFAULT_DAEMON_STARTUP_TIMEOUT_MS.toString() }
+    val configured =
+        sysProp.ifEmpty { envVar }.ifEmpty { DEFAULT_DAEMON_STARTUP_TIMEOUT_MS.toString() }
     return configured.toLongOrNull() ?: DEFAULT_DAEMON_STARTUP_TIMEOUT_MS
   }
 
@@ -481,11 +485,14 @@ internal class DaemonSocketClient(private val socketPath: String) : Closeable, D
 
   private fun buildJsonParams(toolName: String, arguments: JsonObject): JsonObject {
     // Include sessionUuid in tool arguments to enable per-thread plan execution locking
-    val argumentsWithSession = JsonObject(arguments.toMutableMap().apply {
-      if (!containsKey("sessionUuid")) {
-        put("sessionUuid", JsonPrimitive(sessionUuid))
-      }
-    })
+    val argumentsWithSession =
+        JsonObject(
+            arguments.toMutableMap().apply {
+              if (!containsKey("sessionUuid")) {
+                put("sessionUuid", JsonPrimitive(sessionUuid))
+              }
+            }
+        )
     return JsonObject(mapOf("name" to JsonPrimitive(toolName), "arguments" to argumentsWithSession))
   }
 

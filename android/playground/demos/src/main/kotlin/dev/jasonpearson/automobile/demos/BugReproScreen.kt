@@ -61,10 +61,9 @@ fun BugReproScreen(onNavigateBack: () -> Unit) {
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "bug_repro_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "bug_repro_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(

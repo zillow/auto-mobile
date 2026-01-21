@@ -31,6 +31,7 @@ class McpDaemonClient(
   override val transportName: String = "Unix Socket"
   override val connectionDescription: String
     get() = socketPathValue
+
   private val testRecordingClient = TestRecordingSocketClient()
 
   override fun ping() {
@@ -80,7 +81,11 @@ class McpDaemonClient(
     return result.flags
   }
 
-  override fun setFeatureFlag(key: String, enabled: Boolean, config: JsonObject?): FeatureFlagState {
+  override fun setFeatureFlag(
+      key: String,
+      enabled: Boolean,
+      config: JsonObject?,
+  ): FeatureFlagState {
     val response =
         callTool(
             "setFeatureFlag",

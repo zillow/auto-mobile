@@ -6,8 +6,8 @@ import org.junit.Test
 /**
  * Tests for UX exploration workflows documented in docs/using/ux-exploration.md
  *
- * These tests verify the navigation graph exploration capabilities and multi-screen
- * user flows in the Playground demo app.
+ * These tests verify the navigation graph exploration capabilities and multi-screen user flows in
+ * the Playground demo app.
  */
 class PlaygroundUxExplorationTests {
 

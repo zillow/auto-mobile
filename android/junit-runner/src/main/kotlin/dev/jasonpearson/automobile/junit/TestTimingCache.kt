@@ -8,7 +8,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -119,8 +118,7 @@ internal object TestTimingCache {
   private fun loadFromDaemon() {
     val uri = buildRequestUri()
     try {
-      val response =
-          DaemonSocketClientManager.readResource(uri, resolveTimeoutMs())
+      val response = DaemonSocketClientManager.readResource(uri, resolveTimeoutMs())
       val payload = extractResourcePayload(response)
       if (payload.isNullOrBlank()) {
         return
@@ -135,8 +133,7 @@ internal object TestTimingCache {
       val parsed = json.decodeFromJsonElement(TestTimingSummary.serializer(), element)
       summary = parsed
       timingMap = parsed.testTimings.associateBy { TestTimingKey(it.testClass, it.testMethod) }
-    } catch (e: Exception) {
-    }
+    } catch (e: Exception) {}
   }
 
   private fun buildRequestUri(): String {
@@ -147,17 +144,12 @@ internal object TestTimingCache {
 
     addParam(
         "lookbackDays",
-        resolvePositiveIntProperty(
-            "automobile.junit.timing.lookback.days",
-            DEFAULT_LOOKBACK_DAYS
-        ).toString()
+        resolvePositiveIntProperty("automobile.junit.timing.lookback.days", DEFAULT_LOOKBACK_DAYS)
+            .toString(),
     )
     addParam(
         "limit",
-        resolvePositiveIntProperty(
-            "automobile.junit.timing.limit",
-            DEFAULT_LIMIT
-        ).toString()
+        resolvePositiveIntProperty("automobile.junit.timing.limit", DEFAULT_LIMIT).toString(),
     )
     addParam("minSamples", resolveMinSamples().toString())
     addParam("devicePlatform", "android")
@@ -170,14 +162,16 @@ internal object TestTimingCache {
       return TEST_TIMING_RESOURCE_URI
     }
 
-    val query =
-        params.joinToString("&") { (key, value) -> "$key=${encodeQueryParam(value)}" }
+    val query = params.joinToString("&") { (key, value) -> "$key=${encodeQueryParam(value)}" }
     return "$TEST_TIMING_RESOURCE_URI?$query"
   }
 
   private fun resolveMinSamples(): Int {
     val value =
-        SystemPropertyCache.get("automobile.junit.timing.min.samples", DEFAULT_MIN_SAMPLES.toString())
+        SystemPropertyCache.get(
+                "automobile.junit.timing.min.samples",
+                DEFAULT_MIN_SAMPLES.toString(),
+            )
             .toIntOrNull()
     return when {
       value == null -> DEFAULT_MIN_SAMPLES
@@ -194,9 +188,10 @@ internal object TestTimingCache {
   private fun resolveTimeoutMs(): Long {
     val value =
         SystemPropertyCache.get(
-            "automobile.junit.timing.fetch.timeout.ms",
-            DEFAULT_TIMEOUT_MS.toString(),
-        ).toLongOrNull()
+                "automobile.junit.timing.fetch.timeout.ms",
+                DEFAULT_TIMEOUT_MS.toString(),
+            )
+            .toLongOrNull()
     return if (value != null && value > 0) value else DEFAULT_TIMEOUT_MS
   }
 

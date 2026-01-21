@@ -27,13 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
-import dev.jasonpearson.automobile.ide.daemon.McpConnectionException
-import dev.jasonpearson.automobile.ide.daemon.TestTimingEntry
-import dev.jasonpearson.automobile.ide.daemon.TestTimingOrderBy
-import dev.jasonpearson.automobile.ide.daemon.TestTimingOrderDirection
-import dev.jasonpearson.automobile.ide.daemon.TestTimingQuery
-import dev.jasonpearson.automobile.ide.daemon.TestTimingSummary
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
@@ -42,6 +35,17 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScope
+import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
+import dev.jasonpearson.automobile.ide.daemon.McpConnectionException
+import dev.jasonpearson.automobile.ide.daemon.TestTimingEntry
+import dev.jasonpearson.automobile.ide.daemon.TestTimingOrderBy
+import dev.jasonpearson.automobile.ide.daemon.TestTimingOrderDirection
+import dev.jasonpearson.automobile.ide.daemon.TestTimingQuery
+import dev.jasonpearson.automobile.ide.daemon.TestTimingSummary
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -54,10 +58,6 @@ import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.icon.PathIconKey
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import kotlin.math.roundToInt
 
 @Composable
 fun TestTimingPanel(
@@ -111,8 +111,7 @@ fun TestTimingPanel(
     error = null
     val lookbackDays =
         parseOptionalInt("Lookback days", lookbackDaysText.text.toString(), minValue = 1)
-    val minSamples =
-        parseOptionalInt("Min samples", minSamplesText.text.toString(), minValue = 0)
+    val minSamples = parseOptionalInt("Min samples", minSamplesText.text.toString(), minValue = 0)
     val limit = parseOptionalInt("Limit", limitText.text.toString(), minValue = 1)
     if (error != null) {
       status = "Invalid input"
@@ -227,7 +226,10 @@ fun TestTimingPanel(
       Text("Error: ${error ?: ""}", color = palette.error)
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
       LabeledTextField(
           label = "Lookback days",
           state = lookbackDaysText,
@@ -246,12 +248,13 @@ fun TestTimingPanel(
       OutlinedButton(onClick = { autoPollEnabled = !autoPollEnabled }) {
         Text(if (autoPollEnabled) "Pause polling" else "Resume polling")
       }
-      DefaultButton(onClick = { scope.launch { refreshTestTimings() } }) {
-        Text("Refresh")
-      }
+      DefaultButton(onClick = { scope.launch { refreshTestTimings() } }) { Text("Refresh") }
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
       LabeledTextField(
           label = "Filter (class/method)",
           state = filterText,
@@ -260,7 +263,9 @@ fun TestTimingPanel(
       ListComboBox(
           sortLabels,
           selectedSortIndex,
-          { index -> sortKey = sortOptions.getOrNull(index)?.key ?: TestTimingSortKey.AVG_DURATION },
+          { index ->
+            sortKey = sortOptions.getOrNull(index)?.key ?: TestTimingSortKey.AVG_DURATION
+          },
       )
       ListComboBox(
           directionLabels,
@@ -304,7 +309,11 @@ fun TestTimingPanel(
             }
           }
         }
-        Text("${entry.testClass}.${entry.testMethod}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            "${entry.testClass}.${entry.testMethod}",
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
           Text("Avg: ${formatDuration(entry.averageDurationMs)}")
           Text("Runs: ${entry.sampleSize}")
@@ -382,11 +391,7 @@ private fun TestTimingRow(
       }
 
   Row(
-      modifier =
-          Modifier
-              .fillMaxWidth()
-              .clickable(onClick = onOpen)
-              .padding(vertical = 4.dp),
+      modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 4.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(8.dp),
   ) {
@@ -429,11 +434,9 @@ private fun buildTestTimingComparator(
             compareBy<TestTimingEntry> { it.testClass.lowercase() }
                 .thenBy { it.testMethod.lowercase() }
         TestTimingSortKey.AVG_DURATION ->
-            compareBy<TestTimingEntry> { it.averageDurationMs }
-                .thenBy { it.testClass.lowercase() }
+            compareBy<TestTimingEntry> { it.averageDurationMs }.thenBy { it.testClass.lowercase() }
         TestTimingSortKey.SAMPLE_SIZE ->
-            compareBy<TestTimingEntry> { it.sampleSize }
-                .thenBy { it.testClass.lowercase() }
+            compareBy<TestTimingEntry> { it.sampleSize }.thenBy { it.testClass.lowercase() }
         TestTimingSortKey.LAST_RUN ->
             compareBy<TestTimingEntry> { it.lastRunTimestampMs ?: 0L }
                 .thenBy { it.testClass.lowercase() }
@@ -496,10 +499,7 @@ private fun normalizeTestMethodName(value: String): String {
   }
   val bracketIndex = trimmed.indexOf('[')
   val parenIndex = trimmed.indexOf('(')
-  val cutIndex =
-      listOf(bracketIndex, parenIndex)
-          .filter { it >= 0 }
-          .minOrNull()
+  val cutIndex = listOf(bracketIndex, parenIndex).filter { it >= 0 }.minOrNull()
   return if (cutIndex != null) trimmed.substring(0, cutIndex) else trimmed
 }
 
@@ -575,8 +575,7 @@ private const val AVG_COL_WEIGHT = 0.18f
 private const val RUNS_COL_WEIGHT = 0.08f
 private const val SUCCESS_COL_WEIGHT = 0.1f
 private const val LAST_RUN_COL_WEIGHT = 0.16f
-private val TIMESTAMP_FORMATTER: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+private val TIMESTAMP_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
 private fun formatStatusCounts(entry: TestTimingEntry): String {
   val counts = entry.statusCounts ?: return "-"

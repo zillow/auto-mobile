@@ -6,11 +6,11 @@ import com.intellij.patterns.PlatformPatterns.psiElement
 import org.jetbrains.yaml.YAMLLanguage
 
 class TestPlanCompletionContributor : CompletionContributor() {
-    init {
-        extend(
-            CompletionType.BASIC,
-            psiElement().withLanguage(YAMLLanguage.INSTANCE),
-            TestPlanCompletionProvider()
-        )
-    }
+  init {
+    extend(
+        CompletionType.BASIC,
+        psiElement().withLanguage(YAMLLanguage.INSTANCE),
+        TestPlanCompletionProvider(),
+    )
+  }
 }

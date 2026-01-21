@@ -143,10 +143,11 @@ class DeviceAvailabilityChecker : DeviceChecker {
         }
 
         // Check for ADB server issues that warrant a retry
-        val isAdbServerError = result.errorOutput.contains("ADB server didn't ACK") ||
-            result.errorOutput.contains("Address already in use") ||
-            result.errorOutput.contains("failed to start daemon") ||
-            result.errorOutput.contains("cannot connect to daemon")
+        val isAdbServerError =
+            result.errorOutput.contains("ADB server didn't ACK") ||
+                result.errorOutput.contains("Address already in use") ||
+                result.errorOutput.contains("failed to start daemon") ||
+                result.errorOutput.contains("cannot connect to daemon")
 
         if (result.exitCode == 0) {
           // Parse adb devices output to count connected devices
@@ -170,7 +171,9 @@ class DeviceAvailabilityChecker : DeviceChecker {
         } else if (isAdbServerError && attempt < MAX_RETRIES) {
           // ADB server issue - retry with backoff
           val backoffMs = INITIAL_BACKOFF_MS * (1 shl (attempt - 1)) // Exponential backoff
-          println("ADB server issue detected (attempt $attempt/$MAX_RETRIES), retrying in ${backoffMs}ms...")
+          println(
+              "ADB server issue detected (attempt $attempt/$MAX_RETRIES), retrying in ${backoffMs}ms..."
+          )
           Thread.sleep(backoffMs)
           continue
         } else {
@@ -178,7 +181,9 @@ class DeviceAvailabilityChecker : DeviceChecker {
           lastError = buildAdbErrorMessage(result)
           println("Warning: Device check failed with exit code ${result.exitCode}")
           if (attempt == MAX_RETRIES && isAdbServerError) {
-            println("ADB server failed to start after $MAX_RETRIES attempts. This may be a CI environment issue.")
+            println(
+                "ADB server failed to start after $MAX_RETRIES attempts. This may be a CI environment issue."
+            )
           }
         }
       } catch (e: Exception) {

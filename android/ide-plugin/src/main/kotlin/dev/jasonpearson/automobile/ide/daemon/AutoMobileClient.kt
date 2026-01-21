@@ -23,7 +23,9 @@ interface AutoMobileClient {
   fun readResource(uri: String): List<McpResourceContent>
 
   fun getNavigationGraph(platform: String = "android"): JsonElement
+
   fun listFeatureFlags(): List<FeatureFlagState>
+
   fun setFeatureFlag(key: String, enabled: Boolean, config: JsonObject? = null): FeatureFlagState
 
   fun listPerformanceAuditResults(
@@ -32,15 +34,23 @@ interface AutoMobileClient {
       limit: Int? = null,
       offset: Int? = null,
   ): PerformanceAuditHistoryResult
+
   fun getTestTimings(query: TestTimingQuery = TestTimingQuery()): TestTimingSummary
+
   fun startTestRecording(platform: String = "android"): TestRecordingStartResult
-  fun stopTestRecording(recordingId: String? = null, planName: String? = null): TestRecordingStopResult
+
+  fun stopTestRecording(
+      recordingId: String? = null,
+      planName: String? = null,
+  ): TestRecordingStopResult
+
   fun executePlan(
       planContent: String,
       platform: String = "android",
       startStep: Int? = null,
       sessionUuid: String? = null,
   ): ExecutePlanResult
+
   fun close() {}
 }
 
@@ -133,8 +143,9 @@ internal fun <T> decodeToolResponse(
     serializer: KSerializer<T>,
 ): T {
   val response = json.decodeFromJsonElement(McpToolResponse.serializer(), element)
-  val text = response.content.firstOrNull { it.type == "text" }?.text
-      ?: throw McpConnectionException("Tool response missing text content")
+  val text =
+      response.content.firstOrNull { it.type == "text" }?.text
+          ?: throw McpConnectionException("Tool response missing text content")
   return json.decodeFromString(serializer, text)
 }
 
@@ -143,8 +154,9 @@ internal fun <T> decodeResourceResponse(
     contents: List<McpResourceContent>,
     serializer: KSerializer<T>,
 ): T {
-  val text = contents.firstOrNull { !it.text.isNullOrBlank() }?.text
-      ?: throw McpConnectionException("Resource response missing text content")
+  val text =
+      contents.firstOrNull { !it.text.isNullOrBlank() }?.text
+          ?: throw McpConnectionException("Resource response missing text content")
   val element = json.decodeFromString(JsonElement.serializer(), text)
   val error = (element as? JsonObject)?.get("error")?.jsonPrimitive?.content
   if (!error.isNullOrBlank()) {

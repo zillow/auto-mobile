@@ -8,11 +8,10 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonPrimitive
 
 object ToolResultParser {
-  val json: Json =
-      Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-      }
+  val json: Json = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+  }
 
   fun parseToolResult(stepIndex: Int, toolName: String, jsonString: String): ToolResult {
     val element = json.parseToJsonElement(jsonString)
@@ -21,8 +20,7 @@ object ToolResultParser {
 
   fun parseToolResult(stepIndex: Int, toolName: String, element: JsonElement): ToolResult {
     val objectElement =
-        element as? JsonObject
-            ?: throw SerializationException("Tool result is not a JSON object")
+        element as? JsonObject ?: throw SerializationException("Tool result is not a JSON object")
 
     val success = inferSuccess(objectElement)
     val error = objectElement["error"]?.jsonPrimitive?.content
@@ -40,7 +38,7 @@ object ToolResultParser {
         toolName = toolName,
         success = success,
         response = response,
-        error = error
+        error = error,
     )
   }
 

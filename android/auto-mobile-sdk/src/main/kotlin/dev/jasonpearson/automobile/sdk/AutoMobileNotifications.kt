@@ -37,9 +37,7 @@ enum class NotificationStyle {
 /** Notification action payload. */
 data class NotificationAction(val label: String, val actionId: String)
 
-/**
- * Debug-focused notification helper for AutoMobile tests. Requires app-under-test integration.
- */
+/** Debug-focused notification helper for AutoMobile tests. Requires app-under-test integration. */
 object AutoMobileNotifications {
   private const val TAG = "AutoMobileNotifications"
 
@@ -78,7 +76,10 @@ object AutoMobileNotifications {
   ): Boolean {
     val ctx = context
     if (ctx == null) {
-      Log.w(TAG, "AutoMobileNotifications not initialized; call AutoMobileSDK.initialize() or AutoMobileNotifications.initialize().")
+      Log.w(
+          TAG,
+          "AutoMobileNotifications not initialized; call AutoMobileSDK.initialize() or AutoMobileNotifications.initialize().",
+      )
       return false
     }
 
@@ -208,7 +209,9 @@ object AutoMobileNotifications {
 
     if (trimmed.startsWith("content://")) {
       return try {
-        decodeBitmapFromStream(context.contentResolver.openInputStream(android.net.Uri.parse(trimmed)))
+        decodeBitmapFromStream(
+            context.contentResolver.openInputStream(android.net.Uri.parse(trimmed))
+        )
       } catch (e: Exception) {
         Log.w(TAG, "Failed to open content URI for image", e)
         null
@@ -264,9 +267,11 @@ object AutoMobileNotifications {
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-    val options = BitmapFactory.Options().apply {
-      inSampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, MAX_IMAGE_DIMENSION)
-    }
+    val options =
+        BitmapFactory.Options().apply {
+          inSampleSize =
+              calculateInSampleSize(bounds.outWidth, bounds.outHeight, MAX_IMAGE_DIMENSION)
+        }
 
     val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
     return scaleBitmap(decoded, MAX_IMAGE_DIMENSION)
