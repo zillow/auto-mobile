@@ -251,6 +251,26 @@ final class CommandHandlerTests: XCTestCase {
         XCTAssertEqual(setTextHistory.first?.resourceId, "input_field")
     }
 
+    // MARK: - Device Control Tests
+
+    func testPressHomeSuccess() {
+        let request = WebSocketRequest(
+            type: "request_press_home",
+            requestId: "home-123"
+        )
+
+        let response = commandHandler.handle(request)
+
+        guard let homeResponse = response as? WebSocketResponse else {
+            XCTFail("Expected WebSocketResponse")
+            return
+        }
+
+        XCTAssertEqual(homeResponse.success, true)
+        XCTAssertEqual(homeResponse.type, "press_home_result")
+        XCTAssertEqual(fakeGesturePerformer.getPressHomeCallCount(), 1)
+    }
+
     // MARK: - Unknown Command Tests
 
     func testUnknownCommand() {

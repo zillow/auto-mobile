@@ -2,6 +2,7 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BaseVisualChange, ProgressCallback } from "./BaseVisualChange";
 import { BootedDevice, PressButtonResult } from "../../models";
 import { createGlobalPerformanceTracker } from "../../utils/PerformanceTracker";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 
 export class PressButton extends BaseVisualChange {
   constructor(device: BootedDevice, adb: AdbClient | null = null) {
@@ -93,12 +94,32 @@ export class PressButton extends BaseVisualChange {
    * @returns Result of the button press operation
    */
   private async executeiOSButtonPress(button: string): Promise<PressButtonResult> {
-    const supportedButtons = ["apple_pay", "home", "lock", "side_button", "siri"];
-    if (!supportedButtons.includes(button.toLowerCase())) {
-      throw new Error(`Unsupported iOS button: ${button}. Supported buttons: ${supportedButtons.join(", ")}`);
+    const normalizedButton = button.toLowerCase();
+    if (normalizedButton !== "home") {
+      return {
+        success: false,
+        button,
+        keyCode: -1,
+        error: `Unsupported iOS button: ${button}`
+      };
     }
 
-    // iOS button press is not yet implemented without AxeClient
-    throw new Error("iOS button press is not yet supported");
+    const client = XCTestServiceClient.getInstance(this.device);
+    const result = await client.requestPressHome();
+
+    if (!result.success) {
+      return {
+        success: false,
+        button,
+        keyCode: -1,
+        error: result.error ?? "Failed to press iOS home button"
+      };
+    }
+
+    return {
+      success: true,
+      button,
+      keyCode: -1
+    };
   }
 }

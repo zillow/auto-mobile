@@ -90,7 +90,13 @@ class WebSocketServer(
         null,
     private val onRequestTwoFingerSwipe:
         ((
-            requestId: String?, x1: Int, y1: Int, x2: Int, y2: Int, duration: Long, offset: Int,
+            requestId: String?,
+            x1: Int,
+            y1: Int,
+            x2: Int,
+            y2: Int,
+            duration: Long,
+            offset: Int,
         ) -> Unit)? =
         null,
     private val onRequestDrag:
