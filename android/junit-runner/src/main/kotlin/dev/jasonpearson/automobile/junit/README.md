@@ -257,8 +257,7 @@ class MixedTests {
 
 - Java 11+
 - JUnit 4 or 5
-- AutoMobile MCP server
-- AutoMobile daemon (auto-mobile package via bun/bunx)
+- AutoMobile Daemon (`auto-mobile` command available on PATH)
 - Access to Android devices/emulators
 
 ## Installation
@@ -273,12 +272,12 @@ dependencies {
 
 This artifact is intended for Maven Central distribution. Use the latest release version once published.
 
-Ensure AutoMobile daemon dependencies are available:
+Ensure AutoMobile Daemon is installed:
 
 ```bash
-# Ensure bun is installed; the daemon is launched via bun/bunx.
-# The runner will start the daemon automatically when needed.
+# Install auto-mobile globally
 npm install -g auto-mobile
+# The runner will start the daemon automatically when needed.
 ```
 
 ## Publishing (Maintainers)

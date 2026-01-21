@@ -21,7 +21,7 @@ class RemindersIntegrationBase: AutoMobileTestCase {
             DaemonManager.ensureDaemonRunning()
         }
         guard daemonRunning else {
-            throw XCTSkip("Failed to start AutoMobile daemon. Ensure bun is installed and repo is accessible.")
+            throw XCTSkip("Failed to start AutoMobile Daemon. Ensure auto-mobile is installed and on PATH.")
         }
 
         let refreshResult = PerfTimer.measure("DaemonManager.refreshDevicePool") {
