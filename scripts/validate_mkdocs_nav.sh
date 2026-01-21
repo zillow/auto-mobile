@@ -83,7 +83,7 @@ list_actual_files() {
 get_copied_files() {
     cat <<EOF
 changelog.md
-contributing/index.md
+contributing.md
 EOF
 }
 
