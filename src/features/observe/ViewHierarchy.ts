@@ -353,7 +353,7 @@ export class ViewHierarchy {
   ): Promise<ViewHierarchyResult> {
     switch (this.device.platform) {
       case "ios":
-        return this.getiOSViewHierarchy(perf);
+        return this.getiOSViewHierarchy(perf, skipWaitForFresh, minTimestamp);
       case "android":
         return this.getAndroidViewHierarchy(queryOptions, perf, skipWaitForFresh, minTimestamp, signal);
       default:
@@ -364,27 +364,41 @@ export class ViewHierarchy {
   /**
    * Retrieve the view hierarchy of the current screen
    * @param perf - Performance tracker for timing data
+   * @param skipWaitForFresh - If true, skip waiting for fresh data and use cache if available
+   * @param minTimestamp - If provided, cached data must have updatedAt >= this value
    * @returns Promise with parsed XML view hierarchy
    */
   async getiOSViewHierarchy(
-    perf: PerformanceTracker = new NoOpPerformanceTracker()
+    perf: PerformanceTracker = new NoOpPerformanceTracker(),
+    skipWaitForFresh: boolean = false,
+    minTimestamp: number = 0
   ): Promise<ViewHierarchyResult> {
     const startTime = Date.now();
-    logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy for iOS`);
+    logger.info(`[VIEW_HIERARCHY] Starting getViewHierarchy for iOS (skipWaitForFresh=${skipWaitForFresh}, minTimestamp=${minTimestamp})`);
 
     perf.serial("ios_viewHierarchy");
 
     const xcTestClient = XCTestServiceClient.getInstance(this.device);
     const viewHierarchy = await perf.track("xcTestService", async () => {
-      const result = await xcTestClient.getAccessibilityHierarchy();
-      if (!result) {
+      // Use getLatestHierarchy which properly handles skipWaitForFresh and minTimestamp
+      const result = await xcTestClient.getLatestHierarchy(
+        !skipWaitForFresh, // waitForFresh = opposite of skipWaitForFresh
+        15000,             // timeout
+        perf,
+        skipWaitForFresh,
+        minTimestamp
+      );
+
+      if (!result || !result.hierarchy) {
         return {
           hierarchy: {
             error: "Failed to retrieve iOS view hierarchy from XCTestService"
           }
         } as unknown as ViewHierarchyResult;
       }
-      return result;
+
+      // Convert XCTestHierarchy to ViewHierarchyResult format
+      return this.convertXCTestHierarchy(result.hierarchy, result.updatedAt);
     });
 
     perf.end();
@@ -392,6 +406,16 @@ export class ViewHierarchy {
     const duration = Date.now() - startTime;
     logger.info(`[VIEW_HIERARCHY] Successfully retrieved hierarchy from XCTestService in ${duration}ms`);
     return viewHierarchy;
+  }
+
+  /**
+   * Convert XCTestHierarchy to ViewHierarchyResult format
+   */
+  private convertXCTestHierarchy(hierarchy: any, updatedAt?: number): ViewHierarchyResult {
+    return {
+      ...hierarchy,
+      updatedAt: updatedAt ?? hierarchy.updatedAt ?? Date.now()
+    };
   }
 
   /**

@@ -92,7 +92,7 @@ export async function createToolExecutionContext(
 
   if (!existingSession) {
     if (session.platform === "android") {
-      await ensureAccessibilityServiceReady(session.assignedDevice, sessionUuid);
+      await ensureAccessibilityServiceReady(session.assignedDevice, sessionUuid, session.platform);
     }
 
     // Start test coverage session for navigation graph tracking
@@ -113,10 +113,10 @@ export async function createToolExecutionContext(
   };
 }
 
-async function ensureAccessibilityServiceReady(deviceId: string, sessionId: string): Promise<void> {
+async function ensureAccessibilityServiceReady(deviceId: string, sessionId: string, platform: Platform): Promise<void> {
   const device: BootedDevice = {
     name: deviceId,
-    platform: "android",
+    platform,
     deviceId
   };
   logger.info(`[ToolExecutionContext] Ensuring accessibility service is ready for session ${sessionId}`);
@@ -169,7 +169,7 @@ async function ensureKeepScreenAwake(
   const keepScreenAwake = sessionOptions.keepScreenAwake !== false;
   const device: BootedDevice = {
     name: session.assignedDevice,
-    platform: "android",
+    platform: session.platform,
     deviceId: session.assignedDevice
   };
   const manager = new KeepScreenAwakeManager(device);

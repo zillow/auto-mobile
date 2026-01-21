@@ -121,12 +121,14 @@ public class CommandHandler: CommandHandling {
         perfProvider.serial("handleRequestHierarchy")
         defer { perfProvider.end() }
 
-        let hierarchy = perfProvider.track("extraction") {
-            try? elementLocator.getViewHierarchy()
-        }
-
-        guard let hierarchy = hierarchy else {
-            throw CommandError.executionFailed("Failed to get view hierarchy")
+        let hierarchy: ViewHierarchy
+        do {
+            hierarchy = try perfProvider.track("extraction") {
+                try elementLocator.getViewHierarchy()
+            }
+        } catch {
+            print("[CommandHandler] Hierarchy extraction failed: \(error)")
+            throw CommandError.executionFailed("Failed to get view hierarchy: \(error.localizedDescription)")
         }
 
         // Get accumulated timing for this operation

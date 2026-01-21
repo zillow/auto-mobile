@@ -237,10 +237,10 @@ const migrateStepFields = (
       recordWarning(warnings, "Defaulted tapOn.action to tap.", stepIndex);
       changed = true;
     }
-    if (mergedParams.id === undefined && typeof mergedParams.elementId === "string") {
-      mergedParams.id = mergedParams.elementId;
-      delete mergedParams.elementId;
-      recordWarning(warnings, "Renamed elementId to id for tapOn.", stepIndex);
+    if (mergedParams.elementId === undefined && typeof mergedParams.id === "string") {
+      mergedParams.elementId = mergedParams.id;
+      delete mergedParams.id;
+      recordWarning(warnings, "Renamed id to elementId for tapOn.", stepIndex);
       changed = true;
     }
   }

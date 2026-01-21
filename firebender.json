@@ -31,7 +31,9 @@
       "command": "npx",
       "args": [
         "-y",
-        "auto-mobile"
+        "@kaeawc/auto-mobile@latest",
+        "--debug",
+        "--debug-perf"
       ]
     }
   }

@@ -121,7 +121,7 @@ export class PredictionAnalyzer {
   private matchesTapOn(prediction: PredictedAction, toolArgs: Record<string, any>): boolean {
     const target = prediction.target;
     const argText = normalizeIdentifier(toolArgs.text);
-    const argId = normalizeIdentifier(toolArgs.id ?? toolArgs.elementId);
+    const argId = normalizeIdentifier(toolArgs.elementId ?? toolArgs.id);
     const targetText = normalizeIdentifier(target.text);
     const targetId = normalizeIdentifier(target.elementId);
     const targetDesc = normalizeIdentifier(target.contentDesc);

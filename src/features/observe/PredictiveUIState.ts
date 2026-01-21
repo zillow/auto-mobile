@@ -183,9 +183,10 @@ export class PredictiveUIState {
     }
 
     const hasTextMatch = this.matchesText(args.text, interactable);
-    const hasIdMatch = this.matchesResourceId(args.id, interactable);
+    const elementId = args.elementId ?? args.id;
+    const hasIdMatch = this.matchesResourceId(elementId, interactable);
 
-    return (args.text && hasTextMatch) || (args.id && hasIdMatch);
+    return (args.text && hasTextMatch) || (elementId && hasIdMatch);
   }
 
   private matchesSwipeOn(
@@ -245,7 +246,7 @@ export class PredictiveUIState {
 
     if (toolName === "tapOn") {
       const text = args?.text ?? interactable.text;
-      const elementId = args?.id ?? interactable.resourceId;
+      const elementId = args?.elementId ?? args?.id ?? interactable.resourceId;
       const contentDesc = interactable.contentDesc;
 
       if (!text && !elementId && !contentDesc) {
