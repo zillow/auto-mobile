@@ -32,6 +32,7 @@ accept = [
     "200..=299",  # 2xx success
     "403",        # Forbidden (auth-protected URLs like console.anthropic.com)
     "429",        # Too Many Requests (common for rate-limited APIs)
+    "503",        # Service Unavailable (temporary for Anthropic URLs under load)
 ]
 
 # Timeout for each request in seconds
