@@ -109,4 +109,4 @@ For MCP client configuration:
 | **STDIO** (default) | Workstations, CI automation |
 | **Streamable HTTP** | Hot reload development, HTTP-only clients |
 
-See [installation](../../install/index.md) for detailed configuration options.
+See [installation](../../install.md) for detailed configuration options.

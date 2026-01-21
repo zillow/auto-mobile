@@ -81,9 +81,9 @@ replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - swipeOn (MCP)${RESET
 add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Found Product 80${RESET}"
 
 echo ""
-add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_80_action\")${RESET}"
-call_mcp_tool "tapOn" --action "tap" --selector '{"id": "performance_item_80_action"}' --platform "android"
-replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", id: \"performance_item_80_action\")${RESET}"
+add_line "${BOLD}● auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", elementId: \"performance_item_80_action\")${RESET}"
+call_mcp_tool "tapOn" --action "tap" --id "performance_item_80_action" --platform "android"
+replace_prev_line "${GREEN}●${RESET}${BOLD} auto-mobile - tapOn (MCP)${RESET}${GRAY} (action: \"tap\", elementId: \"performance_item_80_action\")${RESET}"
 add_line "${GRAY}  └  ${GREEN}✓${RESET}${GRAY} Navigated to Product 80 detail${RESET}"
 
 # Step 12: Terminate app

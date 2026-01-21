@@ -55,7 +55,7 @@ underlying system tooling differs.
 
 - macOS 13.0+ (Ventura or newer).
 - Xcode 15.0+ and Command Line Tools.
-- Bun or Node.js for the MCP server - see [requirements](../../../install/index.md#requirements).
+- Bun or Node.js for the MCP server - see [requirements](../../../install.md#requirements).
 
 ## Limitations
 
