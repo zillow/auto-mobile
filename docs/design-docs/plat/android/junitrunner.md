@@ -13,7 +13,7 @@ This artifact is intended for Maven Central distribution. Use the latest release
 
 For local development or testing unpublished changes, publish to your mavenLocal (`~/.m2`) via:
 
-```
+```bash
 cd android
 ./gradlew :junit-runner:publishToMavenLocal
 ```
@@ -55,7 +55,7 @@ automatically adapt and recover from common failure scenarios by leveraging AI-d
 Multi-device support with emulator control and app lifecycle management. As long as you have available adb connections,
 AutoMobile can automatically track which one its using for which execution plan or MCP session. CI still needs available
 device connections, but AutoMobile handles selection and readiness checks. During STDIO MCP sessions,
-🔧 [`setActiveDevice`](../../mcp/tools/index.md) is set once and reused for the session.
+🔧 [`setActiveDevice`](../../mcp/tools.md) is set once and reused for the session.
 
 ## Historical Timing Data
 
@@ -134,7 +134,7 @@ android {
    `signingInMemoryKeyPassword`, or the `signing.*` Gradle properties).
 4. From `android/`, run:
 
-```
+```bash
 ./gradlew :junit-runner:publishToMavenCentral
 ```
 

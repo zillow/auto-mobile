@@ -83,7 +83,7 @@ list_actual_files() {
 get_copied_files() {
     cat <<EOF
 changelog.md
-contributing/index.md
+contributing.md
 EOF
 }
 
@@ -96,11 +96,17 @@ ai/mcp-tools.md
 ai/vision-fallback-design.md
 ai/vision-model-research.md
 origin.md
-contributing/overview.md
 design-docs/mcp/system-design.md
 design-docs/mcp/vision-fallback.md
 design-docs/plat/android/docker.md
 using/perf-analysis.md
+EOF
+}
+
+# Files where "TODO" appears in prose (not action items) and should be ignored
+get_todo_ignore_files() {
+    cat <<EOF
+contributing.md
 EOF
 }
 
@@ -200,9 +206,16 @@ fi
 # Check for files containing TODO markers
 print_status "Checking for TODO markers in documentation..."
 TODO_FILES=$(mktemp)
+TODO_IGNORE_FILES=$(mktemp)
+get_todo_ignore_files > "$TODO_IGNORE_FILES"
 while IFS= read -r file; do
     # Skip excluded files
     if grep -Fxq "$file" "$EXCLUDED_FILES"; then
+        continue
+    fi
+
+    # Skip files where TODO appears in prose (not action items)
+    if grep -Fxq "$file" "$TODO_IGNORE_FILES"; then
         continue
     fi
 
@@ -252,7 +265,7 @@ fi
 
 # Clean up temp files
 rm -f "$REFERENCED_FILES" "$ACTUAL_FILES" "$COPIED_FILES" "$EXCLUDED_FILES" \
-      "$MISSING_FILES" "$ORPHANED_FILES" "$DUPLICATES" "$TODO_FILES" "$EMPTY_FILES"
+      "$MISSING_FILES" "$ORPHANED_FILES" "$DUPLICATES" "$TODO_FILES" "$TODO_IGNORE_FILES" "$EMPTY_FILES"
 
 # Final status
 if [[ $HAS_ERRORS -eq 0 ]]; then

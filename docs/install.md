@@ -6,8 +6,7 @@ You can use our interactive installer to step through all host platform requirem
 curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/install.sh | bash
 ```
 
-??? example "See demo: Install"
-    ![Install Demo](img/install.gif)
+![Install Demo](img/install.gif)
 
 Once you've finished that, learn [how to use AutoMobile](using/ux-exploration.md)
 
@@ -21,17 +20,3 @@ curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/uni
 
 ??? example "See demo: Uninstall"
     ![Uninstall Demo](img/uninstall.gif)
-
-This will interactively guide you through removing:
-
-- MCP configurations from AI agents (Claude Desktop, Cursor, VS Code, etc.)
-- Claude Marketplace plugin
-- AutoMobile CLI
-- MCP daemon
-- AutoMobile data directory
-
-Use `--all` flag to remove everything non-interactively:
-
-``` bash
-curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/uninstall.sh | bash -s -- --all
-```

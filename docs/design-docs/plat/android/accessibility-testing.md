@@ -7,7 +7,7 @@ AccessibilityService, with optional deeper checks via ATF.
 
 ## Proposed MCP tool
 
-```
+```typescript
 runA11yChecks({
   scope: "visible" | "screen",
   includeContrast: boolean,

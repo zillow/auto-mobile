@@ -74,7 +74,7 @@ bun scripts/validate-yaml.ts "test/resources/**/*.yaml"
 ### Example Output
 
 **Success:**
-```
+```text
 AutoMobile Test Plan YAML Validation
 ====================================
 
@@ -94,7 +94,7 @@ Invalid files: 0
 ```
 
 **Failure:**
-```
+```text
 ✗ test/resources/test-plans/my-plan.yaml
   root: Missing required property 'name'
   steps[0].tool: Must be one of: observe, tapOn, swipeOn, launchApp, ...
@@ -334,7 +334,7 @@ if (!result.valid) {
 
 Validation is automatic in `AutoMobilePlanExecutor.loadAndProcessPlan()`. If validation fails, you'll get an `IllegalArgumentException`:
 
-```
+```text
 java.lang.IllegalArgumentException: Plan YAML validation failed:
 steps[0].tool: Missing required property 'tool' (line 5)
 steps[2]: Unknown property 'invalidField'. This might be a legacy field - check the migration guide.
@@ -347,7 +347,7 @@ Check schemas/test-plan.schema.json for details.
 
 Validation is automatic when using the `executePlan` MCP tool. If a plan fails validation, you'll receive an `ActionableError` with details:
 
-```
+```text
 Plan YAML validation failed:
 steps[0].tool: Must be one of: observe, tapOn, swipeOn, ... (line 5)
 steps[2]: Missing required property 'tool' (line 12)
@@ -361,7 +361,7 @@ Check the schema at schemas/test-plan.schema.json for details.
 ### "Unknown property" errors for valid parameters
 
 If you see errors like:
-```
+```text
 steps[0]: Unknown property 'auditType'. This might be a legacy field - check the migration guide.
 ```
 
@@ -370,7 +370,7 @@ This means the property should be inside the `params` object or is a tool-specif
 ### "Must be one of" tool name errors
 
 If you see:
-```
+```text
 steps[0].tool: Must be one of: observe, tapOn, swipeOn, ...
 ```
 
@@ -382,7 +382,7 @@ The tool name is not recognized. Check:
 ### YAML parsing errors
 
 If you see:
-```
+```yaml
 root: YAML parsing failed: bad indentation of a mapping entry at line 10, column 3
 ```
 

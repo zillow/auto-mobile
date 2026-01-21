@@ -77,7 +77,7 @@ final class LoginFlowTests: AutoMobileTestCase {
     _ = try executePlan()
   }
 }
-```
+```yaml
 
 ## Timing data
 
@@ -92,7 +92,7 @@ Local:
 ```bash
 AUTOMOBILE_TEST_PLAN=Plans/launch-reminders-app.yaml \
 swift test --filter RemindersLaunchPlanTests
-```
+```yaml
 
 CI:
 ```bash
@@ -105,4 +105,4 @@ xcodebuild test -scheme XCTestRunner -destination 'platform=iOS Simulator,name=i
 ## See also
 
 - [MCP test timings](../../mcp/daemon/index.md)
-- [iOS automation server](accessibility-service.md)
+- [iOS automation server](xctestservice.md)

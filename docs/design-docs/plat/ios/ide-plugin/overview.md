@@ -61,4 +61,4 @@ The companion app selects an MCP transport in this order:
 ## See also
 
 - [Test recording](test-recording.md)
-- [iOS automation server](../accessibility-service.md)
+- [iOS automation server](../xctestservice.md)

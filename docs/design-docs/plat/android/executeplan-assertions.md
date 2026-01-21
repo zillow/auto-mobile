@@ -7,7 +7,7 @@ behavior by default and idling support from accessibility events.
 
 ## Proposed YAML extensions
 
-```
+```text
 - await:
     lookFor:
       text: "Logged in"

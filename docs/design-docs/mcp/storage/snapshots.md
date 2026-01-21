@@ -105,7 +105,7 @@ List archived device snapshots.
   "totalSizeBytes": 47448064,
   "maxArchiveSizeMb": 100
 }
-```
+```bash
 
 ## Configuration
 
@@ -193,7 +193,7 @@ Device snapshot defaults can be read or updated via the Unix socket at `~/.auto-
 
 Snapshot payloads are stored in `~/.automobile/snapshots/` (ADB snapshots), and metadata is tracked in SQLite at `~/.auto-mobile/auto-mobile.db`:
 
-```
+```text
 ~/.automobile/snapshots/
 ├── Pixel_5_2026-01-08_12-30-45/
 │   ├── settings.json          # Device settings (ADB snapshots only)
@@ -208,7 +208,7 @@ VM snapshots themselves are stored in the emulator AVD directory and persist acr
 
 iOS app container backups are stored per simulator device ID:
 
-```
+```text
 ~/.automobile/snapshots/ios/
 └── <device-udid>/
     └── <snapshot-name>/
@@ -284,7 +284,7 @@ await deviceSnapshot({ action: "capture", snapshotName: "v1.1-baseline" });
 // Compare manifests programmatically
 const v1 = await loadManifest("v1.0-baseline");
 const v2 = await loadManifest("v1.1-baseline");
-```
+```bash
 
 ## App Data Backup Details
 

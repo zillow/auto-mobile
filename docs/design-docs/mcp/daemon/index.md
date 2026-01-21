@@ -37,7 +37,7 @@ stateDiagram-v2
 ## Socket Communication
 
 The daemon listens on a Unix socket at:
-```
+```typescript
 /tmp/auto-mobile-daemon-<uid>.sock
 ```
 

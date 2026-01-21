@@ -38,7 +38,7 @@ This process has been [benchmarked to take at most 1ms](performance.md) and it i
 
 ### Navigate to Screen
 
-The 🗺️ [`navigateTo`](../tools/index.md) tool uses the graph to find paths:
+The 🗺️ [`navigateTo`](../tools.md) tool uses the graph to find paths:
 
 1. Finds target screen in graph
 2. Calculates shortest path from current node to the target
@@ -47,7 +47,7 @@ The 🗺️ [`navigateTo`](../tools/index.md) tool uses the graph to find paths:
 
 ### Explore Efficiently
 
-The 🔍 [`explore`](../tools/index.md) tool uses the graph to:
+The 🔍 [`explore`](../tools.md) tool uses the graph to:
 
 - Avoid revisiting known screens
 - Prioritize unexplored branches

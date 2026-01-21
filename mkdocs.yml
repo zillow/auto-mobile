@@ -67,6 +67,7 @@ markdown_extensions:
       alternate_style: true
   - tables
   - admonition
+  - pymdownx.details
   - attr_list
   - md_in_html
 
@@ -78,17 +79,16 @@ nav:
       - 'Reproducing Bugs': using/reproducting-bugs.md
       - 'UI Tests': using/ui-tests.md
       - 'Performance Analysis':
+          - 'Overview': using/perf-analysis/index.md
           - 'Startup': using/perf-analysis/startup.md
           - 'Screen Transition': using/perf-analysis/screen-transition.md
           - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
-      - 'Accessibility':
-          - 'Contrast': using/a11y/contrast.md
-          - 'Tap Targets': using/a11y/tap-targets.md
+      - 'Accessibility': using/a11y.md
   - 'Design Docs':
       - 'Overview': design-docs/index.md
       - 'MCP':
           - 'Overview': design-docs/mcp/index.md
-          - 'Tools': design-docs/mcp/tools/index.md
+          - 'Tools': design-docs/mcp/tools.md
           - 'Observe':
              - 'Overview': design-docs/mcp/observe/index.md
              - 'Appearance Sync': design-docs/mcp/observe/appearance.md
@@ -144,7 +144,7 @@ nav:
               - 'TalkBack simulation': design-docs/plat/android/talkback.md
           - 'iOS':
             - 'Overview': design-docs/plat/ios/index.md
-            - 'Accessibility Bridge': design-docs/plat/ios/accessibility-service.md
+            - 'XCTest Service': design-docs/plat/ios/xctestservice.md
             - 'simctl Integration': design-docs/plat/ios/simctl.md
             - 'Managed App Configuration': design-docs/plat/ios/managed-app-config.md
             - 'Managed Apple IDs': design-docs/plat/ios/managed-apple-ids.md
@@ -152,12 +152,8 @@ nav:
             - 'Xcode Integration':
               - 'Overview': design-docs/plat/ios/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/ios/ide-plugin/test-recording.md
-  - 'Contributing':
-      - 'Overview': contributing/overview.md
-      - 'How': contributing/index.md
-      - 'Local Development': contributing/local-development.md
-      - 'iOS Signing': contributing/ios-signing.md
-      - 'npm Publishing': contributing/publishing.md
-      - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
+              - 'Feature Flags': design-docs/plat/ios/ide-plugin/feature-flags.md
+  - 'Contributing': contributing.md
+  - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md
   - 'Change Log': changelog.md

@@ -140,7 +140,7 @@ export type ToggleCapabilities = {
   apiLevel: number | null;
   reason?: string;
 };
-```
+```typescript
 
 ### `canUseSettingsToggle(): Promise<boolean>`
 

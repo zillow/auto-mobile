@@ -7,7 +7,7 @@ notification by text.
 
 ## Proposed MCP tool
 
-```
+```typescript
 systemTray({
   action: "open" | "find" | "tap" | "dismiss" | "clearAll",
   notification?: {

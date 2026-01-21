@@ -56,7 +56,7 @@ const tapTool = new TapOnElement(
 ### Example Scenarios
 
 **Element Text Changed**:
-```
+```yaml
 Input: tapOn({ text: "Login" })
 
 Traditional Error:
@@ -69,7 +69,7 @@ Element not found. AI suggests trying:
 ```
 
 **Element Requires Navigation**:
-```
+```yaml
 Input: tapOn({ text: "Advanced Settings" })
 
 With Vision Fallback:
@@ -80,7 +80,7 @@ Element not found, but AI suggests these steps:
 ```
 
 **Element Doesn't Exist**:
-```
+```yaml
 Input: tapOn({ text: "Nonexistent Button" })
 
 With Vision Fallback:
@@ -215,5 +215,5 @@ Planned improvements:
 
 ## See Also
 
-- [MCP tool reference](../tools/index.md) - Tool implementation details
+- [MCP tool reference](../tools.md) - Tool implementation details
 - [Feature Flags](../feature-flags.md) - Runtime configuration

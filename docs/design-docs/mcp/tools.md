@@ -2,7 +2,7 @@
 
 #### Observe
 
-Almost all other tool calls have built-in observation via the [interaction loop](../interaction-loop.md), but we also have a standalone [observe](../observe/index.md) tool that specifically performs just that action to get the AI agent up to speed.
+Almost all other tool calls have built-in observation via the [interaction loop](interaction-loop.md), but we also have a standalone [observe](observe/index.md) tool that specifically performs just that action to get the AI agent up to speed.
 
 #### Interactions
 
@@ -37,7 +37,7 @@ Almost all other tool calls have built-in observation via the [interaction loop]
 #### Navigation & Exploration
 
 - 🗺️ `navigateTo` navigates to a specific screen using learned paths from the navigation graph.
-- 🔍 [`explore`](../nav/explore.md) automatically explores the app and builds the navigation graph by intelligently selecting and interacting with UI elements.
+- 🔍 [`explore`](nav/explore.md) automatically explores the app and builds the navigation graph by intelligently selecting and interacting with UI elements.
 - 📊 `getNavigationGraph` retrieves the current navigation graph for debugging and analysis.
 
 #### Advanced Device Management

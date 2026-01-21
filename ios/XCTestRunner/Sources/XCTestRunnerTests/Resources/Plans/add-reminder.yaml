@@ -9,8 +9,7 @@ steps:
 
   - tool: observe
     waitFor:
-      element:
-        text: "Reminders"
+      text: "Reminders"
       timeout: 20000
     label: Wait for Reminders UI
 

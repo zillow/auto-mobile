@@ -63,7 +63,7 @@ echo "Converting to GIF..."
 # Reduced cols and increased font-size for a more square, readable output
 agg "$CAST_FILE" "$GIF_OUTPUT" \
   --cols 100 \
-  --rows 48 \
+  --rows 34 \
   --font-size 24 \
   --theme dracula \
   --font-family "Menlo" \

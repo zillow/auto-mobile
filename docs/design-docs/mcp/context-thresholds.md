@@ -60,7 +60,7 @@ The configuration file (`scripts/context-thresholds.json`) has the following str
 
 ### Terminal Output
 
-```
+```text
 ================================================================================
 MCP CONTEXT THRESHOLD BENCHMARK REPORT
 ================================================================================

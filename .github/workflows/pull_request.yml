@@ -344,10 +344,10 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
-      - name: "Create contributing index file"
+      - name: "Create contributing file"
         shell: "bash"
         run: |
-          touch docs/contributing/index.md
+          touch docs/contributing.md
 
       - name: "Install Lychee"
         shell: "bash"

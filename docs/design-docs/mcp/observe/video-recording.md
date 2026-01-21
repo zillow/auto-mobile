@@ -67,7 +67,7 @@ Recording metadata now includes `highlights` entries with appearance/disappearan
 
 Introduce a `VideoRecorderService` with a pluggable backend interface:
 
-```
+```kotlin
 interface VideoCaptureBackend {
   start(config): Promise<RecordingHandle>;
   stop(handle): Promise<RecordingResult>;
