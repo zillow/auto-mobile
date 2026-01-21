@@ -8,6 +8,7 @@ import {
   XCTestSetTextResult,
   XCTestImeActionResult,
   XCTestSelectAllResult,
+  XCTestPressHomeResult,
   XCTestHierarchyResponse,
   IOSPerfTiming,
   XCTestHierarchy
@@ -83,6 +84,7 @@ export class FakeXCTestService implements XCTestService {
 
   private screenshotRequestCount: number = 0;
   private hierarchyRequestCount: number = 0;
+  private pressHomeRequestCount: number = 0;
   private dragResult: XCTestDragResult | null = null;
   private pinchResult: XCTestPinchResult | null = null;
   private tapResult: XCTestTapResult | null = null;
@@ -192,6 +194,13 @@ export class FakeXCTestService implements XCTestService {
     duration: number;
   }> {
     return [...this.swipeHistory];
+  }
+
+  /**
+   * Get the number of press home requests
+   */
+  getPressHomeRequestCount(): number {
+    return this.pressHomeRequestCount;
   }
 
   /**
@@ -575,6 +584,21 @@ export class FakeXCTestService implements XCTestService {
   ): Promise<XCTestSelectAllResult> {
     await this.applyDelay("selectAll");
     this.checkFailure("selectAll");
+
+    return {
+      success: true,
+      totalTimeMs: 100,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestPressHome(
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestPressHomeResult> {
+    this.pressHomeRequestCount++;
+    await this.applyDelay("pressHome");
+    this.checkFailure("pressHome");
 
     return {
       success: true,

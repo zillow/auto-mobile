@@ -74,6 +74,9 @@ public class CommandHandler: CommandHandling {
             case RequestType.requestSelectAll.rawValue:
                 return try handleSelectAll(request, startTime: startTime)
 
+            case RequestType.requestPressHome.rawValue:
+                return try handlePressHome(request, startTime: startTime)
+
             // Action commands
             case RequestType.requestAction.rawValue:
                 return try handleAction(request, startTime: startTime)
@@ -294,6 +297,16 @@ public class CommandHandler: CommandHandling {
         )
     }
 
+    private func handlePressHome(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
+        try gesturePerformer.pressHome()
+
+        return WebSocketResponse.success(
+            type: ResponseType.pressHomeResult.rawValue,
+            requestId: request.requestId,
+            totalTimeMs: totalTimeMs(from: startTime)
+        )
+    }
+
     // MARK: - Actions
 
     private func handleAction(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
@@ -382,6 +395,8 @@ public class CommandHandler: CommandHandling {
             return ResponseType.imeActionResult.rawValue
         case RequestType.requestSelectAll.rawValue:
             return ResponseType.selectAllResult.rawValue
+        case RequestType.requestPressHome.rawValue:
+            return ResponseType.pressHomeResult.rawValue
         case RequestType.requestAction.rawValue:
             return ResponseType.actionResult.rawValue
         case RequestType.requestClipboard.rawValue:

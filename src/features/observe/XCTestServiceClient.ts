@@ -175,6 +175,16 @@ export interface XCTestSelectAllResult {
 }
 
 /**
+ * Interface for press home result from XCTestService
+ */
+export interface XCTestPressHomeResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: XCTestPerfTiming;
+}
+
+/**
  * Interface for action result from XCTestService
  */
 export interface XCTestActionResult {
@@ -298,6 +308,11 @@ export interface XCTestService {
     timeoutMs?: number,
     perf?: PerformanceTracker
   ): Promise<XCTestSelectAllResult>;
+
+  requestPressHome(
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<XCTestPressHomeResult>;
 
   requestScreenshot(
     timeoutMs?: number,
@@ -574,6 +589,7 @@ export class XCTestServiceClient implements XCTestService {
         case "pinch_result":
         case "set_text_result":
         case "select_all_result":
+        case "press_home_result":
           result = {
             success: message.success ?? true,
             totalTimeMs: message.totalTimeMs ?? 0,
@@ -1445,6 +1461,35 @@ export class XCTestServiceClient implements XCTestService {
 
     const message = {
       type: "request_select_all",
+      requestId
+    };
+
+    this.ws?.send(JSON.stringify(message));
+    return promise;
+  }
+
+  public async requestPressHome(
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestPressHomeResult> {
+    if (!await this.ensureConnected(perf)) {
+      return { success: false, totalTimeMs: 0, error: "Not connected" };
+    }
+
+    const requestId = this.requestManager.generateId("pressHome");
+    const promise = this.requestManager.register<XCTestPressHomeResult>(
+      requestId,
+      "press_home",
+      timeoutMs,
+      (id, type, timeout) => ({
+        success: false,
+        totalTimeMs: timeout,
+        error: `Press home timed out after ${timeout}ms`
+      })
+    );
+
+    const message = {
+      type: "request_press_home",
       requestId
     };
 

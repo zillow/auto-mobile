@@ -1,10 +1,12 @@
-import { expect, describe, test, beforeEach } from "bun:test";
+import { expect, describe, test, beforeEach, spyOn } from "bun:test";
 import { HomeScreen } from "../../../src/features/action/HomeScreen";
-import { ObserveResult } from "../../../src/models";
+import { BootedDevice, ObserveResult } from "../../../src/models";
+import { XCTestServiceClient } from "../../../src/features/observe/XCTestServiceClient";
 import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeWindow } from "../../fakes/FakeWindow";
 import { FakeAwaitIdle } from "../../fakes/FakeAwaitIdle";
+import { FakeXCTestService } from "../../fakes/FakeXCTestService";
 
 
 // Helper function to create mock ObserveResult
@@ -19,6 +21,7 @@ const createObserveResult = (): ObserveResult => ({
 
 describe("HomeScreen", () => {
   let homeScreen: HomeScreen;
+  let mockDevice: BootedDevice;
   let fakeAdb: FakeAdbExecutor;
   let fakeObserveScreen: FakeObserveScreen;
   let fakeWindow: FakeWindow;
@@ -39,7 +42,12 @@ describe("HomeScreen", () => {
     // We need to set different results to simulate screen change
     fakeObserveScreen.setObserveResult(() => createObserveResult());
 
-    homeScreen = new HomeScreen("test-device", fakeAdb);
+    mockDevice = {
+      name: "Test Device",
+      platform: "android",
+      deviceId: "test-device"
+    };
+    homeScreen = new HomeScreen(mockDevice, fakeAdb);
 
     // Replace the internal managers with our fakes
     (homeScreen as any).observeScreen = fakeObserveScreen;
@@ -82,6 +90,31 @@ describe("HomeScreen", () => {
       expect(result.observation).toBeDefined();
       expect(result.observation?.screenSize).toBeDefined();
     });
+
+    test("should use XCTestService press home on iOS", async () => {
+      const iosDevice: BootedDevice = {
+        name: "iPhone 15",
+        platform: "ios",
+        deviceId: "ios-device"
+      };
+      const iosHomeScreen = new HomeScreen(iosDevice, fakeAdb);
+      (iosHomeScreen as any).observeScreen = fakeObserveScreen;
+      (iosHomeScreen as any).window = fakeWindow;
+      (iosHomeScreen as any).awaitIdle = fakeAwaitIdle;
+
+      const fakeXCTestService = new FakeXCTestService();
+      const getInstanceSpy = spyOn(XCTestServiceClient, "getInstance").mockReturnValue(
+        fakeXCTestService as any
+      );
+
+      try {
+        const result = await iosHomeScreen.execute();
+        expect(result.success).toBe(true);
+        expect(fakeXCTestService.getPressHomeRequestCount()).toBe(1);
+      } finally {
+        getInstanceSpy.mockRestore();
+      }
+    });
   });
 
   describe("error handling", () => {
@@ -99,7 +132,12 @@ describe("HomeScreen", () => {
 
   describe("multiple devices", () => {
     test("should work with different device IDs", async () => {
-      const homeScreen2 = new HomeScreen("device-2", fakeAdb);
+      const otherDevice: BootedDevice = {
+        name: "Device 2",
+        platform: "android",
+        deviceId: "device-2"
+      };
+      const homeScreen2 = new HomeScreen(otherDevice, fakeAdb);
 
       // Set up fakes for the second HomeScreen instance
       const fakeWindow2 = new FakeWindow();

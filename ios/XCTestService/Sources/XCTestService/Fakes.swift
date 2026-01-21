@@ -140,6 +140,7 @@ public class FakeGesturePerformer: GesturePerforming {
     private var imeActionHistory: [String] = []
     private var actionHistory: [(action: String, resourceId: String?)] = []
     private var screenshotCallCount = 0
+    private var pressHomeCallCount = 0
     private var appLaunchHistory: [String] = []
     private var appTerminateHistory: [String] = []
 
@@ -170,6 +171,7 @@ public class FakeGesturePerformer: GesturePerforming {
     public func getImeActionHistory() -> [String] { imeActionHistory }
     public func getActionHistory() -> [(action: String, resourceId: String?)] { actionHistory }
     public func getScreenshotCallCount() -> Int { screenshotCallCount }
+    public func getPressHomeCallCount() -> Int { pressHomeCallCount }
     public func getAppLaunchHistory() -> [String] { appLaunchHistory }
     public func getAppTerminateHistory() -> [String] { appTerminateHistory }
 
@@ -186,6 +188,7 @@ public class FakeGesturePerformer: GesturePerforming {
         imeActionHistory.removeAll()
         actionHistory.removeAll()
         screenshotCallCount = 0
+        pressHomeCallCount = 0
         appLaunchHistory.removeAll()
         appTerminateHistory.removeAll()
     }
@@ -294,6 +297,7 @@ public class FakeGesturePerformer: GesturePerforming {
 
     public func pressHome() throws {
         try checkFailure("pressHome")
+        pressHomeCallCount += 1
     }
 
     public func launchApp(bundleId: String) throws {
