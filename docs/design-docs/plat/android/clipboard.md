@@ -7,7 +7,7 @@ best-effort support on devices.
 
 ## Proposed MCP tool
 
-```
+```typescript
 clipboard({
   action: "copy" | "paste" | "clear" | "get",
   text?: string

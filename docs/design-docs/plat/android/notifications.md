@@ -7,7 +7,7 @@ rich content (title, body, big text, big image, actions).
 
 ## Proposed MCP tool
 
-```
+```typescript
 postNotification({
   title: string,
   body: string,
@@ -25,7 +25,7 @@ request and posts a notification from the target app process.
 
 Suggested SDK entrypoint (app side):
 
-```
+```kotlin
 AutoMobileNotifications.post(
   title,
   body,

@@ -17,7 +17,7 @@ for different devices run concurrently unless synchronized via
 
 Simple device labels, allocated by JUnitRunner/Daemon:
 
-```
+```yaml
 devices: ["A", "B"]
 
 steps:
@@ -34,7 +34,7 @@ steps:
 
 Top-level steps remain consistent; parallelism is implicit:
 
-```
+```yaml
 devices: ["A", "B"]
 
 steps:
@@ -77,7 +77,7 @@ steps:
 
 YAML anchors (merge keys) should be supported for reuse and validation:
 
-```
+```yaml
 devices: ["A", "B"]
 
 tap: &tap
@@ -151,7 +151,7 @@ Configurable behavior when a device fails:
 ### Per-Device Timing
 
 Debug mode or failures log per-device execution timing:
-```
+```text
 [PARALLEL_EXEC]   A: SUCCESS - 5/5 steps (1234ms)
 [PARALLEL_EXEC]   B: FAILED - 3/5 steps (987ms)
 [PARALLEL_EXEC]   B: Failed at plan step 7 (track step 2): Timeout waiting for element

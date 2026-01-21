@@ -2,7 +2,7 @@
 
 ## Overview
 
-The 🔒 [`criticalSection`](../tools/index.md) tool provides multi-device synchronization for serialized execution of steps. It implements a barrier synchronization pattern where all devices must arrive at the critical section before any can proceed, and then executes steps one device at a time.
+The 🔒 [`criticalSection`](../tools.md) tool provides multi-device synchronization for serialized execution of steps. It implements a barrier synchronization pattern where all devices must arrive at the critical section before any can proceed, and then executes steps one device at a time.
 
 ## Availability
 
@@ -145,7 +145,7 @@ steps:
 
 If not all devices reach the barrier within the timeout period:
 
-```
+```yaml
 Error: Timeout waiting for critical section "payment-lock".
 2/3 devices arrived after 30000ms.
 Missing devices may have failed or not reached the critical section.
@@ -160,7 +160,7 @@ Missing devices may have failed or not reached the critical section.
 
 If a critical section step contains another critical section:
 
-```
+```yaml
 Error: Nested critical sections are not supported.
 Found criticalSection step inside critical section "outer-lock".
 ```
@@ -173,7 +173,7 @@ Found criticalSection step inside critical section "outer-lock".
 
 If a step fails inside the critical section:
 
-```
+```yaml
 Error: Critical section "payment-lock" failed for device device-A:
 Failed at step 2/3 (observe): Element not found
 ```

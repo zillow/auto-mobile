@@ -182,7 +182,7 @@ The accessibility tree exposed by `AccessibilityNodeInfo` (Android) or `AXUIElem
 #### Element Merging
 
 **Before (Visual Hierarchy)**:
-```
+```text
 LinearLayout (clickable)
   ├─ ImageView (icon)
   ├─ TextView "Settings"
@@ -190,7 +190,7 @@ LinearLayout (clickable)
 ```
 
 **After (Accessibility Tree with TalkBack)**:
-```
+```text
 LinearLayout (clickable, focusable)
   content-desc: "Settings, Manage app preferences"
   [Children marked importantForAccessibility=NO]
@@ -208,7 +208,7 @@ LinearLayout (clickable, focusable)
 Some accessibility nodes don't correspond to actual views:
 
 **Example: Slider**:
-```
+```text
 SeekBar
   ├─ (Virtual) "Slider, 50 percent"
   ├─ (Virtual) "Decrease value"

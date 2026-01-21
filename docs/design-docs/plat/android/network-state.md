@@ -7,7 +7,7 @@ plus emulator-friendly latency/bandwidth shaping.
 
 ## Proposed MCP tool
 
-```
+```typescript
 setNetworkState({
   airplaneMode?: boolean,
   wifi?: boolean,

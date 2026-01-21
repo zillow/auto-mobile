@@ -8,7 +8,7 @@ when emulator support is not sufficient.
 
 ## Proposed MCP tool
 
-```
+```typescript
 biometricAuth({
   action: "match" | "fail" | "cancel",
   modality: "any" | "fingerprint" | "face",
@@ -101,7 +101,7 @@ bypass or simulate biometric callbacks within the app-under-test.
 
 Suggested SDK entrypoint:
 
-```
+```text
 AutoMobileBiometrics.overrideResult(
   result = SUCCESS | FAILURE | CANCEL,
   ttlMs = 5000

@@ -187,7 +187,7 @@ const apps = JSON.parse(response.contents[0].text);
 //     }
 //   ]
 // }
-```
+```yaml
 
 Note: Chrome can be installed in both profiles!
 

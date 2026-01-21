@@ -60,7 +60,7 @@ self-healing test flows.
 Multi-device support includes emulator control and app lifecycle management. As long as you have available ADB
 connections, AutoMobile tracks which device is used for each execution plan or MCP session. CI still needs available
 device connections, but AutoMobile handles selection and readiness checks. During STDIO MCP sessions,
-🔧 [`setActiveDevice`](../../mcp/tools/index.md) is set once and reused for the session.
+🔧 [`setActiveDevice`](../../mcp/tools.md) is set once and reused for the session.
 
 ## Android Accessibility Service
 

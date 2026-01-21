@@ -173,7 +173,7 @@ steps:
 
 Organize recorded tests in your project:
 
-```
+```text
 tests/
   automobile/
     plans/
@@ -227,6 +227,6 @@ Use descriptive names for test plans:
 
 ## See Also
 
-- [MCP tool reference](../../../mcp/tools/index.md) - Available MCP tools for test plans
+- [MCP tool reference](../../../mcp/tools.md) - Available MCP tools for test plans
 - [IDE Plugin Overview](overview.md) - IDE plugin features and setup
 - [UI Tests](../../../../using/ui-tests.md) - Writing and running UI tests

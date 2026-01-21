@@ -8,7 +8,7 @@ cannot treat it as a primary discovery method.
 
 ## Proposed MCP tool
 
-```
+```typescript
 takeScreenshot({
   reason: "element-not-found",
   context: {

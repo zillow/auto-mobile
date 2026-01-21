@@ -8,7 +8,7 @@ AutoMobile's AccessibilityService.
 
 ## Proposed MCP tools
 
-```
+```typescript
 setTalkBackEnabled({ enabled: boolean })
 setA11yFocus({ resourceId?: string, text?: string })
 announce({ text: string })
