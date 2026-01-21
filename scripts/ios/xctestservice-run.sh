@@ -37,8 +37,6 @@ NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-XCTESTSERVICE_DIR="${PROJECT_ROOT}/ios/XCTestService"
 
 # Default paths and settings
 DERIVED_DATA="/tmp/automobile-xctestservice"
