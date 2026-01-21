@@ -17,7 +17,10 @@ import kotlinx.serialization.json.Json
 
 class TestRecordingSocketClient(
     private val socketPathValue: String = TestRecordingSocketPaths.socketPath(),
-    private val json: Json = Json { ignoreUnknownKeys = true; explicitNulls = false },
+    private val json: Json = Json {
+      ignoreUnknownKeys = true
+      explicitNulls = false
+    },
 ) {
   fun startTestRecording(platform: String? = null): TestRecordingStartResult {
     val response = sendRequest(TestRecordingSocketCommand(command = "start", platform = platform))

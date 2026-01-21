@@ -100,10 +100,10 @@ export class Daemon {
 
     // Initialize device pool BEFORE starting socket server
     // This ensures clients connecting via socket will see initialized device pool
-    // Wait up to 10 seconds - emulators should already be running
+    // Wait up to 5 seconds - emulators should already be running
     logger.info("Initializing device pool...");
     startupBenchmark.startPhase("deviceDiscovery");
-    await this.initializeDevicePoolWithTimeout(10000);
+    await this.initializeDevicePoolWithTimeout(5000);
     startupBenchmark.endPhase("deviceDiscovery");
 
     // Initialize iOS XCTestService connections for discovered iOS devices

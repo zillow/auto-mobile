@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -51,10 +50,9 @@ fun UxFlowStartScreen(
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "ux_flow_start_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "ux_flow_start_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(
@@ -103,10 +101,9 @@ fun UxFlowDetailsScreen(
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "ux_flow_details_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "ux_flow_details_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(
@@ -164,10 +161,9 @@ fun UxFlowSummaryScreen(
     ) { paddingValues ->
       Column(
           modifier =
-              Modifier.fillMaxSize()
-                  .padding(paddingValues)
-                  .padding(16.dp)
-                  .semantics { testTag = "ux_flow_summary_content" },
+              Modifier.fillMaxSize().padding(paddingValues).padding(16.dp).semantics {
+                testTag = "ux_flow_summary_content"
+              },
           verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
         Text(

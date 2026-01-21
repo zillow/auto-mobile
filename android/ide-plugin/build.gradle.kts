@@ -12,21 +12,15 @@ repositories {
   google()
   mavenCentral()
   maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-  intellijPlatform {
-    defaultRepositories()
-  }
+  intellijPlatform { defaultRepositories() }
 }
 
 java {
-  toolchain {
-    languageVersion.set(JavaLanguageVersion.of(libs.versions.build.java.target.get()))
-  }
+  toolchain { languageVersion.set(JavaLanguageVersion.of(libs.versions.build.java.target.get())) }
 }
 
 sourceSets {
-  named("main") {
-    resources.srcDir(rootProject.projectDir.parentFile.resolve("schemas"))
-  }
+  named("main") { resources.srcDir(rootProject.projectDir.parentFile.resolve("schemas")) }
 }
 
 dependencies {

@@ -13,7 +13,10 @@ object PlanCache {
 
   private val maxEntries: Int by lazy {
     val configured =
-        System.getProperty("automobile.junit.plan.cache.max.entries", DEFAULT_MAX_ENTRIES.toString())
+        System.getProperty(
+                "automobile.junit.plan.cache.max.entries",
+                DEFAULT_MAX_ENTRIES.toString(),
+            )
             .toIntOrNull()
     when {
       configured == null -> DEFAULT_MAX_ENTRIES

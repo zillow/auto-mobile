@@ -8,20 +8,20 @@ import com.intellij.util.xmlb.XmlSerializerUtil
 
 @State(
     name = "com.automobile.ide.settings.AutoMobileSettings",
-    storages = [Storage("AutoMobileSettings.xml")]
+    storages = [Storage("AutoMobileSettings.xml")],
 )
 class AutoMobileSettings : PersistentStateComponent<AutoMobileSettings> {
-    var enableYamlLinting: Boolean = true
-    var testPlanOutputDirectory: String = "test/resources/test-plans"
+  var enableYamlLinting: Boolean = true
+  var testPlanOutputDirectory: String = "test/resources/test-plans"
 
-    override fun getState(): AutoMobileSettings = this
+  override fun getState(): AutoMobileSettings = this
 
-    override fun loadState(state: AutoMobileSettings) {
-        XmlSerializerUtil.copyBean(state, this)
-    }
+  override fun loadState(state: AutoMobileSettings) {
+    XmlSerializerUtil.copyBean(state, this)
+  }
 
-    companion object {
-        fun getInstance(): AutoMobileSettings =
-            ApplicationManager.getApplication().getService(AutoMobileSettings::class.java)
-    }
+  companion object {
+    fun getInstance(): AutoMobileSettings =
+        ApplicationManager.getApplication().getService(AutoMobileSettings::class.java)
+  }
 }

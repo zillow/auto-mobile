@@ -756,24 +756,6 @@ process.on("unhandledRejection", (reason, promise) => {
 
 async function main() {
   try {
-    // Kill any running daemons at startup to prevent conflicts
-    // The MCP server should have exclusive access to devices
-    const daemonManager = new DaemonManager();
-    const runningDaemons = daemonManager.findAllDaemonProcesses();
-    if (runningDaemons.length > 0) {
-      logger.info(`Found ${runningDaemons.length} running daemon(s), stopping them...`);
-      for (const pid of runningDaemons) {
-        try {
-          process.kill(pid, "SIGTERM");
-          logger.info(`Stopped daemon PID ${pid}`);
-        } catch (error) {
-          logger.warn(`Failed to stop daemon PID ${pid}: ${error}`);
-        }
-      }
-      // Wait briefly for processes to terminate
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
     // Parse command line arguments
     const {
       cliMode,
@@ -876,6 +858,24 @@ async function main() {
       logger.close();
       process.exit(0);
     } else {
+      // Kill any running daemons at startup to prevent conflicts
+      // The MCP server should have exclusive access to devices
+      const daemonManager = new DaemonManager();
+      const runningDaemons = daemonManager.findAllDaemonProcesses();
+      if (runningDaemons.length > 0) {
+        logger.info(`Found ${runningDaemons.length} running daemon(s), stopping them...`);
+        for (const pid of runningDaemons) {
+          try {
+            process.kill(pid, "SIGTERM");
+            logger.info(`Stopped daemon PID ${pid}`);
+          } catch (error) {
+            logger.warn(`Failed to stop daemon PID ${pid}: ${error}`);
+          }
+        }
+        // Wait briefly for processes to terminate
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       // Start host emulator auto-connect service (for Docker with external emulators)
       await startHostEmulatorAutoConnect();
 

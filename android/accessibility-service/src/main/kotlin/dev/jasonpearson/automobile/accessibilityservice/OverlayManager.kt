@@ -36,7 +36,8 @@ class OverlayManager(
     val view = overlayView ?: viewFactory(context).also { overlayView = it }
 
     if (!overlayAdded) {
-      val layoutParams = overlayLayoutParams ?: createLayoutParams().also { overlayLayoutParams = it }
+      val layoutParams =
+          overlayLayoutParams ?: createLayoutParams().also { overlayLayoutParams = it }
       try {
         windowManager.addView(view, layoutParams)
         overlayAdded = true
@@ -83,15 +84,15 @@ class OverlayManager(
   private fun createLayoutParams(): WindowManager.LayoutParams {
     val overlayType = resolveOverlayType()
     return WindowManager.LayoutParams(
-        WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.MATCH_PARENT,
-        overlayType,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-        PixelFormat.TRANSLUCENT,
-    )
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT,
+        )
         .apply {
           gravity = Gravity.TOP or Gravity.START
           x = 0

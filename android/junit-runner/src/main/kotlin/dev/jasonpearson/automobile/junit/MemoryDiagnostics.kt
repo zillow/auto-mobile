@@ -45,7 +45,9 @@ internal object MemoryDiagnostics {
   fun dumpHeap(label: String, reason: String? = null): File? {
     val baseDir = resolveHeapDumpDir()
     if (!baseDir.exists() && !baseDir.mkdirs()) {
-      System.err.println("MemoryDiagnostics: Failed to create heap dump directory: ${baseDir.absolutePath}")
+      System.err.println(
+          "MemoryDiagnostics: Failed to create heap dump directory: ${baseDir.absolutePath}"
+      )
       return null
     }
 
@@ -84,7 +86,9 @@ internal object MemoryDiagnostics {
   fun captureDiagnostics(label: String, reason: String? = null): File? {
     val baseDir = resolveHeapDumpDir()
     if (!baseDir.exists() && !baseDir.mkdirs()) {
-      System.err.println("MemoryDiagnostics: Failed to create heap dump directory: ${baseDir.absolutePath}")
+      System.err.println(
+          "MemoryDiagnostics: Failed to create heap dump directory: ${baseDir.absolutePath}"
+      )
       return null
     }
 
@@ -92,7 +96,9 @@ internal object MemoryDiagnostics {
     val timestamp = timestampFormatter.format(Instant.now())
     val diagnosticsDir = File(baseDir, "diagnostics/${timestamp}_${sanitizedLabel}")
     if (!diagnosticsDir.exists() && !diagnosticsDir.mkdirs()) {
-      System.err.println("MemoryDiagnostics: Failed to create diagnostics directory: ${diagnosticsDir.absolutePath}")
+      System.err.println(
+          "MemoryDiagnostics: Failed to create diagnostics directory: ${diagnosticsDir.absolutePath}"
+      )
       return null
     }
 
@@ -181,7 +187,8 @@ internal object MemoryDiagnostics {
   }
 
   private fun resolveHeapDumpDir(): File {
-    val configured = System.getProperty("automobile.junit.memory.heapdump.dir", DEFAULT_HEAP_DUMP_DIR)
+    val configured =
+        System.getProperty("automobile.junit.memory.heapdump.dir", DEFAULT_HEAP_DUMP_DIR)
     val trimmed = configured.trim()
     return File(if (trimmed.isEmpty()) DEFAULT_HEAP_DUMP_DIR else trimmed)
   }
@@ -203,17 +210,21 @@ internal object MemoryDiagnostics {
 
     listOf(directCandidate, parentCandidate, windowsCandidate, parentWindowsCandidate)
         .firstOrNull { it != null && it.exists() && it.canExecute() }
-        ?.let { return it.absolutePath }
+        ?.let {
+          return it.absolutePath
+        }
 
     val path = System.getenv("PATH") ?: return null
     val segments = path.split(File.pathSeparator)
     val candidates =
-        segments.map { segment ->
-          listOf(
-              File(segment, toolName),
-              File(segment, "$toolName.exe"),
-          )
-        }.flatten()
+        segments
+            .map { segment ->
+              listOf(
+                  File(segment, toolName),
+                  File(segment, "$toolName.exe"),
+              )
+            }
+            .flatten()
     return candidates.firstOrNull { it.exists() && it.canExecute() }?.absolutePath
   }
 

@@ -25,8 +25,13 @@ export interface DeviceImageInfo {
   error?: string;
   // iOS simulator metadata (iOS only)
   state?: string;
+  isAvailable?: boolean;
+  availabilityError?: string;
   iosVersion?: string;
   deviceType?: string;
+  runtime?: string;
+  model?: string;
+  architecture?: string;
 }
 
 // Resource content schema
@@ -209,8 +214,13 @@ function toDeviceImageInfo(device: DeviceInfo, avdInfo?: AvdInfo): DeviceImageIn
     error: avdInfo?.error,
     // iOS simulator metadata
     state: device.state,
+    isAvailable: device.isAvailable,
+    availabilityError: device.availabilityError,
     iosVersion: device.iosVersion,
-    deviceType: device.deviceType
+    deviceType: device.deviceType,
+    runtime: device.runtime,
+    model: device.model,
+    architecture: device.architecture
   };
 }
 

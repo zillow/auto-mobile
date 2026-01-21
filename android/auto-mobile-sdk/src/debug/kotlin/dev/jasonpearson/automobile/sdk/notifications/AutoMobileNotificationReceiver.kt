@@ -25,7 +25,8 @@ class AutoMobileNotificationReceiver : BroadcastReceiver() {
         return
       }
 
-      val style = NotificationStyle.fromWireName(intent.getStringExtra(AutoMobileNotifications.EXTRA_STYLE))
+      val style =
+          NotificationStyle.fromWireName(intent.getStringExtra(AutoMobileNotifications.EXTRA_STYLE))
       val imagePath = intent.getStringExtra(AutoMobileNotifications.EXTRA_IMAGE_PATH)
       val channelId = intent.getStringExtra(AutoMobileNotifications.EXTRA_CHANNEL_ID)
       val actionsJson = intent.getStringExtra(AutoMobileNotifications.EXTRA_ACTIONS)

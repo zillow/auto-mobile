@@ -61,10 +61,11 @@ class McpHttpClient(
   }
 
   override fun getNavigationGraph(platform: String): JsonElement {
-    val response = callTool(
-      "getNavigationGraph",
-      buildJsonObject { put("platform", JsonPrimitive(platform)) },
-    )
+    val response =
+        callTool(
+            "getNavigationGraph",
+            buildJsonObject { put("platform", JsonPrimitive(platform)) },
+        )
     return response
   }
 
@@ -74,17 +75,22 @@ class McpHttpClient(
     return result.flags
   }
 
-  override fun setFeatureFlag(key: String, enabled: Boolean, config: JsonObject?): FeatureFlagState {
-    val response = callTool(
-      "setFeatureFlag",
-      buildJsonObject {
-        put("key", JsonPrimitive(key))
-        put("enabled", JsonPrimitive(enabled))
-        if (config != null) {
-          put("config", config)
-        }
-      },
-    )
+  override fun setFeatureFlag(
+      key: String,
+      enabled: Boolean,
+      config: JsonObject?,
+  ): FeatureFlagState {
+    val response =
+        callTool(
+            "setFeatureFlag",
+            buildJsonObject {
+              put("key", JsonPrimitive(key))
+              put("enabled", JsonPrimitive(enabled))
+              if (config != null) {
+                put("config", config)
+              }
+            },
+        )
     return decodeToolResponse(json, response, FeatureFlagState.serializer())
   }
 
@@ -122,19 +128,20 @@ class McpHttpClient(
       startStep: Int?,
       sessionUuid: String?,
   ): ExecutePlanResult {
-    val response = callTool(
-      "executePlan",
-      buildJsonObject {
-        put("planContent", JsonPrimitive(planContent))
-        put("platform", JsonPrimitive(platform))
-        if (startStep != null) {
-          put("startStep", JsonPrimitive(startStep))
-        }
-        if (!sessionUuid.isNullOrBlank()) {
-          put("sessionUuid", JsonPrimitive(sessionUuid))
-        }
-      },
-    )
+    val response =
+        callTool(
+            "executePlan",
+            buildJsonObject {
+              put("planContent", JsonPrimitive(planContent))
+              put("platform", JsonPrimitive(platform))
+              if (startStep != null) {
+                put("startStep", JsonPrimitive(startStep))
+              }
+              if (!sessionUuid.isNullOrBlank()) {
+                put("sessionUuid", JsonPrimitive(sessionUuid))
+              }
+            },
+        )
     return decodeToolResponse(json, response, ExecutePlanResult.serializer())
   }
 

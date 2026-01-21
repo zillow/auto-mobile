@@ -6,14 +6,20 @@ plugins {
 
 // Signing configuration: reads from environment variables (CI) or gradle.properties (local)
 // Paths are resolved relative to project root using rootProject.file()
-val releaseStoreFilePath: String? = System.getenv("RELEASE_KEYSTORE_PATH") ?: findProperty("RELEASE_KEYSTORE_PATH") as String?
-val releaseStorePassword: String? = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
-val releaseKeyAlias: String? = System.getenv("RELEASE_KEY_ALIAS") ?: findProperty("RELEASE_KEY_ALIAS") as String?
-val releaseKeyPassword: String? = System.getenv("RELEASE_KEY_PASSWORD") ?: findProperty("RELEASE_KEY_PASSWORD") as String?
-val releaseStoreFile: File? = releaseStoreFilePath?.let { path ->
-  val file = File(path)
-  if (file.isAbsolute) file else rootProject.file(path)
-}
+val releaseStoreFilePath: String? =
+    System.getenv("RELEASE_KEYSTORE_PATH") ?: findProperty("RELEASE_KEYSTORE_PATH") as String?
+val releaseStorePassword: String? =
+    System.getenv("RELEASE_KEYSTORE_PASSWORD")
+        ?: findProperty("RELEASE_KEYSTORE_PASSWORD") as String?
+val releaseKeyAlias: String? =
+    System.getenv("RELEASE_KEY_ALIAS") ?: findProperty("RELEASE_KEY_ALIAS") as String?
+val releaseKeyPassword: String? =
+    System.getenv("RELEASE_KEY_PASSWORD") ?: findProperty("RELEASE_KEY_PASSWORD") as String?
+val releaseStoreFile: File? =
+    releaseStoreFilePath?.let { path ->
+      val file = File(path)
+      if (file.isAbsolute) file else rootProject.file(path)
+    }
 val hasReleaseSigning =
     releaseStoreFile?.exists() == true &&
         !releaseStorePassword.isNullOrBlank() &&

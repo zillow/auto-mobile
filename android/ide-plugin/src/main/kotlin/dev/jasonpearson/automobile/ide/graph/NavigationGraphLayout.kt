@@ -31,20 +31,18 @@ fun computeGraphLayout(
   }
 
   val adjacency = buildAdjacency(summary)
-  val root = summary.currentScreen?.takeIf { adjacency.containsKey(it) }
-      ?: summary.nodes.first().screenName
+  val root =
+      summary.currentScreen?.takeIf { adjacency.containsKey(it) }
+          ?: summary.nodes.first().screenName
   val distances = computeDistances(adjacency, root)
 
   val maxDistance = distances.values.maxOrNull() ?: 0
   val unreachableDistance = maxDistance + 1
-  summary.nodes.forEach { node ->
-    distances.putIfAbsent(node.screenName, unreachableDistance)
-  }
+  summary.nodes.forEach { node -> distances.putIfAbsent(node.screenName, unreachableDistance) }
 
   val maxRing = distances.values.maxOrNull() ?: 0
   val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
-  val maxRadius =
-      min(size.width, size.height).toFloat() / 2f - paddingPx - baseRadiusPx
+  val maxRadius = min(size.width, size.height).toFloat() / 2f - paddingPx - baseRadiusPx
   val safeMaxRadius = max(0f, maxRadius)
   val ringSpacing = if (maxRing <= 0) 0f else safeMaxRadius / (maxRing + 1)
 

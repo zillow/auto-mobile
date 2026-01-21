@@ -55,8 +55,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     val timingAvailable = TestTimingCache.hasTimings()
     logTimingOrdering(selection, timingAvailable)
 
-    val timingOrderingActive =
-        selection.resolved != TimingOrderingStrategy.NONE && timingAvailable
+    val timingOrderingActive = selection.resolved != TimingOrderingStrategy.NONE && timingAvailable
     val timingOrderedChildren =
         if (!timingOrderingActive) {
           children
@@ -67,7 +66,9 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     val shuffleEnabled = SystemPropertyCache.getBoolean("automobile.junit.shuffle.enabled", true)
     if (!shuffleEnabled || timingOrderedChildren.size <= 1 || timingOrderingActive) {
       if (shuffleEnabled && timingOrderingActive) {
-        println("AutoMobileRunner: Shuffle enabled but timing ordering is active; preserving timing order.")
+        println(
+            "AutoMobileRunner: Shuffle enabled but timing ordering is active; preserving timing order."
+        )
       }
       timingOrderedChildren
     } else {
@@ -215,8 +216,7 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
         when (strategy) {
           TimingOrderingStrategy.DURATION_DESC ->
               withTiming.sortedWith(
-                  compareByDescending<TimingCandidate> { it.durationMs }
-                      .thenBy { it.index }
+                  compareByDescending<TimingCandidate> { it.durationMs }.thenBy { it.index }
               )
           TimingOrderingStrategy.DURATION_ASC ->
               withTiming.sortedWith(
@@ -482,7 +482,13 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
 
         val requestBuildStart = System.currentTimeMillis()
         val daemonRequestArgs =
-            buildDaemonExecutePlanArgs(base64Content, annotation, sessionUuid, testName, klass.simpleName)
+            buildDaemonExecutePlanArgs(
+                base64Content,
+                annotation,
+                sessionUuid,
+                testName,
+                klass.simpleName,
+            )
         PerformanceTracker.measure("Daemon request build", requestBuildStart)
 
         if (debugMode) {
@@ -664,19 +670,28 @@ class AutoMobileRunner(private val klass: Class<*>) : BlockJUnit4ClassRunner(kla
     }
 
     val jdkVersion =
-        firstNonBlank(System.getProperty("java.version"), System.getProperty("java.runtime.version"))
+        firstNonBlank(
+            System.getProperty("java.version"),
+            System.getProperty("java.runtime.version"),
+        )
     if (jdkVersion != null) {
       metadata["jdkVersion"] = JsonPrimitive(jdkVersion)
     }
 
     val jvmTarget =
-        firstNonBlank(System.getProperty("kotlin.jvm.target"), System.getProperty("java.specification.version"))
+        firstNonBlank(
+            System.getProperty("kotlin.jvm.target"),
+            System.getProperty("java.specification.version"),
+        )
     if (jvmTarget != null) {
       metadata["jvmTarget"] = JsonPrimitive(jvmTarget)
     }
 
     val gradleVersion =
-        firstNonBlank(System.getProperty("org.gradle.version"), System.getProperty("gradle.version"))
+        firstNonBlank(
+            System.getProperty("org.gradle.version"),
+            System.getProperty("gradle.version"),
+        )
     if (gradleVersion != null) {
       metadata["gradleVersion"] = JsonPrimitive(gradleVersion)
     }

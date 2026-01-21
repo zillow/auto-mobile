@@ -122,10 +122,11 @@ internal object AutoMobilePlanExecutor {
     // Validate YAML schema after parameter substitution
     val validationResult = PlanSchemaValidator.validateYaml(processedContent)
     if (!validationResult.valid) {
-      val errorMessages = validationResult.errors.joinToString("\n") { err ->
-        val location = if (err.line != null) " (line ${err.line})" else ""
-        "${err.field}: ${err.message}$location"
-      }
+      val errorMessages =
+          validationResult.errors.joinToString("\n") { err ->
+            val location = if (err.line != null) " (line ${err.line})" else ""
+            "${err.field}: ${err.message}$location"
+          }
       throw IllegalArgumentException(
           "Plan YAML validation failed:\n$errorMessages\n\n" +
               "The plan does not conform to the AutoMobile test plan schema. " +
@@ -237,14 +238,14 @@ internal object AutoMobilePlanExecutor {
       val resultElement = response.result ?: return emptyList()
       val contentArray = resultElement.jsonObject["content"] as? JsonArray ?: return emptyList()
       val contentText =
-          contentArray.firstOrNull { element ->
-            (element as? JsonObject)?.get("type")?.jsonPrimitive?.content == "text"
-          }
+          contentArray
+              .firstOrNull { element ->
+                (element as? JsonObject)?.get("type")?.jsonPrimitive?.content == "text"
+              }
               ?.jsonObject
               ?.get("text")
               ?.jsonPrimitive
-              ?.content
-              ?: return emptyList()
+              ?.content ?: return emptyList()
       val payload = json.parseToJsonElement(contentText).jsonObject
       val stepsElement = payload["toolResults"] ?: payload["toolResult"] ?: return emptyList()
       val stepsArray = stepsElement as? JsonArray ?: return emptyList()
@@ -291,8 +292,7 @@ internal object AutoMobilePlanExecutor {
 
     if (toolName.isNullOrBlank()) {
       val errorMessage =
-          extractErrorMessage(stepObject)
-              ?: "Missing tool name for step $resolvedStepIndex"
+          extractErrorMessage(stepObject) ?: "Missing tool name for step $resolvedStepIndex"
       if (debugMode) {
         println("Warning: $errorMessage")
       }

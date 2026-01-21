@@ -62,7 +62,9 @@ public class XCTestService {
             hierarchyDebouncer.setOnResult { [weak self] result in
                 switch result {
                 case let .changed(hierarchy, hash, extractionTimeMs):
-                    print("[XCTestService] Hierarchy changed (hash=\(hash), extraction=\(extractionTimeMs)ms), broadcasting")
+                    print(
+                        "[XCTestService] Hierarchy changed (hash=\(hash), extraction=\(extractionTimeMs)ms), broadcasting"
+                    )
                     self?.server.broadcastHierarchyUpdate(hierarchy)
                 case .unchanged:
                     // Don't broadcast unchanged results (animation mode)
@@ -77,7 +79,9 @@ public class XCTestService {
             print("[XCTestService] WebSocket server listening on port \(Self.defaultPort)")
             print("[XCTestService] Endpoint: ws://localhost:\(Self.defaultPort)/ws")
             print("[XCTestService] Health check: http://localhost:\(Self.defaultPort)/health")
-            print("[XCTestService] Hierarchy debouncer active (polling every \(HierarchyDebouncer.defaultPollIntervalMs)ms)")
+            print(
+                "[XCTestService] Hierarchy debouncer active (polling every \(HierarchyDebouncer.defaultPollIntervalMs)ms)"
+            )
             print("[XCTestService] Ready to accept connections")
         }
     #else

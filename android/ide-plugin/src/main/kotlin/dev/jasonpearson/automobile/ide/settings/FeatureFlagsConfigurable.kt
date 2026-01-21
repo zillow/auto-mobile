@@ -20,11 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.options.SearchableConfigurable
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
 import dev.jasonpearson.automobile.ide.daemon.FeatureFlagState
 import dev.jasonpearson.automobile.ide.daemon.McpClientFactory
-import com.intellij.openapi.options.Configurable
-import com.intellij.openapi.options.SearchableConfigurable
 import javax.swing.JComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -143,8 +143,7 @@ private class FeatureFlagsViewModel(private val client: AutoMobileClient) {
         val updated = client.setFeatureFlag(flag.key, enabled)
         _state.update {
           it.copy(
-              flags =
-                  it.flags.map { entry -> if (entry.key == flag.key) updated else entry },
+              flags = it.flags.map { entry -> if (entry.key == flag.key) updated else entry },
               statusText = "Updated ${flag.label}",
               updatingKeys = it.updatingKeys - flag.key,
           )
@@ -180,8 +179,7 @@ private class FeatureFlagsViewModel(private val client: AutoMobileClient) {
         val updated = client.setFeatureFlag(flag.key, flag.enabled, config)
         _state.update {
           it.copy(
-              flags =
-                  it.flags.map { entry -> if (entry.key == flag.key) updated else entry },
+              flags = it.flags.map { entry -> if (entry.key == flag.key) updated else entry },
               statusText = "Updated ${flag.label}",
               updatingKeys = it.updatingKeys - flag.key,
           )
@@ -306,11 +304,15 @@ private fun AccessibilityConfigPanel(
   val colors = JewelTheme.globalColors
 
   var level by remember { mutableStateOf(readConfigValue(flag.config, "level", "AA")) }
-  var failureMode by
-      remember { mutableStateOf(readConfigValue(flag.config, "failureMode", "report")) }
-  var minSeverity by
-      remember { mutableStateOf(readConfigValue(flag.config, "minSeverity", "warning")) }
-  var useBaseline by remember { mutableStateOf(readConfigBoolean(flag.config, "useBaseline", false)) }
+  var failureMode by remember {
+    mutableStateOf(readConfigValue(flag.config, "failureMode", "report"))
+  }
+  var minSeverity by remember {
+    mutableStateOf(readConfigValue(flag.config, "minSeverity", "warning"))
+  }
+  var useBaseline by remember {
+    mutableStateOf(readConfigBoolean(flag.config, "useBaseline", false))
+  }
 
   LaunchedEffect(flag.config) {
     level = readConfigValue(flag.config, "level", "AA")

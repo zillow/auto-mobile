@@ -120,8 +120,7 @@ fun TestTimingQuery.toResourceUri(): String {
     return TEST_TIMING_RESOURCE_URI
   }
 
-  val query =
-      params.joinToString("&") { (key, value) -> "$key=${encodeQueryParam(value)}" }
+  val query = params.joinToString("&") { (key, value) -> "$key=${encodeQueryParam(value)}" }
   return "$TEST_TIMING_RESOURCE_URI?$query"
 }
 

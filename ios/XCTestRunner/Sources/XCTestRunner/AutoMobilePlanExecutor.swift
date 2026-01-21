@@ -111,7 +111,7 @@ public struct DefaultPlanLoader: AutoMobilePlanLoading {
 
     private func resolveDirectPath(_ path: String) -> URL? {
         let url = URL(fileURLWithPath: path)
-        if url.path.hasPrefix("/") && FileManager.default.fileExists(atPath: url.path) {
+        if url.path.hasPrefix("/"), FileManager.default.fileExists(atPath: url.path) {
             return url
         }
         if FileManager.default.fileExists(atPath: url.path) {
@@ -226,7 +226,7 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
         PerfTimer.log("DaemonClient.callTool START: name=\(name)")
         let params: [String: Any] = [
             "name": name,
-            "arguments": arguments
+            "arguments": arguments,
         ]
         let result = try sendRequest(method: "tools/call", params: params, timeout: timeout)
         let text = try extractTextContent(from: result)
@@ -237,7 +237,7 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
     public func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
         PerfTimer.log("DaemonClient.readResource START: uri=\(uri)")
         let params: [String: Any] = [
-            "uri": uri
+            "uri": uri,
         ]
         let result = try sendRequest(method: "resources/read", params: params, timeout: timeout)
         let text = try extractResourceTextContent(from: result)
@@ -311,7 +311,7 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
             "type": "mcp_request",
             "method": method,
             "params": params,
-            "timeoutMs": Int(timeout * 1000)
+            "timeoutMs": Int(timeout * 1000),
         ]
 
         let data = try JSONSerialization.data(withJSONObject: request, options: [])
@@ -371,8 +371,8 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
                 if let data = data {
                     self.buffer.append(data)
                     if let lineRange = self.buffer.firstRange(of: Data([0x0A])) {
-                        let lineData = self.buffer.subdata(in: 0..<lineRange.lowerBound)
-                        self.buffer.removeSubrange(0...lineRange.lowerBound)
+                        let lineData = self.buffer.subdata(in: 0 ..< lineRange.lowerBound)
+                        self.buffer.removeSubrange(0 ... lineRange.lowerBound)
                         output = lineData
                         semaphore.signal()
                         return
@@ -416,7 +416,8 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
         }
         for item in content {
             if let type = item["type"] as? String, type == "text",
-               let text = item["text"] as? String {
+               let text = item["text"] as? String
+            {
                 return text
             }
         }
@@ -456,8 +457,8 @@ public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
             "capabilities": [:],
             "clientInfo": [
                 "name": "auto-mobile-xctest-runner",
-                "version": "0.1.0"
-            ]
+                "version": "0.1.0",
+            ],
         ]
         _ = try sendRequest(method: "initialize", params: params, timeout: timeout)
     }
@@ -469,7 +470,7 @@ public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
 
         let params: [String: Any] = [
             "name": name,
-            "arguments": arguments
+            "arguments": arguments,
         ]
 
         do {
@@ -491,7 +492,7 @@ public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
         }
 
         let params: [String: Any] = [
-            "uri": uri
+            "uri": uri,
         ]
 
         do {
@@ -517,7 +518,7 @@ public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
             "jsonrpc": "2.0",
             "id": requestId,
             "method": method,
-            "params": params
+            "params": params,
         ]
 
         let data = try JSONSerialization.data(withJSONObject: payload, options: [])
@@ -618,7 +619,8 @@ public final class StreamableHTTPMCPClient: AutoMobileMCPClient {
         }
         for item in content {
             if let type = item["type"] as? String, type == "text",
-               let text = item["text"] as? String {
+               let text = item["text"] as? String
+            {
                 return text
             }
         }
@@ -850,7 +852,10 @@ public final class AutoMobilePlanExecutor {
         let planMetadata = try PerfTimer.measure("parsePlanMetadata") {
             try PlanMetadataParser.parse(from: substituted)
         }
-        PerfTimer.log("planMetadata: platform=\(planMetadata.platform.map { String(describing: $0) } ?? "nil"), hasDevices=\(planMetadata.hasDevices), deviceLabels=\(planMetadata.deviceLabels)")
+        PerfTimer
+            .log(
+                "planMetadata: platform=\(planMetadata.platform.map { String(describing: $0) } ?? "nil"), hasDevices=\(planMetadata.hasDevices), deviceLabels=\(planMetadata.deviceLabels)"
+            )
 
         let platform = try resolvePlatform(from: planMetadata)
         PerfTimer.log("resolved platform=\(platform)")
@@ -885,7 +890,8 @@ public final class AutoMobilePlanExecutor {
             let result = try PerfTimer.measure("decodeExecutePlanResult") {
                 try decodeExecutePlanResult(from: response.text)
             }
-            PerfTimer.log("executeOnce END - success=\(result.success), steps=\(result.executedSteps)/\(result.totalSteps)")
+            PerfTimer
+                .log("executeOnce END - success=\(result.success), steps=\(result.executedSteps)/\(result.totalSteps)")
             if result.success {
                 return result
             }
@@ -908,13 +914,15 @@ public final class AutoMobilePlanExecutor {
         platform: PlanPlatform,
         deviceLabels: [String],
         testMetadata: TestMetadata?
-    ) -> [String: Any] {
+    )
+        -> [String: Any]
+    {
         let base64Content = Data(planContent.utf8).base64EncodedString()
         var args: [String: Any] = [
             "planContent": "base64:\(base64Content)",
             "platform": platform.rawValue,
             "startStep": configuration.startStep,
-            "sessionUuid": sessionUuid
+            "sessionUuid": sessionUuid,
         ]
 
         if let cleanup = configuration.cleanup {
@@ -929,7 +937,7 @@ public final class AutoMobilePlanExecutor {
         if let metadata = testMetadata {
             var metadataArgs: [String: Any] = [
                 "testClass": metadata.testClass,
-                "testMethod": metadata.testMethod
+                "testMethod": metadata.testMethod,
             ]
             if let appVersion = metadata.appVersion {
                 metadataArgs["appVersion"] = appVersion
@@ -989,15 +997,15 @@ private final class FailingMCPClient: AutoMobileMCPClient {
         self.error = error
     }
 
-    func initialize(timeout: TimeInterval) throws {
+    func initialize(timeout _: TimeInterval) throws {
         throw error
     }
 
-    func callTool(name: String, arguments: [String: Any], timeout: TimeInterval) throws -> MCPToolResponse {
+    func callTool(name _: String, arguments _: [String: Any], timeout _: TimeInterval) throws -> MCPToolResponse {
         throw error
     }
 
-    func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
+    func readResource(uri _: String, timeout _: TimeInterval) throws -> MCPResourceResponse {
         throw error
     }
 
@@ -1207,8 +1215,8 @@ private enum PlanMetadataParser {
     }
 }
 
-private extension AutoMobilePlanExecutor {
-    func resolvePlatform(from metadata: PlanMetadata) throws -> PlanPlatform {
+extension AutoMobilePlanExecutor {
+    private func resolvePlatform(from metadata: PlanMetadata) throws -> PlanPlatform {
         if metadata.hasDevices {
             let platforms = Set(metadata.devicePlatforms.values)
             if platforms.count > 1 {

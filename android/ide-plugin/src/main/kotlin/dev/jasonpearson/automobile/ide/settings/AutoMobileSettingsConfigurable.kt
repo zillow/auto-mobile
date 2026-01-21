@@ -30,7 +30,9 @@ class AutoMobileSettingsConfigurable : SearchableConfigurable, Configurable.NoSc
 
   override fun getDisplayName(): String = "AutoMobile"
 
-  override fun createComponent(): JComponent = JewelComposePanel { AutoMobileSettingsContent { modified = true } }
+  override fun createComponent(): JComponent = JewelComposePanel {
+    AutoMobileSettingsContent { modified = true }
+  }
 
   override fun isModified(): Boolean = modified
 

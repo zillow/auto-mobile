@@ -152,8 +152,13 @@ describe("Device Image Resources with Fakes", () => {
           deviceId: "sim-15-pro",
           source: "local",
           state: "Booted",
+          isAvailable: true,
           iosVersion: "17.4",
-          deviceType: "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro"
+          deviceType: "com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro",
+          runtime: "com.apple.CoreSimulator.SimRuntime.iOS-17-4",
+          model: "iPhone15,3",
+          architecture: "arm64",
+          availabilityError: undefined
         }
       ];
       fakeDeviceUtils.setDeviceImages("ios", iosDevices);
@@ -167,8 +172,12 @@ describe("Device Image Resources with Fakes", () => {
       const result = await handler.getDeviceImagesForPlatforms(["ios"]);
       expect(result.totalCount).toBe(1);
       expect(result.images[0].state).toBe("Booted");
+      expect(result.images[0].isAvailable).toBe(true);
       expect(result.images[0].iosVersion).toBe("17.4");
       expect(result.images[0].deviceType).toBe("com.apple.CoreSimulator.SimDeviceType.iPhone-15-Pro");
+      expect(result.images[0].runtime).toBe("com.apple.CoreSimulator.SimRuntime.iOS-17-4");
+      expect(result.images[0].model).toBe("iPhone15,3");
+      expect(result.images[0].architecture).toBe("arm64");
     });
 
     test("should include extended AVD metadata for Android images", async () => {

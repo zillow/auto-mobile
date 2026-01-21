@@ -25,7 +25,10 @@ internal class HighlightOverlayView(
   override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
     super.onLayout(changed, left, top, right, bottom)
     if (changed) {
-      Log.d(TAG, "Overlay layout changed: left=$left, top=$top, right=$right, bottom=$bottom, width=$width, height=$height")
+      Log.d(
+          TAG,
+          "Overlay layout changed: left=$left, top=$top, right=$right, bottom=$bottom, width=$width, height=$height",
+      )
     }
   }
 

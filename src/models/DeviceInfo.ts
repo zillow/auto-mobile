@@ -8,8 +8,13 @@ export interface DeviceInfo {
   source?: "local";
   // iOS-only metadata (optional)
   state?: string;
+  isAvailable?: boolean;
+  availabilityError?: string;
   iosVersion?: string;
   deviceType?: string;
+  runtime?: string;
+  model?: string;
+  architecture?: string;
 }
 
 export interface BootedDevice {

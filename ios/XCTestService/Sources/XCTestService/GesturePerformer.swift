@@ -50,7 +50,7 @@ public class GesturePerformer: GesturePerforming {
             var result: Result<T, Error>!
             DispatchQueue.main.sync {
                 do {
-                    result = .success(try block())
+                    result = try .success(block())
                 } catch {
                     result = .failure(error)
                 }

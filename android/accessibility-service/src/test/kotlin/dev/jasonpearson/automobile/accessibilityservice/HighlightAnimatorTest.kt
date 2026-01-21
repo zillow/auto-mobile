@@ -25,9 +25,10 @@ class HighlightAnimatorTest {
 
     val valueAnimator = animator.getAnimatorForTest("highlight")
     assertNotNull(valueAnimator)
-    val expectedDuration = HighlightAnimator.DEFAULT_FADE_IN_DURATION_MS +
-                          HighlightAnimator.DEFAULT_DISPLAY_DURATION_MS +
-                          HighlightAnimator.DEFAULT_FADE_OUT_DURATION_MS
+    val expectedDuration =
+        HighlightAnimator.DEFAULT_FADE_IN_DURATION_MS +
+            HighlightAnimator.DEFAULT_DISPLAY_DURATION_MS +
+            HighlightAnimator.DEFAULT_FADE_OUT_DURATION_MS
     assertEquals(expectedDuration, valueAnimator!!.duration)
     assertTrue(valueAnimator.interpolator is AccelerateDecelerateInterpolator)
   }
@@ -49,9 +50,10 @@ class HighlightAnimatorTest {
 
     val valueAnimator = animator.getAnimatorForTest("highlight")
     assertNotNull(valueAnimator)
-    val totalDuration = HighlightAnimator.DEFAULT_FADE_IN_DURATION_MS +
-                       HighlightAnimator.DEFAULT_DISPLAY_DURATION_MS +
-                       HighlightAnimator.DEFAULT_FADE_OUT_DURATION_MS
+    val totalDuration =
+        HighlightAnimator.DEFAULT_FADE_IN_DURATION_MS +
+            HighlightAnimator.DEFAULT_DISPLAY_DURATION_MS +
+            HighlightAnimator.DEFAULT_FADE_OUT_DURATION_MS
     valueAnimator!!.setCurrentPlayTime(totalDuration / 2)
     valueAnimator.setCurrentPlayTime(totalDuration)
     valueAnimator.end()

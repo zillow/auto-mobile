@@ -32,34 +32,24 @@ data class HighlightPoint(
 
 @Serializable
 enum class SmoothingAlgorithm {
-  @SerialName("none")
-  NONE,
-  @SerialName("catmull-rom")
-  CATMULL_ROM,
-  @SerialName("bezier")
-  BEZIER,
-  @SerialName("douglas-peucker")
-  DOUGLAS_PEUCKER,
+  @SerialName("none") NONE,
+  @SerialName("catmull-rom") CATMULL_ROM,
+  @SerialName("bezier") BEZIER,
+  @SerialName("douglas-peucker") DOUGLAS_PEUCKER,
 }
 
 @Serializable
 enum class HighlightLineCap {
-  @SerialName("butt")
-  BUTT,
-  @SerialName("round")
-  ROUND,
-  @SerialName("square")
-  SQUARE,
+  @SerialName("butt") BUTT,
+  @SerialName("round") ROUND,
+  @SerialName("square") SQUARE,
 }
 
 @Serializable
 enum class HighlightLineJoin {
-  @SerialName("miter")
-  MITER,
-  @SerialName("round")
-  ROUND,
-  @SerialName("bevel")
-  BEVEL,
+  @SerialName("miter") MITER,
+  @SerialName("round") ROUND,
+  @SerialName("bevel") BEVEL,
 }
 
 @Serializable

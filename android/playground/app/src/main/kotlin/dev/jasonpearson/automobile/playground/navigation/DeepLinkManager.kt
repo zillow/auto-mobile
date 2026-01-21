@@ -206,34 +206,39 @@ object DeepLinkManager {
   /** Parse deep link URL and return the corresponding navigation destination */
   fun parseDeepLink(uri: Uri): AppDestination? {
     Log.d(TAG, "Parsing deep link URI: $uri")
-    Log.d(TAG, "URI scheme: ${uri.scheme}, host: ${uri.host}, path: ${uri.path}, ssp: ${uri.schemeSpecificPart}")
+    Log.d(
+        TAG,
+        "URI scheme: ${uri.scheme}, host: ${uri.host}, path: ${uri.path}, ssp: ${uri.schemeSpecificPart}",
+    )
 
     if (uri.scheme != SCHEME) {
       Log.d(TAG, "Invalid scheme. Expected: $SCHEME")
       return null
     }
 
-    // Determine if this is a hierarchical URI (automobile://playground/path) or opaque URI (automobile:playground/path)
-    val path = if (uri.host != null) {
-      // Hierarchical URI: automobile://playground/path
-      Log.d(TAG, "Parsing hierarchical URI format")
-      if (uri.host != HOST) {
-        Log.d(TAG, "Invalid host. Expected: $HOST, got: ${uri.host}")
-        return null
-      }
-      // Extract path (already starts with "/")
-      uri.path ?: ""
-    } else {
-      // Opaque URI: automobile:playground/path
-      Log.d(TAG, "Parsing opaque URI format")
-      val ssp = uri.schemeSpecificPart
-      if (ssp == null || !ssp.startsWith(HOST)) {
-        Log.d(TAG, "Invalid host. Expected scheme-specific part to start with: $HOST")
-        return null
-      }
-      // Extract path from scheme-specific part (remove "playground" prefix)
-      if (ssp.length > HOST.length) ssp.substring(HOST.length) else ""
-    }
+    // Determine if this is a hierarchical URI (automobile://playground/path) or opaque URI
+    // (automobile:playground/path)
+    val path =
+        if (uri.host != null) {
+          // Hierarchical URI: automobile://playground/path
+          Log.d(TAG, "Parsing hierarchical URI format")
+          if (uri.host != HOST) {
+            Log.d(TAG, "Invalid host. Expected: $HOST, got: ${uri.host}")
+            return null
+          }
+          // Extract path (already starts with "/")
+          uri.path ?: ""
+        } else {
+          // Opaque URI: automobile:playground/path
+          Log.d(TAG, "Parsing opaque URI format")
+          val ssp = uri.schemeSpecificPart
+          if (ssp == null || !ssp.startsWith(HOST)) {
+            Log.d(TAG, "Invalid host. Expected scheme-specific part to start with: $HOST")
+            return null
+          }
+          // Extract path from scheme-specific part (remove "playground" prefix)
+          if (ssp.length > HOST.length) ssp.substring(HOST.length) else ""
+        }
 
     if (path.isEmpty() && uri.schemeSpecificPart != HOST && uri.host != HOST) {
       Log.d(TAG, "Invalid URI format")
@@ -379,14 +384,16 @@ object DeepLinkManager {
       return false
     }
 
-    // Handle both hierarchical (automobile://playground/path) and opaque (automobile:playground/path) URIs
-    val hasValidHost = if (uri.host != null) {
-      // Hierarchical URI: check host
-      uri.host == HOST
-    } else {
-      // Opaque URI: check scheme-specific part
-      uri.schemeSpecificPart?.startsWith(HOST) == true
-    }
+    // Handle both hierarchical (automobile://playground/path) and opaque
+    // (automobile:playground/path) URIs
+    val hasValidHost =
+        if (uri.host != null) {
+          // Hierarchical URI: check host
+          uri.host == HOST
+        } else {
+          // Opaque URI: check scheme-specific part
+          uri.schemeSpecificPart?.startsWith(HOST) == true
+        }
 
     if (!hasValidHost) {
       Log.d(TAG, "Deep link validation result: false (invalid host)")
@@ -646,7 +653,8 @@ object DeepLinkManager {
   }
 
   private fun buildUri(path: String): String {
-    // Build opaque URI in format "automobile:playground/path" instead of "automobile://playground/path"
+    // Build opaque URI in format "automobile:playground/path" instead of
+    // "automobile://playground/path"
     val uri = "$SCHEME:$HOST$path"
     Log.d(TAG, "Built URI with path '$path': $uri")
     return uri

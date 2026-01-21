@@ -176,7 +176,10 @@ class ViewHierarchyExtractorTest {
     val allowButton =
         UIElementInfo(resourceId = "com.android.permissioncontroller:id/permission_allow_button")
     val childrenJson =
-        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), listOf(title, allowButton))
+        json.encodeToJsonElement(
+            ListSerializer(UIElementInfo.serializer()),
+            listOf(title, allowButton),
+        )
     val root = UIElementInfo(className = "android.widget.LinearLayout", node = childrenJson)
 
     assertTrue(
@@ -193,7 +196,10 @@ class ViewHierarchyExtractorTest {
     val allowButton =
         UIElementInfo(resourceId = "com.android.permissioncontroller:id/permission_allow_button")
     val childrenJson =
-        json.encodeToJsonElement(ListSerializer(UIElementInfo.serializer()), listOf(title, allowButton))
+        json.encodeToJsonElement(
+            ListSerializer(UIElementInfo.serializer()),
+            listOf(title, allowButton),
+        )
     val root = UIElementInfo(className = "android.widget.LinearLayout", node = childrenJson)
 
     assertFalse(
@@ -393,11 +399,9 @@ class ViewHierarchyExtractorTest {
 
   @Test
   fun `occlusion filter removes unrelated nodes when fully occluded`() {
-    val target =
-        elementWithBounds(resourceId = "hidden-target", bounds = bounds(0, 0, 100, 100))
+    val target = elementWithBounds(resourceId = "hidden-target", bounds = bounds(0, 0, 100, 100))
     val targetParent = elementWithBounds(resourceId = "target-parent", children = listOf(target))
-    val occluder =
-        elementWithBounds(resourceId = "occluding-node", bounds = bounds(0, 0, 100, 100))
+    val occluder = elementWithBounds(resourceId = "occluding-node", bounds = bounds(0, 0, 100, 100))
     val occluderParent =
         elementWithBounds(resourceId = "occluder-parent", children = listOf(occluder))
     val root = elementWithBounds(children = listOf(targetParent, occluderParent))
@@ -411,11 +415,9 @@ class ViewHierarchyExtractorTest {
 
   @Test
   fun `occlusion filter keeps partial overlap and annotates metadata`() {
-    val target =
-        elementWithBounds(resourceId = "partial-target", bounds = bounds(0, 0, 100, 100))
+    val target = elementWithBounds(resourceId = "partial-target", bounds = bounds(0, 0, 100, 100))
     val targetParent = elementWithBounds(resourceId = "partial-parent", children = listOf(target))
-    val occluder =
-        elementWithBounds(resourceId = "partial-occluder", bounds = bounds(0, 0, 50, 50))
+    val occluder = elementWithBounds(resourceId = "partial-occluder", bounds = bounds(0, 0, 50, 50))
     val occluderParent =
         elementWithBounds(resourceId = "occluder-parent", children = listOf(occluder))
     val root = elementWithBounds(children = listOf(targetParent, occluderParent))
@@ -468,13 +470,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0.0.0.0"
     val occluderPath = "0.0.0.1"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 5,
-        nodeSubtreeEnd = 5,
-        occluderOrder = 6,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 5,
+            nodeSubtreeEnd = 5,
+            occluderOrder = 6,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.SIBLING, relationship)
   }
@@ -487,13 +490,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0.0.0.1.0"
     val occluderPath = "0.0.0.2"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 10,
-        nodeSubtreeEnd = 10,
-        occluderOrder = 11,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 10,
+            nodeSubtreeEnd = 10,
+            occluderOrder = 11,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.UNCLE, relationship)
   }
@@ -505,13 +509,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0.0.0.1.0.0"
     val occluderPath = "0.0.0.2"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 15,
-        nodeSubtreeEnd = 15,
-        occluderOrder = 16,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 15,
+            nodeSubtreeEnd = 15,
+            occluderOrder = 16,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.UNCLE, relationship)
   }
@@ -522,13 +527,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0.0.0.1"
     val occluderPath = "0.0.0.1.0"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 10,
-        nodeSubtreeEnd = 15, // Subtree ends at 15
-        occluderOrder = 11, // Child is at 11, within [10, 15]
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 10,
+            nodeSubtreeEnd = 15, // Subtree ends at 15
+            occluderOrder = 11, // Child is at 11, within [10, 15]
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.DESCENDANT, relationship)
   }
@@ -539,13 +545,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0.0.0.1"
     val occluderPath = "0.0.0.1.2.0"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 10,
-        nodeSubtreeEnd = 20,
-        occluderOrder = 18, // Deep descendant within subtree
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 10,
+            nodeSubtreeEnd = 20,
+            occluderOrder = 18, // Deep descendant within subtree
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.DESCENDANT, relationship)
   }
@@ -556,13 +563,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0.0.0.1.0"
     val occluderPath = "0.0.1.0.0"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 10,
-        nodeSubtreeEnd = 12,
-        occluderOrder = 20,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 10,
+            nodeSubtreeEnd = 12,
+            occluderOrder = 20,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.UNRELATED, relationship)
   }
@@ -573,13 +581,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0.0.0.1.0"
     val occluderPath = "0.0.0.2.0"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 10,
-        nodeSubtreeEnd = 10,
-        occluderOrder = 15,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 10,
+            nodeSubtreeEnd = 10,
+            occluderOrder = 15,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.UNRELATED, relationship)
   }
@@ -590,13 +599,14 @@ class ViewHierarchyExtractorTest {
     val nodePath = "0"
     val occluderPath = "1"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = nodePath,
-        occluderPath = occluderPath,
-        nodeOrder = 0,
-        nodeSubtreeEnd = 100,
-        occluderOrder = 101,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = nodePath,
+            occluderPath = occluderPath,
+            nodeOrder = 0,
+            nodeSubtreeEnd = 100,
+            occluderOrder = 101,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.SIBLING, relationship)
   }
@@ -607,13 +617,14 @@ class ViewHierarchyExtractorTest {
     val textPath = "0.0.0.0.0.0.1.0.0.0.0"
     val roleDescPath = "0.0.0.0.0.0.1.0.0.0.1"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = textPath,
-        occluderPath = roleDescPath,
-        nodeOrder = 10,
-        nodeSubtreeEnd = 10,
-        occluderOrder = 11,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = textPath,
+            occluderPath = roleDescPath,
+            nodeOrder = 10,
+            nodeSubtreeEnd = 10,
+            occluderOrder = 11,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.SIBLING, relationship)
   }
@@ -626,13 +637,14 @@ class ViewHierarchyExtractorTest {
     val textPath = "0.0.0.0.0.0.1.0.0.1.0"
     val occluderPath = "0.0.0.0.0.0.1.0.0.2"
 
-    val relationship = extractor.determineNodeRelationship(
-        nodePath = textPath,
-        occluderPath = occluderPath,
-        nodeOrder = 10,
-        nodeSubtreeEnd = 10,
-        occluderOrder = 11,
-    )
+    val relationship =
+        extractor.determineNodeRelationship(
+            nodePath = textPath,
+            occluderPath = occluderPath,
+            nodeOrder = 10,
+            nodeSubtreeEnd = 10,
+            occluderOrder = 11,
+        )
 
     assertEquals(ViewHierarchyExtractor.NodeRelationship.UNCLE, relationship)
   }
@@ -709,8 +721,7 @@ class ViewHierarchyExtractorTest {
       isActive: Boolean = true,
       isFocused: Boolean = true,
   ): Any {
-    val windowEntryClass =
-        this.javaClass.declaredClasses.first { it.simpleName == "WindowEntry" }
+    val windowEntryClass = this.javaClass.declaredClasses.first { it.simpleName == "WindowEntry" }
     val constructor =
         windowEntryClass.getDeclaredConstructor(
             Int::class.javaPrimitiveType,

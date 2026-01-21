@@ -16,7 +16,6 @@ import android.graphics.Bitmap
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
-import android.os.UserHandle
 import android.util.Base64
 import android.util.DisplayMetrics
 import android.util.Log
@@ -50,7 +49,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -207,8 +205,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           val uid = intent.getIntExtra(Intent.EXTRA_UID, -1)
           val userId = if (uid >= 0) uid else 0
           val isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)
-          // EXTRA_REMOVED_FOR_ALL_USERS may not be available in all SDK versions, use string literal
-          val removedForAllUsers = intent.getBooleanExtra("android.intent.extra.REMOVED_FOR_ALL_USERS", false)
+          // EXTRA_REMOVED_FOR_ALL_USERS may not be available in all SDK versions, use string
+          // literal
+          val removedForAllUsers =
+              intent.getBooleanExtra("android.intent.extra.REMOVED_FOR_ALL_USERS", false)
 
           val eventAction =
               when (action) {
@@ -241,10 +241,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     Log.d(TAG, "onServiceConnected")
 
     try {
-      overlayDrawer = OverlayDrawer(
-        screenDimensionsProvider = { getScreenDimensions() }
-      )
-      overlayManager = OverlayManager(this, viewFactory = { HighlightOverlayView(it, overlayDrawer) })
+      overlayDrawer = OverlayDrawer(screenDimensionsProvider = { getScreenDimensions() })
+      overlayManager =
+          OverlayManager(this, viewFactory = { HighlightOverlayView(it, overlayDrawer) })
       overlayDrawer.attachOverlayManager(overlayManager)
 
       // Register broadcast receiver for commands
@@ -443,7 +442,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               onGetTraversalOrder = { requestId -> handleGetTraversalOrder(requestId) },
               onAddHighlight = { requestId, highlightId, shape ->
                 handleAddHighlight(requestId, highlightId, shape)
-              }
+              },
           )
       webSocketServer.start()
       Log.d(TAG, "WebSocket server started on port 8765")
@@ -652,8 +651,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   private fun resolveSystemApp(packageName: String): Boolean? {
     return try {
       val appInfo = packageManager.getApplicationInfo(packageName, 0)
-      (appInfo.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) !=
-          0
+      (appInfo.flags and
+          (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
     } catch (e: Exception) {
       Log.w(TAG, "Failed to resolve system flag for $packageName", e)
       null
@@ -725,9 +724,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       if (windowManager != null) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
           val metrics = windowManager.currentWindowMetrics
-          val insets = metrics.windowInsets.getInsetsIgnoringVisibility(
-            android.view.WindowInsets.Type.systemBars()
-          )
+          val insets =
+              metrics.windowInsets.getInsetsIgnoringVisibility(
+                  android.view.WindowInsets.Type.systemBars()
+              )
           insets.top
         } else {
           val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
@@ -1184,13 +1184,17 @@ class AutoMobileAccessibilityService : AccessibilityService() {
             }
         val pressStroke = GestureDescription.StrokeDescription(pressPath, 0, pressDurationMs, true)
         gestureBuilder.addStroke(pressStroke)
-        Log.d(TAG, "Stroke 1 (press): stationary at ($startX, $startY), startTime=0ms, duration=${pressDurationMs}ms, willContinue=true")
+        Log.d(
+            TAG,
+            "Stroke 1 (press): stationary at ($startX, $startY), startTime=0ms, duration=${pressDurationMs}ms, willContinue=true",
+        )
 
         // Phase 2: Drag from start to end with 8 segments for more intermediate touch events
         val dragPath =
             Path().apply {
               moveTo(startX, startY)
-              // Split the drag into 8 segments with variation in both X and Y to ensure hit detection
+              // Split the drag into 8 segments with variation in both X and Y to ensure hit
+              // detection
               for (i in 1..8) {
                 val t = i / 8.0f
                 val baseX = startX + (endX - startX) * t
@@ -1203,9 +1207,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                 lineTo(x, y)
               }
             }
-        val dragStroke = GestureDescription.StrokeDescription(dragPath, pressDurationMs, dragDurationMs, holdDurationMs > 0)
+        val dragStroke =
+            GestureDescription.StrokeDescription(
+                dragPath,
+                pressDurationMs,
+                dragDurationMs,
+                holdDurationMs > 0,
+            )
         gestureBuilder.addStroke(dragStroke)
-        Log.d(TAG, "Stroke 2 (drag): ($startX, $startY) -> ($endX, $endY), startTime=${pressDurationMs}ms, duration=${dragDurationMs}ms, willContinue=${holdDurationMs > 0}")
+        Log.d(
+            TAG,
+            "Stroke 2 (drag): ($startX, $startY) -> ($endX, $endY), startTime=${pressDurationMs}ms, duration=${dragDurationMs}ms, willContinue=${holdDurationMs > 0}",
+        )
 
         if (holdDurationMs > 0) {
           // Phase 3: Hold at end position
@@ -1214,9 +1227,18 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                 moveTo(endX, endY)
                 lineTo(endX, endY) // Zero-length path = stationary touch
               }
-          val holdStroke = GestureDescription.StrokeDescription(holdPath, pressDurationMs + dragDurationMs, holdDurationMs, false)
+          val holdStroke =
+              GestureDescription.StrokeDescription(
+                  holdPath,
+                  pressDurationMs + dragDurationMs,
+                  holdDurationMs,
+                  false,
+              )
           gestureBuilder.addStroke(holdStroke)
-          Log.d(TAG, "Stroke 3 (hold): stationary at ($endX, $endY), startTime=${pressDurationMs + dragDurationMs}ms, duration=${holdDurationMs}ms, willContinue=false")
+          Log.d(
+              TAG,
+              "Stroke 3 (hold): stationary at ($endX, $endY), startTime=${pressDurationMs + dragDurationMs}ms, duration=${holdDurationMs}ms, willContinue=false",
+          )
         }
       } else {
         // Single stroke drag without initial press
@@ -1225,9 +1247,13 @@ class AutoMobileAccessibilityService : AccessibilityService() {
               moveTo(startX, startY)
               lineTo(endX, endY)
             }
-        val dragStroke = GestureDescription.StrokeDescription(dragPath, 0, dragDurationMs, holdDurationMs > 0)
+        val dragStroke =
+            GestureDescription.StrokeDescription(dragPath, 0, dragDurationMs, holdDurationMs > 0)
         gestureBuilder.addStroke(dragStroke)
-        Log.d(TAG, "Single stroke drag: ($startX, $startY) -> ($endX, $endY), startTime=0ms, duration=${dragDurationMs}ms, willContinue=${holdDurationMs > 0}")
+        Log.d(
+            TAG,
+            "Single stroke drag: ($startX, $startY) -> ($endX, $endY), startTime=0ms, duration=${dragDurationMs}ms, willContinue=${holdDurationMs > 0}",
+        )
 
         if (holdDurationMs > 0) {
           val holdPath =
@@ -1235,9 +1261,13 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                 moveTo(endX, endY)
                 lineTo(endX, endY)
               }
-          val holdStroke = GestureDescription.StrokeDescription(holdPath, dragDurationMs, holdDurationMs, false)
+          val holdStroke =
+              GestureDescription.StrokeDescription(holdPath, dragDurationMs, holdDurationMs, false)
           gestureBuilder.addStroke(holdStroke)
-          Log.d(TAG, "Hold after drag: stationary at ($endX, $endY), startTime=${dragDurationMs}ms, duration=${holdDurationMs}ms, willContinue=false")
+          Log.d(
+              TAG,
+              "Hold after drag: stationary at ($endX, $endY), startTime=${dragDurationMs}ms, duration=${holdDurationMs}ms, willContinue=false",
+          )
         }
       }
       val gesture = gestureBuilder.build()
@@ -1305,8 +1335,8 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   }
 
   /**
-   * Perform a tap at specific coordinates using AccessibilityService's dispatchGesture API.
-   * This is significantly faster than ADB input tap and more precise than resource-id lookup.
+   * Perform a tap at specific coordinates using AccessibilityService's dispatchGesture API. This is
+   * significantly faster than ADB input tap and more precise than resource-id lookup.
    *
    * @param requestId Optional request ID for response correlation
    * @param x X coordinate to tap
@@ -1321,10 +1351,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     try {
       // Create a tap path (single point, no movement)
       perfProvider.startOperation("buildPath")
-      val path =
-          Path().apply {
-            moveTo(x.toFloat(), y.toFloat())
-          }
+      val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
 
       // Build the gesture description
       val gesture =
@@ -1353,7 +1380,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
                           pollIntervalMs = 10L,
                       )
                   if (freshHierarchy != null) {
-                    kotlinx.coroutines.runBlocking { broadcastHierarchyUpdate(freshHierarchy, sync = true) }
+                    kotlinx.coroutines.runBlocking {
+                      broadcastHierarchyUpdate(freshHierarchy, sync = true)
+                    }
                   }
 
                   perfProvider.end() // end performTapCoordinates block
@@ -1377,7 +1406,12 @@ class AutoMobileAccessibilityService : AccessibilityService() {
 
                   // Broadcast cancelled result
                   serviceScope.launch {
-                    broadcastTapCoordinatesResult(requestId, false, "Gesture was cancelled", totalTime)
+                    broadcastTapCoordinatesResult(
+                        requestId,
+                        false,
+                        "Gesture was cancelled",
+                        totalTime,
+                    )
                   }
                 }
               },
@@ -2453,10 +2487,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
     val pemFooter = "-----END CERTIFICATE-----"
     val normalized =
         if (trimmed.contains(pemHeader)) {
-          trimmed
-              .replace(pemHeader, "")
-              .replace(pemFooter, "")
-              .replace("\\s".toRegex(), "")
+          trimmed.replace(pemHeader, "").replace(pemFooter, "").replace("\\s".toRegex(), "")
         } else {
           trimmed.replace("\\s".toRegex(), "")
         }
@@ -2990,7 +3021,9 @@ class AutoMobileAccessibilityService : AccessibilityService() {
       val success = error == null
       webSocketServer.broadcastWithPerf { perfTiming ->
         buildString {
-          append("""{"type":"device_owner_status_result","timestamp":${System.currentTimeMillis()}""")
+          append(
+              """{"type":"device_owner_status_result","timestamp":${System.currentTimeMillis()}"""
+          )
           if (requestId != null) {
             append(""","requestId":"$requestId"""")
           }
@@ -3174,7 +3207,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append("}")
         }
       }
-      Log.d(TAG, "Broadcasted tap coordinates result to ${webSocketServer.getConnectionCount()} clients")
+      Log.d(
+          TAG,
+          "Broadcasted tap coordinates result to ${webSocketServer.getConnectionCount()} clients",
+      )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting tap coordinates result", e)
     }
@@ -3415,11 +3451,7 @@ class AutoMobileAccessibilityService : AccessibilityService() {
   ) {
     serviceScope.launch {
       if (!::overlayDrawer.isInitialized) {
-        broadcastHighlightResponse(
-            requestId,
-            false,
-            "Overlay drawer not initialized"
-        )
+        broadcastHighlightResponse(requestId, false, "Overlay drawer not initialized")
         return@launch
       }
 
@@ -3460,7 +3492,10 @@ class AutoMobileAccessibilityService : AccessibilityService() {
           append("}")
         }
       }
-      Log.d(TAG, "Broadcasted highlight response to ${webSocketServer.getConnectionCount()} clients")
+      Log.d(
+          TAG,
+          "Broadcasted highlight response to ${webSocketServer.getConnectionCount()} clients",
+      )
     } catch (e: Exception) {
       Log.e(TAG, "Error broadcasting highlight response", e)
     }

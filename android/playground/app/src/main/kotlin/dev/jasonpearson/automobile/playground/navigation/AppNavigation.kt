@@ -551,9 +551,7 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                 DemoIndexScreen(
                     onNavigateToUxFlow = { backStack.add(DemoUxStartDestination) },
                     onNavigateToStartup = { backStack.add(DemoStartupDestination) },
-                    onNavigateToPerformanceList = {
-                      backStack.add(DemoPerformanceListDestination)
-                    },
+                    onNavigateToPerformanceList = { backStack.add(DemoPerformanceListDestination) },
                     onNavigateToContrast = { backStack.add(DemoContrastDestination) },
                     onNavigateToTapTargets = { backStack.add(DemoTapTargetsDestination) },
                     onNavigateToBugRepro = { backStack.add(DemoBugReproDestination) },
@@ -598,9 +596,7 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
               }
               Box(modifier = Modifier.destinationSemanticModifier<DemoUxSummaryDestination>()) {
                 UxFlowSummaryScreen(
-                    onRestartFlow = {
-                      repeat(2) { backStack.removeLastOrNull() }
-                    },
+                    onRestartFlow = { repeat(2) { backStack.removeLastOrNull() } },
                     onNavigateBack = { backStack.removeLastOrNull() },
                 )
               }
@@ -641,7 +637,10 @@ fun AppNavigation(deepLinkUri: Uri? = null, onDeepLinkCallbackSet: ((Uri) -> Uni
                   extractArguments = { mapOf("itemId" to it.itemId) },
               )
               LaunchedEffect(Unit) {
-                Log.d(TAG, "Navigated to PerformanceDetailScreen with itemId: ${destination.itemId}")
+                Log.d(
+                    TAG,
+                    "Navigated to PerformanceDetailScreen with itemId: ${destination.itemId}",
+                )
                 analyticsTracker.trackScreenView("PerformanceDetailScreen")
               }
               Box(

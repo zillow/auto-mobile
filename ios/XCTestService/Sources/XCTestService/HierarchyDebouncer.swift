@@ -70,16 +70,16 @@ public class HierarchyDebouncer: HierarchyDebouncing {
 
     // MARK: - State
 
-    private var lastStructuralHash: Int = 0
-    private var inAnimationMode: Bool = false
+    private var lastStructuralHash = 0
+    private var inAnimationMode = false
     private var animationModeEndTime: Int64 = 0
-    private var skippedPollCount: Int = 0
+    private var skippedPollCount = 0
     private var lastBroadcastTime: Int64 = 0
     private var lastHierarchy: ViewHierarchy?
 
     private let lock = NSLock()
-    private var _isRunning: Bool = false
-    private var pollScheduled: Bool = false
+    private var _isRunning = false
+    private var pollScheduled = false
     private var onResult: ((HierarchyResult) -> Void)?
 
     public var isRunning: Bool {
@@ -227,7 +227,7 @@ public class HierarchyDebouncer: HierarchyDebouncing {
         guard running else { return }
 
         // If we're in animation mode and within the skip window, skip extraction
-        if animationMode && now < animationEnd {
+        if animationMode, now < animationEnd {
             lock.lock()
             skippedPollCount += 1
             lock.unlock()
@@ -235,7 +235,7 @@ public class HierarchyDebouncer: HierarchyDebouncing {
         }
 
         // Exit animation mode if window expired
-        if animationMode && now >= animationEnd {
+        if animationMode, now >= animationEnd {
             lock.lock()
             let skipped = skippedPollCount
             inAnimationMode = false
@@ -300,7 +300,9 @@ public class HierarchyDebouncer: HierarchyDebouncing {
                         extractionTimeMs: extractionTime
                     )
 
-                    print("[HierarchyDebouncer] Structure changed (oldHash=\(oldHash), newHash=\(newHash)), broadcasting")
+                    print(
+                        "[HierarchyDebouncer] Structure changed (oldHash=\(oldHash), newHash=\(newHash)), broadcasting"
+                    )
                     callback?(result)
                 }
             }
@@ -411,7 +413,7 @@ public class FakeHierarchyDebouncer: HierarchyDebouncing {
         lock.unlock()
     }
 
-    public func extractNowBlocking(skipFlowEmit: Bool = false) -> ViewHierarchy? {
+    public func extractNowBlocking(skipFlowEmit _: Bool = false) -> ViewHierarchy? {
         lock.lock()
         extractNowBlockingCallCount += 1
         let hierarchy = hierarchyToReturn

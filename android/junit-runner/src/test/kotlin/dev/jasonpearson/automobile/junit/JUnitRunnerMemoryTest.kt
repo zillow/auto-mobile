@@ -87,7 +87,9 @@ class JUnitRunnerMemoryTest {
   ) {
     val planContent =
         PlanCache.getCachedContent(resolvedPlanPath)
-            ?: File(resolvedPlanPath).readText().also { PlanCache.cacheContent(resolvedPlanPath, it) }
+            ?: File(resolvedPlanPath).readText().also {
+              PlanCache.cacheContent(resolvedPlanPath, it)
+            }
     val base64Content = Base64.getEncoder().encodeToString(planContent.toByteArray())
 
     runner.invokeBuildDaemonExecutePlanArgs(
@@ -127,7 +129,10 @@ class JUnitRunnerMemoryTest {
 
   private fun resolveMaxGrowthBytes(): Long {
     val configured =
-        System.getProperty("automobile.junit.memory.max.growth.mb", DEFAULT_MAX_GROWTH_MB.toString())
+        System.getProperty(
+                "automobile.junit.memory.max.growth.mb",
+                DEFAULT_MAX_GROWTH_MB.toString(),
+            )
             .toLongOrNull()
     val resolved = configured ?: DEFAULT_MAX_GROWTH_MB
     return resolved * 1024L * 1024L

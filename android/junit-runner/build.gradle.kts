@@ -58,7 +58,11 @@ mavenPublishing {
   publishToMavenCentral()
   signAllPublications()
 
-  coordinates("dev.jasonpearson.auto-mobile", "auto-mobile-junit-runner", project.version.toString())
+  coordinates(
+      "dev.jasonpearson.auto-mobile",
+      "auto-mobile-junit-runner",
+      project.version.toString(),
+  )
 
   pom {
     name.set("AutoMobile JUnit Runner")
