@@ -28,6 +28,7 @@ import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from 
 import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./appearanceSocketServer";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
+import { DeviceSessionManager } from "../utils/DeviceSessionManager";
 import { startAppearanceSyncScheduler, stopAppearanceSyncScheduler } from "../utils/appearance/AppearanceSyncScheduler";
 import { listActiveVideoRecordings, stopVideoRecording } from "../server/videoRecordingManager";
 
@@ -104,6 +105,10 @@ export class Daemon {
     startupBenchmark.startPhase("deviceDiscovery");
     await this.initializeDevicePoolWithTimeout(10000);
     startupBenchmark.endPhase("deviceDiscovery");
+
+    // Initialize iOS XCTestService connections for discovered iOS devices
+    // This establishes WebSocket connections early so observe calls are fast
+    await this.initializeIosServices();
 
     // Start Unix socket server AFTER device pool is ready
     logger.info(`Daemon host: "${this.host}", port: ${this.port}`);
@@ -684,6 +689,35 @@ export class Daemon {
       logger.error(`Failed to initialize device pool: ${error}`);
       // Continue daemon startup even if device discovery fails
       // Tools will handle "no devices" errors when sessions are created
+    }
+  }
+
+  /**
+   * Initialize iOS XCTestService connections for discovered iOS devices
+   * This establishes WebSocket connections early so first observe calls are fast
+   */
+  private async initializeIosServices(): Promise<void> {
+    const allDevices = this.devicePool.getAllDevices();
+    const iosDevices = allDevices.filter(device => device.platform === "ios");
+    if (iosDevices.length === 0) {
+      logger.debug("[Daemon] No iOS devices to initialize XCTestService for");
+      return;
+    }
+
+    logger.info(`[Daemon] Initializing XCTestService for ${iosDevices.length} iOS device(s)...`);
+    const deviceSessionManager = DeviceSessionManager.getInstance();
+
+    for (const device of iosDevices) {
+      try {
+        logger.info(`[Daemon] Setting up XCTestService for iOS device ${device.id}`);
+        await deviceSessionManager.verifyIosDevice(device.id, {
+          skipAccessibilityDownload: true  // Skip app download during startup, use cached version
+        });
+        logger.info(`[Daemon] XCTestService ready for iOS device ${device.id}`);
+      } catch (error) {
+        // Log but don't fail - service will be set up on first tool call if needed
+        logger.warn(`[Daemon] Failed to initialize XCTestService for ${device.id}: ${error}`);
+      }
     }
   }
 

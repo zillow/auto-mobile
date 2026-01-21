@@ -116,9 +116,14 @@ export async function handleDaemonRequest(
       const pool = state.getDevicePool();
       const session = manager.getSession(sessionId);
       if (!session) {
+        // Session doesn't exist - treat as already released (idempotent)
+        // This happens when daemon auto-releases after executePlan completes
         return {
-          success: false,
-          error: `Session not found: ${sessionId}`,
+          success: true,
+          result: {
+            message: `Session ${sessionId} already released or never existed`,
+            alreadyReleased: true,
+          },
         };
       }
       const deviceId = session.assignedDevice;
@@ -129,6 +134,7 @@ export async function handleDaemonRequest(
         result: {
           message: `Session ${sessionId} released`,
           device: deviceId,
+          alreadyReleased: false,
         },
       };
     }

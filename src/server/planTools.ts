@@ -71,6 +71,7 @@ const executePlanResultSchema = z.object({
   }).optional(),
   error: z.string().optional(),
   platform: z.enum(["android", "ios"]).optional(),
+  deviceId: z.string().optional(),
   deviceMapping: z.record(z.string(), z.string()).optional(),
   debug: executePlanDebugSchema.optional()
 }).passthrough();
@@ -131,22 +132,23 @@ const executePlanTool = async (device: BootedDevice, params: {
   };
 
   try {
+    const perfStart = Date.now();
     logger.info("=== Starting executePlanTool ===");
-    logger.info(`Device: ${device.platform} (${device.deviceId}), Start Step: ${params.startStep}, SessionUUID: ${params.sessionUuid}`);
+    logger.info(`[PERF +0ms] Device: ${device.platform} (${device.deviceId}), Start Step: ${params.startStep}, SessionUUID: ${params.sessionUuid}`);
 
     let yamlContent = params.planContent;
     const startStep = params.startStep;
 
     // Decode base64 if content is base64-encoded
     if (yamlContent.startsWith("base64:")) {
-      logger.info("=== Decoding base64 plan content ===");
+      logger.info(`[PERF +${Date.now() - perfStart}ms] Decoding base64 plan content`);
       const base64Content = yamlContent.substring(7); // Remove "base64:" prefix
       yamlContent = Buffer.from(base64Content, "base64").toString("utf-8");
-      logger.info(`Base64 content decoded (${yamlContent.length} bytes)`);
+      logger.info(`[PERF +${Date.now() - perfStart}ms] Base64 content decoded (${yamlContent.length} bytes)`);
     }
 
     // Validate YAML schema before parsing
-    logger.info("=== Validating plan YAML schema ===");
+    logger.info(`[PERF +${Date.now() - perfStart}ms] Validating plan YAML schema`);
     const validator = new PlanSchemaValidator();
     await validator.loadSchema();
     const validationResult = validator.validateYaml(yamlContent);
@@ -162,12 +164,12 @@ const executePlanTool = async (device: BootedDevice, params: {
         "Check the schema at schemas/test-plan.schema.json for details."
       );
     }
-    logger.info("Plan YAML schema validation passed");
+    logger.info(`[PERF +${Date.now() - perfStart}ms] Plan YAML schema validation passed`);
 
     // Parse the plan
-    logger.info("=== Parsing plan from YAML ===");
+    logger.info(`[PERF +${Date.now() - perfStart}ms] Parsing plan from YAML`);
     const plan = importPlanFromYaml(yamlContent);
-    logger.info(`Plan parsed successfully: '${plan.name}' with ${plan.steps.length} steps`);
+    logger.info(`[PERF +${Date.now() - perfStart}ms] Plan parsed: '${plan.name}' with ${plan.steps.length} steps`);
 
     const normalizedPlanDevices = normalizePlanDevices(plan.devices);
     const planDeviceLabels = normalizedPlanDevices.labels;
@@ -202,7 +204,7 @@ const executePlanTool = async (device: BootedDevice, params: {
       }
 
       // Upfront device allocation for fail-fast behavior
-      logger.info("=== Allocating devices upfront ===");
+      logger.info(`[PERF +${Date.now() - perfStart}ms] Allocating devices upfront`);
 
       if (!DaemonState.getInstance().isInitialized()) {
         throw new ActionableError("Multi-device plans require an active daemon session.");
@@ -280,10 +282,10 @@ const executePlanTool = async (device: BootedDevice, params: {
       }
 
       // Log the allocation result
-      logger.info("=== Device allocation complete ===");
+      logger.info(`[PERF +${Date.now() - perfStart}ms] Device allocation complete`);
       for (const [label, deviceId] of Object.entries(deviceMapping)) {
         const sessionUuid = labelToSessionMap[label];
-        logger.info(`  ${label} → ${deviceId} (session: ${sessionUuid})`);
+        logger.info(`[PERF +${Date.now() - perfStart}ms]   ${label} → ${deviceId} (session: ${sessionUuid})`);
       }
 
       // Register the device label map (sessions are already created, this just caches the mapping)
@@ -298,9 +300,10 @@ const executePlanTool = async (device: BootedDevice, params: {
     }
 
     // Execute the plan with device context
-    logger.info(`=== Starting plan execution on device ${device.deviceId} ===`);
+    logger.info(`[PERF +${Date.now() - perfStart}ms] Starting plan execution on device ${device.deviceId} (${device.platform})`);
     const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal, params.abortStrategy);
-    logger.info(`Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
+    const execDuration = Date.now() - perfStart;
+    logger.info(`[PERF +${execDuration}ms] Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
 
     await recordTestExecution(result.success ? "passed" : "failed", Date.now() - startTime);
 
@@ -311,13 +314,14 @@ const executePlanTool = async (device: BootedDevice, params: {
       failedStep: result.failedStep,
       error: result.failedStep ? result.failedStep.error : undefined,
       platform: device.platform,
+      deviceId: device.deviceId,
       deviceMapping
     };
 
-    logger.info("=== Returning from executePlanTool ===");
+    logger.info(`[PERF +${Date.now() - perfStart}ms] Returning from executePlanTool (deviceId=${device.deviceId})`);
     return createJSONToolResponse(response);
   } catch (error) {
-    logger.error("=== Failed to execute plan ===", error);
+    logger.error(`[PERF] Failed to execute plan: ${error}`);
 
     await recordTestExecution("failed", Date.now() - startTime);
 
@@ -326,10 +330,11 @@ const executePlanTool = async (device: BootedDevice, params: {
       executedSteps: 0,
       totalSteps: 0,
       error: `${error}`,
-      platform: device.platform
+      platform: device.platform,
+      deviceId: device.deviceId
     };
 
-    logger.info("=== Returning error from executePlanTool ===");
+    logger.info(`[PERF] Returning error from executePlanTool (deviceId=${device.deviceId})`);
     return createJSONToolResponse(response);
   }
 };

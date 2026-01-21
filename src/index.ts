@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./server";
 import { logger } from "./utils/logger";
 import { runCliCommand } from "./cli";
-import { runDaemonCommand } from "./daemon/manager";
+import { runDaemonCommand, DaemonManager } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./daemon/videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./daemon/testRecordingSocketServer";
@@ -756,6 +756,24 @@ process.on("unhandledRejection", (reason, promise) => {
 
 async function main() {
   try {
+    // Kill any running daemons at startup to prevent conflicts
+    // The MCP server should have exclusive access to devices
+    const daemonManager = new DaemonManager();
+    const runningDaemons = daemonManager.findAllDaemonProcesses();
+    if (runningDaemons.length > 0) {
+      logger.info(`Found ${runningDaemons.length} running daemon(s), stopping them...`);
+      for (const pid of runningDaemons) {
+        try {
+          process.kill(pid, "SIGTERM");
+          logger.info(`Stopped daemon PID ${pid}`);
+        } catch (error) {
+          logger.warn(`Failed to stop daemon PID ${pid}: ${error}`);
+        }
+      }
+      // Wait briefly for processes to terminate
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     // Parse command line arguments
     const {
       cliMode,

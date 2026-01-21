@@ -77,20 +77,31 @@ try observer.exportTimingData(to: "timing-history.json")
 ### Environment Variables
 
 Primary:
-- `AUTOMOBILE_DAEMON_SOCKET_PATH`: Daemon socket path (default: `/tmp/auto-mobile-daemon-$UID.sock`)
-- `AUTOMOBILE_MCP_URL`: MCP HTTP endpoint (optional override)
-- `AUTOMOBILE_TEST_PLAN`: Path to YAML automation plan
-- `AUTOMOBILE_TEST_RETRY_COUNT`: Number of retry attempts (default: 0)
-- `AUTOMOBILE_TEST_TIMEOUT_SECONDS`: Test timeout in seconds (default: 300)
-- `AUTOMOBILE_TEST_RETRY_DELAY_SECONDS`: Retry backoff in seconds (default: 1)
-- `AUTOMOBILE_INTEGRATION_TESTS`: Set to `1` to enable MCP integration tests
+- `AUTOMOBILE_MCP_URL`: MCP HTTP endpoint. If unset, the runner uses the daemon socket.
+- `AUTOMOBILE_MCP_HTTP_URL`: Alias for `AUTOMOBILE_MCP_URL`.
+- `AUTOMOBILE_DAEMON_SOCKET_PATH`: Daemon socket path (default: `/tmp/auto-mobile-daemon-$UID.sock`).
+- `AUTOMOBILE_TEST_PLAN`: Path to YAML automation plan.
+- `AUTOMOBILE_TEST_RETRY_COUNT`: Number of retry attempts (default: `0`).
+- `AUTOMOBILE_TEST_TIMEOUT_SECONDS`: Test timeout in seconds (default: `300`).
+- `AUTOMOBILE_TEST_RETRY_DELAY_SECONDS`: Retry backoff in seconds (default: `1`).
+- `AUTOMOBILE_CI_MODE`: Marks runs as CI for metadata and timing fetch behavior.
+- `AUTOMOBILE_APP_VERSION`: App version metadata passed to MCP.
+- `AUTOMOBILE_GIT_COMMIT`: Git commit metadata passed to MCP.
 
 Legacy (still supported):
-- `AUTO_MOBILE_DAEMON_SOCKET_PATH`: Daemon socket path
-- `MCP_ENDPOINT`: MCP server endpoint
-- `PLAN_PATH`: Path to YAML automation plan
-- `RETRY_COUNT`: Number of retry attempts
-- `TEST_TIMEOUT`: Test timeout in seconds
+- `AUTO_MOBILE_DAEMON_SOCKET_PATH`
+- `MCP_ENDPOINT`
+- `PLAN_PATH`
+- `RETRY_COUNT`
+- `TEST_TIMEOUT`
+- `AUTO_MOBILE_APP_VERSION`
+- `APP_VERSION`
+- `AUTO_MOBILE_GIT_COMMIT`
+- `GITHUB_SHA`
+- `GIT_COMMIT`
+- `CI_COMMIT_SHA`
+- `CI`
+- `GITHUB_ACTIONS`
 
 ### Test Scheme Settings
 
@@ -98,6 +109,25 @@ Configure in Xcode test scheme:
 1. Edit Scheme → Test → Arguments
 2. Add environment variables
 3. Configure test ordering and parallelization
+
+Test ordering and timing settings (via environment variables or UserDefaults):
+- `automobile.junit.timing.ordering`: `auto`, `duration-asc`, `duration-desc`, `none`.
+- `automobile.junit.timing.enabled`: Enable/disable timing fetch (default: `true`).
+- `automobile.junit.timing.lookback.days`: Timing history window (default: `90`).
+- `automobile.junit.timing.limit`: Max timing records to load (default: `1000`).
+- `automobile.junit.timing.min.samples`: Minimum samples per test (default: `1`).
+- `automobile.junit.timing.fetch.timeout.ms`: Timing fetch timeout in ms (default: `5000`).
+- `automobile.ci.mode`: Disable timing fetch in CI (default: `false`).
+
+Parallel worker count is derived from either:
+- `-parallel-testing-worker-count <n>` (Xcode argument).
+- `XCTEST_PARALLEL_THREAD_COUNT=<n>` (environment variable).
+
+Example scheme argument values:
+```
+-automobile.junit.timing.ordering duration-desc
+-automobile.junit.timing.limit 500
+```
 
 ## Building
 
@@ -119,6 +149,9 @@ xcodebuild -scheme XCTestRunner -destination 'platform=iOS Simulator,name=iPhone
 3. Subclass AutoMobileTestCase
 4. Configure test scheme with environment variables
 5. Run tests via Xcode Test Navigator or xcodebuild
+
+When using the daemon socket transport (default), XCTestRunner will attempt to start the AutoMobile
+daemon automatically if it cannot connect.
 
 ## Example XCTest Target (Reminders)
 
@@ -143,15 +176,37 @@ final class RemindersLaunchPlanTests: AutoMobileTestCase {
 }
 ```
 
+The sample target is implemented in `ios/XCTestRunner/Sources/XCTestRunnerTests/RemindersIntegrationTests.swift`
+and compiles as part of the `XCTestRunnerTests` target.
+
 Integration test (opt-in, requires MCP + iOS simulator running):
 
 ```bash
-AUTOMOBILE_INTEGRATION_TESTS=1 \
 AUTOMOBILE_DAEMON_SOCKET_PATH=/tmp/auto-mobile-daemon-$UID.sock \
 swift test --filter RemindersLaunchPlanTests
 ```
 
 Note: The Reminders plans assume English UI labels and may need adjustment for other locales.
+
+## CI vs local execution
+
+Local development typically uses the daemon socket (no MCP URL override):
+
+```bash
+AUTOMOBILE_TEST_PLAN=Plans/launch-reminders-app.yaml \
+swift test --filter RemindersLaunchPlanTests
+```
+
+CI should set explicit MCP metadata and use an HTTP endpoint:
+
+```bash
+AUTOMOBILE_CI_MODE=1 \
+AUTOMOBILE_MCP_URL="https://mcp.example.com/auto-mobile/streamable" \
+AUTOMOBILE_TEST_PLAN=Plans/launch-reminders-app.yaml \
+AUTOMOBILE_APP_VERSION="1.2.3" \
+AUTOMOBILE_GIT_COMMIT="$GITHUB_SHA" \
+xcodebuild test -scheme XCTestRunner -destination 'platform=iOS Simulator,name=iPhone 15'
+```
 
 ## Development Status
 

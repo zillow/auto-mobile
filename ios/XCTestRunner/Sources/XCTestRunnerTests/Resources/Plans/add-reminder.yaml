@@ -23,8 +23,9 @@ steps:
     text: "AutoMobile XCTest demo"
     label: Type reminder title
 
-  - tool: pressButton
-    button: "return"
+  - tool: tapOn
+    text: "Done"
+    action: "tap"
     label: Save reminder
 
   - tool: terminateApp

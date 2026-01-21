@@ -2,10 +2,17 @@ import Foundation
 import Darwin
 import XCTest
 
+// Module load logging - this runs when the test module is first loaded
+private let _moduleLoadLog: Void = {
+    let line = "[XCTestRunner] Module loaded at \(Date())\n"
+    fputs(line, stderr)
+}()
+
 public enum AutoMobileTestCaseError: Error, CustomStringConvertible {
     case missingPlanPath
     case invalidEndpoint(String)
     case executorUnavailable
+    case devicePoolUnavailable(String)
 
     public var description: String {
         switch self {
@@ -15,6 +22,8 @@ public enum AutoMobileTestCaseError: Error, CustomStringConvertible {
             return "Invalid MCP endpoint: \(endpoint)"
         case .executorUnavailable:
             return "AutoMobile plan executor is unavailable."
+        case let .devicePoolUnavailable(details):
+            return "Device pool unavailable: \(details)"
         }
     }
 }
@@ -22,13 +31,20 @@ public enum AutoMobileTestCaseError: Error, CustomStringConvertible {
 /// Base XCTestCase for executing AutoMobile YAML automation plans via MCP.
 open class AutoMobileTestCase: XCTestCase {
     override open class var defaultTestSuite: XCTestSuite {
+        // Ensure module load logging is triggered
+        _ = _moduleLoadLog
+        PerfTimer.log("defaultTestSuite START for \(self)")
         if self == AutoMobileTestCase.self {
+            PerfTimer.log("defaultTestSuite: returning empty suite for base class")
             return XCTestSuite(name: "AutoMobileTestCase")
         }
+        PerfTimer.log("defaultTestSuite: registering observer")
         _ = AutoMobileTestObserver.registerIfNeeded()
 
+        PerfTimer.log("defaultTestSuite: calling super.defaultTestSuite")
         let baseSuite = super.defaultTestSuite
         let tests = baseSuite.tests
+        PerfTimer.log("defaultTestSuite: found \(tests.count) tests")
         let orderingSelection = resolveTimingOrderingSelection()
         let timingAvailable = TestTimingCache.shared.hasTimings()
         logTimingOrdering(selection: orderingSelection, timingAvailable: timingAvailable)
@@ -38,6 +54,7 @@ open class AutoMobileTestCase: XCTestCase {
             let orderedTests = orderTestsByTiming(tests, strategy: orderingSelection.resolved)
             baseSuite.setValue(orderedTests, forKey: "tests")
         }
+        PerfTimer.log("defaultTestSuite END for \(self)")
         return baseSuite
     }
     open var planPath: String {
@@ -95,49 +112,81 @@ open class AutoMobileTestCase: XCTestCase {
 
     private var executor: AutoMobilePlanExecutor?
     private let environment = AutoMobileEnvironment()
+    private static let devicePoolCheckLock = NSLock()
+    private static var devicePoolCheckCompleted = false
 
     override open func setUpWithError() throws {
-        try super.setUpWithError()
-        try setUpAutoMobile()
-        let config = try makeConfiguration()
-        executor = AutoMobilePlanExecutor(configuration: config)
+        PerfTimer.log("setUpWithError START for \(name)")
+        try PerfTimer.measure("super.setUpWithError") {
+            try super.setUpWithError()
+        }
+        try PerfTimer.measure("setUpAutoMobile") {
+            try setUpAutoMobile()
+        }
+        let config = try PerfTimer.measure("makeConfiguration") {
+            try makeConfiguration()
+        }
+        PerfTimer.log("Configuration: planPath=\(config.planPath), transport=\(config.transport)")
+        executor = PerfTimer.measure("createExecutor") {
+            AutoMobilePlanExecutor(configuration: config)
+        }
+        PerfTimer.log("setUpWithError END for \(name)")
     }
 
     override open func tearDownWithError() throws {
+        print("[AutoMobileTestCase] tearDownWithError starting for \(name)")
         try tearDownAutoMobile()
         executor = nil
+        // Note: Session release is handled automatically by the daemon after executePlan completes
         try super.tearDownWithError()
+        print("[AutoMobileTestCase] tearDownWithError complete")
     }
 
     public func executePlan() throws -> AutoMobilePlanExecutor.ExecutePlanResult {
+        PerfTimer.log("executePlan START")
         guard let executor = executor else {
+            PerfTimer.log("ERROR: executor is nil")
             throw AutoMobileTestCaseError.executorUnavailable
         }
-        let metadata = buildTestMetadata()
-        return try executor.execute(testMetadata: metadata)
+        let metadata = PerfTimer.measure("buildTestMetadata") {
+            buildTestMetadata()
+        }
+        PerfTimer.log("Executing with metadata: testClass=\(metadata.testClass), testMethod=\(metadata.testMethod)")
+        let result = try PerfTimer.measure("executor.execute") {
+            try executor.execute(testMetadata: metadata)
+        }
+        PerfTimer.log("executePlan END - success=\(result.success), steps=\(result.executedSteps)/\(result.totalSteps)")
+        return result
     }
 
     private func makeConfiguration() throws -> AutoMobilePlanExecutor.Configuration {
+        PerfTimer.log("makeConfiguration: resolving planPath")
         let planPath = planPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        PerfTimer.log("makeConfiguration: planPath=\(planPath)")
         guard !planPath.isEmpty else {
+            PerfTimer.log("ERROR: planPath is empty")
             throw AutoMobileTestCaseError.missingPlanPath
         }
 
         let transport: AutoMobilePlanExecutor.Transport
+        PerfTimer.log("makeConfiguration: checking for MCP endpoint env vars")
         if let endpoint = environment.firstNonEmpty([
             "AUTOMOBILE_MCP_URL",
             "AUTOMOBILE_MCP_HTTP_URL",
             "MCP_ENDPOINT"
         ]) {
+            PerfTimer.log("makeConfiguration: using HTTP transport endpoint=\(endpoint)")
             let normalizedEndpoint = normalizeEndpoint(endpoint)
             guard let endpointURL = URL(string: normalizedEndpoint) else {
                 throw AutoMobileTestCaseError.invalidEndpoint(normalizedEndpoint)
             }
             transport = .streamableHttp(url: endpointURL)
         } else {
+            PerfTimer.log("makeConfiguration: using Unix socket transport at \(daemonSocketPath)")
             transport = .daemonUnixSocket(path: daemonSocketPath)
         }
 
+        PerfTimer.log("makeConfiguration: creating Configuration object")
         return AutoMobilePlanExecutor.Configuration(
             transport: transport,
             planPath: planPath,
@@ -198,6 +247,214 @@ open class AutoMobileTestCase: XCTestCase {
             return "\(trimmed)/streamable"
         }
         return "\(trimmed)/auto-mobile/streamable"
+    }
+
+    private struct BootedDevicesResource: Decodable {
+        let totalCount: Int?
+        let devices: [BootedDeviceInfo]
+    }
+
+    private struct BootedDeviceInfo: Decodable {
+        let name: String?
+        let platform: String
+        let deviceId: String
+        let poolStatus: String?
+    }
+
+    private func ensureDevicePoolReady() throws {
+        Self.devicePoolCheckLock.lock()
+        defer { Self.devicePoolCheckLock.unlock() }
+        if Self.devicePoolCheckCompleted {
+            return
+        }
+
+        let bootedSimulatorDetected = hasBootedSimulator()
+        let usesDaemonSocket = isDaemonSocketTransport()
+
+        var resource = try fetchBootedDevicesResource(
+            timeoutSeconds: 5,
+            allowDaemonStart: usesDaemonSocket
+        )
+
+        if usesDaemonSocket && resource.devices.contains(where: { $0.poolStatus == nil }) {
+            try startDaemon()
+            resource = try fetchBootedDevicesResource(timeoutSeconds: 5, allowDaemonStart: false)
+        }
+
+        let devices = resource.devices
+        if bootedSimulatorDetected && devices.isEmpty {
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Booted iOS simulator detected, but no booted iOS devices reported by the daemon."
+            )
+        }
+
+        let missingStatus = devices.filter { $0.poolStatus == nil }
+        if !missingStatus.isEmpty {
+            let names = missingStatus.map { $0.name ?? $0.deviceId }.joined(separator: ", ")
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Booted devices missing pool status: \(names). Ensure the AutoMobile daemon is running."
+            )
+        }
+
+        let unavailable = devices.filter { $0.poolStatus != "idle" }
+        if !unavailable.isEmpty {
+            let details = unavailable.map {
+                "\($0.name ?? $0.deviceId)=\($0.poolStatus ?? "unknown")"
+            }.joined(separator: ", ")
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Booted devices unavailable: \(details)"
+            )
+        }
+
+        Self.devicePoolCheckCompleted = true
+    }
+
+    private func makeMcpClient() throws -> AutoMobileMCPClient {
+        if let endpoint = environment.firstNonEmpty([
+            "AUTOMOBILE_MCP_URL",
+            "AUTOMOBILE_MCP_HTTP_URL",
+            "MCP_ENDPOINT"
+        ]) {
+            let normalizedEndpoint = normalizeEndpoint(endpoint)
+            guard let endpointURL = URL(string: normalizedEndpoint) else {
+                throw AutoMobileTestCaseError.invalidEndpoint(normalizedEndpoint)
+            }
+            return try StreamableHTTPMCPClient(endpoint: endpointURL)
+        }
+        return AutoMobileDaemonClient(socketPath: daemonSocketPath)
+    }
+
+    private func isDaemonSocketTransport() -> Bool {
+        return environment.firstNonEmpty([
+            "AUTOMOBILE_MCP_URL",
+            "AUTOMOBILE_MCP_HTTP_URL",
+            "MCP_ENDPOINT"
+        ]) == nil
+    }
+
+    private func fetchBootedDevicesResource(
+        timeoutSeconds: TimeInterval,
+        allowDaemonStart: Bool
+    ) throws -> BootedDevicesResource {
+        let client = try makeMcpClient()
+
+        do {
+            try client.initialize(timeout: timeoutSeconds)
+        } catch {
+            if allowDaemonStart {
+                try startDaemon()
+                return try fetchBootedDevicesResource(timeoutSeconds: timeoutSeconds, allowDaemonStart: false)
+            }
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to initialize MCP client: \(error.localizedDescription)"
+            )
+        }
+
+        let response: MCPResourceResponse
+        do {
+            response = try client.readResource(uri: "automobile:devices/booted/ios", timeout: timeoutSeconds)
+        } catch {
+            if allowDaemonStart {
+                try startDaemon()
+                return try fetchBootedDevicesResource(timeoutSeconds: timeoutSeconds, allowDaemonStart: false)
+            }
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to read booted device resource: \(error.localizedDescription)"
+            )
+        }
+
+        guard let data = response.text.data(using: .utf8) else {
+            throw AutoMobileTestCaseError.devicePoolUnavailable("Invalid device pool response.")
+        }
+
+        if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []),
+           let object = jsonObject as? [String: Any],
+           let error = object["error"] as? String,
+           !error.isEmpty {
+            throw AutoMobileTestCaseError.devicePoolUnavailable(error)
+        }
+
+        let decoder = JSONDecoder()
+        do {
+            return try decoder.decode(BootedDevicesResource.self, from: data)
+        } catch {
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to parse booted device resource: \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func startDaemon() throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["auto-mobile", "--daemon", "start"]
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
+        do {
+            try process.run()
+        } catch {
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to start daemon: \(error.localizedDescription)"
+            )
+        }
+
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+            let stderr = String(data: errorData, encoding: .utf8) ?? ""
+            let message = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw AutoMobileTestCaseError.devicePoolUnavailable(
+                "Failed to start daemon: \(message.isEmpty ? "exit code \(process.terminationStatus)" : message)"
+            )
+        }
+    }
+
+    internal func hasBootedSimulator() -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        process.arguments = ["simctl", "list", "devices", "--json"]
+
+        let outputPipe = Pipe()
+        let errorPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = errorPipe
+
+        do {
+            try process.run()
+        } catch {
+            return false
+        }
+
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            return false
+        }
+
+        let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        guard let json = try? JSONSerialization.jsonObject(with: data, options: []),
+              let payload = json as? [String: Any],
+              let devices = payload["devices"] as? [String: Any] else {
+            return false
+        }
+
+        for (_, value) in devices {
+            guard let deviceList = value as? [[String: Any]] else {
+                continue
+            }
+            for device in deviceList {
+                let state = device["state"] as? String
+                let isAvailable = device["isAvailable"] as? Bool ?? true
+                if state == "Booted", isAvailable {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 
     private enum TimingOrderingStrategy: String {

@@ -311,6 +311,12 @@ export interface XCTestService {
   hasCachedHierarchy(): boolean;
   invalidateCache(): void;
   close(): Promise<void>;
+
+  /**
+   * Register a callback to be notified when push updates arrive from iOS.
+   * Returns a function to unregister the callback.
+   */
+  onPushUpdate(callback: (hierarchy: XCTestHierarchy) => void): () => void;
 }
 
 /**
@@ -345,6 +351,9 @@ export class XCTestServiceClient implements XCTestService {
   private cachedHierarchy: CachedHierarchy | null = null;
   private static readonly CACHE_FRESH_TTL_MS = 500;
   private hierarchyNavigationDetector: HierarchyNavigationDetector | null = null;
+
+  // Push update callbacks
+  private onPushUpdateCallbacks: Set<(hierarchy: XCTestHierarchy) => void> = new Set();
 
   // Auto-reconnect
   private autoReconnectEnabled: boolean = true;
@@ -611,7 +620,10 @@ export class XCTestServiceClient implements XCTestService {
         fresh: true,
         perfTiming: message.perfTiming
       };
-      logger.debug(`[XCTestServiceClient] Received hierarchy push update`);
+      logger.info(`[XCTestServiceClient] Received hierarchy push update - UI changed`);
+
+      // Notify listeners (e.g., ObserveScreen to clear its cache)
+      this.notifyPushUpdateListeners(message.data);
       return;
     }
   }
@@ -740,6 +752,30 @@ export class XCTestServiceClient implements XCTestService {
   public invalidateCache(): void {
     if (this.cachedHierarchy) {
       this.cachedHierarchy.fresh = false;
+    }
+  }
+
+  /**
+   * Register a callback to be notified when push updates arrive from iOS.
+   * This allows higher-level caches to be invalidated when the UI changes.
+   */
+  public onPushUpdate(callback: (hierarchy: XCTestHierarchy) => void): () => void {
+    this.onPushUpdateCallbacks.add(callback);
+    return () => {
+      this.onPushUpdateCallbacks.delete(callback);
+    };
+  }
+
+  /**
+   * Notify all registered callbacks about a push update
+   */
+  private notifyPushUpdateListeners(hierarchy: XCTestHierarchy): void {
+    for (const callback of this.onPushUpdateCallbacks) {
+      try {
+        callback(hierarchy);
+      } catch (error) {
+        logger.warn(`[XCTestServiceClient] Push update callback error: ${error}`);
+      }
     }
   }
 

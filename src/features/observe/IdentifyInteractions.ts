@@ -576,7 +576,11 @@ export class IdentifyInteractions {
   ): number {
     const args = edge.interaction?.args || {};
     const edgeText = typeof args.text === "string" ? args.text : undefined;
-    const edgeId = typeof args.id === "string" ? args.id : typeof args.elementId === "string" ? args.elementId : undefined;
+    const edgeId = typeof args.elementId === "string"
+      ? args.elementId
+      : typeof args.id === "string"
+        ? args.id
+        : undefined;
 
     let score = 0;
 

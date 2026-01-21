@@ -166,6 +166,7 @@ describe("handleDaemonRequest", () => {
     expect(response.result).toEqual({
       message: `Session ${sessionId} released`,
       device: deviceId,
+      alreadyReleased: false,
     });
     expect(devicePool.releasedDevices).toEqual([deviceId]);
     expect(sessionManager.getSession(sessionId)).toBeNull();

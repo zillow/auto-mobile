@@ -29,7 +29,7 @@ import { FeatureFlagService } from "../featureFlags/FeatureFlagService";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
-import { ObserveElementsBuilder } from "./ObserveElementsBuilder";
+import { ElementUtils } from "../utility/ElementUtils";
 
 /**
  * Interface for cached observe result
@@ -53,7 +53,6 @@ export class ObserveScreen {
   private backStack: GetBackStack;
   private adb: AdbClient;
   private predictiveUIState: PredictiveUIState;
-  private observeElementsBuilder: ObserveElementsBuilder;
 
   // Static cache for observe results
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
@@ -116,8 +115,7 @@ export class ObserveScreen {
 
   constructor(
     device: BootedDevice,
-    adb: AdbClient | null = null,
-    observeElementsBuilder: ObserveElementsBuilder = new ObserveElementsBuilder()
+    adb: AdbClient | null = null
   ) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
@@ -129,7 +127,6 @@ export class ObserveScreen {
     this.dumpsysWindow = new GetDumpsysWindow(device, this.adb);
     this.backStack = new GetBackStack(this.adb);
     this.predictiveUIState = new PredictiveUIState();
-    this.observeElementsBuilder = observeElementsBuilder;
 
     // Ensure observe result cache directory exists
     if (!fs.existsSync(ObserveScreen.observeResultCacheDir)) {
@@ -382,13 +379,6 @@ export class ObserveScreen {
     }
   }
 
-  private populateElements(result: ObserveResult): void {
-    if (result.elements || !result.viewHierarchy?.hierarchy) {
-      return;
-    }
-
-    result.elements = this.observeElementsBuilder.build(result.viewHierarchy);
-  }
 
   /**
    * Collect active window information using cache if available
@@ -463,8 +453,6 @@ export class ObserveScreen {
           };
         }
 
-        this.populateElements(result);
-
         // Fallback: if activeWindow still not populated, use the Window class
         if (!result.activeWindow) {
           await this.collectActiveWindow(result);
@@ -508,8 +496,6 @@ export class ObserveScreen {
             attachRawViewHierarchy(result.viewHierarchy, rawHierarchy);
           }
         }
-
-        this.populateElements(result);
 
         perf.end();
         break;
@@ -984,9 +970,9 @@ export class ObserveScreen {
       return;
     }
 
-    // Need view hierarchy and elements
-    if (!result.viewHierarchy?.hierarchy || !result.elements) {
-      logger.debug("[AccessibilityAudit] Skipping audit, no view hierarchy or elements available");
+    // Need view hierarchy
+    if (!result.viewHierarchy?.hierarchy) {
+      logger.debug("[AccessibilityAudit] Skipping audit, no view hierarchy available");
       return;
     }
 
@@ -1003,12 +989,10 @@ export class ObserveScreen {
         // Initialize audit
         const wcagAudit = new WcagAudit();
 
-        // Flatten all elements for audit
-        const allElements: Element[] = [
-          ...(result.elements?.clickable || []),
-          ...(result.elements?.scrollable || []),
-          ...(result.elements?.text || []),
-        ];
+        // Extract elements directly from view hierarchy for audit
+        const elementUtils = new ElementUtils();
+        const allElements: Element[] = elementUtils.flattenViewHierarchy(result.viewHierarchy!)
+          .map(entry => entry.element);
 
         // Get screenshot path if available (from TakeScreenshot cache)
         const screenshotPath = await this.getLatestScreenshotPath();

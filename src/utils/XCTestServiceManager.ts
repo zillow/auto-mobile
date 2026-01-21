@@ -13,8 +13,14 @@ import {
   getHostControlHost,
   getXCTestServiceStatus,
   isHostControlAvailable,
+  getIproxyStatus,
+  runIdeviceIdExec,
+  runIdeviceInstallerExec,
+  runSimctlExec,
   shouldUseHostControl,
+  startIproxy,
   startXCTestService,
+  stopIproxy,
   stopXCTestService
 } from "./hostControlClient";
 
@@ -47,6 +53,26 @@ interface HostControlXCTestServiceRunner {
   isRunningInDocker(): boolean;
   isAvailable(): Promise<boolean>;
   getHost(): string;
+  runIdeviceId(args: string[]): Promise<{ success: boolean; error?: string; data?: { stdout: string } }>;
+  runIdeviceInstaller(args: string[]): Promise<{ success: boolean; error?: string; data?: { stdout: string } }>;
+  runSimctl(args: string[]): Promise<{ success: boolean; error?: string; data?: { stdout: string } }>;
+  startIproxy(params: {
+    deviceId: string;
+    localPort: number;
+    devicePort?: number;
+  }): Promise<{ success: boolean; error?: string; data?: { pid: number } }>;
+  stopIproxy(params: {
+    pid?: number;
+    deviceId?: string;
+    localPort?: number;
+    devicePort?: number;
+  }): Promise<{ success: boolean; error?: string }>;
+  getIproxyStatus(params: {
+    pid?: number;
+    deviceId?: string;
+    localPort?: number;
+    devicePort?: number;
+  }): Promise<{ success: boolean; error?: string; data?: { running: boolean; pid?: number } }>;
   start(params: {
     deviceId: string;
     port: number;
@@ -146,6 +172,12 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       isRunningInDocker,
       isAvailable: () => isHostControlAvailable(),
       getHost: () => getHostControlHost(),
+      runIdeviceId: async (args: string[]) => runIdeviceIdExec(args),
+      runIdeviceInstaller: async (args: string[]) => runIdeviceInstallerExec(args),
+      runSimctl: async (args: string[]) => runSimctlExec(args),
+      startIproxy: params => startIproxy(params),
+      stopIproxy: params => stopIproxy(params),
+      getIproxyStatus: params => getIproxyStatus(params),
       start: params => startXCTestService(params),
       stop: params => stopXCTestService(params),
       status: params => getXCTestServiceStatus(params)
@@ -254,6 +286,14 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
         return true;
       } else {
         // For physical devices, check if the test app is installed
+        if (this.useHostControl()) {
+          const result = await this.hostControl.runIdeviceInstaller(["-u", this.device.deviceId, "-l"]);
+          if (!result.success || !result.data) {
+            return false;
+          }
+          return result.data.stdout.includes(IOSXCTestServiceManager.BUNDLE_ID);
+        }
+
         const { stdout } = await this.processExecutor.exec(
           `ideviceinstaller -u ${this.device.deviceId} -l 2>/dev/null | grep ${IOSXCTestServiceManager.BUNDLE_ID}`
         );
@@ -386,6 +426,10 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
         }
       } catch (error) {
         logger.warn(`[XCTestServiceManager] Host control stop failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      if (!this.isSimulator()) {
+        await this.stopIproxyTunnel();
       }
 
       this.xcTestProcessId = null;
@@ -700,7 +744,27 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     logger.info("[XCTestServiceManager] Starting XCTestService on physical device");
 
     if (this.useHostControl()) {
-      throw new Error("Host control XCTestService for physical devices is not supported yet.");
+      if (!await this.isHostControlAvailable()) {
+        throw new Error("Host control daemon not available for XCTestService startup");
+      }
+
+      const xctestrunPath = await this.builder.getXctestrunPath("device");
+      await this.startIproxyTunnel();
+      await this.verifyInstalledAppBundle();
+
+      const result = await this.hostControl.start({
+        deviceId: this.device.deviceId,
+        port: this.servicePort,
+        xctestrunPath: xctestrunPath || undefined
+      });
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Host control failed to start XCTestService");
+      }
+
+      this.xcTestProcessId = result.data.pid;
+      this.xcTestProcess = null;
+      return;
     }
 
     // For physical devices, we need to use iproxy for port forwarding
@@ -836,6 +900,32 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       return;
     }
 
+    if (this.useHostControl()) {
+      if (this.iproxyProcessId) {
+        const status = await this.hostControl.getIproxyStatus({ pid: this.iproxyProcessId });
+        if (status.success && status.data?.running) {
+          return;
+        }
+      }
+
+      await this.stopIproxyTunnel();
+
+      const result = await this.hostControl.startIproxy({
+        deviceId: this.device.deviceId,
+        localPort: this.servicePort,
+        devicePort: this.servicePort
+      });
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to start iproxy tunnel via host control");
+      }
+
+      this.iproxyProcessId = result.data.pid;
+      this.iproxyProcess = null;
+      this.iproxyHealthFailures = 0;
+      await this.waitForIproxyStartup();
+      return;
+    }
+
     if (this.iproxyProcessId && await this.isProcessRunning(this.iproxyProcessId)) {
       return;
     }
@@ -887,7 +977,14 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
       this.iproxyRestartTimeout = null;
     }
 
-    if (this.iproxyProcess && typeof this.iproxyProcess.kill === "function") {
+    if (this.useHostControl()) {
+      if (this.iproxyProcessId) {
+        const result = await this.hostControl.stopIproxy({ pid: this.iproxyProcessId });
+        if (!result.success) {
+          logger.warn(`[XCTestServiceManager] Failed to stop host iproxy: ${result.error || "Unknown error"}`);
+        }
+      }
+    } else if (this.iproxyProcess && typeof this.iproxyProcess.kill === "function") {
       try {
         this.iproxyProcess.kill();
       } catch {
@@ -912,8 +1009,15 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     const deadline = this.timer.now() + timeoutMs;
 
     while (this.timer.now() < deadline) {
-      if (this.iproxyProcessId && await this.isProcessRunning(this.iproxyProcessId)) {
-        return;
+      if (this.iproxyProcessId) {
+        if (this.useHostControl()) {
+          const status = await this.hostControl.getIproxyStatus({ pid: this.iproxyProcessId });
+          if (status.success && status.data?.running) {
+            return;
+          }
+        } else if (await this.isProcessRunning(this.iproxyProcessId)) {
+          return;
+        }
       }
       await this.timer.sleep(100);
     }
@@ -982,6 +1086,14 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
   private async isDeviceDetected(): Promise<boolean> {
     if (this.isSimulator()) {
       try {
+        if (this.useHostControl()) {
+          const result = await this.hostControl.runSimctl(["list", "devices"]);
+          if (!result.success || !result.data) {
+            return false;
+          }
+          return result.data.stdout.includes(this.device.deviceId);
+        }
+
         const { stdout } = await this.processExecutor.exec("xcrun simctl list devices");
         return stdout.includes(this.device.deviceId);
       } catch {
@@ -990,6 +1102,14 @@ export class IOSXCTestServiceManager implements XCTestServiceManager {
     }
 
     try {
+      if (this.useHostControl()) {
+        const result = await this.hostControl.runIdeviceId(["-l"]);
+        if (!result.success || !result.data) {
+          return false;
+        }
+        return result.data.stdout.split("\n").some(line => line.trim() === this.device.deviceId);
+      }
+
       const { stdout } = await this.processExecutor.exec("idevice_id -l");
       return stdout.split("\n").some(line => line.trim() === this.device.deviceId);
     } catch {

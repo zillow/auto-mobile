@@ -184,13 +184,13 @@ const buildRecordedMetadata = (event: InteractionEvent): Record<string, any> => 
 
 const buildSelector = (
   element?: Partial<Element>
-): { id?: string; text?: string } | null => {
+): { elementId?: string; text?: string } | null => {
   if (!element) {
     return null;
   }
   const resourceId = element["resource-id"];
   if (resourceId) {
-    return { id: resourceId };
+    return { elementId: resourceId };
   }
 
   const text = element.text ?? element["content-desc"];
@@ -253,8 +253,8 @@ const buildPlanSteps = (events: InteractionEvent[]): PlanStep[] => {
       };
 
       if (selector) {
-        params.container = selector.id
-          ? { elementId: selector.id }
+        params.container = selector.elementId
+          ? { elementId: selector.elementId }
           : { text: selector.text };
       }
 

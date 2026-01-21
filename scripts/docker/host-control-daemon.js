@@ -28,8 +28,10 @@ const { promisify } = require("util");
 const path = require("path");
 const os = require("os");
 const fs = require("fs");
+const crypto = require("crypto");
 
 const execFileAsync = promisify(execFile);
+const fsp = fs.promises;
 
 // Configuration
 const DEFAULT_PORT = 15037;
@@ -95,6 +97,135 @@ async function isXcodeAvailable() {
 const runningEmulators = new Map(); // avdName -> { pid, process }
 const runningSimulators = new Map(); // udid -> { name, state }
 const runningXCTestServices = new Map(); // deviceId -> { pid, process, port, startedAt, deviceId }
+const runningIproxyTunnels = new Map(); // key -> { pid, process, deviceId, localPort, devicePort }
+
+const sanitizeForLog = value => String(value ?? "").replace(/[\r\n]/g, "");
+
+const skipPathSegment = segment => (
+  segment === "_CodeSignature" ||
+  segment === "SC_Info"
+);
+
+const skipFileName = name => (
+  name === "embedded.mobileprovision" ||
+  name === "PkgInfo" ||
+  name.endsWith(".xcent")
+);
+
+function normalizeDevicePath(rawPath) {
+  if (rawPath.startsWith("file://")) {
+    try {
+      return decodeURIComponent(new URL(rawPath).pathname);
+    } catch {
+      return rawPath.replace("file://", "");
+    }
+  }
+  return rawPath;
+}
+
+function findBundleEntry(data, bundleId) {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const found = findBundleEntry(item, bundleId);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  const record = data;
+  const idValue = record.bundleIdentifier || record.bundleID || record.bundleId || record.BUNDLE_IDENTIFIER;
+  if (typeof idValue === "string" && idValue === bundleId) {
+    return record;
+  }
+
+  for (const value of Object.values(record)) {
+    const found = findBundleEntry(value, bundleId);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function extractBundlePath(entry) {
+  const candidates = [
+    entry.bundleURL,
+    entry.bundlePath,
+    entry.bundleURLString,
+    entry.bundle_url,
+    entry.bundle_path,
+    entry.url,
+    entry.path
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      return normalizeDevicePath(candidate);
+    }
+  }
+  return null;
+}
+
+async function findAppBundleInDir(root) {
+  const entries = await fsp.readdir(root);
+  for (const entry of entries) {
+    const fullPath = path.join(root, entry);
+    const stats = await fsp.stat(fullPath);
+    if (stats.isDirectory()) {
+      if (entry.endsWith(".app")) {
+        return fullPath;
+      }
+      const nested = await findAppBundleInDir(fullPath);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return null;
+}
+
+async function collectBundlePaths(root, current, output) {
+  const entries = await fsp.readdir(current);
+  entries.sort();
+  for (const entry of entries) {
+    const fullPath = path.join(current, entry);
+    const stats = await fsp.stat(fullPath);
+    const relPath = path.relative(root, fullPath).replace(/\\/g, "/");
+    const segments = relPath.split("/").filter(Boolean);
+    if (segments.some(segment => skipPathSegment(segment))) {
+      continue;
+    }
+    const fileName = segments[segments.length - 1] || "";
+    if (skipFileName(fileName)) {
+      continue;
+    }
+    if (stats.isDirectory()) {
+      await collectBundlePaths(root, fullPath, output);
+    } else if (stats.isFile()) {
+      output.push(relPath);
+    }
+  }
+}
+
+async function hashAppBundle(bundlePath) {
+  const hash = crypto.createHash("sha256");
+  const files = [];
+  await collectBundlePaths(bundlePath, bundlePath, files);
+  files.sort();
+  for (const relativePath of files) {
+    const fullPath = path.join(bundlePath, relativePath);
+    hash.update(relativePath);
+    hash.update("\0");
+    const contents = await fsp.readFile(fullPath);
+    hash.update(contents);
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+}
 
 function drainChildOutput(child) {
   if (child.stdout) {
@@ -512,6 +643,341 @@ const handlers = {
   },
 
   /**
+   * Run xcode-select on the host
+   */
+  async "xcode-select"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "xcode-select is only available on macOS" };
+    }
+
+    const { args } = params;
+    if (!Array.isArray(args)) {
+      return { success: false, error: "args must be an array" };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync("xcode-select", args, {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      return { success: true, stdout, stderr };
+    } catch (error) {
+      return { success: false, error: error.message, stderr: error.stderr };
+    }
+  },
+
+  /**
+   * Run xcrun on the host
+   */
+  async "xcrun"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "xcrun is only available on macOS" };
+    }
+
+    const { args } = params;
+    if (!Array.isArray(args)) {
+      return { success: false, error: "args must be an array" };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync("xcrun", args, {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      return { success: true, stdout, stderr };
+    } catch (error) {
+      return { success: false, error: error.message, stderr: error.stderr };
+    }
+  },
+
+  /**
+   * Run security on the host
+   */
+  async "security"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "security is only available on macOS" };
+    }
+
+    const { args } = params;
+    if (!Array.isArray(args)) {
+      return { success: false, error: "args must be an array" };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync("security", args, {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      return { success: true, stdout, stderr };
+    } catch (error) {
+      return { success: false, error: error.message, stderr: error.stderr };
+    }
+  },
+
+  /**
+   * Run idevice_id on the host
+   */
+  async "idevice-id"(params) {
+    const { args } = params;
+    if (!Array.isArray(args)) {
+      return { success: false, error: "args must be an array" };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync("idevice_id", args, {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      return { success: true, stdout, stderr };
+    } catch (error) {
+      return { success: false, error: error.message, stderr: error.stderr };
+    }
+  },
+
+  /**
+   * Run ideviceinstaller on the host
+   */
+  async "ideviceinstaller"(params) {
+    const { args } = params;
+    if (!Array.isArray(args)) {
+      return { success: false, error: "args must be an array" };
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync("ideviceinstaller", args, {
+        timeout: COMMAND_TIMEOUT_MS
+      });
+      return { success: true, stdout, stderr };
+    } catch (error) {
+      return { success: false, error: error.message, stderr: error.stderr };
+    }
+  },
+
+  /**
+   * Start iproxy tunnel on the host
+   */
+  async "iproxy-start"(params) {
+    const { deviceId, localPort, devicePort } = params || {};
+    if (!deviceId || !localPort) {
+      return { success: false, error: "deviceId and localPort are required" };
+    }
+
+    const targetPort = devicePort || localPort;
+    const key = `${deviceId}:${localPort}:${targetPort}`;
+    const existing = runningIproxyTunnels.get(key);
+    if (existing && isProcessRunning(existing.pid)) {
+      return { success: true, pid: existing.pid, message: "iproxy already running" };
+    }
+
+    try {
+      const child = spawn("iproxy", [String(localPort), String(targetPort), deviceId], {
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      if (!child.pid) {
+        return { success: false, error: "Failed to start iproxy (no PID)" };
+      }
+
+      drainChildOutput(child);
+      runningIproxyTunnels.set(key, { pid: child.pid, process: child, deviceId, localPort, devicePort: targetPort });
+
+      child.on("exit", () => {
+        runningIproxyTunnels.delete(key);
+      });
+
+      return { success: true, pid: child.pid, message: "iproxy started" };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Stop iproxy tunnel on the host
+   */
+  async "iproxy-stop"(params) {
+    const { pid, deviceId, localPort, devicePort } = params || {};
+    let entry = null;
+
+    if (pid) {
+      for (const value of runningIproxyTunnels.values()) {
+        if (value.pid === pid) {
+          entry = value;
+          break;
+        }
+      }
+    } else if (deviceId && localPort) {
+      const targetPort = devicePort || localPort;
+      const key = `${deviceId}:${localPort}:${targetPort}`;
+      entry = runningIproxyTunnels.get(key) || null;
+    }
+
+    if (!entry) {
+      return { success: false, error: "iproxy process not found" };
+    }
+
+    try {
+      process.kill(entry.pid);
+      runningIproxyTunnels.forEach((value, key) => {
+        if (value.pid === entry.pid) {
+          runningIproxyTunnels.delete(key);
+        }
+      });
+      return { success: true, message: `Stopped iproxy pid ${entry.pid}` };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
+   * Check iproxy status on the host
+   */
+  async "iproxy-status"(params) {
+    const { pid, deviceId, localPort, devicePort } = params || {};
+    let entry = null;
+
+    if (pid) {
+      for (const value of runningIproxyTunnels.values()) {
+        if (value.pid === pid) {
+          entry = value;
+          break;
+        }
+      }
+    } else if (deviceId && localPort) {
+      const targetPort = devicePort || localPort;
+      const key = `${deviceId}:${localPort}:${targetPort}`;
+      entry = runningIproxyTunnels.get(key) || null;
+    }
+
+    if (!entry) {
+      return { success: true, running: false };
+    }
+
+    const running = isProcessRunning(entry.pid);
+    if (!running) {
+      runningIproxyTunnels.forEach((value, key) => {
+        if (value.pid === entry.pid) {
+          runningIproxyTunnels.delete(key);
+        }
+      });
+      return { success: true, running: false };
+    }
+
+    return {
+      success: true,
+      running: true,
+      pid: entry.pid,
+      deviceId: entry.deviceId,
+      localPort: entry.localPort,
+      devicePort: entry.devicePort
+    };
+  },
+
+  /**
+   * Compute app bundle hash via devicectl on the host
+   */
+  async "devicectl-app-hash"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "devicectl is only available on macOS" };
+    }
+
+    const { deviceId, bundleId } = params || {};
+    if (!deviceId || !bundleId) {
+      return { success: false, error: "deviceId and bundleId are required" };
+    }
+
+    const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "automobile-devicectl-"));
+    const jsonPath = path.join(tempDir, "apps.json");
+    let copyDir = null;
+
+    try {
+      await execFileAsync("xcrun", [
+        "devicectl",
+        "device",
+        "info",
+        "apps",
+        "--device",
+        deviceId,
+        "--bundle-id",
+        bundleId,
+        "--json-output",
+        jsonPath,
+        "--quiet"
+      ], { timeout: COMMAND_TIMEOUT_MS });
+
+      const raw = await fsp.readFile(jsonPath, "utf-8");
+      const data = JSON.parse(raw);
+      const entry = findBundleEntry(data, bundleId);
+      if (!entry) {
+        return { success: true, hash: null };
+      }
+
+      const bundlePath = extractBundlePath(entry);
+      if (!bundlePath) {
+        return { success: true, hash: null };
+      }
+
+      copyDir = await fsp.mkdtemp(path.join(os.tmpdir(), "automobile-device-app-"));
+      await execFileAsync("xcrun", [
+        "devicectl",
+        "device",
+        "copy",
+        "from",
+        "--device",
+        deviceId,
+        "--source",
+        bundlePath,
+        "--destination",
+        copyDir,
+        "--quiet"
+      ], { timeout: COMMAND_TIMEOUT_MS });
+
+      const bundleOnDisk = await findAppBundleInDir(copyDir);
+      if (!bundleOnDisk) {
+        return { success: true, hash: null };
+      }
+
+      const hash = await hashAppBundle(bundleOnDisk);
+      return { success: true, hash };
+    } catch (error) {
+      return { success: false, error: error.message };
+    } finally {
+      try {
+        await fsp.rm(tempDir, { recursive: true, force: true });
+      } catch {}
+      if (copyDir) {
+        try {
+          await fsp.rm(copyDir, { recursive: true, force: true });
+        } catch {}
+      }
+    }
+  },
+
+  /**
+   * Uninstall an app via devicectl on the host
+   */
+  async "devicectl-uninstall"(params) {
+    if (!IS_MACOS) {
+      return { success: false, error: "devicectl is only available on macOS" };
+    }
+
+    const { deviceId, bundleId } = params || {};
+    if (!deviceId || !bundleId) {
+      return { success: false, error: "deviceId and bundleId are required" };
+    }
+
+    try {
+      await execFileAsync("xcrun", [
+        "devicectl",
+        "device",
+        "uninstall",
+        "app",
+        "--device",
+        deviceId,
+        bundleId,
+        "--quiet"
+      ], { timeout: COMMAND_TIMEOUT_MS });
+      return { success: true, message: "App uninstalled" };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  /**
    * Start XCTestService via xcodebuild on the host
    */
   async "xctest-start"(params) {
@@ -801,7 +1267,17 @@ iOS Commands (macOS only):
   - boot-simulator         Boot a simulator (params: udid)
   - shutdown-simulator     Shutdown a simulator (params: udid)
   - simctl                 Run simctl command (params: args)
+  - xcrun                  Run xcrun command (params: args)
   - xcodebuild             Run xcodebuild command (params: args)
+  - xcode-select           Run xcode-select command (params: args)
+  - security               Run security command (params: args)
+  - idevice-id             Run idevice_id command (params: args)
+  - ideviceinstaller       Run ideviceinstaller command (params: args)
+  - iproxy-start           Start iproxy tunnel (params: deviceId, localPort, devicePort)
+  - iproxy-stop            Stop iproxy tunnel (params: pid or deviceId, localPort, devicePort)
+  - iproxy-status          Check iproxy status (params: pid or deviceId, localPort, devicePort)
+  - devicectl-app-hash     Compute device app hash (params: deviceId, bundleId)
+  - devicectl-uninstall    Uninstall device app (params: deviceId, bundleId)
   - xctest-start           Start XCTestService (params: deviceId, port, xctestrunPath, bundleId, timeoutSeconds)
   - xctest-stop            Stop XCTestService (params: deviceId or pid)
   - xctest-status          Check XCTestService status (params: deviceId, pid, port)
@@ -830,6 +1306,16 @@ process.on("SIGINT", () => {
     try {
       process.kill(pid, "SIGTERM");
       console.log(`Stopped XCTestService for ${deviceId} (pid ${pid})`);
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  // Kill any iproxy tunnels we started
+  for (const { pid, deviceId } of runningIproxyTunnels.values()) {
+    try {
+      process.kill(pid, "SIGTERM");
+      console.log(`Stopped iproxy for ${sanitizeForLog(deviceId || "unknown device")} (pid ${pid})`);
     } catch {
       // Ignore errors
     }

@@ -197,6 +197,25 @@ public class WebSocketServer: WebSocketServing {
         }
     }
 
+    /// Broadcast a hierarchy update to all connected clients (push notification)
+    public func broadcastHierarchyUpdate(_ hierarchy: ViewHierarchy) {
+        let response = HierarchyUpdateResponse(
+            requestId: nil, // No requestId for push updates
+            data: hierarchy,
+            perfTiming: nil
+        )
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = .sortedKeys
+            let data = try encoder.encode(response)
+            broadcast(data)
+            print("[WebSocketServer] Broadcast hierarchy update to \(connections.count) client(s)")
+        } catch {
+            print("[WebSocketServer] Failed to encode hierarchy update: \(error)")
+        }
+    }
+
     /// Broadcast a message with perf timing data included.
     /// Flushes accumulated perf data and injects it into the message via the builder.
     /// - Parameter messageBuilder: Function that takes optional perfTiming and returns message data

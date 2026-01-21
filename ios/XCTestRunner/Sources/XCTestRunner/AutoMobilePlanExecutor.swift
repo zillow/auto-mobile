@@ -91,6 +91,9 @@ public struct DefaultPlanLoader: AutoMobilePlanLoading {
             if let resourceURL = resolveBundleResource(path: path, bundle: bundle) {
                 return try readFile(at: resourceURL)
             }
+            if let fallbackURL = resolveBundleFallback(path: path, bundle: bundle) {
+                return try readFile(at: fallbackURL)
+            }
         }
 
         if let mainURL = Bundle.main.url(forResource: path, withExtension: nil) {
@@ -125,6 +128,17 @@ public struct DefaultPlanLoader: AutoMobilePlanLoading {
             return bundle.url(forResource: name, withExtension: ext)
         }
         return nil
+    }
+
+    private func resolveBundleFallback(path: String, bundle: Bundle) -> URL? {
+        guard path.contains("/") else {
+            return nil
+        }
+        let filename = URL(fileURLWithPath: path).lastPathComponent
+        if let resourceURL = bundle.url(forResource: filename, withExtension: nil) {
+            return resourceURL
+        }
+        return resolveBundleResource(path: filename, bundle: bundle)
     }
 
     private func readFile(at url: URL) throws -> String {
@@ -203,25 +217,31 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
     }
 
     public func initialize(timeout: TimeInterval) throws {
+        PerfTimer.log("DaemonClient.initialize START")
         try ensureConnection(timeout: timeout)
+        PerfTimer.log("DaemonClient.initialize END")
     }
 
     public func callTool(name: String, arguments: [String: Any], timeout: TimeInterval) throws -> MCPToolResponse {
+        PerfTimer.log("DaemonClient.callTool START: name=\(name)")
         let params: [String: Any] = [
             "name": name,
             "arguments": arguments
         ]
         let result = try sendRequest(method: "tools/call", params: params, timeout: timeout)
         let text = try extractTextContent(from: result)
+        PerfTimer.log("DaemonClient.callTool END: name=\(name), responseLength=\(text.count)")
         return MCPToolResponse(text: text)
     }
 
     public func readResource(uri: String, timeout: TimeInterval) throws -> MCPResourceResponse {
+        PerfTimer.log("DaemonClient.readResource START: uri=\(uri)")
         let params: [String: Any] = [
             "uri": uri
         ]
         let result = try sendRequest(method: "resources/read", params: params, timeout: timeout)
         let text = try extractResourceTextContent(from: result)
+        PerfTimer.log("DaemonClient.readResource END: uri=\(uri), responseLength=\(text.count)")
         return MCPResourceResponse(text: text)
     }
 
@@ -233,9 +253,11 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
 
     private func ensureConnection(timeout: TimeInterval) throws {
         if connection != nil {
+            PerfTimer.log("ensureConnection: already connected")
             return
         }
 
+        PerfTimer.log("ensureConnection: creating NWConnection to \(socketPath)")
         let connection = NWConnection(to: .unix(path: socketPath), using: .tcp)
         let semaphore = DispatchSemaphore(value: 0)
         var connectionError: Error?
@@ -243,11 +265,14 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
         connection.stateUpdateHandler = { state in
             switch state {
             case .ready:
+                PerfTimer.log("ensureConnection: NWConnection ready")
                 semaphore.signal()
             case let .failed(error):
+                PerfTimer.log("ensureConnection: NWConnection failed - \(error)")
                 connectionError = error
                 semaphore.signal()
             case .cancelled:
+                PerfTimer.log("ensureConnection: NWConnection cancelled")
                 connectionError = MCPClientError.requestFailed("Daemon connection cancelled")
                 semaphore.signal()
             default:
@@ -255,9 +280,11 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
             }
         }
 
+        PerfTimer.log("ensureConnection: starting connection")
         connection.start(queue: queue)
         let timeoutResult = semaphore.wait(timeout: .now() + timeout)
         if timeoutResult == .timedOut {
+            PerfTimer.log("ensureConnection: TIMEOUT")
             connection.cancel()
             throw MCPClientError.requestFailed("Timed out connecting to daemon socket")
         }
@@ -267,10 +294,12 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
             throw MCPClientError.requestFailed(error.localizedDescription)
         }
 
+        PerfTimer.log("ensureConnection: connected successfully")
         self.connection = connection
     }
 
     private func sendRequest(method: String, params: [String: Any], timeout: TimeInterval) throws -> [String: Any] {
+        PerfTimer.log("sendRequest START: method=\(method)")
         try ensureConnection(timeout: timeout)
         guard let connection = connection else {
             throw MCPClientError.requestFailed("Daemon connection unavailable")
@@ -288,6 +317,7 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
         let data = try JSONSerialization.data(withJSONObject: request, options: [])
         var payload = data
         payload.append(0x0A)
+        PerfTimer.log("sendRequest: sending \(payload.count) bytes")
 
         let sendSemaphore = DispatchSemaphore(value: 0)
         var sendError: Error?
@@ -298,13 +328,17 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
 
         let sendTimeout = sendSemaphore.wait(timeout: .now() + timeout)
         if sendTimeout == .timedOut {
+            PerfTimer.log("sendRequest: TIMEOUT sending")
             throw MCPClientError.requestFailed("Timed out sending daemon request")
         }
         if let error = sendError {
             throw MCPClientError.requestFailed(error.localizedDescription)
         }
+        PerfTimer.log("sendRequest: sent successfully, waiting for response")
 
         let responseData = try receiveLine(timeout: timeout)
+        PerfTimer.log("sendRequest: received \(responseData.count) bytes")
+
         let jsonObject = try JSONSerialization.jsonObject(with: responseData, options: [])
         guard let response = jsonObject as? [String: Any] else {
             throw MCPClientError.invalidResponse("Expected JSON object response from daemon")
@@ -313,11 +347,13 @@ public final class AutoMobileDaemonClient: AutoMobileMCPClient {
         let success = response["success"] as? Bool ?? false
         if !success {
             let message = response["error"] as? String ?? "Daemon returned error"
+            PerfTimer.log("sendRequest ERROR: \(message)")
             throw MCPClientError.serverError(message)
         }
         guard let result = response["result"] as? [String: Any] else {
             throw MCPClientError.invalidResponse("Missing result in daemon response")
         }
+        PerfTimer.log("sendRequest END: method=\(method)")
         return result
     }
 
@@ -795,44 +831,73 @@ public final class AutoMobilePlanExecutor {
     }
 
     private func executeOnce(testMetadata: TestMetadata?) throws -> ExecutePlanResult {
+        PerfTimer.log("executeOnce START")
         let planContent: String
         do {
-            planContent = try planLoader.loadPlan(at: configuration.planPath, bundle: configuration.planBundle)
+            planContent = try PerfTimer.measure("loadPlan") {
+                try planLoader.loadPlan(at: configuration.planPath, bundle: configuration.planBundle)
+            }
         } catch let error as PlanLoaderError {
             throw ExecutorError.planNotFound(error.description)
         } catch {
             throw ExecutorError.planNotFound(error.localizedDescription)
         }
+        PerfTimer.log("planContent loaded, length=\(planContent.count) chars")
 
-        let substituted = substituteParameters(in: planContent, parameters: configuration.parameters)
-        let planMetadata = try PlanMetadataParser.parse(from: substituted)
+        let substituted = PerfTimer.measure("substituteParameters") {
+            substituteParameters(in: planContent, parameters: configuration.parameters)
+        }
+        let planMetadata = try PerfTimer.measure("parsePlanMetadata") {
+            try PlanMetadataParser.parse(from: substituted)
+        }
+        PerfTimer.log("planMetadata: platform=\(planMetadata.platform.map { String(describing: $0) } ?? "nil"), hasDevices=\(planMetadata.hasDevices), deviceLabels=\(planMetadata.deviceLabels)")
+
         let platform = try resolvePlatform(from: planMetadata)
+        PerfTimer.log("resolved platform=\(platform)")
+
         let sessionUuid = sessionIdProvider()
-        let arguments = buildExecutePlanArguments(
-            planContent: substituted,
-            sessionUuid: sessionUuid,
-            platform: platform,
-            deviceLabels: planMetadata.deviceLabels,
-            testMetadata: testMetadata
-        )
+        PerfTimer.log("sessionUuid=\(sessionUuid)")
+
+        let arguments = PerfTimer.measure("buildExecutePlanArguments") {
+            buildExecutePlanArguments(
+                planContent: substituted,
+                sessionUuid: sessionUuid,
+                platform: platform,
+                deviceLabels: planMetadata.deviceLabels,
+                testMetadata: testMetadata
+            )
+        }
+        PerfTimer.log("arguments built, keys=\(arguments.keys.sorted())")
 
         do {
-            try mcpClient.initialize(timeout: configuration.timeoutSeconds)
-            let response = try mcpClient.callTool(
-                name: "executePlan",
-                arguments: arguments,
-                timeout: configuration.timeoutSeconds
-            )
-            let result = try decodeExecutePlanResult(from: response.text)
+            try PerfTimer.measure("mcpClient.initialize") {
+                try mcpClient.initialize(timeout: configuration.timeoutSeconds)
+            }
+            PerfTimer.log("calling executePlan tool with timeout=\(configuration.timeoutSeconds)s")
+            let response = try PerfTimer.measure("mcpClient.callTool(executePlan)") {
+                try mcpClient.callTool(
+                    name: "executePlan",
+                    arguments: arguments,
+                    timeout: configuration.timeoutSeconds
+                )
+            }
+            PerfTimer.log("executePlan response received, length=\(response.text.count) chars")
+            let result = try PerfTimer.measure("decodeExecutePlanResult") {
+                try decodeExecutePlanResult(from: response.text)
+            }
+            PerfTimer.log("executeOnce END - success=\(result.success), steps=\(result.executedSteps)/\(result.totalSteps)")
             if result.success {
                 return result
             }
             throw ExecutorError.executionFailed(result.error ?? "AutoMobile plan failed")
         } catch let error as MCPClientError {
+            PerfTimer.log("executeOnce ERROR: MCPClientError - \(error.description)")
             throw ExecutorError.mcpFailure(error.description)
         } catch let error as ExecutorError {
+            PerfTimer.log("executeOnce ERROR: ExecutorError - \(error)")
             throw error
         } catch {
+            PerfTimer.log("executeOnce ERROR: \(error.localizedDescription)")
             throw ExecutorError.executionFailed(error.localizedDescription)
         }
     }

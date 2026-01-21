@@ -64,7 +64,16 @@ export const HEALTH_CHECK_INTERVAL_MS = 30000;
  * Daemon startup timeout in milliseconds
  * How long to wait for daemon to become ready
  */
-export const DAEMON_STARTUP_TIMEOUT_MS = 10000;
+const startupTimeoutOverride =
+  process.env.AUTOMOBILE_DAEMON_STARTUP_TIMEOUT_MS ??
+  process.env.AUTO_MOBILE_DAEMON_STARTUP_TIMEOUT_MS;
+const parsedStartupTimeout = startupTimeoutOverride
+  ? Number.parseInt(startupTimeoutOverride, 10)
+  : NaN;
+export const DAEMON_STARTUP_TIMEOUT_MS =
+  Number.isFinite(parsedStartupTimeout) && parsedStartupTimeout > 0
+    ? parsedStartupTimeout
+    : 10000;
 
 /**
  * Daemon shutdown timeout in milliseconds

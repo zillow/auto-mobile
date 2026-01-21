@@ -334,7 +334,7 @@ export class SessionManager {
 
     const device: BootedDevice = {
       name: session.assignedDevice,
-      platform: "android",
+      platform: session.platform,
       deviceId: session.assignedDevice
     };
     const manager = new KeepScreenAwakeManager(device);
