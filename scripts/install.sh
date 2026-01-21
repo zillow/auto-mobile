@@ -581,6 +581,9 @@ detect_os() {
         Linux*)
             echo "linux"
             ;;
+        MINGW*|MSYS*|CYGWIN*)
+            echo "linux"
+            ;;
         *)
             echo "unknown"
             ;;
