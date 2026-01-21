@@ -1,8 +1,8 @@
 # AutoMobile
 
-AutoMobile lets AI agents control your Android & iOS devices using natural language. [Install it now](install.md) and [get started](using/ux-exploration.md).
+AutoMobile is an MCP server that lets AI agents control your Android & iOS devices using natural language. [Install it now](install.md) and [get started](using/ux-exploration.md).
 
-It can do this by being an MCP server that uses standard platform tools like `adb` & `simctl` paired with additional Kotlin & Swift libraries and apps. All components are open source. The point is to provide mobile engineers with AI workflow tools to perform UX deep dives, reproduce bugs, and run automated tests.
+It uses standard platform tools like `adb` & `simctl` paired with its own additional Kotlin & Swift libraries and apps. All components are open source. The point is to provide mobile engineers with AI workflow tools to perform UX deep dives, reproduce bugs, and run automated tests.
 
 ??? example "See demo: Clock app alarm"
     ![Setting an alarm in the Clock app](img/clock-app.gif)
@@ -21,8 +21,8 @@ It can do this by being an MCP server that uses standard platform tools like `ad
 | **[Create UI tests](using/ui-tests.md)** | Describe test scenarios in plain English, get executable test plans |
 | **[Measure startup time](using/perf-analysis/startup.md)** | Profile cold and warm launch performance |
 | **[Check scroll performance](using/perf-analysis/scroll-framerate.md)** | Detect jank and dropped frames |
-| **[Audit contrast](using/a11y/contrast.md)** | Find accessibility issues with color contrast |
-| **[Check tap targets](using/a11y/tap-targets.md)** | Ensure touch targets meet size guidelines |
+| **[Audit contrast](using/a11y.md#contrast)** | Find accessibility issues with color contrast |
+| **[Check tap targets](using/a11y.md#tap-targets)** | Ensure touch targets meet size guidelines |
 
 ## How it works
 

@@ -4,7 +4,7 @@
 
 - [Explore app ux](using/ux-exploration.md), [create UI tests](using/ui-tests.md), and easily create [bug reports]() with built-in [video recording](design-docs/mcp/observe/video-recording.md) and [visual highlights](design-docs/mcp/observe/visual-highlighting.md).
 - Measure [startup](using/perf-analysis/startup.md), [scroll framerate](using/perf-analysis/scroll-framerate.md), and [screen transitions](using/perf-analysis/screen-transition.md).
-- Audit accessibility compliance with [contrast ratios](using/a11y/contrast.md) & [tap targets](using/a11y/tap-targets.md).
+- Audit accessibility compliance with [contrast ratios](using/a11y.md#contrast) & [tap targets](using/a11y.md#tap-targets).
 - (Coming soon) record tests via AutoMobile's companion Android plugin & MacOS app.
 - Run tests natively via [JUnitRunner for Android](design-docs/plat/android/junitrunner.md) and [XCTestRunner for iOS](design-docs/plat/ios/xctestrunner.md).
 

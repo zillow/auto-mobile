@@ -1,7 +1,5 @@
 # Design Documentation
 
-![AutoMobile](../img/auto-mobile-party.gif)
-
 Technical architecture and design details for AutoMobile.
 
 ## Design Principles

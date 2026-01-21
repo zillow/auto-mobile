@@ -67,6 +67,7 @@ markdown_extensions:
       alternate_style: true
   - tables
   - admonition
+  - pymdownx.details
   - attr_list
   - md_in_html
 
@@ -78,12 +79,11 @@ nav:
       - 'Reproducing Bugs': using/reproducting-bugs.md
       - 'UI Tests': using/ui-tests.md
       - 'Performance Analysis':
+          - 'Overview': using/perf-analysis/index.md
           - 'Startup': using/perf-analysis/startup.md
           - 'Screen Transition': using/perf-analysis/screen-transition.md
           - 'Scroll Framerate': using/perf-analysis/scroll-framerate.md
-      - 'Accessibility':
-          - 'Contrast': using/a11y/contrast.md
-          - 'Tap Targets': using/a11y/tap-targets.md
+      - 'Accessibility': using/a11y.md
   - 'Design Docs':
       - 'Overview': design-docs/index.md
       - 'MCP':

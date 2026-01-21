@@ -118,7 +118,11 @@ update_mcp_json() {
   "mcpServers": {
     "auto-mobile": {
       "type": "http",
-      "url": "${url}"
+      "url": "${url}",
+      "env": {
+        "AUTOMOBILE_DEBUG": "1",
+        "AUTOMOBILE_DEBUG_PERF": "1"
+      }
     }
   }
 }
@@ -146,6 +150,8 @@ EOF
 
 # Start MCP dev server in background
 start_mcp_server() {
+  export AUTOMOBILE_DEBUG=1
+  export AUTOMOBILE_DEBUG_PERF=1
   log_info "Starting MCP dev server in background..."
   nohup bun run dev > "${PROJECT_ROOT}/scratch/mcp-server.log" 2>&1 &
   MCP_PID=$!

@@ -121,10 +121,12 @@ function parseArgs(): {
     daemonCommandIndex >= 0 ? args.slice(daemonCommandIndex + 2) : [];
 
   // Detect debug-perf mode for performance timing output
-  const debugPerf = args.includes("--debug-perf");
+  const debugPerf =
+    args.includes("--debug-perf") || process.env.AUTOMOBILE_DEBUG_PERF === "1";
 
   // Detect debug mode to enable debug tools (rawViewHierarchy, debugSearch, bugReport)
-  const debug = args.includes("--debug");
+  const debug =
+    args.includes("--debug") || process.env.AUTOMOBILE_DEBUG === "1";
 
   // Detect UI performance audit mode
   const uiPerfMode = args.includes("--ui-perf-mode");
