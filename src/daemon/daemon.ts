@@ -26,6 +26,7 @@ import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from 
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./testRecordingSocketServer";
 import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./deviceSnapshotSocketServer";
 import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./appearanceSocketServer";
+import { startPerformanceStreamSocketServer, stopPerformanceStreamSocketServer } from "./performanceStreamSocketServer";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
 import { InstalledAppsRepository } from "../db/installedAppsRepository";
 import { DeviceSessionManager } from "../utils/DeviceSessionManager";
@@ -126,6 +127,7 @@ export class Daemon {
     await startTestRecordingSocketServer();
     await startDeviceSnapshotSocketServer();
     await startAppearanceSocketServer();
+    await startPerformanceStreamSocketServer();
     startAppearanceSyncScheduler();
     this.startDeviceDisconnectMonitor();
 
@@ -775,6 +777,7 @@ export class Daemon {
     await stopTestRecordingSocketServer();
     await stopDeviceSnapshotSocketServer();
     await stopAppearanceSocketServer();
+    await stopPerformanceStreamSocketServer();
     stopAppearanceSyncScheduler();
 
     // Close all active HTTP sessions
