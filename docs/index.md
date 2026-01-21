@@ -4,11 +4,13 @@ AutoMobile lets AI agents control your Android & iOS devices using natural langu
 
 It can do this by being an MCP server that uses standard platform tools like `adb` & `simctl` paired with additional Kotlin & Swift libraries and apps. All components are open source. The point is to provide mobile engineers with AI workflow tools to perform UX deep dives, reproduce bugs, and run automated tests.
 
-![Setting an alarm in the Clock app](img/clock-app.gif)
-*An AI agent navigating to the Clock app, creating a new alarm*
+??? example "See demo: Clock app alarm"
+    ![Setting an alarm in the Clock app](img/clock-app.gif)
+    *An AI agent navigating to the Clock app, creating a new alarm*
 
-![Searching YouTube for a video](img/youtube-search.gif)
-*An AI agent searching YouTube and browsing results*
+??? example "See demo: YouTube search"
+    ![Searching YouTube for a video](img/youtube-search.gif)
+    *An AI agent searching YouTube and browsing results*
 
 ### Explore and Test
 
