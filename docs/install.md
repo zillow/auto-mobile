@@ -6,7 +6,8 @@ You can use our interactive installer to step through all host platform requirem
 curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/install.sh | bash
 ```
 
-![Install Demo](img/install.gif)
+??? example "See demo: Install"
+    ![Install Demo](img/install.gif)
 
 Once you've finished that, learn [how to use AutoMobile](using/ux-exploration.md)
 
@@ -18,7 +19,8 @@ To remove AutoMobile and its configurations, use the uninstall script:
 curl -fsSL https://raw.githubusercontent.com/kaeawc/auto-mobile/main/scripts/uninstall.sh | bash
 ```
 
-![Uninstall Demo](img/uninstall.gif)
+??? example "See demo: Uninstall"
+    ![Uninstall Demo](img/uninstall.gif)
 
 This will interactively guide you through removing:
 

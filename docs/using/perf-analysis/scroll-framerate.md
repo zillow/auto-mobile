@@ -2,7 +2,8 @@
 
 Scroll performance is critical to user experience. Janky scrolling is one of the most noticeable performance issues - users immediately feel stuttering and frame drops when swiping through lists, feeds, or grids. AutoMobile measures scroll framerate using Android's `gfxinfo` to catch performance regressions before they reach production.
 
-![Scroll performance demo](../../img/scroll-transition-perf.gif)
+??? example "See demo: Scroll performance"
+    ![Scroll performance demo](../../img/scroll-transition-perf.gif)
 
 ## What is Measured
 

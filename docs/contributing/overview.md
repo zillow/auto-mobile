@@ -26,6 +26,11 @@ Thank you for your interest in contributing to AutoMobile!
 - **Keep PRs focused** - One feature or fix per PR
 - **Add tests** - Cover new functionality with tests
 
+## Documentation Style
+
+- **Demos are collapsible** - Wrap GIF demos in MkDocs collapsible admonitions (e.g. `??? example "See demo: <label>"`).
+- **Vary labels by page** - Use "See demo: <context>" or similar, rather than repeating a single label everywhere.
+
 ## Pull Request Process
 
 1. Create a branch from `main`

@@ -20,11 +20,14 @@ Use AI agents to interactively explore your app and discover UI flows.
 | Define boundaries | "Don't submit forms" prevents unwanted actions |
 | Request specific outputs | "Build a navigation summary" gives concrete results |
 
-![Exploring Google Maps](../img/google-maps.gif)
-*Demo: An AI agent exploring Google Maps, searching for locations, and interacting with map controls.*
+??? example "See demo: Google Maps exploration"
+    ![Exploring Google Maps](../img/google-maps.gif)
+    *Demo: An AI agent exploring Google Maps, searching for locations, and interacting with map controls.*
 
-![Setting an alarm in the Clock app](../img/clock-app.gif)
-*Demo: An AI agent navigating to the Clock app, opening the alarm tab, and creating a new alarm.*
+??? example "See demo: Clock app alarm"
+    ![Setting an alarm in the Clock app](../img/clock-app.gif)
+    *Demo: An AI agent navigating to the Clock app, opening the alarm tab, and creating a new alarm.*
 
-![Taking a photo and viewing the gallery](../img/camera-gallery.gif)
-*Demo: An AI agent opening the Camera app, taking a photo, and viewing it in the Gallery.*
+??? example "See demo: Camera gallery"
+    ![Taking a photo and viewing the gallery](../img/camera-gallery.gif)
+    *Demo: An AI agent opening the Camera app, taking a photo, and viewing it in the Gallery.*

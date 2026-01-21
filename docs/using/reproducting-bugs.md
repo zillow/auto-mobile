@@ -22,5 +22,6 @@ The agent will:
 2. Take a snapshot of device state using the [deviceSnapshot](../design-docs/mcp/storage/snapshots.md).
 3. Reproduce any steps or context provided to approximate the state.
 
-![Bug reproduction workflow](../img/bug-repro.gif)
-*Demo: An AI agent reproducing a sample counter bug and [highlighting](../design-docs/mcp/observe/visual-highlighting.md) the main issue.*
+??? example "See demo: Bug reproduction"
+    ![Bug reproduction workflow](../img/bug-repro.gif)
+    *Demo: An AI agent reproducing a sample counter bug and [highlighting](../design-docs/mcp/observe/visual-highlighting.md) the main issue.*
