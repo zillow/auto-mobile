@@ -53,3 +53,4 @@ runs:
       shell: ${{ inputs.shell }}
       run: |
         bun install -g .
+        npm install -g .
