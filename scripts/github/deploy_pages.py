@@ -64,7 +64,7 @@ def copy_required_files():
     # Files to copy: (source_path, target_filename)
     files_to_copy = [
         (project_root / "CHANGELOG.md", "changelog.md"),
-        (project_root / ".github" / "CONTRIBUTING.md", "contributing/index.md")
+        (project_root / ".github" / "CONTRIBUTING.md", "contributing.md")
     ]
 
     for source_path, target_filename in files_to_copy:

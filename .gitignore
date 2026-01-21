@@ -27,7 +27,7 @@ android/junit-runner/.cache/screen-size/
 /site
 
 docs/changelog.md
-docs/contributing/index.md
+docs/contributing.md
 
 /.cache
 .mcp.json

@@ -88,7 +88,7 @@ nav:
       - 'Overview': design-docs/index.md
       - 'MCP':
           - 'Overview': design-docs/mcp/index.md
-          - 'Tools': design-docs/mcp/tools/index.md
+          - 'Tools': design-docs/mcp/tools.md
           - 'Observe':
              - 'Overview': design-docs/mcp/observe/index.md
              - 'Appearance Sync': design-docs/mcp/observe/appearance.md
@@ -152,11 +152,7 @@ nav:
             - 'Xcode Integration':
               - 'Overview': design-docs/plat/ios/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/ios/ide-plugin/test-recording.md
-  - 'Contributing':
-      - 'Overview': contributing/index.md
-      - 'Local Development': contributing/local-development.md
-      - 'iOS Signing': contributing/ios-signing.md
-      - 'npm Publishing': contributing/publishing.md
-      - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
+  - 'Contributing': contributing.md
+  - 'GitHub Discussions': https://github.com/kaeawc/auto-mobile/discussions
   - 'FAQ': faq.md
   - 'Change Log': changelog.md

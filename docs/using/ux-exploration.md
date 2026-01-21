@@ -21,7 +21,7 @@ The agent will:
 1. Look for available devices, launch an Android emulator or iOS simulator
 2. Look for installed apps. If the specified one is not installed it can attempt to install it.
 3. Launch the requested app.
-4. Use device interaction [tool calls](../design-docs/mcp/tools/index.md) to tap, swipe, pinch, drag, and generally interact to accomplish the given tasks.
+4. Use device interaction [tool calls](../design-docs/mcp/tools.md) to tap, swipe, pinch, drag, and generally interact to accomplish the given tasks.
 5. At each step the agent will have full device state and observations to keep iterating.
 
 ??? example "See demo: Google Maps exploration"

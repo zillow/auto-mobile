@@ -2,32 +2,67 @@
 
 Technical architecture and design details for AutoMobile.
 
-## Design Principles
-
-High quality, performant, and accessible workflows are necessary to creating good software.
-
-1. **Fast & Accurate** - Mobile UX can change instantly so slow observations translate to lower quality analysis.
-2. **Reliable Element Search** - Multiple strategies with integrated vision fallback.
-3. **Autonomous Operation** - AI agents explore without human guidance or intervention.
-4. **CI/CD Ready** - Built for automated testing pipelines, dogfooding the tool to test itself.
-5. **Accessible** - You shouldn't need to be a build engineer or AI expert to use AutoMobile.
-
 ## Overview
 
 AutoMobile is a mobile UI automation framework built on the Model Context Protocol (MCP). It enables AI agents to interact with Android and iOS devices for testing, exploration, and automation.
 
 ```mermaid
-stateDiagram-v2
-    Agent: Agent
-    RequestHandler: Request Handler
-    DeviceSessionManager: Device Session Manager
-    InteractionLoop: Interaction Loop
-    
-    Agent --> RequestHandler
-    RequestHandler --> Agent
-    RequestHandler --> DeviceSessionManager
-    InteractionLoop --> RequestHandler: 🖼️ Processed Results 
-    DeviceSessionManager --> InteractionLoop: 📱
+flowchart TB
+    subgraph Clients
+        Agent["🤖 AI Agent"]
+        IDE["💻 IDE Plugin"]
+        CLI["🧪 Test Runner"]
+    end
+
+    subgraph MCP["MCP Server"]
+        Transport["Transport Layer<br/>(STDIO / HTTP)"]
+        Registry["Tool & Resource<br/>Registry"]
+
+        subgraph Features["Feature Composition"]
+            Actions["Actions<br/>(tap, swipe, input)"]
+            Observe["Observation<br/>(hierarchy, screenshot)"]
+            AppMgmt["App Management<br/>(launch, terminate)"]
+            DeviceMgmt["Device Management<br/>(list, start, kill)"]
+        end
+    end
+
+    subgraph External["External Interfaces"]
+        WS["📡 WebSocket<br/>Clients"]
+        Socket["🔌 Unix Socket<br/>Commands"]
+        CLITools["🛠️ CLI Tools<br/>(adb, xcrun)"]
+    end
+
+    subgraph Devices["Devices"]
+        Android["📱 Android"]
+        iOS["📱 iOS"]
+    end
+
+    Agent --> Transport
+    IDE --> Transport
+    CLI --> Transport
+    Transport --> Registry
+    Registry --> Features
+
+    Actions --> WS
+    Observe --> WS
+    AppMgmt --> CLITools
+    DeviceMgmt --> CLITools
+    DeviceMgmt --> Socket
+
+    WS --> Android
+    WS --> iOS
+    CLITools --> Android
+    CLITools --> iOS
+
+    classDef client fill:#FF3300,stroke-width:0px,color:white;
+    classDef mcp fill:#525FE1,stroke-width:0px,color:white;
+    classDef external fill:#00AA55,stroke-width:0px,color:white;
+    classDef device fill:#666666,stroke-width:0px,color:white;
+
+    class Agent,IDE,CLI client;
+    class Transport,Registry,Actions,Observe,AppMgmt,DeviceMgmt mcp;
+    class WS,Socket,CLITools external;
+    class Android,iOS device;
 ```
 
 ## Core Components
@@ -37,9 +72,19 @@ stateDiagram-v2
 | [MCP Server](mcp/index.md) | Protocol server enabling AI agent interaction |
 | [Interaction Loop](mcp/interaction-loop.md) | Observe-act-observe cycle with idle detection |
 | [Observation](mcp/observe/index.md) | Real-time UI hierarchy and screen capture |
-| [Actions](mcp/tools/index.md) | Touch, swipe, input, and app management |
+| [Actions](mcp/tools.md) | Touch, swipe, input, and app management |
 | [Navigation Graph](mcp/nav/index.md) | Automatic screen flow mapping |
 | [Daemon](mcp/daemon/index.md) | Device pooling and test execution |
+
+## Design Principles
+
+High quality, performant, and accessible workflows are necessary to creating good software.
+
+1. **Fast & Accurate** - Mobile UX can change instantly so slow observations translate to lower quality analysis.
+2. **Reliable Element Search** - Multiple strategies with integrated vision fallback.
+3. **Autonomous Operation** - AI agents explore without human guidance or intervention.
+4. **CI/CD Ready** - Built for automated testing pipelines, dogfooding the tool to test itself.
+5. **Accessible** - You shouldn't need to be a build engineer or AI expert to use AutoMobile.
 
 ## Platform Support
 
@@ -57,6 +102,6 @@ stateDiagram-v2
 | Component | Purpose |
 |-----------|---------|
 | [iOS Overview](plat/ios/index.md) | Architecture and roadmap |
-| [Accessibility Bridge](plat/ios/accessibility-service.md) | WebSocket automation server |
-| [XCTest Runner](plat/ios/xctestrunner.md) | Test execution framework |
+| [XCTestService](plat/ios/xctestservice.md) | WebSocket automation server |
+| [XCTestRunner](plat/ios/xctestrunner.md) | Test execution framework |
 | [Xcode Integration](plat/ios/ide-plugin/overview.md) | Editor extension |
