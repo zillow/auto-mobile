@@ -70,6 +70,7 @@ detect_os() {
     case "$(uname -s)" in
         Darwin*) echo "macos" ;;
         Linux*)  echo "linux" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "linux" ;;
         *)       echo "unknown" ;;
     esac
 }

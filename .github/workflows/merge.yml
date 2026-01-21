@@ -161,6 +161,61 @@ jobs:
         run: |
           scripts/lychee/validate_lychee.sh
 
+  interactive-installer:
+    name: "Interactive Installer (${{ matrix.os }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Run Interactive Installer"
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p ci-logs
+          log_path="ci-logs/interactive-installer-${{ matrix.os }}.log"
+          bash ./scripts/install.sh --preset minimal --record-mode 2>&1 | tee "${log_path}"
+          echo "INSTALL_EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+
+      - name: "Run Interactive Uninstaller"
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          mkdir -p ci-logs
+          log_path="ci-logs/interactive-uninstaller-${{ matrix.os }}.log"
+          bash ./scripts/uninstall.sh --record-mode --force 2>&1 | tee "${log_path}"
+          echo "UNINSTALL_EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_ENV"
+
+      - name: "Upload Installer Logs"
+        if: env.INSTALL_EXIT_CODE != '0'
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: interactive-installer-${{ matrix.os }}-logs
+          path: ci-logs/interactive-installer-${{ matrix.os }}.log
+          retention-days: 7
+
+      - name: "Upload Uninstaller Logs"
+        if: env.UNINSTALL_EXIT_CODE != '0'
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: interactive-uninstaller-${{ matrix.os }}-logs
+          path: ci-logs/interactive-uninstaller-${{ matrix.os }}.log
+          retention-days: 7
+
+      - name: "Fail if Installer or Uninstaller Failed"
+        if: env.INSTALL_EXIT_CODE != '0' || env.UNINSTALL_EXIT_CODE != '0'
+        shell: bash
+        run: |
+          echo "Installer exit code: ${INSTALL_EXIT_CODE:-0}"
+          echo "Uninstaller exit code: ${UNINSTALL_EXIT_CODE:-0}"
+          exit 1
+
   mcp-build-and-test:
     name: "Node TypeScript Build and Test"
     runs-on: ubuntu-latest
