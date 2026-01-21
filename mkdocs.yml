@@ -153,8 +153,7 @@ nav:
               - 'Overview': design-docs/plat/ios/ide-plugin/overview.md
               - 'Test Recording': design-docs/plat/ios/ide-plugin/test-recording.md
   - 'Contributing':
-      - 'Overview': contributing/overview.md
-      - 'How': contributing/index.md
+      - 'Overview': contributing/index.md
       - 'Local Development': contributing/local-development.md
       - 'iOS Signing': contributing/ios-signing.md
       - 'npm Publishing': contributing/publishing.md

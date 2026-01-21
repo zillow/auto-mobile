@@ -96,7 +96,6 @@ ai/mcp-tools.md
 ai/vision-fallback-design.md
 ai/vision-model-research.md
 origin.md
-contributing/overview.md
 design-docs/mcp/system-design.md
 design-docs/mcp/vision-fallback.md
 design-docs/plat/android/docker.md
