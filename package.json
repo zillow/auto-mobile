@@ -102,6 +102,12 @@
     "xml2js": "^0.6.2",
     "zod": "^4.3.5"
   },
+  "overrides": {
+    "lodash": "^4.17.23"
+  },
+  "//overrides": {
+    "lodash": "CVE-2025-13465: prototype pollution in _.unset and _.omit"
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.38.0",
