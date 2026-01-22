@@ -53,6 +53,19 @@ export interface PerformanceAuditHistoryPage {
   nextOffset: number | null;
 }
 
+export interface PerformanceAuditStreamQuery {
+  startTime?: string;
+  endTime?: string;
+  limit?: number;
+  deviceId?: string;
+  sessionId?: string;
+  packageName?: string;
+  sinceTimestamp?: string;
+  sinceId?: number;
+}
+
+const STREAM_LIMIT_MAX = 500;
+
 export class PerformanceAuditRepository {
   async recordAudit(record: PerformanceAuditRecord): Promise<void> {
     try {
@@ -157,6 +170,87 @@ export class PerformanceAuditRepository {
       hasMore,
       nextOffset: hasMore ? offset + limit : null,
     };
+  }
+
+  async listResultsSince(query: PerformanceAuditStreamQuery): Promise<PerformanceAuditHistoryEntry[]> {
+    const db = getDatabase();
+    const limit = Math.min(Math.max(1, query.limit ?? 50), STREAM_LIMIT_MAX);
+
+    let builder = db
+      .selectFrom("performance_audit_results")
+      .select([
+        "id",
+        "device_id",
+        "session_id",
+        "package_name",
+        "timestamp",
+        "passed",
+        "p50_ms",
+        "p90_ms",
+        "p95_ms",
+        "p99_ms",
+        "jank_count",
+        "missed_vsync_count",
+        "slow_ui_thread_count",
+        "frame_deadline_missed_count",
+        "cpu_usage_percent",
+        "touch_latency_ms",
+        "diagnostics_json",
+      ]);
+
+    if (query.deviceId) {
+      builder = builder.where("device_id", "=", query.deviceId);
+    }
+    if (query.sessionId) {
+      builder = builder.where("session_id", "=", query.sessionId);
+    }
+    if (query.packageName) {
+      builder = builder.where("package_name", "=", query.packageName);
+    }
+    if (query.startTime) {
+      builder = builder.where("timestamp", ">=", query.startTime);
+    }
+    if (query.endTime) {
+      builder = builder.where("timestamp", "<=", query.endTime);
+    }
+    if (query.sinceTimestamp) {
+      const sinceId = query.sinceId ?? 0;
+      builder = builder.where(eb => eb.or([
+        eb("timestamp", ">", query.sinceTimestamp),
+        eb.and([
+          eb("timestamp", "=", query.sinceTimestamp),
+          eb("id", ">", sinceId),
+        ]),
+      ]));
+    }
+
+    const rows = await builder
+      .orderBy("timestamp", "asc")
+      .orderBy("id", "asc")
+      .limit(limit)
+      .execute();
+
+    return rows.map(row => ({
+      id: row.id,
+      deviceId: row.device_id,
+      sessionId: row.session_id,
+      packageName: row.package_name,
+      timestamp: row.timestamp,
+      passed: row.passed === 1,
+      metrics: {
+        p50Ms: row.p50_ms,
+        p90Ms: row.p90_ms,
+        p95Ms: row.p95_ms,
+        p99Ms: row.p99_ms,
+        jankCount: row.jank_count,
+        missedVsyncCount: row.missed_vsync_count,
+        slowUiThreadCount: row.slow_ui_thread_count,
+        frameDeadlineMissedCount: row.frame_deadline_missed_count,
+        cpuUsagePercent: row.cpu_usage_percent,
+        touchLatencyMs: row.touch_latency_ms,
+      },
+      diagnostics: row.diagnostics_json,
+    }));
   }
 
   private async cleanupRetention(): Promise<void> {
