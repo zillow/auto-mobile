@@ -1,0 +1,115 @@
+#file: noinspection YAMLSchemaValidation
+name: "android-emulator-wtf"
+description: "Run Android tests against emulator.wtf using an adb-connected session"
+inputs:
+  shell:
+    description: "The shell to use for any steps that use shells"
+    default: "bash"
+    required: "true"
+  script:
+    description: "Script to execute once the emulator.wtf session is ready"
+    example: './gradlew :junit-runner:test'
+    required: "true"
+  working-directory:
+    description: "Working directory"
+    default: "./"
+    required: "true"
+  max-time-limit:
+    description: "Max emulator session time (e.g., 1m, 2m)"
+    default: "1m"
+    required: "true"
+  device:
+    description: "Optional device profile (e.g., model=Pixel2,version=34,gpu=auto)"
+    default: ""
+    required: "false"
+  accessibility-apk-path:
+    description: "Optional path to accessibility service APK to install before running the script"
+    default: ""
+    required: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: "zulu"
+        java-version: "21"
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3.2.2
+
+    - name: Install emulator.wtf CLI
+      shell: ${{ inputs.shell }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$HOME/bin"
+        curl -fsSL https://maven.emulator.wtf/releases/ew-cli -o "$HOME/bin/ew-cli"
+        chmod a+x "$HOME/bin/ew-cli"
+        echo "$HOME/bin" >> "$GITHUB_PATH"
+        ew-cli --version
+
+    - name: Start emulator.wtf session
+      shell: ${{ inputs.shell }}
+      env:
+        EW_API_TOKEN: ${{ env.EW_API_TOKEN }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${EW_API_TOKEN:-}" ]; then
+          echo "EW_API_TOKEN is not set" >&2
+          exit 1
+        fi
+
+        device_args=()
+        if [ -n "${{ inputs.device }}" ]; then
+          device_args+=(--device "${{ inputs.device }}")
+        fi
+
+        session_log="$RUNNER_TEMP/emulator-wtf-session.log"
+        ew-cli start-session --max-time-limit "${{ inputs.max-time-limit }}" --adb "${device_args[@]}" \
+          >"$session_log" 2>&1 &
+        session_pid=$!
+
+        echo "EMULATOR_WTF_SESSION_PID=$session_pid" >> "$GITHUB_ENV"
+        echo "EMULATOR_WTF_SESSION_LOG=$session_log" >> "$GITHUB_ENV"
+
+        echo "Waiting for adb device to connect..."
+        for _ in $(seq 1 30); do
+          if adb devices | awk 'NR>1 && $2=="device" {found=1} END {exit found ? 0 : 1}'; then
+            echo "adb device connected."
+            exit 0
+          fi
+          sleep 2
+        done
+
+        echo "Timed out waiting for adb device." >&2
+        cat "$session_log" || true
+        exit 1
+
+    - name: Run tests
+      shell: ${{ inputs.shell }}
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        if [ -n "${{ inputs.accessibility-apk-path }}" ]; then
+          "${{ github.workspace }}/scripts/android/run-emulator-tests.sh" \
+            "${{ inputs.accessibility-apk-path }}" \
+            "${{ inputs.script }}"
+        else
+          eval "${{ inputs.script }}"
+        fi
+
+    - name: Stop emulator.wtf session
+      if: always()
+      shell: ${{ inputs.shell }}
+      run: |
+        set -euo pipefail
+        if [ -n "${EMULATOR_WTF_SESSION_PID:-}" ]; then
+          kill "$EMULATOR_WTF_SESSION_PID" || true
+          wait "$EMULATOR_WTF_SESSION_PID" || true
+        fi
+        if [ -n "${EMULATOR_WTF_SESSION_LOG:-}" ]; then
+          echo "Session log:"
+          tail -n 200 "$EMULATOR_WTF_SESSION_LOG" || true
+        fi
