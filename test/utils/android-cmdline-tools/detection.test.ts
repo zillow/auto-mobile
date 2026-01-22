@@ -178,7 +178,7 @@ describe("Android Command Line Tools - Detection", () => {
 
       expect(result).not.toBeNull();
       expect(result?.androidHome).toBe("/android/sdk");
-      expect(result?.systemImagesPath).toBe("/android/sdk/system-images");
+      expect(normalizePath(result?.systemImagesPath ?? "")).toBe("/android/sdk/system-images");
     });
 
     test("should return null when system-images is missing", () => {
@@ -426,7 +426,7 @@ describe("Android Command Line Tools - Detection", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].source).toBe("android_sdk_root");
-      expect(result[0].path).toBe("/android/sdk/cmdline-tools/latest");
+      expect(normalizePath(result[0].path)).toBe("/android/sdk/cmdline-tools/latest");
     });
   });
 

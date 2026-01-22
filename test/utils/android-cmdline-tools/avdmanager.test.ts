@@ -861,8 +861,8 @@ id: pixel_4
           // The two-pass search should have picked the SDK with system-images
           // even though Homebrew location appears earlier in candidates
           expect(usedEnv).toBeDefined();
-          expect(usedEnv?.ANDROID_HOME).toBe("/Users/test/Library/Android/sdk");
-          expect(usedEnv?.ANDROID_SDK_ROOT).toBe("/Users/test/Library/Android/sdk");
+          expect(normalizePath(usedEnv?.ANDROID_HOME ?? "")).toBe("/Users/test/Library/Android/sdk");
+          expect(normalizePath(usedEnv?.ANDROID_SDK_ROOT ?? "")).toBe("/Users/test/Library/Android/sdk");
         } finally {
           // Restore original environment
           if (originalAndroidHome) {
