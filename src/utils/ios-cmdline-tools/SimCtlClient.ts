@@ -715,22 +715,33 @@ export class SimCtlClient implements SimCtl {
     logger.debug(`Listing installed apps on iOS simulator ${targetDevice}`);
 
     try {
+      const parseApps = (payload: string): any[] => {
+        const appsData = JSON.parse(payload);
+
+        if (Array.isArray(appsData)) {
+          return appsData;
+        }
+
+        if (!appsData || typeof appsData !== "object") {
+          return [];
+        }
+
+        // Convert the apps object to an array, preserving bundle IDs from keys.
+        return Object.entries(appsData).map(([bundleId, appInfo]) => {
+          const record = appInfo && typeof appInfo === "object" ? appInfo : {};
+          return { ...record, bundleId };
+        });
+      };
+
+      try {
+        const result = await this.executeCommand(`listapps ${targetDevice} --all`);
+        return parseApps(result.stdout);
+      } catch (error) {
+        logger.warn(`Failed to list iOS apps with --all: ${error}`);
+      }
+
       const result = await this.executeCommand(`listapps ${targetDevice}`);
-      const appsData = JSON.parse(result.stdout);
-
-      if (Array.isArray(appsData)) {
-        return appsData;
-      }
-
-      if (!appsData || typeof appsData !== "object") {
-        return [];
-      }
-
-      // Convert the apps object to an array, preserving bundle IDs from keys.
-      return Object.entries(appsData).map(([bundleId, appInfo]) => {
-        const record = appInfo && typeof appInfo === "object" ? appInfo : {};
-        return { ...record, bundleId };
-      });
+      return parseApps(result.stdout);
     } catch (error) {
       logger.warn(`Failed to list iOS apps: ${error}`);
       return [];

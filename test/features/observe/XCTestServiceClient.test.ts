@@ -427,6 +427,46 @@ describe("XCTestServiceClient", function() {
     });
   });
 
+  describe("requestLaunchApp", function() {
+    test("should send launch app request and return result", async function() {
+      const testTimer = new FakeTimer();
+      testTimer.setSleepDuration(1);
+
+      const { factory, getSocket } = createCapturingWebSocketFactory(testTimer);
+      const testClient = XCTestServiceClient.createForTesting(
+        testDevice,
+        serverPort,
+        factory,
+        testTimer
+      );
+
+      try {
+        const resultPromise = testClient.requestLaunchApp("com.apple.Preferences", 5000);
+        const socket = await waitForSocket(getSocket);
+        expect(socket).not.toBeNull();
+        await waitForSocketOpen(socket);
+        await waitForSentMessages(socket, 1);
+
+        const sentMessage = JSON.parse(socket!.sentMessages[0]);
+        expect(sentMessage.type).toBe("request_launch_app");
+        expect(sentMessage.bundleId).toBe("com.apple.Preferences");
+
+        socket!.simulateMessage(JSON.stringify({
+          type: "launch_app_result",
+          requestId: sentMessage.requestId,
+          success: true,
+          totalTimeMs: 120
+        }));
+
+        const result = await resultPromise;
+        expect(result.success).toBe(true);
+        expect(result.totalTimeMs).toBe(120);
+      } finally {
+        await testClient.close();
+      }
+    });
+  });
+
   describe("connection management", function() {
     test("isConnected should return true when WebSocket is open", async function() {
       const testTimer = new FakeTimer();
