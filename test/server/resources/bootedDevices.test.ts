@@ -368,6 +368,9 @@ describe("MCP Booted Device Resources", () => {
       );
       expect(idleDevice).toBeDefined();
       expect(idleDevice?.poolStatus).toBe("idle");
+
+      // Clean up SessionManager timer to prevent process hang
+      sessionManager.stopCleanupTimer();
     });
 
     test("should return error for invalid platform", async function() {

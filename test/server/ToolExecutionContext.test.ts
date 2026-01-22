@@ -33,6 +33,7 @@ describe("ToolExecutionContext", () => {
   });
 
   afterEach(() => {
+    sessionManager.stopCleanupTimer();
     AndroidAccessibilityServiceManager.getInstance = originalGetInstance;
     AccessibilityServiceClient.getInstance = originalClientGetInstance;
     AccessibilityServiceClient.resetInstances();
