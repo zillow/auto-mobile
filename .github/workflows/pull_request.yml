@@ -486,6 +486,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: detect-changes
     if: needs.detect-changes.outputs.docs_only != 'true' && needs.detect-changes.outputs.sha256_only != 'true'
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:
@@ -515,6 +516,13 @@ jobs:
           set -euo pipefail
           mkdir -p ci-logs
           bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
+
+      - name: "Kill Orphan Processes (Windows)"
+        if: always() && runner.os == 'Windows'
+        shell: bash
+        run: |
+          # Kill any orphan adb processes that may prevent job completion
+          taskkill //F //IM adb.exe 2>/dev/null || true
 
       - name: "Upload Build/Test Logs"
         if: failure()
