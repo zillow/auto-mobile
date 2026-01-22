@@ -517,13 +517,6 @@ jobs:
           mkdir -p ci-logs
           bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
 
-      - name: "Kill Orphan Processes (Windows)"
-        if: always() && runner.os == 'Windows'
-        shell: bash
-        run: |
-          # Kill any orphan adb processes that may prevent job completion
-          taskkill //F //IM adb.exe 2>/dev/null || true
-
       - name: "Upload Build/Test Logs"
         if: failure()
         uses: actions/upload-artifact@v4.4.0
