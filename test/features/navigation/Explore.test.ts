@@ -134,104 +134,8 @@ describe("Explore", () => {
   }
 
   describe("execute", () => {
-    test.skip("should complete with default options (requires full device setup)", async () => {
-      // This test requires mocking TapOnElement which is complex
-      // Core functionality is tested in unit tests below
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 2,
-        timeoutMs: 5000
-      });
-
-      expect(result.success).toBe(true);
-      assert.isAtLeast(result.interactionsPerformed, 0);
-      assert.exists(result.navigationGraph);
-      assert.exists(result.coverage);
-    });
-
-    test.skip("should respect maxInteractions limit (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const maxInteractions = 3;
-      const result = await explore.execute({
-        maxInteractions,
-        timeoutMs: 10000
-      });
-
-      assert.isAtMost(result.interactionsPerformed, maxInteractions);
-    });
-
-    test.skip("should discover new screens (requires full device setup)", async () => {
-      const manager = NavigationGraphManager.getInstance();
-      manager.setCurrentApp("com.test.app");
-
-      // Set initial screen
-      manager.recordNavigationEvent({
-        destination: "HomeScreen",
-        source: "TEST",
-        arguments: {},
-        metadata: {},
-        timestamp: Date.now(),
-        sequenceNumber: 0,
-        applicationId: "com.test.app"
-      });
-
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 5,
-        timeoutMs: 10000
-      });
-
-      assert.isAtLeast(result.screensDiscovered, 0);
-      assert.exists(result.navigationGraph);
-    });
-
-    test.skip("should track exploration path (requires full device setup)", async () => {
-      const manager = NavigationGraphManager.getInstance();
-      manager.setCurrentApp("com.test.app");
-
-      manager.recordNavigationEvent({
-        destination: "HomeScreen",
-        source: "TEST",
-        arguments: {},
-        metadata: {},
-        timestamp: Date.now(),
-        sequenceNumber: 0,
-        applicationId: "com.test.app"
-      });
-
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 3,
-        timeoutMs: 5000
-      });
-
-      assert.isArray(result.explorationPath);
-    });
-
-    test.skip("should calculate coverage correctly (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 5,
-        timeoutMs: 5000
-      });
-
-      assert.exists(result.coverage);
-      assert.isNumber(result.coverage.totalScreens);
-      assert.isNumber(result.coverage.exploredScreens);
-      assert.isNumber(result.coverage.percentage);
-      assert.isAtLeast(result.coverage.percentage, 0);
-      assert.isAtMost(result.coverage.percentage, 100);
-    });
+    // Core execute functionality is tested through the unit tests below
+    // Full device integration tests are in JUnitRunner and XCTestRunner
   });
 
   describe("element selection", () => {
@@ -371,120 +275,11 @@ describe("Explore", () => {
     });
   });
 
-  describe("exploration strategies", () => {
-    test.skip("should support breadth-first strategy (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
+  // Exploration strategies and modes are tested through unit tests
+  // Full device integration tests are in JUnitRunner and XCTestRunner
 
-      const result = await explore.execute({
-        maxInteractions: 3,
-        strategy: "breadth-first",
-        timeoutMs: 5000
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    test.skip("should support depth-first strategy (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 3,
-        strategy: "depth-first",
-        timeoutMs: 5000
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    test.skip("should support weighted strategy (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 3,
-        strategy: "weighted",
-        timeoutMs: 5000
-      });
-
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe("exploration modes", () => {
-    test.skip("should support discover mode (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 3,
-        mode: "discover",
-        timeoutMs: 5000
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    test.skip("should support validate mode (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 3,
-        mode: "validate",
-        timeoutMs: 5000
-      });
-
-      expect(result.success).toBe(true);
-    });
-
-    test.skip("should support hybrid mode (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 3,
-        mode: "hybrid",
-        timeoutMs: 5000
-      });
-
-      expect(result.success).toBe(true);
-    });
-  });
-
-  describe("safety features", () => {
-    test.skip("should track consecutive back presses (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-
-      // Mock observe screen that returns no navigation elements
-      (explore as any).observeScreen = {
-        execute: async () => createMockObservation([])
-      };
-
-      const result = await explore.execute({
-        maxInteractions: 20,
-        timeoutMs: 5000
-      });
-
-      // Should stop before reaching maxInteractions due to safety limit
-      expect(result.success).toBe(true);
-    });
-
-    test.skip("should include performance metrics (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 2,
-        timeoutMs: 5000
-      });
-
-      assert.exists(result.durationMs);
-      assert.isNumber(result.durationMs);
-      expect(result.durationMs).toBeGreaterThan(0);
-    });
-  });
+  // Safety features are tested through unit tests
+  // Full device integration tests are in JUnitRunner and XCTestRunner
 
   describe("foreground app enforcement", () => {
     test("should default to initial foreground package when packageName is not provided", async () => {
@@ -556,21 +351,6 @@ describe("Explore", () => {
   });
 
   describe("element tracking", () => {
-    test.skip("should track element interactions (requires full device setup)", async () => {
-      explore = new Explore(device, mockAdb);
-      (explore as any).observeScreen = mockObserveScreen;
-
-      const result = await explore.execute({
-        maxInteractions: 5,
-        timeoutMs: 5000
-      });
-
-      // Should have element selection stats
-      if (result.elementSelections) {
-        assert.isArray(result.elementSelections);
-      }
-    });
-
     test("should generate unique element keys", async () => {
       explore = new Explore(device, mockAdb);
 
