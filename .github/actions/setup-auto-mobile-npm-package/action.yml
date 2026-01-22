@@ -67,5 +67,10 @@ runs:
     - name: "Globally Install AutoMobile"
       shell: ${{ inputs.shell }}
       run: |
+        if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
+          npm install -g .
+          exit 0
+        fi
+
         bun install -g .
         npm install -g .
