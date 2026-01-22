@@ -15,14 +15,18 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+interface PerformanceAuditStreamClient {
+  fun poll(request: PerformanceAuditStreamRequest): PerformanceAuditStreamResponse
+}
+
 class PerformanceAuditStreamSocketClient(
     private val socketPathValue: String = PerformanceAuditStreamSocketPaths.socketPath(),
     private val json: Json = Json {
       ignoreUnknownKeys = true
       explicitNulls = false
     },
-) {
-  fun poll(request: PerformanceAuditStreamRequest): PerformanceAuditStreamResponse {
+) : PerformanceAuditStreamClient {
+  override fun poll(request: PerformanceAuditStreamRequest): PerformanceAuditStreamResponse {
     val response = sendRequest(request)
     if (!response.success) {
       throw McpConnectionException(response.error ?: "Performance stream request failed")
