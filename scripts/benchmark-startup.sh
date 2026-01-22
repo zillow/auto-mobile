@@ -21,9 +21,113 @@
 #   1 - One or more regressions detected or error occurred
 
 DEFAULT_TIMEOUT_MS=15000
+GLOBAL_TIMEOUT_MS=30000
 MCP_PROTOCOL_VERSION="2024-11-05"
 STDERR_TAIL_LINES=20
 verbose="false"
+script_start_ms=""
+current_operation=""
+child_pids=()
+
+# Track child process PIDs for cleanup
+track_child_pid() {
+  child_pids+=("$1")
+}
+
+untrack_child_pid() {
+  local pid="$1"
+  child_pids=("${child_pids[@]/$pid}")
+}
+
+# Global timeout handler - logs diagnostics and exits
+# shellcheck disable=SC2317,SC2329  # Function is invoked indirectly via trap
+global_timeout_handler() {
+  local elapsed_ms=$(( $(get_time_ms) - script_start_ms ))
+
+  echo "" >&2
+  echo "========================================" >&2
+  echo "GLOBAL TIMEOUT EXCEEDED (${GLOBAL_TIMEOUT_MS}ms)" >&2
+  echo "========================================" >&2
+  echo "" >&2
+  echo "Diagnostic Information:" >&2
+  echo "  Elapsed time: ${elapsed_ms}ms" >&2
+  echo "  Current operation: ${current_operation:-unknown}" >&2
+  echo "" >&2
+
+  # Show process tree
+  echo "Process tree:" >&2
+  if command -v pstree >/dev/null 2>&1; then
+    pstree -p $$ 2>/dev/null | sed 's/^/  /' >&2 || true
+  else
+    echo "  (pstree not available)" >&2
+    echo "  Child PIDs tracked: ${child_pids[*]:-none}" >&2
+    for pid in "${child_pids[@]}"; do
+      if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        echo "    PID $pid: running" >&2
+      fi
+    done
+  fi
+  echo "" >&2
+
+  # Show any stderr logs collected
+  for log_file in /tmp/auto-mobile-*/stderr.log; do
+    if [[ -f "$log_file" && -s "$log_file" ]]; then
+      echo "Stderr log ($log_file):" >&2
+      tail -n 30 "$log_file" 2>/dev/null | sed 's/^/  /' >&2 || true
+      echo "" >&2
+    fi
+  done
+
+  # Environment info
+  local env_info
+  env_info=$(environment_summary 2>/dev/null || echo "unknown")
+  echo "Environment: $env_info" >&2
+  echo "" >&2
+
+  # Kill all tracked child processes
+  echo "Killing child processes..." >&2
+  for pid in "${child_pids[@]}"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -TERM "$pid" 2>/dev/null || true
+    fi
+  done
+  sleep 0.5
+  for pid in "${child_pids[@]}"; do
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -KILL "$pid" 2>/dev/null || true
+    fi
+  done
+
+  echo "Benchmark terminated due to global timeout." >&2
+  exit 1
+}
+
+# Start global timeout monitor in background
+start_global_timeout_monitor() {
+  script_start_ms=$(get_time_ms)
+
+  (
+    sleep_seconds=$(( GLOBAL_TIMEOUT_MS / 1000 ))
+    sleep "$sleep_seconds"
+    # Signal parent to run timeout handler
+    kill -USR1 $$ 2>/dev/null || true
+  ) &
+  global_timeout_pid=$!
+  disown "$global_timeout_pid" 2>/dev/null || true
+}
+
+# Stop global timeout monitor
+stop_global_timeout_monitor() {
+  if [[ -n "${global_timeout_pid:-}" ]]; then
+    kill "$global_timeout_pid" 2>/dev/null || true
+    wait "$global_timeout_pid" 2>/dev/null || true
+  fi
+}
+
+# Set operation for diagnostic purposes
+set_current_operation() {
+  current_operation="$1"
+}
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -526,6 +630,7 @@ run_mcp_server() {
   bun run dist/src/index.js --startup-benchmark \
     <"$stdin_fifo" >"$stdout_fifo" 2>"$stderr_fifo" &
   local server_pid=$!
+  track_child_pid "$server_pid"
 
   exec 3>"$stdin_fifo"
   exec 4<"$stdout_fifo"
@@ -557,6 +662,7 @@ run_mcp_server() {
       "$last_stderr_message" \
       "$stderr_log" \
       "Mode: $mode")
+    untrack_child_pid "$server_pid"
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
@@ -585,6 +691,7 @@ run_mcp_server() {
       "$last_stderr_message" \
       "$stderr_log" \
       "Mode: $mode; Resource: automobile:devices/booted")
+    untrack_child_pid "$server_pid"
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
@@ -611,6 +718,7 @@ run_mcp_server() {
       "$last_stderr_message" \
       "$stderr_log" \
       "Mode: $mode")
+    untrack_child_pid "$server_pid"
     stop_process "$server_pid"
     exec 3>&-
     exec 4<&-
@@ -649,6 +757,7 @@ run_mcp_server() {
     fi
   fi
 
+  untrack_child_pid "$server_pid"
   stop_process "$server_pid"
   exec 3>&-
   exec 4<&-
@@ -698,6 +807,7 @@ run_daemon() {
   bun run dist/src/index.js --daemon-mode --startup-benchmark --port "$port" \
     >/dev/null 2>"$stderr_fifo" &
   local daemon_pid=$!
+  track_child_pid "$daemon_pid"
   local spawn_ms
   spawn_ms=$(( $(get_time_ms) - spawn_start ))
 
@@ -718,6 +828,7 @@ run_daemon() {
       "$last_stderr_message" \
       "$stderr_log" \
       "Mode: $mode; Port: $port; Socket: $socket_path")
+    untrack_child_pid "$daemon_pid"
     stop_process "$daemon_pid"
     exec 5<&-
     rm -rf "$run_dir"
@@ -750,6 +861,7 @@ run_daemon() {
       "$last_stderr_message" \
       "$stderr_log" \
       "Mode: $mode; Port: $port; Socket: $socket_path")
+    untrack_child_pid "$daemon_pid"
     stop_process "$daemon_pid"
     exec 5<&-
     rm -rf "$run_dir" "$socket_path" "$pid_path"
@@ -764,6 +876,7 @@ run_daemon() {
   marks=$(jq -c '.marks // {}' <<<"$startup_report")
   memory=$(jq -c '.memoryUsage // {}' <<<"$startup_report")
 
+  untrack_child_pid "$daemon_pid"
   stop_process "$daemon_pid"
   exec 5<&-
   rm -rf "$run_dir" "$socket_path" "$pid_path"
@@ -850,6 +963,10 @@ fi
 require_command bun
 require_command jq
 
+# Setup global timeout handler
+trap 'global_timeout_handler' USR1
+start_global_timeout_monitor
+
 if [[ "$run_daemon" == "true" ]]; then
   if command -v python3 >/dev/null 2>&1; then
     daemon_socket_client="python"
@@ -873,17 +990,21 @@ fi
 
 if [[ "$run_server" == "true" ]]; then
   if [[ "$run_warm" == "true" ]]; then
+    set_current_operation "MCP server warm-up run"
     if ! run_error=$(run_mcp_server "warm" "false" "$adb_available" "$adb_device_count" "$adb_error"); then
       printf '%s\n' "$run_error" >&2
       echo "Warm-up MCP server run failed (see details above)" >&2
+      stop_global_timeout_monitor
       exit 1
     fi
   fi
 
   if [[ "$run_cold" == "true" ]]; then
+    set_current_operation "MCP server cold benchmark"
     if ! run_json=$(run_mcp_server "cold" "true" "$adb_available" "$adb_device_count" "$adb_error"); then
       printf '%s\n' "$run_json" >&2
       echo "Cold MCP server benchmark failed (see details above)" >&2
+      stop_global_timeout_monitor
       exit 1
     fi
     server_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$server_runs_json")
@@ -894,9 +1015,11 @@ if [[ "$run_server" == "true" ]]; then
   fi
 
   if [[ "$run_warm" == "true" ]]; then
+    set_current_operation "MCP server warm benchmark"
     if ! run_json=$(run_mcp_server "warm" "false" "$adb_available" "$adb_device_count" "$adb_error"); then
       printf '%s\n' "$run_json" >&2
       echo "Warm MCP server benchmark failed (see details above)" >&2
+      stop_global_timeout_monitor
       exit 1
     fi
     server_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$server_runs_json")
@@ -911,17 +1034,21 @@ fi
 
 if [[ "$run_daemon" == "true" ]]; then
   if [[ "$run_warm" == "true" ]]; then
+    set_current_operation "Daemon warm-up run"
     if ! run_error=$(run_daemon "warm"); then
       printf '%s\n' "$run_error" >&2
       echo "Warm-up daemon run failed (see details above)" >&2
+      stop_global_timeout_monitor
       exit 1
     fi
   fi
 
   if [[ "$run_cold" == "true" ]]; then
+    set_current_operation "Daemon cold benchmark"
     if ! run_json=$(run_daemon "cold"); then
       printf '%s\n' "$run_json" >&2
       echo "Cold daemon benchmark failed (see details above)" >&2
+      stop_global_timeout_monitor
       exit 1
     fi
     daemon_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$daemon_runs_json")
@@ -932,9 +1059,11 @@ if [[ "$run_daemon" == "true" ]]; then
   fi
 
   if [[ "$run_warm" == "true" ]]; then
+    set_current_operation "Daemon warm benchmark"
     if ! run_json=$(run_daemon "warm"); then
       printf '%s\n' "$run_json" >&2
       echo "Warm daemon benchmark failed (see details above)" >&2
+      stop_global_timeout_monitor
       exit 1
     fi
     daemon_runs_json=$(jq --argjson run "$run_json" '. + [$run]' <<<"$daemon_runs_json")
@@ -1035,6 +1164,9 @@ if [[ -n "$output_path" ]]; then
   echo "$report_json" > "$output_path"
   echo "Benchmark report written to: $output_path"
 fi
+
+set_current_operation "Benchmark complete"
+stop_global_timeout_monitor
 
 if [[ "$passed" != "true" ]]; then
   echo "Startup benchmark regressions detected:" >&2

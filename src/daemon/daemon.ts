@@ -650,10 +650,14 @@ export class Daemon {
    */
   private async initializeDevicePoolWithTimeout(timeoutMs: number): Promise<void> {
     const timeoutPromise = new Promise<void>(resolve => {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         logger.warn(`Device pool initialization timed out after ${timeoutMs}ms`);
         resolve();
       }, timeoutMs);
+      // Allow process to exit even if this timer is pending
+      if (typeof timer.unref === "function") {
+        timer.unref();
+      }
     });
 
     const initPromise = this.initializeDevicePool();
@@ -709,12 +713,29 @@ export class Daemon {
     logger.info(`[Daemon] Initializing XCTestService for ${iosDevices.length} iOS device(s)...`);
     const deviceSessionManager = DeviceSessionManager.getInstance();
 
+    // Per-device timeout to prevent hanging on unresponsive devices
+    const PER_DEVICE_TIMEOUT_MS = 5000;
+
     for (const device of iosDevices) {
       try {
         logger.info(`[Daemon] Setting up XCTestService for iOS device ${device.id}`);
-        await deviceSessionManager.verifyIosDevice(device.id, {
-          skipAccessibilityDownload: true  // Skip app download during startup, use cached version
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error(`Timeout after ${PER_DEVICE_TIMEOUT_MS}ms`));
+          }, PER_DEVICE_TIMEOUT_MS);
+          // Allow process to exit even if this timer is pending
+          if (typeof timer.unref === "function") {
+            timer.unref();
+          }
         });
+
+        await Promise.race([
+          deviceSessionManager.verifyIosDevice(device.id, {
+            skipAccessibilityDownload: true  // Skip app download during startup, use cached version
+          }),
+          timeoutPromise
+        ]);
         logger.info(`[Daemon] XCTestService ready for iOS device ${device.id}`);
       } catch (error) {
         // Log but don't fail - service will be set up on first tool call if needed
