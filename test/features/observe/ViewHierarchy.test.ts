@@ -1389,3 +1389,630 @@ describe("Offscreen Node Filtering", function() {
     });
   });
 });
+
+describe("Node Hash Generation", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should generate consistent hash for same node properties", function() {
+    const node1 = {
+      "bounds": "[0,0][100,50]",
+      "resource-id": "com.app:id/button",
+      "text": "Click me",
+      "content-desc": "Button",
+      "class": "android.widget.Button",
+      "clickable": "true",
+      "scrollable": "false"
+    };
+
+    const node2 = { ...node1 };
+
+    const hash1 = viewHierarchy.generateNodeHash(node1);
+    const hash2 = viewHierarchy.generateNodeHash(node2);
+
+    expect(hash1).toBe(hash2);
+    expect(hash1.length).toBeGreaterThan(0);
+  });
+
+  test("should generate different hash for different bounds", function() {
+    const node1 = {
+      "bounds": "[0,0][100,50]",
+      "resource-id": "com.app:id/button",
+      "text": "Click me"
+    };
+
+    const node2 = {
+      "bounds": "[0,100][100,150]",
+      "resource-id": "com.app:id/button",
+      "text": "Click me"
+    };
+
+    const hash1 = viewHierarchy.generateNodeHash(node1);
+    const hash2 = viewHierarchy.generateNodeHash(node2);
+
+    expect(hash1).not.toBe(hash2);
+  });
+
+  test("should handle $ property format", function() {
+    const nodeWithDollar = {
+      $: {
+        "bounds": "[0,0][100,50]",
+        "resource-id": "com.app:id/button",
+        "text": "Click me"
+      }
+    };
+
+    const nodeWithoutDollar = {
+      "bounds": "[0,0][100,50]",
+      "resource-id": "com.app:id/button",
+      "text": "Click me"
+    };
+
+    const hash1 = viewHierarchy.generateNodeHash(nodeWithDollar);
+    const hash2 = viewHierarchy.generateNodeHash(nodeWithoutDollar);
+
+    expect(hash1).toBe(hash2);
+  });
+
+  test("should return empty string for null node", function() {
+    const hash = viewHierarchy.generateNodeHash(null);
+    expect(hash).toBe("");
+  });
+
+  test("should NOT include interaction properties in hash (for deduplication)", function() {
+    // Interaction properties are intentionally excluded from hash
+    // so the same element with different capability metadata is treated as duplicate
+    const clickableNode = {
+      bounds: "[0,0][100,50]",
+      clickable: "true"
+    };
+
+    const scrollableNode = {
+      bounds: "[0,0][100,50]",
+      scrollable: "true"
+    };
+
+    const hash1 = viewHierarchy.generateNodeHash(clickableNode);
+    const hash2 = viewHierarchy.generateNodeHash(scrollableNode);
+
+    // Same bounds, no other identifying properties = same hash
+    expect(hash1).toBe(hash2);
+  });
+});
+
+describe("Zero Bounds Detection", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should detect zero width bounds", function() {
+    const node = { bounds: "[100,0][100,50]" };
+    expect(viewHierarchy.hasZeroBounds(node)).toBe(true);
+  });
+
+  test("should detect zero height bounds", function() {
+    const node = { bounds: "[0,100][100,100]" };
+    expect(viewHierarchy.hasZeroBounds(node)).toBe(true);
+  });
+
+  test("should not flag valid bounds", function() {
+    const node = { bounds: "[0,0][100,50]" };
+    expect(viewHierarchy.hasZeroBounds(node)).toBe(false);
+  });
+
+  test("should handle object format bounds", function() {
+    const zeroWidthNode = { bounds: { left: 100, top: 0, right: 100, bottom: 50 } };
+    const zeroHeightNode = { bounds: { left: 0, top: 100, right: 100, bottom: 100 } };
+    const validNode = { bounds: { left: 0, top: 0, right: 100, bottom: 50 } };
+
+    expect(viewHierarchy.hasZeroBounds(zeroWidthNode)).toBe(true);
+    expect(viewHierarchy.hasZeroBounds(zeroHeightNode)).toBe(true);
+    expect(viewHierarchy.hasZeroBounds(validNode)).toBe(false);
+  });
+
+  test("should handle $ property format", function() {
+    const node = { $: { bounds: "[100,0][100,50]" } };
+    expect(viewHierarchy.hasZeroBounds(node)).toBe(true);
+  });
+
+  test("should return true for null node", function() {
+    expect(viewHierarchy.hasZeroBounds(null)).toBe(true);
+  });
+
+  test("should not filter nodes without bounds info", function() {
+    const node = { text: "No bounds" };
+    expect(viewHierarchy.hasZeroBounds(node)).toBe(false);
+  });
+
+  test("should handle negative coordinates", function() {
+    const validNode = { bounds: "[-50,-50][50,50]" };
+    const zeroNode = { bounds: "[-50,0][-50,50]" };
+
+    expect(viewHierarchy.hasZeroBounds(validNode)).toBe(false);
+    expect(viewHierarchy.hasZeroBounds(zeroNode)).toBe(true);
+  });
+});
+
+describe("Invisible Node Detection", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should detect invisible node with string false", function() {
+    const node = { visible: "false" };
+    expect(viewHierarchy.isInvisible(node)).toBe(true);
+  });
+
+  test("should detect invisible node with boolean false", function() {
+    const node = { visible: false };
+    expect(viewHierarchy.isInvisible(node)).toBe(true);
+  });
+
+  test("should not flag visible node", function() {
+    const node = { visible: "true" };
+    expect(viewHierarchy.isInvisible(node)).toBe(false);
+  });
+
+  test("should not filter nodes without visible property", function() {
+    const node = { text: "No visible property" };
+    expect(viewHierarchy.isInvisible(node)).toBe(false);
+  });
+
+  test("should handle $ property format", function() {
+    const node = { $: { visible: "false" } };
+    expect(viewHierarchy.isInvisible(node)).toBe(true);
+  });
+
+  test("should return true for null node", function() {
+    expect(viewHierarchy.isInvisible(null)).toBe(true);
+  });
+});
+
+describe("Interactable Node Detection", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should detect clickable node", function() {
+    const node = { clickable: "true" };
+    expect(viewHierarchy.isInteractable(node)).toBe(true);
+  });
+
+  test("should detect scrollable node", function() {
+    const node = { scrollable: "true" };
+    expect(viewHierarchy.isInteractable(node)).toBe(true);
+  });
+
+  test("should detect long-clickable node", function() {
+    const node = { "long-clickable": "true" };
+    expect(viewHierarchy.isInteractable(node)).toBe(true);
+  });
+
+  test("should detect focusable node", function() {
+    const node = { focusable: "true" };
+    expect(viewHierarchy.isInteractable(node)).toBe(true);
+  });
+
+  test("should detect checkable node", function() {
+    const node = { checkable: "true" };
+    expect(viewHierarchy.isInteractable(node)).toBe(true);
+  });
+
+  test("should not flag non-interactable node", function() {
+    const node = { text: "Static text", enabled: "true" };
+    expect(viewHierarchy.isInteractable(node)).toBe(false);
+  });
+
+  test("should return false for null node", function() {
+    expect(viewHierarchy.isInteractable(null)).toBe(false);
+  });
+
+  test("should handle $ property format", function() {
+    const node = { $: { clickable: "true" } };
+    expect(viewHierarchy.isInteractable(node)).toBe(true);
+  });
+});
+
+describe("Node Deduplication", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should remove duplicate nodes with same hash", function() {
+    const nodes = [
+      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
+      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
+      { "bounds": "[0,100][100,150]", "resource-id": "button2", "text": "Submit" }
+    ];
+
+    const result = viewHierarchy.deduplicateNodes(nodes);
+
+    expect(result).toHaveLength(2);
+  });
+
+  test("should prefer interactable nodes over non-interactable", function() {
+    const nodes = [
+      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
+      { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click", "clickable": "true" }
+    ];
+
+    const result = viewHierarchy.deduplicateNodes(nodes);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].clickable).toBe("true");
+  });
+
+  test("should filter out zero-bounds nodes", function() {
+    const nodes = [
+      { bounds: "[0,0][100,50]", text: "Visible" },
+      { bounds: "[100,0][100,50]", text: "Zero width" },
+      { bounds: "[0,100][100,100]", text: "Zero height" }
+    ];
+
+    const result = viewHierarchy.deduplicateNodes(nodes);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe("Visible");
+  });
+
+  test("should filter out invisible nodes", function() {
+    const nodes = [
+      { bounds: "[0,0][100,50]", text: "Visible" },
+      { bounds: "[0,100][100,150]", text: "Hidden", visible: "false" }
+    ];
+
+    const result = viewHierarchy.deduplicateNodes(nodes);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe("Visible");
+  });
+
+  test("should handle empty array", function() {
+    const result = viewHierarchy.deduplicateNodes([]);
+    expect(result).toHaveLength(0);
+  });
+});
+
+describe("Hierarchy Tree Deduplication", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should recursively deduplicate children", function() {
+    const hierarchy = {
+      bounds: "[0,0][1080,2400]",
+      text: "Root",
+      node: [
+        { bounds: "[0,0][100,50]", text: "Child 1" },
+        { bounds: "[0,0][100,50]", text: "Child 1" },
+        { bounds: "[0,100][100,150]", text: "Child 2" }
+      ]
+    };
+
+    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
+
+    expect(result).toBeDefined();
+    const children = Array.isArray(result.node) ? result.node : [result.node];
+    expect(children).toHaveLength(2);
+  });
+
+  test("should filter zero-bounds nodes from tree", function() {
+    const hierarchy = {
+      bounds: "[0,0][1080,2400]",
+      text: "Root",
+      node: [
+        { bounds: "[0,0][100,50]", text: "Visible" },
+        { bounds: "[100,0][100,50]", text: "Zero width" }
+      ]
+    };
+
+    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
+
+    expect(result).toBeDefined();
+    expect(result.node.text).toBe("Visible");
+  });
+
+  test("should return null for zero-bounds root", function() {
+    const hierarchy = {
+      bounds: "[0,0][0,0]",
+      text: "Zero root"
+    };
+
+    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
+
+    expect(result).toBeNull();
+  });
+
+  test("should handle single child", function() {
+    const hierarchy = {
+      bounds: "[0,0][1080,2400]",
+      text: "Root",
+      node: { bounds: "[0,0][100,50]", text: "Only child" }
+    };
+
+    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
+
+    expect(result).toBeDefined();
+    expect(result.node.text).toBe("Only child");
+  });
+
+  test("should remove node property when all children filtered", function() {
+    const hierarchy = {
+      bounds: "[0,0][1080,2400]",
+      text: "Root",
+      node: [
+        { bounds: "[100,0][100,50]", text: "Zero 1" },
+        { bounds: "[0,100][100,100]", text: "Zero 2" }
+      ]
+    };
+
+    const result = viewHierarchy.deduplicateHierarchyTree(hierarchy);
+
+    expect(result).toBeDefined();
+    expect(result.node).toBeUndefined();
+  });
+});
+
+describe("Overlay Window Filtering", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should filter accessibility_overlay windows", function() {
+    const windows = [
+      { windowType: "application", id: 1 },
+      { windowType: "accessibility_overlay", id: 2 },
+      { windowType: "system", id: 3 }
+    ];
+
+    const result = viewHierarchy.filterOverlayWindows(windows);
+
+    expect(result).toHaveLength(2);
+    expect(result?.find(w => w.windowType === "accessibility_overlay")).toBeUndefined();
+  });
+
+  test("should filter magnification_overlay windows", function() {
+    const windows = [
+      { windowType: "application", id: 1 },
+      { windowType: "magnification_overlay", id: 2 }
+    ];
+
+    const result = viewHierarchy.filterOverlayWindows(windows);
+
+    expect(result).toHaveLength(1);
+    expect(result?.[0].windowType).toBe("application");
+  });
+
+  test("should handle numeric window types", function() {
+    const windows = [
+      { type: 1, id: 1 }, // application
+      { type: 4, id: 2 }, // accessibility_overlay
+      { type: 5, id: 3 }, // magnification_overlay
+      { type: 2, id: 4 }  // input_method
+    ];
+
+    const result = viewHierarchy.filterOverlayWindows(windows);
+
+    expect(result).toHaveLength(2);
+    expect(result?.find(w => w.type === 4)).toBeUndefined();
+    expect(result?.find(w => w.type === 5)).toBeUndefined();
+  });
+
+  test("should return undefined for undefined input", function() {
+    const result = viewHierarchy.filterOverlayWindows(undefined);
+    expect(result).toBeUndefined();
+  });
+
+  test("should keep all non-overlay windows", function() {
+    const windows = [
+      { windowType: "application", id: 1 },
+      { windowType: "system", id: 2 },
+      { windowType: "input_method", id: 3 },
+      { windowType: "split_screen_divider", id: 4 }
+    ];
+
+    const result = viewHierarchy.filterOverlayWindows(windows);
+
+    expect(result).toHaveLength(4);
+  });
+
+  test("should handle windows without type property", function() {
+    const windows = [
+      { id: 1, packageName: "com.app" },
+      { windowType: "accessibility_overlay", id: 2 }
+    ];
+
+    const result = viewHierarchy.filterOverlayWindows(windows);
+
+    expect(result).toHaveLength(1);
+    expect(result?.[0].id).toBe(1);
+  });
+});
+
+describe("Merge Hierarchies with Deduplication", function() {
+  let viewHierarchy: ViewHierarchy;
+  let mockDevice: BootedDevice;
+
+  beforeEach(function() {
+    mockDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    viewHierarchy = new ViewHierarchy(mockDevice, null);
+  });
+
+  test("should deduplicate nodes when merging a11y and uiautomator", function() {
+    const a11yHierarchy = {
+      hierarchy: {
+        node: {
+          "bounds": "[0,0][1080,2400]",
+          "resource-id": "root",
+          "node": [
+            { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" }
+          ]
+        }
+      },
+      packageName: "com.test"
+    };
+
+    const uiautomatorHierarchy = {
+      hierarchy: {
+        node: {
+          "bounds": "[0,0][1080,2400]",
+          "resource-id": "root",
+          "node": [
+            { "bounds": "[0,0][100,50]", "resource-id": "button1", "text": "Click" },
+            { "bounds": "[0,100][100,150]", "resource-id": "button2", "text": "Submit" }
+          ]
+        }
+      }
+    };
+
+    const result = viewHierarchy.mergeHierarchies(
+      a11yHierarchy as any,
+      uiautomatorHierarchy as any
+    );
+
+    expect(result.accessibilityServiceIncomplete).toBe(true);
+    expect(result.sources).toContain("accessibility-service");
+    expect(result.sources).toContain("uiautomator");
+  });
+
+  test("should return a11y hierarchy when uiautomator is missing", function() {
+    const a11yHierarchy = {
+      hierarchy: {
+        node: { bounds: "[0,0][100,50]", text: "A11y only" }
+      },
+      packageName: "com.test"
+    };
+
+    const uiautomatorHierarchy = {
+      hierarchy: {}
+    };
+
+    const result = viewHierarchy.mergeHierarchies(
+      a11yHierarchy as any,
+      uiautomatorHierarchy as any
+    );
+
+    expect(result.hierarchy.node.text).toBe("A11y only");
+  });
+
+  test("should return uiautomator hierarchy when a11y is missing", function() {
+    const a11yHierarchy = {
+      hierarchy: {},
+      packageName: "com.test",
+      windows: [{ id: 1 }]
+    };
+
+    const uiautomatorHierarchy = {
+      hierarchy: {
+        node: { bounds: "[0,0][100,50]", text: "UI only" }
+      }
+    };
+
+    const result = viewHierarchy.mergeHierarchies(
+      a11yHierarchy as any,
+      uiautomatorHierarchy as any
+    );
+
+    expect(result.hierarchy.node.text).toBe("UI only");
+    expect(result.packageName).toBe("com.test");
+  });
+
+  test("should return error when both hierarchies are empty", function() {
+    const a11yHierarchy = { hierarchy: {} };
+    const uiautomatorHierarchy = { hierarchy: {} };
+
+    const result = viewHierarchy.mergeHierarchies(
+      a11yHierarchy as any,
+      uiautomatorHierarchy as any
+    );
+
+    expect(result.hierarchy.error).toBeDefined();
+  });
+
+  test("should filter overlay windows from merged result", function() {
+    const a11yHierarchy = {
+      hierarchy: {
+        node: { bounds: "[0,0][100,50]", text: "Test" }
+      },
+      windows: [
+        { windowType: "application", id: 1 },
+        { windowType: "accessibility_overlay", id: 2 }
+      ]
+    };
+
+    const uiautomatorHierarchy = {
+      hierarchy: {
+        node: { bounds: "[0,100][100,150]", text: "UI" }
+      }
+    };
+
+    const result = viewHierarchy.mergeHierarchies(
+      a11yHierarchy as any,
+      uiautomatorHierarchy as any
+    );
+
+    expect(result.windows).toHaveLength(1);
+    expect(result.windows?.[0].windowType).toBe("application");
+  });
+});

@@ -419,6 +419,230 @@ export class ViewHierarchy {
   }
 
   /**
+   * Window types that should be excluded from hierarchy (conservative filtering).
+   * These are overlay types that don't contain meaningful UI content.
+   */
+  private static readonly EXCLUDED_WINDOW_TYPES = new Set([
+    "accessibility_overlay",
+    "magnification_overlay"
+  ]);
+
+  /**
+   * Generate a hash key for a node based on its identifying properties.
+   * Used for deduplication when merging hierarchies from multiple sources.
+   *
+   * The hash identifies the "same" element across sources. Interaction properties
+   * (clickable, scrollable, etc.) are NOT included because the same element may
+   * have different capability metadata in different sources.
+   *
+   * @param node - The node to generate a hash for
+   * @returns A string hash key representing the node's identity
+   */
+  generateNodeHash(node: any): string {
+    if (!node) {
+      return "";
+    }
+
+    const props = node.$ || node;
+    const bounds = props.bounds || "";
+    const resourceId = props["resource-id"] || props.resourceId || "";
+    const text = props.text || "";
+    const contentDesc = props["content-desc"] || props.contentDesc || "";
+    const className = props.class || props.className || "";
+
+    // Identity is based on position (bounds), identifiers (resource-id), and content (text, content-desc).
+    // Interaction properties are intentionally excluded so that the same element
+    // with different capability metadata is still treated as a duplicate.
+    return `${bounds}|${resourceId}|${text}|${contentDesc}|${className}`;
+  }
+
+  /**
+   * Check if a node has zero bounds (invisible or not rendered).
+   *
+   * @param node - The node to check
+   * @returns True if the node has zero bounds
+   */
+  hasZeroBounds(node: any): boolean {
+    if (!node) {
+      return true;
+    }
+
+    const props = node.$ || node;
+    const bounds = props.bounds;
+
+    if (!bounds) {
+      return false; // No bounds info, don't filter
+    }
+
+    // Parse bounds string format "[left,top][right,bottom]"
+    if (typeof bounds === "string") {
+      const match = bounds.match(/\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]/);
+      if (match) {
+        const left = parseInt(match[1], 10);
+        const top = parseInt(match[2], 10);
+        const right = parseInt(match[3], 10);
+        const bottom = parseInt(match[4], 10);
+        return left === right || top === bottom;
+      }
+    }
+
+    // Handle object format { left, top, right, bottom }
+    if (typeof bounds === "object") {
+      const { left, top, right, bottom } = bounds;
+      return left === right || top === bottom;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a node is explicitly marked as invisible.
+   *
+   * @param node - The node to check
+   * @returns True if the node is marked as not visible
+   */
+  isInvisible(node: any): boolean {
+    if (!node) {
+      return true;
+    }
+
+    const props = node.$ || node;
+    const visible = props.visible;
+
+    // Only filter if explicitly marked as false
+    return visible === "false" || visible === false;
+  }
+
+  /**
+   * Check if a node is interactable (clickable, scrollable, etc.).
+   *
+   * @param node - The node to check
+   * @returns True if the node has any interactive properties
+   */
+  isInteractable(node: any): boolean {
+    if (!node) {
+      return false;
+    }
+
+    const props = node.$ || node;
+    return (
+      props.clickable === "true" ||
+      props.scrollable === "true" ||
+      props["long-clickable"] === "true" ||
+      props.focusable === "true" ||
+      props.checkable === "true"
+    );
+  }
+
+  /**
+   * Deduplicate nodes by their hash, preferring a11y data and interactable nodes.
+   *
+   * @param nodes - Array of nodes to deduplicate
+   * @param sourcePreference - Source to prefer when deduping ("a11y" or "uiautomator")
+   * @returns Deduplicated array of nodes
+   */
+  deduplicateNodes(nodes: any[], sourcePreference: "a11y" | "uiautomator" = "a11y"): any[] {
+    const seen = new Map<string, { node: any; isA11y: boolean; isInteractable: boolean }>();
+
+    for (const node of nodes) {
+      const hash = this.generateNodeHash(node);
+      if (!hash) {
+        continue;
+      }
+
+      // Skip zero-bounds and invisible nodes
+      if (this.hasZeroBounds(node) || this.isInvisible(node)) {
+        continue;
+      }
+
+      const existing = seen.get(hash);
+      const nodeIsInteractable = this.isInteractable(node);
+      // Nodes from the first part of the array are from a11y when merging
+      const nodeIsA11y = nodes.indexOf(node) < nodes.length / 2 && sourcePreference === "a11y";
+
+      if (!existing) {
+        seen.set(hash, { node, isA11y: nodeIsA11y, isInteractable: nodeIsInteractable });
+      } else {
+        // Prefer a11y over uiautomator, and interactable over non-interactable
+        const shouldReplace =
+          (sourcePreference === "a11y" && nodeIsA11y && !existing.isA11y) ||
+          (nodeIsInteractable && !existing.isInteractable);
+
+        if (shouldReplace) {
+          seen.set(hash, { node, isA11y: nodeIsA11y, isInteractable: nodeIsInteractable });
+        }
+      }
+    }
+
+    return Array.from(seen.values()).map(entry => entry.node);
+  }
+
+  /**
+   * Recursively deduplicate nodes throughout a hierarchy tree.
+   *
+   * @param node - Root node of the hierarchy
+   * @returns Node with deduplicated children
+   */
+  deduplicateHierarchyTree(node: any): any {
+    if (!node) {
+      return node;
+    }
+
+    // Skip zero-bounds and invisible nodes
+    if (this.hasZeroBounds(node) || this.isInvisible(node)) {
+      return null;
+    }
+
+    const result = { ...node };
+
+    if (node.node) {
+      const children = Array.isArray(node.node) ? node.node : [node.node];
+
+      // Recursively process children first
+      const processedChildren = children
+        .map((child: any) => this.deduplicateHierarchyTree(child))
+        .filter((child: any) => child !== null);
+
+      // Deduplicate at this level
+      const dedupedChildren = this.deduplicateNodes(processedChildren);
+
+      if (dedupedChildren.length === 0) {
+        delete result.node;
+      } else if (dedupedChildren.length === 1) {
+        result.node = dedupedChildren[0];
+      } else {
+        result.node = dedupedChildren;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Filter out windows that are overlay types (conservative filtering).
+   *
+   * @param windows - Array of window info objects
+   * @returns Filtered array excluding overlay windows
+   */
+  filterOverlayWindows(windows: any[] | undefined): any[] | undefined {
+    if (!windows) {
+      return undefined;
+    }
+
+    return windows.filter(window => {
+      const windowType = window.windowType || window.type;
+      if (typeof windowType === "string") {
+        return !ViewHierarchy.EXCLUDED_WINDOW_TYPES.has(windowType);
+      }
+      // Numeric type codes: 4 = accessibility_overlay, 5 = magnification_overlay
+      if (typeof windowType === "number") {
+        return windowType !== 4 && windowType !== 5;
+      }
+      return true;
+    });
+  }
+
+  /**
    * Merge accessibility service hierarchy with uiautomator hierarchy.
    * When accessibility service returns incomplete data (e.g., active window has null root),
    * we supplement it with uiautomator data.
@@ -464,16 +688,18 @@ export class ViewHierarchy {
       };
     }
 
-    // Both have data - combine root nodes under a wrapper
-    // This creates a unified hierarchy that contains both data sources
+    // Both have data - combine and deduplicate root nodes
+    // Accessibility service nodes come first to get preference in deduplication
     const combinedNodes: any[] = [];
 
-    // Add accessibility service nodes
+    // Add accessibility service nodes first (they get preference)
     if (Array.isArray(a11yNode)) {
       combinedNodes.push(...a11yNode);
     } else {
       combinedNodes.push(a11yNode);
     }
+
+    const a11yCount = combinedNodes.length;
 
     // Add uiautomator nodes
     if (Array.isArray(uiautomatorNode)) {
@@ -482,12 +708,26 @@ export class ViewHierarchy {
       combinedNodes.push(uiautomatorNode);
     }
 
-    logger.debug(`[VIEW_HIERARCHY] Merged hierarchies: ${combinedNodes.length} root nodes from both sources`);
+    logger.debug(`[VIEW_HIERARCHY] Before deduplication: ${combinedNodes.length} root nodes (${a11yCount} a11y, ${combinedNodes.length - a11yCount} uiautomator)`);
+
+    // Deduplicate root nodes, preferring a11y data
+    const deduplicatedNodes = this.deduplicateNodes(combinedNodes, "a11y");
+
+    // Recursively deduplicate within each root node's tree
+    const processedNodes = deduplicatedNodes
+      .map(node => this.deduplicateHierarchyTree(node))
+      .filter(node => node !== null);
+
+    logger.debug(`[VIEW_HIERARCHY] After deduplication: ${processedNodes.length} root nodes`);
+
+    // Filter overlay windows from the windows metadata
+    const filteredWindows = this.filterOverlayWindows(accessibilityHierarchy.windows);
 
     return {
       ...accessibilityHierarchy,
+      windows: filteredWindows,
       hierarchy: {
-        node: combinedNodes.length === 1 ? combinedNodes[0] : combinedNodes
+        node: processedNodes.length === 1 ? processedNodes[0] : processedNodes
       },
       accessibilityServiceIncomplete: true,
       sources: ["accessibility-service", "uiautomator"]
