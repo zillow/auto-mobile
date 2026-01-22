@@ -68,13 +68,14 @@ describe("videoRecordingManager", () => {
   });
 
   const waitForRecordingCount = async (expected: number): Promise<void> => {
-    for (let attempt = 0; attempt < 20; attempt++) {
+    for (let attempt = 0; attempt < 50; attempt++) {
       const recordings = await listVideoRecordings();
       if (recordings.length === expected) {
         return;
       }
-      // Yield to event loop to let async operations complete
-      await new Promise(resolve => setImmediate(resolve));
+      // Use setTimeout instead of setImmediate for more reliable cross-platform timing
+      // The auto-stop callback fires async work that needs multiple event loop cycles
+      await new Promise(resolve => setTimeout(resolve, 1));
     }
     throw new Error(`Timed out waiting for ${expected} recordings`);
   };
