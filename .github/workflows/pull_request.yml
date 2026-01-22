@@ -834,7 +834,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [detect-changes, build-android-accessibility-service]
-    if: needs.detect-changes.outputs.android_should_run == 'true'
+    if: needs.detect-changes.outputs.android_should_run == 'true' && secrets.EMULATOR_WTF_API_KEY != ''
     steps:
       - name: "Git Checkout"
         uses: actions/checkout@v4
