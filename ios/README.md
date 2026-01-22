@@ -114,7 +114,7 @@ swift test
 - **macOS**: 13.0 (Ventura) or later
 - **Xcode**: 15.0 or later
 - **Swift**: 5.9 or later
-- **Bun**: 1.3.5 or later
+- **Bun**: 1.3.6 or later
 - **Node.js**: 18+ (alternative to Bun)
 
 ## Building All Components

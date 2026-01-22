@@ -6,7 +6,8 @@ import { FakeAccessibilityServiceManager } from "../fakes/FakeAccessibilityServi
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
 import { Window } from "../../src/features/observe/Window";
-import { BootedDevice } from "../../src/models";
+import { BootedDevice, AppearanceConfigInput } from "../../src/models";
+import { serverConfig } from "../../src/utils/ServerConfig";
 
 describe("DeviceSessionManager", () => {
   const device: BootedDevice = {
@@ -20,11 +21,20 @@ describe("DeviceSessionManager", () => {
   let originalGetActive: typeof Window.prototype.getActive;
   let originalGetInstance: typeof AndroidAccessibilityServiceManager.getInstance;
   let originalAccessibilityClientGetInstance: typeof AccessibilityServiceClient.getInstance;
+  let originalAppearanceDefaults: AppearanceConfigInput;
 
   beforeEach(() => {
     fakeAdb = new FakeAdbExecutor();
     fakeDeviceUtils = new FakeDeviceUtils();
     fakeAdb.setDevices([device]);
+
+    originalAppearanceDefaults = serverConfig.getAppearanceDefaults();
+    serverConfig.setAppearanceDefaults({
+      ...originalAppearanceDefaults,
+      applyOnConnect: false,
+      syncWithHost: false,
+      defaultMode: "light"
+    });
 
     originalGetActive = Window.prototype.getActive;
     Window.prototype.getActive = async function() {
@@ -43,6 +53,7 @@ describe("DeviceSessionManager", () => {
     Window.prototype.getActive = originalGetActive;
     AndroidAccessibilityServiceManager.getInstance = originalGetInstance;
     AccessibilityServiceClient.getInstance = originalAccessibilityClientGetInstance;
+    serverConfig.setAppearanceDefaults(originalAppearanceDefaults);
   });
 
   test("should skip accessibility download when requested and not installed", async () => {

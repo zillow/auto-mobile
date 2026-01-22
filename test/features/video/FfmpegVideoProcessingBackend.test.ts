@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { platform } from "node:os";
 import { FfmpegVideoProcessingBackend } from "../../../src/features/video/FfmpegVideoProcessingBackend";
 import type { VideoCaptureConfig } from "../../../src/features/video/VideoRecorderService";
 import type { BootedDevice } from "../../../src/models";
@@ -49,21 +50,41 @@ describe("FfmpegVideoProcessingBackend - Unit Tests", function() {
 
   describe("Hardware Acceleration Detection", function() {
     test("should detect platform capabilities", async function() {
+      const osPlatform = platform();
       const hwAccel = await (backend as any).detectHardwareAccel();
 
       expect(hwAccel).toBeDefined();
       expect(hwAccel.encoder).toBeDefined();
       expect(typeof hwAccel.available).toBe("boolean");
       expect(hwAccel.description).toBeDefined();
-      expect(listEncodersCalls).toBe(1);
+
+      if (osPlatform === "darwin") {
+        expect(hwAccel.encoder).toBe("h264_videotoolbox");
+        expect(hwAccel.available).toBe(true);
+        expect(listEncodersCalls).toBe(1);
+      } else if (osPlatform === "linux") {
+        expect(hwAccel.encoder).toBe("h264_nvenc");
+        expect(hwAccel.available).toBe(true);
+        expect(listEncodersCalls).toBe(1);
+      } else {
+        expect(hwAccel.encoder).toBe("libx264");
+        expect(hwAccel.available).toBe(false);
+        expect(hwAccel.description).toContain("Unsupported platform");
+        expect(listEncodersCalls).toBe(0);
+      }
     });
 
     test("should cache hardware acceleration detection", async function() {
+      const osPlatform = platform();
       const hwAccel1 = await (backend as any).detectHardwareAccel();
       const hwAccel2 = await (backend as any).detectHardwareAccel();
 
       expect(hwAccel1).toEqual(hwAccel2);
-      expect(listEncodersCalls).toBe(1);
+      if (osPlatform === "darwin" || osPlatform === "linux") {
+        expect(listEncodersCalls).toBe(1);
+      } else {
+        expect(listEncodersCalls).toBe(0);
+      }
     });
   });
 

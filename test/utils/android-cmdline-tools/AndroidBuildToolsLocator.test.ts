@@ -35,6 +35,6 @@ describe("DefaultAndroidBuildToolsLocator", () => {
     const locator = new DefaultAndroidBuildToolsLocator(fileSystem, systemDetection);
     const tool = await locator.findAaptTool();
 
-    expect(tool).toEqual({ tool: "aapt2", path: "/sdk/build-tools/34.0.0/aapt2" });
+    expect(tool).toEqual({ tool: "aapt2", path: join("/sdk/build-tools", "34.0.0", "aapt2") });
   });
 });

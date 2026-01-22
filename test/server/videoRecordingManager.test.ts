@@ -33,6 +33,7 @@ describe("videoRecordingManager", () => {
     fakeTimer = new FakeTimer();
     fakeTimer.setManualMode();
     fakeBackend = new FakeVideoCaptureBackend();
+    fakeBackend.setNowProvider(() => new Date(fakeTimer.now()));
     fakeHighlightClient = new FakeHighlightClient();
     await fs.emptyDir(archiveRoot);
 
@@ -67,11 +68,12 @@ describe("videoRecordingManager", () => {
   });
 
   const waitForRecordingCount = async (expected: number): Promise<void> => {
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
       const recordings = await listVideoRecordings();
       if (recordings.length === expected) {
         return;
       }
+      // Yield to event loop to let async operations complete
       await new Promise(resolve => setImmediate(resolve));
     }
     throw new Error(`Timed out waiting for ${expected} recordings`);

@@ -2,6 +2,11 @@ import { expect, describe, test, beforeEach } from "bun:test";
 import { AvdManagerDependencies } from "../../../src/utils/android-cmdline-tools/avdmanager";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
+// Normalize paths for cross-platform comparison:
+// 1. Convert backslashes to forward slashes
+// 2. Strip Windows drive letter prefix (e.g., "C:" -> "")
+const normalizePath = (value: string): string => value.replace(/\\/g, "/").replace(/^[A-Za-z]:/, "");
+
 describe("AVDManager", function() {
   let mockLocation: any;
   let avdmanager: any;
@@ -744,7 +749,7 @@ id: pixel_4
           ["/test/sdk/cmdline-tools/latest/bin/avdmanager", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         // Test the behavior indirectly - system-images should make it valid
         expect(mockDeps.existsSync("/test/sdk")).toBe(true);
@@ -761,7 +766,7 @@ id: pixel_4
           ["/test/sdk/build-tools", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         expect(mockDeps.existsSync("/test/sdk/system-images")).toBe(true);
         expect(mockDeps.existsSync("/test/sdk/platforms")).toBe(true);
@@ -783,7 +788,7 @@ id: pixel_4
           ["/Users/test/Library/Android/sdk/platform-tools", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         // The proper SDK should be preferred because it has system-images
         expect(mockDeps.existsSync("/Users/test/Library/Android/sdk/system-images")).toBe(true);
@@ -820,7 +825,7 @@ id: pixel_4
           ["/Users/test/Library/Android/sdk/build-tools", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         // Mock detectAndroidCommandLineTools to return Homebrew location
         // Note: location.path should be the cmdline-tools/latest directory, not the avdmanager executable
@@ -859,8 +864,8 @@ id: pixel_4
           // The two-pass search should have picked the SDK with system-images
           // even though Homebrew location appears earlier in candidates
           expect(usedEnv).toBeDefined();
-          expect(usedEnv?.ANDROID_HOME).toBe("/Users/test/Library/Android/sdk");
-          expect(usedEnv?.ANDROID_SDK_ROOT).toBe("/Users/test/Library/Android/sdk");
+          expect(normalizePath(usedEnv?.ANDROID_HOME ?? "")).toBe("/Users/test/Library/Android/sdk");
+          expect(normalizePath(usedEnv?.ANDROID_SDK_ROOT ?? "")).toBe("/Users/test/Library/Android/sdk");
         } finally {
           // Restore original environment
           if (originalAndroidHome) {
@@ -883,7 +888,7 @@ id: pixel_4
           ["/test/sdk/build-tools", false]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         // Should still work with 2 markers (backward compatibility)
         expect(mockDeps.existsSync("/test/sdk/platforms")).toBe(true);
@@ -900,7 +905,7 @@ id: pixel_4
           ["/test/sdk/build-tools", false]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         // Only 1 marker - should be insufficient
         const platformsExist = mockDeps.existsSync("/test/sdk/platforms");
@@ -925,7 +930,7 @@ id: pixel_4
           ["/test/sdk/build-tools", false]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         const hasAnyMarker =
           mockDeps.existsSync("/test/sdk/system-images") ||
@@ -964,7 +969,7 @@ id: pixel_4
           ["/Users/test/Library/Android/sdk/platform-tools", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         expect(mockDeps.existsSync("/Users/test/Library/Android/sdk/system-images")).toBe(true);
         expect(mockDeps.existsSync("/Users/test/Library/Android/sdk/cmdline-tools/latest")).toBe(true);
@@ -972,16 +977,18 @@ id: pixel_4
 
       test("should handle Windows typical path with system-images", async () => {
         const mockDeps = createDependencies();
+        // Map keys use paths without drive letters since normalizePath strips them
         const pathChecks = new Map<string, boolean>([
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk", true],
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\system-images", true],
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\cmdline-tools\\latest", true],
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\platforms", true],
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\platform-tools", true]
+          ["/Users/test/AppData/Local/Android/Sdk", true],
+          ["/Users/test/AppData/Local/Android/Sdk/system-images", true],
+          ["/Users/test/AppData/Local/Android/Sdk/cmdline-tools/latest", true],
+          ["/Users/test/AppData/Local/Android/Sdk/platforms", true],
+          ["/Users/test/AppData/Local/Android/Sdk/platform-tools", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
+        // Both backslash and forward slash queries work due to normalization (drive letter stripped)
         expect(mockDeps.existsSync("C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\system-images")).toBe(true);
         expect(mockDeps.existsSync("C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\cmdline-tools\\latest")).toBe(true);
       });
@@ -996,7 +1003,7 @@ id: pixel_4
           ["/home/test/Android/Sdk/platform-tools", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         expect(mockDeps.existsSync("/home/test/Android/Sdk/system-images")).toBe(true);
         expect(mockDeps.existsSync("/home/test/Android/Sdk/cmdline-tools/latest")).toBe(true);
@@ -1016,7 +1023,7 @@ id: pixel_4
           ["/Users/test/Library/Android/sdk/platforms", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         // ANDROID_HOME location should be preferred due to system-images
         expect(mockDeps.existsSync("/Users/test/Library/Android/sdk/system-images")).toBe(true);
@@ -1025,33 +1032,33 @@ id: pixel_4
 
       test("should handle Windows old tools path vs new cmdline-tools", async () => {
         const mockDeps = createDependencies();
+        // Map keys use paths without drive letters since normalizePath strips them
         const pathChecks = new Map<string, boolean>([
           // Old tools location (deprecated)
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\tools\\bin", true],
+          ["/Users/test/AppData/Local/Android/Sdk/tools/bin", true],
           // New cmdline-tools location
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\cmdline-tools\\latest", true],
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\system-images", true]
+          ["/Users/test/AppData/Local/Android/Sdk/cmdline-tools/latest", true],
+          ["/Users/test/AppData/Local/Android/Sdk/system-images", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
-        // New cmdline-tools should be preferred
+        // Both backslash and forward slash queries work (drive letter stripped)
         expect(mockDeps.existsSync("C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\cmdline-tools\\latest")).toBe(true);
         expect(mockDeps.existsSync("C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\tools\\bin")).toBe(true);
       });
 
       test("should handle mixed path separators in Windows paths", async () => {
         const mockDeps = createDependencies();
+        // Map keys use paths without drive letters since normalizePath strips them
         const pathChecks = new Map<string, boolean>([
-          ["C:/Users/test/AppData/Local/Android/Sdk", true],
-          ["C:/Users/test/AppData/Local/Android/Sdk/system-images", true],
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk", true],
-          ["C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\system-images", true]
+          ["/Users/test/AppData/Local/Android/Sdk", true],
+          ["/Users/test/AppData/Local/Android/Sdk/system-images", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
-        // Both forward and backslash should work
+        // Both forward and backslash queries work (drive letter stripped, separators normalized)
         expect(mockDeps.existsSync("C:/Users/test/AppData/Local/Android/Sdk/system-images")).toBe(true);
         expect(mockDeps.existsSync("C:\\Users\\test\\AppData\\Local\\Android\\Sdk\\system-images")).toBe(true);
       });
