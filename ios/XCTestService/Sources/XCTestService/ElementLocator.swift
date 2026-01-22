@@ -303,7 +303,7 @@ public class ElementLocator: ElementLocating {
 
         // MARK: - View Hierarchy
 
-        public func getViewHierarchy() throws -> ViewHierarchy {
+        public func getViewHierarchy(disableAllFiltering: Bool = false) throws -> ViewHierarchy {
             perfProvider.serial("getViewHierarchy")
             defer { perfProvider.end() }
 
@@ -343,9 +343,15 @@ public class ElementLocator: ElementLocating {
             }
 
             // Apply optimization - flatten structural wrappers and filter empty nodes
-            let rootElement = perfProvider.track("optimize") {
-                let optimizedElements = optimizeHierarchy(rawElement, isRoot: true)
-                return optimizedElements.first ?? rawElement
+            // Skip optimization when disableAllFiltering is true (for raw hierarchy debugging)
+            let rootElement: UIElementInfo
+            if disableAllFiltering {
+                rootElement = rawElement
+            } else {
+                rootElement = perfProvider.track("optimize") {
+                    let optimizedElements = optimizeHierarchy(rawElement, isRoot: true)
+                    return optimizedElements.first ?? rawElement
+                }
             }
 
             // Get window info from snapshot
@@ -826,7 +832,7 @@ public class ElementLocator: ElementLocating {
         // Non-iOS stub implementation
         public init() {}
 
-        public func getViewHierarchy() throws -> ViewHierarchy {
+        public func getViewHierarchy(disableAllFiltering _: Bool = false) throws -> ViewHierarchy {
             return ViewHierarchy(
                 packageName: nil,
                 hierarchy: nil,

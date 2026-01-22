@@ -980,7 +980,8 @@ export class XCTestServiceClient implements XCTestService {
 
     const message = {
       type: disableAllFiltering ? "request_hierarchy" : "request_hierarchy_if_stale",
-      requestId
+      requestId,
+      disableAllFiltering: disableAllFiltering ?? false
     };
 
     this.ws?.send(JSON.stringify(message));

@@ -5,7 +5,8 @@ import Foundation
 /// Protocol for locating UI elements and building view hierarchies
 public protocol ElementLocating {
     /// Get the full view hierarchy
-    func getViewHierarchy() throws -> ViewHierarchy
+    /// - Parameter disableAllFiltering: If true, skip hierarchy optimization and return raw hierarchy
+    func getViewHierarchy(disableAllFiltering: Bool) throws -> ViewHierarchy
 
     /// Find element by resource ID / accessibility identifier
     func findElement(byResourceId resourceId: String) -> Any?

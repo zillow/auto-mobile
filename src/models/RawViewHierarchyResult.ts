@@ -3,19 +3,24 @@
  */
 export interface RawViewHierarchyResult {
   /**
-   * Raw XML content from uiautomator dump
+   * Raw XML content from uiautomator dump (Android only)
    */
   xml?: string;
 
   /**
-   * Raw JSON content from accessibility service (if available)
+   * Raw JSON content from accessibility service (Android only)
    */
   json?: string;
 
   /**
+   * Raw JSON content from XCUITest (iOS only)
+   */
+  xcuitest?: string;
+
+  /**
    * Source of the hierarchy data
    */
-  source: "uiautomator" | "accessibility-service" | "both";
+  source: "uiautomator" | "accessibility-service" | "both" | "xcuitest";
 
   /**
    * Timestamp when the hierarchy was captured

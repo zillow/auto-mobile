@@ -16,6 +16,9 @@ public class FakeElementLocator: ElementLocating {
     private var findByIdHistory: [String] = []
     private var findByTextHistory: [String] = []
 
+    /// Tracks the last value of disableAllFiltering passed to getViewHierarchy
+    public private(set) var lastDisableAllFiltering: Bool?
+
     public init() {}
 
     // MARK: - Configuration
@@ -47,12 +50,14 @@ public class FakeElementLocator: ElementLocating {
         getHierarchyCallCount = 0
         findByIdHistory.removeAll()
         findByTextHistory.removeAll()
+        lastDisableAllFiltering = nil
     }
 
     // MARK: - ElementLocating
 
-    public func getViewHierarchy() throws -> ViewHierarchy {
+    public func getViewHierarchy(disableAllFiltering: Bool = false) throws -> ViewHierarchy {
         getHierarchyCallCount += 1
+        lastDisableAllFiltering = disableAllFiltering
 
         if let error = shouldThrow {
             throw error

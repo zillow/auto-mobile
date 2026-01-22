@@ -3,6 +3,7 @@ import { logger } from "../../utils/logger";
 import { BootedDevice, RawViewHierarchyResult } from "../../models";
 import { ViewHierarchy } from "../observe/ViewHierarchy";
 import { AccessibilityServiceClient } from "../observe/AccessibilityServiceClient";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 import { NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 
 export interface RawViewHierarchyOptions {
@@ -41,11 +42,10 @@ export class RawViewHierarchy {
    * @returns Raw hierarchy data
    */
   async execute(options: RawViewHierarchyOptions = {}): Promise<RawViewHierarchyResult> {
-    const source = options.source || "both";
     const startTime = Date.now();
 
     const result: RawViewHierarchyResult = {
-      source,
+      source: this.device.platform === "ios" ? "xcuitest" : (options.source || "both"),
       timestamp: startTime,
       device: {
         deviceId: this.device.deviceId,
@@ -56,56 +56,81 @@ export class RawViewHierarchy {
     const errors: string[] = [];
 
     try {
-      if (source === "uiautomator" || source === "both") {
-        logger.info("[RawViewHierarchy] Extracting via uiautomator dump");
+      if (this.device.platform === "ios") {
+        // iOS: Get raw XCUITest hierarchy (ignore source parameter)
+        logger.info("[RawViewHierarchy] Extracting via XCTestService");
         try {
-          const xml = await this.viewHierarchy.executeUiAutomatorDump();
-          result.xml = xml;
-          logger.info(`[RawViewHierarchy] Got XML (${xml.length} bytes)`);
+          const xcTestClient = XCTestServiceClient.getInstance(this.device);
+          const hierarchyResult = await xcTestClient.requestHierarchySync(
+            new NoOpPerformanceTracker(),
+            true // disableAllFiltering = true
+          );
+          if (hierarchyResult?.hierarchy) {
+            result.xcuitest = JSON.stringify(hierarchyResult.hierarchy, null, 2);
+            logger.info(`[RawViewHierarchy] Got XCUITest JSON (${result.xcuitest.length} bytes)`);
+          } else {
+            errors.push("XCTestService returned no data");
+          }
         } catch (error) {
-          const errorMsg = `uiautomator dump failed: ${error}`;
+          const errorMsg = `XCTestService failed: ${error}`;
           errors.push(errorMsg);
           logger.warn(`[RawViewHierarchy] ${errorMsg}`);
         }
-      }
+      } else {
+        // Android: Use existing implementation
+        const source = options.source || "both";
 
-      if (source === "accessibility-service" || source === "both") {
-        logger.info("[RawViewHierarchy] Extracting via accessibility service");
-        try {
-          const perf = new NoOpPerformanceTracker();
-          const hierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(
-            undefined,
-            perf,
-            false,
-            0,
-            true // disableAllFiltering - get unfiltered/unoptimized hierarchy
-          );
-
-          if (hierarchy) {
-            // Get the raw hierarchy data before conversion
-            result.json = JSON.stringify(hierarchy, null, 2);
-            logger.info(`[RawViewHierarchy] Got JSON (${result.json.length} bytes)`);
-          } else {
-            errors.push("accessibility-service returned no data");
+        if (source === "uiautomator" || source === "both") {
+          logger.info("[RawViewHierarchy] Extracting via uiautomator dump");
+          try {
+            const xml = await this.viewHierarchy.executeUiAutomatorDump();
+            result.xml = xml;
+            logger.info(`[RawViewHierarchy] Got XML (${xml.length} bytes)`);
+          } catch (error) {
+            const errorMsg = `uiautomator dump failed: ${error}`;
+            errors.push(errorMsg);
+            logger.warn(`[RawViewHierarchy] ${errorMsg}`);
           }
-        } catch (error) {
-          const errorMsg = `accessibility-service failed: ${error}`;
-          errors.push(errorMsg);
-          logger.warn(`[RawViewHierarchy] ${errorMsg}`);
+        }
+
+        if (source === "accessibility-service" || source === "both") {
+          logger.info("[RawViewHierarchy] Extracting via accessibility service");
+          try {
+            const perf = new NoOpPerformanceTracker();
+            const hierarchy = await this.accessibilityServiceClient.getAccessibilityHierarchy(
+              undefined,
+              perf,
+              false,
+              0,
+              true // disableAllFiltering - get unfiltered/unoptimized hierarchy
+            );
+
+            if (hierarchy) {
+              // Get the raw hierarchy data before conversion
+              result.json = JSON.stringify(hierarchy, null, 2);
+              logger.info(`[RawViewHierarchy] Got JSON (${result.json.length} bytes)`);
+            } else {
+              errors.push("accessibility-service returned no data");
+            }
+          } catch (error) {
+            const errorMsg = `accessibility-service failed: ${error}`;
+            errors.push(errorMsg);
+            logger.warn(`[RawViewHierarchy] ${errorMsg}`);
+          }
+        }
+
+        // Adjust source based on what we actually got
+        if (source === "both") {
+          if (result.xml && !result.json) {
+            result.source = "uiautomator";
+          } else if (!result.xml && result.json) {
+            result.source = "accessibility-service";
+          }
         }
       }
 
       if (errors.length > 0) {
         result.error = errors.join("; ");
-      }
-
-      // Adjust source based on what we actually got
-      if (source === "both") {
-        if (result.xml && !result.json) {
-          result.source = "uiautomator";
-        } else if (!result.xml && result.json) {
-          result.source = "accessibility-service";
-        }
       }
 
       const duration = Date.now() - startTime;

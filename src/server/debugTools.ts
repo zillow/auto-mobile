@@ -62,7 +62,7 @@ export const rawViewHierarchySchema = addDeviceTargetingToSchema(z.object({
   platform: z.enum(["android", "ios"]).describe("Target platform"),
   source: z.enum(["uiautomator", "accessibility-service", "both"])
     .optional()
-    .describe("Source for hierarchy extraction: 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison")
+    .describe("Source for hierarchy extraction (Android only, ignored on iOS): 'uiautomator' for raw XML, 'accessibility-service' for JSON, or 'both' for comparison. iOS always returns XCUITest JSON.")
 }));
 
 const debugSearchBaseSchema = z.object({

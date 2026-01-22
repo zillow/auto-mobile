@@ -127,10 +127,11 @@ public class CommandHandler: CommandHandling {
         perfProvider.serial("handleRequestHierarchy")
         defer { perfProvider.end() }
 
+        let disableAllFiltering = request.disableAllFiltering ?? false
         let hierarchy: ViewHierarchy
         do {
             hierarchy = try perfProvider.track("extraction") {
-                try elementLocator.getViewHierarchy()
+                try elementLocator.getViewHierarchy(disableAllFiltering: disableAllFiltering)
             }
         } catch {
             print("[CommandHandler] Hierarchy extraction failed: \(error)")

@@ -201,7 +201,7 @@ public class HierarchyDebouncer: HierarchyDebouncing {
 
     private func captureInitialState() {
         do {
-            let hierarchy = try elementLocator.getViewHierarchy()
+            let hierarchy = try elementLocator.getViewHierarchy(disableAllFiltering: false)
             let hash = StructuralHasher.computeHash(hierarchy)
 
             lock.lock()
@@ -250,7 +250,7 @@ public class HierarchyDebouncer: HierarchyDebouncing {
         let startTime = timer.now()
 
         do {
-            let hierarchy = try elementLocator.getViewHierarchy()
+            let hierarchy = try elementLocator.getViewHierarchy(disableAllFiltering: false)
             let extractionTime = timer.now() - startTime
             let newHash = StructuralHasher.computeHash(hierarchy)
 
