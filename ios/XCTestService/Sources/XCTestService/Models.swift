@@ -39,6 +39,7 @@ public struct WebSocketRequest: Codable {
 
     // Action parameters
     public let action: String?
+    public let bundleId: String?
 
     // Filtering control
     public let sinceTimestamp: Int64?
@@ -76,6 +77,7 @@ public struct WebSocketRequest: Codable {
         text: String? = nil,
         resourceId: String? = nil,
         action: String? = nil,
+        bundleId: String? = nil,
         sinceTimestamp: Int64? = nil,
         disableAllFiltering: Bool? = nil,
         id: String? = nil,
@@ -106,6 +108,7 @@ public struct WebSocketRequest: Codable {
         self.text = text
         self.resourceId = resourceId
         self.action = action
+        self.bundleId = bundleId
         self.sinceTimestamp = sinceTimestamp
         self.disableAllFiltering = disableAllFiltering
         self.id = id
@@ -528,6 +531,7 @@ public enum RequestType: String {
 
     // Node actions
     case requestAction = "request_action"
+    case requestLaunchApp = "request_launch_app"
 
     // Clipboard
     case requestClipboard = "request_clipboard"
@@ -553,6 +557,7 @@ public enum ResponseType: String {
     case selectAllResult = "select_all_result"
     case pressHomeResult = "press_home_result"
     case actionResult = "action_result"
+    case launchAppResult = "launch_app_result"
     case clipboardResult = "clipboard_result"
     case currentFocusResult = "current_focus_result"
     case traversalOrderResult = "traversal_order_result"

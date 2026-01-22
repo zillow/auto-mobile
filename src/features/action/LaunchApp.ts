@@ -12,6 +12,7 @@ import { createGlobalPerformanceTracker, PerformanceTracker } from "../../utils/
 import { DisplayedTimeMetricsCollector } from "../performance/DisplayedTimeMetricsCollector";
 import { serverConfig } from "../../utils/ServerConfig";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
+import { XCTestServiceClient } from "../observe/XCTestServiceClient";
 
 export interface TargetUserDetector {
   detectTargetUserId(packageName: string, userId?: number): Promise<number>;
@@ -214,12 +215,14 @@ export class LaunchApp extends BaseVisualChange {
     logger.info(`executeiOS bundleId ${bundleId}`);
 
     let observationTimestampMs: number | undefined;
+    const isSystemBundleId = bundleId.startsWith("com.apple.");
 
     return this.observedInteraction(
       async () => {
         // Check if app is installed
-        const installedApps = await (new ListInstalledApps(this.device)).execute();
-        if (!installedApps.includes(bundleId)) {
+        const installedApps = await this.installedAppsProvider.listInstalledApps();
+        const shouldBlockOnMissing = !isSystemBundleId && installedApps.length > 0;
+        if (shouldBlockOnMissing && !installedApps.includes(bundleId)) {
           logger.info("App is not installed");
           return {
             success: false,
@@ -241,10 +244,19 @@ export class LaunchApp extends BaseVisualChange {
           }
         }
 
-        // Launch the app using axe
-        const launchResult = await this.simctl.launchApp(bundleId, {
-          foregroundIfRunning: !coldBoot
-        });
+        const xcTestClient = XCTestServiceClient.getInstance(this.device);
+        const xcTestLaunchResult = await xcTestClient.requestLaunchApp(bundleId);
+        let launchResult: { success: boolean; pid?: number; error?: string } = {
+          success: xcTestLaunchResult.success,
+          error: xcTestLaunchResult.error
+        };
+
+        if (!xcTestLaunchResult.success) {
+          logger.warn(`[LaunchApp] XCTestService launch failed: ${xcTestLaunchResult.error ?? "unknown error"}`);
+          launchResult = await this.simctl.launchApp(bundleId, {
+            foregroundIfRunning: !coldBoot
+          });
+        }
 
         if (launchResult.error) {
           return {

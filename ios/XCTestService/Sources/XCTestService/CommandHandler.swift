@@ -81,6 +81,9 @@ public class CommandHandler: CommandHandling {
             case RequestType.requestAction.rawValue:
                 return try handleAction(request, startTime: startTime)
 
+            case RequestType.requestLaunchApp.rawValue:
+                return try handleLaunchApp(request, startTime: startTime)
+
             // Clipboard commands
             case RequestType.requestClipboard.rawValue:
                 return try handleClipboard(request, startTime: startTime)
@@ -323,6 +326,20 @@ public class CommandHandler: CommandHandling {
         )
     }
 
+    private func handleLaunchApp(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
+        guard let bundleId = request.bundleId else {
+            throw CommandError.missingParameter("bundleId")
+        }
+
+        try gesturePerformer.launchApp(bundleId: bundleId)
+
+        return WebSocketResponse.success(
+            type: ResponseType.launchAppResult.rawValue,
+            requestId: request.requestId,
+            totalTimeMs: totalTimeMs(from: startTime)
+        )
+    }
+
     // MARK: - Clipboard
 
     private func handleClipboard(_ request: WebSocketRequest, startTime: Date) throws -> WebSocketResponse {
@@ -399,6 +416,8 @@ public class CommandHandler: CommandHandling {
             return ResponseType.pressHomeResult.rawValue
         case RequestType.requestAction.rawValue:
             return ResponseType.actionResult.rawValue
+        case RequestType.requestLaunchApp.rawValue:
+            return ResponseType.launchAppResult.rawValue
         case RequestType.requestClipboard.rawValue:
             return ResponseType.clipboardResult.rawValue
         default:

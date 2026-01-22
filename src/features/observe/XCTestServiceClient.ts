@@ -185,6 +185,16 @@ export interface XCTestPressHomeResult {
 }
 
 /**
+ * Interface for launch app result from XCTestService
+ */
+export interface XCTestLaunchAppResult {
+  success: boolean;
+  totalTimeMs: number;
+  error?: string;
+  perfTiming?: XCTestPerfTiming;
+}
+
+/**
  * Interface for action result from XCTestService
  */
 export interface XCTestActionResult {
@@ -313,6 +323,12 @@ export interface XCTestService {
     timeoutMs?: number,
     perf?: PerformanceTracker
   ): Promise<XCTestPressHomeResult>;
+
+  requestLaunchApp(
+    bundleId: string,
+    timeoutMs?: number,
+    perf?: PerformanceTracker
+  ): Promise<XCTestLaunchAppResult>;
 
   requestScreenshot(
     timeoutMs?: number,
@@ -590,6 +606,7 @@ export class XCTestServiceClient implements XCTestService {
         case "set_text_result":
         case "select_all_result":
         case "press_home_result":
+        case "launch_app_result":
           result = {
             success: message.success ?? true,
             totalTimeMs: message.totalTimeMs ?? 0,
@@ -1491,6 +1508,37 @@ export class XCTestServiceClient implements XCTestService {
     const message = {
       type: "request_press_home",
       requestId
+    };
+
+    this.ws?.send(JSON.stringify(message));
+    return promise;
+  }
+
+  public async requestLaunchApp(
+    bundleId: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestLaunchAppResult> {
+    if (!await this.ensureConnected(perf)) {
+      return { success: false, totalTimeMs: 0, error: "Not connected" };
+    }
+
+    const requestId = this.requestManager.generateId("launchApp");
+    const promise = this.requestManager.register<XCTestLaunchAppResult>(
+      requestId,
+      "launch_app",
+      timeoutMs,
+      (id, type, timeout) => ({
+        success: false,
+        totalTimeMs: timeout,
+        error: `Launch app timed out after ${timeout}ms`
+      })
+    );
+
+    const message = {
+      type: "request_launch_app",
+      requestId,
+      bundleId
     };
 
     this.ws?.send(JSON.stringify(message));

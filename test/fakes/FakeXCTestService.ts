@@ -9,6 +9,7 @@ import {
   XCTestImeActionResult,
   XCTestSelectAllResult,
   XCTestPressHomeResult,
+  XCTestLaunchAppResult,
   XCTestHierarchyResponse,
   IOSPerfTiming,
   XCTestHierarchy
@@ -85,6 +86,7 @@ export class FakeXCTestService implements XCTestService {
   private screenshotRequestCount: number = 0;
   private hierarchyRequestCount: number = 0;
   private pressHomeRequestCount: number = 0;
+  private launchAppHistory: string[] = [];
   private dragResult: XCTestDragResult | null = null;
   private pinchResult: XCTestPinchResult | null = null;
   private tapResult: XCTestTapResult | null = null;
@@ -204,6 +206,13 @@ export class FakeXCTestService implements XCTestService {
   }
 
   /**
+   * Get the history of launch app requests
+   */
+  getLaunchAppHistory(): string[] {
+    return [...this.launchAppHistory];
+  }
+
+  /**
    * Get the history of drag requests
    */
   getDragHistory(): Array<{
@@ -283,6 +292,7 @@ export class FakeXCTestService implements XCTestService {
     this.imeActionHistory = [];
     this.screenshotRequestCount = 0;
     this.hierarchyRequestCount = 0;
+    this.launchAppHistory = [];
   }
 
   // MARK: - Private Helpers
@@ -599,6 +609,22 @@ export class FakeXCTestService implements XCTestService {
     this.pressHomeRequestCount++;
     await this.applyDelay("pressHome");
     this.checkFailure("pressHome");
+
+    return {
+      success: true,
+      totalTimeMs: 100,
+      perfTiming: this.performanceTiming || undefined
+    };
+  }
+
+  async requestLaunchApp(
+    bundleId: string,
+    timeoutMs: number = 5000,
+    perf?: PerformanceTracker
+  ): Promise<XCTestLaunchAppResult> {
+    await this.applyDelay("launchApp");
+    this.checkFailure("launchApp");
+    this.launchAppHistory.push(bundleId);
 
     return {
       success: true,

@@ -271,6 +271,25 @@ final class CommandHandlerTests: XCTestCase {
         XCTAssertEqual(fakeGesturePerformer.getPressHomeCallCount(), 1)
     }
 
+    func testLaunchAppSuccess() {
+        let request = WebSocketRequest(
+            type: "request_launch_app",
+            requestId: "launch-123",
+            bundleId: "com.apple.Preferences"
+        )
+
+        let response = commandHandler.handle(request)
+
+        guard let launchResponse = response as? WebSocketResponse else {
+            XCTFail("Expected WebSocketResponse")
+            return
+        }
+
+        XCTAssertEqual(launchResponse.success, true)
+        XCTAssertEqual(launchResponse.type, "launch_app_result")
+        XCTAssertEqual(fakeGesturePerformer.getAppLaunchHistory(), ["com.apple.Preferences"])
+    }
+
     // MARK: - Unknown Command Tests
 
     func testUnknownCommand() {

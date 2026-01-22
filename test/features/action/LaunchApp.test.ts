@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test, spyOn } from "bun:test";
 import { LaunchApp } from "../../../src/features/action/LaunchApp";
 import { BootedDevice, ObserveResult } from "../../../src/models";
 import { DefaultPerformanceTracker } from "../../../src/utils/PerformanceTracker";
@@ -9,6 +9,8 @@ import { FakeObserveScreen } from "../../fakes/FakeObserveScreen";
 import { FakeTargetUserDetector } from "../../fakes/FakeTargetUserDetector";
 import { FakeTimer } from "../../fakes/FakeTimer";
 import { FakeWindow } from "../../fakes/FakeWindow";
+import { FakeXCTestService } from "../../fakes/FakeXCTestService";
+import { XCTestServiceClient } from "../../../src/features/observe/XCTestServiceClient";
 
 describe("LaunchApp", () => {
   let device: BootedDevice;
@@ -201,5 +203,52 @@ describe("LaunchApp", () => {
     const childNames = (launchEntry.children as any[]).map(entry => entry.name);
     expect(childNames).toContain("detectTargetUser");
     expect(childNames).toContain("checkInstalled");
+  });
+
+  test("launches iOS system apps even when installed list is empty", async () => {
+    const iosDevice: BootedDevice = { name: "test-ios-device", platform: "ios", deviceId: "ios-123" };
+    const systemBundleId = "com.apple.Preferences";
+    const fakeXCTestService = new FakeXCTestService();
+    const getInstanceSpy = spyOn(XCTestServiceClient, "getInstance").mockReturnValue(
+      fakeXCTestService as unknown as XCTestServiceClient
+    );
+
+    const iosObserveResult: ObserveResult = {
+      updatedAt: Date.now(),
+      screenSize: { width: 1080, height: 1920 },
+      systemInsets: { top: 0, bottom: 0, left: 0, right: 0 },
+      viewHierarchy: { hierarchy: { node: {} }, packageName: systemBundleId } as any
+    };
+
+    const iosFakeObserveScreen = new FakeObserveScreen();
+    iosFakeObserveScreen.setObserveResult(iosObserveResult);
+    const iosFakeAwaitIdle = new FakeAwaitIdle();
+    const iosFakeWindow = new FakeWindow();
+    iosFakeWindow.setCachedActiveWindow({ appId: systemBundleId, activityName: "Main", layoutSeqSum: 1 });
+
+    const installedAppsProvider = new FakeInstalledAppsProvider(fakeTimer, {
+      installedApps: []
+    });
+
+    const iosLaunchApp = new LaunchApp(
+      iosDevice,
+      fakeAdb as unknown as any,
+      null,
+      fakeTimer,
+      { installedAppsProvider }
+    );
+    (iosLaunchApp as any).awaitIdle = iosFakeAwaitIdle;
+    (iosLaunchApp as any).observeScreen = iosFakeObserveScreen;
+    (iosLaunchApp as any).window = iosFakeWindow;
+    (iosLaunchApp as any).waitForIosHierarchyReady = async () => {};
+
+    try {
+      const result = await iosLaunchApp.execute(systemBundleId, false, false);
+      expect(result.success).toBe(true);
+      expect(fakeXCTestService.getLaunchAppHistory()).toEqual([systemBundleId]);
+      expect(installedAppsProvider.getCallCount()).toBe(1);
+    } finally {
+      getInstanceSpy.mockRestore();
+    }
   });
 });
