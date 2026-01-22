@@ -1,4 +1,3 @@
-import fs from "fs-extra";
 import type {
   RecordingHandle,
   RecordingResult,
@@ -6,12 +5,17 @@ import type {
   VideoCaptureConfig,
 } from "../../src/features/video/VideoRecorderService";
 
+/**
+ * Fake implementation of VideoCaptureBackend for testing.
+ * Does NOT perform any real file I/O - all operations are in-memory.
+ */
 export class FakeVideoCaptureBackend implements VideoCaptureBackend {
   readonly startCalls: VideoCaptureConfig[] = [];
   readonly stopCalls: RecordingHandle[] = [];
   private stopResolvers: Array<(handle: RecordingHandle) => void> = [];
   private stopResultOverrides: Partial<RecordingResult> | null = null;
   private outputPayload: Buffer = Buffer.from("fake-video");
+  private nowProvider: () => Date = () => new Date();
 
   setStopResultOverrides(overrides: Partial<RecordingResult>): void {
     this.stopResultOverrides = overrides;
@@ -21,9 +25,13 @@ export class FakeVideoCaptureBackend implements VideoCaptureBackend {
     this.outputPayload = payload;
   }
 
+  setNowProvider(provider: () => Date): void {
+    this.nowProvider = provider;
+  }
+
   async start(config: VideoCaptureConfig): Promise<RecordingHandle> {
     this.startCalls.push(config);
-    await fs.ensureFile(config.outputPath);
+    // No real file I/O - just return the handle
     return {
       recordingId: config.recordingId,
       outputPath: config.outputPath,
@@ -33,13 +41,13 @@ export class FakeVideoCaptureBackend implements VideoCaptureBackend {
 
   async stop(handle: RecordingHandle): Promise<RecordingResult> {
     this.stopCalls.push(handle);
-    await fs.writeFile(handle.outputPath, this.outputPayload);
+    // No real file I/O - just return the result
 
     const baseResult: RecordingResult = {
       recordingId: handle.recordingId,
       outputPath: handle.outputPath,
       startedAt: handle.startedAt,
-      endedAt: new Date().toISOString(),
+      endedAt: this.nowProvider().toISOString(),
       sizeBytes: this.outputPayload.length,
       codec: "h264",
     };
