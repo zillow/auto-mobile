@@ -2,6 +2,8 @@ import { expect, describe, test, beforeEach } from "bun:test";
 import { AvdManagerDependencies } from "../../../src/utils/android-cmdline-tools/avdmanager";
 import { FakeTimer } from "../../fakes/FakeTimer";
 
+const normalizePath = (value: string): string => value.replace(/\\/g, "/");
+
 describe("AVDManager", function() {
   let mockLocation: any;
   let avdmanager: any;
@@ -744,7 +746,7 @@ id: pixel_4
           ["/test/sdk/cmdline-tools/latest/bin/avdmanager", true]
         ]);
 
-        mockDeps.existsSync = (path: string) => pathChecks.get(path) ?? false;
+        mockDeps.existsSync = (path: string) => pathChecks.get(normalizePath(path)) ?? false;
 
         // Test the behavior indirectly - system-images should make it valid
         expect(mockDeps.existsSync("/test/sdk")).toBe(true);

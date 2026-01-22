@@ -9,13 +9,17 @@ export class FakeFileSystem implements FileSystem {
   private directories: Set<string> = new Set();
   private existsSync_shouldExist: Map<string, boolean> = new Map();
 
+  private normalizePath(value: string): string {
+    return value.replace(/\\/g, "/");
+  }
+
   /**
    * Set up a file to be read
    * @param filePath - Path to the file
    * @param content - Content of the file
    */
   setFile(filePath: string, content: string): void {
-    this.files.set(filePath, content);
+    this.files.set(this.normalizePath(filePath), content);
   }
 
   /**
@@ -23,7 +27,7 @@ export class FakeFileSystem implements FileSystem {
    * @param dirPath - Path to the directory
    */
   setDirectory(dirPath: string): void {
-    this.directories.add(dirPath);
+    this.directories.add(this.normalizePath(dirPath));
   }
 
   /**
@@ -32,7 +36,7 @@ export class FakeFileSystem implements FileSystem {
    * @param exists - Whether it should exist
    */
   setExists(filePath: string, exists: boolean): void {
-    this.existsSync_shouldExist.set(filePath, exists);
+    this.existsSync_shouldExist.set(this.normalizePath(filePath), exists);
   }
 
   /**
@@ -63,19 +67,21 @@ export class FakeFileSystem implements FileSystem {
   // Implementation of FileSystem interface
 
   async readFile(filePath: string, encoding: string = "utf8"): Promise<string> {
-    const content = this.files.get(filePath);
+    const normalizedPath = this.normalizePath(filePath);
+    const content = this.files.get(normalizedPath);
     if (content === undefined) {
-      throw new Error(`File not found: ${filePath}`);
+      throw new Error(`File not found: ${normalizedPath}`);
     }
     return content;
   }
 
   async readdir(dirPath: string): Promise<string[]> {
     // Return files that are under this directory
+    const normalizedDirPath = this.normalizePath(dirPath);
     const files: string[] = [];
     this.files.forEach((_, filePath) => {
-      if (filePath.startsWith(dirPath)) {
-        const relativePath = filePath.substring(dirPath.length + 1).split("/")[0];
+      if (filePath.startsWith(normalizedDirPath)) {
+        const relativePath = filePath.substring(normalizedDirPath.length + 1).split("/")[0];
         if (relativePath && !files.includes(relativePath)) {
           files.push(relativePath);
         }
@@ -85,20 +91,21 @@ export class FakeFileSystem implements FileSystem {
   }
 
   existsSync(filePath: string): boolean {
+    const normalizedPath = this.normalizePath(filePath);
     // Check if explicitly configured
-    if (this.existsSync_shouldExist.has(filePath)) {
-      return this.existsSync_shouldExist.get(filePath) ?? false;
+    if (this.existsSync_shouldExist.has(normalizedPath)) {
+      return this.existsSync_shouldExist.get(normalizedPath) ?? false;
     }
 
     // Otherwise, check if file or directory exists
-    return this.files.has(filePath) || this.directories.has(filePath);
+    return this.files.has(normalizedPath) || this.directories.has(normalizedPath);
   }
 
   async writeFile(filePath: string, content: string, encoding: string = "utf8"): Promise<void> {
-    this.files.set(filePath, content);
+    this.files.set(this.normalizePath(filePath), content);
   }
 
   async ensureDir(dirPath: string): Promise<void> {
-    this.directories.add(dirPath);
+    this.directories.add(this.normalizePath(dirPath));
   }
 }

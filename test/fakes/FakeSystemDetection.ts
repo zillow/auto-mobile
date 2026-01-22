@@ -12,6 +12,10 @@ export class FakeSystemDetection implements SystemDetection {
   private execResponses: Map<string, { stdout: string; stderr: string }> = new Map();
   private execErrors: Map<string, Error> = new Map();
 
+  private normalizePath(value: string): string {
+    return value.replace(/\\/g, "/");
+  }
+
   /**
    * Set the platform to return
    */
@@ -51,14 +55,14 @@ export class FakeSystemDetection implements SystemDetection {
    * Mark a file as existing
    */
   addExistingFile(path: string): void {
-    this.existingFiles.add(path);
+    this.existingFiles.add(this.normalizePath(path));
   }
 
   /**
    * Mark a file as not existing
    */
   removeExistingFile(path: string): void {
-    this.existingFiles.delete(path);
+    this.existingFiles.delete(this.normalizePath(path));
   }
 
   /**
@@ -118,11 +122,11 @@ export class FakeSystemDetection implements SystemDetection {
   }
 
   fileExistsSync(path: string): boolean {
-    return this.existingFiles.has(path);
+    return this.existingFiles.has(this.normalizePath(path));
   }
 
   async fileExists(path: string): Promise<boolean> {
-    return this.existingFiles.has(path);
+    return this.existingFiles.has(this.normalizePath(path));
   }
 
   async exec(command: string): Promise<{ stdout: string; stderr: string }> {

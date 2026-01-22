@@ -18,6 +18,8 @@ import {
 } from "../../../src/utils/android-cmdline-tools/detection";
 import { FakeSystemDetection } from "../../fakes/FakeSystemDetection";
 
+const normalizePath = (value: string): string => value.replace(/\\/g, "/");
+
 describe("Android Command Line Tools - Detection", () => {
   let systemDetection: FakeSystemDetection;
 
@@ -55,7 +57,7 @@ describe("Android Command Line Tools - Detection", () => {
       systemDetection.setPlatform("darwin");
       systemDetection.setHomeDir("/Users/testuser");
 
-      const paths = getTypicalAndroidSdkPaths(systemDetection);
+      const paths = getTypicalAndroidSdkPaths(systemDetection).map(normalizePath);
 
       expect(paths).toContain("/Users/testuser/Library/Android/sdk");
       expect(paths).toContain("/opt/android-sdk");
@@ -66,7 +68,7 @@ describe("Android Command Line Tools - Detection", () => {
       systemDetection.setPlatform("linux");
       systemDetection.setHomeDir("/home/testuser");
 
-      const paths = getTypicalAndroidSdkPaths(systemDetection);
+      const paths = getTypicalAndroidSdkPaths(systemDetection).map(normalizePath);
 
       expect(paths).toContain("/home/testuser/Android/Sdk");
       expect(paths).toContain("/opt/android-sdk");
@@ -77,9 +79,9 @@ describe("Android Command Line Tools - Detection", () => {
       systemDetection.setPlatform("win32");
       systemDetection.setHomeDir("C:\\Users\\testuser");
 
-      const paths = getTypicalAndroidSdkPaths(systemDetection);
+      const paths = getTypicalAndroidSdkPaths(systemDetection).map(normalizePath);
 
-      expect(paths).toContain("C:\\Users\\testuser/AppData/Local/Android/Sdk");
+      expect(paths).toContain("C:/Users/testuser/AppData/Local/Android/Sdk");
       expect(paths).toContain("C:/Android/Sdk");
       expect(paths).toContain("C:/android-sdk");
     });

@@ -6,6 +6,8 @@ import {
 } from "../../../src/utils/android-cmdline-tools/detection";
 import { FakeSystemDetection } from "../../fakes/FakeSystemDetection";
 
+const normalizePath = (value: string): string => value.replace(/\\/g, "/");
+
 describe("Detection Module (Refactored)", () => {
   let systemDetection: FakeSystemDetection;
 
@@ -18,7 +20,7 @@ describe("Detection Module (Refactored)", () => {
       systemDetection.setPlatform("darwin");
       systemDetection.setHomeDir("/Users/testuser");
 
-      const paths = getTypicalAndroidSdkPaths(systemDetection);
+      const paths = getTypicalAndroidSdkPaths(systemDetection).map(normalizePath);
 
       expect(paths).toContain("/Users/testuser/Library/Android/sdk");
       expect(paths).toContain("/opt/android-sdk");
@@ -29,7 +31,7 @@ describe("Detection Module (Refactored)", () => {
       systemDetection.setPlatform("linux");
       systemDetection.setHomeDir("/home/testuser");
 
-      const paths = getTypicalAndroidSdkPaths(systemDetection);
+      const paths = getTypicalAndroidSdkPaths(systemDetection).map(normalizePath);
 
       expect(paths).toContain("/home/testuser/Android/Sdk");
       expect(paths).toContain("/opt/android-sdk");

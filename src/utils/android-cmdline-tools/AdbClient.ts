@@ -439,6 +439,7 @@ export class AdbClient implements AdbExecutor {
 
   private parseCommandArgs(command: string): string[] {
     const trimmed = command.trim();
+    const isWindows = process.platform === "win32";
     if (trimmed.startsWith("shell ")) {
       let shellCommand = trimmed.slice(6).trim();
       if (
@@ -463,7 +464,7 @@ export class AdbClient implements AdbExecutor {
         continue;
       }
 
-      if (char === "\\" && !inSingle) {
+      if (!isWindows && char === "\\" && !inSingle) {
         escape = true;
         continue;
       }
