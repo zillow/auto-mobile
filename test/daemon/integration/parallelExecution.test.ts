@@ -17,8 +17,8 @@ describe("Parallel Execution Across Multiple Devices", function() {
   });
 
   beforeEach(async function() {
-    sessionManager = new SessionManager();
     fakeTimer = new FakeTimer();
+    sessionManager = new SessionManager(fakeTimer);
     fakeAppsRepo = new FakeInstalledAppsRepository();
     devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo);
     await devicePool.initializeWithDevices([

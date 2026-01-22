@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { McpTestFixture } from "../../fixtures/mcpTestFixture";
 import { ResourceRegistry } from "../../../src/server/resourceRegistry";
 import { FakeDeviceUtils } from "../../fakes/FakeDeviceUtils";
+import { FakeTimer } from "../../fakes/FakeTimer";
 import { setDeviceManager, BootedDevicesResourceContent } from "../../../src/server/bootedDeviceResources";
 import { BootedDevice } from "../../../src/models";
 import { DaemonState } from "../../../src/daemon/daemonState";
@@ -319,10 +320,11 @@ describe("MCP Booted Device Resources", () => {
     test("should include pool status when daemon is initialized", async function() {
       fakeDeviceUtils.setBootedDevices("android", [mockAndroidDevice1, mockAndroidDevice2]);
 
-      const sessionManager = new SessionManager();
+      const fakeTimer = new FakeTimer();
+      const sessionManager = new SessionManager(fakeTimer);
       const { FakeInstalledAppsRepository } = await import("../../fakes/FakeInstalledAppsRepository");
       const fakeAppsRepo = new FakeInstalledAppsRepository();
-      const devicePool = new DevicePool(sessionManager, "test-daemon-session-id", undefined, fakeAppsRepo);
+      const devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo);
       await devicePool.initializeWithDevices([
         mockAndroidDevice1,
         mockAndroidDevice2

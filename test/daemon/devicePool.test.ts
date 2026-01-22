@@ -24,8 +24,8 @@ describe("DevicePool", () => {
   });
 
   beforeEach(() => {
-    sessionManager = new SessionManager();
     fakeTimer = new FakeTimer();
+    sessionManager = new SessionManager(fakeTimer);
     fakeAppsRepo = new FakeInstalledAppsRepository();
     devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo);
   });
