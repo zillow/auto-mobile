@@ -868,7 +868,7 @@ jobs:
           script: "./gradlew :junit-runner:test --stacktrace --info"
           working-directory: "./android/"
           accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
-          device: "model=Pixel2,version=34,gpu=auto"
+          device: "model=Pixel7,version=35,gpu=auto"
           max-time-limit: "2m"
 
       - name: "Upload Heap Dumps"
