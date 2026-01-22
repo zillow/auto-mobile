@@ -33,6 +33,21 @@ runs:
           exit 0
         fi
 
+        if command -v choco >/dev/null 2>&1; then
+          choco install ripgrep -y
+          exit 0
+        fi
+
+        if command -v scoop >/dev/null 2>&1; then
+          scoop install ripgrep
+          exit 0
+        fi
+
+        if command -v winget >/dev/null 2>&1; then
+          winget install --id BurntSushi.ripgrep -e --source winget
+          exit 0
+        fi
+
         echo "ripgrep not installed and no supported package manager found." >&2
         exit 1
 
