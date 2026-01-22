@@ -828,6 +828,71 @@ jobs:
           check_name: "JUnit Runner Emulator Test Report"
           report_paths: '**/build/test-results/**/*.xml'
 
+  # Emulator.wtf session-based tests (see #94 for investigation context)
+  junit-runner-emulator-wtf-tests:
+    name: "Run JUnit Runner Emulator.wtf Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [detect-changes, build-android-accessibility-service]
+    if: needs.detect-changes.outputs.android_should_run == 'true'
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-auto-mobile-npm-package
+
+      - name: "Compile JUnit Runner Test Classes"
+        uses: ./.github/actions/gradle-task-run
+        with:
+          gradle-tasks: ":junit-runner:testClasses"
+          gradle-project-directory: "android"
+          gradle-home-directory: "~/.gradle/${{ github.job }}"
+          reuse-configuration-cache: true
+          gradle-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+          release-keystore-base64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          release-keystore-password: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          release-key-alias: ${{ secrets.RELEASE_KEY_ALIAS }}
+          release-key-password: ${{ secrets.RELEASE_KEY_PASSWORD }}
+
+      - name: "Download Accessibility Service APK"
+        uses: actions/download-artifact@v4
+        with:
+          name: accessibility-service-apk
+          path: android/accessibility-service/build/outputs/apk/debug
+
+      - name: "Run AutoMobile tests on emulator.wtf"
+        uses: ./.github/actions/android-emulator-wtf
+        env:
+          EW_API_TOKEN: ${{ secrets.EMULATOR_WTF_API_KEY }}
+        with:
+          script: "./gradlew :junit-runner:test --stacktrace --info"
+          working-directory: "./android/"
+          accessibility-apk-path: accessibility-service/build/outputs/apk/debug/accessibility-service-debug.apk
+          device: "model=Pixel2,version=34,gpu=auto"
+          max-time-limit: "2m"
+
+      - name: "Upload Heap Dumps"
+        if: failure()
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: junit-runner-emulator-wtf-heap-dumps
+          path: heap-dump
+          if-no-files-found: ignore
+
+      - name: "Upload Test Results"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-runner-emulator-wtf-test-results
+          path: android/junit-runner/build/reports/tests/test/
+
+      - name: "Publish Test Report"
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          check_name: "JUnit Runner Emulator.wtf Test Report"
+          report_paths: '**/build/test-results/**/*.xml'
+
   playground-automobile-emulator-tests:
     name: "Run Playground Automobile Emulator Tests"
     runs-on: ubuntu-latest
