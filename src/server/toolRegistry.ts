@@ -377,6 +377,15 @@ class ToolRegistryClass {
       return;
     }
 
+    // Check if an iOS device was set via setActiveDevice and platform is explicitly ios
+    // Only skip the guard when platform === "ios" because ensureDeviceReady only honors
+    // the current device when the requested platform matches currentPlatform
+    const currentDevice = this.deviceSessionManager.getCurrentDevice();
+    const currentPlatform = this.deviceSessionManager.getCurrentPlatform();
+    if (currentDevice && currentPlatform === "ios" && platform === "ios") {
+      return;
+    }
+
     if (platform !== "ios" && platform !== "either") {
       return;
     }
