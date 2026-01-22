@@ -240,6 +240,16 @@ if [[ -z "$max_parallel" ]]; then
   fi
 fi
 
+if ! [[ "$max_parallel" =~ ^[0-9]+$ ]]; then
+  echo "--max-parallel must be a positive integer." >&2
+  exit 1
+fi
+
+if [[ "$max_parallel" -lt 1 ]]; then
+  echo "--max-parallel must be greater than 0." >&2
+  exit 1
+fi
+
 if [[ "$parallel_enabled" -eq 0 ]]; then
   max_parallel=1
 fi
