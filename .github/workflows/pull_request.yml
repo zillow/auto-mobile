@@ -504,7 +504,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             node_modules
-          key: bun-${{ matrix.os }}-${{ hashFiles('bun.lockb') }}
+          key: bun-${{ matrix.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-${{ matrix.os }}-
 
