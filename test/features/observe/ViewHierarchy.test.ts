@@ -899,7 +899,7 @@ describe("findFocusedElement", function() {
       getAccessibilityHierarchy: async () => null
     } as unknown as AccessibilityServiceClient;
 
-    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any, null, null, mockAccessibilityServiceClient);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any, null, null);
   });
 
   test("should find focused element in simple hierarchy", function() {
