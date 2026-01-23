@@ -1,5 +1,5 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
-import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
+import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
 import { ListInstalledApps } from "../features/observe/ListInstalledApps";
 import { SimCtlClient } from "../utils/ios-cmdline-tools/SimCtlClient";
 import { BootedDevice, InstalledApp, InstalledAppsByProfile, Platform, SystemInstalledApp } from "../models";
@@ -94,7 +94,6 @@ const APPS_QUERY_URI_TTL_MS = 300000;
 const appCacheByDeviceId = new Map<string, AppsCacheEntry>();
 const registeredDeviceResources = new Map<string, string>();
 const appsQueryUrisByDeviceId = new Map<string, Map<string, number>>();
-const deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager();
 
 function userProfileForUserId(userId: number): "personal" | "work" {
   return userId >= 10 ? "work" : "personal";
@@ -315,7 +314,7 @@ function getAndroidAppsMessage(deviceId: string): string {
 
 async function findBootedDevice(deviceId: string): Promise<BootedDevice | null> {
   try {
-    const devices = await deviceManager.getBootedDevices("either");
+    const devices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("either");
     return devices.find(device => device.deviceId === deviceId) ?? null;
   } catch (error) {
     logger.warn(`[AppResources] Failed to list booted devices: ${error}`);
@@ -508,7 +507,7 @@ async function getAppsQueryDevice(options: AppsQueryOptions): Promise<BootedDevi
     throw new Error("deviceId is required");
   }
 
-  const devices = await deviceManager.getBootedDevices("either");
+  const devices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("either");
 
   const matched = devices.find(device => device.deviceId === options.deviceId);
   if (!matched) {
@@ -652,7 +651,7 @@ function unregisterDeviceAppResource(deviceId: string): void {
 export async function syncInstalledAppResources(): Promise<void> {
   let devices: BootedDevice[] = [];
   try {
-    devices = await deviceManager.getBootedDevices("either");
+    devices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("either");
   } catch (error) {
     logger.warn(`[AppResources] Failed to get booted devices: ${error}`);
   }

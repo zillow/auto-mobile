@@ -522,13 +522,16 @@ jobs:
 
       - name: "Run Tests"
         shell: bash
+        env:
+          # Enable debug logging on Windows to trace what's starting the adb daemon
+          DEBUG_ADB_EXEC: ${{ matrix.os == 'windows-latest' && 'true' || '' }}
         run: |
           set -euo pipefail
           mkdir -p ci-logs
           bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
 
       - name: "Upload Build/Test Logs"
-        if: failure()
+        if: failure() || cancelled() || matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4.4.0
         with:
           name: mcp-build-test-logs-${{ matrix.os }}

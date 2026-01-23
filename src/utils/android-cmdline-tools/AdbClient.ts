@@ -15,6 +15,11 @@ const execFileAsync: ExecFileAsync = async (
   args: string[],
   maxBuffer?: number
 ): Promise<ExecResult> => {
+  // Debug: Log when real exec is called (helps trace daemon startup in tests)
+  if (process.env.DEBUG_ADB_EXEC) {
+    console.warn(`[DEBUG_ADB_EXEC] Real execFileAsync called: ${file} ${args.join(" ")}`);
+    console.warn(`[DEBUG_ADB_EXEC] Stack trace:`, new Error().stack);
+  }
   const options = maxBuffer ? { maxBuffer } : undefined;
   const result = await promisify(execFile)(file, args, options);
 
@@ -68,6 +73,12 @@ export class AdbClient implements AdbExecutor {
     this.isTestMode = execAsyncFn !== null; // If custom execAsync provided, we're in test mode
     // Initialize with fallback, will be updated lazily
     this.adbPath = this.getFallbackAdbPath();
+
+    // Debug: Log when a real (non-test) AdbClient is created
+    if (process.env.DEBUG_ADB_EXEC && !this.isTestMode) {
+      console.warn(`[DEBUG_ADB_EXEC] Real AdbClient created (not test mode)`);
+      console.warn(`[DEBUG_ADB_EXEC] Stack trace:`, new Error().stack);
+    }
   }
 
   private wrapExecAsync(

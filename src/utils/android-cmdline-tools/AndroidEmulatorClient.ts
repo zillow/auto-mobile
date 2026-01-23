@@ -97,20 +97,25 @@ export class AndroidEmulatorClient implements AndroidEmulator {
   private spawnFn: typeof spawn;
   private emulatorPath: string;
   private timer: Timer;
+  private adbExecutor: AdbExecutor | null;
 
   /**
    * Create an AndroidEmulatorClient instance
    * @param execAsyncFn - promisified exec function (for testing)
    * @param spawnFn - spawn function (for testing)
+   * @param timer - Timer for delays
+   * @param adbExecutor - Optional AdbExecutor for device operations (for testing)
    */
   constructor(
     execAsyncFn: ((command: string) => Promise<ExecResult>) | null = null,
     spawnFn: typeof spawn | null = null,
-    timer: Timer = defaultTimer
+    timer: Timer = defaultTimer,
+    adbExecutor: AdbExecutor | null = null
   ) {
     this.execAsync = execAsyncFn || execAsync;
     this.spawnFn = spawnFn || spawn;
     this.timer = timer;
+    this.adbExecutor = adbExecutor;
     // Only set a fallback emulator path here; proper detection happens lazily
     this.emulatorPath = this.getFallbackEmulatorPath();
   }
@@ -520,7 +525,7 @@ export class AndroidEmulatorClient implements AndroidEmulator {
    */
   async getBootedDevices(onlyEmulators: boolean = false): Promise<BootedDevice[]> {
     try {
-      const adb = new AdbClient();
+      const adb = this.adbExecutor || new AdbClient();
       const devices = await adb.getBootedAndroidDevices();
       const runningDevices: BootedDevice[] = [];
       const externalMode = this.isExternalEmulatorMode();
