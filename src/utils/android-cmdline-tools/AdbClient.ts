@@ -70,7 +70,8 @@ export class AdbClient implements AdbExecutor {
       ? this.wrapExecAsync(execAsyncFn)
       : execFileAsync;
     this.spawnFn = spawnFn || spawn;
-    this.isTestMode = execAsyncFn !== null; // If custom execAsync provided, we're in test mode
+    // Test mode if: custom execAsync provided OR global test mode flag is set
+    this.isTestMode = execAsyncFn !== null || process.env.AUTOMOBILE_TEST_MODE === "true";
     // Initialize with fallback, will be updated lazily
     this.adbPath = this.getFallbackAdbPath();
 

@@ -525,6 +525,8 @@ jobs:
         env:
           # Enable debug logging on Windows to trace what's starting the adb daemon
           DEBUG_ADB_EXEC: ${{ matrix.os == 'windows-latest' && 'true' || '' }}
+          # Force AdbClient into test mode on Windows to prevent adb daemon startup
+          AUTOMOBILE_TEST_MODE: ${{ matrix.os == 'windows-latest' && 'true' || '' }}
         run: |
           set -euo pipefail
           mkdir -p ci-logs
