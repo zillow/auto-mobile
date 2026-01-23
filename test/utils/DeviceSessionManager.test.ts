@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { DeviceSessionManager } from "../../src/utils/DeviceSessionManager";
 import { FakeAdbExecutor } from "../fakes/FakeAdbExecutor";
 import { FakeDeviceUtils } from "../fakes/FakeDeviceUtils";
+import { FakeDeviceClientProvider } from "../fakes/FakeDeviceClientProvider";
 import { FakeAccessibilityServiceManager } from "../fakes/FakeAccessibilityServiceManager";
 import { AndroidAccessibilityServiceManager } from "../../src/utils/AccessibilityServiceManager";
 import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
@@ -66,7 +67,7 @@ describe("DeviceSessionManager", () => {
         isConnected: () => false
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1", { skipAccessibilityDownload: true });
 
     expect(accessibilityManager.wasMethodCalled("setup")).toBe(false);
@@ -85,7 +86,7 @@ describe("DeviceSessionManager", () => {
         waitForConnection: () => Promise.resolve(true)
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1", { skipAccessibilityDownload: true });
 
     expect(accessibilityManager.wasMethodCalled("enable")).toBe(true);
@@ -105,7 +106,7 @@ describe("DeviceSessionManager", () => {
         waitForConnection: () => Promise.resolve(true)
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1", { skipAccessibilityDownload: true });
 
     expect(accessibilityManager.wasMethodCalled("isVersionCompatible")).toBe(true);
@@ -124,7 +125,7 @@ describe("DeviceSessionManager", () => {
         waitForConnection: () => Promise.resolve(true)
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await expect(
       manager.ensureDeviceReady("android", "device-1", { skipAccessibilityDownload: true })
     ).rejects.toThrow("Accessibility service version mismatch");
@@ -142,7 +143,7 @@ describe("DeviceSessionManager", () => {
         verifyServiceReady: () => Promise.resolve(true)
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1");
 
     expect(accessibilityManager.wasMethodCalled("setup")).toBe(true);
@@ -159,7 +160,7 @@ describe("DeviceSessionManager", () => {
         waitForConnection: () => Promise.resolve(true)
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1");
 
     // When installed, enabled, and WebSocket connects - service is working, no need for setup
@@ -177,7 +178,7 @@ describe("DeviceSessionManager", () => {
         waitForConnection: () => Promise.resolve(false)  // WebSocket fails - cache is stale
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1");
 
     // Cache was stale (claimed installed but WebSocket failed), so setup should run
@@ -202,7 +203,7 @@ describe("DeviceSessionManager", () => {
         verifyServiceReady: () => Promise.resolve(true)
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1");
 
     expect(managerTouched).toBe(false);
@@ -220,7 +221,7 @@ describe("DeviceSessionManager", () => {
         waitForConnection: () => Promise.resolve(true)
       } as any);
 
-    const manager = DeviceSessionManager.createInstance(fakeAdb, fakeDeviceUtils);
+    const manager = DeviceSessionManager.createInstance(new FakeDeviceClientProvider(fakeAdb, fakeDeviceUtils));
     await manager.ensureDeviceReady("android", "device-1");
 
     // Should have fallen through and checked status since service wasn't responsive

@@ -17,6 +17,58 @@ import { storeSetupTiming } from "../server/ToolExecutionContext";
 import { applyAppearanceOnConnect } from "./appearance/applyAppearanceOnConnect";
 
 /**
+ * Provider interface for device clients - enables dependency injection for testing
+ */
+export interface DeviceClientProvider {
+  getAdb(): AdbExecutor;
+  getSimctl(): SimCtlClient | undefined;
+  getAndroidEmulator(): AndroidEmulatorClient | undefined;
+  getDeviceUtils(): PlatformDeviceManager;
+}
+
+/**
+ * Default provider that lazily creates real clients
+ */
+export class DefaultDeviceClientProvider implements DeviceClientProvider {
+  private _adb: AdbClient | undefined;
+  private _simctl: SimCtlClient | undefined;
+  private _androidEmulator: AndroidEmulatorClient | undefined;
+  private _deviceUtils: PlatformDeviceManager | undefined;
+
+  getAdb(): AdbExecutor {
+    if (!this._adb) {
+      this._adb = new AdbClient(null);
+    }
+    return this._adb;
+  }
+
+  getSimctl(): SimCtlClient | undefined {
+    if (!this._simctl) {
+      this._simctl = new SimCtlClient(null);
+    }
+    return this._simctl;
+  }
+
+  getAndroidEmulator(): AndroidEmulatorClient | undefined {
+    if (!this._androidEmulator) {
+      this._androidEmulator = new AndroidEmulatorClient();
+    }
+    return this._androidEmulator;
+  }
+
+  getDeviceUtils(): PlatformDeviceManager {
+    if (!this._deviceUtils) {
+      this._deviceUtils = new MultiPlatformDeviceManager(
+        this.getAdb() as AdbClient,
+        this.getSimctl()!,
+        this.getAndroidEmulator()!
+      );
+    }
+    return this._deviceUtils;
+  }
+}
+
+/**
  * Interface for device session management
  * Handles device detection, verification, and lifecycle for Android and iOS platforms
  */
@@ -90,73 +142,49 @@ export class DeviceSessionManager implements DeviceSessionManager {
   private currentDevice: BootedDevice | undefined;
   private currentPlatform: Platform | undefined;
   private static instance: DeviceSessionManager;
-  private _adb: AdbClient | undefined;
-  private _simctl: SimCtlClient | undefined;
-  private _androidEmulator: AndroidEmulatorClient | undefined;
-  private _deviceUtils: PlatformDeviceManager | undefined;
+  private static defaultProvider: DeviceClientProvider | undefined;
+  private readonly provider: DeviceClientProvider;
+  private _adb: AdbExecutor | undefined;
   private window: Window | undefined;
-  private injectedAdb: AdbExecutor | undefined;
-  private injectedDeviceUtils: PlatformDeviceManager | undefined;
 
   // Track devices that have push update listeners registered
   private static pushUpdateListenersRegistered: Set<string> = new Set();
 
-  private constructor(adb?: AdbExecutor, deviceUtils?: PlatformDeviceManager) {
-    // Store injected dependencies for lazy initialization
-    this.injectedAdb = adb;
-    this.injectedDeviceUtils = deviceUtils;
+  private constructor(provider: DeviceClientProvider) {
+    this.provider = provider;
   }
 
-  // Lazy getters to avoid spawning processes on import
-  // When injectedDeviceUtils is provided, we skip creating real platform clients
-  private get adb(): AdbClient {
+  private get adb(): AdbExecutor {
     if (!this._adb) {
-      if (this.injectedAdb) {
-        this._adb = this.injectedAdb as AdbClient;
-      } else if (!this.injectedDeviceUtils) {
-        // Only create real AdbClient if no fake deviceUtils is injected
-        this._adb = new AdbClient(null);
-      }
+      this._adb = this.provider.getAdb();
     }
-    return this._adb!;
+    return this._adb;
   }
 
   private get simctl(): SimCtlClient | undefined {
-    if (!this._simctl && !this.injectedDeviceUtils) {
-      // Only create real SimCtlClient if no fake deviceUtils is injected
-      this._simctl = new SimCtlClient(null);
-    }
-    return this._simctl;
+    return this.provider.getSimctl();
   }
 
   private get androidEmulator(): AndroidEmulatorClient | undefined {
-    if (!this._androidEmulator && !this.injectedDeviceUtils) {
-      // Only create real AndroidEmulatorClient if no fake deviceUtils is injected
-      this._androidEmulator = new AndroidEmulatorClient();
-    }
-    return this._androidEmulator;
+    return this.provider.getAndroidEmulator();
   }
 
   private get deviceUtils(): PlatformDeviceManager {
-    if (!this._deviceUtils) {
-      this._deviceUtils = this.injectedDeviceUtils || new MultiPlatformDeviceManager(
-        this.adb,
-        this.simctl!,
-        this.androidEmulator!
-      );
-    }
-    return this._deviceUtils;
+    return this.provider.getDeviceUtils();
   }
 
   public static getInstance(): DeviceSessionManager {
     if (!DeviceSessionManager.instance) {
-      DeviceSessionManager.instance = new DeviceSessionManager();
+      if (!DeviceSessionManager.defaultProvider) {
+        DeviceSessionManager.defaultProvider = new DefaultDeviceClientProvider();
+      }
+      DeviceSessionManager.instance = new DeviceSessionManager(DeviceSessionManager.defaultProvider);
     }
     return DeviceSessionManager.instance;
   }
 
-  public static createInstance(adb?: AdbExecutor, deviceUtils?: PlatformDeviceManager): DeviceSessionManager {
-    return new DeviceSessionManager(adb, deviceUtils);
+  public static createInstance(provider: DeviceClientProvider): DeviceSessionManager {
+    return new DeviceSessionManager(provider);
   }
 
   /**
@@ -181,7 +209,7 @@ export class DeviceSessionManager implements DeviceSessionManager {
     this.currentPlatform = platform;
 
     if (platform === "android") {
-      // Update AdbClient with new device ID
+      // Update AdbClient with new device ID - need a fresh client for the new device
       this._adb = new AdbClient(device);
     }
 
