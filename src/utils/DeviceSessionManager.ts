@@ -108,22 +108,30 @@ export class DeviceSessionManager implements DeviceSessionManager {
   }
 
   // Lazy getters to avoid spawning processes on import
+  // When injectedDeviceUtils is provided, we skip creating real platform clients
   private get adb(): AdbClient {
     if (!this._adb) {
-      this._adb = this.injectedAdb as AdbClient || new AdbClient(null);
+      if (this.injectedAdb) {
+        this._adb = this.injectedAdb as AdbClient;
+      } else if (!this.injectedDeviceUtils) {
+        // Only create real AdbClient if no fake deviceUtils is injected
+        this._adb = new AdbClient(null);
+      }
     }
-    return this._adb;
+    return this._adb!;
   }
 
-  private get simctl(): SimCtlClient {
-    if (!this._simctl) {
+  private get simctl(): SimCtlClient | undefined {
+    if (!this._simctl && !this.injectedDeviceUtils) {
+      // Only create real SimCtlClient if no fake deviceUtils is injected
       this._simctl = new SimCtlClient(null);
     }
     return this._simctl;
   }
 
-  private get androidEmulator(): AndroidEmulatorClient {
-    if (!this._androidEmulator) {
+  private get androidEmulator(): AndroidEmulatorClient | undefined {
+    if (!this._androidEmulator && !this.injectedDeviceUtils) {
+      // Only create real AndroidEmulatorClient if no fake deviceUtils is injected
       this._androidEmulator = new AndroidEmulatorClient();
     }
     return this._androidEmulator;
@@ -133,8 +141,8 @@ export class DeviceSessionManager implements DeviceSessionManager {
     if (!this._deviceUtils) {
       this._deviceUtils = this.injectedDeviceUtils || new MultiPlatformDeviceManager(
         this.adb,
-        this.simctl,
-        this.androidEmulator
+        this.simctl!,
+        this.androidEmulator!
       );
     }
     return this._deviceUtils;
