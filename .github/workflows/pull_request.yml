@@ -525,28 +525,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ci-logs
-
-          # Run tests and capture exit code
-          # Use timeout on Windows to prevent hanging due to orphan adb daemon
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            # Run with timeout - tests complete in ~15s, give 3 minutes max
-            timeout 180 bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
-            test_exit=${PIPESTATUS[0]}
-            # Kill adb server that may have started during tests
-            adb kill-server 2>/dev/null || true
-            # Exit with original test result (timeout returns 124 on timeout)
-            if [[ $test_exit -eq 124 ]]; then
-              echo "::warning::Tests may have completed but process hung - check logs"
-              # Check if tests actually passed by looking at the log
-              if grep -q "0 fail" "ci-logs/bun-test-${{ matrix.os }}.log"; then
-                echo "Tests passed but process didn't exit cleanly"
-                exit 0
-              fi
-            fi
-            exit $test_exit
-          else
-            bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
-          fi
+          bun run test 2>&1 | tee "ci-logs/bun-test-${{ matrix.os }}.log"
 
       - name: "Upload Build/Test Logs"
         if: failure()

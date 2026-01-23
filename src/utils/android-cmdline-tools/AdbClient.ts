@@ -754,6 +754,23 @@ export class AdbClient implements AdbExecutor {
       return null;
     }
   }
+
+  /**
+   * Kill the ADB server daemon.
+   * Useful for cleanup after tests to prevent orphan processes.
+   */
+  static async killServer(): Promise<void> {
+    try {
+      const { execFile } = await import("child_process");
+      const { promisify } = await import("util");
+      const execFileAsync = promisify(execFile);
+      await execFileAsync("adb", ["kill-server"]);
+      logger.debug("[ADB] Server killed successfully");
+    } catch {
+      // Ignore errors - server may not be running
+      logger.debug("[ADB] Server kill failed or server not running");
+    }
+  }
 }
 
 // Backward compatibility export
