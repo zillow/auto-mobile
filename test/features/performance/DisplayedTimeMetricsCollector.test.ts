@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { DisplayedTimeMetricsCollector } from "../../../src/features/performance/DisplayedTimeMetricsCollector";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 
 describe("DisplayedTimeMetricsCollector - Unit Tests", function() {
   let collector: DisplayedTimeMetricsCollector;
 
   beforeEach(function() {
-    collector = new DisplayedTimeMetricsCollector({ deviceId: "test", name: "test", platform: "android" });
+    // Use FakeAdbExecutor to avoid starting real adb daemon
+    const fakeAdb = new FakeAdbExecutor();
+    collector = new DisplayedTimeMetricsCollector({ deviceId: "test", name: "test", platform: "android" }, fakeAdb as any);
   });
 
   test("parses ActivityManager displayed metrics with millisecond duration", function() {
