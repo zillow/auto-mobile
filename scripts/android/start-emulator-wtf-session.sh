@@ -127,6 +127,23 @@ log "Waiting for adb device to connect (timeout: ${TIMEOUT}s)..."
 max_polls=$((TIMEOUT / POLL_INTERVAL))
 poll=0
 while [[ $poll -lt $max_polls ]]; do
+  # Check if session process has exited with an error
+  if ! kill -0 "$session_pid" 2>/dev/null; then
+    # Process has exited, check the log for errors
+    if grep -q "Http error 412" "$SESSION_LOG" 2>/dev/null; then
+      error "Emulator sessions are not enabled for your organization!"
+      error "Contact support@emulator.wtf to enable this feature."
+      log "Session log contents:"
+      cat "$SESSION_LOG" || true
+      exit 1
+    elif grep -qi "error\|failed\|unauthorized" "$SESSION_LOG" 2>/dev/null; then
+      error "Session failed to start. Check the log below for details."
+      log "Session log contents:"
+      cat "$SESSION_LOG" || true
+      exit 1
+    fi
+  fi
+
   if adb devices | awk 'NR>1 && $2=="device" {found=1} END {exit found ? 0 : 1}'; then
     log "adb device connected"
     exit 0
