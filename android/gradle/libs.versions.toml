@@ -59,7 +59,7 @@ material = "1.13.0"
 lifecycleViewmodelNavigation3Android = "2.10.0"
 
 # Network and server libraries
-ktor = "3.3.3"
+ktor = "3.4.0"
 okhttp = "5.3.2"
 
 # Publishing
