@@ -892,12 +892,6 @@ describe("findFocusedElement", function() {
       name: "Test Device",
       platform: "android"
     };
-    const mockAccessibilityServiceClient = {
-      getLatestHierarchy: async () => null,
-      convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-      convertAccessibilityNode: () => ({}),
-      getAccessibilityHierarchy: async () => null
-    } as unknown as AccessibilityServiceClient;
 
     viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any, null, null);
   });
