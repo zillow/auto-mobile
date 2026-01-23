@@ -50,28 +50,10 @@ runs:
       if: steps.cache-ew-cli.outputs.cache-hit != 'true'
       shell: ${{ inputs.shell }}
       run: |
-        set -euo pipefail
-        mkdir -p "$HOME/bin"
-
-        # Retry download up to 5 times with 1 second backoff
-        max_attempts=5
-        attempt=1
-        while [ $attempt -le $max_attempts ]; do
-          echo "Downloading ew-cli (attempt $attempt/$max_attempts)..."
-          if curl -fsSL https://maven.emulator.wtf/releases/ew-cli -o "$HOME/bin/ew-cli"; then
-            echo "Download successful"
-            break
-          fi
-          if [ $attempt -eq $max_attempts ]; then
-            echo "Failed to download ew-cli after $max_attempts attempts" >&2
-            exit 1
-          fi
-          echo "Download failed, retrying in 1 second..."
-          sleep 1
-          attempt=$((attempt + 1))
-        done
-
-        chmod a+x "$HOME/bin/ew-cli"
+        "${{ github.workspace }}/scripts/android/install-ew-cli.sh" \
+          --install-dir "$HOME/bin" \
+          --max-attempts 5 \
+          --retry-delay 1
 
     - name: Add ew-cli to PATH and verify
       shell: ${{ inputs.shell }}
@@ -86,38 +68,17 @@ runs:
       env:
         EW_API_TOKEN: ${{ env.EW_API_TOKEN }}
       run: |
-        set -euo pipefail
-
-        if [ -z "${EW_API_TOKEN:-}" ]; then
-          echo "EW_API_TOKEN is not set" >&2
-          exit 1
-        fi
-
-        device_args=()
+        device_args=""
         if [ -n "${{ inputs.device }}" ]; then
-          device_args+=(--device "${{ inputs.device }}")
+          device_args="--device ${{ inputs.device }}"
         fi
-
-        session_log="$RUNNER_TEMP/emulator-wtf-session.log"
-        ew-cli start-session --max-time-limit "${{ inputs.max-time-limit }}" --adb "${device_args[@]}" \
-          >"$session_log" 2>&1 &
-        session_pid=$!
-
-        echo "EMULATOR_WTF_SESSION_PID=$session_pid" >> "$GITHUB_ENV"
-        echo "EMULATOR_WTF_SESSION_LOG=$session_log" >> "$GITHUB_ENV"
-
-        echo "Waiting for adb device to connect..."
-        for _ in $(seq 1 30); do
-          if adb devices | awk 'NR>1 && $2=="device" {found=1} END {exit found ? 0 : 1}'; then
-            echo "adb device connected."
-            exit 0
-          fi
-          sleep 2
-        done
-
-        echo "Timed out waiting for adb device." >&2
-        cat "$session_log" || true
-        exit 1
+        "${{ github.workspace }}/scripts/android/start-emulator-wtf-session.sh" \
+          --max-time-limit "${{ inputs.max-time-limit }}" \
+          --session-log "$RUNNER_TEMP/emulator-wtf-session.log" \
+          --env-file "$GITHUB_ENV" \
+          --timeout 60 \
+          --poll-interval 2 \
+          $device_args
 
     - name: Run tests
       shell: ${{ inputs.shell }}
@@ -136,12 +97,5 @@ runs:
       if: always()
       shell: ${{ inputs.shell }}
       run: |
-        set -euo pipefail
-        if [ -n "${EMULATOR_WTF_SESSION_PID:-}" ]; then
-          kill "$EMULATOR_WTF_SESSION_PID" || true
-          wait "$EMULATOR_WTF_SESSION_PID" || true
-        fi
-        if [ -n "${EMULATOR_WTF_SESSION_LOG:-}" ]; then
-          echo "Session log:"
-          tail -n 200 "$EMULATOR_WTF_SESSION_LOG" || true
-        fi
+        "${{ github.workspace }}/scripts/android/stop-emulator-wtf-session.sh" \
+          --log-lines 200
