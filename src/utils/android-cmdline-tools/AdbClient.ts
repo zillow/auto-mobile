@@ -71,14 +71,19 @@ export class AdbClient implements AdbExecutor {
       : execFileAsync;
     this.spawnFn = spawnFn || spawn;
     // Test mode if: custom execAsync provided OR global test mode flag is set
-    this.isTestMode = execAsyncFn !== null || process.env.AUTOMOBILE_TEST_MODE === "true";
+    // Check for any truthy value (not just exactly "true") to handle different env var formats
+    const testModeEnv = process.env.AUTOMOBILE_TEST_MODE;
+    this.isTestMode = execAsyncFn !== null || (testModeEnv !== undefined && testModeEnv !== "" && testModeEnv !== "false" && testModeEnv !== "0");
     // Initialize with fallback, will be updated lazily
     this.adbPath = this.getFallbackAdbPath();
 
     // Debug: Log when a real (non-test) AdbClient is created
-    if (process.env.DEBUG_ADB_EXEC && !this.isTestMode) {
-      console.warn(`[DEBUG_ADB_EXEC] Real AdbClient created (not test mode)`);
-      console.warn(`[DEBUG_ADB_EXEC] Stack trace:`, new Error().stack);
+    if (process.env.DEBUG_ADB_EXEC) {
+      console.warn(`[DEBUG_ADB_EXEC] AdbClient created. isTestMode=${this.isTestMode}, AUTOMOBILE_TEST_MODE="${testModeEnv}" (type: ${typeof testModeEnv}), execAsyncFn=${execAsyncFn !== null}`);
+      if (!this.isTestMode) {
+        console.warn(`[DEBUG_ADB_EXEC] Real AdbClient created (not test mode)`);
+        console.warn(`[DEBUG_ADB_EXEC] Stack trace:`, new Error().stack);
+      }
     }
   }
 
