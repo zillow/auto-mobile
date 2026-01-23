@@ -22,6 +22,14 @@ set -euo pipefail
 VERSION="15.1.0"
 INSTALL_DIR=""
 DRY_RUN=false
+TEMP_DIR=""
+
+cleanup() {
+  if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+    rm -rf "$TEMP_DIR"
+  fi
+}
+trap cleanup EXIT
 
 usage() {
   head -n 17 "$0" | tail -n 15 | sed 's/^# //' | sed 's/^#//'
@@ -142,7 +150,7 @@ get_default_install_dir() {
 
 # Main installation logic
 main() {
-  local os arch url install_dir archive_name temp_dir
+  local os arch url install_dir archive_name
 
   os=$(detect_os)
   arch=$(detect_arch)
@@ -172,16 +180,15 @@ main() {
   # Create install directory
   mkdir -p "$install_dir"
 
-  # Create temp directory for download
-  temp_dir=$(mktemp -d)
-  trap 'rm -rf "$temp_dir"' EXIT
+  # Create temp directory for download (uses global TEMP_DIR for cleanup trap)
+  TEMP_DIR=$(mktemp -d)
 
   # Download
   log "Downloading ripgrep ${VERSION}..."
   if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$url" -o "${temp_dir}/${archive_name}"
+    curl -fsSL "$url" -o "${TEMP_DIR}/${archive_name}"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q "$url" -O "${temp_dir}/${archive_name}"
+    wget -q "$url" -O "${TEMP_DIR}/${archive_name}"
   else
     error "Neither curl nor wget found"
     exit 1
@@ -189,7 +196,7 @@ main() {
 
   # Extract
   log "Extracting..."
-  cd "$temp_dir"
+  cd "$TEMP_DIR"
 
   case "$archive_name" in
     *.tar.gz)
