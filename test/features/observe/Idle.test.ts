@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Idle } from "../../../src/features/observe/Idle";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
+import { BootedDevice } from "../../../src/models";
 
 describe("Idle - Unit Tests", function() {
   let idle: Idle;
 
   beforeEach(function() {
     // Create instance with mock adb to avoid real ADB calls
-    idle = new Idle("test-device");
+    const mockDevice: BootedDevice = {
+      deviceId: "test-device",
+      name: "Test Device",
+      platform: "android"
+    };
+    const fakeAdb = new FakeAdbExecutor();
+    idle = new Idle(mockDevice, fakeAdb as any);
   });
 
   describe("getTouchStatus", function() {

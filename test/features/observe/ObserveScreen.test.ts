@@ -422,7 +422,8 @@ describe("ObserveScreen", function() {
         name: "Invalid Device",
         platform: "android"
       };
-      const invalidObserveScreen = new ObserveScreen(invalidDevice);
+      // Pass fakeAdb to avoid creating real AdbClient
+      const invalidObserveScreen = new ObserveScreen(invalidDevice, fakeAdb as any);
 
       // Should still return a result object with error info
       const result = await invalidObserveScreen.execute();

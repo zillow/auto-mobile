@@ -4,12 +4,14 @@
  * This ensures proper cleanup of resources that could prevent the test
  * process from exiting (e.g., adb daemon on Windows).
  */
-import { afterAll } from "bun:test";
-import { AdbClient } from "../src/utils/android-cmdline-tools/AdbClient";
+import { spawnSync } from "child_process";
 
-// Register global cleanup after all tests complete
-afterAll(async () => {
-  // Kill adb server to prevent orphan daemon from blocking process exit
-  // This is especially important on Windows where the daemon prevents bun from exiting
-  await AdbClient.killServer();
+// Kill any existing adb server BEFORE tests start
+// This prevents tests from inheriting a running daemon
+spawnSync("adb", ["kill-server"], { stdio: "ignore" });
+
+// Also register cleanup for when process tries to exit
+// This catches any adb daemon started during tests
+process.on("beforeExit", () => {
+  spawnSync("adb", ["kill-server"], { stdio: "ignore" });
 });
