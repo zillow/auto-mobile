@@ -39,15 +39,47 @@ runs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3.2.2
 
+    - name: Cache emulator.wtf CLI
+      id: cache-ew-cli
+      uses: actions/cache@v4
+      with:
+        path: ~/bin/ew-cli
+        key: ew-cli-v1
+
     - name: Install emulator.wtf CLI
+      if: steps.cache-ew-cli.outputs.cache-hit != 'true'
       shell: ${{ inputs.shell }}
       run: |
         set -euo pipefail
         mkdir -p "$HOME/bin"
-        curl -fsSL https://maven.emulator.wtf/releases/ew-cli -o "$HOME/bin/ew-cli"
+
+        # Retry download up to 5 times with 1 second backoff
+        max_attempts=5
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          echo "Downloading ew-cli (attempt $attempt/$max_attempts)..."
+          if curl -fsSL https://maven.emulator.wtf/releases/ew-cli -o "$HOME/bin/ew-cli"; then
+            echo "Download successful"
+            break
+          fi
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Failed to download ew-cli after $max_attempts attempts" >&2
+            exit 1
+          fi
+          echo "Download failed, retrying in 1 second..."
+          sleep 1
+          attempt=$((attempt + 1))
+        done
+
         chmod a+x "$HOME/bin/ew-cli"
+
+    - name: Add ew-cli to PATH and verify
+      shell: ${{ inputs.shell }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$HOME/bin"
         echo "$HOME/bin" >> "$GITHUB_PATH"
-        ew-cli --version
+        "$HOME/bin/ew-cli" --version
 
     - name: Start emulator.wtf session
       shell: ${{ inputs.shell }}
