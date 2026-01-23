@@ -1,0 +1,65 @@
+#file: noinspection YAMLSchemaValidation
+name: "setup-ripgrep"
+description: "Install ripgrep by downloading pre-built binaries. Skips if already installed."
+inputs:
+  version:
+    description: "ripgrep version to install (default: 15.1.0)"
+    default: "15.1.0"
+    required: false
+  install-dir:
+    description: "Directory to install ripgrep binary"
+    default: ""
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Check if ripgrep is already installed"
+      id: check-rg
+      shell: bash
+      run: |
+        if command -v rg >/dev/null 2>&1; then
+          echo "ripgrep is already installed: $(rg --version | head -1)"
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "ripgrep not found, will install"
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: "Install ripgrep"
+      if: steps.check-rg.outputs.installed != 'true'
+      shell: bash
+      run: |
+        "${{ github.action_path }}/install-ripgrep.sh" \
+          --version "${{ inputs.version }}" \
+          ${INSTALL_DIR:+--install-dir "$INSTALL_DIR"}
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
+
+    - name: "Add to GITHUB_PATH (Unix)"
+      if: steps.check-rg.outputs.installed != 'true' && runner.os != 'Windows'
+      shell: bash
+      run: |
+        install_dir="${{ inputs.install-dir }}"
+        if [ -z "$install_dir" ]; then
+          install_dir="$HOME/.local/bin"
+        fi
+        echo "$install_dir" >> "$GITHUB_PATH"
+
+    - name: "Add to GITHUB_PATH (Windows)"
+      if: steps.check-rg.outputs.installed != 'true' && runner.os == 'Windows'
+      shell: bash
+      run: |
+        install_dir="${{ inputs.install-dir }}"
+        if [ -z "$install_dir" ]; then
+          install_dir="$USERPROFILE/.local/bin"
+        fi
+        echo "$install_dir" >> "$GITHUB_PATH"
+
+    - name: "Verify installation"
+      if: steps.check-rg.outputs.installed != 'true'
+      shell: bash
+      run: |
+        # Give PATH a moment to update
+        export PATH="$HOME/.local/bin:$USERPROFILE/.local/bin:$PATH"
+        rg --version

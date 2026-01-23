@@ -498,6 +498,16 @@ jobs:
       - name: "Git Checkout"
         uses: actions/checkout@v4
 
+      - name: "Cache Bun dependencies"
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: bun-${{ matrix.os }}-${{ hashFiles('bun.lockb') }}
+          restore-keys: |
+            bun-${{ matrix.os }}-
+
       - uses: ./.github/actions/setup-auto-mobile-npm-package
 
       - name: "Run Lint"
