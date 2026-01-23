@@ -892,14 +892,8 @@ describe("findFocusedElement", function() {
       name: "Test Device",
       platform: "android"
     };
-    const mockAccessibilityServiceClient = {
-      getLatestHierarchy: async () => null,
-      convertToViewHierarchyResult: () => ({ hierarchy: {} }),
-      convertAccessibilityNode: () => ({}),
-      getAccessibilityHierarchy: async () => null
-    } as unknown as AccessibilityServiceClient;
 
-    viewHierarchy = new ViewHierarchy(mockDevice, null, null, null, mockAccessibilityServiceClient);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any, null, null);
   });
 
   test("should find focused element in simple hierarchy", function() {
@@ -1400,7 +1394,7 @@ describe("Node Hash Generation", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should generate consistent hash for same node properties", function() {
@@ -1499,7 +1493,7 @@ describe("Zero Bounds Detection", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should detect zero width bounds", function() {
@@ -1560,7 +1554,7 @@ describe("Invisible Node Detection", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should detect invisible node with string false", function() {
@@ -1603,7 +1597,7 @@ describe("Interactable Node Detection", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should detect clickable node", function() {
@@ -1656,7 +1650,7 @@ describe("Node Deduplication", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should remove duplicate nodes with same hash", function() {
@@ -1724,7 +1718,7 @@ describe("Hierarchy Tree Deduplication", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should recursively deduplicate children", function() {
@@ -1812,7 +1806,7 @@ describe("Overlay Window Filtering", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should filter accessibility_overlay windows", function() {
@@ -1896,7 +1890,7 @@ describe("Merge Hierarchies with Deduplication", function() {
       name: "Test Device",
       platform: "android"
     };
-    viewHierarchy = new ViewHierarchy(mockDevice, null);
+    viewHierarchy = new ViewHierarchy(mockDevice, new FakeAdbExecutor() as any);
   });
 
   test("should deduplicate nodes when merging a11y and uiautomator", function() {

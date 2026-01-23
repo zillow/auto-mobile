@@ -1,5 +1,6 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
-import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
+import { PlatformDeviceManager } from "../utils/deviceUtils";
+import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
 import { logger } from "../utils/logger";
 import { BootedDevice, Platform } from "../models";
 import { DaemonState } from "../daemon/daemonState";
@@ -62,26 +63,13 @@ interface PoolDeviceInfo {
   assignedSession?: string;
 }
 
-// Module-level device manager for dependency injection
-let deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager();
-
 /**
  * Set a custom device manager for testing
  * @param manager - The device manager to use (or null to reset to default)
+ * @deprecated Use PlatformDeviceManagerFactory.setInstance() instead
  */
 export function setDeviceManager(manager: PlatformDeviceManager | null): void {
-  if (manager === null) {
-    deviceManager = new MultiPlatformDeviceManager();
-  } else {
-    deviceManager = manager;
-  }
-}
-
-/**
- * Get the current device manager (for testing purposes)
- */
-export function getDeviceManager(): PlatformDeviceManager {
-  return deviceManager;
+  PlatformDeviceManagerFactory.setInstance(manager);
 }
 
 // Convert BootedDevice to BootedDeviceInfo
@@ -228,7 +216,7 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
     // Fetch Android booted devices if requested
     if (platforms.includes("android")) {
       try {
-        const androidDevices = await deviceManager.getBootedDevices("android");
+        const androidDevices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("android");
         for (const device of androidDevices) {
           devices.push(
             toBootedDeviceInfo(
@@ -247,7 +235,7 @@ async function getBootedDevicesForPlatforms(platforms: Platform[]): Promise<Boot
     // Fetch iOS booted simulators if requested
     if (platforms.includes("ios")) {
       try {
-        const iosDevices = await deviceManager.getBootedDevices("ios");
+        const iosDevices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("ios");
         for (const device of iosDevices) {
           devices.push(
             toBootedDeviceInfo(

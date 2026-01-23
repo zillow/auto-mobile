@@ -6,6 +6,7 @@ import { AndroidAccessibilityServiceManager } from "../../src/utils/Accessibilit
 import { AccessibilityServiceClient } from "../../src/features/observe/AccessibilityServiceClient";
 import { FakeInstalledAppsRepository } from "../fakes/FakeInstalledAppsRepository";
 import { FakeTimer } from "../fakes/FakeTimer";
+import { FakeDeviceManager } from "../fakes/FakeDeviceManager";
 import { BootedDevice } from "../../src/models";
 
 describe("ToolExecutionContext", () => {
@@ -26,7 +27,8 @@ describe("ToolExecutionContext", () => {
     fakeTimer = new FakeTimer();
     sessionManager = new SessionManager(fakeTimer);
     fakeAppsRepo = new FakeInstalledAppsRepository();
-    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo);
+    const fakeDeviceManager = new FakeDeviceManager();
+    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager);
     await devicePool.initializeWithDevices([createBootedDevice("device-1")]);
     originalGetInstance = AndroidAccessibilityServiceManager.getInstance;
     originalClientGetInstance = AccessibilityServiceClient.getInstance;

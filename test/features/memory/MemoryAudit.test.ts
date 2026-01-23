@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { MemoryAudit } from "../../../src/features/memory/MemoryAudit";
 import type { MemoryMetrics } from "../../../src/features/memory/MemoryMetricsCollector";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 
 describe("MemoryAudit - Unit Tests", function() {
   let audit: MemoryAudit;
 
   beforeEach(function() {
-    // Create instance with test device
-    audit = new MemoryAudit({ id: "test-device", platform: "android" } as any);
+    // Use FakeAdbExecutor to avoid starting real adb daemon
+    const fakeAdb = new FakeAdbExecutor();
+    audit = new MemoryAudit({ deviceId: "test-device", name: "test", platform: "android" }, fakeAdb as any);
   });
 
   describe("validateMetrics", function() {

@@ -31,8 +31,9 @@ describe("AppLifecycleMonitor", () => {
 
   describe("singleton pattern", () => {
     test("should return the same instance", () => {
-      const instance1 = AppLifecycleMonitor.getInstance();
-      const instance2 = AppLifecycleMonitor.getInstance();
+      // Use factory to get instance (respects injected fake from beforeEach)
+      const instance1 = AppLifecycleMonitorFactory.getInstance();
+      const instance2 = AppLifecycleMonitorFactory.getInstance();
       expect(instance1).toBe(instance2);
     });
   });

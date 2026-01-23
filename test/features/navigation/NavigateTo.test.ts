@@ -5,6 +5,7 @@ import { ToolRegistry } from "../../../src/server/toolRegistry";
 import { BootedDevice } from "../../../src/models";
 import { z } from "zod";
 import { FakeNavigationGraphManager } from "../../fakes/FakeNavigationGraphManager";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 
 describe("NavigateTo", () => {
   let navigateTo: NavigateTo;
@@ -12,6 +13,7 @@ describe("NavigateTo", () => {
   let toolCallLog: Array<{ toolName: string; args: Record<string, any> }>;
   let fakeGraph: FakeNavigationGraphManager;
   let getInstanceSpy: ReturnType<typeof spyOn> | null = null;
+  let fakeAdb: FakeAdbExecutor;
 
   // Map of text -> screen to simulate navigation when tools are called
   let navigationMap: Map<string, string>;
@@ -29,6 +31,9 @@ describe("NavigateTo", () => {
       platform: "android",
       source: "local"
     } as BootedDevice;
+
+    // Create fake adb to avoid real ADB calls
+    fakeAdb = new FakeAdbExecutor();
 
     // Track tool calls
     toolCallLog = [];
@@ -76,7 +81,7 @@ describe("NavigateTo", () => {
 
   describe("execute", () => {
     test("should return error when no current screen", async () => {
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       const result = await navigateTo.execute({
         targetScreen: "TargetScreen",
@@ -99,7 +104,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 0
       });
 
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       const result = await navigateTo.execute({
         targetScreen: "HomeScreen",
@@ -122,7 +127,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 0
       });
 
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       const result = await navigateTo.execute({
         targetScreen: "UnknownScreen",
@@ -173,7 +178,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 2
       });
 
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       await navigateTo.execute({
         targetScreen: "SettingsScreen",
@@ -219,7 +224,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 2
       });
 
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       const result = await navigateTo.execute({
         targetScreen: "ProfileScreen",
@@ -265,7 +270,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 2
       });
 
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       await navigateTo.execute(
         { targetScreen: "Screen2", platform: "android" },
@@ -291,7 +296,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 0
       });
 
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       const result = await navigateTo.execute({
         targetScreen: "HomeScreen",
@@ -352,7 +357,7 @@ describe("NavigateTo", () => {
         sequenceNumber: 3
       });
 
-      navigateTo = new NavigateTo(device, null);
+      navigateTo = new NavigateTo(device, fakeAdb as any);
 
       await navigateTo.execute({
         targetScreen: "AdvancedScreen",

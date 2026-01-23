@@ -1,5 +1,5 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
-import { MultiPlatformDeviceManager, PlatformDeviceManager } from "../utils/deviceUtils";
+import { PlatformDeviceManagerFactory } from "../utils/factories/PlatformDeviceManagerFactory";
 import { SystemConfigurationManager } from "../features/utility/SystemConfigurationManager";
 import { BootedDevice, LocalizationSettingsResult } from "../models";
 import { logger } from "../utils/logger";
@@ -21,11 +21,9 @@ export interface LocalizationResourceContent {
   error?: string;
 }
 
-const deviceManager: PlatformDeviceManager = new MultiPlatformDeviceManager();
-
 async function findBootedDevice(deviceId: string): Promise<BootedDevice | null> {
   try {
-    const devices = await deviceManager.getBootedDevices("either");
+    const devices = await PlatformDeviceManagerFactory.getInstance().getBootedDevices("either");
     return devices.find(device => device.deviceId === deviceId) ?? null;
   } catch (error) {
     logger.warn(`[LocalizationResources] Failed to list booted devices: ${error}`);

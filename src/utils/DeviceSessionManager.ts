@@ -17,6 +17,58 @@ import { storeSetupTiming } from "../server/ToolExecutionContext";
 import { applyAppearanceOnConnect } from "./appearance/applyAppearanceOnConnect";
 
 /**
+ * Provider interface for device clients - enables dependency injection for testing
+ */
+export interface DeviceClientProvider {
+  getAdb(): AdbExecutor;
+  getSimctl(): SimCtlClient | undefined;
+  getAndroidEmulator(): AndroidEmulatorClient | undefined;
+  getDeviceUtils(): PlatformDeviceManager;
+}
+
+/**
+ * Default provider that lazily creates real clients
+ */
+export class DefaultDeviceClientProvider implements DeviceClientProvider {
+  private _adb: AdbClient | undefined;
+  private _simctl: SimCtlClient | undefined;
+  private _androidEmulator: AndroidEmulatorClient | undefined;
+  private _deviceUtils: PlatformDeviceManager | undefined;
+
+  getAdb(): AdbExecutor {
+    if (!this._adb) {
+      this._adb = new AdbClient(null);
+    }
+    return this._adb;
+  }
+
+  getSimctl(): SimCtlClient | undefined {
+    if (!this._simctl) {
+      this._simctl = new SimCtlClient(null);
+    }
+    return this._simctl;
+  }
+
+  getAndroidEmulator(): AndroidEmulatorClient | undefined {
+    if (!this._androidEmulator) {
+      this._androidEmulator = new AndroidEmulatorClient();
+    }
+    return this._androidEmulator;
+  }
+
+  getDeviceUtils(): PlatformDeviceManager {
+    if (!this._deviceUtils) {
+      this._deviceUtils = new MultiPlatformDeviceManager(
+        this.getAdb() as AdbClient,
+        this.getSimctl()!,
+        this.getAndroidEmulator()!
+      );
+    }
+    return this._deviceUtils;
+  }
+}
+
+/**
  * Interface for device session management
  * Handles device detection, verification, and lifecycle for Android and iOS platforms
  */
@@ -90,46 +142,49 @@ export class DeviceSessionManager implements DeviceSessionManager {
   private currentDevice: BootedDevice | undefined;
   private currentPlatform: Platform | undefined;
   private static instance: DeviceSessionManager;
-  private adb: AdbClient;
-  private simctl: SimCtlClient | undefined;
-  private androidEmulator: AndroidEmulatorClient | undefined;
-  private deviceUtils: PlatformDeviceManager;
+  private static defaultProvider: DeviceClientProvider | undefined;
+  private readonly provider: DeviceClientProvider;
+  private _adb: AdbExecutor | undefined;
   private window: Window | undefined;
 
   // Track devices that have push update listeners registered
   private static pushUpdateListenersRegistered: Set<string> = new Set();
 
-  private constructor(adb?: AdbExecutor, deviceUtils?: PlatformDeviceManager) {
-    // Use injected adb or create default AdbClient
-    if (adb) {
-      this.adb = adb as AdbClient;
-    } else {
-      this.adb = new AdbClient(null);
-    }
+  private constructor(provider: DeviceClientProvider) {
+    this.provider = provider;
+  }
 
-    // Use injected deviceUtils or create default DeviceUtils
-    if (deviceUtils) {
-      this.deviceUtils = deviceUtils;
-    } else {
-      this.simctl = new SimCtlClient(null);
-      this.androidEmulator = new AndroidEmulatorClient();
-      this.deviceUtils = new MultiPlatformDeviceManager(
-        this.adb,
-        this.simctl,
-        this.androidEmulator
-      );
+  private get adb(): AdbExecutor {
+    if (!this._adb) {
+      this._adb = this.provider.getAdb();
     }
+    return this._adb;
+  }
+
+  private get simctl(): SimCtlClient | undefined {
+    return this.provider.getSimctl();
+  }
+
+  private get androidEmulator(): AndroidEmulatorClient | undefined {
+    return this.provider.getAndroidEmulator();
+  }
+
+  private get deviceUtils(): PlatformDeviceManager {
+    return this.provider.getDeviceUtils();
   }
 
   public static getInstance(): DeviceSessionManager {
     if (!DeviceSessionManager.instance) {
-      DeviceSessionManager.instance = new DeviceSessionManager();
+      if (!DeviceSessionManager.defaultProvider) {
+        DeviceSessionManager.defaultProvider = new DefaultDeviceClientProvider();
+      }
+      DeviceSessionManager.instance = new DeviceSessionManager(DeviceSessionManager.defaultProvider);
     }
     return DeviceSessionManager.instance;
   }
 
-  public static createInstance(adb?: AdbExecutor, deviceUtils?: PlatformDeviceManager): DeviceSessionManager {
-    return new DeviceSessionManager(adb, deviceUtils);
+  public static createInstance(provider: DeviceClientProvider): DeviceSessionManager {
+    return new DeviceSessionManager(provider);
   }
 
   /**
@@ -154,8 +209,8 @@ export class DeviceSessionManager implements DeviceSessionManager {
     this.currentPlatform = platform;
 
     if (platform === "android") {
-      // Update AdbClient with new device ID
-      this.adb = new AdbClient(device);
+      // Update AdbClient with new device ID - need a fresh client for the new device
+      this._adb = new AdbClient(device);
     }
 
     // Reset window when device changes

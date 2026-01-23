@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { MemoryMetricsCollector } from "../../../src/features/memory/MemoryMetricsCollector";
+import { FakeAdbExecutor } from "../../fakes/FakeAdbExecutor";
 
 describe("MemoryMetricsCollector - Unit Tests", function() {
   let collector: MemoryMetricsCollector;
 
   beforeEach(function() {
-    // Create instance with test device ID
-    collector = new MemoryMetricsCollector("test-device" as any);
+    // Use FakeAdbExecutor to avoid starting real adb daemon
+    const fakeAdb = new FakeAdbExecutor();
+    collector = new MemoryMetricsCollector({ deviceId: "test-device", name: "test", platform: "android" }, fakeAdb as any);
   });
 
   describe("parseMeminfo", function() {

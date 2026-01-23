@@ -41,7 +41,9 @@ describe("Window", () => {
         name: "Default Device",
         platform: "android"
       };
-      const windowInstance = new Window(mockDevice);
+      // Pass FakeAdbExecutor to avoid creating real AdbClient
+      const defaultFakeAdb = new FakeAdbExecutor();
+      const windowInstance = new Window(mockDevice, defaultFakeAdb as any);
       expect(windowInstance).toBeInstanceOf(Window);
     });
   });

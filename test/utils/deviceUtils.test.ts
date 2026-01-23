@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { MultiPlatformDeviceManager } from "../../src/utils/deviceUtils";
 import type { DeviceInfo } from "../../src/models";
 import { SimCtlClient } from "../../src/utils/ios-cmdline-tools/SimCtlClient";
+import { FakeAdbClient } from "../fakes/FakeAdbClient";
+import { AdbClient } from "../../src/utils/android-cmdline-tools/AdbClient";
 
 describe("MultiPlatformDeviceManager", () => {
   test("isDeviceImageRunning uses UDID when present for iOS", async () => {
@@ -12,7 +14,8 @@ describe("MultiPlatformDeviceManager", () => {
       }
     } as unknown as SimCtlClient;
 
-    const manager = new MultiPlatformDeviceManager(null, fakeSimctl, null);
+    // Use FakeAdbClient to avoid starting real adb daemon
+    const manager = new MultiPlatformDeviceManager(new FakeAdbClient() as unknown as AdbClient, fakeSimctl, null);
     const device: DeviceInfo = {
       name: "iPhone 15",
       platform: "ios",
@@ -31,7 +34,8 @@ describe("MultiPlatformDeviceManager", () => {
       isSimulatorRunning: async (name: string) => name === "iPhone 15"
     } as unknown as SimCtlClient;
 
-    const manager = new MultiPlatformDeviceManager(null, fakeSimctl, null);
+    // Use FakeAdbClient to avoid starting real adb daemon
+    const manager = new MultiPlatformDeviceManager(new FakeAdbClient() as unknown as AdbClient, fakeSimctl, null);
     const device: DeviceInfo = {
       name: "iPhone 15",
       platform: "ios",

@@ -8,6 +8,7 @@ import { Jimp, intToRGBA } from "jimp";
 import fs from "fs/promises";
 import { Element } from "../../models/Element";
 import { WcagLevel } from "../../models/AccessibilityAudit";
+import { logger } from "../../utils/logger";
 
 interface RGB {
   r: number;
@@ -241,7 +242,7 @@ export class ContrastChecker {
 
       return result;
     } catch (error) {
-      console.error("Contrast checking error:", error);
+      logger.debug(`Contrast checking error: ${error}`);
       return null;
     }
   }
