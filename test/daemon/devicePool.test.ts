@@ -11,6 +11,7 @@ describe("DevicePool", () => {
   let sessionManager: SessionManager;
   let fakeTimer: FakeTimer;
   let fakeAppsRepo: FakeInstalledAppsRepository;
+  let fakeDeviceManager: FakeDeviceManager;
   const createBootedDevice = (
     deviceId: string,
     platform: Platform = "android",
@@ -27,7 +28,8 @@ describe("DevicePool", () => {
     fakeTimer = new FakeTimer();
     sessionManager = new SessionManager(fakeTimer);
     fakeAppsRepo = new FakeInstalledAppsRepository();
-    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo);
+    fakeDeviceManager = new FakeDeviceManager();
+    devicePool = new DevicePool(sessionManager, "test-daemon-session-id", fakeTimer, fakeAppsRepo, fakeDeviceManager);
   });
 
   afterEach(() => {
