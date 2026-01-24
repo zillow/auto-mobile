@@ -33,7 +33,7 @@ android {
   buildFeatures { compose = true }
 }
 
-version = "0.0.7-SNAPSHOT"
+version = "0.0.8-SNAPSHOT"
 
 dependencies {
   // Android core libraries
