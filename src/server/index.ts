@@ -34,6 +34,7 @@ import { registerVideoRecordingTools } from "./videoRecordingTools";
 import { registerSnapshotTools } from "./snapshotTools";
 import { registerBiometricTools } from "./biometricTools";
 import { registerHighlightTools } from "./highlightTools";
+import { registerDatabaseTools } from "./databaseTools";
 import { getMcpServerVersion } from "../utils/mcpVersion";
 
 // Import resource registration functions
@@ -47,6 +48,7 @@ import { registerPerformanceResources } from "./performanceResources";
 import { registerVideoRecordingResources } from "./videoRecordingResources";
 import { registerLocalizationResources } from "./localizationResources";
 import { registerDeviceSnapshotResources } from "./deviceSnapshotResources";
+import { registerDatabaseResources } from "./databaseResources";
 import { FeatureFlagService } from "../features/featureFlags/FeatureFlagService";
 import { startupBenchmark } from "../utils/startupBenchmark";
 
@@ -138,6 +140,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerSnapshotTools();
   registerBiometricTools();
   registerHighlightTools();
+  registerDatabaseTools();
   registerDebugTools();
   startupBenchmark.endPhase("toolRegistration");
 
@@ -153,6 +156,7 @@ export const createMcpServer = (options: McpServerOptions = {}): McpServer => {
   registerVideoRecordingResources();
   registerLocalizationResources();
   registerDeviceSnapshotResources();
+  registerDatabaseResources();
   startupBenchmark.endPhase("resourceRegistration");
 
   // Create a new MCP server

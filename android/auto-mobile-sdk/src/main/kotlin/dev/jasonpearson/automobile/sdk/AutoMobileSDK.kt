@@ -2,6 +2,7 @@ package dev.jasonpearson.automobile.sdk
 
 import android.content.Context
 import android.content.Intent
+import dev.jasonpearson.automobile.sdk.database.DatabaseInspector
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -57,6 +58,7 @@ object AutoMobileSDK {
     this.context = context.applicationContext
     RecompositionTracker.initialize(this.context!!)
     AutoMobileNotifications.initialize(this.context!!)
+    DatabaseInspector.initialize(this.context!!)
   }
 
   /**

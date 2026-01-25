@@ -16,5 +16,10 @@
         <action android:name="dev.jasonpearson.automobile.sdk.NOTIFICATION_ACTION" />
       </intent-filter>
     </receiver>
+
+    <provider
+      android:name="dev.jasonpearson.automobile.sdk.database.DatabaseInspectorProvider"
+      android:authorities="${applicationId}.automobile.database"
+      android:exported="true" />
   </application>
 </manifest>
