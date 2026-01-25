@@ -24,15 +24,20 @@ export interface SqlQueryArgs {
 }
 
 /**
- * Extract table names from SQL query for notification purposes
+ * Extract table names from SQL query for notification purposes.
+ *
+ * Handles SQLite conflict clauses like INSERT OR REPLACE INTO and UPDATE OR IGNORE.
  */
 function extractAffectedTables(query: string): string[] {
   const tables: string[] = [];
 
-  // Match INSERT INTO table, UPDATE table, DELETE FROM table, ALTER TABLE table
+  // SQLite conflict clause: OR (ABORT|FAIL|IGNORE|REPLACE|ROLLBACK)
+  const conflictClause = "(?:OR\\s+(?:ABORT|FAIL|IGNORE|REPLACE|ROLLBACK)\\s+)?";
+
+  // Match INSERT [OR conflict] INTO table, UPDATE [OR conflict] table, etc.
   const patterns = [
-    /INSERT\s+INTO\s+["']?(\w+)["']?/gi,
-    /UPDATE\s+["']?(\w+)["']?/gi,
+    new RegExp(`INSERT\\s+${conflictClause}INTO\\s+["']?(\\w+)["']?`, "gi"),
+    new RegExp(`UPDATE\\s+${conflictClause}["']?(\\w+)["']?`, "gi"),
     /DELETE\s+FROM\s+["']?(\w+)["']?/gi,
     /ALTER\s+TABLE\s+["']?(\w+)["']?/gi,
     /DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["']?(\w+)["']?/gi,
