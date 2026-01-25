@@ -54,10 +54,15 @@ function extractAffectedTables(query: string): string[] {
 
 /**
  * Determine if query is a mutation (modifies data)
+ *
+ * Handles CTE queries (WITH ... SELECT/INSERT/UPDATE/DELETE) by looking past
+ * the CTE prefix to find the actual statement type.
  */
 function isMutationQuery(query: string): boolean {
   const upperQuery = query.trim().toUpperCase();
-  return (
+
+  // Direct mutations
+  if (
     upperQuery.startsWith("INSERT") ||
     upperQuery.startsWith("UPDATE") ||
     upperQuery.startsWith("DELETE") ||
@@ -65,7 +70,48 @@ function isMutationQuery(query: string): boolean {
     upperQuery.startsWith("DROP") ||
     upperQuery.startsWith("CREATE") ||
     upperQuery.startsWith("TRUNCATE")
-  );
+  ) {
+    return true;
+  }
+
+  // CTE queries: WITH ... followed by SELECT/INSERT/UPDATE/DELETE
+  if (upperQuery.startsWith("WITH")) {
+    const statementType = findStatementAfterCTE(upperQuery);
+    // Only INSERT/UPDATE/DELETE are mutations; SELECT is not
+    return statementType === "INSERT" || statementType === "UPDATE" || statementType === "DELETE";
+  }
+
+  return false;
+}
+
+/**
+ * Find the actual statement type after CTE definitions.
+ *
+ * Parses past WITH ... AS (...) clauses to find SELECT/INSERT/UPDATE/DELETE.
+ */
+function findStatementAfterCTE(upperQuery: string): string | null {
+  let depth = 0;
+  let i = 4; // Skip "WITH"
+
+  while (i < upperQuery.length) {
+    const char = upperQuery[i];
+
+    if (char === "(") {
+      depth++;
+    } else if (char === ")") {
+      depth--;
+    } else if (depth === 0) {
+      // Check for statement keywords at this position
+      const remaining = upperQuery.slice(i).trimStart();
+      if (remaining.startsWith("SELECT")) {return "SELECT";}
+      if (remaining.startsWith("INSERT")) {return "INSERT";}
+      if (remaining.startsWith("UPDATE")) {return "UPDATE";}
+      if (remaining.startsWith("DELETE")) {return "DELETE";}
+    }
+    i++;
+  }
+
+  return null;
 }
 
 /**

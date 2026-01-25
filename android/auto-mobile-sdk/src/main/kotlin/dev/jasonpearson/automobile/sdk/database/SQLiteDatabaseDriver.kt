@@ -146,19 +146,76 @@ class SQLiteDatabaseDriver(private val context: Context) : DatabaseDriver {
 
   override fun executeSQL(databasePath: String, query: String): SQLExecutionResult {
     val trimmedQuery = query.trim()
-    val upperQuery = trimmedQuery.uppercase()
 
     // Determine if this is a query or mutation
-    val isQuery =
-        upperQuery.startsWith("SELECT") ||
-            upperQuery.startsWith("PRAGMA") ||
-            upperQuery.startsWith("EXPLAIN")
+    val isQuery = isReadQuery(trimmedQuery)
 
     return if (isQuery) {
       executeQuery(databasePath, trimmedQuery)
     } else {
       executeMutation(databasePath, trimmedQuery)
     }
+  }
+
+  /**
+   * Determine if a SQL statement is a read query (returns rows) vs a mutation.
+   *
+   * Handles CTE queries (WITH ... SELECT) by looking past the CTE prefix to find the actual
+   * statement type.
+   */
+  private fun isReadQuery(query: String): Boolean {
+    val upperQuery = query.uppercase()
+
+    // Direct read queries
+    if (upperQuery.startsWith("SELECT") ||
+        upperQuery.startsWith("PRAGMA") ||
+        upperQuery.startsWith("EXPLAIN")) {
+      return true
+    }
+
+    // CTE queries: WITH ... followed by SELECT/INSERT/UPDATE/DELETE
+    // We need to find the actual statement after the CTE definitions
+    if (upperQuery.startsWith("WITH")) {
+      // Find the final statement after all CTE definitions
+      // CTEs are: WITH name AS (...), name2 AS (...) SELECT/INSERT/UPDATE/DELETE
+      // We look for the last occurrence of a statement keyword not inside parentheses
+      val statementType = findStatementAfterCTE(upperQuery)
+      return statementType == "SELECT"
+    }
+
+    return false
+  }
+
+  /**
+   * Find the actual statement type after CTE definitions.
+   *
+   * Parses past WITH ... AS (...) clauses to find SELECT/INSERT/UPDATE/DELETE.
+   */
+  private fun findStatementAfterCTE(upperQuery: String): String? {
+    var depth = 0
+    var i = 4 // Skip "WITH"
+
+    while (i < upperQuery.length) {
+      val char = upperQuery[i]
+
+      when {
+        char == '(' -> depth++
+        char == ')' -> depth--
+        depth == 0 -> {
+          // Check for statement keywords at this position
+          val remaining = upperQuery.substring(i).trimStart()
+          when {
+            remaining.startsWith("SELECT") -> return "SELECT"
+            remaining.startsWith("INSERT") -> return "INSERT"
+            remaining.startsWith("UPDATE") -> return "UPDATE"
+            remaining.startsWith("DELETE") -> return "DELETE"
+          }
+        }
+      }
+      i++
+    }
+
+    return null
   }
 
   private fun executeQuery(databasePath: String, query: String): SQLExecutionResult.Query {
