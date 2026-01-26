@@ -164,16 +164,21 @@ export interface NavigationGraphSummaryNode {
   id: number;
   screenName: string;
   visitCount: number;
+  /** Path to screenshot file, or resource URI for fetching */
+  screenshotPath?: string | null;
 }
 
 /**
  * High-level summary edge for navigation graph resources.
+ * When aggregated, represents a unique transition (from → to via toolName) with a traversal count.
  */
 export interface NavigationGraphSummaryEdge {
   id: number;
   from: string;
   to: string;
   toolName: string | null;
+  /** Number of times this transition has been traversed */
+  traversalCount: number;
 }
 
 /**
@@ -242,6 +247,7 @@ export interface NavigationGraphHistoryPage {
  */
 export interface NavigationGraphSummaryProvider {
   exportGraphSummary(): Promise<NavigationGraphSummary>;
+  exportGraphSummaryForApp?(appId: string | null): Promise<NavigationGraphSummary>;
   setGraphUpdateListener?(listener: (() => void) | null): void;
 }
 

@@ -1,5 +1,6 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
+import { NavigationScreenshotManager } from "../features/navigation/NavigationScreenshotManager";
 import { testCoverageAnalyzer } from "../features/navigation/TestCoverageAnalyzer";
 import {
   NavigationGraphSummary,
@@ -12,8 +13,10 @@ import { logger } from "../utils/logger";
 
 export const NAVIGATION_RESOURCE_URIS = {
   GRAPH: "automobile:navigation/graph",
+  GRAPH_WITH_APP_ID: "automobile:navigation/graph?appId={appId}",
   NODE_BY_ID: "automobile:navigation/nodes/{nodeId}",
   NODE_BY_SCREEN: "automobile:navigation/nodes?screen={screenName}",
+  NODE_SCREENSHOT: "automobile:navigation/nodes/{nodeId}/screenshot",
   HISTORY: "automobile:navigation/history",
   HISTORY_WITH_CURSOR: "automobile:navigation/history?cursor={cursor}",
   HISTORY_WITH_LIMIT: "automobile:navigation/history?limit={limit}",
@@ -68,18 +71,29 @@ export function setNavigationGraphProvider(provider: NavigationGraphResourceProv
   attachGraphUpdateListener(navigationGraphProvider);
 }
 
-async function getNavigationGraphResource(): Promise<ResourceContent> {
+async function getNavigationGraphResource(appId?: string): Promise<ResourceContent> {
+  const uri = appId
+    ? `automobile:navigation/graph?appId=${encodeURIComponent(appId)}`
+    : NAVIGATION_RESOURCE_URIS.GRAPH;
+
   try {
-    const graph = await navigationGraphProvider.exportGraphSummary();
+    // Use exportGraphSummaryForApp if available and appId is provided
+    let graph;
+    if (appId && navigationGraphProvider.exportGraphSummaryForApp) {
+      graph = await navigationGraphProvider.exportGraphSummaryForApp(appId);
+    } else {
+      graph = await navigationGraphProvider.exportGraphSummary();
+    }
+
     return {
-      uri: NAVIGATION_RESOURCE_URIS.GRAPH,
+      uri,
       mimeType: "application/json",
       text: JSON.stringify(graph, null, 2)
     };
   } catch (error) {
     logger.error(`[NavigationResources] Failed to get navigation graph: ${error}`);
     return {
-      uri: NAVIGATION_RESOURCE_URIS.GRAPH,
+      uri,
       mimeType: "application/json",
       text: JSON.stringify({
         error: `Failed to retrieve navigation graph: ${error}`
@@ -185,6 +199,73 @@ function parseHistoryParams(params: Record<string, string>): {
   };
 }
 
+async function getNavigationNodeScreenshotResource(nodeId: number): Promise<ResourceContent> {
+  const uri = `automobile:navigation/nodes/${nodeId}/screenshot`;
+
+  try {
+    // Get the node to find its screenshot path
+    const nodeResource = await navigationGraphProvider.getNodeResourceById(nodeId);
+    if (!nodeResource || !nodeResource.node) {
+      return {
+        uri,
+        mimeType: "application/json",
+        text: JSON.stringify({ error: `Navigation node ${nodeId} not found.` }, null, 2)
+      };
+    }
+
+    // Get the screenshot path from the database node
+    // The node from repository includes screenshot_path
+    const navManager = NavigationGraphManager.getInstance();
+    const appId = navManager.getCurrentAppId();
+    if (!appId) {
+      return {
+        uri,
+        mimeType: "application/json",
+        text: JSON.stringify({ error: "No current app set." }, null, 2)
+      };
+    }
+
+    // Find screenshot for this screen using the screenshot manager
+    const screenshotManager = NavigationScreenshotManager.getInstance();
+    const screenshotPath = await screenshotManager.findExistingScreenshot(
+      appId,
+      nodeResource.node.screenName
+    );
+
+    if (!screenshotPath) {
+      return {
+        uri,
+        mimeType: "application/json",
+        text: JSON.stringify({ error: `No screenshot available for node ${nodeId}.` }, null, 2)
+      };
+    }
+
+    // Read the screenshot file
+    const screenshotData = await screenshotManager.readScreenshot(screenshotPath);
+    if (!screenshotData) {
+      return {
+        uri,
+        mimeType: "application/json",
+        text: JSON.stringify({ error: `Screenshot file not found for node ${nodeId}.` }, null, 2)
+      };
+    }
+
+    // Return as base64-encoded blob
+    return {
+      uri,
+      mimeType: "image/webp",
+      blob: screenshotData.toString("base64")
+    };
+  } catch (error) {
+    logger.error(`[NavigationResources] Failed to get screenshot for node ${nodeId}: ${error}`);
+    return {
+      uri,
+      mimeType: "application/json",
+      text: JSON.stringify({ error: `Failed to retrieve screenshot: ${error}` }, null, 2)
+    };
+  }
+}
+
 export function registerNavigationResources(options: {
   navigationGraph?: NavigationGraphResourceProvider;
 } = {}): void {
@@ -200,9 +281,20 @@ export function registerNavigationResources(options: {
   ResourceRegistry.register(
     NAVIGATION_RESOURCE_URIS.GRAPH,
     "Navigation Graph",
-    "High-level navigation graph for the current app (nodes and edges).",
+    "High-level navigation graph for the current app (nodes and edges). Use ?appId= to filter by specific app.",
     "application/json",
-    getNavigationGraphResource
+    () => getNavigationGraphResource()
+  );
+
+  ResourceRegistry.registerTemplate(
+    NAVIGATION_RESOURCE_URIS.GRAPH_WITH_APP_ID,
+    "Navigation Graph (App-Specific)",
+    "High-level navigation graph filtered by app ID.",
+    "application/json",
+    async params => {
+      const appId = params.appId ? decodeURIComponent(params.appId).trim() : undefined;
+      return getNavigationGraphResource(appId);
+    }
   );
 
   ResourceRegistry.register(
@@ -284,6 +376,24 @@ export function registerNavigationResources(options: {
         );
       }
       return getNavigationNodeByScreenResource(screenName);
+    }
+  );
+
+  ResourceRegistry.registerTemplate(
+    NAVIGATION_RESOURCE_URIS.NODE_SCREENSHOT,
+    "Navigation Node Screenshot",
+    "Screenshot thumbnail for a navigation graph node (WebP image).",
+    "image/webp",
+    async params => {
+      const nodeId = Number(params.nodeId);
+      if (!Number.isFinite(nodeId)) {
+        return {
+          uri: `automobile:navigation/nodes/${params.nodeId}/screenshot`,
+          mimeType: "application/json",
+          text: JSON.stringify({ error: `Invalid node id: ${params.nodeId}` }, null, 2)
+        };
+      }
+      return getNavigationNodeScreenshotResource(nodeId);
     }
   );
 

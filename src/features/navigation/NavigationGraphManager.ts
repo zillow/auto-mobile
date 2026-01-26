@@ -70,7 +70,7 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
   private testCoverageRepository: TestCoverageRepository;
   private currentAppId: string | null = null;
   private currentScreen: string | null = null;
-  private graphUpdateListener?: () => void;
+  private graphUpdateListeners: Array<() => void | Promise<void>> = [];
 
   // Tool call history kept in memory for correlation (transient data)
   private toolCallHistory: ToolCallInteraction[] = [];
@@ -420,6 +420,7 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
 
     this.currentScreen = screenName;
     await this.repository.touchApp(this.currentAppId);
+    this.notifyGraphUpdated();
   }
 
   /**
@@ -1002,9 +1003,19 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
 
   /**
    * Export a high-level graph summary for MCP resources.
+   * Uses the current app if no appId is specified.
    */
   public async exportGraphSummary(): Promise<NavigationGraphSummary> {
-    if (!this.currentAppId) {
+    return this.exportGraphSummaryForApp(this.currentAppId);
+  }
+
+  /**
+   * Export a high-level graph summary for a specific app.
+   * Edges are aggregated by (from, to, toolName) with traversal counts.
+   * @param appId The app ID to export the graph for, or null for empty graph.
+   */
+  public async exportGraphSummaryForApp(appId: string | null): Promise<NavigationGraphSummary> {
+    if (!appId) {
       return {
         appId: null,
         nodes: [],
@@ -1013,27 +1024,54 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
       };
     }
 
-    const dbNodes = await this.repository.getNodes(this.currentAppId);
-    const dbEdges = await this.repository.getEdges(this.currentAppId);
+    const dbNodes = await this.repository.getNodes(appId);
+    const dbEdges = await this.repository.getEdges(appId);
 
     const nodes: NavigationGraphSummaryNode[] = dbNodes.map(node => ({
       id: node.id,
       screenName: node.screen_name,
       visitCount: node.visit_count,
+      // Include screenshot path as resource URI if available
+      screenshotPath: node.screenshot_path
+        ? `automobile:navigation/nodes/${node.id}/screenshot`
+        : null,
     }));
 
-    const edges: NavigationGraphSummaryEdge[] = dbEdges.map(edge => ({
-      id: edge.id,
-      from: edge.from_screen,
-      to: edge.to_screen,
-      toolName: edge.tool_name,
+    // Aggregate edges by (from, to, toolName) to get unique transitions with counts
+    const edgeAggregation = new Map<string, { id: number; from: string; to: string; toolName: string | null; count: number }>();
+
+    for (const edge of dbEdges) {
+      const key = `${edge.from_screen}|${edge.to_screen}|${edge.tool_name ?? ""}`;
+      const existing = edgeAggregation.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        edgeAggregation.set(key, {
+          id: edge.id, // Use first edge's ID as representative
+          from: edge.from_screen,
+          to: edge.to_screen,
+          toolName: edge.tool_name,
+          count: 1,
+        });
+      }
+    }
+
+    const edges: NavigationGraphSummaryEdge[] = Array.from(edgeAggregation.values()).map(agg => ({
+      id: agg.id,
+      from: agg.from,
+      to: agg.to,
+      toolName: agg.toolName,
+      traversalCount: agg.count,
     }));
+
+    // Only include currentScreen if this is the currently active app
+    const isCurrentApp = appId === this.currentAppId;
 
     return {
-      appId: this.currentAppId,
+      appId,
       nodes,
       edges,
-      currentScreen: this.currentScreen,
+      currentScreen: isCurrentApp ? this.currentScreen : null,
     };
   }
 
@@ -1134,15 +1172,40 @@ export class NavigationGraphManager implements NavigationGraph, NavigationGraphS
   }
 
   /**
-   * Register a listener for graph update notifications.
+   * Update the screenshot path for a navigation node.
+   * Called after async screenshot capture completes.
    */
-  public setGraphUpdateListener(listener: (() => void) | null): void {
-    this.graphUpdateListener = listener ?? undefined;
+  public async updateNodeScreenshot(
+    appId: string,
+    screenName: string,
+    screenshotPath: string | null
+  ): Promise<void> {
+    await this.repository.updateNodeScreenshot(appId, screenName, screenshotPath);
+    logger.debug(`[NAVIGATION_GRAPH] Updated screenshot for ${screenName}: ${screenshotPath}`);
+    this.notifyGraphUpdated();
+  }
+
+  /**
+   * Register a listener for graph update notifications.
+   * The listener can be async - it will be called without awaiting.
+   * Multiple listeners can be registered; passing null removes all listeners.
+   */
+  public setGraphUpdateListener(listener: (() => void | Promise<void>) | null): void {
+    if (listener === null) {
+      this.graphUpdateListeners = [];
+    } else {
+      this.graphUpdateListeners.push(listener);
+    }
   }
 
   private notifyGraphUpdated(): void {
-    if (this.graphUpdateListener) {
-      this.graphUpdateListener();
+    logger.info(`[NAVIGATION_GRAPH] notifyGraphUpdated called, ${this.graphUpdateListeners.length} listeners`);
+    for (const listener of this.graphUpdateListeners) {
+      try {
+        listener();
+      } catch (error) {
+        logger.warn(`[NAVIGATION_GRAPH] Listener error: ${error}`);
+      }
     }
   }
 

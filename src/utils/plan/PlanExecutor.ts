@@ -107,8 +107,9 @@ export class DefaultPlanExecutor implements PlanExecutor {
   ): Promise<PlanExecutionResult> {
     let executedSteps = 0;
     const debugMode = isDebugModeEnabled();
-    const startTime = debugMode ? Date.now() : 0;
-    const debugSteps: ExecutePlanStepDebugInfo[] = debugMode ? [] : [];
+    const startTime = Date.now();
+    // Always capture step data for test recording, not just in debug mode
+    const debugSteps: ExecutePlanStepDebugInfo[] = [];
 
     try {
       // Validate and normalize startStep
@@ -142,16 +143,14 @@ export class DefaultPlanExecutor implements PlanExecutor {
         if (!tool) {
           logger.info(`Could not find tool: ${step.tool}`);
 
-          if (debugMode) {
-            debugSteps.push({
-              step: `Execute step ${i + 1}: ${step.tool}`,
-              status: "failed",
-              durationMs: Date.now() - stepStartTime,
-              details: {
-                error: `Unknown tool: ${step.tool}`
-              }
-            });
-          }
+          debugSteps.push({
+            step: `Execute step ${i + 1}: ${step.tool}`,
+            status: "failed",
+            durationMs: Date.now() - stepStartTime,
+            details: {
+              error: `Unknown tool: ${step.tool}`
+            }
+          });
 
           return {
             success: false,
@@ -162,12 +161,10 @@ export class DefaultPlanExecutor implements PlanExecutor {
               tool: step.tool,
               error: `Unknown tool: ${step.tool}`
             },
-            ...(debugMode ? {
-              debug: {
-                executionTimeMs: Date.now() - startTime,
-                steps: debugSteps
-              }
-            } : {})
+            debug: {
+              executionTimeMs: Date.now() - startTime,
+              steps: debugSteps
+            }
           };
         }
 
@@ -211,19 +208,17 @@ export class DefaultPlanExecutor implements PlanExecutor {
           // Check if the response indicates failure
           if (response && typeof response === "object" && "success" in response && response.success === false) {
             logger.error(`[PLAN_STEP_${i + 1}] FAILED: ${step.tool} - ${response.error || "Unknown error"}`);
-            if (debugMode) {
-              debugSteps.push({
-                step: `Execute step ${i + 1}: ${step.tool}`,
-                status: "failed",
-                durationMs: Date.now() - stepStartTime,
-                details: {
-                  params: step.params,
-                  error: "error" in response ? String(response.error) : "Tool execution failed",
-                  // Include debug info from tool response if available
-                  ...(response.debug ? { toolDebug: response.debug } : {})
-                }
-              });
-            }
+            debugSteps.push({
+              step: `Execute step ${i + 1}: ${step.tool}`,
+              status: "failed",
+              durationMs: Date.now() - stepStartTime,
+              details: {
+                params: step.params,
+                error: "error" in response ? String(response.error) : "Tool execution failed",
+                // Include debug info from tool response if available
+                ...(response.debug ? { toolDebug: response.debug } : {})
+              }
+            });
 
             return {
               success: false,
@@ -234,41 +229,35 @@ export class DefaultPlanExecutor implements PlanExecutor {
                 tool: step.tool,
                 error: "error" in response ? String(response.error) : "Tool execution failed"
               },
-              ...(debugMode ? {
-                debug: {
-                  executionTimeMs: Date.now() - startTime,
-                  steps: debugSteps
-                }
-              } : {})
+              debug: {
+                executionTimeMs: Date.now() - startTime,
+                steps: debugSteps
+              }
             };
           }
 
-          if (debugMode) {
-            debugSteps.push({
-              step: `Execute step ${i + 1}: ${step.tool}`,
-              status: "completed",
-              durationMs: Date.now() - stepStartTime,
-              details: {
-                params: step.params
-              }
-            });
-          }
+          debugSteps.push({
+            step: `Execute step ${i + 1}: ${step.tool}`,
+            status: "completed",
+            durationMs: Date.now() - stepStartTime,
+            details: {
+              params: step.params
+            }
+          });
 
           executedSteps++;
           logger.info(`[PLAN_STEP_${i + 1}] Successfully completed. Total executed: ${executedSteps}/${plan.steps.length}`);
         } catch (error) {
           logger.error(`[PLAN_STEP_${i + 1}] EXCEPTION in ${step.tool}: ${error}`);
-          if (debugMode) {
-            debugSteps.push({
-              step: `Execute step ${i + 1}: ${step.tool}`,
-              status: "failed",
-              durationMs: Date.now() - stepStartTime,
-              details: {
-                params: step.params,
-                error: `${error}`
-              }
-            });
-          }
+          debugSteps.push({
+            step: `Execute step ${i + 1}: ${step.tool}`,
+            status: "failed",
+            durationMs: Date.now() - stepStartTime,
+            details: {
+              params: step.params,
+              error: `${error}`
+            }
+          });
 
           return {
             success: false,
@@ -279,12 +268,10 @@ export class DefaultPlanExecutor implements PlanExecutor {
               tool: step.tool,
               error: `${error}`
             },
-            ...(debugMode ? {
-              debug: {
-                executionTimeMs: Date.now() - startTime,
-                steps: debugSteps
-              }
-            } : {})
+            debug: {
+              executionTimeMs: Date.now() - startTime,
+              steps: debugSteps
+            }
           };
         }
       }
@@ -294,27 +281,23 @@ export class DefaultPlanExecutor implements PlanExecutor {
         success: true,
         executedSteps,
         totalSteps: plan.steps.length,
-        ...(debugMode ? {
-          debug: {
-            executionTimeMs: Date.now() - startTime,
-            steps: debugSteps
-          }
-        } : {})
+        debug: {
+          executionTimeMs: Date.now() - startTime,
+          steps: debugSteps
+        }
       };
 
     } catch (error) {
       logger.error(`Plan execution failed: ${error}`);
 
-      if (debugMode) {
-        debugSteps.push({
-          step: "Plan execution error",
-          status: "failed",
-          durationMs: Date.now() - startTime,
-          details: {
-            error: `${error}`
-          }
-        });
-      }
+      debugSteps.push({
+        step: "Plan execution error",
+        status: "failed",
+        durationMs: Date.now() - startTime,
+        details: {
+          error: `${error}`
+        }
+      });
 
       return {
         success: false,
@@ -325,12 +308,10 @@ export class DefaultPlanExecutor implements PlanExecutor {
           tool: "unknown",
           error: `${error}`
         },
-        ...(debugMode ? {
-          debug: {
-            executionTimeMs: Date.now() - startTime,
-            steps: debugSteps
-          }
-        } : {})
+        debug: {
+          executionTimeMs: Date.now() - startTime,
+          steps: debugSteps
+        }
       };
     }
   }

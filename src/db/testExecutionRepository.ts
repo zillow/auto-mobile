@@ -1,6 +1,6 @@
 import { sql } from "kysely";
 import { getDatabase } from "./database";
-import type { NewTestExecution } from "./types";
+import type { NewTestExecution, NewTestExecutionStep, NewTestExecutionScreen } from "./types";
 import { logger } from "../utils/logger";
 
 export const TEST_EXECUTION_RETENTION_MAX_ROWS = 10_000;
@@ -10,6 +10,18 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 let cleanupInProgress = false;
 
 export type TestExecutionStatus = "passed" | "failed" | "skipped";
+
+export interface TestStepRecord {
+  stepIndex: number;
+  action: string;
+  target?: string | null;
+  status: "completed" | "failed" | "skipped";
+  durationMs: number;
+  screenName?: string | null;
+  screenshotPath?: string | null;
+  errorMessage?: string | null;
+  details?: unknown;
+}
 
 export interface TestExecutionRecord {
   testClass: string;
@@ -29,6 +41,11 @@ export interface TestExecutionRecord {
   gradleVersion?: string | null;
   isCi?: boolean | null;
   sessionUuid?: string | null;
+  errorMessage?: string | null;
+  videoPath?: string | null;
+  snapshotPath?: string | null;
+  steps?: TestStepRecord[];
+  screensVisited?: Array<{ screenName: string; timestamp: number }>;
 }
 
 export interface TestTimingQueryOptions {
@@ -65,8 +82,45 @@ export interface TestTimingStats {
   stdDevDurationMs: number;
 }
 
+export interface TestRunStep {
+  id: number;
+  stepIndex: number;
+  action: string;
+  target: string | null;
+  status: "completed" | "failed" | "skipped";
+  durationMs: number;
+  screenName: string | null;
+  screenshotPath: string | null;
+  errorMessage: string | null;
+}
+
+export interface TestRun {
+  id: number;
+  testClass: string;
+  testMethod: string;
+  status: TestExecutionStatus;
+  startTime: number;
+  durationMs: number;
+  deviceId: string | null;
+  deviceName: string | null;
+  platform: "android" | "ios" | null;
+  errorMessage: string | null;
+  videoPath: string | null;
+  snapshotPath: string | null;
+  steps: TestRunStep[];
+  screensVisited: string[];
+}
+
+export interface TestRunQueryOptions {
+  testClass?: string;
+  testMethod?: string;
+  lookbackDays?: number;
+  limit?: number;
+  orderDirection?: "asc" | "desc";
+}
+
 export class TestExecutionRepository {
-  async recordExecution(record: TestExecutionRecord): Promise<void> {
+  async recordExecution(record: TestExecutionRecord): Promise<number> {
     const db = getDatabase();
 
     const entry: NewTestExecution = {
@@ -87,11 +141,146 @@ export class TestExecutionRepository {
       gradle_version: record.gradleVersion ?? null,
       is_ci: record.isCi === null || record.isCi === undefined ? null : record.isCi ? 1 : 0,
       session_uuid: record.sessionUuid ?? null,
+      error_message: record.errorMessage ?? null,
+      video_path: record.videoPath ?? null,
+      snapshot_path: record.snapshotPath ?? null,
     };
 
-    await db.insertInto("test_executions").values(entry).execute();
+    const result = await db.insertInto("test_executions").values(entry).executeTakeFirst();
+    const executionId = Number(result.insertId);
+
+    // Record steps if provided
+    if (record.steps && record.steps.length > 0) {
+      const stepEntries: NewTestExecutionStep[] = record.steps.map(step => ({
+        execution_id: executionId,
+        step_index: step.stepIndex,
+        action: step.action,
+        target: step.target ?? null,
+        status: step.status,
+        duration_ms: Math.max(0, Math.round(step.durationMs)),
+        screen_name: step.screenName ?? null,
+        screenshot_path: step.screenshotPath ?? null,
+        error_message: step.errorMessage ?? null,
+        details_json: step.details ? JSON.stringify(step.details) : null,
+      }));
+
+      await db.insertInto("test_execution_steps").values(stepEntries).execute();
+    }
+
+    // Record screens visited if provided
+    if (record.screensVisited && record.screensVisited.length > 0) {
+      const screenEntries: NewTestExecutionScreen[] = record.screensVisited.map((screen, index) => ({
+        execution_id: executionId,
+        screen_name: screen.screenName,
+        visit_order: index,
+        timestamp: screen.timestamp,
+      }));
+
+      await db.insertInto("test_execution_screens").values(screenEntries).execute();
+    }
 
     await this.cleanupRetention();
+    return executionId;
+  }
+
+  async getTestRuns(options: TestRunQueryOptions = {}): Promise<TestRun[]> {
+    const db = getDatabase();
+
+    let query = db
+      .selectFrom("test_executions")
+      .select([
+        "id",
+        "test_class as testClass",
+        "test_method as testMethod",
+        "status",
+        "timestamp as startTime",
+        "duration_ms as durationMs",
+        "device_id as deviceId",
+        "device_name as deviceName",
+        "device_platform as platform",
+        "error_message as errorMessage",
+        "video_path as videoPath",
+        "snapshot_path as snapshotPath",
+      ]);
+
+    if (options.lookbackDays && options.lookbackDays > 0) {
+      const cutoff = Date.now() - options.lookbackDays * MS_PER_DAY;
+      query = query.where("timestamp", ">=", cutoff);
+    }
+
+    if (options.testClass) {
+      query = query.where("test_class", "=", options.testClass);
+    }
+
+    if (options.testMethod) {
+      query = query.where("test_method", "=", options.testMethod);
+    }
+
+    const orderDirection = options.orderDirection ?? "desc";
+    query = query.orderBy("timestamp", orderDirection);
+
+    if (options.limit && options.limit > 0) {
+      query = query.limit(options.limit);
+    }
+
+    const executions = await query.execute();
+
+    // Fetch steps and screens for each execution
+    const runs: TestRun[] = [];
+    for (const exec of executions) {
+      const steps = await db
+        .selectFrom("test_execution_steps")
+        .select([
+          "id",
+          "step_index as stepIndex",
+          "action",
+          "target",
+          "status",
+          "duration_ms as durationMs",
+          "screen_name as screenName",
+          "screenshot_path as screenshotPath",
+          "error_message as errorMessage",
+        ])
+        .where("execution_id", "=", exec.id)
+        .orderBy("step_index", "asc")
+        .execute();
+
+      const screens = await db
+        .selectFrom("test_execution_screens")
+        .select(["screen_name as screenName"])
+        .where("execution_id", "=", exec.id)
+        .orderBy("visit_order", "asc")
+        .execute();
+
+      runs.push({
+        id: exec.id,
+        testClass: exec.testClass,
+        testMethod: exec.testMethod,
+        status: exec.status as TestExecutionStatus,
+        startTime: exec.startTime,
+        durationMs: exec.durationMs,
+        deviceId: exec.deviceId,
+        deviceName: exec.deviceName,
+        platform: exec.platform as "android" | "ios" | null,
+        errorMessage: exec.errorMessage,
+        videoPath: exec.videoPath,
+        snapshotPath: exec.snapshotPath,
+        steps: steps.map(s => ({
+          id: s.id,
+          stepIndex: s.stepIndex,
+          action: s.action,
+          target: s.target,
+          status: s.status as "completed" | "failed" | "skipped",
+          durationMs: s.durationMs,
+          screenName: s.screenName,
+          screenshotPath: s.screenshotPath,
+          errorMessage: s.errorMessage,
+        })),
+        screensVisited: screens.map(s => s.screenName),
+      });
+    }
+
+    return runs;
   }
 
   private async cleanupRetention(): Promise<void> {

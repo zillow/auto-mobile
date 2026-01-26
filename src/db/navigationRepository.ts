@@ -710,6 +710,42 @@ export class NavigationRepository {
   }
 
   /**
+   * Update the screenshot path for a navigation node.
+   */
+  async updateNodeScreenshot(
+    appId: string,
+    screenName: string,
+    screenshotPath: string | null
+  ): Promise<void> {
+    const db = getDatabase();
+    await db
+      .updateTable("navigation_nodes")
+      .set({ screenshot_path: screenshotPath })
+      .where("app_id", "=", appId)
+      .where("screen_name", "=", screenName)
+      .execute();
+
+    logger.debug(`[NAV_REPO] Updated screenshot for ${screenName}: ${screenshotPath}`);
+  }
+
+  /**
+   * Update the screenshot path for a navigation node by node ID.
+   */
+  async updateNodeScreenshotById(
+    nodeId: number,
+    screenshotPath: string | null
+  ): Promise<void> {
+    const db = getDatabase();
+    await db
+      .updateTable("navigation_nodes")
+      .set({ screenshot_path: screenshotPath })
+      .where("id", "=", nodeId)
+      .execute();
+
+    logger.debug(`[NAV_REPO] Updated screenshot for node ${nodeId}: ${screenshotPath}`);
+  }
+
+  /**
    * Clear only nodes and edges for an app, keeping the app record.
    * Useful for tests that want to reset graph state without losing the app.
    */

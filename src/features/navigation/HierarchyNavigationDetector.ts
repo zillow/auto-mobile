@@ -27,6 +27,16 @@ export interface HierarchyNavigationUpdateMetrics {
   fingerprintMs?: number;
 }
 
+/**
+ * Callback invoked when hierarchy-based navigation is detected.
+ * Can be used to trigger screenshot capture from the owning service.
+ */
+export type HierarchyNavigationCallback = (info: {
+  packageName: string | null;
+  screenFingerprint: string;
+  timestamp: number;
+}) => void;
+
 const DEFAULT_OPTIONS: Required<Omit<HierarchyNavigationDetectorOptions, "timer">> & { timer: Timer } = {
   debounceMs: 100,
   stabilityTimeoutMs: 5000,
@@ -66,6 +76,8 @@ export class HierarchyNavigationDetector {
   private stabilityTimeoutTimer: NodeJS.Timeout | null = null;
   /** Last recorded performance metrics for debugging */
   private lastUpdateMetrics: HierarchyNavigationUpdateMetrics | null = null;
+  /** Callback for navigation events (used for screenshot capture) */
+  private navigationCallback: HierarchyNavigationCallback | null = null;
 
   constructor(
     navigationManager: NavigationGraphManager,
@@ -216,6 +228,27 @@ export class HierarchyNavigationDetector {
       .catch(error => {
         logger.error(`[HIERARCHY_NAV] Failed to record navigation: ${error}`);
       });
+
+    // Invoke callback (e.g., for screenshot capture)
+    if (this.navigationCallback) {
+      try {
+        this.navigationCallback({
+          packageName: newFingerprint.packageName,
+          screenFingerprint: toFingerprint,
+          timestamp: newFingerprint.timestamp,
+        });
+      } catch (error) {
+        logger.warn(`[HIERARCHY_NAV] Navigation callback error: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Register a callback to be invoked when navigation is detected.
+   * Used by AccessibilityServiceClient to trigger screenshot capture.
+   */
+  public setNavigationCallback(callback: HierarchyNavigationCallback | null): void {
+    this.navigationCallback = callback;
   }
 
   /**

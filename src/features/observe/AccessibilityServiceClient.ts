@@ -21,12 +21,20 @@ import { AndroidAccessibilityServiceManager } from "../../utils/AccessibilitySer
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { Timer, defaultTimer } from "../../utils/SystemTimer";
 import { NavigationGraphManager, NavigationEvent } from "../navigation/NavigationGraphManager";
+import { NavigationScreenshotManager } from "../navigation/NavigationScreenshotManager";
 import { HierarchyNavigationDetector } from "../navigation/HierarchyNavigationDetector";
 import { throwIfAborted } from "../../utils/toolUtils";
 import { ElementParser } from "../utility/ElementParser";
 import { InstalledAppsRepository, InstalledAppsStore } from "../../db/installedAppsRepository";
 import { PortManager } from "../../utils/PortManager";
 import { RequestManager } from "../../utils/RequestManager";
+import { getObservationStreamServer } from "../../daemon/observationStreamSocketServer";
+import {
+  ScreenshotBackoffScheduler,
+  DefaultScreenshotBackoffScheduler,
+  ScreenshotCaptureResult,
+  computeChecksum,
+} from "./ScreenshotBackoffScheduler";
 
 /**
  * Generate a cryptographically secure random suffix for request IDs.
@@ -791,6 +799,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
   // Track apps that emit SDK navigation events so we can avoid overriding screen names
   private sdkNavigationAppIds: Set<string> = new Set();
 
+  // Screenshot backoff scheduler for streaming screenshots after hierarchy updates
+  private screenshotBackoffScheduler: ScreenshotBackoffScheduler | null = null;
+  private cachedScreenDimensions: { width: number; height: number } | null = null;
+
   /**
    * Private constructor - use getInstance() instead
    * @param device - The booted device
@@ -876,6 +888,24 @@ export class AccessibilityServiceClient implements AccessibilityService {
         NavigationGraphManager.getInstance(),
         { timer: this.timer }
       );
+
+      // Wire up screenshot capture for hierarchy-based navigation
+      this.hierarchyNavigationDetector.setNavigationCallback(info => {
+        if (info.packageName && info.screenFingerprint) {
+          const appId = info.packageName;
+          const screenName = `screen_${info.screenFingerprint.substring(0, 12)}`;
+          NavigationScreenshotManager.getInstance()
+            .captureAndStore(this.device, this.adb, appId, screenName)
+            .then(screenshotPath => {
+              if (screenshotPath) {
+                NavigationGraphManager.getInstance()
+                  .updateNodeScreenshot(appId, screenName, screenshotPath)
+                  .catch(err => logger.warn(`[ACCESSIBILITY_SERVICE] Failed to update hierarchy screenshot: ${err}`));
+              }
+            })
+            .catch(err => logger.debug(`[ACCESSIBILITY_SERVICE] Hierarchy screenshot capture skipped: ${err}`));
+        }
+      });
     }
     return this.hierarchyNavigationDetector;
   }
@@ -1317,6 +1347,17 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
         logger.debug(`[ACCESSIBILITY_SERVICE] Cached fresh hierarchy (updatedAt: ${message.data.updatedAt})`);
 
+        // Update cached screen dimensions from hierarchy windows
+        this.updateCachedScreenDimensions(message.data);
+
+        // Push update to observation stream for IDE plugins
+        this.pushHierarchyToObservationStream(message.data);
+
+        // Start screenshot backoff sequence to capture the settled screen state
+        // Takes screenshots at t=0, 100, 300, 500, 800, 1300 ms
+        // Skips duplicates and cancels on new activity
+        this.startScreenshotBackoff();
+
         // Notify hierarchy navigation detector for view hierarchy-based navigation detection
         if (!message.data.hierarchy) {
           logger.warn("[ACCESSIBILITY_SERVICE] Skipping navigation detection: hierarchy missing in update");
@@ -1335,6 +1376,10 @@ export class AccessibilityServiceClient implements AccessibilityService {
 
         // Extract data from the message - it may be nested under 'data' key or directly on message
         const base64Data = (message as any).data as string;
+
+        // Push screenshot to observation stream for IDE plugins
+        this.pushScreenshotToObservationStream(base64Data);
+
         this.requestManager.resolve<ScreenshotResult>(message.requestId, {
           success: true,
           data: base64Data,
@@ -1688,6 +1733,22 @@ export class AccessibilityServiceClient implements AccessibilityService {
             `(source: ${event.source}, app: ${event.applicationId || "unknown"}, timestamp: ${event.timestamp})`
           );
           await NavigationGraphManager.getInstance().recordNavigationEvent(event);
+
+          // Fire-and-forget screenshot capture for navigation graph thumbnails
+          if (event.applicationId && event.destination) {
+            const appId = event.applicationId;
+            const screenName = event.destination;
+            NavigationScreenshotManager.getInstance()
+              .captureAndStore(this.device, this.adb, appId, screenName)
+              .then(screenshotPath => {
+                if (screenshotPath) {
+                  NavigationGraphManager.getInstance()
+                    .updateNodeScreenshot(appId, screenName, screenshotPath)
+                    .catch(err => logger.warn(`[ACCESSIBILITY_SERVICE] Failed to update screenshot: ${err}`));
+                }
+              })
+              .catch(err => logger.debug(`[ACCESSIBILITY_SERVICE] Screenshot capture skipped: ${err}`));
+          }
         }
       }
 
@@ -1727,6 +1788,179 @@ export class AccessibilityServiceClient implements AccessibilityService {
       return true;
     }
     return !this.sdkNavigationAppIds.has(packageName);
+  }
+
+  /**
+   * Push hierarchy update to observation stream for IDE plugins.
+   */
+  private pushHierarchyToObservationStream(hierarchy: ViewHierarchyResult): void {
+    const server = getObservationStreamServer();
+    if (!server) {
+      logger.debug(`[ACCESSIBILITY_SERVICE] No observation stream server available for hierarchy push`);
+      return;
+    }
+
+    try {
+      const subscriberCount = server.getSubscriberCount();
+      logger.info(`[ACCESSIBILITY_SERVICE] Pushing hierarchy to observation stream (${subscriberCount} subscribers)`);
+      server.pushHierarchyUpdate(this.device.deviceId, hierarchy);
+    } catch (error) {
+      logger.warn(`[ACCESSIBILITY_SERVICE] Failed to push hierarchy to observation stream: ${error}`);
+    }
+  }
+
+  /**
+   * Push screenshot update to observation stream for IDE plugins.
+   */
+  private pushScreenshotToObservationStream(screenshotBase64: string): void {
+    const server = getObservationStreamServer();
+    if (!server) {
+      return;
+    }
+
+    // Use cached screen dimensions if available, otherwise use defaults
+    const screenWidth = this.cachedScreenDimensions?.width ?? 1080;
+    const screenHeight = this.cachedScreenDimensions?.height ?? 2340;
+
+    try {
+      server.pushScreenshotUpdate(this.device.deviceId, screenshotBase64, screenWidth, screenHeight);
+    } catch (error) {
+      logger.debug(`[ACCESSIBILITY_SERVICE] Failed to push screenshot to observation stream: ${error}`);
+    }
+  }
+
+  /**
+   * Get or create the screenshot backoff scheduler.
+   * Created lazily to ensure dependencies are ready.
+   */
+  private getScreenshotBackoffScheduler(): ScreenshotBackoffScheduler {
+    if (!this.screenshotBackoffScheduler) {
+      this.screenshotBackoffScheduler = new DefaultScreenshotBackoffScheduler(
+        // Capture callback
+        async (): Promise<ScreenshotCaptureResult> => {
+          return this.captureScreenshotForBackoff();
+        },
+        // Emit callback
+        (data: string) => {
+          this.pushScreenshotToObservationStream(data);
+        },
+        // Config with backoff intervals
+        { intervals: [0, 100, 300, 500, 800, 1300] },
+        this.timer
+      );
+    }
+    return this.screenshotBackoffScheduler;
+  }
+
+  /**
+   * Capture a screenshot for the backoff scheduler.
+   * Returns the result with checksum for duplicate detection.
+   */
+  private async captureScreenshotForBackoff(): Promise<ScreenshotCaptureResult> {
+    // Check if WebSocket is connected
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return { success: false, error: "WebSocket not connected" };
+    }
+
+    // Check if there are any subscribers
+    const server = getObservationStreamServer();
+    if (!server || server.getSubscriberCount() === 0) {
+      return { success: false, error: "No subscribers" };
+    }
+
+    // Request screenshot via WebSocket
+    const requestId = this.requestManager.generateId("screenshot-backoff");
+    const message = JSON.stringify({ type: "request_screenshot", requestId });
+
+    try {
+      // Register the request with timeout
+      const screenshotPromise = this.requestManager.register<ScreenshotResult>(
+        requestId,
+        "screenshot",
+        3000, // 3 second timeout
+        (_id, _type, _timeout) => ({ success: false, error: "Screenshot timeout" })
+      );
+
+      this.ws.send(message);
+      logger.debug(`[ACCESSIBILITY_SERVICE] Sent backoff screenshot request (requestId: ${requestId})`);
+
+      const result = await screenshotPromise;
+
+      if (!result.success || !result.data) {
+        return { success: false, error: result.error || "No data" };
+      }
+
+      // Compute checksum for duplicate detection
+      const checksum = computeChecksum(result.data);
+
+      return {
+        success: true,
+        data: result.data,
+        checksum,
+      };
+    } catch (error) {
+      return { success: false, error: `${error}` };
+    }
+  }
+
+  /**
+   * Start screenshot backoff sequence for the observation stream.
+   * Captures screenshots at backoff intervals (t=0, 100, 300, 500, 800, 1300 ms).
+   * Skips duplicates and cancels on new activity.
+   */
+  private startScreenshotBackoff(): void {
+    // Check if there are any subscribers before starting
+    const server = getObservationStreamServer();
+    if (!server || server.getSubscriberCount() === 0) {
+      logger.debug(`[ACCESSIBILITY_SERVICE] No observation stream subscribers, skipping screenshot backoff`);
+      return;
+    }
+
+    const scheduler = this.getScreenshotBackoffScheduler();
+    scheduler.startBackoffSequence();
+  }
+
+  /**
+   * Cancel any pending screenshot backoff captures.
+   * Called when new activity occurs that will likely change the screen.
+   */
+  cancelScreenshotBackoff(): void {
+    if (this.screenshotBackoffScheduler) {
+      this.screenshotBackoffScheduler.cancelPendingCaptures();
+    }
+  }
+
+  /**
+   * Update cached screen dimensions from hierarchy windows.
+   * Extracts the largest window bounds as the screen dimensions.
+   */
+  private updateCachedScreenDimensions(hierarchy: ViewHierarchyResult): void {
+    const windows = hierarchy.windows;
+    if (!windows || windows.length === 0) {
+      return;
+    }
+
+    // Find the largest window bounds (likely the main screen)
+    let maxArea = 0;
+    let bestDimensions: { width: number; height: number } | null = null;
+
+    for (const window of windows) {
+      if (window.bounds) {
+        const width = window.bounds.right - window.bounds.left;
+        const height = window.bounds.bottom - window.bounds.top;
+        const area = width * height;
+        if (area > maxArea) {
+          maxArea = area;
+          bestDimensions = { width, height };
+        }
+      }
+    }
+
+    if (bestDimensions && (bestDimensions.width !== this.cachedScreenDimensions?.width ||
+        bestDimensions.height !== this.cachedScreenDimensions?.height)) {
+      this.cachedScreenDimensions = bestDimensions;
+      logger.debug(`[ACCESSIBILITY_SERVICE] Updated cached screen dimensions: ${bestDimensions.width}x${bestDimensions.height}`);
+    }
   }
 
   /**
@@ -2570,6 +2804,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   ): Promise<A11ySwipeResult> {
     const startTime = Date.now();
 
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
+
     try {
       // Ensure WebSocket connection is established
       const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
@@ -2656,6 +2893,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yTapCoordinatesResult> {
     const startTime = Date.now();
+
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
 
     try {
       // Ensure WebSocket connection is established
@@ -2747,6 +2987,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySwipeResult> {
     const startTime = Date.now();
+
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
 
     try {
       // Ensure WebSocket connection is established
@@ -2847,6 +3090,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   ): Promise<A11yDragResult> {
     const startTime = Date.now();
 
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
+
     try {
       const connected = await this.connectWebSocket();
       if (!connected) {
@@ -2927,6 +3173,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yPinchResult> {
     const startTime = Date.now();
+
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
 
     try {
       const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
@@ -3016,6 +3265,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11ySetTextResult> {
     const startTime = Date.now();
+
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
 
     try {
       // Ensure WebSocket connection is established
@@ -3127,6 +3379,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   ): Promise<A11yImeActionResult> {
     const startTime = Date.now();
 
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
+
     try {
       // Ensure WebSocket connection is established
       const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
@@ -3215,6 +3470,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
   ): Promise<A11ySelectAllResult> {
     const startTime = Date.now();
 
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
+
     try {
       // Ensure WebSocket connection is established
       const connected = await perf.track("ensureConnection", () => this.connectWebSocket(perf));
@@ -3300,6 +3558,9 @@ export class AccessibilityServiceClient implements AccessibilityService {
     perf: PerformanceTracker = new NoOpPerformanceTracker()
   ): Promise<A11yActionResult> {
     const startTime = Date.now();
+
+    // Cancel any pending screenshot backoff - new action will change the screen
+    this.cancelScreenshotBackoff();
 
     try {
       // Ensure WebSocket connection is established

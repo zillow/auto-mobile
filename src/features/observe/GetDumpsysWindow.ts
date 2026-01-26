@@ -2,8 +2,8 @@ import { AdbClient } from "../../utils/android-cmdline-tools/AdbClient";
 import { BootedDevice, ExecResult } from "../../models";
 import * as fs from "fs/promises";
 import * as path from "path";
-import * as os from "os";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 
 export class GetDumpsysWindow {
   private adb: AdbClient;
@@ -21,7 +21,7 @@ export class GetDumpsysWindow {
   constructor(device: BootedDevice, adb: AdbClient | null = null) {
     this.device = device;
     this.adb = adb || new AdbClient(device);
-    this.cacheDir = path.join(os.tmpdir(), "auto-mobile-cache");
+    this.cacheDir = getTempDir(TEMP_SUBDIRS.CACHE);
     this.cacheFilePath = path.join(this.cacheDir, `dumpsys-window-${device.deviceId}.json`);
   }
 

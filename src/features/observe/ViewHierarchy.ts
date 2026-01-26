@@ -18,6 +18,7 @@ import { XCTestServiceClient } from "./XCTestServiceClient";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
 import { serverConfig } from "../../utils/ServerConfig";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
+import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 
 /**
  * Interface for element bounds
@@ -36,8 +37,8 @@ export class ViewHierarchy {
   private elementUtils: ElementUtils;
   private accessibilityServiceClient: AccessibilityServiceClient;
   private static viewHierarchyCache: Map<string, ViewHierarchyCache> = new Map();
-  private static cacheDir: string = path.join("/tmp/auto-mobile", "view_hierarchy");
-  private static screenshotCacheDir: string = path.join("/tmp/auto-mobile", "screenshots");
+  private static cacheDir: string = getTempDir(TEMP_SUBDIRS.VIEW_HIERARCHY);
+  private static screenshotCacheDir: string = getTempDir(TEMP_SUBDIRS.SCREENSHOTS);
   private static readonly MAX_CACHE_SIZE_BYTES = 128 * 1024 * 1024; // 128MB
   private static readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 

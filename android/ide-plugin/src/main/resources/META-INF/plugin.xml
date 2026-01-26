@@ -12,6 +12,7 @@
   <depends>org.jetbrains.plugins.yaml</depends>
   <extensions defaultExtensionNs="com.intellij">
     <toolWindow id="AutoMobile" anchor="right" icon="/icons/toolWindow.svg" factoryClass="dev.jasonpearson.automobile.ide.AutoMobileToolWindowFactory"/>
+    <notificationGroup id="AutoMobile" displayType="BALLOON"/>
     <applicationConfigurable id="automobile.settings" displayName="AutoMobile" instance="dev.jasonpearson.automobile.ide.settings.AutoMobileSettingsConfigurable"/>
     <applicationConfigurable id="automobile.featureFlags" parentId="automobile.settings" displayName="Feature Flags" instance="dev.jasonpearson.automobile.ide.settings.FeatureFlagsConfigurable"/>
     <applicationService serviceImplementation="dev.jasonpearson.automobile.ide.settings.AutoMobileSettings"/>

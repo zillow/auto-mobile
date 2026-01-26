@@ -5,12 +5,13 @@ import { importPlanFromYaml, executePlan } from "../utils/planUtils";
 import { logger } from "../utils/logger";
 import { createJSONToolResponse } from "../utils/toolUtils";
 import { Platform } from "../models";
-import { TestExecutionRepository, TestExecutionStatus } from "../db/testExecutionRepository";
+import { TestExecutionRepository, TestExecutionStatus, TestStepRecord } from "../db/testExecutionRepository";
 import { DEVICE_LABEL_DESCRIPTION } from "./toolSchemaHelpers";
 import { registerDeviceLabelMap, buildDeviceLabelMap } from "./deviceLabelMapping";
 import { PlanSchemaValidator } from "../utils/plan/PlanSchemaValidator";
 import { DaemonState } from "../daemon/daemonState";
 import { normalizePlanDevices } from "../utils/plan/PlanDevices";
+import { ExecutePlanStepDebugInfo } from "../models/ExecutePlanResult";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -86,6 +87,47 @@ const getDeviceType = (device: BootedDevice): "emulator" | "simulator" | "device
 };
 
 // Execute plan from YAML file or content
+function convertDebugStepsToRecords(
+  debugSteps: ExecutePlanStepDebugInfo[] | undefined
+): TestStepRecord[] {
+  if (!debugSteps || debugSteps.length === 0) {
+    return [];
+  }
+
+  return debugSteps.map((step, index) => {
+    // Extract tool name from step description like "Execute step N: toolName"
+    const toolMatch = step.step.match(/:\s*(\w+)$/);
+    const action = toolMatch ? toolMatch[1] : step.step;
+
+    // Extract target from details.params if available
+    const details = step.details as { params?: Record<string, unknown>; error?: string } | undefined;
+    const params = details?.params;
+    let target: string | null = null;
+    if (params) {
+      // Try to build a target description from common params
+      if (params.text) {
+        target = `text="${params.text}"`;
+      } else if (params.elementId) {
+        target = `id="${params.elementId}"`;
+      } else if (params.direction) {
+        target = `direction=${params.direction}`;
+      }
+    }
+
+    return {
+      stepIndex: index,
+      action,
+      target,
+      status: step.status,
+      durationMs: step.durationMs,
+      screenName: null, // TODO: Track screen name during execution
+      screenshotPath: null, // TODO: Capture screenshots during execution
+      errorMessage: details?.error ?? null,
+      details: step.details,
+    };
+  });
+}
+
 const executePlanTool = async (device: BootedDevice, params: {
   planContent: string;
   startStep: number;
@@ -102,7 +144,14 @@ const executePlanTool = async (device: BootedDevice, params: {
   cleanupClearAppData?: boolean;
 }, _progress?: unknown, signal?: AbortSignal): Promise<any> => {
   const startTime = Date.now();
-  const recordTestExecution = async (status: TestExecutionStatus, durationMs: number) => {
+  const recordTestExecution = async (
+    status: TestExecutionStatus,
+    durationMs: number,
+    options?: {
+      steps?: TestStepRecord[];
+      errorMessage?: string;
+    }
+  ) => {
     if (!params.testMetadata) {
       return;
     }
@@ -125,6 +174,8 @@ const executePlanTool = async (device: BootedDevice, params: {
         gradleVersion: params.testMetadata.gradleVersion,
         isCi: params.testMetadata.isCi,
         sessionUuid: params.sessionUuid,
+        errorMessage: options?.errorMessage,
+        steps: options?.steps,
       });
     } catch (error) {
       logger.warn(`Failed to record test execution timing: ${error}`);
@@ -305,7 +356,14 @@ const executePlanTool = async (device: BootedDevice, params: {
     const execDuration = Date.now() - perfStart;
     logger.info(`[PERF +${execDuration}ms] Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
 
-    await recordTestExecution(result.success ? "passed" : "failed", Date.now() - startTime);
+    // Capture step data and error message for recording
+    const steps = convertDebugStepsToRecords(result.debug?.steps);
+    const errorMessage = result.failedStep?.error ?? undefined;
+
+    await recordTestExecution(result.success ? "passed" : "failed", Date.now() - startTime, {
+      steps,
+      errorMessage,
+    });
 
     const response: ExecutePlanResult = {
       success: result.success,
@@ -323,7 +381,9 @@ const executePlanTool = async (device: BootedDevice, params: {
   } catch (error) {
     logger.error(`[PERF] Failed to execute plan: ${error}`);
 
-    await recordTestExecution("failed", Date.now() - startTime);
+    await recordTestExecution("failed", Date.now() - startTime, {
+      errorMessage: String(error),
+    });
 
     const response: ExecutePlanResult = {
       success: false,

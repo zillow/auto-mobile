@@ -30,6 +30,7 @@ import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
 import { ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { attachRawViewHierarchy } from "../../utils/viewHierarchySearch";
 import { ElementUtils } from "../utility/ElementUtils";
+import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 
 /**
  * Interface for cached observe result
@@ -56,7 +57,7 @@ export class ObserveScreen {
 
   // Static cache for observe results
   private static observeResultCache: Map<string, ObserveResultCache> = new Map();
-  private static observeResultCacheDir: string = path.join("/tmp/auto-mobile", "observe_results");
+  private static observeResultCacheDir: string = getTempDir(TEMP_SUBDIRS.OBSERVE_RESULTS);
   private static readonly OBSERVE_RESULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   private static latestScreenshotPath: string | null = null;
   private static latestScreenshotError: string | null = null;
@@ -1090,7 +1091,7 @@ export class ObserveScreen {
         }
       }
 
-      const cacheDir = path.join("/tmp/auto-mobile", "screenshots");
+      const cacheDir = getTempDir(TEMP_SUBDIRS.SCREENSHOTS);
       if (!fs.existsSync(cacheDir)) {
         return undefined;
       }

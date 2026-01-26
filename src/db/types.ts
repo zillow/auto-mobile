@@ -85,6 +85,7 @@ export interface NavigationNodesTable {
   visit_count: number;
   back_stack_depth: number | null;
   task_id: number | null;
+  screenshot_path: string | null;
   created_at: Generated<string>;
 }
 
@@ -300,6 +301,35 @@ export interface TestExecutionsTable {
   gradle_version: string | null;
   is_ci: number | null;
   session_uuid: string | null;
+  error_message: string | null;
+  video_path: string | null;
+  snapshot_path: string | null;
+  created_at: Generated<string>;
+}
+
+// Test execution step details
+export interface TestExecutionStepsTable {
+  id: Generated<number>;
+  execution_id: number;
+  step_index: number;
+  action: string;
+  target: string | null;
+  status: "completed" | "failed" | "skipped";
+  duration_ms: number;
+  screen_name: string | null;
+  screenshot_path: string | null;
+  error_message: string | null;
+  details_json: string | null;
+  created_at: Generated<string>;
+}
+
+// Screens visited during test execution
+export interface TestExecutionScreensTable {
+  id: Generated<number>;
+  execution_id: number;
+  screen_name: string;
+  visit_order: number;
+  timestamp: number;
   created_at: Generated<string>;
 }
 
@@ -424,6 +454,8 @@ export interface Database {
   memory_audit_results: MemoryAuditResultsTable;
   recomposition_metrics: RecompositionMetricsTable;
   test_executions: TestExecutionsTable;
+  test_execution_steps: TestExecutionStepsTable;
+  test_execution_screens: TestExecutionScreensTable;
   feature_flags: FeatureFlagsTable;
   device_snapshots: DeviceSnapshotsTable;
   device_snapshot_configs: DeviceSnapshotConfigsTable;
@@ -536,6 +568,12 @@ export type AppearanceConfigUpdate = Updateable<AppearanceConfigsTable>;
 export type TestExecution = Selectable<TestExecutionsTable>;
 export type NewTestExecution = Insertable<TestExecutionsTable>;
 export type TestExecutionUpdate = Updateable<TestExecutionsTable>;
+
+export type TestExecutionStep = Selectable<TestExecutionStepsTable>;
+export type NewTestExecutionStep = Insertable<TestExecutionStepsTable>;
+
+export type TestExecutionScreen = Selectable<TestExecutionScreensTable>;
+export type NewTestExecutionScreen = Insertable<TestExecutionScreensTable>;
 
 export type TestCoverageSession = Selectable<TestCoverageSessionsTable>;
 export type NewTestCoverageSession = Insertable<TestCoverageSessionsTable>;

@@ -6,12 +6,13 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { BootedDevice } from "../../models";
 import { PerformanceTracker, NoOpPerformanceTracker } from "../../utils/PerformanceTracker";
+import { getTempDir, TEMP_SUBDIRS } from "../../utils/tempDir";
 
 export class Window {
   private adb: AdbClient;
   private cachedActiveWindow: ActiveWindowInfo | null = null;
   private readonly device: BootedDevice;
-  private cacheDir: string = "/tmp/auto-mobile/window";
+  private cacheDir: string = getTempDir(TEMP_SUBDIRS.WINDOW);
 
   /**
    * Create a Window instance

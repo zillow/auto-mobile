@@ -8,6 +8,7 @@ import { Image } from "../../utils/image-utils";
 import { BootedDevice } from "../../models";
 import { ScreenshotJobHandle, ScreenshotJobOptions, ScreenshotJobTracker } from "../../utils/ScreenshotJobTracker";
 import { OPERATION_CANCELLED_MESSAGE } from "../../utils/constants";
+import { getTempDir, TEMP_SUBDIRS, SECURE_DIR_MODE } from "../../utils/tempDir";
 
 export interface ScreenshotOptions {
   format?: "png" | "webp";
@@ -19,7 +20,7 @@ export class TakeScreenshot {
   private readonly device: BootedDevice;
   private adb: AdbClient;
   private window: Window;
-  private static cacheDir: string = path.join("/tmp/auto-mobile", "screenshots");
+  private static cacheDir: string = getTempDir(TEMP_SUBDIRS.SCREENSHOTS);
   private static readonly MAX_CACHE_SIZE_BYTES = 128 * 1024 * 1024; // 128MB
 
   /**
@@ -35,9 +36,9 @@ export class TakeScreenshot {
     this.adb = adb || new AdbClient(device);
     this.window = new Window(device, this.adb);
 
-    // Ensure cache directory exists
+    // Ensure cache directory exists with secure permissions
     if (!fs.existsSync(TakeScreenshot.cacheDir)) {
-      fs.mkdirSync(TakeScreenshot.cacheDir, { recursive: true });
+      fs.mkdirSync(TakeScreenshot.cacheDir, { recursive: true, mode: SECURE_DIR_MODE });
     }
 
     // Manage cache size

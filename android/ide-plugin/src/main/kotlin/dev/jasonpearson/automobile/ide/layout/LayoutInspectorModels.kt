@@ -1,0 +1,439 @@
+package dev.jasonpearson.automobile.ide.layout
+
+/**
+ * Represents a UI element in the view hierarchy.
+ * This maps to accessibility node data from the device.
+ */
+data class UIElementInfo(
+    val id: String,
+    val className: String,
+    val resourceId: String?,
+    val text: String?,
+    val contentDescription: String?,
+    val bounds: ElementBounds,
+    val isClickable: Boolean,
+    val isEnabled: Boolean,
+    val isFocused: Boolean,
+    val isSelected: Boolean,
+    val isScrollable: Boolean,
+    val isCheckable: Boolean,
+    val isChecked: Boolean,
+    val children: List<UIElementInfo>,
+    val depth: Int,
+)
+
+/**
+ * Element bounds in screen coordinates (pixels).
+ */
+data class ElementBounds(
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+) {
+    val width: Int get() = right - left
+    val height: Int get() = bottom - top
+    val centerX: Int get() = left + width / 2
+    val centerY: Int get() = top + height / 2
+
+    fun contains(x: Int, y: Int): Boolean =
+        x >= left && x < right && y >= top && y < bottom
+}
+
+/**
+ * Screenshot frame data received from the device.
+ */
+data class ScreenshotFrame(
+    val data: ByteArray,
+    val width: Int,
+    val height: Int,
+    val timestamp: Long,
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ScreenshotFrame) return false
+        return timestamp == other.timestamp && width == other.width && height == other.height
+    }
+
+    override fun hashCode(): Int {
+        var result = timestamp.hashCode()
+        result = 31 * result + width
+        result = 31 * result + height
+        return result
+    }
+}
+
+/**
+ * Connection status for the layout inspector.
+ */
+enum class ConnectionStatus {
+    Disconnected,
+    Connecting,
+    Connected,
+    Error,
+}
+
+/**
+ * Streaming mode for screenshot updates.
+ */
+enum class StreamingMode {
+    Paused,
+    Live,
+}
+
+// Mock data for development
+object LayoutInspectorMockData {
+
+    val mockHierarchy = UIElementInfo(
+        id = "root",
+        className = "android.widget.FrameLayout",
+        resourceId = "android:id/content",
+        text = null,
+        contentDescription = null,
+        bounds = ElementBounds(0, 0, 1080, 2340),
+        isClickable = false,
+        isEnabled = true,
+        isFocused = false,
+        isSelected = false,
+        isScrollable = false,
+        isCheckable = false,
+        isChecked = false,
+        depth = 0,
+        children = listOf(
+            UIElementInfo(
+                id = "toolbar_container",
+                className = "androidx.appcompat.widget.Toolbar",
+                resourceId = "com.chat.app:id/toolbar",
+                text = null,
+                contentDescription = null,
+                bounds = ElementBounds(0, 84, 1080, 224),
+                isClickable = false,
+                isEnabled = true,
+                isFocused = false,
+                isSelected = false,
+                isScrollable = false,
+                isCheckable = false,
+                isChecked = false,
+                depth = 1,
+                children = listOf(
+                    UIElementInfo(
+                        id = "nav_back",
+                        className = "android.widget.ImageButton",
+                        resourceId = "com.chat.app:id/btn_back",
+                        text = null,
+                        contentDescription = "Navigate back",
+                        bounds = ElementBounds(16, 100, 88, 172),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = emptyList(),
+                    ),
+                    UIElementInfo(
+                        id = "title",
+                        className = "android.widget.TextView",
+                        resourceId = "com.chat.app:id/toolbar_title",
+                        text = "Chat",
+                        contentDescription = null,
+                        bounds = ElementBounds(104, 108, 400, 164),
+                        isClickable = false,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = emptyList(),
+                    ),
+                    UIElementInfo(
+                        id = "menu_more",
+                        className = "android.widget.ImageButton",
+                        resourceId = "com.chat.app:id/btn_menu",
+                        text = null,
+                        contentDescription = "More options",
+                        bounds = ElementBounds(992, 100, 1064, 172),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = emptyList(),
+                    ),
+                ),
+            ),
+            UIElementInfo(
+                id = "recycler_messages",
+                className = "androidx.recyclerview.widget.RecyclerView",
+                resourceId = "com.chat.app:id/message_list",
+                text = null,
+                contentDescription = null,
+                bounds = ElementBounds(0, 224, 1080, 2140),
+                isClickable = false,
+                isEnabled = true,
+                isFocused = false,
+                isSelected = false,
+                isScrollable = true,
+                isCheckable = false,
+                isChecked = false,
+                depth = 1,
+                children = listOf(
+                    UIElementInfo(
+                        id = "msg_1",
+                        className = "android.widget.LinearLayout",
+                        resourceId = null,
+                        text = null,
+                        contentDescription = null,
+                        bounds = ElementBounds(16, 240, 800, 360),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = listOf(
+                            UIElementInfo(
+                                id = "msg_1_text",
+                                className = "android.widget.TextView",
+                                resourceId = "com.chat.app:id/message_text",
+                                text = "Hey! How are you?",
+                                contentDescription = null,
+                                bounds = ElementBounds(32, 256, 784, 344),
+                                isClickable = false,
+                                isEnabled = true,
+                                isFocused = false,
+                                isSelected = false,
+                                isScrollable = false,
+                                isCheckable = false,
+                                isChecked = false,
+                                depth = 3,
+                                children = emptyList(),
+                            ),
+                        ),
+                    ),
+                    UIElementInfo(
+                        id = "msg_2",
+                        className = "android.widget.LinearLayout",
+                        resourceId = null,
+                        text = null,
+                        contentDescription = null,
+                        bounds = ElementBounds(280, 380, 1064, 520),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = listOf(
+                            UIElementInfo(
+                                id = "msg_2_text",
+                                className = "android.widget.TextView",
+                                resourceId = "com.chat.app:id/message_text",
+                                text = "I'm doing great! Just finished a project.",
+                                contentDescription = null,
+                                bounds = ElementBounds(296, 396, 1048, 504),
+                                isClickable = false,
+                                isEnabled = true,
+                                isFocused = false,
+                                isSelected = false,
+                                isScrollable = false,
+                                isCheckable = false,
+                                isChecked = false,
+                                depth = 3,
+                                children = emptyList(),
+                            ),
+                        ),
+                    ),
+                    UIElementInfo(
+                        id = "msg_3",
+                        className = "android.widget.LinearLayout",
+                        resourceId = null,
+                        text = null,
+                        contentDescription = null,
+                        bounds = ElementBounds(16, 540, 700, 660),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = listOf(
+                            UIElementInfo(
+                                id = "msg_3_text",
+                                className = "android.widget.TextView",
+                                resourceId = "com.chat.app:id/message_text",
+                                text = "That's awesome! What kind of project?",
+                                contentDescription = null,
+                                bounds = ElementBounds(32, 556, 684, 644),
+                                isClickable = false,
+                                isEnabled = true,
+                                isFocused = false,
+                                isSelected = false,
+                                isScrollable = false,
+                                isCheckable = false,
+                                isChecked = false,
+                                depth = 3,
+                                children = emptyList(),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            UIElementInfo(
+                id = "input_container",
+                className = "android.widget.LinearLayout",
+                resourceId = "com.chat.app:id/input_area",
+                text = null,
+                contentDescription = null,
+                bounds = ElementBounds(0, 2140, 1080, 2260),
+                isClickable = false,
+                isEnabled = true,
+                isFocused = false,
+                isSelected = false,
+                isScrollable = false,
+                isCheckable = false,
+                isChecked = false,
+                depth = 1,
+                children = listOf(
+                    UIElementInfo(
+                        id = "attach_button",
+                        className = "android.widget.ImageButton",
+                        resourceId = "com.chat.app:id/btn_attach",
+                        text = null,
+                        contentDescription = "Attach file",
+                        bounds = ElementBounds(16, 2156, 88, 2228),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = emptyList(),
+                    ),
+                    UIElementInfo(
+                        id = "message_input",
+                        className = "android.widget.EditText",
+                        resourceId = "com.chat.app:id/input_message",
+                        text = "",
+                        contentDescription = "Type a message",
+                        bounds = ElementBounds(104, 2156, 904, 2228),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = true,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = emptyList(),
+                    ),
+                    UIElementInfo(
+                        id = "send_button",
+                        className = "android.widget.ImageButton",
+                        resourceId = "com.chat.app:id/btn_send",
+                        text = null,
+                        contentDescription = "Send message",
+                        bounds = ElementBounds(920, 2156, 1064, 2228),
+                        isClickable = true,
+                        isEnabled = true,
+                        isFocused = false,
+                        isSelected = false,
+                        isScrollable = false,
+                        isCheckable = false,
+                        isChecked = false,
+                        depth = 2,
+                        children = emptyList(),
+                    ),
+                ),
+            ),
+            UIElementInfo(
+                id = "nav_bar",
+                className = "android.view.View",
+                resourceId = "android:id/navigationBarBackground",
+                text = null,
+                contentDescription = null,
+                bounds = ElementBounds(0, 2260, 1080, 2340),
+                isClickable = false,
+                isEnabled = true,
+                isFocused = false,
+                isSelected = false,
+                isScrollable = false,
+                isCheckable = false,
+                isChecked = false,
+                depth = 1,
+                children = emptyList(),
+            ),
+        ),
+    )
+
+    // Helper to flatten hierarchy for searching
+    fun flattenHierarchy(root: UIElementInfo): List<UIElementInfo> {
+        val result = mutableListOf<UIElementInfo>()
+        fun traverse(element: UIElementInfo) {
+            result.add(element)
+            element.children.forEach { traverse(it) }
+        }
+        traverse(root)
+        return result
+    }
+
+    // Helper to find element by ID
+    fun findElementById(root: UIElementInfo, id: String): UIElementInfo? {
+        if (root.id == id) return root
+        for (child in root.children) {
+            val found = findElementById(child, id)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    // Helper to find deepest element at point
+    fun findElementAt(root: UIElementInfo, x: Int, y: Int): UIElementInfo? {
+        if (!root.bounds.contains(x, y)) return null
+
+        // Check children first (depth-first to find deepest)
+        for (child in root.children.reversed()) {
+            val found = findElementAt(child, x, y)
+            if (found != null) return found
+        }
+
+        return root
+    }
+
+    // Helper to get path from root to element
+    fun getPathToElement(root: UIElementInfo, targetId: String): List<String> {
+        val path = mutableListOf<String>()
+
+        fun traverse(element: UIElementInfo): Boolean {
+            if (element.id == targetId) {
+                path.add(element.id)
+                return true
+            }
+            for (child in element.children) {
+                if (traverse(child)) {
+                    path.add(0, element.id)
+                    return true
+                }
+            }
+            return false
+        }
+
+        traverse(root)
+        return path
+    }
+}

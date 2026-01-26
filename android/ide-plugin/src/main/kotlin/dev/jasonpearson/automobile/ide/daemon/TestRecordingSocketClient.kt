@@ -15,14 +15,23 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+interface TestRecordingClient {
+  fun startTestRecording(platform: String? = null): TestRecordingStartResult
+
+  fun stopTestRecording(
+      recordingId: String? = null,
+      planName: String? = null,
+  ): TestRecordingStopResult
+}
+
 class TestRecordingSocketClient(
     private val socketPathValue: String = TestRecordingSocketPaths.socketPath(),
     private val json: Json = Json {
       ignoreUnknownKeys = true
       explicitNulls = false
     },
-) {
-  fun startTestRecording(platform: String? = null): TestRecordingStartResult {
+) : TestRecordingClient {
+  override fun startTestRecording(platform: String?): TestRecordingStartResult {
     val response = sendRequest(TestRecordingSocketCommand(command = "start", platform = platform))
     ensureSuccess(response)
     return TestRecordingStartResult(
@@ -33,9 +42,9 @@ class TestRecordingSocketClient(
     )
   }
 
-  fun stopTestRecording(
-      recordingId: String? = null,
-      planName: String? = null,
+  override fun stopTestRecording(
+      recordingId: String?,
+      planName: String?,
   ): TestRecordingStopResult {
     val response =
         sendRequest(
@@ -97,6 +106,40 @@ class TestRecordingSocketClient(
 
   private fun missingField(name: String): McpConnectionException {
     return McpConnectionException("Test recording response missing $name")
+  }
+}
+
+data class FakeTestRecordingStartCall(val platform: String?)
+
+data class FakeTestRecordingStopCall(val recordingId: String?, val planName: String?)
+
+class FakeTestRecordingClient(
+    private val startResponses: List<TestRecordingStartResult> = emptyList(),
+    private val stopResponses: List<TestRecordingStopResult> = emptyList(),
+) : TestRecordingClient {
+  val startCalls = mutableListOf<FakeTestRecordingStartCall>()
+  val stopCalls = mutableListOf<FakeTestRecordingStopCall>()
+  private var startIndex = 0
+  private var stopIndex = 0
+
+  override fun startTestRecording(platform: String?): TestRecordingStartResult {
+    startCalls.add(FakeTestRecordingStartCall(platform))
+    if (startResponses.isEmpty()) {
+      throw IllegalStateException("No start responses configured")
+    }
+    val response = startResponses.getOrNull(startIndex) ?: startResponses.last()
+    startIndex += 1
+    return response
+  }
+
+  override fun stopTestRecording(recordingId: String?, planName: String?): TestRecordingStopResult {
+    stopCalls.add(FakeTestRecordingStopCall(recordingId, planName))
+    if (stopResponses.isEmpty()) {
+      throw IllegalStateException("No stop responses configured")
+    }
+    val response = stopResponses.getOrNull(stopIndex) ?: stopResponses.last()
+    stopIndex += 1
+    return response
   }
 }
 

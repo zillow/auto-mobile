@@ -6,11 +6,26 @@ import kotlinx.serialization.json.JsonObject
 
 data class ToolDefinition(val name: String, val description: String?, val inputSchema: JsonObject)
 
-object ToolDefinitionStore {
+/** Provider interface for accessing tool definitions. */
+interface ToolDefinitionProvider {
+  /** Returns all tool definitions keyed by tool name. */
+  fun getToolDefinitions(): Map<String, ToolDefinition>
+
+  /** Returns a tool definition by name, or null if not found. */
+  fun getToolDefinition(name: String): ToolDefinition? = getToolDefinitions()[name]
+}
+
+/**
+ * Production implementation that loads tool definitions from classpath resources.
+ *
+ * This object lazily loads tool definitions from `tool-definitions.json` or
+ * `schemas/tool-definitions.json` on first access.
+ */
+object ToolDefinitionStore : ToolDefinitionProvider {
   private val json = Json { ignoreUnknownKeys = true }
   private var toolDefinitions: Map<String, ToolDefinition>? = null
 
-  fun getToolDefinitions(): Map<String, ToolDefinition> {
+  override fun getToolDefinitions(): Map<String, ToolDefinition> {
     if (toolDefinitions == null) {
       toolDefinitions = loadToolDefinitions()
     }

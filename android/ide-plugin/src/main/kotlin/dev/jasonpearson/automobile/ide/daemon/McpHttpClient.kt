@@ -49,6 +49,13 @@ class McpHttpClient(
     return result.resourceTemplates
   }
 
+  override fun listTools(): List<McpTool> {
+    ensureInitialized()
+    val response = sendRequest("tools/list")
+    val result = json.decodeFromJsonElement(ListToolsResult.serializer(), response.result!!)
+    return result.tools
+  }
+
   override fun readResource(uri: String): List<McpResourceContent> {
     ensureInitialized()
     val response =
@@ -110,6 +117,11 @@ class McpHttpClient(
     return decodeResourceResponse(json, contents, TestTimingSummary.serializer())
   }
 
+  override fun getTestRuns(query: TestRunQuery): TestRunSummary {
+    val contents = readResource(query.toResourceUri())
+    return decodeResourceResponse(json, contents, TestRunSummary.serializer())
+  }
+
   override fun startTestRecording(platform: String): TestRecordingStartResult {
     return testRecordingClient.startTestRecording(platform)
   }
@@ -143,6 +155,61 @@ class McpHttpClient(
             },
         )
     return decodeToolResponse(json, response, ExecutePlanResult.serializer())
+  }
+
+  override fun startDevice(name: String, platform: String, deviceId: String?): StartDeviceResult {
+    val response =
+        callTool(
+            "startDevice",
+            buildJsonObject {
+              put(
+                  "device",
+                  buildJsonObject {
+                    put("name", JsonPrimitive(name))
+                    put("platform", JsonPrimitive(platform))
+                    if (deviceId != null) {
+                      put("deviceId", JsonPrimitive(deviceId))
+                    }
+                  },
+              )
+            },
+        )
+    return try {
+      decodeToolResponse(json, response, StartDeviceResult.serializer())
+    } catch (e: Exception) {
+      StartDeviceResult(success = false, message = e.message ?: "Failed to start device")
+    }
+  }
+
+  override fun setActiveDevice(deviceId: String, platform: String): SetActiveDeviceResult {
+    val response =
+        callTool(
+            "setActiveDevice",
+            buildJsonObject {
+              put("deviceId", JsonPrimitive(deviceId))
+              put("platform", JsonPrimitive(platform))
+            },
+        )
+    return try {
+      decodeToolResponse(json, response, SetActiveDeviceResult.serializer())
+    } catch (e: Exception) {
+      SetActiveDeviceResult(success = false, message = e.message ?: "Failed to set active device")
+    }
+  }
+
+  override fun observe(platform: String): ObserveResult {
+    val response =
+        callTool(
+            "observe",
+            buildJsonObject {
+              put("platform", JsonPrimitive(platform))
+            },
+        )
+    return try {
+      decodeToolResponse(json, response, ObserveResult.serializer())
+    } catch (e: Exception) {
+      ObserveResult()
+    }
   }
 
   private fun callTool(name: String, arguments: JsonObject): JsonElement {
