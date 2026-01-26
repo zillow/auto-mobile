@@ -70,6 +70,8 @@ fun DeviceScreenView(
     hoveredElementId: String?,
     onElementSelected: (String?) -> Unit,
     onElementHovered: (String?) -> Unit,
+    showTapTargetIssues: Boolean = false,
+    onToggleTapTargetIssues: () -> Unit = {},
     modifier: Modifier = Modifier,
     refitTrigger: Any? = null,  // When this changes, refit the view to center
 ) {
@@ -109,7 +111,23 @@ fun DeviceScreenView(
         } else null
     }
 
+    // Find non-compliant tap targets (clickable elements smaller than 48x48dp)
+    val nonCompliantElements = remember(hierarchy, screenWidth, showTapTargetIssues) {
+        if (showTapTargetIssues && hierarchy != null && screenWidth > 0) {
+            findNonCompliantTapTargets(hierarchy, screenWidth)
+        } else {
+            emptyList()
+        }
+    }
+
     Column(modifier = modifier) {
+        // Tap target compliance toggle
+        TapTargetComplianceToggle(
+            enabled = showTapTargetIssues,
+            issueCount = nonCompliantElements.size,
+            onToggle = onToggleTapTargetIssues,
+        )
+
         // Screenshot viewport
         BoxWithConstraints(
             modifier = Modifier
@@ -313,6 +331,31 @@ fun DeviceScreenView(
                                             size = Size(scaledWidth, scaledHeight),
                                         )
                                     }
+
+                                    // Non-compliant tap targets (orange/red)
+                                    if (showTapTargetIssues) {
+                                        for (element in nonCompliantElements) {
+                                            val bounds = element.bounds
+                                            val scaledLeft = bounds.left * deviceToFrameScale
+                                            val scaledTop = bounds.top * deviceToFrameScale
+                                            val scaledWidth = bounds.width * deviceToFrameScale
+                                            val scaledHeight = bounds.height * deviceToFrameScale
+
+                                            // Draw orange border
+                                            drawRect(
+                                                color = Color(0xFFFF6B00),
+                                                topLeft = Offset(scaledLeft, scaledTop),
+                                                size = Size(scaledWidth, scaledHeight),
+                                                style = Stroke(width = 2f),
+                                            )
+                                            // Fill with semi-transparent orange
+                                            drawRect(
+                                                color = Color(0xFFFF6B00).copy(alpha = 0.15f),
+                                                topLeft = Offset(scaledLeft, scaledTop),
+                                                size = Size(scaledWidth, scaledHeight),
+                                            )
+                                        }
+                                    }
                                 }
                         )
                     } else {
@@ -400,5 +443,68 @@ private fun ZoomButton(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontSize = 14.sp)
+    }
+}
+
+/**
+ * Toggle for tap target compliance highlighting.
+ * Shows the number of non-compliant elements when enabled.
+ */
+@Composable
+private fun TapTargetComplianceToggle(
+    enabled: Boolean,
+    issueCount: Int,
+    onToggle: () -> Unit,
+) {
+    val colors = JewelTheme.globalColors
+    val backgroundColor = if (enabled) {
+        Color(0xFFFF6B00).copy(alpha = 0.15f)
+    } else {
+        colors.text.normal.copy(alpha = 0.05f)
+    }
+    val borderColor = if (enabled) {
+        Color(0xFFFF6B00).copy(alpha = 0.5f)
+    } else {
+        colors.text.normal.copy(alpha = 0.1f)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.Start,
+    ) {
+        Row(
+            modifier = Modifier
+                .background(backgroundColor, RoundedCornerShape(4.dp))
+                .border(1.dp, borderColor, RoundedCornerShape(4.dp))
+                .clickable(onClick = onToggle)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            // Warning icon
+            Text(
+                text = if (enabled && issueCount > 0) "\u26A0" else "\u2B1A",  // Warning or empty square
+                fontSize = 12.sp,
+                color = if (enabled) Color(0xFFFF6B00) else colors.text.normal.copy(alpha = 0.5f),
+            )
+
+            Text(
+                text = "Tap Targets",
+                fontSize = 11.sp,
+                color = if (enabled) colors.text.normal else colors.text.normal.copy(alpha = 0.6f),
+            )
+
+            // Show issue count when enabled
+            if (enabled) {
+                Text(
+                    text = "($issueCount)",
+                    fontSize = 11.sp,
+                    color = if (issueCount > 0) Color(0xFFFF6B00) else colors.text.normal.copy(alpha = 0.5f),
+                )
+            }
+        }
     }
 }

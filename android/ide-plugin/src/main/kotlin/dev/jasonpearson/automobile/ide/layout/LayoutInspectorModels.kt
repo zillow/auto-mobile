@@ -81,6 +81,63 @@ enum class StreamingMode {
     Live,
 }
 
+/**
+ * Minimum tap target size in dp as per Android accessibility guidelines.
+ * Touch targets should be at least 48x48dp for comfortable tapping.
+ */
+const val MIN_TAP_TARGET_DP = 48
+
+/**
+ * Calculate minimum tap target size in pixels based on screen width.
+ * Assumes standard phone screen width of ~360dp to derive density.
+ *
+ * @param screenWidthPx The screen width in pixels
+ * @return The minimum tap target size in pixels
+ */
+fun calculateMinTapTargetPx(screenWidthPx: Int): Int {
+    // Most phones have a screen width around 360dp
+    // density = screenWidthPx / 360
+    // minTapTargetPx = 48dp * density = 48 * (screenWidthPx / 360) = screenWidthPx / 7.5
+    val density = screenWidthPx.toFloat() / 360f
+    return (MIN_TAP_TARGET_DP * density).toInt()
+}
+
+/**
+ * Check if an element is a non-compliant tap target.
+ * An element is non-compliant if it's clickable but smaller than 48x48dp.
+ *
+ * @param element The element to check
+ * @param minSizePx The minimum tap target size in pixels
+ * @return True if the element is clickable but too small
+ */
+fun isNonCompliantTapTarget(element: UIElementInfo, minSizePx: Int): Boolean {
+    if (!element.isClickable) return false
+    return element.bounds.width < minSizePx || element.bounds.height < minSizePx
+}
+
+/**
+ * Find all non-compliant tap targets in a hierarchy.
+ * Returns elements that are clickable but smaller than 48x48dp.
+ *
+ * @param root The root of the hierarchy to search
+ * @param screenWidthPx The screen width in pixels (used to calculate density)
+ * @return List of non-compliant clickable elements
+ */
+fun findNonCompliantTapTargets(root: UIElementInfo, screenWidthPx: Int): List<UIElementInfo> {
+    val minSizePx = calculateMinTapTargetPx(screenWidthPx)
+    val result = mutableListOf<UIElementInfo>()
+
+    fun traverse(element: UIElementInfo) {
+        if (isNonCompliantTapTarget(element, minSizePx)) {
+            result.add(element)
+        }
+        element.children.forEach { traverse(it) }
+    }
+
+    traverse(root)
+    return result
+}
+
 // Mock data for development
 object LayoutInspectorMockData {
 

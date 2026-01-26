@@ -55,6 +55,10 @@ class LayoutInspectorState {
     var hoveredElementId by mutableStateOf<String?>(null)
         private set
 
+    // Tap target compliance highlighting
+    var showTapTargetIssues by mutableStateOf(false)
+        private set
+
     // Selected element (computed from hierarchy and selectedElementId)
     val selectedElement: UIElementInfo?
         get() = hierarchy?.let { root ->
@@ -89,6 +93,13 @@ class LayoutInspectorState {
      */
     fun hoverElement(elementId: String?) {
         hoveredElementId = elementId
+    }
+
+    /**
+     * Toggle tap target compliance highlighting.
+     */
+    fun toggleTapTargetIssues() {
+        showTapTargetIssues = !showTapTargetIssues
     }
 
     /**

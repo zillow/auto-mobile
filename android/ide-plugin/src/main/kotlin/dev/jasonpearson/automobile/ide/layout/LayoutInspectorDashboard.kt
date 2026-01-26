@@ -181,6 +181,8 @@ fun LayoutInspectorDashboard(
                 hoveredElementId = state.hoveredElementId,
                 onElementSelected = { state.selectElement(it) },
                 onElementHovered = { state.hoverElement(it) },
+                showTapTargetIssues = state.showTapTargetIssues,
+                onToggleTapTargetIssues = { state.toggleTapTargetIssues() },
                 modifier = Modifier.fillMaxSize(),
                 refitTrigger = refitTrigger,  // Trigger refit when panels toggle
             )
