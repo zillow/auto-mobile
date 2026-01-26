@@ -90,9 +90,21 @@ function isMutationQuery(query: string): boolean {
 }
 
 /**
+ * Check if text starts with a keyword followed by a word boundary.
+ * Prevents matching CTE names like "select_cte" as statement keywords.
+ */
+function startsWithKeyword(text: string, keyword: string): boolean {
+  if (!text.startsWith(keyword)) {return false;}
+  const nextChar = text[keyword.length];
+  // Word boundary: next char is undefined (end of string) or not a word character
+  return nextChar === undefined || !/\w/.test(nextChar);
+}
+
+/**
  * Find the actual statement type after CTE definitions.
  *
  * Parses past WITH ... AS (...) clauses to find SELECT/INSERT/UPDATE/DELETE.
+ * Uses word boundary checks to avoid matching CTE names like "update_cte".
  */
 function findStatementAfterCTE(upperQuery: string): string | null {
   let depth = 0;
@@ -106,12 +118,12 @@ function findStatementAfterCTE(upperQuery: string): string | null {
     } else if (char === ")") {
       depth--;
     } else if (depth === 0) {
-      // Check for statement keywords at this position
+      // Check for statement keywords at this position (with word boundary)
       const remaining = upperQuery.slice(i).trimStart();
-      if (remaining.startsWith("SELECT")) {return "SELECT";}
-      if (remaining.startsWith("INSERT")) {return "INSERT";}
-      if (remaining.startsWith("UPDATE")) {return "UPDATE";}
-      if (remaining.startsWith("DELETE")) {return "DELETE";}
+      if (startsWithKeyword(remaining, "SELECT")) {return "SELECT";}
+      if (startsWithKeyword(remaining, "INSERT")) {return "INSERT";}
+      if (startsWithKeyword(remaining, "UPDATE")) {return "UPDATE";}
+      if (startsWithKeyword(remaining, "DELETE")) {return "DELETE";}
     }
     i++;
   }

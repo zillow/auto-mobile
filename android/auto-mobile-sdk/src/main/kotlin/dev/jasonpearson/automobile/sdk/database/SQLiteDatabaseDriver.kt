@@ -187,9 +187,21 @@ class SQLiteDatabaseDriver(private val context: Context) : DatabaseDriver {
   }
 
   /**
+   * Check if text starts with a keyword followed by a word boundary.
+   * Prevents matching CTE names like "select_cte" as statement keywords.
+   */
+  private fun startsWithKeyword(text: String, keyword: String): Boolean {
+    if (!text.startsWith(keyword)) return false
+    val nextChar = text.getOrNull(keyword.length)
+    // Word boundary: next char is null (end of string) or not a word character
+    return nextChar == null || (!nextChar.isLetterOrDigit() && nextChar != '_')
+  }
+
+  /**
    * Find the actual statement type after CTE definitions.
    *
    * Parses past WITH ... AS (...) clauses to find SELECT/INSERT/UPDATE/DELETE.
+   * Uses word boundary checks to avoid matching CTE names like "update_cte".
    */
   private fun findStatementAfterCTE(upperQuery: String): String? {
     var depth = 0
@@ -202,13 +214,13 @@ class SQLiteDatabaseDriver(private val context: Context) : DatabaseDriver {
         char == '(' -> depth++
         char == ')' -> depth--
         depth == 0 -> {
-          // Check for statement keywords at this position
+          // Check for statement keywords at this position (with word boundary)
           val remaining = upperQuery.substring(i).trimStart()
           when {
-            remaining.startsWith("SELECT") -> return "SELECT"
-            remaining.startsWith("INSERT") -> return "INSERT"
-            remaining.startsWith("UPDATE") -> return "UPDATE"
-            remaining.startsWith("DELETE") -> return "DELETE"
+            startsWithKeyword(remaining, "SELECT") -> return "SELECT"
+            startsWithKeyword(remaining, "INSERT") -> return "INSERT"
+            startsWithKeyword(remaining, "UPDATE") -> return "UPDATE"
+            startsWithKeyword(remaining, "DELETE") -> return "DELETE"
           }
         }
       }
