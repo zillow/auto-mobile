@@ -69,6 +69,10 @@ class ObservationStreamClient {
     private val _navigationUpdates = MutableSharedFlow<NavigationGraphStreamUpdate>(replay = 1)
     val navigationUpdates: SharedFlow<NavigationGraphStreamUpdate> = _navigationUpdates.asSharedFlow()
 
+    // Flow for performance metrics updates
+    private val _performanceUpdates = MutableSharedFlow<PerformanceStreamUpdate>(replay = 1)
+    val performanceUpdates: SharedFlow<PerformanceStreamUpdate> = _performanceUpdates.asSharedFlow()
+
     // Flow for connection state
     private val _connectionState = MutableSharedFlow<StreamConnectionState>(replay = 1)
     val connectionState: SharedFlow<StreamConnectionState> = _connectionState.asSharedFlow()
@@ -268,6 +272,26 @@ class ObservationStreamClient {
                     log.info("Emitted navigation update to flow")
                 }
             }
+            "performance_update" -> {
+                val perfData = response.performanceData
+                log.info("Performance update received - deviceId=${response.deviceId}, fps=${perfData?.fps}, jankFrames=${perfData?.jankFrames}")
+                if (perfData != null) {
+                    val update = PerformanceStreamUpdate(
+                        deviceId = response.deviceId,
+                        timestamp = response.timestamp ?: System.currentTimeMillis(),
+                        fps = perfData.fps,
+                        frameTimeMs = perfData.frameTimeMs,
+                        jankFrames = perfData.jankFrames,
+                        droppedFrames = perfData.droppedFrames,
+                        memoryUsageMb = perfData.memoryUsageMb,
+                        cpuUsagePercent = perfData.cpuUsagePercent,
+                        screenName = perfData.screenName,
+                        isResponsive = perfData.isResponsive,
+                    )
+                    _performanceUpdates.emit(update)
+                    log.info("Emitted performance update to flow")
+                }
+            }
             "ping" -> {
                 log.info("Received ping, sending pong")
                 sendPong()
@@ -326,6 +350,7 @@ data class StreamResponse(
     val screenWidth: Int? = null,
     val screenHeight: Int? = null,
     val navigationGraph: NavigationGraphStreamData? = null,
+    val performanceData: PerformanceStreamData? = null,
 )
 
 @Serializable
@@ -374,6 +399,31 @@ data class NavigationGraphStreamUpdate(
     val nodes: List<NavigationNodeData>,
     val edges: List<NavigationEdgeData>,
     val currentScreen: String?,
+)
+
+@Serializable
+data class PerformanceStreamData(
+    val fps: Float,
+    val frameTimeMs: Float,
+    val jankFrames: Int,
+    val droppedFrames: Int,
+    val memoryUsageMb: Float,
+    val cpuUsagePercent: Float,
+    val screenName: String? = null,
+    val isResponsive: Boolean = true,
+)
+
+data class PerformanceStreamUpdate(
+    val deviceId: String?,
+    val timestamp: Long,
+    val fps: Float,
+    val frameTimeMs: Float,
+    val jankFrames: Int,
+    val droppedFrames: Int,
+    val memoryUsageMb: Float,
+    val cpuUsagePercent: Float,
+    val screenName: String?,
+    val isResponsive: Boolean,
 )
 
 sealed class StreamConnectionState {
