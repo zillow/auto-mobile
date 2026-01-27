@@ -4,7 +4,7 @@ plugins {
   kotlin("jvm")
   alias(libs.plugins.kotlin.serialization)
   kotlin("plugin.compose")
-  id("org.jetbrains.intellij.platform") version "2.10.5"
+  id("org.jetbrains.intellij.platform") version "2.11.0"
   // Note: Using IntelliJ Platform's composeUI() instead of standalone org.jetbrains.compose
   // to avoid bundling duplicate coroutines that conflict with IDE's version
 }
