@@ -1,10 +1,13 @@
 import { ResourceRegistry, ResourceContent } from "./resourceRegistry";
 import { logger } from "../utils/logger";
+import { FailuresRepository } from "../db/failuresRepository";
 
 export const FAILURES_RESOURCE_URIS = {
   BASE: "automobile:failures",
   TIMELINE: "automobile:failures/timeline",
 } as const;
+
+const failuresRepository = new FailuresRepository();
 
 // Type definitions matching IDE plugin models
 
@@ -126,10 +129,10 @@ export interface TimelineResponse {
 
 async function getFailuresResource(uri: string): Promise<ResourceContent> {
   try {
-    // Return empty data - real failure tracking not yet implemented
-    // When failure monitoring is added, this will return actual failures from logcat/SDK
+    const groups = await failuresRepository.getFailureGroups();
+
     const response: FailuresResponse = {
-      groups: [],
+      groups,
       generatedAt: new Date().toISOString(),
     };
 
@@ -148,17 +151,44 @@ async function getFailuresResource(uri: string): Promise<ResourceContent> {
   }
 }
 
+function getDateRangeDuration(preset: string): number {
+  switch (preset) {
+    case "1h":
+      return 60 * 60 * 1000;
+    case "24h":
+      return 24 * 60 * 60 * 1000;
+    case "3d":
+      return 3 * 24 * 60 * 60 * 1000;
+    case "7d":
+      return 7 * 24 * 60 * 60 * 1000;
+    case "30d":
+      return 30 * 24 * 60 * 60 * 1000;
+    default:
+      return 24 * 60 * 60 * 1000;
+  }
+}
+
 async function getTimelineResource(params: Record<string, string>): Promise<ResourceContent> {
   try {
     const dateRange = params.dateRange || "24h";
-    const aggregation = params.aggregation || "hour";
+    const aggregation = (params.aggregation || "hour") as "minute" | "hour" | "day" | "week";
 
-    // Return empty timeline - real failure tracking not yet implemented
+    const now = Date.now();
+    const duration = getDateRangeDuration(dateRange);
+    const startTime = now - duration;
+    const endTime = now;
+
+    const result = await failuresRepository.getTimelineData({
+      startTime,
+      endTime,
+      aggregation,
+    });
+
     const response: TimelineResponse = {
-      dataPoints: [],
+      dataPoints: result.dataPoints,
       dateRange,
       aggregation,
-      previousPeriodTotals: { crashes: 0, anrs: 0, toolFailures: 0 },
+      previousPeriodTotals: result.previousPeriodTotals,
     };
 
     const uri = `${FAILURES_RESOURCE_URIS.TIMELINE}?dateRange=${dateRange}&aggregation=${aggregation}`;

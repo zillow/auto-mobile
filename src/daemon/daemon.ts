@@ -28,6 +28,7 @@ import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from 
 import { startAppearanceSocketServer, stopAppearanceSocketServer } from "./appearanceSocketServer";
 import { startPerformanceStreamSocketServer, stopPerformanceStreamSocketServer } from "./performanceStreamSocketServer";
 import { startObservationStreamSocketServer, stopObservationStreamSocketServer, getObservationStreamServer } from "./observationStreamSocketServer";
+import { startFailuresStreamSocketServer, stopFailuresStreamSocketServer } from "./failuresStreamSocketServer";
 import { AccessibilityServiceClient } from "../features/observe/AccessibilityServiceClient";
 import { NavigationGraphManager } from "../features/navigation/NavigationGraphManager";
 import type { InstalledAppsStore } from "../db/installedAppsRepository";
@@ -132,6 +133,7 @@ export class Daemon {
     await startAppearanceSocketServer();
     await startPerformanceStreamSocketServer();
     await startObservationStreamSocketServer();
+    await startFailuresStreamSocketServer();
 
     // Wire up callback to establish WebSocket connections when IDE plugins subscribe
     this.setupObservationStreamCallback();
@@ -919,6 +921,7 @@ export class Daemon {
     await stopAppearanceSocketServer();
     await stopPerformanceStreamSocketServer();
     await stopObservationStreamSocketServer();
+    await stopFailuresStreamSocketServer();
     stopAppearanceSyncScheduler();
 
     // Close all active HTTP sessions
