@@ -12,6 +12,8 @@ import { PlanSchemaValidator } from "../utils/plan/PlanSchemaValidator";
 import { DaemonState } from "../daemon/daemonState";
 import { normalizePlanDevices } from "../utils/plan/PlanDevices";
 import { ExecutePlanStepDebugInfo } from "../models/ExecutePlanResult";
+import { serverConfig } from "../utils/ServerConfig";
+import { startVideoRecording, stopVideoRecording } from "./videoRecordingManager";
 
 const testMetadataSchema = z.object({
   testClass: z.string(),
@@ -350,11 +352,45 @@ const executePlanTool = async (device: BootedDevice, params: {
       throw new ActionableError("Device label requires a devices list to be provided.");
     }
 
-    // Execute the plan with device context
-    logger.info(`[PERF +${Date.now() - perfStart}ms] Starting plan execution on device ${device.deviceId} (${device.platform})`);
-    const result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal, params.abortStrategy);
-    const execDuration = Date.now() - perfStart;
-    logger.info(`[PERF +${execDuration}ms] Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
+    // Start video recording if enabled
+    const testVideoRecordingEnabled = serverConfig.isTestVideoRecordingEnabled();
+    let videoRecordingId: string | undefined;
+    if (testVideoRecordingEnabled) {
+      try {
+        logger.info(`[PERF +${Date.now() - perfStart}ms] Starting automatic video recording for test`);
+        const recording = await startVideoRecording({
+          device,
+          outputName: `test-${plan.name}-${Date.now()}`,
+          maxDurationSeconds: 300, // 5 minutes max
+        });
+        videoRecordingId = recording.recordingId;
+        logger.info(`[PERF +${Date.now() - perfStart}ms] Video recording started: ${videoRecordingId}`);
+      } catch (videoError) {
+        logger.warn(`[PERF +${Date.now() - perfStart}ms] Failed to start automatic video recording: ${videoError}`);
+        // Continue with plan execution even if video recording fails to start
+      }
+    }
+
+    // Execute the plan with device context, ensuring video recording is stopped in finally block
+    let result;
+    try {
+      logger.info(`[PERF +${Date.now() - perfStart}ms] Starting plan execution on device ${device.deviceId} (${device.platform})`);
+      result = await executePlan(plan, startStep, params.platform, device.deviceId, params.sessionUuid, signal, params.abortStrategy);
+      const execDuration = Date.now() - perfStart;
+      logger.info(`[PERF +${execDuration}ms] Plan execution completed: ${result.success ? "SUCCESS" : "FAILED"} (${result.executedSteps}/${result.totalSteps} steps)`);
+    } finally {
+      // Stop video recording regardless of plan execution outcome
+      if (videoRecordingId) {
+        try {
+          logger.info(`[PERF +${Date.now() - perfStart}ms] Stopping automatic video recording: ${videoRecordingId}`);
+          await stopVideoRecording(videoRecordingId);
+          logger.info(`[PERF +${Date.now() - perfStart}ms] Video recording stopped successfully`);
+        } catch (videoError) {
+          logger.warn(`[PERF +${Date.now() - perfStart}ms] Failed to stop automatic video recording: ${videoError}`);
+          // Don't throw - let the original result/error propagate
+        }
+      }
+    }
 
     // Capture step data and error message for recording
     const steps = convertDebugStepsToRecords(result.debug?.steps);
