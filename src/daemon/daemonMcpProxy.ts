@@ -2,6 +2,7 @@ import { DaemonClient, DaemonUnavailableError, type DaemonClientLike, type Daemo
 import { DaemonManager } from "./manager";
 import { logger } from "../utils/logger";
 import { SOCKET_PATH, DAEMON_STARTUP_TIMEOUT_MS } from "./constants";
+import type { DaemonOptions } from "./types";
 
 /**
  * Configuration for the DaemonMcpProxy
@@ -17,6 +18,8 @@ export interface DaemonMcpProxyConfig {
   clientFactory?: DaemonClientFactory;
   /** Custom daemon manager (for testing) */
   daemonManager?: DaemonManager;
+  /** Options to pass when auto-starting the daemon */
+  daemonOptions?: DaemonOptions;
 }
 
 /**
@@ -163,7 +166,8 @@ export class DaemonMcpProxy {
 
     if (!status.running) {
       logger.info("[DaemonMcpProxy] Starting daemon...");
-      await this.daemonManager.start();
+      // Pass through daemon options (debug flags, video defaults, etc.)
+      await this.daemonManager.start(this.config.daemonOptions ?? {});
 
       // Wait for daemon to be ready
       const ready = await this.daemonManager.waitForReady(DAEMON_STARTUP_TIMEOUT_MS);

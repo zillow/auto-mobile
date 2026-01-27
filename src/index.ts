@@ -10,6 +10,7 @@ import { logger } from "./utils/logger";
 import { runCliCommand } from "./cli";
 import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
+import type { DaemonOptions } from "./daemon/types";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./daemon/videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./daemon/testRecordingSocketServer";
 import { startDeviceSnapshotSocketServer, stopDeviceSnapshotSocketServer } from "./daemon/deviceSnapshotSocketServer";
@@ -727,7 +728,7 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
 }
 
 // Create and start Streamable HTTP proxy server (connects to daemon)
-async function startStreamableProxyServer(transport: TransportConfig): Promise<void> {
+async function startStreamableProxyServer(transport: TransportConfig, daemonOptions: DaemonOptions): Promise<void> {
   const server = createHttpServer();
   const transports = new Map<string, StreamableHTTPServerTransport>();
 
@@ -830,7 +831,10 @@ async function startStreamableProxyServer(transport: TransportConfig): Promise<v
         // Create proxy MCP server
         let proxyResult;
         try {
-          proxyResult = createProxyMcpServer({ sessionContext });
+          proxyResult = createProxyMcpServer({
+            sessionContext,
+            proxyConfig: { daemonOptions }
+          });
         } catch (error) {
           logger.error("Failed to create proxy MCP server:", error);
           sendJsonRpcError("Server error", error);
@@ -926,7 +930,7 @@ async function startStreamableProxyServer(transport: TransportConfig): Promise<v
 }
 
 // Create and start SSE proxy server (connects to daemon)
-async function startSSEProxyServer(transport: TransportConfig): Promise<void> {
+async function startSSEProxyServer(transport: TransportConfig, daemonOptions: DaemonOptions): Promise<void> {
   const server = createHttpServer();
   const sessions = new Map<string, SSEServerTransport>();
 
@@ -952,7 +956,8 @@ async function startSSEProxyServer(transport: TransportConfig): Promise<void> {
 
       // Create proxy MCP server
       const { server: mcpServer, proxy: sseProxy } = createProxyMcpServer({
-        sessionContext: { sessionId }
+        sessionContext: { sessionId },
+        proxyConfig: { daemonOptions }
       });
 
       sseTransport.onclose = async () => {
@@ -1184,6 +1189,19 @@ async function main() {
       // In direct mode (--direct flag), the MCP server executes tools directly
       const useProxyMode = !directMode;
 
+      // Construct daemon options from CLI args to pass when auto-starting daemon
+      const proxyDaemonOptions: DaemonOptions = {
+        debug,
+        debugPerf,
+        planExecutionLockScope,
+        videoQualityPreset: videoRecordingDefaults.qualityPreset,
+        videoTargetBitrateKbps: videoRecordingDefaults.targetBitrateKbps,
+        videoMaxThroughputMbps: videoRecordingDefaults.maxThroughputMbps,
+        videoFps: videoRecordingDefaults.fps,
+        videoFormat: videoRecordingDefaults.format,
+        videoMaxArchiveSizeMb: videoRecordingDefaults.maxArchiveSizeMb,
+      };
+
       if (useProxyMode) {
         logger.info("Starting MCP server in proxy mode (connecting to daemon)");
       } else {
@@ -1202,7 +1220,7 @@ async function main() {
         logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
         logger.enableStdoutLogging();
         if (useProxyMode) {
-          await startStreamableProxyServer(transport);
+          await startStreamableProxyServer(transport, proxyDaemonOptions);
         } else {
           await startStreamableServer(transport, debug);
         }
@@ -1211,7 +1229,7 @@ async function main() {
         logger.info(`Starting SSE transport on ${transport.host}:${transport.port} (deprecated - consider using streamable)`);
         logger.enableStdoutLogging();
         if (useProxyMode) {
-          await startSSEProxyServer(transport);
+          await startSSEProxyServer(transport, proxyDaemonOptions);
         } else {
           await startSSEServer(transport, debug);
         }
@@ -1222,7 +1240,9 @@ async function main() {
         let stdioProxy: ReturnType<typeof createProxyMcpServer>["proxy"] | undefined;
         try {
           if (useProxyMode) {
-            const result = createProxyMcpServer({});
+            const result = createProxyMcpServer({
+              proxyConfig: { daemonOptions: proxyDaemonOptions }
+            });
             server = result.server;
             stdioProxy = result.proxy;
           } else {
