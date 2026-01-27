@@ -78,3 +78,18 @@ export {
   UIState,
   SelectedElement
 } from "./NavigationGraph";
+export {
+  CrashMonitor,
+  CrashDetector,
+  CrashEvent,
+  AnrEvent,
+  FailureEvent,
+  CrashType,
+  CrashDetectionSource,
+  AnrDetectionSource,
+  CrashEventListener,
+  AnrEventListener,
+  CrashMonitorConfig,
+  ParsedCrash,
+  ParsedAnr,
+} from "./CrashMonitor";

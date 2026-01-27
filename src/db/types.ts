@@ -191,6 +191,58 @@ export interface ToolCallsTable {
   tool_name: string;
   timestamp: string;
   session_uuid: string | null;
+  status: string | null; // success, failure
+  error_message: string | null;
+  error_type: string | null;
+  device_id: string | null;
+  package_name: string | null;
+  duration_ms: number | null;
+  tool_args: string | null; // JSON blob
+  created_at: Generated<string>;
+}
+
+// Crash tracking table
+export interface CrashesTable {
+  id: Generated<number>;
+  device_id: string;
+  package_name: string;
+  crash_type: "java" | "native" | "system";
+  timestamp: number;
+  process_name: string | null;
+  pid: number | null;
+  exception_class: string | null;
+  exception_message: string | null;
+  stacktrace: string | null;
+  signal: string | null; // For native crashes
+  fault_address: string | null; // For native crashes
+  tombstone_path: string | null;
+  detection_source: "logcat" | "tombstone" | "dropbox" | "accessibility" | "process_monitor";
+  raw_log: string | null;
+  navigation_node_id: number | null;
+  test_execution_id: number | null;
+  session_uuid: string | null;
+  created_at: Generated<string>;
+}
+
+// ANR tracking table
+export interface AnrsTable {
+  id: Generated<number>;
+  device_id: string;
+  package_name: string;
+  timestamp: number;
+  process_name: string | null;
+  pid: number | null;
+  reason: string | null;
+  activity: string | null;
+  wait_duration_ms: number | null;
+  cpu_usage: string | null;
+  main_thread_state: string | null;
+  stacktrace: string | null;
+  detection_source: "logcat" | "dropbox" | "accessibility";
+  raw_log: string | null;
+  navigation_node_id: number | null;
+  test_execution_id: number | null;
+  session_uuid: string | null;
   created_at: Generated<string>;
 }
 
@@ -470,6 +522,8 @@ export interface Database {
   failure_occurrence_screens: FailureOccurrenceScreensTable;
   failure_captures: FailureCapturesTable;
   failure_notifications: FailureNotificationsTable;
+  crashes: CrashesTable;
+  anrs: AnrsTable;
 }
 
 // Convenience types for each table
@@ -672,3 +726,11 @@ export type NewFailureCapture = Insertable<FailureCapturesTable>;
 export type FailureNotification = Selectable<FailureNotificationsTable>;
 export type NewFailureNotification = Insertable<FailureNotificationsTable>;
 export type FailureNotificationUpdate = Updateable<FailureNotificationsTable>;
+
+export type Crash = Selectable<CrashesTable>;
+export type NewCrash = Insertable<CrashesTable>;
+export type CrashUpdate = Updateable<CrashesTable>;
+
+export type Anr = Selectable<AnrsTable>;
+export type NewAnr = Insertable<AnrsTable>;
+export type AnrUpdate = Updateable<AnrsTable>;
