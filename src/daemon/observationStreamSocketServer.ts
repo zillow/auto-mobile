@@ -44,11 +44,33 @@ export interface NavigationGraphStreamData {
 }
 
 /**
+ * Performance metrics data for real-time streaming to IDE plugins.
+ */
+export interface PerformanceStreamData {
+  /** Current FPS value */
+  fps: number;
+  /** Frame time in milliseconds */
+  frameTimeMs: number;
+  /** Number of janky frames (>16ms) in the last second */
+  jankFrames: number;
+  /** Total dropped frames since measurement started */
+  droppedFrames: number;
+  /** Memory usage in MB */
+  memoryUsageMb: number;
+  /** CPU usage percentage (0-100) */
+  cpuUsagePercent: number;
+  /** Current screen/activity name if available */
+  screenName: string | null;
+  /** Whether the app is considered responsive */
+  isResponsive: boolean;
+}
+
+/**
  * Response/push message format
  */
 interface ObservationStreamMessage {
   id?: string;
-  type: "subscription_response" | "hierarchy_update" | "screenshot_update" | "navigation_update" | "ping" | "pong" | "error";
+  type: "subscription_response" | "hierarchy_update" | "screenshot_update" | "navigation_update" | "performance_update" | "ping" | "pong" | "error";
   success?: boolean;
   error?: string;
   deviceId?: string;
@@ -58,6 +80,7 @@ interface ObservationStreamMessage {
   screenWidth?: number;
   screenHeight?: number;
   navigationGraph?: NavigationGraphStreamData;
+  performanceData?: PerformanceStreamData;
 }
 
 /**
@@ -294,6 +317,20 @@ export class ObservationStreamSocketServer {
     };
 
     this.broadcastToAllSubscribers(message);
+  }
+
+  /**
+   * Push a performance metrics update to all subscribers interested in this device.
+   */
+  pushPerformanceUpdate(deviceId: string, performanceData: PerformanceStreamData): void {
+    const message: ObservationStreamMessage = {
+      type: "performance_update",
+      deviceId,
+      timestamp: Date.now(),
+      performanceData,
+    };
+
+    this.broadcastToSubscribers(deviceId, message);
   }
 
   /**

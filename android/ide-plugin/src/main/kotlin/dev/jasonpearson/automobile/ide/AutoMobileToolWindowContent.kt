@@ -467,18 +467,22 @@ fun AutoMobileToolWindowContent() {
               clientProvider = clientProvider,
               observationStreamClient = observationStreamClient,
           )
-          Dashboard.Performance -> PerformanceDashboard(
-              onNavigateToScreen = { screenName ->
-                  // Switch to Navigation tab and highlight the screen
-                  selectedIndex = 0
-              },
-              onNavigateToTest = { testName ->
-                  // Switch to Test tab
-                  selectedIndex = 1
-              },
-              dataSourceMode = dataSourceMode,
-              clientProvider = clientProvider,
-          )
+          Dashboard.Performance -> {
+              LOG.info("Rendering PerformanceDashboard with observationStreamClient: ${observationStreamClient.hashCode()}")
+              PerformanceDashboard(
+                  onNavigateToScreen = { screenName ->
+                      // Switch to Navigation tab and highlight the screen
+                      selectedIndex = 0
+                  },
+                  onNavigateToTest = { testName ->
+                      // Switch to Test tab
+                      selectedIndex = 1
+                  },
+                  dataSourceMode = dataSourceMode,
+                  clientProvider = clientProvider,
+                  observationStreamClient = observationStreamClient,
+              )
+          }
           Dashboard.Layout -> {
               LOG.info("Rendering LayoutInspectorDashboard with observationStreamClient: ${observationStreamClient.hashCode()}")
               LayoutInspectorDashboard(

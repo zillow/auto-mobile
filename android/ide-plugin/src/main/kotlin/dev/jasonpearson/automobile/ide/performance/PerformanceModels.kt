@@ -10,6 +10,7 @@ enum class MetricType {
     TimeToInteractive, // When the UI becomes responsive
     Jank,              // Missed frames / UI stuttering
     FPS,               // Frames per second time series
+    FrameTime,         // Time to render a single frame (ms)
 }
 
 data class PerformanceMetric(
