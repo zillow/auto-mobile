@@ -465,6 +465,11 @@ export interface Database {
   test_coverage_sessions: TestCoverageSessionsTable;
   test_node_coverage: TestNodeCoverageTable;
   test_edge_coverage: TestEdgeCoverageTable;
+  failure_groups: FailureGroupsTable;
+  failure_occurrences: FailureOccurrencesTable;
+  failure_occurrence_screens: FailureOccurrenceScreensTable;
+  failure_captures: FailureCapturesTable;
+  failure_notifications: FailureNotificationsTable;
 }
 
 // Convenience types for each table
@@ -584,3 +589,86 @@ export type NewTestNodeCoverage = Insertable<TestNodeCoverageTable>;
 
 export type TestEdgeCoverage = Selectable<TestEdgeCoverageTable>;
 export type NewTestEdgeCoverage = Insertable<TestEdgeCoverageTable>;
+
+// Failure tracking tables
+export interface FailureGroupsTable {
+  id: string;
+  type: "crash" | "anr" | "tool_failure";
+  signature: string;
+  title: string;
+  message: string;
+  severity: "critical" | "high" | "medium" | "low";
+  first_occurrence: number;
+  last_occurrence: number;
+  total_count: number;
+  unique_sessions: number;
+  stack_trace_json: string | null;
+  tool_call_info_json: string | null;
+  created_at: Generated<string>;
+  updated_at: string;
+}
+
+export interface FailureOccurrencesTable {
+  id: string;
+  group_id: string;
+  timestamp: number;
+  device_id: string | null;
+  device_model: string;
+  os: string;
+  app_version: string;
+  session_id: string;
+  screen_at_failure: string | null;
+  test_name: string | null;
+  test_execution_id: number | null;
+  error_code: string | null;
+  duration_ms: number | null;
+  tool_args_json: string | null;
+  created_at: Generated<string>;
+}
+
+export interface FailureOccurrenceScreensTable {
+  id: Generated<number>;
+  occurrence_id: string;
+  screen_name: string;
+  visit_order: number;
+  created_at: Generated<string>;
+}
+
+export interface FailureCapturesTable {
+  id: string;
+  occurrence_id: string;
+  type: "screenshot" | "video";
+  path: string;
+  timestamp: number;
+  device_model: string;
+  created_at: Generated<string>;
+}
+
+export interface FailureNotificationsTable {
+  id: Generated<number>;
+  occurrence_id: string;
+  group_id: string;
+  type: "crash" | "anr" | "tool_failure";
+  severity: "critical" | "high" | "medium" | "low";
+  title: string;
+  timestamp: number;
+  acknowledged: number; // SQLite boolean (0/1)
+  created_at: Generated<string>;
+}
+
+export type FailureGroup = Selectable<FailureGroupsTable>;
+export type NewFailureGroup = Insertable<FailureGroupsTable>;
+export type FailureGroupUpdate = Updateable<FailureGroupsTable>;
+
+export type FailureOccurrence = Selectable<FailureOccurrencesTable>;
+export type NewFailureOccurrence = Insertable<FailureOccurrencesTable>;
+
+export type FailureOccurrenceScreen = Selectable<FailureOccurrenceScreensTable>;
+export type NewFailureOccurrenceScreen = Insertable<FailureOccurrenceScreensTable>;
+
+export type FailureCapture = Selectable<FailureCapturesTable>;
+export type NewFailureCapture = Insertable<FailureCapturesTable>;
+
+export type FailureNotification = Selectable<FailureNotificationsTable>;
+export type NewFailureNotification = Insertable<FailureNotificationsTable>;
+export type FailureNotificationUpdate = Updateable<FailureNotificationsTable>;
