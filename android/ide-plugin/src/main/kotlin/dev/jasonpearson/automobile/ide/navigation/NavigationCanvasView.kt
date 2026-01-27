@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -667,11 +668,6 @@ private fun ScreenNodeCard(
     }
 
     val colors = JewelTheme.globalColors
-    val coverageColor = when {
-        screen.testCoverage >= 80 -> Color(0xFF4CAF50)
-        screen.testCoverage >= 50 -> Color(0xFFFFC107)
-        else -> Color(0xFFFF5722)
-    }
 
     // Highlight colors
     val lightBlue = Color(0xFF64B5F6)   // Light blue for hovered screen
@@ -682,12 +678,6 @@ private fun ScreenNodeCard(
 
     // Visual states based on highlighting type
     val isHighlighted = isHovered || isSource || isTarget || isInTestFlow || isCurrentReplayStep
-    val bgAlpha = when {
-        isCurrentReplayStep -> 0.35f  // Brightest for current step
-        isHighlighted -> 0.25f
-        isDimmed -> 0.05f
-        else -> 0.1f
-    }
     val borderColor = when {
         isCurrentReplayStep -> currentStepGreen  // Current step is bright green
         isHovered -> lightBlue
@@ -709,28 +699,33 @@ private fun ScreenNodeCard(
             }
         },
     ) {
-        Column(
+        Box(
             modifier = Modifier
-                .size(NODE_WIDTH, NODE_HEIGHT)
-                .background(colors.text.normal.copy(alpha = bgAlpha), RoundedCornerShape(8.dp))
-                .then(
-                    if (isHighlighted) Modifier.border(borderWidth, borderColor, RoundedCornerShape(8.dp))
-                    else Modifier
-                )
                 .clickable(onClick = onClick)
                 .pointerHoverIcon(PointerIcon.Hand)
                 .onPointerEvent(PointerEventType.Enter) { onHoverChange(true) }
-                .onPointerEvent(PointerEventType.Exit) { onHoverChange(false) }
-                .padding(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .onPointerEvent(PointerEventType.Exit) { onHoverChange(false) },
         ) {
-            // Screen preview (screenshot or placeholder)
+            // Screen name positioned 8dp above the card (plus ~12dp for text height)
+            Text(
+                text = screen.name.take(12) + if (screen.name.length > 12) "…" else "",
+                fontSize = 9.sp,
+                color = colors.text.normal.copy(alpha = textAlpha),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-20).dp),
+            )
+
+            // Screenshot card - edge to edge
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxSize()
-                    .padding(4.dp)
-                    .background(colors.text.normal.copy(alpha = 0.08f), RoundedCornerShape(4.dp)),
+                    .size(NODE_WIDTH, NODE_HEIGHT)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.text.normal.copy(alpha = 0.08f))
+                    .then(
+                        if (isHighlighted) Modifier.border(borderWidth, borderColor, RoundedCornerShape(8.dp))
+                        else Modifier
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 when {
@@ -752,28 +747,6 @@ private fun ScreenNodeCard(
                     }
                     // else: empty placeholder (no screenshot available)
                 }
-            }
-
-            // Screen name (truncated)
-            Text(
-                text = screen.name.take(12) + if (screen.name.length > 12) "…" else "",
-                fontSize = 9.sp,
-                color = colors.text.normal.copy(alpha = textAlpha),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-
-            // Coverage indicator
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 2.dp),
-            ) {
-                Box(modifier = Modifier.size(6.dp).background(coverageColor, CircleShape))
-                Text(
-                    "${screen.testCoverage}%",
-                    fontSize = 8.sp,
-                    color = colors.text.normal.copy(alpha = if (isDimmed) 0.3f else 0.5f),
-                )
             }
         }
     }
