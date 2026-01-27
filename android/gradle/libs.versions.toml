@@ -33,7 +33,7 @@ androidx-startup = "1.2.0"
 coil = "3.3.0"
 core-splashscreen = "1.2.0"
 kotlinx-coroutines-test = "1.10.2"
-media3 = "1.9.0"
+media3 = "1.9.1"
 
 # Library versions
 clikt = "5.1.0"
