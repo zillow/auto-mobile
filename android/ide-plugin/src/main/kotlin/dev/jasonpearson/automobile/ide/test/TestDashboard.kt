@@ -88,6 +88,15 @@ fun TestDashboard(
     var currentScreenshotUpdate by remember { mutableStateOf<ScreenshotStreamUpdate?>(null) }
     var currentNavigationUpdate by remember { mutableStateOf<NavigationGraphStreamUpdate?>(null) }
 
+    // Clear navigation data when foreground app changes to avoid stale data mismatch
+    val currentForegroundPackage = currentHierarchyUpdate?.packageName
+    LaunchedEffect(currentForegroundPackage) {
+        if (currentForegroundPackage != null && currentNavigationUpdate?.appId != currentForegroundPackage) {
+            LOG.info("Foreground app changed to $currentForegroundPackage, clearing stale navigation data")
+            currentNavigationUpdate = null
+        }
+    }
+
     // Collect real-time hierarchy updates from the stream
     LaunchedEffect(observationStreamClient) {
         if (observationStreamClient == null) return@LaunchedEffect
@@ -111,13 +120,21 @@ fun TestDashboard(
     }
 
     // Collect real-time navigation updates from the stream
+    // Filter by current foreground app to ensure navigation data matches the displayed screenshot/hierarchy
     LaunchedEffect(observationStreamClient) {
         if (observationStreamClient == null) return@LaunchedEffect
 
         LOG.info("Starting navigation updates collection in TestDashboard")
         observationStreamClient.navigationUpdates.collect { update ->
-            LOG.info("Received navigation update in TestDashboard - appId=${update.appId}, nodes=${update.nodes.size}")
-            currentNavigationUpdate = update
+            // Get current foreground package name from hierarchy
+            val foregroundPackage = currentHierarchyUpdate?.packageName
+            // Only accept navigation updates that match the foreground app (or if no hierarchy yet)
+            if (foregroundPackage == null || update.appId == foregroundPackage) {
+                LOG.info("Received navigation update in TestDashboard - appId=${update.appId}, nodes=${update.nodes.size}")
+                currentNavigationUpdate = update
+            } else {
+                LOG.info("Ignoring navigation update for ${update.appId} (foreground is $foregroundPackage)")
+            }
         }
     }
 
