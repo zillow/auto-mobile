@@ -36,6 +36,8 @@ declare module "@modelcontextprotocol/sdk/types.js" {
   export const ListToolsRequestSchema: any;
   export const GetResourceRequestSchema: any;
   export const ListResourcesRequestSchema: any;
+  export const ReadResourceRequestSchema: any;
+  export const ListResourceTemplatesRequestSchema: any;
 }
 
 declare module "@modelcontextprotocol/sdk/types" {

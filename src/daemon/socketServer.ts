@@ -194,6 +194,9 @@ export class UnixSocketServer {
     const requestOptions = { timeout: request.timeoutMs ?? DEFAULT_MCP_REQUEST_TIMEOUT_MS };
 
     switch (request.method) {
+      case "tools/list": {
+        return await mcpClient.listTools();
+      }
       case "tools/call": {
         return await mcpClient.callTool({
           name: request.params.name,

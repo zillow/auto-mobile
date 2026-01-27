@@ -5,9 +5,10 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { createServer as createHttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { createMcpServer } from "./server";
+import { createProxyMcpServer } from "./server/proxyServer";
 import { logger } from "./utils/logger";
 import { runCliCommand } from "./cli";
-import { runDaemonCommand, DaemonManager } from "./daemon/manager";
+import { runDaemonCommand } from "./daemon/manager";
 import { startDaemon } from "./daemon/daemon";
 import { startVideoRecordingSocketServer, stopVideoRecordingSocketServer } from "./daemon/videoRecordingSocketServer";
 import { startTestRecordingSocketServer, stopTestRecordingSocketServer } from "./daemon/testRecordingSocketServer";
@@ -96,6 +97,7 @@ function parseArgs(): {
   daemonCommand?: string;
   daemonArgs: string[];
   skipAccessibilityDownload: boolean;
+  directMode: boolean;
   } {
   const args = process.argv.slice(2);
 
@@ -112,6 +114,10 @@ function parseArgs(): {
 
   // Detect daemon mode (internal daemon process)
   const daemonMode = args.includes("--daemon-mode");
+
+  // Detect direct mode (skip daemon proxy, execute tools directly)
+  // By default, MCP server proxies to daemon for stable device management
+  const directMode = args.includes("--direct");
 
   // Detect daemon management command
   const daemonCommandIndex = args.indexOf("--daemon");
@@ -344,6 +350,7 @@ function parseArgs(): {
     daemonCommand,
     daemonArgs,
     skipAccessibilityDownload,
+    directMode,
   };
 }
 
@@ -719,6 +726,317 @@ async function startSSEServer(transport: TransportConfig, debug: boolean): Promi
   process.on("SIGTERM", shutdown);
 }
 
+// Create and start Streamable HTTP proxy server (connects to daemon)
+async function startStreamableProxyServer(transport: TransportConfig): Promise<void> {
+  const server = createHttpServer();
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+
+  // Server instance tracking for health checks
+  const serverInstanceId = randomUUID();
+  const serverStartTime = Date.now();
+
+  server.on("request", async (req, res) => {
+    // CORS headers for development
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, MCP-Session-Id");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+
+    // Health check endpoint
+    if (url.pathname === "/health" || url.pathname === "/auto-mobile/health") {
+      const uptimeMs = Date.now() - serverStartTime;
+      const health = {
+        status: "ok",
+        server: "AutoMobile",
+        mode: "proxy",
+        instanceId: serverInstanceId,
+        port: transport.port,
+        uptime: {
+          ms: uptimeMs,
+          human: formatUptime(uptimeMs)
+        },
+        activeSessions: transports.size,
+        transport: "streamable"
+      };
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(health, null, 2));
+      return;
+    }
+
+    if (url.pathname === "/auto-mobile/streamable") {
+      const sessionId = req.headers["mcp-session-id"] as string | undefined;
+
+      let streamableTransport: StreamableHTTPServerTransport;
+      let parsedBody: unknown;
+
+      // Parse body for POST requests
+      if (req.method === "POST") {
+        let body = "";
+        req.on("data", chunk => {
+          body += chunk.toString();
+        });
+
+        await new Promise<void>(resolve => {
+          req.on("end", resolve);
+        });
+
+        try {
+          parsedBody = JSON.parse(body);
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid JSON" }));
+          return;
+        }
+      }
+
+      const isInitializeRequest = parsedBody && typeof parsedBody === "object" && "method" in parsedBody && parsedBody.method === "initialize";
+      const sendJsonRpcError = (message: string, error?: unknown) => {
+        if (res.headersSent) {
+          return;
+        }
+        const id = parsedBody && typeof parsedBody === "object" && "id" in parsedBody ? parsedBody.id : null;
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          error: {
+            code: -32603,
+            message,
+            data: error instanceof Error ? error.message : undefined
+          }
+        }));
+      };
+
+      if (sessionId && transports.has(sessionId)) {
+        streamableTransport = transports.get(sessionId)!;
+      } else if (isInitializeRequest || !sessionId) {
+        const sessionContext: { sessionId?: string } = {};
+        streamableTransport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: newSessionId => {
+            transports.set(newSessionId, streamableTransport);
+            sessionContext.sessionId = newSessionId;
+            logger.info(`Streamable HTTP proxy session initialized: ${newSessionId}`);
+          }
+        });
+
+        // Create proxy MCP server
+        let proxyResult;
+        try {
+          proxyResult = createProxyMcpServer({ sessionContext });
+        } catch (error) {
+          logger.error("Failed to create proxy MCP server:", error);
+          sendJsonRpcError("Server error", error);
+          return;
+        }
+
+        const mcpServer = proxyResult.server;
+        const proxyInstance = proxyResult.proxy;
+
+        // Setup cleanup handlers
+        streamableTransport.onclose = async () => {
+          if (streamableTransport.sessionId) {
+            transports.delete(streamableTransport.sessionId);
+            await proxyInstance.close();
+            logger.info(`Streamable HTTP proxy session closed: ${streamableTransport.sessionId}`);
+          }
+        };
+
+        streamableTransport.onerror = async error => {
+          if (streamableTransport.sessionId) {
+            logger.error(`Streamable HTTP proxy transport error for session ${streamableTransport.sessionId}:`, error);
+            transports.delete(streamableTransport.sessionId);
+          }
+        };
+
+        try {
+          logger.info("Connecting proxy MCP server to Streamable HTTP transport");
+          await mcpServer.connect(streamableTransport);
+          logger.info("Proxy MCP server connected to Streamable HTTP transport");
+        } catch (error) {
+          logger.error("Proxy MCP server connect failed:", error);
+          sendJsonRpcError("Server error", error);
+          return;
+        }
+      } else {
+        logger.warn(`Session not found: ${sessionId}. Server may have restarted.`);
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          error: "Session not found",
+          message: "The session may have expired or the server was restarted. Please reinitialize the connection.",
+          serverInstanceId,
+          activeSessions: transports.size
+        }));
+        return;
+      }
+
+      try {
+        await streamableTransport.handleRequest(req, res, parsedBody);
+      } catch (error) {
+        logger.error("Streamable HTTP proxy request handling failed:", error);
+        sendJsonRpcError("Server error", error);
+      }
+    } else {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not found" }));
+    }
+  });
+
+  startupBenchmark.startPhase("serverListening");
+  server.listen(transport.port!, transport.host!, () => {
+    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/streamable (proxy mode)`);
+    logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/streamable`);
+    startupBenchmark.endPhase("serverListening");
+    startupBenchmark.emit("mcp-server", {
+      transport: "streamable",
+      mode: "proxy",
+      host: transport.host,
+      port: transport.port
+    });
+  });
+
+  // Handle server shutdown
+  const shutdown = async () => {
+    logger.info("Shutting down Streamable HTTP proxy server...");
+    for (const [sessionId, streamableTransport] of transports) {
+      try {
+        await streamableTransport.close();
+      } catch (error) {
+        logger.warn(`Error closing Streamable HTTP session ${sessionId}:`, error);
+      }
+    }
+    transports.clear();
+
+    server.close(() => {
+      logger.info("Streamable HTTP proxy server shut down");
+      logger.close();
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
+// Create and start SSE proxy server (connects to daemon)
+async function startSSEProxyServer(transport: TransportConfig): Promise<void> {
+  const server = createHttpServer();
+  const sessions = new Map<string, SSEServerTransport>();
+
+  server.on("request", async (req, res) => {
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+
+    // CORS headers for development
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/auto-mobile/sse") {
+      const sseTransport = new SSEServerTransport("/auto-mobile/messages", res);
+      const sessionId = sseTransport.sessionId;
+
+      sessions.set(sessionId, sseTransport);
+
+      // Create proxy MCP server
+      const { server: mcpServer, proxy: sseProxy } = createProxyMcpServer({
+        sessionContext: { sessionId }
+      });
+
+      sseTransport.onclose = async () => {
+        sessions.delete(sessionId);
+        await sseProxy.close();
+        logger.info(`SSE proxy session closed: ${sessionId}`);
+      };
+
+      sseTransport.onerror = async error => {
+        logger.error(`SSE proxy transport error for session ${sessionId}:`, error);
+        sessions.delete(sessionId);
+      };
+
+      await mcpServer.connect(sseTransport);
+      logger.info(`SSE proxy session started: ${sessionId}`);
+
+    } else if (req.method === "POST" && url.pathname === "/auto-mobile/messages") {
+      const sessionId = url.searchParams.get("sessionId");
+
+      if (!sessionId || !sessions.has(sessionId)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid or missing sessionId" }));
+        return;
+      }
+
+      const sseTransport = sessions.get(sessionId)!;
+
+      let body = "";
+      req.on("data", chunk => {
+        body += chunk.toString();
+      });
+
+      req.on("end", async () => {
+        try {
+          const parsedBody = JSON.parse(body);
+          await sseTransport.handlePostMessage(req, res, parsedBody);
+        } catch (error) {
+          logger.error(`Error handling POST message for session ${sessionId}:`, error);
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Invalid JSON" }));
+        }
+      });
+
+    } else {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not found" }));
+    }
+  });
+
+  startupBenchmark.startPhase("serverListening");
+  server.listen(transport.port!, transport.host!, () => {
+    logger.info(`automobile:${transport.host}:${transport.port}/auto-mobile/sse (proxy mode)`);
+    logger.info(`Connect using: npx -y mcp-remote http://${transport.host}:${transport.port}/auto-mobile/sse`);
+    startupBenchmark.endPhase("serverListening");
+    startupBenchmark.emit("mcp-server", {
+      transport: "sse",
+      mode: "proxy",
+      host: transport.host,
+      port: transport.port
+    });
+  });
+
+  const shutdown = async () => {
+    logger.info("Shutting down SSE proxy server...");
+    for (const [sessionId, sseTransport] of sessions) {
+      try {
+        await sseTransport.close();
+      } catch (error) {
+        logger.warn(`Error closing SSE session ${sessionId}:`, error);
+      }
+    }
+    sessions.clear();
+
+    server.close(() => {
+      logger.info("SSE proxy server shut down");
+      logger.close();
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
 process.on("SIGINT", async () => {
   logger.info("Received SIGINT signal, shutting down");
   await stopHostEmulatorAutoConnect();
@@ -781,6 +1099,7 @@ async function main() {
       daemonCommand,
       daemonArgs,
       skipAccessibilityDownload,
+      directMode,
     } = parseArgs();
 
     serverConfig.setPlanExecutionLockScope(planExecutionLockScope);
@@ -860,48 +1179,55 @@ async function main() {
       logger.close();
       process.exit(0);
     } else {
-      // Kill any running daemons at startup to prevent conflicts
-      // The MCP server should have exclusive access to devices
-      const daemonManager = new DaemonManager();
-      const runningDaemons = daemonManager.findAllDaemonProcesses();
-      if (runningDaemons.length > 0) {
-        logger.info(`Found ${runningDaemons.length} running daemon(s), stopping them...`);
-        for (const pid of runningDaemons) {
-          try {
-            process.kill(pid, "SIGTERM");
-            logger.info(`Stopped daemon PID ${pid}`);
-          } catch (error) {
-            logger.warn(`Failed to stop daemon PID ${pid}: ${error}`);
-          }
-        }
-        // Wait briefly for processes to terminate
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // In proxy mode (default), the MCP server proxies requests to the daemon
+      // The daemon manages device state and tool execution
+      // In direct mode (--direct flag), the MCP server executes tools directly
+      const useProxyMode = !directMode;
+
+      if (useProxyMode) {
+        logger.info("Starting MCP server in proxy mode (connecting to daemon)");
+      } else {
+        logger.info("Starting MCP server in direct mode (--direct flag)");
+        // Start auxiliary services only in direct mode
+        await startHostEmulatorAutoConnect();
+        await startVideoRecordingSocketServer();
+        await startTestRecordingSocketServer();
+        await startDeviceSnapshotSocketServer();
+        await startAppearanceSocketServer();
+        startAppearanceSyncScheduler();
       }
 
-      // Start host emulator auto-connect service (for Docker with external emulators)
-      await startHostEmulatorAutoConnect();
-
-      await startVideoRecordingSocketServer();
-      await startTestRecordingSocketServer();
-      await startDeviceSnapshotSocketServer();
-      await startAppearanceSocketServer();
-      startAppearanceSyncScheduler();
       if (transport.type === "streamable") {
         // Run as Streamable HTTP server
         logger.info(`Starting Streamable HTTP transport on ${transport.host}:${transport.port}`);
         logger.enableStdoutLogging();
-        await startStreamableServer(transport, debug);
+        if (useProxyMode) {
+          await startStreamableProxyServer(transport);
+        } else {
+          await startStreamableServer(transport, debug);
+        }
       } else if (transport.type === "sse") {
         // Run as SSE server (deprecated)
         logger.info(`Starting SSE transport on ${transport.host}:${transport.port} (deprecated - consider using streamable)`);
         logger.enableStdoutLogging();
-        await startSSEServer(transport, debug);
+        if (useProxyMode) {
+          await startSSEProxyServer(transport);
+        } else {
+          await startSSEServer(transport, debug);
+        }
       } else {
         // Run as MCP server with STDIO transport (default)
         const stdioTransport = new StdioServerTransport();
         let server;
+        let stdioProxy: ReturnType<typeof createProxyMcpServer>["proxy"] | undefined;
         try {
-          server = createMcpServer({ debug });
+          if (useProxyMode) {
+            const result = createProxyMcpServer({});
+            server = result.server;
+            stdioProxy = result.proxy;
+          } else {
+            server = createMcpServer({ debug });
+          }
         } catch (error) {
           logger.error("Failed to create MCP server:", error);
           throw error;
@@ -912,8 +1238,16 @@ async function main() {
           await server.connect(stdioTransport);
           startupBenchmark.endPhase("serverListening");
           logger.info("MCP server connected to stdio transport");
-          logger.info("AutoMobile MCP server running on stdio");
-          startupBenchmark.emit("mcp-server", { transport: "stdio" });
+          logger.info(`AutoMobile MCP server running on stdio (${useProxyMode ? "proxy" : "direct"} mode)`);
+          startupBenchmark.emit("mcp-server", { transport: "stdio", mode: useProxyMode ? "proxy" : "direct" });
+
+          // Register cleanup for proxy mode
+          if (stdioProxy) {
+            const cleanupProxy = async () => {
+              await stdioProxy!.close();
+            };
+            process.on("beforeExit", cleanupProxy);
+          }
         } catch (error) {
           logger.error("MCP server connect failed:", error);
           throw error;

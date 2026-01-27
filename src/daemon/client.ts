@@ -312,6 +312,7 @@ export interface DaemonClientLike {
   close(): Promise<void>;
   callTool(toolName: string, params: Record<string, any>): Promise<any>;
   readResource(uri: string): Promise<any>;
+  callDaemonMethod(method: string, params: Record<string, any>): Promise<any>;
 }
 
 export type DaemonClientFactory = () => DaemonClientLike;
