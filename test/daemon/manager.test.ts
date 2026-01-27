@@ -6,6 +6,7 @@ import type { DaemonClientLike } from "../../src/daemon/client";
 class FakeDaemonClient implements DaemonClientLike {
   readonly readResourceCalls: string[] = [];
   readonly callToolCalls: Array<{ toolName: string; params: Record<string, any> }> = [];
+  readonly callDaemonMethodCalls: Array<{ method: string; params: Record<string, any> }> = [];
   private readonly result: any;
 
   constructor(result: any) {
@@ -24,6 +25,11 @@ class FakeDaemonClient implements DaemonClientLike {
   async readResource(uri: string): Promise<any> {
     this.readResourceCalls.push(uri);
     return this.result;
+  }
+
+  async callDaemonMethod(method: string, params: Record<string, any>): Promise<any> {
+    this.callDaemonMethodCalls.push({ method, params });
+    return {};
   }
 }
 
