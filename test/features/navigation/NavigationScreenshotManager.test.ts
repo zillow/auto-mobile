@@ -6,25 +6,39 @@ import {
 import { FakeTimer } from "../../fakes/FakeTimer";
 
 /**
+ * Normalize a path to use forward slashes for consistent comparison.
+ */
+function normalizePath(p: string): string {
+  return p.replace(/\\/g, "/");
+}
+
+/**
  * Fake file system implementation for testing.
+ * Uses normalized paths (forward slashes) internally for cross-platform compatibility.
  */
 class FakeFileSystem implements FileSystem {
   private files: Map<string, { data: Buffer; mtimeMs: number }> = new Map();
   private directories: Set<string> = new Set();
 
-  async ensureDir(dir: string): Promise<void> {
-    this.directories.add(dir);
+  private normalize(p: string): string {
+    return normalizePath(p);
   }
 
-  async pathExists(path: string): Promise<boolean> {
-    return this.files.has(path) || this.directories.has(path);
+  async ensureDir(dir: string): Promise<void> {
+    this.directories.add(this.normalize(dir));
+  }
+
+  async pathExists(p: string): Promise<boolean> {
+    const normalized = this.normalize(p);
+    return this.files.has(normalized) || this.directories.has(normalized);
   }
 
   async readdir(dir: string): Promise<string[]> {
+    const normalizedDir = this.normalize(dir);
     const result: string[] = [];
-    for (const path of this.files.keys()) {
-      if (path.startsWith(dir + "/")) {
-        const filename = path.slice(dir.length + 1);
+    for (const filePath of this.files.keys()) {
+      if (filePath.startsWith(normalizedDir + "/")) {
+        const filename = filePath.slice(normalizedDir.length + 1);
         if (!filename.includes("/")) {
           result.push(filename);
         }
@@ -33,41 +47,43 @@ class FakeFileSystem implements FileSystem {
     return result;
   }
 
-  async stat(path: string): Promise<{ size: number; mtimeMs: number }> {
-    const file = this.files.get(path);
+  async stat(p: string): Promise<{ size: number; mtimeMs: number }> {
+    const normalized = this.normalize(p);
+    const file = this.files.get(normalized);
     if (!file) {
-      throw new Error(`File not found: ${path}`);
+      throw new Error(`File not found: ${p}`);
     }
     return { size: file.data.length, mtimeMs: file.mtimeMs };
   }
 
-  async readFile(path: string): Promise<Buffer> {
-    const file = this.files.get(path);
+  async readFile(p: string): Promise<Buffer> {
+    const normalized = this.normalize(p);
+    const file = this.files.get(normalized);
     if (!file) {
-      throw new Error(`File not found: ${path}`);
+      throw new Error(`File not found: ${p}`);
     }
     return file.data;
   }
 
-  async writeFile(path: string, data: Buffer): Promise<void> {
-    this.files.set(path, { data, mtimeMs: Date.now() });
+  async writeFile(p: string, data: Buffer): Promise<void> {
+    this.files.set(this.normalize(p), { data, mtimeMs: Date.now() });
   }
 
-  async unlink(path: string): Promise<void> {
-    this.files.delete(path);
+  async unlink(p: string): Promise<void> {
+    this.files.delete(this.normalize(p));
   }
 
-  async remove(path: string): Promise<void> {
-    this.files.delete(path);
+  async remove(p: string): Promise<void> {
+    this.files.delete(this.normalize(p));
   }
 
   // Test helpers
-  setFile(path: string, data: Buffer, mtimeMs?: number): void {
-    this.files.set(path, { data, mtimeMs: mtimeMs ?? Date.now() });
+  setFile(p: string, data: Buffer, mtimeMs?: number): void {
+    this.files.set(this.normalize(p), { data, mtimeMs: mtimeMs ?? Date.now() });
   }
 
-  getFile(path: string): Buffer | undefined {
-    return this.files.get(path)?.data;
+  getFile(p: string): Buffer | undefined {
+    return this.files.get(this.normalize(p))?.data;
   }
 
   getFileCount(): number {
@@ -82,8 +98,8 @@ class FakeFileSystem implements FileSystem {
     return total;
   }
 
-  setFileMtime(path: string, mtimeMs: number): void {
-    const file = this.files.get(path);
+  setFileMtime(p: string, mtimeMs: number): void {
+    const file = this.files.get(this.normalize(p));
     if (file) {
       file.mtimeMs = mtimeMs;
     }
@@ -172,11 +188,12 @@ describe("NavigationScreenshotManager", () => {
     test("should find existing screenshot", async () => {
       // Generate a filename and create it in the fake FS
       const filename = manager.generateFilename("com.test.app", "HomeScreen");
-      const path = `${screenshotDir}/${filename}`;
-      fakeFs.setFile(path, Buffer.from("test"));
+      const expectedPath = `${screenshotDir}/${filename}`;
+      fakeFs.setFile(expectedPath, Buffer.from("test"));
 
       const result = await manager.findExistingScreenshot("com.test.app", "HomeScreen");
-      expect(result).toBe(path);
+      // Compare normalized paths for cross-platform compatibility
+      expect(normalizePath(result!)).toBe(normalizePath(expectedPath));
     });
 
     test("should return most recent screenshot when multiple exist", async () => {
@@ -190,7 +207,8 @@ describe("NavigationScreenshotManager", () => {
       fakeFs.setFile(newFile, Buffer.from("new"));
 
       const result = await manager.findExistingScreenshot("com.test.app", "HomeScreen");
-      expect(result).toBe(newFile);
+      // Compare normalized paths for cross-platform compatibility
+      expect(normalizePath(result!)).toBe(normalizePath(newFile));
     });
   });
 
