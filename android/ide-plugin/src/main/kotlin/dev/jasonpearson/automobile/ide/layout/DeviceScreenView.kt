@@ -112,9 +112,9 @@ fun DeviceScreenView(
     }
 
     // Find non-compliant tap targets (clickable elements smaller than 48x48dp)
-    val nonCompliantElements = remember(hierarchy, screenWidth, showTapTargetIssues) {
-        if (showTapTargetIssues && hierarchy != null && screenWidth > 0) {
-            findNonCompliantTapTargets(hierarchy, screenWidth)
+    val nonCompliantElements = remember(hierarchy, screenWidth, screenHeight, showTapTargetIssues) {
+        if (showTapTargetIssues && hierarchy != null && screenWidth > 0 && screenHeight > 0) {
+            findNonCompliantTapTargets(hierarchy, screenWidth, screenHeight)
         } else {
             emptyList()
         }

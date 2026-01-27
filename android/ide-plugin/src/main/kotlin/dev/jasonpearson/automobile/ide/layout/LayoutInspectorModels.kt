@@ -88,18 +88,32 @@ enum class StreamingMode {
 const val MIN_TAP_TARGET_DP = 48
 
 /**
- * Calculate minimum tap target size in pixels based on screen width.
- * Assumes standard phone screen width of ~360dp to derive density.
+ * Standard phone screen width in dp (used as baseline for density estimation).
+ */
+private const val STANDARD_PHONE_WIDTH_DP = 360
+
+/**
+ * Calculate minimum tap target size in pixels based on screen dimensions.
+ *
+ * Uses the shorter screen dimension to estimate density, which provides
+ * more consistent results across orientation changes (portrait/landscape).
+ *
+ * Note: This is a heuristic that assumes typical phone layouts (~360dp width).
+ * For more accurate results on tablets or unusual screen configurations,
+ * actual device density metrics should be provided by the data source.
  *
  * @param screenWidthPx The screen width in pixels
+ * @param screenHeightPx The screen height in pixels
  * @return The minimum tap target size in pixels
  */
-fun calculateMinTapTargetPx(screenWidthPx: Int): Int {
-    // Most phones have a screen width around 360dp
-    // density = screenWidthPx / 360
-    // minTapTargetPx = 48dp * density = 48 * (screenWidthPx / 360) = screenWidthPx / 7.5
-    val density = screenWidthPx.toFloat() / 360f
-    return (MIN_TAP_TARGET_DP * density).toInt()
+fun calculateMinTapTargetPx(screenWidthPx: Int, screenHeightPx: Int): Int {
+    // Use the shorter dimension for more stable density estimation across orientations.
+    // A 1080x1920 screen in portrait and 1920x1080 in landscape both use 1080.
+    val shorterDimension = minOf(screenWidthPx, screenHeightPx)
+
+    // Estimate density: most phones have ~360dp on the shorter edge
+    val estimatedDensity = shorterDimension.toFloat() / STANDARD_PHONE_WIDTH_DP
+    return (MIN_TAP_TARGET_DP * estimatedDensity).toInt()
 }
 
 /**
@@ -120,11 +134,16 @@ fun isNonCompliantTapTarget(element: UIElementInfo, minSizePx: Int): Boolean {
  * Returns elements that are clickable but smaller than 48x48dp.
  *
  * @param root The root of the hierarchy to search
- * @param screenWidthPx The screen width in pixels (used to calculate density)
+ * @param screenWidthPx The screen width in pixels
+ * @param screenHeightPx The screen height in pixels
  * @return List of non-compliant clickable elements
  */
-fun findNonCompliantTapTargets(root: UIElementInfo, screenWidthPx: Int): List<UIElementInfo> {
-    val minSizePx = calculateMinTapTargetPx(screenWidthPx)
+fun findNonCompliantTapTargets(
+    root: UIElementInfo,
+    screenWidthPx: Int,
+    screenHeightPx: Int,
+): List<UIElementInfo> {
+    val minSizePx = calculateMinTapTargetPx(screenWidthPx, screenHeightPx)
     val result = mutableListOf<UIElementInfo>()
 
     fun traverse(element: UIElementInfo) {
