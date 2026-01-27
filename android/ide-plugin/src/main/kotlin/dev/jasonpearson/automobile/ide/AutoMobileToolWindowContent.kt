@@ -465,6 +465,7 @@ fun AutoMobileToolWindowContent() {
               },
               dataSourceMode = dataSourceMode,
               clientProvider = clientProvider,
+              observationStreamClient = observationStreamClient,
           )
           Dashboard.Performance -> PerformanceDashboard(
               onNavigateToScreen = { screenName ->

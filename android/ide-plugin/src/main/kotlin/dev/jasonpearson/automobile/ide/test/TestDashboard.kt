@@ -1,5 +1,6 @@
 package dev.jasonpearson.automobile.ide.test
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,22 +31,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.jetbrains.skia.Image
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.Link
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
+import com.intellij.openapi.diagnostic.Logger
 import dev.jasonpearson.automobile.ide.BootedDevice
 import dev.jasonpearson.automobile.ide.DeviceType
 import dev.jasonpearson.automobile.ide.daemon.AutoMobileClient
+import dev.jasonpearson.automobile.ide.daemon.ObservationStreamClient
+import dev.jasonpearson.automobile.ide.daemon.HierarchyStreamUpdate
+import dev.jasonpearson.automobile.ide.daemon.ScreenshotStreamUpdate
+import dev.jasonpearson.automobile.ide.daemon.NavigationGraphStreamUpdate
 import dev.jasonpearson.automobile.ide.datasource.DataSourceMode
 import dev.jasonpearson.automobile.ide.datasource.DataSourceFactory
+
+private val LOG = Logger.getInstance("TestDashboard")
 
 enum class TestScreen {
     Dashboard,
@@ -60,6 +72,7 @@ fun TestDashboard(
     onNavigateToGraph: (List<String>) -> Unit = {},  // Navigate to nav graph with highlighted screens
     dataSourceMode: DataSourceMode = DataSourceMode.Fake,
     clientProvider: (() -> AutoMobileClient)? = null,  // MCP client for real data
+    observationStreamClient: ObservationStreamClient? = null,  // Real-time stream client for hierarchy/screenshot/navigation updates
 ) {
     var currentScreen by remember { mutableStateOf(TestScreen.Dashboard) }
     var selectedTestRun by remember { mutableStateOf<TestRun?>(null) }
@@ -69,6 +82,61 @@ fun TestDashboard(
     var testRuns by remember { mutableStateOf<List<TestRun>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    // Real-time observation state
+    var currentHierarchyUpdate by remember { mutableStateOf<HierarchyStreamUpdate?>(null) }
+    var currentScreenshotUpdate by remember { mutableStateOf<ScreenshotStreamUpdate?>(null) }
+    var currentNavigationUpdate by remember { mutableStateOf<NavigationGraphStreamUpdate?>(null) }
+
+    // Clear navigation data when foreground app changes to avoid stale data mismatch
+    val currentForegroundPackage = currentHierarchyUpdate?.packageName
+    LaunchedEffect(currentForegroundPackage) {
+        if (currentForegroundPackage != null && currentNavigationUpdate?.appId != currentForegroundPackage) {
+            LOG.info("Foreground app changed to $currentForegroundPackage, clearing stale navigation data")
+            currentNavigationUpdate = null
+        }
+    }
+
+    // Collect real-time hierarchy updates from the stream
+    LaunchedEffect(observationStreamClient) {
+        if (observationStreamClient == null) return@LaunchedEffect
+
+        LOG.info("Starting hierarchy updates collection in TestDashboard")
+        observationStreamClient.hierarchyUpdates.collect { update ->
+            LOG.info("Received hierarchy update in TestDashboard - deviceId=${update.deviceId}, hasData=${update.data != null}")
+            currentHierarchyUpdate = update
+        }
+    }
+
+    // Collect real-time screenshot updates from the stream
+    LaunchedEffect(observationStreamClient) {
+        if (observationStreamClient == null) return@LaunchedEffect
+
+        LOG.info("Starting screenshot updates collection in TestDashboard")
+        observationStreamClient.screenshotUpdates.collect { update ->
+            LOG.info("Received screenshot update in TestDashboard - deviceId=${update.deviceId}, hasScreenshot=${update.screenshotBase64 != null}")
+            currentScreenshotUpdate = update
+        }
+    }
+
+    // Collect real-time navigation updates from the stream
+    // Filter by current foreground app to ensure navigation data matches the displayed screenshot/hierarchy
+    LaunchedEffect(observationStreamClient) {
+        if (observationStreamClient == null) return@LaunchedEffect
+
+        LOG.info("Starting navigation updates collection in TestDashboard")
+        observationStreamClient.navigationUpdates.collect { update ->
+            // Get current foreground package name from hierarchy
+            val foregroundPackage = currentHierarchyUpdate?.packageName
+            // Only accept navigation updates that match the foreground app (or if no hierarchy yet)
+            if (foregroundPackage == null || update.appId == foregroundPackage) {
+                LOG.info("Received navigation update in TestDashboard - appId=${update.appId}, nodes=${update.nodes.size}")
+                currentNavigationUpdate = update
+            } else {
+                LOG.info("Ignoring navigation update for ${update.appId} (foreground is $foregroundPackage)")
+            }
+        }
+    }
 
     LaunchedEffect(dataSourceMode, clientProvider) {
         isLoading = true
@@ -119,6 +187,9 @@ fun TestDashboard(
                 recordedActions = emptyList()
                 currentScreen = TestScreen.Dashboard
             },
+            screenshotUpdate = currentScreenshotUpdate,
+            hierarchyUpdate = currentHierarchyUpdate,
+            navigationUpdate = currentNavigationUpdate,
         )
         TestScreen.ModuleSelection -> ModuleSelectionScreen(
             recordedActions = recordedActions,
@@ -610,8 +681,26 @@ private fun RecordingTestScreen(
     onActionRecorded: (RecordedAction) -> Unit,
     onFinishRecording: () -> Unit,
     onBack: () -> Unit,
+    screenshotUpdate: ScreenshotStreamUpdate? = null,
+    hierarchyUpdate: HierarchyStreamUpdate? = null,
+    navigationUpdate: NavigationGraphStreamUpdate? = null,
 ) {
     val colors = JewelTheme.globalColors
+
+    // Decode screenshot if available
+    val screenshotBytes = remember(screenshotUpdate?.screenshotBase64) {
+        screenshotUpdate?.screenshotBase64?.let { base64 ->
+            try {
+                java.util.Base64.getDecoder().decode(base64)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    // Current screen info from hierarchy or navigation
+    val currentPackageName = hierarchyUpdate?.packageName
+    val currentScreenName = navigationUpdate?.currentScreen
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Header with recording indicator
@@ -641,7 +730,7 @@ private fun RecordingTestScreen(
             }
 
             DefaultButton(onClick = onFinishRecording) {
-                Text("✓ Finish Recording")
+                Text("Finish Recording")
             }
         }
 
@@ -663,72 +752,183 @@ private fun RecordingTestScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // Terminal-style action log
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(Color(0xFF1E1E1E))
-                .padding(12.dp),
+        // Main content - side by side device preview and action log
+        Row(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (recordedActions.isEmpty()) {
-                Column {
-                    Text(
-                        "$ awaiting tool calls...",
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF888888),
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "# Example actions that will be recorded:",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF666666),
-                    )
-                    Text(
-                        "# - tapOn(element: \"Login button\")",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF666666),
-                    )
-                    Text(
-                        "# - inputText(text: \"user@example.com\")",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF666666),
-                    )
-                    Text(
-                        "# - swipeOn(direction: \"up\")",
-                        fontSize = 11.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = Color(0xFF666666),
-                    )
-                }
-            } else {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                ) {
-                    recordedActions.forEachIndexed { index, action ->
-                        Text(
-                            "[$index] ${action.toolName}(${action.parameters.entries.joinToString { "${it.key}: ${it.value}" }})",
-                            fontSize = 12.sp,
-                            fontFamily = FontFamily.Monospace,
-                            color = Color(0xFF4EC9B0),
-                        )
-                        action.result?.let {
+            // Left side: Device preview with live screenshot
+            Column(
+                modifier = Modifier.width(180.dp).fillMaxHeight(),
+            ) {
+                // Current screen info
+                if (currentPackageName != null || currentScreenName != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.text.normal.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                            .padding(8.dp),
+                    ) {
+                        currentPackageName?.let { pkg ->
                             Text(
-                                "    → $it",
+                                pkg.substringAfterLast('.'),
                                 fontSize = 11.sp,
-                                fontFamily = FontFamily.Monospace,
-                                color = Color(0xFF888888),
+                                color = colors.text.normal.copy(alpha = 0.8f),
                             )
                         }
-                        Spacer(Modifier.height(4.dp))
+                        currentScreenName?.let { screen ->
+                            Text(
+                                screen,
+                                fontSize = 10.sp,
+                                color = colors.text.normal.copy(alpha = 0.5f),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // Live device screenshot
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                        .border(1.dp, colors.text.normal.copy(alpha = 0.1f), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (screenshotBytes != null) {
+                        // Display the live screenshot
+                        val imageBitmap = remember(screenshotBytes) {
+                            try {
+                                val skiaImage = Image.makeFromEncoded(screenshotBytes)
+                                skiaImage.toComposeImageBitmap()
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
+                        imageBitmap?.let { bitmap ->
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = "Live device screen",
+                                modifier = Modifier.fillMaxSize().padding(4.dp),
+                                contentScale = ContentScale.Fit,
+                            )
+                        } ?: run {
+                            // Fallback if image decode fails
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Text("Device Preview", fontSize = 10.sp, color = colors.text.normal.copy(alpha = 0.4f))
+                            }
+                        }
+                    } else {
+                        // No screenshot available yet
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text("📱", fontSize = 24.sp)
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                "Awaiting device...",
+                                fontSize = 10.sp,
+                                color = colors.text.normal.copy(alpha = 0.4f),
+                            )
+                            if (screenshotUpdate == null) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Connect a device to see live updates",
+                                    fontSize = 9.sp,
+                                    color = colors.text.normal.copy(alpha = 0.3f),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Navigation info if available
+                navigationUpdate?.let { navUpdate ->
+                    if (navUpdate.nodes.isNotEmpty()) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "${navUpdate.nodes.size} screens discovered",
+                            fontSize = 10.sp,
+                            color = Color(0xFF4CAF50),
+                        )
+                    }
+                }
+            }
+
+            // Right side: Terminal-style action log
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                    .padding(12.dp),
+            ) {
+                if (recordedActions.isEmpty()) {
+                    Column {
+                        Text(
+                            "$ awaiting tool calls...",
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF888888),
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            "# Example actions that will be recorded:",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF666666),
+                        )
+                        Text(
+                            "# - tapOn(element: \"Login button\")",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF666666),
+                        )
+                        Text(
+                            "# - inputText(text: \"user@example.com\")",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF666666),
+                        )
+                        Text(
+                            "# - swipeOn(direction: \"up\")",
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0xFF666666),
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.verticalScroll(rememberScrollState()),
+                    ) {
+                        recordedActions.forEachIndexed { index, action ->
+                            Text(
+                                "[$index] ${action.toolName}(${action.parameters.entries.joinToString { "${it.key}: ${it.value}" }})",
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF4EC9B0),
+                            )
+                            action.result?.let {
+                                Text(
+                                    "    → $it",
+                                    fontSize = 11.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF888888),
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
                     }
                 }
             }
         }
+
+        Spacer(Modifier.height(12.dp))
 
         // Launch buttons
         Row(
