@@ -69,8 +69,12 @@ class ObservationStreamClient {
     private val _navigationUpdates = MutableSharedFlow<NavigationGraphStreamUpdate>(replay = 1)
     val navigationUpdates: SharedFlow<NavigationGraphStreamUpdate> = _navigationUpdates.asSharedFlow()
 
-    // Flow for performance metrics updates
-    private val _performanceUpdates = MutableSharedFlow<PerformanceStreamUpdate>(replay = 1)
+    // Flow for performance metrics updates (use extraBufferCapacity + DROP_OLDEST to avoid blocking)
+    private val _performanceUpdates = MutableSharedFlow<PerformanceStreamUpdate>(
+        replay = 1,
+        extraBufferCapacity = 10,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST,
+    )
     val performanceUpdates: SharedFlow<PerformanceStreamUpdate> = _performanceUpdates.asSharedFlow()
 
     // Flow for connection state
@@ -288,7 +292,7 @@ class ObservationStreamClient {
                         screenName = perfData.screenName,
                         isResponsive = perfData.isResponsive,
                     )
-                    _performanceUpdates.emit(update)
+                    _performanceUpdates.tryEmit(update)
                     log.info("Emitted performance update to flow")
                 }
             }

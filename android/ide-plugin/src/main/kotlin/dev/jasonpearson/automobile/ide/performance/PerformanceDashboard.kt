@@ -113,7 +113,7 @@ fun PerformanceDashboard(
                             )).takeLast(120),
                             trend = calculateTrend(metric.currentValue, update.jankFrames.toFloat()),
                         )
-                        MetricType.TouchLatency -> metric.copy(
+                        MetricType.FrameTime -> metric.copy(
                             currentValue = update.frameTimeMs,
                             history = (metric.history + MetricDataPoint(
                                 timestamp = update.timestamp,
@@ -122,6 +122,7 @@ fun PerformanceDashboard(
                             )).takeLast(120),
                             trend = calculateTrend(metric.currentValue, update.frameTimeMs),
                         )
+                        // TouchLatency requires actual touch interaction events, not streaming frame data
                         else -> metric
                     }
                 }
@@ -1082,6 +1083,25 @@ private fun detectAnomalies(
                 testName = null,
                 value = update.jankFrames.toFloat(),
                 threshold = jankMetric.thresholdWarning,
+            )
+        )
+    }
+
+    // Check frame time anomaly (>16ms means can't hit 60fps)
+    val frameTimeMetric = metrics.find { it.type == MetricType.FrameTime }
+    if (frameTimeMetric != null && update.frameTimeMs > frameTimeMetric.thresholdWarning) {
+        val severity = if (update.frameTimeMs > frameTimeMetric.thresholdCritical) HealthStatus.Critical else HealthStatus.Warning
+        anomalies.add(
+            PerformanceAnomaly(
+                id = "frametime-${update.timestamp}",
+                metricType = MetricType.FrameTime,
+                severity = severity,
+                message = "Slow frame: ${update.frameTimeMs.toInt()}ms render time",
+                timestamp = update.timestamp,
+                screenName = update.screenName,
+                testName = null,
+                value = update.frameTimeMs,
+                threshold = frameTimeMetric.thresholdWarning,
             )
         )
     }
