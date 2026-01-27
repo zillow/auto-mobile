@@ -80,6 +80,7 @@ export interface FailuresStreamQuery {
   endTime?: number;
   limit?: number;
   type?: FailureType;
+  severity?: FailureSeverity;
   acknowledged?: boolean;
 }
 
@@ -470,7 +471,7 @@ export class FailuresRepository {
    * Acknowledge notifications (mark as read)
    */
   async acknowledgeNotifications(ids: number[]): Promise<void> {
-    if (ids.length === 0) return;
+    if (ids.length === 0) {return;}
 
     const db = getDatabase();
     await db
@@ -491,6 +492,7 @@ export class FailuresRepository {
       startTime: query.startTime,
       endTime: query.endTime,
       type: query.type,
+      severity: query.severity,
     });
 
     const totals = {

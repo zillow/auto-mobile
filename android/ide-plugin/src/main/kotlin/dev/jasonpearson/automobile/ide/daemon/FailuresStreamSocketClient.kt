@@ -415,7 +415,13 @@ class FailuresStreamSocketClient(
 
 object FailuresStreamSocketPaths {
     fun socketPath(): String {
-        val home = System.getProperty("user.home", "").ifBlank { "." }
-        return File(home, ".auto-mobile/failures-stream.sock").path
+        // Check for external mode (matches the server's logic)
+        val isExternalMode = System.getenv("AUTOMOBILE_EMULATOR_EXTERNAL") == "true"
+        return if (isExternalMode) {
+            "/tmp/auto-mobile-failures-stream.sock"
+        } else {
+            val home = System.getProperty("user.home", "").ifBlank { "." }
+            File(home, ".auto-mobile/failures-stream.sock").path
+        }
     }
 }

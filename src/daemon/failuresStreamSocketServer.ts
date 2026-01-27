@@ -309,6 +309,7 @@ export class FailuresStreamSocketServer {
       startTime,
       endTime,
       type: request.type,
+      severity: request.severity,
     });
 
     return {

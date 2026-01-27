@@ -1,6 +1,5 @@
 import { FailuresRepository, RecordFailureInput } from "../../db/failuresRepository";
 import type {
-  FailureType,
   FailureSeverity,
   StackTraceElement,
   AggregatedToolCallInfo,
@@ -129,12 +128,12 @@ export class FailureRecorder {
       parameterVariants: this.extractParameterVariants(input.toolArgs),
       durationStats: input.durationMs
         ? {
-            minMs: input.durationMs,
-            maxMs: input.durationMs,
-            avgMs: input.durationMs,
-            medianMs: input.durationMs,
-            p95Ms: input.durationMs,
-          }
+          minMs: input.durationMs,
+          maxMs: input.durationMs,
+          avgMs: input.durationMs,
+          medianMs: input.durationMs,
+          p95Ms: input.durationMs,
+        }
         : null,
     };
 
@@ -298,7 +297,7 @@ export class FailureRecorder {
   }
 
   private calculateToolFailureSeverity(errorCode?: string): FailureSeverity {
-    if (!errorCode) return "medium";
+    if (!errorCode) {return "medium";}
 
     // Critical errors
     if (errorCode.includes("CRASH") || errorCode.includes("FATAL")) {
@@ -355,7 +354,7 @@ export class FailureRecorder {
   private extractParameterVariants(
     toolArgs?: Record<string, unknown>
   ): Record<string, string[]> {
-    if (!toolArgs) return {};
+    if (!toolArgs) {return {};}
 
     const variants: Record<string, string[]> = {};
     for (const [key, value] of Object.entries(toolArgs)) {
