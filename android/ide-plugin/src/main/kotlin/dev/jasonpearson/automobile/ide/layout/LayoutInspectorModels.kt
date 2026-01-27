@@ -81,6 +81,82 @@ enum class StreamingMode {
     Live,
 }
 
+/**
+ * Minimum tap target size in dp as per Android accessibility guidelines.
+ * Touch targets should be at least 48x48dp for comfortable tapping.
+ */
+const val MIN_TAP_TARGET_DP = 48
+
+/**
+ * Standard phone screen width in dp (used as baseline for density estimation).
+ */
+private const val STANDARD_PHONE_WIDTH_DP = 360
+
+/**
+ * Calculate minimum tap target size in pixels based on screen dimensions.
+ *
+ * Uses the shorter screen dimension to estimate density, which provides
+ * more consistent results across orientation changes (portrait/landscape).
+ *
+ * Note: This is a heuristic that assumes typical phone layouts (~360dp width).
+ * For more accurate results on tablets or unusual screen configurations,
+ * actual device density metrics should be provided by the data source.
+ *
+ * @param screenWidthPx The screen width in pixels
+ * @param screenHeightPx The screen height in pixels
+ * @return The minimum tap target size in pixels
+ */
+fun calculateMinTapTargetPx(screenWidthPx: Int, screenHeightPx: Int): Int {
+    // Use the shorter dimension for more stable density estimation across orientations.
+    // A 1080x1920 screen in portrait and 1920x1080 in landscape both use 1080.
+    val shorterDimension = minOf(screenWidthPx, screenHeightPx)
+
+    // Estimate density: most phones have ~360dp on the shorter edge
+    val estimatedDensity = shorterDimension.toFloat() / STANDARD_PHONE_WIDTH_DP
+    return (MIN_TAP_TARGET_DP * estimatedDensity).toInt()
+}
+
+/**
+ * Check if an element is a non-compliant tap target.
+ * An element is non-compliant if it's clickable but smaller than 48x48dp.
+ *
+ * @param element The element to check
+ * @param minSizePx The minimum tap target size in pixels
+ * @return True if the element is clickable but too small
+ */
+fun isNonCompliantTapTarget(element: UIElementInfo, minSizePx: Int): Boolean {
+    if (!element.isClickable) return false
+    return element.bounds.width < minSizePx || element.bounds.height < minSizePx
+}
+
+/**
+ * Find all non-compliant tap targets in a hierarchy.
+ * Returns elements that are clickable but smaller than 48x48dp.
+ *
+ * @param root The root of the hierarchy to search
+ * @param screenWidthPx The screen width in pixels
+ * @param screenHeightPx The screen height in pixels
+ * @return List of non-compliant clickable elements
+ */
+fun findNonCompliantTapTargets(
+    root: UIElementInfo,
+    screenWidthPx: Int,
+    screenHeightPx: Int,
+): List<UIElementInfo> {
+    val minSizePx = calculateMinTapTargetPx(screenWidthPx, screenHeightPx)
+    val result = mutableListOf<UIElementInfo>()
+
+    fun traverse(element: UIElementInfo) {
+        if (isNonCompliantTapTarget(element, minSizePx)) {
+            result.add(element)
+        }
+        element.children.forEach { traverse(it) }
+    }
+
+    traverse(root)
+    return result
+}
+
 // Mock data for development
 object LayoutInspectorMockData {
 
